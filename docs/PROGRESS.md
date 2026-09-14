@@ -21,8 +21,14 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 | Testcontainers harness (fallback to local PG — no Docker on dev box) | 🟡 | CI uses postgres:16 service; local harness lands with first integration test in Phase 1 |
 | CI build workflow | ✅ | `.github/workflows/ci.yml` — build + unit/accounting/integration tests |
 
-## Phase 1 — System Manager + Security + Licensing
-_Not started. Companies, branches, users, roles, groups, permission grid, scopes, audit trail (both layers), periods, currencies & rates, number sequences, Licensing.Core + Generator, licence enforcement, WPF shell._
+## Phase 1 — System Manager + Security + Licensing + Shell
+| Increment | Status | Notes |
+|---|---|---|
+| **1A** Security domain (Core) | ✅ | `OperationFlags` grid, `PermissionCatalogue` (incl. full Housing/Payroll/Budget sets), `PermissionResolution` (role union + Grant/Deny overrides, Deny wins), SoD matrix, `User`/`Role`/`Group`/scopes/overrides — 43 unit tests green |
+| **1B** `sys`/`sec`/`audit` EF config + first migration | 🟡 | Companies, periods, currencies, rates, number sequences; audit change-log + hash chain |
+| **1C** Licensing.Core (Ed25519) + Generator | ⬜ | Payload, sign/verify, fingerprint, validator, vendor key issuer |
+| **1D** Security/licence application services | ⬜ | Argon2id auth, permission evaluation, licence gating |
+| **1E** WPF shell (Sage Evolution layout) | ⬜ | Login → licence read → licensed+permitted menu tree + module icon grid; permission grid UI. See `docs/UI_SHELL.md` |
 
 ---
 
