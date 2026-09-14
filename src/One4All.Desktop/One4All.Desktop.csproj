@@ -3,6 +3,17 @@
   <ItemGroup>
     <ProjectReference Include="..\One4All.Application\One4All.Application.csproj" />
     <ProjectReference Include="..\One4All.Core\One4All.Core.csproj" />
+    <ProjectReference Include="..\One4All.Infrastructure\One4All.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="appsettings.Development.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('appsettings.Development.json')" />
   </ItemGroup>
 
   <PropertyGroup>

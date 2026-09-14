@@ -29,7 +29,9 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 | **1D** Application/Infrastructure services | ✅ | Argon2id hasher, PermissionService (role+group+override resolution from DB), AuthenticationService (lockout, PIN), CurrentUserContext, LicenceService (install/reload/gating from `lic` table + trusted keys), AdministratorSeeder (default admin), and the EF **audit interceptor** (auto hash-chained change log + created/modified stamping). Fixed two tamper-evidence bugs (µs timestamp precision, jsonb re-normalization). 8 integration tests green |
 | **1C** Licensing.Core (Ed25519) + Generator | ✅ | Ed25519 sign/verify (BouncyCastle), canonical-JSON payload, compact token, PBKDF2→AES-GCM protected private key, fuzzy ≥3/4 machine fingerprint, clock-rollback detection, validator (grace/read-only/hard-stop + per-module gating & limits). Generator CLI (keygen/issue/verify/machineid) — end-to-end smoke test passes. 12 licensing unit tests green |
 | **1D** Security/licence application services | ⬜ | Argon2id auth, permission evaluation, licence gating |
-| **1E** WPF shell (Sage Evolution layout) | ⬜ | Login → licence read → licensed+permitted menu tree + module icon grid; permission grid UI. See `docs/UI_SHELL.md` |
+| **1E** WPF shell (Sage Evolution layout) | ✅ | Embedded-mode host (migrate + seed + licence install on startup); login (Argon2 auth) → shell with menu bar, toolbar, left System Tree + module icon grid built at runtime from **licensed + permitted** modules; licence/user status bar. CommunityToolkit.Mvvm, no business logic in code-behind. Verified rendering (screenshot). Permission-grid editor UI deferred to a follow-up. |
+
+**Phase 1 status:** functionally complete — the shell logs in, reads the licence, and shows only licensed + permitted modules (brief §18 item 5). Remaining polish carried forward: the back-office **permission-grid editor** screen, JWT for the API path, and Windows WMI machine-fingerprint provider.
 
 ---
 
