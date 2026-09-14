@@ -47,4 +47,25 @@ public sealed class Permission : AuditableEntity
 
     /// <summary>The licensing module that gates this permission.</summary>
     public string LicenceModule { get; private set; }
+
+    /// <summary>Returns true when this row already matches the catalogue definition (no update needed).</summary>
+    /// <param name="definition">The catalogue definition.</param>
+    /// <returns>True when name, available operations, module, feature and licence module all match.</returns>
+    public bool MatchesDefinition(PermissionDefinition definition) =>
+        Name == definition.Name &&
+        AvailableOperations == definition.Available &&
+        Module == definition.Module &&
+        Feature == definition.Feature &&
+        LicenceModule == definition.LicenceModule;
+
+    /// <summary>Updates the mutable metadata of this permission from the catalogue definition.</summary>
+    /// <param name="definition">The catalogue definition (its <see cref="PermissionDefinition.Code"/> must equal <see cref="Code"/>).</param>
+    public void SyncWith(PermissionDefinition definition)
+    {
+        Module = definition.Module;
+        Feature = definition.Feature;
+        Name = definition.Name;
+        AvailableOperations = definition.Available;
+        LicenceModule = definition.LicenceModule;
+    }
 }

@@ -1,5 +1,10 @@
 using Microsoft.EntityFrameworkCore;
+using One4All.Core.Accounting;
+using One4All.Core.Audit;
 using One4All.Core.Common;
+using One4All.Core.Security;
+using One4All.Core.System;
+using One4All.Infrastructure.Persistence.Converters;
 
 namespace One4All.Infrastructure.Persistence;
 
@@ -22,6 +27,39 @@ public class One4AllDbContext : DbContext
         : base(options)
     {
     }
+
+    /// <summary>Companies (sets of books).</summary>
+    public DbSet<Company> Companies => Set<Company>();
+
+    /// <summary>Branches / sites.</summary>
+    public DbSet<Branch> Branches => Set<Branch>();
+
+    /// <summary>Currency master.</summary>
+    public DbSet<Currency> Currencies => Set<Currency>();
+
+    /// <summary>Exchange rates.</summary>
+    public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
+
+    /// <summary>Fiscal years.</summary>
+    public DbSet<FiscalYear> FiscalYears => Set<FiscalYear>();
+
+    /// <summary>Number sequences.</summary>
+    public DbSet<NumberSequence> NumberSequences => Set<NumberSequence>();
+
+    /// <summary>Users.</summary>
+    public DbSet<User> Users => Set<User>();
+
+    /// <summary>Roles.</summary>
+    public DbSet<Role> Roles => Set<Role>();
+
+    /// <summary>Groups.</summary>
+    public DbSet<Group> Groups => Set<Group>();
+
+    /// <summary>Permission catalogue.</summary>
+    public DbSet<Permission> Permissions => Set<Permission>();
+
+    /// <summary>The append-only audit change log.</summary>
+    public DbSet<ChangeLogEntry> ChangeLog => Set<ChangeLogEntry>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -56,5 +94,8 @@ public class One4AllDbContext : DbContext
 
         // Bound string columns to a sane default; long text opts in explicitly.
         configurationBuilder.Properties<string>().HaveMaxLength(256);
+
+        // Domain value objects mapped to primitive columns.
+        configurationBuilder.Properties<CurrencyCode>().HaveConversion<CurrencyCodeConverter>().HaveMaxLength(3);
     }
 }

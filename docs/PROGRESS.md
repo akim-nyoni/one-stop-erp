@@ -25,7 +25,7 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 | Increment | Status | Notes |
 |---|---|---|
 | **1A** Security domain (Core) | ✅ | `OperationFlags` grid, `PermissionCatalogue` (incl. full Housing/Payroll/Budget sets), `PermissionResolution` (role union + Grant/Deny overrides, Deny wins), SoD matrix, `User`/`Role`/`Group`/scopes/overrides — 43 unit tests green |
-| **1B** `sys`/`sec`/`audit` EF config + first migration | 🟡 | Companies, periods, currencies, rates, number sequences; audit change-log + hash chain |
+| **1B** `sys`/`sec`/`audit` EF config + first migration | ✅ | 20 tables applied to PG18; snake_case naming; Company/Branch/Currency+denoms/ExchangeRate/FiscalYear+Period(per-module status)/NumberSequence; User/Role/Group/scopes/overrides + Permission; audit change-log with hash chain. Permission seeder (202 permissions, idempotent). 4 integration tests green against live PG |
 | **1C** Licensing.Core (Ed25519) + Generator | ⬜ | Payload, sign/verify, fingerprint, validator, vendor key issuer |
 | **1D** Security/licence application services | ⬜ | Argon2id auth, permission evaluation, licence gating |
 | **1E** WPF shell (Sage Evolution layout) | ⬜ | Login → licence read → licensed+permitted menu tree + module icon grid; permission grid UI. See `docs/UI_SHELL.md` |
@@ -39,4 +39,4 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 - **No Docker** on the dev machine → integration tests fall back to the local PG18 instance; Testcontainers path kept for CI.
 
 ## Open questions for the product owner
-- Local `postgres` password for `appsettings.Development.json` (not committed).
+- _(resolved)_ Local `postgres` password is `root`; stored in `src/One4All.Server/appsettings.Development.json` (gitignored). DB `one4all` created and migrated.

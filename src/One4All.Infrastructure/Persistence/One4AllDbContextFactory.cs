@@ -20,11 +20,8 @@ public sealed class One4AllDbContextFactory : IDesignTimeDbContextFactory<One4Al
         string connectionString =
             Environment.GetEnvironmentVariable("ONE4ALL_CONNECTION") ?? DevelopmentConnectionString;
 
-        DbContextOptions<One4AllDbContext> options =
-            new DbContextOptionsBuilder<One4AllDbContext>()
-                .UseNpgsql(connectionString, npgsql => npgsql.MigrationsHistoryTable("__ef_migrations_history", Schemas.System))
-                .Options;
-
-        return new One4AllDbContext(options);
+        DbContextOptionsBuilder<One4AllDbContext> builder = new();
+        builder.UseOne4All(connectionString);
+        return new One4AllDbContext(builder.Options);
     }
 }

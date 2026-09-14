@@ -1,0 +1,162 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using One4All.Core.Security;
+using One4All.Infrastructure.Persistence.Converters;
+
+namespace One4All.Infrastructure.Persistence.Configurations;
+
+/// <summary>Shared value comparer for delimited string lists (change tracking of converted collections).</summary>
+internal static class Comparers
+{
+    public static readonly ValueComparer<IReadOnlyList<string>> StringList = new(
+        (a, b) => (a ?? new List<string>()).SequenceEqual(b ?? new List<string>()),
+        v => v.Aggregate(0, (h, s) => HashCode.Combine(h, s.GetHashCode(StringComparison.Ordinal))),
+        v => v.ToList());
+}
+
+internal sealed class PermissionConfiguration : IEntityTypeConfiguration<Permission>
+{
+    public void Configure(EntityTypeBuilder<Permission> b)
+    {
+        b.ToTable("permission", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(120);
+        b.HasIndex(x => x.Code).IsUnique();
+        b.Property(x => x.Module).HasMaxLength(60);
+        b.Property(x => x.Feature).HasMaxLength(80);
+        b.Property(x => x.Name).HasMaxLength(160);
+        b.Property(x => x.LicenceModule).HasMaxLength(40);
+        b.Property(x => x.AvailableOperations).HasColumnType("bigint");
+    }
+}
+
+internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
+{
+    public void Configure(EntityTypeBuilder<Role> b)
+    {
+        b.ToTable("role", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.NormalizedName).HasMaxLength(120);
+        b.HasIndex(x => x.NormalizedName).IsUnique().HasFilter("is_deleted = false");
+        b.Property(x => x.Description).HasMaxLength(512);
+
+        b.HasMany(x => x.Permissions).WithOne().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Permissions).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<RolePermission>
+{
+    public void Configure(EntityTypeBuilder<RolePermission> b)
+    {
+        b.ToTable("role_permission", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PermissionCode).HasMaxLength(120);
+        b.Property(x => x.Operations).HasColumnType("bigint");
+        b.HasIndex(x => new { x.RoleId, x.PermissionCode }).IsUnique();
+    }
+}
+
+internal sealed class GroupConfiguration : IEntityTypeConfiguration<Group>
+{
+    public void Configure(EntityTypeBuilder<Group> b)
+    {
+        b.ToTable("group", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.NormalizedName).HasMaxLength(120);
+        b.HasIndex(x => x.NormalizedName).IsUnique().HasFilter("is_deleted = false");
+        b.Property(x => x.Description).HasMaxLength(512);
+
+        b.HasMany(x => x.Roles).WithOne().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Roles).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+internal sealed class GroupRoleConfiguration : IEntityTypeConfiguration<GroupRole>
+{
+    public void Configure(EntityTypeBuilder<GroupRole> b)
+    {
+        b.ToTable("group_role", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.GroupId, x.RoleId }).IsUnique();
+    }
+}
+
+internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
+{
+    public void Configure(EntityTypeBuilder<User> b)
+    {
+        b.ToTable("user", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Username).HasMaxLength(100);
+        b.Property(x => x.NormalizedUsername).HasMaxLength(100);
+        b.HasIndex(x => x.NormalizedUsername).IsUnique().HasFilter("is_deleted = false");
+        b.Property(x => x.DisplayName).HasMaxLength(200);
+        b.Property(x => x.Email).HasMaxLength(256);
+        b.Property(x => x.PasswordHash).HasMaxLength(512);
+        b.Property(x => x.PinHash).HasMaxLength(512);
+        b.Property(x => x.SecurityStamp).HasMaxLength(64);
+
+        b.HasMany(x => x.Roles).WithOne().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        b.HasMany(x => x.Groups).WithOne().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        b.HasMany(x => x.Overrides).WithOne().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Roles).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.Navigation(x => x.Groups).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.Navigation(x => x.Overrides).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+internal sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
+{
+    public void Configure(EntityTypeBuilder<UserRole> b)
+    {
+        b.ToTable("user_role", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.UserId, x.RoleId }).IsUnique();
+
+        b.HasMany(x => x.Scopes).WithOne().HasForeignKey(x => x.UserRoleId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Scopes).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class AccessScopeConfiguration : IEntityTypeConfiguration<AccessScope>
+{
+    public void Configure(EntityTypeBuilder<AccessScope> b)
+    {
+        b.ToTable("access_scope", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Dimension).HasConversion<int>();
+        b.Property(x => x.Values)
+            .HasConversion(new StringListConverter())
+            .Metadata.SetValueComparer(Comparers.StringList);
+        b.Property(x => x.Values).HasColumnName("values").HasColumnType("text");
+    }
+}
+
+internal sealed class UserGroupMemberConfiguration : IEntityTypeConfiguration<UserGroupMember>
+{
+    public void Configure(EntityTypeBuilder<UserGroupMember> b)
+    {
+        b.ToTable("user_group", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.UserId, x.GroupId }).IsUnique();
+    }
+}
+
+internal sealed class UserPermissionOverrideConfiguration : IEntityTypeConfiguration<UserPermissionOverrideEntity>
+{
+    public void Configure(EntityTypeBuilder<UserPermissionOverrideEntity> b)
+    {
+        b.ToTable("user_permission_override", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PermissionCode).HasMaxLength(120);
+        b.Property(x => x.Operations).HasColumnType("bigint");
+        b.HasIndex(x => new { x.UserId, x.PermissionCode, x.IsGrant }).IsUnique();
+    }
+}

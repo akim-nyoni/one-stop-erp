@@ -29,6 +29,7 @@ artifacts/
 
 # Local secrets & environment
 appsettings.*.local.json
+appsettings.Development.json
 *.env
 .env
 secrets.json
