@@ -20,8 +20,12 @@ internal sealed class ChangeLogEntryConfiguration : IEntityTypeConfiguration<Cha
         b.Property(x => x.EntityType).HasMaxLength(120);
         b.Property(x => x.EntityId).HasMaxLength(64);
         b.Property(x => x.Action).HasConversion<int>();
-        b.Property(x => x.OldValues).HasColumnType("jsonb");
-        b.Property(x => x.NewValues).HasColumnType("jsonb");
+
+        // Stored as text (not jsonb): the row hash covers these exact bytes, and jsonb would
+        // re-normalize key order/formatting on read and break the tamper-evident chain. A generated
+        // jsonb projection can be added later for querying without affecting the hash.
+        b.Property(x => x.OldValues).HasColumnType("text");
+        b.Property(x => x.NewValues).HasColumnType("text");
         b.Property(x => x.Reason).HasMaxLength(1024);
         b.Property(x => x.CorrelationId).HasMaxLength(64);
         b.Property(x => x.RowHash).HasMaxLength(64);

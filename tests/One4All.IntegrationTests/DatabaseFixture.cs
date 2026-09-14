@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using One4All.Infrastructure;
+using One4All.Infrastructure.Licensing;
 using One4All.Infrastructure.Persistence;
 using Xunit;
 
@@ -28,13 +31,26 @@ public sealed class DatabaseFixture : IAsyncLifetime
     /// <summary>The connection string to the throwaway test database.</summary>
     public string ConnectionString { get; private set; } = string.Empty;
 
-    /// <summary>Creates a new context against the test database.</summary>
+    /// <summary>Creates a new plain context against the test database (no interceptors).</summary>
     /// <returns>A configured context.</returns>
     public One4AllDbContext CreateContext()
     {
         DbContextOptionsBuilder<One4AllDbContext> builder = new();
         builder.UseOne4All(ConnectionString);
         return new One4AllDbContext(builder.Options);
+    }
+
+    /// <summary>
+    /// Builds a fully wired service provider (audit interceptor, security and licensing services) against
+    /// the test database, optionally with trusted licensing keys.
+    /// </summary>
+    /// <param name="licensingOptions">Optional licensing options.</param>
+    /// <returns>The service provider (dispose it when done).</returns>
+    public ServiceProvider BuildServiceProvider(LicensingOptions? licensingOptions = null)
+    {
+        ServiceCollection services = new();
+        services.AddOne4AllInfrastructure(ConnectionString, licensingOptions);
+        return services.BuildServiceProvider();
     }
 
     /// <inheritdoc />

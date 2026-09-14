@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using One4All.Core.Accounting;
 using One4All.Core.Audit;
 using One4All.Core.Common;
+using One4All.Core.Licensing;
 using One4All.Core.Security;
 using One4All.Core.System;
 using One4All.Infrastructure.Persistence.Converters;
@@ -60,6 +61,9 @@ public class One4AllDbContext : DbContext
 
     /// <summary>The append-only audit change log.</summary>
     public DbSet<ChangeLogEntry> ChangeLog => Set<ChangeLogEntry>();
+
+    /// <summary>Installed licence tokens (active + history).</summary>
+    public DbSet<InstalledLicence> InstalledLicences => Set<InstalledLicence>();
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

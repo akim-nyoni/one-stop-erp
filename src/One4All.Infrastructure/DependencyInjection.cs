@@ -1,28 +1,60 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using One4All.Application.Abstractions.Licensing;
+using One4All.Application.Abstractions.Security;
+using One4All.Infrastructure.Licensing;
 using One4All.Infrastructure.Persistence;
+using One4All.Infrastructure.Persistence.Auditing;
 using One4All.Infrastructure.Persistence.RawSql;
 using One4All.Infrastructure.Persistence.Seeding;
+using One4All.Infrastructure.Security;
+using One4All.Licensing.Core;
 
 namespace One4All.Infrastructure;
 
 /// <summary>
-/// Registers the infrastructure services (EF Core context, raw-SQL runner, seeders) into the DI
-/// container. Both the ASP.NET Core host and the embedded desktop host call this with the same
-/// connection string, so there is a single data-access code path (brief §2.2).
+/// Registers the infrastructure services (EF Core context + audit interceptor, security, licensing,
+/// seeders) into the DI container. Both the ASP.NET Core host and the embedded desktop host call this
+/// with the same connection string, so there is a single data-access code path (brief §2.2).
 /// </summary>
 public static class DependencyInjection
 {
     /// <summary>Adds One4All infrastructure services.</summary>
     /// <param name="services">The service collection.</param>
     /// <param name="connectionString">The PostgreSQL connection string.</param>
+    /// <param name="licensingOptions">The licensing options (trusted keys); defaults to empty.</param>
     /// <returns>The same collection, for chaining.</returns>
-    public static IServiceCollection AddOne4AllInfrastructure(this IServiceCollection services, string connectionString)
+    public static IServiceCollection AddOne4AllInfrastructure(
+        this IServiceCollection services,
+        string connectionString,
+        LicensingOptions? licensingOptions = null)
     {
-        services.AddDbContext<One4AllDbContext>(options => options.UseOne4All(connectionString));
+        // Cross-cutting.
+        services.AddSingleton<IClock, SystemClock>();
+        services.AddScoped<CurrentUserContext>();
+        services.AddScoped<ICurrentUser>(sp => sp.GetRequiredService<CurrentUserContext>());
 
-        services.AddScoped<PermissionSeeder>();
+        // Persistence + audit interceptor (scoped, so it sees the ambient user).
+        services.AddScoped<AuditingInterceptor>();
+        services.AddDbContext<One4AllDbContext>((sp, options) =>
+            options.UseOne4All(connectionString)
+                   .AddInterceptors(sp.GetRequiredService<AuditingInterceptor>()));
+
+        // Security services.
+        services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
+        services.AddSingleton(new AuthenticationOptions());
+        services.AddScoped<IPermissionService, PermissionService>();
+        services.AddScoped<IAuthenticationService, AuthenticationService>();
+
+        // Licensing.
+        services.AddSingleton(licensingOptions ?? new LicensingOptions());
+        services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();
+        services.AddSingleton<ILicenceService, LicenceService>();
+
+        // Raw-SQL runner + seeders.
         services.AddSingleton<ISqlScriptRunner>(_ => new SqlScriptRunner(connectionString));
+        services.AddScoped<PermissionSeeder>();
+        services.AddScoped<AdministratorSeeder>();
 
         return services;
     }

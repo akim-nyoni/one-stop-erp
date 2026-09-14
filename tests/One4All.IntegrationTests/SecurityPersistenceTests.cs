@@ -22,10 +22,10 @@ public sealed class SecurityPersistenceTests
     {
         Skip.IfNot(_fixture.Available, _fixture.SkipReason);
 
+        // The database is shared across the collection, so another test may already have seeded;
+        // assert on the end state (full catalogue present) and on idempotency, not the first-run delta.
         await using One4AllDbContext db = _fixture.CreateContext();
-
-        int firstRun = await new PermissionSeeder(db).SeedAsync();
-        firstRun.Should().Be(PermissionCatalogue.All.Count);
+        await new PermissionSeeder(db).SeedAsync();
 
         (await db.Permissions.CountAsync()).Should().Be(PermissionCatalogue.All.Count);
 

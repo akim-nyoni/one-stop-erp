@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Application layer: CQRS handlers, DTOs, validators, ports (interfaces). -->
+  <ItemGroup>
+    <ProjectReference Include="..\One4All.Licensing.Core\One4All.Licensing.Core.csproj" />
+    <ProjectReference Include="..\One4All.Core\One4All.Core.csproj" />
+  </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>One4All.Application</RootNamespace>

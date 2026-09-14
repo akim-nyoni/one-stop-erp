@@ -152,13 +152,19 @@ public sealed class ChangeLogEntry : Entity
         string? correlationId = null)
     {
         IReadOnlyList<string> fields = changedFields ?? [];
+
+        // Normalize to microsecond precision so the hash is stable across a PostgreSQL timestamptz
+        // round-trip (Postgres keeps microseconds; .NET keeps 100 ns ticks). Without this, verifying a
+        // reloaded entry would recompute a different hash and falsely report tampering.
+        DateTimeOffset normalizedOccurred = TruncateToMicroseconds(occurredOnUtc);
+
         string payload = CanonicalPayload(
-            occurredOnUtc, companyId, userId, module, entityType, entityId, action,
+            normalizedOccurred, companyId, userId, module, entityType, entityId, action,
             oldValues, newValues, fields, reason, correlationId);
         string rowHash = ComputeHash(previousRowHash, payload);
 
         return new ChangeLogEntry(
-            occurredOnUtc, companyId, userId, userName, module, entityType, entityId, action,
+            normalizedOccurred, companyId, userId, userName, module, entityType, entityId, action,
             oldValues, newValues, fields, reason, terminal, ipAddress, sessionId, correlationId, rowHash);
     }
 
@@ -210,5 +216,12 @@ public sealed class ChangeLogEntry : Entity
     {
         byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(previousRowHash + "␟" + payload));
         return Convert.ToHexStringLower(bytes);
+    }
+
+    private static DateTimeOffset TruncateToMicroseconds(DateTimeOffset value)
+    {
+        const long ticksPerMicrosecond = 10; // 1 tick = 100 ns; 1 µs = 10 ticks
+        long ticks = value.UtcTicks - (value.UtcTicks % ticksPerMicrosecond);
+        return new DateTimeOffset(ticks, TimeSpan.Zero);
     }
 }

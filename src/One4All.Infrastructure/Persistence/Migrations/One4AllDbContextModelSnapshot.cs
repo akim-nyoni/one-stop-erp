@@ -73,7 +73,7 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("NewValues")
                         .HasMaxLength(256)
-                        .HasColumnType("jsonb")
+                        .HasColumnType("text")
                         .HasColumnName("new_values");
 
                     b.Property<DateTimeOffset>("OccurredOnUtc")
@@ -82,7 +82,7 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("OldValues")
                         .HasMaxLength(256)
-                        .HasColumnType("jsonb")
+                        .HasColumnType("text")
                         .HasColumnName("old_values");
 
                     b.Property<string>("Reason")
@@ -135,6 +135,65 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_change_log_entity_type_entity_id");
 
                     b.ToTable("change_log", "audit");
+                });
+
+            modelBuilder.Entity("One4All.Core.Licensing.InstalledLicence", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("InstalledByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("installed_by_user_id");
+
+                    b.Property<DateTimeOffset>("InstalledOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("installed_on_utc");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("token");
+
+                    b.HasKey("Id")
+                        .HasName("pk_installed_licence");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("ix_installed_licence_is_active")
+                        .HasFilter("is_active = true");
+
+                    b.ToTable("installed_licence", "lic");
                 });
 
             modelBuilder.Entity("One4All.Core.Security.AccessScope", b =>
