@@ -1,0 +1,48 @@
+# .NET / Visual Studio
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.user
+*.suo
+.vs/
+*.userprefs
+
+# Rider / ReSharper
+.idea/
+_ReSharper*/
+*.DotSettings.user
+
+# Test / coverage
+[Tt]est[Rr]esult*/
+coverage*.json
+coverage*.xml
+*.coverage
+*.trx
+
+# Publish output
+publish/
+artifacts/
+*.nupkg
+
+# Local secrets & environment
+appsettings.*.local.json
+*.env
+.env
+secrets.json
+
+# Licensing private keys — NEVER commit
+*.private.pem
+*.privatekey
+licensing-keys/
+*.lic
+
+# Logs
+logs/
+*.log
+
+# OS
+Thumbs.db
+.DS_Store

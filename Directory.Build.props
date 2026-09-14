@@ -1,0 +1,39 @@
+<Project>
+
+  <!--
+    Central build configuration for the One4All ERP solution.
+    Product-wide properties live here so individual .csproj files stay small.
+    Warnings-as-errors is applied only to Core/Application (the layers the brief
+    mandates must stay clean); UI/host projects opt out to avoid third-party noise.
+  -->
+
+  <PropertyGroup>
+    <Product>One4All ERP</Product>
+    <Company>One4All</Company>
+    <Authors>One4All</Authors>
+    <Version>0.1.0</Version>
+    <NeutralLanguage>en</NeutralLanguage>
+
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>false</InvariantGlobalization>
+
+    <!-- Deterministic, analyzable builds -->
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!--
+    Warnings-as-errors on the domain and application layers only.
+    Set the property "IsCoreLayer" to true in those projects.
+  -->
+  <PropertyGroup Condition="'$(IsCoreLayer)' == 'true'">
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: missing XML doc — enforced via GenerateDocumentationFile on public members -->
+    <NoWarn>$(NoWarn)</NoWarn>
+  </PropertyGroup>
+
+</Project>

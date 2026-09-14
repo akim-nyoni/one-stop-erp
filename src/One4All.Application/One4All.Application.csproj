@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Application layer: CQRS handlers, DTOs, validators, ports (interfaces). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>One4All.Application</RootNamespace>
+    <IsCoreLayer>true</IsCoreLayer>
+  </PropertyGroup>
+
+</Project>

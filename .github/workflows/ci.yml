@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: one4all
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Integration tests fall back to this when Docker/Testcontainers is unavailable.
+      ONE4ALL_CONNECTION: "Host=localhost;Port=5432;Database=one4all;Username=postgres;Password=postgres"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore One4All.slnx
+
+      - name: Build (warnings are errors on Core/Application)
+        run: dotnet build One4All.slnx --configuration Release --no-restore
+
+      - name: Unit tests
+        run: dotnet test tests/One4All.UnitTests/One4All.UnitTests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Accounting tests
+        run: dotnet test tests/One4All.AccountingTests/One4All.AccountingTests.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Integration tests
+        run: dotnet test tests/One4All.IntegrationTests/One4All.IntegrationTests.csproj --configuration Release --no-build --verbosity normal

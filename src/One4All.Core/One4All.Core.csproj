@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Domain layer: entities, value objects, domain services, enums. No I/O. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>One4All.Core</RootNamespace>
+    <IsCoreLayer>true</IsCoreLayer>
+  </PropertyGroup>
+
+</Project>

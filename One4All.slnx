@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/One4All.Application/One4All.Application.csproj" />
+    <Project Path="src/One4All.Core/One4All.Core.csproj" />
+    <Project Path="src/One4All.Desktop/One4All.Desktop.csproj" />
+    <Project Path="src/One4All.Infrastructure/One4All.Infrastructure.csproj" />
+    <Project Path="src/One4All.Server/One4All.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/One4All.AccountingTests/One4All.AccountingTests.csproj" />
+    <Project Path="tests/One4All.IntegrationTests/One4All.IntegrationTests.csproj" />
+    <Project Path="tests/One4All.UnitTests/One4All.UnitTests.csproj" />
+  </Folder>
+</Solution>
