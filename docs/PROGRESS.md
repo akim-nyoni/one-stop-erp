@@ -26,7 +26,7 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 |---|---|---|
 | **1A** Security domain (Core) | ✅ | `OperationFlags` grid, `PermissionCatalogue` (incl. full Housing/Payroll/Budget sets), `PermissionResolution` (role union + Grant/Deny overrides, Deny wins), SoD matrix, `User`/`Role`/`Group`/scopes/overrides — 43 unit tests green |
 | **1B** `sys`/`sec`/`audit` EF config + first migration | ✅ | 20 tables applied to PG18; snake_case naming; Company/Branch/Currency+denoms/ExchangeRate/FiscalYear+Period(per-module status)/NumberSequence; User/Role/Group/scopes/overrides + Permission; audit change-log with hash chain. Permission seeder (202 permissions, idempotent). 4 integration tests green against live PG |
-| **1C** Licensing.Core (Ed25519) + Generator | ⬜ | Payload, sign/verify, fingerprint, validator, vendor key issuer |
+| **1C** Licensing.Core (Ed25519) + Generator | ✅ | Ed25519 sign/verify (BouncyCastle), canonical-JSON payload, compact token, PBKDF2→AES-GCM protected private key, fuzzy ≥3/4 machine fingerprint, clock-rollback detection, validator (grace/read-only/hard-stop + per-module gating & limits). Generator CLI (keygen/issue/verify/machineid) — end-to-end smoke test passes. 12 licensing unit tests green |
 | **1D** Security/licence application services | ⬜ | Argon2id auth, permission evaluation, licence gating |
 | **1E** WPF shell (Sage Evolution layout) | ⬜ | Login → licence read → licensed+permitted menu tree + module icon grid; permission grid UI. See `docs/UI_SHELL.md` |
 

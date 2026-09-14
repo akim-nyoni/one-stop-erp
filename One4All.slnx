@@ -4,6 +4,8 @@
     <Project Path="src/One4All.Core/One4All.Core.csproj" />
     <Project Path="src/One4All.Desktop/One4All.Desktop.csproj" />
     <Project Path="src/One4All.Infrastructure/One4All.Infrastructure.csproj" />
+    <Project Path="src/One4All.Licensing.Core/One4All.Licensing.Core.csproj" />
+    <Project Path="src/One4All.Licensing.Generator/One4All.Licensing.Generator.csproj" />
     <Project Path="src/One4All.Server/One4All.Server.csproj" />
   </Folder>
   <Folder Name="/tests/">

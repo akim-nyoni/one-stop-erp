@@ -1,0 +1,25 @@
+{
+  "customer": { "id": "CUST-0142", "name": "Example Municipality", "contact": "ict@example.gov" },
+  "product": "One4All ERP",
+  "edition": "Municipal",
+  "licence_type": "Subscription",
+  "valid_from": "2026-01-15",
+  "valid_to": "2027-01-14",
+  "grace_days": 14,
+  "hard_stop": false,
+  "machine_binding": { "mode": "None", "fingerprints": [], "allow_rebind_count": 2 },
+  "limits": { "companies": 3, "concurrent_users": 25, "pos_terminals": 4, "properties": 50000 },
+  "modules": [
+    { "code": "GL" },
+    { "code": "AR" },
+    { "code": "AP" },
+    { "code": "CB" },
+    { "code": "MUNI", "valid_to": "2027-01-14", "limits": { "properties": 50000 } },
+    { "code": "BUD", "limits": { "departments": 40 } },
+    { "code": "PAY", "valid_to": "2026-12-31", "limits": { "employees": 500 } },
+    { "code": "REPORT_DESIGNER" }
+  ],
+  "features": ["MULTI_CURRENCY", "OFFLINE_POS", "API_ACCESS"],
+  "support_expiry": "2027-01-14",
+  "notes": "Sample template — edit and sign with the Generator."
+}
