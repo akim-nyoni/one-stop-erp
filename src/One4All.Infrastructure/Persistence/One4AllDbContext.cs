@@ -80,6 +80,9 @@ public class One4AllDbContext : DbContext
     /// <summary>GL period balances.</summary>
     public DbSet<GlPeriodBalance> PeriodBalances => Set<GlPeriodBalance>();
 
+    /// <summary>Tax codes.</summary>
+    public DbSet<TaxCode> TaxCodes => Set<TaxCode>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

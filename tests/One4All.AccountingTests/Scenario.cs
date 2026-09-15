@@ -37,6 +37,11 @@ public static class Scenario
             db.ExchangeRates.Add(new ExchangeRate(Eur, Usd, ExchangeRateType.Daily, new DateOnly(2026, 1, 1), 1.10m));
         }
 
+        if (!await EntityFrameworkQueryableExtensions.AnyAsync(db.ExchangeRates, r => r.FromCurrency == Eur && r.ToCurrency == Usd && r.RateType == ExchangeRateType.ClosingRate))
+        {
+            db.ExchangeRates.Add(new ExchangeRate(Eur, Usd, ExchangeRateType.ClosingRate, new DateOnly(2026, 6, 30), 1.20m));
+        }
+
         await db.SaveChangesAsync();
 
         // Each test gets its own company (unique code) so tests on the shared database don't collide.
@@ -77,6 +82,18 @@ public static class Scenario
         db.Accounts.Add(new LedgerAccount(company.Id, "4000", "Sales", AccountType.Income));
         db.Accounts.Add(new LedgerAccount(company.Id, "5000", "Cost of Sales", AccountType.Expense));
         db.Accounts.Add(new LedgerAccount(company.Id, "3200", "Retained Earnings", AccountType.Equity));
+
+        // Foreign-currency bank (EUR) for FX revaluation, plus FX gain/loss control accounts.
+        LedgerAccount foreignBank = new(company.Id, "1150", "Bank (EUR)", AccountType.Asset) { CurrencyRestriction = Eur };
+        db.Accounts.Add(foreignBank);
+
+        LedgerAccount fxGain = new(company.Id, "7100", "FX Gain", AccountType.Income);
+        fxGain.MakeControlAccount(ControlAccountType.FxGain);
+        db.Accounts.Add(fxGain);
+
+        LedgerAccount fxLoss = new(company.Id, "7200", "FX Loss", AccountType.Expense);
+        fxLoss.MakeControlAccount(ControlAccountType.FxLoss);
+        db.Accounts.Add(fxLoss);
 
         await db.SaveChangesAsync();
         return company.Id;

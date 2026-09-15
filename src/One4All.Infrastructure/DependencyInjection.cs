@@ -52,6 +52,9 @@ public static class DependencyInjection
         services.AddScoped<IPostingEngine, PostingEngine>();
         services.AddScoped<IPeriodService, PeriodService>();
         services.AddScoped<IYearEndService, YearEndService>();
+        services.AddScoped<ITaxCalculator, TaxCalculator>();
+        services.AddScoped<IFxRevaluationService, FxRevaluationService>();
+        services.AddSingleton<IFiscalDeviceProvider, NullFiscalDeviceProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IGeneralLedgerReports, GeneralLedgerReports>();
 
         // Licensing.
