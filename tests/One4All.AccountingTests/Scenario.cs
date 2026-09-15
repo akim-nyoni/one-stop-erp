@@ -58,7 +58,7 @@ public static class Scenario
             FiscalPeriod period = year.AddPeriod(month, start.ToString("MMMM"), start, end);
             if (openPeriods)
             {
-                foreach (string module in new[] { "GL", "AR", "AP", "CB", "POS" })
+                foreach (string module in new[] { "GL", "AR", "AP", "CB", "POS", "INV" })
                 {
                     period.SetStatus(module, PeriodStatus.Open);
                 }
@@ -82,6 +82,10 @@ public static class Scenario
         LedgerAccount apControl = new(company.Id, "2100", "Accounts Payable Control", AccountType.Liability);
         apControl.MakeControlAccount(ControlAccountType.AccountsPayable);
         db.Accounts.Add(apControl);
+
+        LedgerAccount stockControl = new(company.Id, "1400", "Inventory", AccountType.Asset);
+        stockControl.MakeControlAccount(ControlAccountType.Stock);
+        db.Accounts.Add(stockControl);
 
         db.Accounts.Add(new LedgerAccount(company.Id, "4000", "Sales", AccountType.Income));
         db.Accounts.Add(new LedgerAccount(company.Id, "5000", "Cost of Sales", AccountType.Expense));

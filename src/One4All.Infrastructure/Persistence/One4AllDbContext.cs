@@ -110,6 +110,18 @@ public class One4AllDbContext : DbContext
     /// <summary>Workflow instances.</summary>
     public DbSet<Core.Workflow.WorkflowInstance> WorkflowInstances => Set<Core.Workflow.WorkflowInstance>();
 
+    /// <summary>Inventory items.</summary>
+    public DbSet<Core.Inventory.Item> Items => Set<Core.Inventory.Item>();
+
+    /// <summary>Warehouses.</summary>
+    public DbSet<Core.Inventory.Warehouse> Warehouses => Set<Core.Inventory.Warehouse>();
+
+    /// <summary>Stock balances (item × warehouse).</summary>
+    public DbSet<Core.Inventory.StockBalance> StockBalances => Set<Core.Inventory.StockBalance>();
+
+    /// <summary>Stock movements.</summary>
+    public DbSet<Core.Inventory.StockMovement> StockMovements => Set<Core.Inventory.StockMovement>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

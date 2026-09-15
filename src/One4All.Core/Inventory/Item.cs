@@ -1,0 +1,119 @@
+using One4All.Core.Common;
+
+namespace One4All.Core.Inventory;
+
+/// <summary>
+/// An inventory item (brief §4.2, <c>inv.item</c>). Carries the costing method and the GL accounts used
+/// when its stock moves (the stock control account is resolved from the chart of accounts; cost of sales
+/// is on the item so different item groups can hit different COGS accounts).
+/// </summary>
+public sealed class Item : SoftDeletableEntity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private Item()
+    {
+        Code = string.Empty;
+        Description = string.Empty;
+        UnitOfMeasure = "EA";
+    }
+
+    /// <summary>Creates an item.</summary>
+    /// <param name="companyId">The owning company.</param>
+    /// <param name="code">The item code.</param>
+    /// <param name="description">The description.</param>
+    /// <param name="itemType">The item type.</param>
+    /// <param name="costingMethod">The costing method.</param>
+    public Item(long companyId, string code, string description, ItemType itemType = ItemType.Stock, CostingMethod costingMethod = CostingMethod.WeightedAverage)
+    {
+        CompanyId = companyId;
+        Code = code.Trim().ToUpperInvariant();
+        Description = description;
+        ItemType = itemType;
+        CostingMethod = costingMethod;
+        UnitOfMeasure = "EA";
+        IsActive = true;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The item code.</summary>
+    public string Code { get; private set; }
+
+    /// <summary>The description.</summary>
+    public string Description { get; set; }
+
+    /// <summary>A short description for receipts.</summary>
+    public string? ShortDescription { get; set; }
+
+    /// <summary>The item type.</summary>
+    public ItemType ItemType { get; private set; }
+
+    /// <summary>The costing method.</summary>
+    public CostingMethod CostingMethod { get; private set; }
+
+    /// <summary>The stock-keeping unit of measure.</summary>
+    public string UnitOfMeasure { get; set; }
+
+    /// <summary>The default tax code.</summary>
+    public string? TaxCode { get; set; }
+
+    /// <summary>The item category.</summary>
+    public string? Category { get; set; }
+
+    /// <summary>A primary barcode.</summary>
+    public string? Barcode { get; set; }
+
+    /// <summary>The cost-of-sales account code hit when the item is issued/sold.</summary>
+    public string? CostOfSalesAccountCode { get; set; }
+
+    /// <summary>The revenue account code for sales.</summary>
+    public string? RevenueAccountCode { get; set; }
+
+    /// <summary>Reorder level (below which replenishment is suggested).</summary>
+    public decimal ReorderLevel { get; set; }
+
+    /// <summary>Reorder quantity.</summary>
+    public decimal ReorderQuantity { get; set; }
+
+    /// <summary>Whether the item is active.</summary>
+    public bool IsActive { get; set; }
+
+    /// <summary>Whether the item is quantity-tracked stock.</summary>
+    public bool IsStockTracked => ItemType is ItemType.Stock or ItemType.Weighed;
+}
+
+/// <summary>A warehouse / stock location (brief §4.2, <c>inv.warehouse</c>).</summary>
+public sealed class Warehouse : SoftDeletableEntity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private Warehouse()
+    {
+        Code = string.Empty;
+        Name = string.Empty;
+    }
+
+    /// <summary>Creates a warehouse.</summary>
+    /// <param name="companyId">The owning company.</param>
+    /// <param name="code">The warehouse code.</param>
+    /// <param name="name">The warehouse name.</param>
+    public Warehouse(long companyId, string code, string name)
+    {
+        CompanyId = companyId;
+        Code = code.Trim().ToUpperInvariant();
+        Name = name;
+        IsActive = true;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The warehouse code.</summary>
+    public string Code { get; private set; }
+
+    /// <summary>The warehouse name.</summary>
+    public string Name { get; set; }
+
+    /// <summary>Whether the warehouse is active.</summary>
+    public bool IsActive { get; set; }
+}

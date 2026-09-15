@@ -71,6 +71,9 @@ public static class DependencyInjection
         // Generic workflow / approvals engine.
         services.AddScoped<Application.Abstractions.Workflow.IWorkflowService, Workflow.WorkflowService>();
 
+        // Inventory.
+        services.AddScoped<Application.Abstractions.Inventory.IInventoryService, Inventory.InventoryService>();
+
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();
