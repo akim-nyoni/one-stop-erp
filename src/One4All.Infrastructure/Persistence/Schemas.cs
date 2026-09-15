@@ -27,6 +27,9 @@ public static class Schemas
     /// <summary>Trading sub-ledger shared between AR and AP (open items, allocations).</summary>
     public const string Trading = "trd";
 
+    /// <summary>Workflow &amp; approvals engine.</summary>
+    public const string Workflow = "wf";
+
     /// <summary>Cash Book / Treasury.</summary>
     public const string CashBook = "cb";
 

@@ -1,0 +1,68 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using One4All.Core.Workflow;
+using One4All.Infrastructure.Persistence.Converters;
+
+namespace One4All.Infrastructure.Persistence.Configurations;
+
+internal sealed class WorkflowDefinitionConfiguration : IEntityTypeConfiguration<WorkflowDefinition>
+{
+    public void Configure(EntityTypeBuilder<WorkflowDefinition> b)
+    {
+        b.ToTable("definition", Schemas.Workflow);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.DocumentType).HasMaxLength(60);
+        b.Property(x => x.Name).HasMaxLength(160);
+        b.HasMany(x => x.Stages).WithOne().HasForeignKey(x => x.WorkflowDefinitionId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Stages).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.DocumentType }).HasFilter("is_deleted = false");
+        b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+internal sealed class WorkflowStageConfiguration : IEntityTypeConfiguration<WorkflowStage>
+{
+    public void Configure(EntityTypeBuilder<WorkflowStage> b)
+    {
+        b.ToTable("stage", Schemas.Workflow);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.MinValue).HasPrecision(19, 4);
+        b.Property(x => x.RequiredRoleName).HasMaxLength(120);
+        b.Property<List<long>>("_eligibleUserIds")
+            .HasColumnName("eligible_user_ids")
+            .HasColumnType("text")
+            .HasConversion(new LongListConverter())
+            .Metadata.SetValueComparer(Comparers.LongList);
+        b.Ignore(x => x.EligibleUserIds);
+        b.HasIndex(x => new { x.WorkflowDefinitionId, x.Sequence }).IsUnique();
+    }
+}
+
+internal sealed class WorkflowInstanceConfiguration : IEntityTypeConfiguration<WorkflowInstance>
+{
+    public void Configure(EntityTypeBuilder<WorkflowInstance> b)
+    {
+        b.ToTable("instance", Schemas.Workflow);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.DocumentType).HasMaxLength(60);
+        b.Property(x => x.DocumentReference).HasMaxLength(60);
+        b.Property(x => x.Value).HasPrecision(19, 4);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasMany(x => x.Approvals).WithOne().HasForeignKey(x => x.WorkflowInstanceId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Approvals).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.DocumentType, x.DocumentReference });
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}
+
+internal sealed class WorkflowApprovalConfiguration : IEntityTypeConfiguration<WorkflowApproval>
+{
+    public void Configure(EntityTypeBuilder<WorkflowApproval> b)
+    {
+        b.ToTable("approval", Schemas.Workflow);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Action).HasConversion<int>();
+        b.Property(x => x.Comment).HasMaxLength(1024);
+    }
+}

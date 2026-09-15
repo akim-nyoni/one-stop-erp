@@ -68,6 +68,9 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Trading.IPaymentRunService, Trading.PaymentRunService>();
         services.AddScoped<Application.Abstractions.Banking.IBankReconciliationService, Banking.BankReconciliationService>();
 
+        // Generic workflow / approvals engine.
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowService, Workflow.WorkflowService>();
+
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();

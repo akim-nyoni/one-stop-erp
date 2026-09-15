@@ -1,0 +1,42 @@
+using One4All.Core.Common;
+using One4All.Core.Workflow;
+
+namespace One4All.Application.Abstractions.Workflow;
+
+/// <summary>The result of starting a workflow.</summary>
+/// <param name="InstanceId">The created instance id.</param>
+/// <param name="Status">The initial status (Approved immediately if no stages apply).</param>
+public readonly record struct WorkflowStartResult(long InstanceId, WorkflowStatus Status);
+
+/// <summary>
+/// The generic workflow/approval service (brief §7). One engine serves requisitions, POs, journals,
+/// payment runs, budgets, master-data changes and more: start a workflow for a document, then route
+/// approvals through its stages with quorum and value-band rules.
+/// </summary>
+public interface IWorkflowService
+{
+    /// <summary>Starts a workflow for a document using the active definition for its document type.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="documentType">The document type.</param>
+    /// <param name="documentReference">The document reference/number.</param>
+    /// <param name="value">The document value (for value-band routing).</param>
+    /// <param name="initiatedByUserId">Who started it.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The start result, or an error (e.g. no active definition).</returns>
+    Task<Result<WorkflowStartResult>> StartAsync(long companyId, string documentType, string documentReference, decimal value, long initiatedByUserId, CancellationToken ct = default);
+
+    /// <summary>Records an approve/reject/return action on a workflow instance.</summary>
+    /// <param name="instanceId">The instance.</param>
+    /// <param name="userId">The acting user.</param>
+    /// <param name="action">The action.</param>
+    /// <param name="comment">An optional comment (required for reject/return).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The updated status, or an error.</returns>
+    Task<Result<WorkflowStatus>> ActAsync(long instanceId, long userId, WorkflowActionType action, string? comment, CancellationToken ct = default);
+
+    /// <summary>Gets the current status of a workflow instance.</summary>
+    /// <param name="instanceId">The instance.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The status, or an error.</returns>
+    Task<Result<WorkflowStatus>> GetStatusAsync(long instanceId, CancellationToken ct = default);
+}

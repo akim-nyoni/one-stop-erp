@@ -104,6 +104,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Imported bank statement lines.</summary>
     public DbSet<Core.Banking.BankStatementLine> BankStatementLines => Set<Core.Banking.BankStatementLine>();
 
+    /// <summary>Workflow definitions.</summary>
+    public DbSet<Core.Workflow.WorkflowDefinition> WorkflowDefinitions => Set<Core.Workflow.WorkflowDefinition>();
+
+    /// <summary>Workflow instances.</summary>
+    public DbSet<Core.Workflow.WorkflowInstance> WorkflowInstances => Set<Core.Workflow.WorkflowInstance>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

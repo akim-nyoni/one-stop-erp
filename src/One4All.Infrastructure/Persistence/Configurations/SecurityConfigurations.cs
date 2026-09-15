@@ -13,6 +13,11 @@ internal static class Comparers
         (a, b) => (a ?? new List<string>()).SequenceEqual(b ?? new List<string>()),
         v => v.Aggregate(0, (h, s) => HashCode.Combine(h, s.GetHashCode(StringComparison.Ordinal))),
         v => v.ToList());
+
+    public static readonly ValueComparer<List<long>> LongList = new(
+        (a, b) => (a ?? new List<long>()).SequenceEqual(b ?? new List<long>()),
+        v => v.Aggregate(0, (h, x) => HashCode.Combine(h, x)),
+        v => v.ToList());
 }
 
 internal sealed class PermissionConfiguration : IEntityTypeConfiguration<Permission>

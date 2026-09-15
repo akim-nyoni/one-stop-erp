@@ -2749,6 +2749,266 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("supplier", "ap");
                 });
 
+            modelBuilder.Entity("One4All.Core.Workflow.WorkflowApproval", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("comment");
+
+                    b.Property<DateTimeOffset>("OccurredOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_on_utc");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("StageSequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage_sequence");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<long>("WorkflowInstanceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("workflow_instance_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_approval");
+
+                    b.HasIndex("WorkflowInstanceId")
+                        .HasDatabaseName("ix_approval_workflow_instance_id");
+
+                    b.ToTable("approval", "wf");
+                });
+
+            modelBuilder.Entity("One4All.Core.Workflow.WorkflowDefinition", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DeletedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_on_utc");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("document_type");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_definition");
+
+                    b.HasIndex("CompanyId", "DocumentType")
+                        .HasDatabaseName("ix_definition_company_id_document_type")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("definition", "wf");
+                });
+
+            modelBuilder.Entity("One4All.Core.Workflow.WorkflowInstance", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<int>("CurrentStageSequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("current_stage_sequence");
+
+                    b.Property<string>("DocumentReference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("document_reference");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("document_type");
+
+                    b.Property<long>("InitiatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("initiated_by_user_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("value");
+
+                    b.Property<long>("WorkflowDefinitionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("workflow_definition_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_instance");
+
+                    b.HasIndex("CompanyId", "Status")
+                        .HasDatabaseName("ix_instance_company_id_status");
+
+                    b.HasIndex("CompanyId", "DocumentType", "DocumentReference")
+                        .HasDatabaseName("ix_instance_company_id_document_type_document_reference");
+
+                    b.ToTable("instance", "wf");
+                });
+
+            modelBuilder.Entity("One4All.Core.Workflow.WorkflowStage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal?>("MinValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("min_value");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Quorum")
+                        .HasColumnType("integer")
+                        .HasColumnName("quorum");
+
+                    b.Property<string>("RequiredRoleName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("required_role_name");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.Property<long>("WorkflowDefinitionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("workflow_definition_id");
+
+                    b.Property<string>("_eligibleUserIds")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("eligible_user_ids");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stage");
+
+                    b.HasIndex("WorkflowDefinitionId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stage_workflow_definition_id_sequence");
+
+                    b.ToTable("stage", "wf");
+                });
+
             modelBuilder.Entity("One4All.Core.Accounting.JournalLine", b =>
                 {
                     b.HasOne("One4All.Core.Accounting.JournalEntry", null)
@@ -2859,6 +3119,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_period_module_status_fiscal_period_fiscal_period_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Workflow.WorkflowApproval", b =>
+                {
+                    b.HasOne("One4All.Core.Workflow.WorkflowInstance", null)
+                        .WithMany("Approvals")
+                        .HasForeignKey("WorkflowInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_approval_workflow_instances_workflow_instance_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Workflow.WorkflowStage", b =>
+                {
+                    b.HasOne("One4All.Core.Workflow.WorkflowDefinition", null)
+                        .WithMany("Stages")
+                        .HasForeignKey("WorkflowDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_stage_definition_workflow_definition_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Accounting.JournalEntry", b =>
                 {
                     b.Navigation("Lines");
@@ -2906,6 +3186,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.System.FiscalYear", b =>
                 {
                     b.Navigation("Periods");
+                });
+
+            modelBuilder.Entity("One4All.Core.Workflow.WorkflowDefinition", b =>
+                {
+                    b.Navigation("Stages");
+                });
+
+            modelBuilder.Entity("One4All.Core.Workflow.WorkflowInstance", b =>
+                {
+                    b.Navigation("Approvals");
                 });
 #pragma warning restore 612, 618
         }

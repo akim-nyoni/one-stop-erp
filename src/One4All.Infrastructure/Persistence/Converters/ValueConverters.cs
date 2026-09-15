@@ -35,3 +35,20 @@ public sealed class StringListConverter : ValueConverter<IReadOnlyList<string>, 
             ? []
             : text.Split(Separator, StringSplitOptions.None);
 }
+
+/// <summary>Converts a list of longs to/from a comma-delimited text column (e.g. eligible approver ids).</summary>
+public sealed class LongListConverter : ValueConverter<List<long>, string>
+{
+    /// <summary>Creates the converter.</summary>
+    public LongListConverter()
+        : base(
+            list => string.Join(',', list),
+            text => Parse(text))
+    {
+    }
+
+    private static List<long> Parse(string text) =>
+        string.IsNullOrEmpty(text)
+            ? []
+            : text.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(long.Parse).ToList();
+}

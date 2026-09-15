@@ -101,12 +101,16 @@ public sealed class ServicesIntegrationTests
         entries.Should().Contain(e => e.Action == AuditAction.Update && e.ChangedFields.Contains("Symbol"));
         entries.Should().OnlyContain(e => e.UserName == "tester");
 
-        // The hash chain links each entry to the previous one.
-        string previous = string.Empty;
-        foreach (ChangeLogEntry entry in await db.ChangeLog.OrderBy(c => c.Id).ToListAsync())
+        // The hash chain is maintained per company, so verify each company's chain independently.
+        List<ChangeLogEntry> all = await db.ChangeLog.OrderBy(c => c.Id).ToListAsync();
+        foreach (IGrouping<long?, ChangeLogEntry> companyChain in all.GroupBy(c => c.CompanyId))
         {
-            entry.VerifyAgainst(previous).Should().BeTrue($"entry {entry.Id} should chain from the previous hash");
-            previous = entry.RowHash;
+            string previous = string.Empty;
+            foreach (ChangeLogEntry entry in companyChain.OrderBy(c => c.Id))
+            {
+                entry.VerifyAgainst(previous).Should().BeTrue($"entry {entry.Id} (company {entry.CompanyId}) should chain from the previous hash");
+                previous = entry.RowHash;
+            }
         }
     }
 

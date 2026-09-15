@@ -68,6 +68,13 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 
 **Phase 4 status: COMPLETE.** AR/AP/Cash Book — trader master, invoice/receipt/payment/credit-note posting, open-item allocation with realised FX, ageing, **statements rendered to PDF**, **payment runs with EFT**, and **bank reconciliation**. 23 accounting tests. (Dunning letters + a full remaining-report seed are light follow-ups on the same engine.)
 
+## Phase 5 — Inventory + Procurement + Workflow
+| Increment | Status | Notes |
+|---|---|---|
+| **5A** Generic Workflow/approval engine (§7) | ✅ | `WorkflowDefinition`/`WorkflowStage` (ordered stages, quorum, value-band routing, eligible approvers), `WorkflowInstance` with pure advancement logic (approve/quorum/advance, reject, return, resubmit), `IWorkflowService` (start/act/status) with eligibility enforcement. Reusable by requisitions/POs/journals/payment-runs/budgets/master-data. `AddWorkflowEngine` migration. 7 unit + 1 integration test green |
+| **5B** Inventory (items, warehouses, costing, movements) | ⬜ | |
+| **5C** Procurement (requisition→PO→GRN→3-way match + budget check + workflow) | ⬜ | |
+
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
 - **PostgreSQL 18** dev, min supported 16 (ADR-0002).
