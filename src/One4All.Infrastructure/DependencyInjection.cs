@@ -78,6 +78,9 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Vouchers.IVoucherService, Vouchers.VoucherService>();
         services.AddScoped<Application.Abstractions.SalesOrders.ISalesOrderService, SalesOrders.SalesOrderService>();
 
+        // Municipality / Council billing.
+        services.AddScoped<Application.Abstractions.Municipal.IMunicipalBillingService, Municipal.MunicipalBillingService>();
+
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();

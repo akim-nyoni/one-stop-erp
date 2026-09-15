@@ -143,6 +143,18 @@ public class One4AllDbContext : DbContext
     /// <summary>Sales orders.</summary>
     public DbSet<Core.SalesOrders.SalesOrder> SalesOrders => Set<Core.SalesOrders.SalesOrder>();
 
+    /// <summary>Municipal tariffs.</summary>
+    public DbSet<Core.Municipal.Tariff> Tariffs => Set<Core.Municipal.Tariff>();
+
+    /// <summary>Municipal properties / stands.</summary>
+    public DbSet<Core.Municipal.Property> Properties => Set<Core.Municipal.Property>();
+
+    /// <summary>Municipal meters.</summary>
+    public DbSet<Core.Municipal.Meter> Meters => Set<Core.Municipal.Meter>();
+
+    /// <summary>Municipal meter readings.</summary>
+    public DbSet<Core.Municipal.MeterReading> MeterReadings => Set<Core.Municipal.MeterReading>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

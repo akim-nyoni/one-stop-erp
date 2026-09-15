@@ -93,6 +93,14 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 
 **Phase 7 status: COMPLETE.** Gift-card liability accounting and the quote/order→despatch→invoice distribution flow, both integrated through the posting engine, inventory and AR.
 
+## Phase 8 — Municipality
+| Increment | Status | Notes |
+|---|---|---|
+| **8A** Property register, tariff engine, metered/valuation billing (§4.9) | ✅ | `Tariff`/`TariffBlock` flexible tariff engine (**flat / per-unit / stepped-block / rate-per-valuation**, minimum-charge floor, effective-dated, revenue account); `Property`/`PropertyServiceLink` (stand, ward, valuation, ratepayer customer, per-service tariff + meter); `Meter`/`MeterReading` (multiplier, rollover-guarded consumption). `IMunicipalBillingService`: record a reading (computes consumption), and **bill a service** — resolves the linked tariff, computes the charge from consumption/valuation, and raises it on the ratepayer's account **through the central AR ledger** (so it ages, reconciles and appears on the consumer statement like any receivable). `AddMunicipal` migration (`mun` schema). Tests: 6 unit (stepped 5→7.5, 25→25, 40→45; per-unit; rate-per-valuation; minimum-charge floor) + 1 accounting (stepped water: read 25 → consumption 25 → bill $25 → debtors $25, trial balance balances). |
+| **8B** Housing, Land &amp; Estates (§4.10) | ⬜ | Next in §16 order |
+
+**Phase 8 status:** Municipal billing core complete — tariff engine, property/meter register, and consumption/valuation billing posting through AR. 123 tests green (85 unit + 9 integration + 29 accounting).
+
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
 - **PostgreSQL 18** dev, min supported 16 (ADR-0002).
