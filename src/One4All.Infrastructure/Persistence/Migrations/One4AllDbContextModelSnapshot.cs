@@ -1395,6 +1395,242 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("installed_licence", "lic");
                 });
 
+            modelBuilder.Entity("One4All.Core.Procurement.GoodsReceivedNote", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("GrnNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("grn_number");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("PurchaseOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("purchase_order_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_grn");
+
+                    b.HasIndex("CompanyId", "GrnNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_grn_company_id_grn_number");
+
+                    b.ToTable("grn", "pop");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.GrnLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("GoodsReceivedNoteId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("goods_received_note_id");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<long>("PurchaseOrderLineId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("purchase_order_line_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id")
+                        .HasName("pk_grn_line");
+
+                    b.HasIndex("GoodsReceivedNoteId")
+                        .HasDatabaseName("ix_grn_line_goods_received_note_id");
+
+                    b.ToTable("grn_line", "pop");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrder", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("OrderDate")
+                        .HasColumnType("date")
+                        .HasColumnName("order_date");
+
+                    b.Property<string>("OrderNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("order_number");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_purchase_order");
+
+                    b.HasIndex("CompanyId", "OrderNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_purchase_order_company_id_order_number");
+
+                    b.ToTable("purchase_order", "pop");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrderLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("description");
+
+                    b.Property<decimal>("InvoicedQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("invoiced_quantity");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<decimal>("OrderedQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("ordered_quantity");
+
+                    b.Property<long>("PurchaseOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("purchase_order_id");
+
+                    b.Property<decimal>("ReceivedQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("received_quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id")
+                        .HasName("pk_purchase_order_line");
+
+                    b.HasIndex("PurchaseOrderId")
+                        .HasDatabaseName("ix_purchase_order_line_purchase_order_id");
+
+                    b.ToTable("purchase_order_line", "pop");
+                });
+
             modelBuilder.Entity("One4All.Core.Reporting.ReportDefinitionRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -3367,6 +3603,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tax_rate_tax_codes_tax_code_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Procurement.GrnLine", b =>
+                {
+                    b.HasOne("One4All.Core.Procurement.GoodsReceivedNote", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("GoodsReceivedNoteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_grn_line_goods_received_notes_goods_received_note_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrderLine", b =>
+                {
+                    b.HasOne("One4All.Core.Procurement.PurchaseOrder", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("PurchaseOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_purchase_order_line_purchase_orders_purchase_order_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Security.AccessScope", b =>
                 {
                     b.HasOne("One4All.Core.Security.UserRole", null)
@@ -3485,6 +3741,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Accounting.TaxCode", b =>
                 {
                     b.Navigation("Rates");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.GoodsReceivedNote", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrder", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("One4All.Core.Security.Group", b =>

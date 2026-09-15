@@ -122,6 +122,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Stock movements.</summary>
     public DbSet<Core.Inventory.StockMovement> StockMovements => Set<Core.Inventory.StockMovement>();
 
+    /// <summary>Purchase orders.</summary>
+    public DbSet<Core.Procurement.PurchaseOrder> PurchaseOrders => Set<Core.Procurement.PurchaseOrder>();
+
+    /// <summary>Goods-received notes.</summary>
+    public DbSet<Core.Procurement.GoodsReceivedNote> GoodsReceivedNotes => Set<Core.Procurement.GoodsReceivedNote>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

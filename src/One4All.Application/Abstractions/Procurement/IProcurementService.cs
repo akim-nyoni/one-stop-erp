@@ -1,0 +1,129 @@
+using One4All.Core.Common;
+
+namespace One4All.Application.Abstractions.Procurement;
+
+/// <summary>A line on a new purchase order.</summary>
+/// <param name="ItemId">The item.</param>
+/// <param name="Description">The description.</param>
+/// <param name="Quantity">The quantity.</param>
+/// <param name="UnitPrice">The unit price.</param>
+public readonly record struct PurchaseOrderLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice);
+
+/// <summary>A request to create a purchase order.</summary>
+public sealed class CreatePurchaseOrderRequest
+{
+    /// <summary>The company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>The supplier.</summary>
+    public long SupplierId { get; init; }
+
+    /// <summary>The order number.</summary>
+    public string OrderNumber { get; init; } = string.Empty;
+
+    /// <summary>The order date.</summary>
+    public DateOnly OrderDate { get; init; }
+
+    /// <summary>The currency.</summary>
+    public Core.Accounting.CurrencyCode Currency { get; init; }
+
+    /// <summary>The order lines.</summary>
+    public IReadOnlyList<PurchaseOrderLineRequest> Lines { get; init; } = [];
+}
+
+/// <summary>A received line on a GRN.</summary>
+/// <param name="PurchaseOrderLineId">The PO line.</param>
+/// <param name="Quantity">The quantity received.</param>
+public readonly record struct ReceiveLine(long PurchaseOrderLineId, decimal Quantity);
+
+/// <summary>A request to receive goods against a purchase order.</summary>
+public sealed class ReceiveGoodsRequest
+{
+    /// <summary>The company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>The purchase order.</summary>
+    public long PurchaseOrderId { get; init; }
+
+    /// <summary>The warehouse goods are received into.</summary>
+    public long WarehouseId { get; init; }
+
+    /// <summary>The GRN number.</summary>
+    public string GrnNumber { get; init; } = string.Empty;
+
+    /// <summary>The receipt date.</summary>
+    public DateOnly Date { get; init; }
+
+    /// <summary>The received lines.</summary>
+    public IReadOnlyList<ReceiveLine> Lines { get; init; } = [];
+}
+
+/// <summary>An invoiced line for a three-way match.</summary>
+/// <param name="PurchaseOrderLineId">The PO line.</param>
+/// <param name="Quantity">The invoiced quantity.</param>
+/// <param name="UnitPrice">The invoiced unit price.</param>
+public readonly record struct InvoiceMatchLine(long PurchaseOrderLineId, decimal Quantity, decimal UnitPrice);
+
+/// <summary>A request to match a supplier invoice against a purchase order and its receipts.</summary>
+public sealed class MatchInvoiceRequest
+{
+    /// <summary>The company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>The purchase order.</summary>
+    public long PurchaseOrderId { get; init; }
+
+    /// <summary>The supplier invoice number.</summary>
+    public string InvoiceNumber { get; init; } = string.Empty;
+
+    /// <summary>The invoice date.</summary>
+    public DateOnly Date { get; init; }
+
+    /// <summary>The allowed price tolerance as a percentage (e.g. 5 = 5%).</summary>
+    public decimal TolerancePercent { get; init; } = 5m;
+
+    /// <summary>The invoiced lines.</summary>
+    public IReadOnlyList<InvoiceMatchLine> Lines { get; init; } = [];
+}
+
+/// <summary>The result of creating a purchase order.</summary>
+/// <param name="PurchaseOrderId">The created order id.</param>
+/// <param name="OrderNumber">The order number.</param>
+public readonly record struct PurchaseOrderResult(long PurchaseOrderId, string OrderNumber);
+
+/// <summary>The result of receiving goods.</summary>
+/// <param name="GrnId">The created GRN id.</param>
+/// <param name="AccruedValue">The value accrued to GRNI.</param>
+public readonly record struct GrnResult(long GrnId, decimal AccruedValue);
+
+/// <summary>The result of a three-way match.</summary>
+/// <param name="OpenItemId">The created AP open item id.</param>
+/// <param name="JournalNumber">The GL journal number.</param>
+/// <param name="InvoiceValue">The invoice value posted to AP.</param>
+public readonly record struct MatchInvoiceResult(long OpenItemId, string JournalNumber, decimal InvoiceValue);
+
+/// <summary>
+/// Procurement service (brief §4.3): purchase orders, goods-received notes (GRNI accrual through the
+/// inventory receipt), and the three-way invoice match (PO ↔ GRN ↔ invoice) that clears GRNI to accounts
+/// payable within a price/quantity tolerance. Requisition approval routes through the generic workflow engine.
+/// </summary>
+public interface IProcurementService
+{
+    /// <summary>Creates a purchase order.</summary>
+    /// <param name="request">The request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The order result.</returns>
+    Task<Result<PurchaseOrderResult>> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken ct = default);
+
+    /// <summary>Receives goods against a purchase order, accruing GRNI and updating stock.</summary>
+    /// <param name="request">The request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The GRN result.</returns>
+    Task<Result<GrnResult>> ReceiveGoodsAsync(ReceiveGoodsRequest request, CancellationToken ct = default);
+
+    /// <summary>Matches a supplier invoice (three-way) and clears GRNI to AP within tolerance.</summary>
+    /// <param name="request">The request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The match result, or an error when the match is out of tolerance.</returns>
+    Task<Result<MatchInvoiceResult>> MatchInvoiceAsync(MatchInvoiceRequest request, CancellationToken ct = default);
+}

@@ -73,7 +73,9 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 |---|---|---|
 | **5A** Generic Workflow/approval engine (§7) | ✅ | `WorkflowDefinition`/`WorkflowStage` (ordered stages, quorum, value-band routing, eligible approvers), `WorkflowInstance` with pure advancement logic (approve/quorum/advance, reject, return, resubmit), `IWorkflowService` (start/act/status) with eligibility enforcement. Reusable by requisitions/POs/journals/payment-runs/budgets/master-data. `AddWorkflowEngine` migration. 7 unit + 1 integration test green |
 | **5B** Inventory (items, warehouses, costing, movements) | ✅ | `Item`/`Warehouse` master; `StockBalance` with **moving weighted-average** cost; `StockMovement` history; `IInventoryService` (receive → Dr stock/Cr offset + recompute average; issue → Dr COGS/Cr stock at average; stock valuation). `AddInventory` migration. Test: receive 100@2 + 100@3 → avg 2.50, issue 50 → COGS 125, valuation 375 |
-| **5C** Procurement (requisition→PO→GRN→3-way match + budget check + workflow) | ⬜ | Follow-up; ties Inventory + Workflow + AP together |
+| **5C** Procurement (PO→GRN→3-way match) | ✅ | `PurchaseOrder`/`PurchaseOrderLine` (ordered/received/invoiced qty + status), `GoodsReceivedNote`/`GrnLine`; `IProcurementService`: create PO, receive goods (GRN accrues **GRNI** via the inventory receipt Dr stock/Cr GRNI + moving-average), and **3-way invoice match** (qty + price tolerance) clearing GRNI→AP and raising an AP open item. `AddProcurement` migration. Test: PO 100@2 → GRN accrues 200 → price mismatch rejected → matched invoice clears to AP 200 (creditors 200, stock 100@2=200). Requisition approval routes through the §7 workflow engine (5A). |
+
+**Phase 5 status: COMPLETE.** Generic approval workflow, inventory with moving weighted-average costing, and procurement (PO→GRN→3-way match) — all integrated through the posting engine and tested. (Requisition UI, RFQ/tender, landed costs, batch/serial, budget-check-at-gates are follow-ups on this base.)
 
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
