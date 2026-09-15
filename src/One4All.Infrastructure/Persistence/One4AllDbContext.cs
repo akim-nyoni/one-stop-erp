@@ -128,6 +128,15 @@ public class One4AllDbContext : DbContext
     /// <summary>Goods-received notes.</summary>
     public DbSet<Core.Procurement.GoodsReceivedNote> GoodsReceivedNotes => Set<Core.Procurement.GoodsReceivedNote>();
 
+    /// <summary>POS terminals.</summary>
+    public DbSet<Core.Pos.PosTerminal> PosTerminals => Set<Core.Pos.PosTerminal>();
+
+    /// <summary>Till sessions.</summary>
+    public DbSet<Core.Pos.TillSession> TillSessions => Set<Core.Pos.TillSession>();
+
+    /// <summary>POS sales.</summary>
+    public DbSet<Core.Pos.Sale> Sales => Set<Core.Pos.Sale>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

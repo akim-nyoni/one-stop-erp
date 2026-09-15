@@ -228,18 +228,29 @@ public sealed class PostingEngine : IPostingEngine
 
     private async Task UpdatePeriodBalancesAsync(long companyId, long fiscalYearId, long fiscalPeriodId, JournalEntry journal, CancellationToken ct)
     {
+        // Aggregate by account key so a journal that touches the same account on more than one line
+        // (e.g. a POS sale with a cash tender and cash change) updates a single period-balance row.
+        Dictionary<string, GlPeriodBalance> touched = new(StringComparer.Ordinal);
+
         foreach (JournalLine line in journal.Lines)
         {
             AccountKey key = line.Key;
-            GlPeriodBalance? balance = await _db.PeriodBalances.FirstOrDefaultAsync(
-                b => b.CompanyId == companyId && b.FiscalPeriodId == fiscalPeriodId &&
-                     b.AccountCode == key.AccountCode && b.CostCentre == key.CostCentre && b.Department == key.Department,
-                ct).ConfigureAwait(false);
+            string mapKey = $"{key.AccountCode}{key.CostCentre}{key.Department}";
 
-            if (balance is null)
+            if (!touched.TryGetValue(mapKey, out GlPeriodBalance? balance))
             {
-                balance = new GlPeriodBalance(companyId, fiscalYearId, fiscalPeriodId, key);
-                _db.PeriodBalances.Add(balance);
+                balance = await _db.PeriodBalances.FirstOrDefaultAsync(
+                    b => b.CompanyId == companyId && b.FiscalPeriodId == fiscalPeriodId &&
+                         b.AccountCode == key.AccountCode && b.CostCentre == key.CostCentre && b.Department == key.Department,
+                    ct).ConfigureAwait(false);
+
+                if (balance is null)
+                {
+                    balance = new GlPeriodBalance(companyId, fiscalYearId, fiscalPeriodId, key);
+                    _db.PeriodBalances.Add(balance);
+                }
+
+                touched[mapKey] = balance;
             }
 
             balance.AddMovement(line.BaseDebit, line.BaseCredit, line.ReportingDebit, line.ReportingCredit);

@@ -74,6 +74,7 @@ public static class DependencyInjection
         // Inventory + Procurement.
         services.AddScoped<Application.Abstractions.Inventory.IInventoryService, Inventory.InventoryService>();
         services.AddScoped<Application.Abstractions.Procurement.IProcurementService, Procurement.ProcurementService>();
+        services.AddScoped<Application.Abstractions.Pos.IPosService, Pos.PosService>();
 
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());

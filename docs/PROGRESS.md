@@ -77,6 +77,14 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 
 **Phase 5 status: COMPLETE.** Generic approval workflow, inventory with moving weighted-average costing, and procurement (PO→GRN→3-way match) — all integrated through the posting engine and tested. (Requisition UI, RFQ/tender, landed costs, batch/serial, budget-check-at-gates are follow-ups on this base.)
 
+## Phase 6 — POS
+| Increment | Status | Notes |
+|---|---|---|
+| **6A** POS transaction/accounting core | ✅ | `PosTerminal`, `TillSession` (float, X/Z read), `Sale`/`SaleLine`/`SaleTender`; `IPosService`: open till, **complete sale** (multi-currency tenders + change → Dr tenders/Cr revenue/Cr output VAT; then Dr COGS/Cr stock via the inventory issue), **X-read** (non-resetting) and **Z-read** (sequential, immutable, closes the session). `AddPointOfSale` migration. Test: sale 10@2 net 20+VAT 3, cash 25 with 2 change → gross 23, COGS via stock issue, X/Z reads, stock 100→90. Fixed a posting-engine bug (same account on multiple journal lines duplicated period balances). |
+| **6B** Full-screen touch POS UI + offline sync | ⬜ | Large WPF UI follow-up (like the report designer); the transaction engine is complete |
+
+**Phase 6 status:** POS transaction + accounting core complete and tested (till sessions, multi-currency tendering, COGS, X/Z reads). The full-screen touch UI + offline sync are the remaining UI work.
+
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
 - **PostgreSQL 18** dev, min supported 16 (ADR-0002).
