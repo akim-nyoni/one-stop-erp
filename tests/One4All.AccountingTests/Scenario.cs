@@ -53,9 +53,10 @@ public static class Scenario
             FiscalPeriod period = year.AddPeriod(month, start.ToString("MMMM"), start, end);
             if (openPeriods)
             {
-                period.SetStatus("GL", PeriodStatus.Open);
-                period.SetStatus("AR", PeriodStatus.Open);
-                period.SetStatus("POS", PeriodStatus.Open);
+                foreach (string module in new[] { "GL", "AR", "AP", "CB", "POS" })
+                {
+                    period.SetStatus(module, PeriodStatus.Open);
+                }
             }
         }
 

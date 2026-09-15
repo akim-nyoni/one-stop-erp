@@ -43,7 +43,7 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 | **2C** Journals + period control + year-end | ⬜ | |
 | **2D** Tax engine | ⬜ | |
 | **2E** FX realised/unrealised + revaluation | ⬜ | |
-| **2F** Trial Balance, Nominal Activity, Balance Sheet, P&L | ⬜ | |
+| **2F** Trial Balance, Nominal Activity, Balance Sheet, P&L | ✅ | `IGeneralLedgerReports` query services over posted journals: Trial Balance (balances), Income Statement (net profit), Balance Sheet (balances, with current-year earnings in equity), Nominal Activity (opening/movements/running/closing). 4 report tests green (11 accounting total) |
 
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.

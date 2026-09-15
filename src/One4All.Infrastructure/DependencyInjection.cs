@@ -50,6 +50,7 @@ public static class DependencyInjection
 
         // Accounting.
         services.AddScoped<IPostingEngine, PostingEngine>();
+        services.AddScoped<Application.Abstractions.Reporting.IGeneralLedgerReports, GeneralLedgerReports>();
 
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
