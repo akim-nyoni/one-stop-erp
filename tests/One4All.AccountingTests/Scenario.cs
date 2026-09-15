@@ -97,6 +97,12 @@ public static class Scenario
         db.Accounts.Add(new LedgerAccount(company.Id, "2300", "Gift Card Liability", AccountType.Liability));
         db.Accounts.Add(new LedgerAccount(company.Id, "4900", "Breakage Income", AccountType.Income));
 
+        // Housing / land inventory (IAS 2): WIP → stands available → cost of land sales.
+        db.Accounts.Add(new LedgerAccount(company.Id, "1450", "Land & Housing Stock (WIP)", AccountType.Asset));
+        db.Accounts.Add(new LedgerAccount(company.Id, "1460", "Stands Available for Sale", AccountType.Asset));
+        db.Accounts.Add(new LedgerAccount(company.Id, "4100", "Land & Housing Sales", AccountType.Income));
+        db.Accounts.Add(new LedgerAccount(company.Id, "5100", "Cost of Land Sales", AccountType.Expense));
+
         // Foreign-currency bank (EUR) for FX revaluation, plus FX gain/loss control accounts.
         LedgerAccount foreignBank = new(company.Id, "1150", "Bank (EUR)", AccountType.Asset) { CurrencyRestriction = Eur };
         db.Accounts.Add(foreignBank);

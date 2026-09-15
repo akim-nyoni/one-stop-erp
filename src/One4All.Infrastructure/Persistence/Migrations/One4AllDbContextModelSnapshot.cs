@@ -998,6 +998,406 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("bank_statement_line", "cb");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.HousingApplicant", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DeletedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_on_utc");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("full_name");
+
+                    b.Property<string>("IdNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("id_number");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsVerified")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_verified");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("RegistrationDate")
+                        .HasColumnType("date")
+                        .HasColumnName("registration_date");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_applicant");
+
+                    b.HasIndex("CompanyId", "IdNumber")
+                        .HasDatabaseName("ix_applicant_company_id_id_number");
+
+                    b.ToTable("applicant", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.HousingScheme", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DeletedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_on_utc");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("SchemeType")
+                        .HasColumnType("integer")
+                        .HasColumnName("scheme_type");
+
+                    b.Property<int>("TargetBeneficiaries")
+                        .HasColumnType("integer")
+                        .HasColumnName("target_beneficiaries");
+
+                    b.HasKey("Id")
+                        .HasName("pk_scheme");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_scheme_company_id_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("scheme", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.HousingStand", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("AllocatedCost")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("allocated_cost");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("CurrentHolderCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("current_holder_customer_id");
+
+                    b.Property<long?>("DeletedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_on_utc");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<long>("LandParcelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("land_parcel_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long?>("SchemeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("scheme_id");
+
+                    b.Property<decimal>("SellingPrice")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("selling_price");
+
+                    b.Property<decimal>("SizeSquareMetres")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("size_square_metres");
+
+                    b.Property<string>("StandNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("stand_number");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stand");
+
+                    b.HasIndex("CompanyId", "StandNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stand_company_id_stand_number")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("stand", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.LandParcel", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("AcquisitionCost")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("acquisition_cost");
+
+                    b.Property<decimal>("AreaSquareMetres")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("area_square_metres");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DeletedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_on_utc");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("ParcelNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("parcel_number");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_land_parcel");
+
+                    b.HasIndex("CompanyId", "ParcelNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_land_parcel_company_id_parcel_number")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("land_parcel", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.OwnershipRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("ChangeType")
+                        .HasColumnType("integer")
+                        .HasColumnName("change_type");
+
+                    b.Property<decimal>("Consideration")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("consideration");
+
+                    b.Property<DateOnly>("EffectiveDate")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_date");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("hash");
+
+                    b.Property<long?>("HolderCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("holder_customer_id");
+
+                    b.Property<string>("HolderName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("holder_name");
+
+                    b.Property<long>("HousingStandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("housing_stand_id");
+
+                    b.Property<string>("PreviousHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("previous_hash");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ownership_record");
+
+                    b.HasIndex("HousingStandId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ownership_record_housing_stand_id_sequence");
+
+                    b.ToTable("ownership_record", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.Item", b =>
                 {
                     b.Property<long>("Id")
@@ -4637,6 +5037,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tax_rate_tax_codes_tax_code_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.OwnershipRecord", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany("Ownership")
+                        .HasForeignKey("HousingStandId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_ownership_record_housing_stands_housing_stand_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.PropertyServiceLink", b =>
                 {
                     b.HasOne("One4All.Core.Municipal.Property", null)
@@ -4825,6 +5235,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Accounting.TaxCode", b =>
                 {
                     b.Navigation("Rates");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.HousingStand", b =>
+                {
+                    b.Navigation("Ownership");
                 });
 
             modelBuilder.Entity("One4All.Core.Municipal.Property", b =>

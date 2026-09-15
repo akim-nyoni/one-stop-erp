@@ -81,6 +81,9 @@ public static class DependencyInjection
         // Municipality / Council billing.
         services.AddScoped<Application.Abstractions.Municipal.IMunicipalBillingService, Municipal.MunicipalBillingService>();
 
+        // Housing, Land & Estates.
+        services.AddScoped<Application.Abstractions.Housing.IHousingService, Housing.HousingService>();
+
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();

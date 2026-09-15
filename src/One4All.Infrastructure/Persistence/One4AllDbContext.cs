@@ -155,6 +155,18 @@ public class One4AllDbContext : DbContext
     /// <summary>Municipal meter readings.</summary>
     public DbSet<Core.Municipal.MeterReading> MeterReadings => Set<Core.Municipal.MeterReading>();
 
+    /// <summary>Housing land parcels (land bank).</summary>
+    public DbSet<Core.Housing.LandParcel> LandParcels => Set<Core.Housing.LandParcel>();
+
+    /// <summary>Housing schemes.</summary>
+    public DbSet<Core.Housing.HousingScheme> HousingSchemes => Set<Core.Housing.HousingScheme>();
+
+    /// <summary>Housing stands.</summary>
+    public DbSet<Core.Housing.HousingStand> HousingStands => Set<Core.Housing.HousingStand>();
+
+    /// <summary>Housing applicants (waiting list).</summary>
+    public DbSet<Core.Housing.HousingApplicant> HousingApplicants => Set<Core.Housing.HousingApplicant>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
