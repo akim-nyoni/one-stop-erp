@@ -137,6 +137,12 @@ public class One4AllDbContext : DbContext
     /// <summary>POS sales.</summary>
     public DbSet<Core.Pos.Sale> Sales => Set<Core.Pos.Sale>();
 
+    /// <summary>Gift cards.</summary>
+    public DbSet<Core.Vouchers.GiftCard> GiftCards => Set<Core.Vouchers.GiftCard>();
+
+    /// <summary>Sales orders.</summary>
+    public DbSet<Core.SalesOrders.SalesOrder> SalesOrders => Set<Core.SalesOrders.SalesOrder>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

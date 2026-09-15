@@ -85,6 +85,14 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 
 **Phase 6 status:** POS transaction + accounting core complete and tested (till sessions, multi-currency tendering, COGS, X/Z reads). The full-screen touch UI + offline sync are the remaining UI work.
 
+## Phase 7 — Vouchers + SOP
+| Increment | Status | Notes |
+|---|---|---|
+| **7A** Voucher management (gift cards) | ✅ | `GiftCard` (serial, balance, expiry, status); `IVoucherService`: issue (Dr cash/Cr **liability**, not revenue), redeem (balance draw-down; the GL debit is the sale's voucher tender), balance enquiry, over-redeem guard, and **breakage** (expired residual → Dr liability/Cr breakage income). `AddGiftCards` migration. Test: issue 50 → redeem 20 → over-redeem rejected → breakage 30. |
+| **7B** Sales Order Processing / Distribution | ✅ | `SalesOrder`/`SalesOrderLine` (ordered/despatched/invoiced qty + status); `ISalesOrderService`: create order, **despatch** (issues stock → cost of sales via the inventory service; back-order aware), **invoice** the despatched-but-uninvoiced qty via the AR service (Dr AR/Cr revenue/Cr VAT + open item). `AddSalesOrders` migration. Test: order 10@5 → despatch (COGS 10) → invoice 57.50 (net 50 + VAT 7.50); debtors 57.50; stock 100→90. |
+
+**Phase 7 status: COMPLETE.** Gift-card liability accounting and the quote/order→despatch→invoice distribution flow, both integrated through the posting engine, inventory and AR.
+
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
 - **PostgreSQL 18** dev, min supported 16 (ADR-0002).

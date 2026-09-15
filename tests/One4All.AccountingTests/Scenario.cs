@@ -58,7 +58,7 @@ public static class Scenario
             FiscalPeriod period = year.AddPeriod(month, start.ToString("MMMM"), start, end);
             if (openPeriods)
             {
-                foreach (string module in new[] { "GL", "AR", "AP", "CB", "POS", "INV", "POP" })
+                foreach (string module in new[] { "GL", "AR", "AP", "CB", "POS", "INV", "POP", "VOU" })
                 {
                     period.SetStatus(module, PeriodStatus.Open);
                 }
@@ -94,6 +94,8 @@ public static class Scenario
         db.Accounts.Add(new LedgerAccount(company.Id, "4000", "Sales", AccountType.Income));
         db.Accounts.Add(new LedgerAccount(company.Id, "5000", "Cost of Sales", AccountType.Expense));
         db.Accounts.Add(new LedgerAccount(company.Id, "3200", "Retained Earnings", AccountType.Equity));
+        db.Accounts.Add(new LedgerAccount(company.Id, "2300", "Gift Card Liability", AccountType.Liability));
+        db.Accounts.Add(new LedgerAccount(company.Id, "4900", "Breakage Income", AccountType.Income));
 
         // Foreign-currency bank (EUR) for FX revaluation, plus FX gain/loss control accounts.
         LedgerAccount foreignBank = new(company.Id, "1150", "Bank (EUR)", AccountType.Asset) { CurrencyRestriction = Eur };
