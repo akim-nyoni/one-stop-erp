@@ -84,6 +84,9 @@ public static class DependencyInjection
         // Housing, Land & Estates.
         services.AddScoped<Application.Abstractions.Housing.IHousingService, Housing.HousingService>();
 
+        // School management & fee billing.
+        services.AddScoped<Application.Abstractions.Schools.ISchoolBillingService, Schools.SchoolBillingService>();
+
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();

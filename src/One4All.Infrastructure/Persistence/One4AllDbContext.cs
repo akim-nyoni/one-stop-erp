@@ -167,6 +167,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Housing applicants (waiting list).</summary>
     public DbSet<Core.Housing.HousingApplicant> HousingApplicants => Set<Core.Housing.HousingApplicant>();
 
+    /// <summary>School fee structures.</summary>
+    public DbSet<Core.Schools.FeeStructure> FeeStructures => Set<Core.Schools.FeeStructure>();
+
+    /// <summary>Students.</summary>
+    public DbSet<Core.Schools.Student> Students => Set<Core.Schools.Student>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

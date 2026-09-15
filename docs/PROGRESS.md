@@ -101,6 +101,13 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 
 **Phase 8 status: COMPLETE.** Municipal billing (tariff engine + property/meter register + consumption/valuation billing→AR) and Housing land-bank (IAS 2 WIP→stands→COGS + tamper-evident ownership chain + cession controls). 124 tests green (85 unit + 9 integration + 30 accounting). Deferred depth: waiting-list allocation/ballot run, instalment schedules, council rental/voids, servicing-cost apportionment from job costing, housing permissions wiring.
 
+## Phase 9 — Schools
+| Increment | Status | Notes |
+|---|---|---|
+| **9A** School management & fee billing (§4.11) | ✅ | `sch` schema. `FeeStructure`/`FeeItem` (per grade/term, compulsory vs optional items, compulsory-total charge, fee-income account); `Student` (admission no., grade, guardian/sponsor customer account, boarder flag, **bursary** — percentage or value, capped at fees). `ISchoolBillingService`: bill one student, and **term billing run** across all enrolled students in a grade — computes compulsory fees less bursary and raises the net on the **guardian/sponsor AR account** (one invoice per student, statements/ageing reuse AR). `AddSchools` migration. Test: Grade-1 structure (tuition 900 + levy 100 compulsory, trip 50 optional) → 2 students, one full-fee + one 25% bursary → term run bills 1000 + 750 = **1750 debtors**, trial balance balances. |
+
+**Phase 9 status:** Fee billing core complete — structures, students, bursaries, and the per-term billing run posting to guardian AR. Deferred depth: deferred-income recognition across the term, sponsor split billing, sibling/staff-child discounts, optional-item opt-in, tuck shop/boarding/transport-route billing, hostel allocation.
+
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
 - **PostgreSQL 18** dev, min supported 16 (ADR-0002).

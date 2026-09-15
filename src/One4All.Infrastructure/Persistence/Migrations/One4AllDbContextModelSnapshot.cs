@@ -3066,6 +3066,237 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("sales_order_line", "sop");
                 });
 
+            modelBuilder.Entity("One4All.Core.Schools.FeeItem", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<long>("FeeStructureId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fee_structure_id");
+
+                    b.Property<bool>("IsCompulsory")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_compulsory");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_fee_item");
+
+                    b.HasIndex("FeeStructureId")
+                        .HasDatabaseName("ix_fee_item_fee_structure_id");
+
+                    b.ToTable("fee_item", "sch");
+                });
+
+            modelBuilder.Entity("One4All.Core.Schools.FeeStructure", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DeletedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_on_utc");
+
+                    b.Property<string>("Grade")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("grade");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("RevenueAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("revenue_account_code");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Term")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("term");
+
+                    b.HasKey("Id")
+                        .HasName("pk_fee_structure");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_fee_structure_company_id_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("fee_structure", "sch");
+                });
+
+            modelBuilder.Entity("One4All.Core.Schools.Student", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AdmissionNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("admission_number");
+
+                    b.Property<int>("BursaryType")
+                        .HasColumnType("integer")
+                        .HasColumnName("bursary_type");
+
+                    b.Property<decimal>("BursaryValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("bursary_value");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DeletedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_on_utc");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("full_name");
+
+                    b.Property<string>("Grade")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("grade");
+
+                    b.Property<long>("GuardianCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("guardian_customer_id");
+
+                    b.Property<bool>("IsBoarder")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_boarder");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsEnrolled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enrolled");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_student");
+
+                    b.HasIndex("CompanyId", "AdmissionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_student_company_id_admission_number")
+                        .HasFilter("is_deleted = false");
+
+                    b.HasIndex("CompanyId", "Grade")
+                        .HasDatabaseName("ix_student_company_id_grade");
+
+                    b.ToTable("student", "sch");
+                });
+
             modelBuilder.Entity("One4All.Core.Security.AccessScope", b =>
                 {
                     b.Property<long>("Id")
@@ -5117,6 +5348,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sales_order_line_sales_orders_sales_order_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Schools.FeeItem", b =>
+                {
+                    b.HasOne("One4All.Core.Schools.FeeStructure", null)
+                        .WithMany("Items")
+                        .HasForeignKey("FeeStructureId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_fee_item_fee_structures_fee_structure_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Security.AccessScope", b =>
                 {
                     b.HasOne("One4All.Core.Security.UserRole", null)
@@ -5272,6 +5513,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.SalesOrders.SalesOrder", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Schools.FeeStructure", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("One4All.Core.Security.Group", b =>
