@@ -24,6 +24,9 @@ public static class Schemas
     /// <summary>Accounts Payable (Purchase Ledger).</summary>
     public const string AccountsPayable = "ap";
 
+    /// <summary>Trading sub-ledger shared between AR and AP (open items, allocations).</summary>
+    public const string Trading = "trd";
+
     /// <summary>Cash Book / Treasury.</summary>
     public const string CashBook = "cb";
 

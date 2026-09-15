@@ -86,6 +86,18 @@ public class One4AllDbContext : DbContext
     /// <summary>Stored report definitions.</summary>
     public DbSet<Core.Reporting.ReportDefinitionRecord> ReportDefinitions => Set<Core.Reporting.ReportDefinitionRecord>();
 
+    /// <summary>Customers (Sales Ledger).</summary>
+    public DbSet<Core.Trading.Customer> Customers => Set<Core.Trading.Customer>();
+
+    /// <summary>Suppliers (Purchase Ledger).</summary>
+    public DbSet<Core.Trading.Supplier> Suppliers => Set<Core.Trading.Supplier>();
+
+    /// <summary>Trader open items (AR + AP).</summary>
+    public DbSet<Core.Trading.OpenItem> OpenItems => Set<Core.Trading.OpenItem>();
+
+    /// <summary>Trader allocations.</summary>
+    public DbSet<Core.Trading.Allocation> Allocations => Set<Core.Trading.Allocation>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

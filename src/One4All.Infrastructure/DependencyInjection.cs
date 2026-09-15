@@ -59,6 +59,13 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Reporting.IFinancialReportRenderer, Reporting.FinancialReportRenderer>();
         services.AddScoped<Persistence.Seeding.ReportCatalogueSeeder>();
 
+        // Trading sub-ledgers (AR/AP + Cash Book).
+        services.AddScoped<Trading.TradingService>();
+        services.AddScoped<Application.Abstractions.Trading.ISalesLedgerService>(sp => sp.GetRequiredService<Trading.TradingService>());
+        services.AddScoped<Application.Abstractions.Trading.IPurchaseLedgerService>(sp => sp.GetRequiredService<Trading.TradingService>());
+        services.AddScoped<Application.Abstractions.Trading.IAllocationService>(sp => sp.GetRequiredService<Trading.TradingService>());
+        services.AddScoped<Application.Abstractions.Trading.ITradingReports, Trading.TradingReports>();
+
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();

@@ -1,0 +1,145 @@
+using One4All.Core.Accounting;
+
+namespace One4All.Application.Abstractions.Trading;
+
+/// <summary>The result of posting a trading document.</summary>
+/// <param name="OpenItemId">The created open-item id.</param>
+/// <param name="JournalNumber">The GL journal number.</param>
+/// <param name="BaseAmount">The gross amount in base currency.</param>
+public readonly record struct TradingPostingResult(long OpenItemId, string JournalNumber, decimal BaseAmount);
+
+/// <summary>A request to post a sales invoice (AR).</summary>
+public sealed class SalesInvoiceRequest
+{
+    /// <summary>The company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>The customer.</summary>
+    public long CustomerId { get; init; }
+
+    /// <summary>The invoice number.</summary>
+    public string DocumentNumber { get; init; } = string.Empty;
+
+    /// <summary>The invoice date.</summary>
+    public DateOnly DocumentDate { get; init; }
+
+    /// <summary>The transaction currency.</summary>
+    public CurrencyCode Currency { get; init; }
+
+    /// <summary>The net (tax-exclusive) amount.</summary>
+    public decimal NetAmount { get; init; }
+
+    /// <summary>The tax amount.</summary>
+    public decimal TaxAmount { get; init; }
+
+    /// <summary>The revenue account code (credited).</summary>
+    public string SalesAccountCode { get; init; } = string.Empty;
+
+    /// <summary>The output-tax account code (credited), when there is tax.</summary>
+    public string? TaxAccountCode { get; init; }
+
+    /// <summary>Optional explicit exchange rate; otherwise the daily rate is used.</summary>
+    public decimal? ExchangeRate { get; init; }
+
+    /// <summary>Optional narrative.</summary>
+    public string? Narrative { get; init; }
+}
+
+/// <summary>A request to post a receipt against a customer (AR).</summary>
+public sealed class ReceiptRequest
+{
+    /// <summary>The company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>The customer.</summary>
+    public long CustomerId { get; init; }
+
+    /// <summary>The receipt number.</summary>
+    public string DocumentNumber { get; init; } = string.Empty;
+
+    /// <summary>The receipt date.</summary>
+    public DateOnly ReceiptDate { get; init; }
+
+    /// <summary>The transaction currency.</summary>
+    public CurrencyCode Currency { get; init; }
+
+    /// <summary>The amount received.</summary>
+    public decimal Amount { get; init; }
+
+    /// <summary>The bank/cash account code (debited).</summary>
+    public string BankAccountCode { get; init; } = string.Empty;
+
+    /// <summary>Optional explicit exchange rate.</summary>
+    public decimal? ExchangeRate { get; init; }
+
+    /// <summary>Optional narrative.</summary>
+    public string? Narrative { get; init; }
+}
+
+/// <summary>A request to post a supplier invoice (AP).</summary>
+public sealed class PurchaseInvoiceRequest
+{
+    /// <summary>The company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>The supplier.</summary>
+    public long SupplierId { get; init; }
+
+    /// <summary>The invoice number.</summary>
+    public string DocumentNumber { get; init; } = string.Empty;
+
+    /// <summary>The invoice date.</summary>
+    public DateOnly DocumentDate { get; init; }
+
+    /// <summary>The transaction currency.</summary>
+    public CurrencyCode Currency { get; init; }
+
+    /// <summary>The net amount.</summary>
+    public decimal NetAmount { get; init; }
+
+    /// <summary>The tax amount.</summary>
+    public decimal TaxAmount { get; init; }
+
+    /// <summary>The expense/stock account code (debited).</summary>
+    public string ExpenseAccountCode { get; init; } = string.Empty;
+
+    /// <summary>The input-tax account code (debited), when there is recoverable tax.</summary>
+    public string? TaxAccountCode { get; init; }
+
+    /// <summary>Optional explicit exchange rate.</summary>
+    public decimal? ExchangeRate { get; init; }
+
+    /// <summary>Optional narrative.</summary>
+    public string? Narrative { get; init; }
+}
+
+/// <summary>A request to post a payment to a supplier (AP).</summary>
+public sealed class PaymentRequest
+{
+    /// <summary>The company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>The supplier.</summary>
+    public long SupplierId { get; init; }
+
+    /// <summary>The payment number.</summary>
+    public string DocumentNumber { get; init; } = string.Empty;
+
+    /// <summary>The payment date.</summary>
+    public DateOnly PaymentDate { get; init; }
+
+    /// <summary>The transaction currency.</summary>
+    public CurrencyCode Currency { get; init; }
+
+    /// <summary>The amount paid.</summary>
+    public decimal Amount { get; init; }
+
+    /// <summary>The bank/cash account code (credited).</summary>
+    public string BankAccountCode { get; init; } = string.Empty;
+
+    /// <summary>Optional explicit exchange rate.</summary>
+    public decimal? ExchangeRate { get; init; }
+
+    /// <summary>Optional narrative.</summary>
+    public string? Narrative { get; init; }
+}

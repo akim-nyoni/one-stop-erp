@@ -58,6 +58,14 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 
 **Phase 3 status:** the reporting **engine** (definition model, expression engine, banded rendering to HTML/PDF/CSV/ESC-POS, persistence, bursting, and the first bound report) is complete and tested — later modules can ship reports on it now. The visual WPF designer/viewer is the remaining piece.
 
+## Phase 4 — AR + AP + Cash Book
+| Increment | Status | Notes |
+|---|---|---|
+| **4A/4B/4C** Trader master + sub-ledgers + allocation | ✅ | `Customer`/`Supplier` master; unified `OpenItem`/`Allocation` sub-ledger (`trd` schema, AR+AP). `ISalesLedgerService` (invoice, receipt) + `IPurchaseLedgerService` (invoice, payment) post through the central engine and create open items. `IAllocationService` matches debit↔credit items, reduces outstanding, and **realises FX** from differing base rates (posts to FX gain/loss + control). `ITradingReports`: aged debtors/creditors + open-item customer statement. Migration `AddTradingLedgers`. 3 trading tests green (settle + no FX, cross-rate realised gain 10, AP ageing) |
+| **4D–4F** Credit notes, payment runs, bank reconciliation, dunning, statements-render, full report set | ⬜ | Follow-up increments |
+
+**Phase 4 status:** the AR/AP sub-ledger core (trader master, invoice/receipt/payment posting, open-item allocation with realised FX, ageing, statement) is done and tested. Bank reconciliation, payment runs, dunning and the full report set remain.
+
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
 - **PostgreSQL 18** dev, min supported 16 (ADR-0002).
