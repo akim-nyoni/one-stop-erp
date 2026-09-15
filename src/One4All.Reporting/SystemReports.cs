@@ -78,6 +78,76 @@ public static class SystemReports
         return def;
     }
 
+    /// <summary>The customer statement report code.</summary>
+    public const string CustomerStatementCode = "AR-STMT";
+
+    /// <summary>Builds the open-item customer statement definition (brief §14 report 26).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition CustomerStatement()
+    {
+        ReportDefinition def = new()
+        {
+            Code = CustomerStatementCode,
+            Name = "Customer Statement",
+            Module = "Sales",
+            Description = "Outstanding items for a customer, with the closing balance.",
+        };
+        def.DataSources.Add(new ReportDataSource { Name = "Main", Kind = DataSourceKind.InMemory, Command = "CustomerStatement" });
+
+        def.Bands.Add(new ReportBand
+        {
+            Type = BandType.ReportHeader,
+            Height = 60,
+            Elements =
+            [
+                new ReportElement { Kind = ElementKind.Expression, Name = "company", Expression = "CompanyName", X = 0, Y = 0, Width = 400, Height = 16, Bold = true, FontSize = 13 },
+                Label("title", "Statement of Account", 0, 20, 300, 14, bold: true, size: 11),
+                new ReportElement { Kind = ElementKind.Expression, Name = "cust", Expression = "\"Account: \" + Param(\"TraderCode\") + \"  \" + Param(\"TraderName\")", X = 0, Y = 38, Width = 400, Height = 12, FontSize = 9 },
+            ],
+        });
+
+        def.Bands.Add(new ReportBand
+        {
+            Type = BandType.PageHeader,
+            Height = 18,
+            Elements =
+            [
+                Label("hDate", "Date", 0, 2, 70, 12, bold: true),
+                Label("hType", "Type", 75, 2, 90, 12, bold: true),
+                Label("hNum", "Number", 170, 2, 100, 12, bold: true),
+                Label("hDue", "Due", 275, 2, 70, 12, bold: true),
+                Label("hOut", "Outstanding", 420, 2, 90, 12, bold: true, align: ReportHAlign.Right),
+            ],
+        });
+
+        def.Bands.Add(new ReportBand
+        {
+            Type = BandType.Detail,
+            Height = 14,
+            Elements =
+            [
+                Field("dDate", "Date", 0, 0, 70, 12, format: "yyyy-MM-dd"),
+                Field("dType", "Type", 75, 0, 90, 12),
+                Field("dNum", "Number", 170, 0, 100, 12),
+                Field("dDue", "Due", 275, 0, 70, 12, format: "yyyy-MM-dd"),
+                Field("dOut", "Outstanding", 420, 0, 90, 12, format: "N2", align: ReportHAlign.Right),
+            ],
+        });
+
+        def.Bands.Add(new ReportBand
+        {
+            Type = BandType.ReportFooter,
+            Height = 22,
+            Elements =
+            [
+                Label("bLabel", "Balance due", 275, 4, 140, 14, bold: true),
+                Aggregate("bTotal", "Outstanding", 420, 4, 90, 14, bold: true, align: ReportHAlign.Right),
+            ],
+        });
+
+        return def;
+    }
+
     private static ReportElement Label(string name, string text, double x, double y, double w, double h, bool bold = false, double size = 9, ReportHAlign align = ReportHAlign.Left) =>
         new() { Kind = ElementKind.Label, Name = name, Text = text, X = x, Y = y, Width = w, Height = h, Bold = bold, FontSize = size, HAlign = align };
 

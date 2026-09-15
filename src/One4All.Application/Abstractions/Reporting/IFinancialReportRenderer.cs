@@ -37,4 +37,12 @@ public interface IFinancialReportRenderer
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The rendered document, or an error.</returns>
     Task<Result<RenderedDocument>> RenderTrialBalanceAsync(long companyId, DateOnly asAtDate, ReportFormat format, CancellationToken ct = default);
+
+    /// <summary>Renders a customer's open-item statement to the requested format.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="customerId">The customer.</param>
+    /// <param name="format">The output format.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The rendered document, or an error.</returns>
+    Task<Result<RenderedDocument>> RenderCustomerStatementAsync(long companyId, long customerId, ReportFormat format, CancellationToken ct = default);
 }

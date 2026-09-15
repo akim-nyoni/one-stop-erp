@@ -55,5 +55,6 @@ public sealed class ReportCatalogueSeeder
     private static IEnumerable<ReportDefinition> SystemDefinitions()
     {
         yield return SystemReports.TrialBalance();
+        yield return SystemReports.CustomerStatement();
     }
 }
