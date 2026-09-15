@@ -65,6 +65,21 @@ public class One4AllDbContext : DbContext
     /// <summary>Installed licence tokens (active + history).</summary>
     public DbSet<InstalledLicence> InstalledLicences => Set<InstalledLicence>();
 
+    /// <summary>Chart of accounts.</summary>
+    public DbSet<LedgerAccount> Accounts => Set<LedgerAccount>();
+
+    /// <summary>Cost centres.</summary>
+    public DbSet<CostCentre> CostCentres => Set<CostCentre>();
+
+    /// <summary>Departments (GL analysis dimension).</summary>
+    public DbSet<Department> Departments => Set<Department>();
+
+    /// <summary>Posted and draft journals.</summary>
+    public DbSet<JournalEntry> Journals => Set<JournalEntry>();
+
+    /// <summary>GL period balances.</summary>
+    public DbSet<GlPeriodBalance> PeriodBalances => Set<GlPeriodBalance>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

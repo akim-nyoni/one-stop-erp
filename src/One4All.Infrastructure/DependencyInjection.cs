@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Licensing;
 using One4All.Application.Abstractions.Security;
+using One4All.Infrastructure.Accounting;
 using One4All.Infrastructure.Licensing;
 using One4All.Infrastructure.Persistence;
 using One4All.Infrastructure.Persistence.Auditing;
@@ -45,6 +47,9 @@ public static class DependencyInjection
         services.AddSingleton(new AuthenticationOptions());
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+
+        // Accounting.
+        services.AddScoped<IPostingEngine, PostingEngine>();
 
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());

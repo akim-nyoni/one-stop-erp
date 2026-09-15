@@ -35,6 +35,16 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 
 ---
 
+## Phase 2 — Accounting Core
+| Increment | Status | Notes |
+|---|---|---|
+| **2A** Chart of accounts | ✅ | `LedgerAccount` (composite AccountCode+CostCentre+Department via `AccountKey`; account types + normal-balance rules; `ControlAccountType`; manual-journal lock), CostCentre/Department dimensions; EF config + migration |
+| **2B** Posting engine | ✅ | Central non-bypassable `IPostingEngine`: enforces **Dr=Cr in base + per transaction currency**, open-period check (per-module), account validity/active, control-account manual-journal block, currency restriction, FX rate lookup, gapless journal numbering, and `gl.period_balance` update — all in one transaction. `JournalEntry`/`JournalLine`/`GlPeriodBalance`. **7 accounting tests green** (balanced posts + TB nets to zero, unbalanced rejected, control-account block, sub-ledger posting, closed-period rejected, multi-currency, sequential numbering) |
+| **2C** Journals + period control + year-end | ⬜ | |
+| **2D** Tax engine | ⬜ | |
+| **2E** FX realised/unrealised + revaluation | ⬜ | |
+| **2F** Trial Balance, Nominal Activity, Balance Sheet, P&L | ⬜ | |
+
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
 - **PostgreSQL 18** dev, min supported 16 (ADR-0002).
