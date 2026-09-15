@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\One4All.Application\One4All.Application.csproj" />
     <ProjectReference Include="..\One4All.Core\One4All.Core.csproj" />
+    <ProjectReference Include="..\One4All.Reporting\One4All.Reporting.csproj" />
   </ItemGroup>
 
   <ItemGroup>

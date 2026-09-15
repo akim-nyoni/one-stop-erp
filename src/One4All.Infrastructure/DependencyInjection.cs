@@ -56,6 +56,8 @@ public static class DependencyInjection
         services.AddScoped<IFxRevaluationService, FxRevaluationService>();
         services.AddSingleton<IFiscalDeviceProvider, NullFiscalDeviceProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IGeneralLedgerReports, GeneralLedgerReports>();
+        services.AddScoped<Application.Abstractions.Reporting.IFinancialReportRenderer, Reporting.FinancialReportRenderer>();
+        services.AddScoped<Persistence.Seeding.ReportCatalogueSeeder>();
 
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());

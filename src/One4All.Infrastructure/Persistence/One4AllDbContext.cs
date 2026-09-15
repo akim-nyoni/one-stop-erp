@@ -83,6 +83,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Tax codes.</summary>
     public DbSet<TaxCode> TaxCodes => Set<TaxCode>();
 
+    /// <summary>Stored report definitions.</summary>
+    public DbSet<Core.Reporting.ReportDefinitionRecord> ReportDefinitions => Set<Core.Reporting.ReportDefinitionRecord>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

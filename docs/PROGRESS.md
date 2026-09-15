@@ -53,8 +53,10 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 | **3A** Report definition model | ✅ | `ReportDefinition` (page setup, parameters, data sources, groups, bands, elements with conditional formatting) + `.mrpt` JSON serializer |
 | **3B** Expression engine | ✅ | Sandboxed `ReportExpressionEngine` (DynamicExpresso) with curated library (string/math/date/logical), field/param/page-variable access, `NumberToWords`/`AmountToWords`, `ToBase`. Reused by payroll later |
 | **3C** Rendering engine + renderers | ✅ | Banded `ReportEngine` (multi-level grouping, scoped aggregates, expressions, conditional formats, suppression) → HTML, PDF (QuestPDF), CSV, plain-text/ESC-POS renderers. 16 unit tests green |
-| **3D** Persist definitions + bind Phase 2 reports + bursting | ⬜ | |
-| **3E** WPF viewer + designer | ⬜ | Full drag-drop canvas is a large follow-up; a viewer + basic designer first |
+| **3D** Persist definitions + bind Phase 2 reports + bursting | ✅ | `rpt.report_definition` entity + migration; `SystemReports.TrialBalance()` definition; `ReportCatalogueSeeder` (idempotent); `IFinancialReportRenderer` renders the live Trial Balance to HTML/PDF/CSV/text through the engine (definition resolved user→company→system); `ReportBurster` splits a run by key. Verified with a rendered PDF. 6 more tests (72 unit + 16 accounting) |
+| **3E** WPF viewer + designer | ⬜ | The banded engine, persistence, renderers and bursting are done; the interactive WPF drag-drop **designer** and in-app viewer remain as a focused follow-up |
+
+**Phase 3 status:** the reporting **engine** (definition model, expression engine, banded rendering to HTML/PDF/CSV/ESC-POS, persistence, bursting, and the first bound report) is complete and tested — later modules can ship reports on it now. The visual WPF designer/viewer is the remaining piece.
 
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
