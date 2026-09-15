@@ -65,6 +65,8 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Trading.IPurchaseLedgerService>(sp => sp.GetRequiredService<Trading.TradingService>());
         services.AddScoped<Application.Abstractions.Trading.IAllocationService>(sp => sp.GetRequiredService<Trading.TradingService>());
         services.AddScoped<Application.Abstractions.Trading.ITradingReports, Trading.TradingReports>();
+        services.AddScoped<Application.Abstractions.Trading.IPaymentRunService, Trading.PaymentRunService>();
+        services.AddScoped<Application.Abstractions.Banking.IBankReconciliationService, Banking.BankReconciliationService>();
 
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());

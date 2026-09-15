@@ -107,6 +107,92 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
+    public async Task<Result<TradingPostingResult>> PostCreditNoteAsync(SalesCreditNoteRequest request, CancellationToken ct = default)
+    {
+        Customer? customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
+        if (customer is null)
+        {
+            return Error.NotFound("Ar.CustomerNotFound", $"Customer {request.CustomerId} not found.");
+        }
+
+        Result<string> controlResult = await ControlCodeAsync(request.CompanyId, ControlAccountType.AccountsReceivable, ct).ConfigureAwait(false);
+        if (controlResult.IsFailure)
+        {
+            return controlResult.Error;
+        }
+
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct).ConfigureAwait(false);
+        if (rateResult.IsFailure)
+        {
+            return rateResult.Error;
+        }
+
+        decimal rate = rateResult.Value;
+        decimal gross = request.NetAmount + request.TaxAmount;
+        decimal baseNet = Round(request.NetAmount * rate);
+        decimal baseTax = Round(request.TaxAmount * rate);
+        decimal baseGross = baseNet + baseTax;
+
+        // Reverse of an invoice: Dr revenue, Dr output tax, Cr AR control.
+        List<JournalLineRequest> lines =
+        [
+            Line(request.SalesAccountCode, JournalSide.Debit, request.NetAmount, rate, baseNet),
+            Line(controlResult.Value, JournalSide.Credit, gross, rate, baseGross),
+        ];
+        if (request.TaxAmount != 0m && request.TaxAccountCode is not null)
+        {
+            lines.Add(Line(request.TaxAccountCode, JournalSide.Debit, request.TaxAmount, rate, baseTax));
+        }
+
+        return await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.CreditNote,
+            LedgerSign.Credit, request.DocumentNumber, request.DocumentDate, request.DocumentDate, request.Currency, rate,
+            gross, baseGross, request.Narrative, lines, request.SalesAccountCode, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<TradingPostingResult>> PostCreditNoteAsync(PurchaseCreditNoteRequest request, CancellationToken ct = default)
+    {
+        Supplier? supplier = await _db.Suppliers.FirstOrDefaultAsync(s => s.Id == request.SupplierId && s.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
+        if (supplier is null)
+        {
+            return Error.NotFound("Ap.SupplierNotFound", $"Supplier {request.SupplierId} not found.");
+        }
+
+        Result<string> controlResult = await ControlCodeAsync(request.CompanyId, ControlAccountType.AccountsPayable, ct).ConfigureAwait(false);
+        if (controlResult.IsFailure)
+        {
+            return controlResult.Error;
+        }
+
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct).ConfigureAwait(false);
+        if (rateResult.IsFailure)
+        {
+            return rateResult.Error;
+        }
+
+        decimal rate = rateResult.Value;
+        decimal gross = request.NetAmount + request.TaxAmount;
+        decimal baseNet = Round(request.NetAmount * rate);
+        decimal baseTax = Round(request.TaxAmount * rate);
+        decimal baseGross = baseNet + baseTax;
+
+        // Reverse of a supplier invoice: Dr AP control, Cr expense, Cr input tax.
+        List<JournalLineRequest> lines =
+        [
+            Line(controlResult.Value, JournalSide.Debit, gross, rate, baseGross),
+            Line(request.ExpenseAccountCode, JournalSide.Credit, request.NetAmount, rate, baseNet),
+        ];
+        if (request.TaxAmount != 0m && request.TaxAccountCode is not null)
+        {
+            lines.Add(Line(request.TaxAccountCode, JournalSide.Credit, request.TaxAmount, rate, baseTax));
+        }
+
+        return await PostAndOpenAsync(request.CompanyId, "AP", TradingLedger.AccountsPayable, supplier.Id, OpenItemType.CreditNote,
+            LedgerSign.Debit, request.DocumentNumber, request.DocumentDate, request.DocumentDate, request.Currency, rate,
+            gross, baseGross, request.Narrative, lines, request.ExpenseAccountCode, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<TradingPostingResult>> PostInvoiceAsync(PurchaseInvoiceRequest request, CancellationToken ct = default)
     {
         Supplier? supplier = await _db.Suppliers.FirstOrDefaultAsync(s => s.Id == request.SupplierId && s.CompanyId == request.CompanyId, ct).ConfigureAwait(false);

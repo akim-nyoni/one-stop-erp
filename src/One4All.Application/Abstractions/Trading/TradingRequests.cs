@@ -113,6 +113,80 @@ public sealed class PurchaseInvoiceRequest
     public string? Narrative { get; init; }
 }
 
+/// <summary>A request to post a credit note to a customer (AR) — reduces the debtor balance.</summary>
+public sealed class SalesCreditNoteRequest
+{
+    /// <summary>The company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>The customer.</summary>
+    public long CustomerId { get; init; }
+
+    /// <summary>The credit-note number.</summary>
+    public string DocumentNumber { get; init; } = string.Empty;
+
+    /// <summary>The document date.</summary>
+    public DateOnly DocumentDate { get; init; }
+
+    /// <summary>The transaction currency.</summary>
+    public CurrencyCode Currency { get; init; }
+
+    /// <summary>The net amount credited.</summary>
+    public decimal NetAmount { get; init; }
+
+    /// <summary>The tax amount credited.</summary>
+    public decimal TaxAmount { get; init; }
+
+    /// <summary>The revenue/returns account code (debited).</summary>
+    public string SalesAccountCode { get; init; } = string.Empty;
+
+    /// <summary>The output-tax account code (debited), when there is tax.</summary>
+    public string? TaxAccountCode { get; init; }
+
+    /// <summary>Optional explicit exchange rate.</summary>
+    public decimal? ExchangeRate { get; init; }
+
+    /// <summary>Optional narrative.</summary>
+    public string? Narrative { get; init; }
+}
+
+/// <summary>A request to post a credit note from a supplier (AP) — reduces the creditor balance.</summary>
+public sealed class PurchaseCreditNoteRequest
+{
+    /// <summary>The company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>The supplier.</summary>
+    public long SupplierId { get; init; }
+
+    /// <summary>The credit-note number.</summary>
+    public string DocumentNumber { get; init; } = string.Empty;
+
+    /// <summary>The document date.</summary>
+    public DateOnly DocumentDate { get; init; }
+
+    /// <summary>The transaction currency.</summary>
+    public CurrencyCode Currency { get; init; }
+
+    /// <summary>The net amount.</summary>
+    public decimal NetAmount { get; init; }
+
+    /// <summary>The tax amount.</summary>
+    public decimal TaxAmount { get; init; }
+
+    /// <summary>The expense/stock account code (credited).</summary>
+    public string ExpenseAccountCode { get; init; } = string.Empty;
+
+    /// <summary>The input-tax account code (credited), when there is tax.</summary>
+    public string? TaxAccountCode { get; init; }
+
+    /// <summary>Optional explicit exchange rate.</summary>
+    public decimal? ExchangeRate { get; init; }
+
+    /// <summary>Optional narrative.</summary>
+    public string? Narrative { get; init; }
+}
+
 /// <summary>A request to post a payment to a supplier (AP).</summary>
 public sealed class PaymentRequest
 {

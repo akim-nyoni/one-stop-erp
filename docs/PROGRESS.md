@@ -62,9 +62,11 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 | Increment | Status | Notes |
 |---|---|---|
 | **4A/4B/4C** Trader master + sub-ledgers + allocation | ✅ | `Customer`/`Supplier` master; unified `OpenItem`/`Allocation` sub-ledger (`trd` schema, AR+AP). `ISalesLedgerService` (invoice, receipt) + `IPurchaseLedgerService` (invoice, payment) post through the central engine and create open items. `IAllocationService` matches debit↔credit items, reduces outstanding, and **realises FX** from differing base rates (posts to FX gain/loss + control). `ITradingReports`: aged debtors/creditors + open-item customer statement. Migration `AddTradingLedgers`. 3 trading tests green (settle + no FX, cross-rate realised gain 10, AP ageing) |
-| **4D–4F** Credit notes, payment runs, bank reconciliation, dunning, statements-render, full report set | ⬜ | Follow-up increments |
+| **4D** Credit notes (AR + AP) | ✅ | `PostCreditNoteAsync` on both ledgers (reverse of an invoice), allocatable like any credit item. Test: sales credit note reduces the debtor to 95 |
+| **4E** Payment run + bank reconciliation | ✅ | `IPaymentRunService` (selects due AP invoices, pays per supplier through the engine, allocates, generates a bank EFT file); `IBankReconciliationService` (import statement lines, auto-match to GL cash-book postings by amount, reconciliation statement with GL vs statement balance + unpresented items). `AddCashBookAndCreditNotes` migration (`cb.bank_account`/`cb.bank_statement_line`). 2 tests green (payment run pays 300 + EFT; bank rec auto-matches, difference 0) |
+| **4F** Dunning + statement PDF rendering + full report set | ⬜ | Light follow-up: statement DTO already exists; renders on the Phase 3 engine |
 
-**Phase 4 status:** the AR/AP sub-ledger core (trader master, invoice/receipt/payment posting, open-item allocation with realised FX, ageing, statement) is done and tested. Bank reconciliation, payment runs, dunning and the full report set remain.
+**Phase 4 status: substantially complete.** AR/AP/Cash Book functional core done and tested — trader master, invoice/receipt/payment/credit-note posting, open-item allocation with realised FX, ageing, statements, **payment runs with EFT**, and **bank reconciliation**. Dunning letters and statement PDF rendering (both thin wrappers over the report engine) remain as polish.
 
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.

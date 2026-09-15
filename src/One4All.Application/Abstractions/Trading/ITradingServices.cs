@@ -24,6 +24,12 @@ public interface ISalesLedgerService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The posting result.</returns>
     Task<Result<TradingPostingResult>> PostReceiptAsync(ReceiptRequest request, CancellationToken ct = default);
+
+    /// <summary>Posts a credit note: Dr revenue, Dr output tax, Cr AR control; creates an AR (credit) open item.</summary>
+    /// <param name="request">The credit-note request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The posting result.</returns>
+    Task<Result<TradingPostingResult>> PostCreditNoteAsync(SalesCreditNoteRequest request, CancellationToken ct = default);
 }
 
 /// <summary>The Purchase Ledger (AP) posting service (brief §4.6).</summary>
@@ -40,6 +46,12 @@ public interface IPurchaseLedgerService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The posting result.</returns>
     Task<Result<TradingPostingResult>> PostPaymentAsync(PaymentRequest request, CancellationToken ct = default);
+
+    /// <summary>Posts a supplier credit note: Dr AP control, Cr expense/stock, Cr input tax; creates an AP (debit) open item.</summary>
+    /// <param name="request">The credit-note request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The posting result.</returns>
+    Task<Result<TradingPostingResult>> PostCreditNoteAsync(PurchaseCreditNoteRequest request, CancellationToken ct = default);
 }
 
 /// <summary>Matches credit items against debit items and realises FX (brief §4.5 allocation/matching).</summary>

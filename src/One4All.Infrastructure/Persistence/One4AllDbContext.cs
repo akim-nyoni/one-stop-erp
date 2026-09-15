@@ -98,6 +98,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Trader allocations.</summary>
     public DbSet<Core.Trading.Allocation> Allocations => Set<Core.Trading.Allocation>();
 
+    /// <summary>Bank/cash accounts.</summary>
+    public DbSet<Core.Banking.BankAccount> BankAccounts => Set<Core.Banking.BankAccount>();
+
+    /// <summary>Imported bank statement lines.</summary>
+    public DbSet<Core.Banking.BankStatementLine> BankStatementLines => Set<Core.Banking.BankStatementLine>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
