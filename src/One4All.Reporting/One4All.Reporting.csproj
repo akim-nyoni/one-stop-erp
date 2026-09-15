@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- In-house banded report definition model, expression engine, rendering engine and renderers. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>One4All.Reporting</RootNamespace>
+    <IsCoreLayer>true</IsCoreLayer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\One4All.Core\One4All.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DynamicExpresso.Core" Version="2.16.1" />
+    <PackageReference Include="QuestPDF" Version="2024.12.3" />
+  </ItemGroup>
+
+</Project>

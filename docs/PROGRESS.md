@@ -47,6 +47,15 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 **Phase 2 status: COMPLETE.** Accounting core (COA, posting engine, period control, year-end, tax, FX revaluation) + the first four financial reports, all enforced and tested (14 accounting tests). The trial balance always balances.
 | **2F** Trial Balance, Nominal Activity, Balance Sheet, P&L | ✅ | `IGeneralLedgerReports` query services over posted journals: Trial Balance (balances), Income Statement (net profit), Balance Sheet (balances, with current-year earnings in equity), Nominal Activity (opening/movements/running/closing). 4 report tests green (11 accounting total) |
 
+## Phase 3 — Reporting Engine + Designer
+| Increment | Status | Notes |
+|---|---|---|
+| **3A** Report definition model | ✅ | `ReportDefinition` (page setup, parameters, data sources, groups, bands, elements with conditional formatting) + `.mrpt` JSON serializer |
+| **3B** Expression engine | ✅ | Sandboxed `ReportExpressionEngine` (DynamicExpresso) with curated library (string/math/date/logical), field/param/page-variable access, `NumberToWords`/`AmountToWords`, `ToBase`. Reused by payroll later |
+| **3C** Rendering engine + renderers | ✅ | Banded `ReportEngine` (multi-level grouping, scoped aggregates, expressions, conditional formats, suppression) → HTML, PDF (QuestPDF), CSV, plain-text/ESC-POS renderers. 16 unit tests green |
+| **3D** Persist definitions + bind Phase 2 reports + bursting | ⬜ | |
+| **3E** WPF viewer + designer | ⬜ | Full drag-drop canvas is a large follow-up; a viewer + basic designer first |
+
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
 - **PostgreSQL 18** dev, min supported 16 (ADR-0002).

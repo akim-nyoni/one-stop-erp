@@ -1,0 +1,191 @@
+namespace One4All.Reporting.Model;
+
+/// <summary>Paper sizes supported by the report engine (brief §13.1 page setup).</summary>
+public enum PaperSize
+{
+    /// <summary>ISO A4.</summary>
+    A4 = 0,
+
+    /// <summary>US Letter.</summary>
+    Letter = 1,
+
+    /// <summary>US Legal.</summary>
+    Legal = 2,
+
+    /// <summary>ISO A5.</summary>
+    A5 = 3,
+
+    /// <summary>58 mm thermal receipt roll.</summary>
+    Receipt58 = 10,
+
+    /// <summary>80 mm thermal receipt roll.</summary>
+    Receipt80 = 11,
+
+    /// <summary>A custom size defined by width/height on the page setup.</summary>
+    Custom = 99,
+}
+
+/// <summary>Page orientation.</summary>
+public enum ReportOrientation
+{
+    /// <summary>Portrait.</summary>
+    Portrait = 0,
+
+    /// <summary>Landscape.</summary>
+    Landscape = 1,
+}
+
+/// <summary>The bands of a banded report (brief §13.1).</summary>
+public enum BandType
+{
+    /// <summary>Printed once at the very start of the report.</summary>
+    ReportHeader = 0,
+
+    /// <summary>Printed at the top of every page.</summary>
+    PageHeader = 1,
+
+    /// <summary>Printed at the start of each group.</summary>
+    GroupHeader = 2,
+
+    /// <summary>Printed once per data row.</summary>
+    Detail = 3,
+
+    /// <summary>Printed at the end of each group.</summary>
+    GroupFooter = 4,
+
+    /// <summary>Printed at the bottom of every page.</summary>
+    PageFooter = 5,
+
+    /// <summary>Printed once at the very end of the report.</summary>
+    ReportFooter = 6,
+
+    /// <summary>An overlay/watermark band.</summary>
+    Overlay = 7,
+}
+
+/// <summary>The kinds of element that can be placed on a band (brief §13.1).</summary>
+public enum ElementKind
+{
+    /// <summary>Static text label.</summary>
+    Label = 0,
+
+    /// <summary>A bound data field.</summary>
+    Field = 1,
+
+    /// <summary>An expression-evaluated field.</summary>
+    Expression = 2,
+
+    /// <summary>An aggregate (sum/avg/count/…) value.</summary>
+    Aggregate = 3,
+
+    /// <summary>A horizontal or vertical line.</summary>
+    Line = 4,
+
+    /// <summary>A rectangle/box.</summary>
+    Rectangle = 5,
+
+    /// <summary>An image.</summary>
+    Image = 6,
+
+    /// <summary>A barcode/QR.</summary>
+    Barcode = 7,
+}
+
+/// <summary>Horizontal text alignment.</summary>
+public enum ReportHAlign
+{
+    /// <summary>Left-aligned.</summary>
+    Left = 0,
+
+    /// <summary>Centre-aligned.</summary>
+    Center = 1,
+
+    /// <summary>Right-aligned (numbers).</summary>
+    Right = 2,
+}
+
+/// <summary>Vertical text alignment.</summary>
+public enum ReportVAlign
+{
+    /// <summary>Top.</summary>
+    Top = 0,
+
+    /// <summary>Middle.</summary>
+    Middle = 1,
+
+    /// <summary>Bottom.</summary>
+    Bottom = 2,
+}
+
+/// <summary>The type of a report parameter.</summary>
+public enum ParameterType
+{
+    /// <summary>Text.</summary>
+    String = 0,
+
+    /// <summary>Integer.</summary>
+    Integer = 1,
+
+    /// <summary>Decimal.</summary>
+    Decimal = 2,
+
+    /// <summary>Date.</summary>
+    Date = 3,
+
+    /// <summary>Boolean.</summary>
+    Boolean = 4,
+}
+
+/// <summary>How a data source is obtained.</summary>
+public enum DataSourceKind
+{
+    /// <summary>A raw SQL query.</summary>
+    Sql = 0,
+
+    /// <summary>A database view.</summary>
+    View = 1,
+
+    /// <summary>A stored function.</summary>
+    Function = 2,
+
+    /// <summary>An in-memory dataset supplied by the caller (e.g. a report DTO).</summary>
+    InMemory = 3,
+}
+
+/// <summary>Aggregate functions (brief §13.1).</summary>
+public enum AggregateFunction
+{
+    /// <summary>Sum.</summary>
+    Sum = 0,
+
+    /// <summary>Average.</summary>
+    Average = 1,
+
+    /// <summary>Count.</summary>
+    Count = 2,
+
+    /// <summary>Distinct count.</summary>
+    DistinctCount = 3,
+
+    /// <summary>Minimum.</summary>
+    Min = 4,
+
+    /// <summary>Maximum.</summary>
+    Max = 5,
+
+    /// <summary>Running total.</summary>
+    RunningTotal = 6,
+}
+
+/// <summary>The scope an aggregate resets at.</summary>
+public enum AggregateScope
+{
+    /// <summary>Whole report.</summary>
+    Report = 0,
+
+    /// <summary>Current group.</summary>
+    Group = 1,
+
+    /// <summary>Current page.</summary>
+    Page = 2,
+}
