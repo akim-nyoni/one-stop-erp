@@ -157,6 +157,9 @@ public sealed class ReceiptingService : IReceiptingService
                 return receiptPosting.Error;
             }
 
+            receipt.DebtorOpenItemId = receiptPosting.Value.OpenItemId;
+            receipt.CashAccountCode = request.CashAccountCode;
+
             // Same-currency payments allocate here; a foreign-currency payment posts as an on-account credit
             // (in its own currency) to be matched — realising FX — in the allocation workbench.
             if (currency == company.BaseCurrency)
@@ -210,6 +213,110 @@ public sealed class ReceiptingService : IReceiptingService
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new ReceiptResult(receipt.Id, receiptNumber, total, allocatedToDebt, creditOnAccount);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<ReceiptReversalResult>> ReverseReceiptAsync(long companyId, long receiptId, DateOnly date, long reverserUserId, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Rcp.ReasonRequired", "Reversing a receipt requires a reason.");
+        }
+
+        Receipt? receipt = await _db.Set<Receipt>().Include(r => r.Lines)
+            .FirstOrDefaultAsync(r => r.Id == receiptId && r.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (receipt is null)
+        {
+            return Error.NotFound("Rcp.ReceiptNotFound", $"Receipt {receiptId} not found.");
+        }
+
+        if (receipt.Status != ReceiptStatus.Committed)
+        {
+            return Error.Rule("Rcp.NotReversible", "Only a committed receipt can be reversed.");
+        }
+
+        if (receipt.CashierUserId == reverserUserId)
+        {
+            return Error.Rule("Rcp.SelfReverse", "A cashier cannot reverse their own receipt (segregation of duties).");
+        }
+
+        if (string.IsNullOrWhiteSpace(receipt.CashAccountCode))
+        {
+            return Error.Rule("Rcp.NoCashAccount", "The receipt has no recorded cash account to reverse against.");
+        }
+
+        string cashAccount = receipt.CashAccountCode;
+
+        // Debtor portion: un-allocate the receipt's matches, then post the exact opposite (Dr AR / Cr cash)
+        // and net the reversal debit against the restored receipt credit so both settle to nil.
+        string? debtorJournal = null;
+        decimal debtorTotal = receipt.Lines.Where(l => l.Type == ReceiptLineType.DebtorPayment).Sum(l => l.Amount);
+        if (receipt.DebtorOpenItemId is { } creditItemId && debtorTotal > 0m)
+        {
+            List<long> allocationIds = await _db.Set<Allocation>()
+                .Where(a => a.CompanyId == companyId && a.CreditItemId == creditItemId && !a.IsReversed)
+                .Select(a => a.Id)
+                .ToListAsync(ct).ConfigureAwait(false);
+
+            foreach (long allocationId in allocationIds)
+            {
+                Result<UnallocationResult> un = await _allocation.UnallocateAsync(companyId, allocationId, date, ct).ConfigureAwait(false);
+                if (un.IsFailure)
+                {
+                    return un.Error;
+                }
+            }
+
+            Result<TradingPostingResult> reversal = await _salesLedger.PostReceiptReversalAsync(companyId, receipt.PayerAccountId!.Value, receipt.ReceiptNumber + "-REV", date, receipt.Currency, debtorTotal, cashAccount, ct: ct).ConfigureAwait(false);
+            if (reversal.IsFailure)
+            {
+                return reversal.Error;
+            }
+
+            debtorJournal = reversal.Value.JournalNumber;
+
+            Result<AllocationResult> match = await _allocation.AllocateAsync(companyId, TradingLedger.AccountsReceivable, reversal.Value.OpenItemId, creditItemId, debtorTotal, date, ct).ConfigureAwait(false);
+            if (match.IsFailure)
+            {
+                return match.Error;
+            }
+        }
+
+        // Coded portion: mirror the original journal — Cr cash, Dr each income/deposit/suspense account.
+        string? codedJournal = null;
+        List<ReceiptLine> codedLines = receipt.Lines.Where(l => l.Type != ReceiptLineType.DebtorPayment).ToList();
+        if (codedLines.Count > 0)
+        {
+            decimal codedTotal = codedLines.Sum(l => l.Amount);
+            List<JournalLineRequest> journalLines =
+            [
+                new JournalLineRequest { AccountCode = cashAccount, Side = JournalSide.Credit, TransactionAmount = codedTotal },
+            ];
+            journalLines.AddRange(codedLines.Select(l => new JournalLineRequest { AccountCode = l.AccountCode!, Side = JournalSide.Debit, TransactionAmount = l.Amount, Narrative = l.Narrative }));
+
+            Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+            {
+                CompanyId = companyId,
+                SourceModule = "GL",
+                PostingDate = date,
+                TransactionCurrency = receipt.Currency,
+                DocumentType = "RECEIPT-REV",
+                DocumentNumber = receipt.ReceiptNumber + "-REV",
+                Narrative = $"Receipt reversal: {reason}",
+                Lines = journalLines,
+            }, ct).ConfigureAwait(false);
+
+            if (posted.IsFailure)
+            {
+                return posted.Error;
+            }
+
+            codedJournal = posted.Value.JournalNumber;
+        }
+
+        receipt.Cancel();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new ReceiptReversalResult(receipt.Id, receipt.LineTotal, debtorJournal, codedJournal);
     }
 
     /// <inheritdoc />

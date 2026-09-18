@@ -1,3 +1,4 @@
+using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.Trading;
 
@@ -37,6 +38,23 @@ public interface ISalesLedgerService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The posting result.</returns>
     Task<Result<TradingPostingResult>> PostCreditNoteAsync(SalesCreditNoteRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Posts a receipt reversal: Dr AR control, Cr bank/cash — the exact opposite of a receipt — and creates
+    /// an AR (debit) adjustment open item that restores the debtor balance (brief §RCP-7). Used to reverse a
+    /// receipt after its allocations have been un-allocated.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="customerId">The customer.</param>
+    /// <param name="documentNumber">The reversal document number.</param>
+    /// <param name="date">The reversal date.</param>
+    /// <param name="currency">The transaction currency.</param>
+    /// <param name="amount">The amount to reverse.</param>
+    /// <param name="bankAccountCode">The bank/cash account credited (the money goes back out).</param>
+    /// <param name="exchangeRate">Optional explicit exchange rate.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The posting result (the debit adjustment open item).</returns>
+    Task<Result<TradingPostingResult>> PostReceiptReversalAsync(long companyId, long customerId, string documentNumber, DateOnly date, CurrencyCode currency, decimal amount, string bankAccountCode, decimal? exchangeRate = null, CancellationToken ct = default);
 }
 
 /// <summary>The Purchase Ledger (AP) posting service (brief §4.6).</summary>

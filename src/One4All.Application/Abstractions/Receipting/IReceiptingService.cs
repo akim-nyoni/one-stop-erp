@@ -135,6 +135,13 @@ public sealed class ReceiptRequest
 /// <param name="CreditOnAccount">The overpayment left as credit on account.</param>
 public readonly record struct ReceiptResult(long ReceiptId, string ReceiptNumber, decimal Total, decimal AllocatedToDebt, decimal CreditOnAccount);
 
+/// <summary>The result of reversing a receipt (brief §RCP-7).</summary>
+/// <param name="ReceiptId">The reversed receipt.</param>
+/// <param name="Amount">The receipt total reversed.</param>
+/// <param name="DebtorReversalJournal">The AR reversal journal number, when there was a debtor portion.</param>
+/// <param name="CodedReversalJournal">The sundry/deposit/suspense reversal journal number, when there were coded lines.</param>
+public readonly record struct ReceiptReversalResult(long ReceiptId, decimal Amount, string? DebtorReversalJournal, string? CodedReversalJournal);
+
 /// <summary>The result of closing a session (blind cash-up).</summary>
 /// <param name="ExpectedCashBase">The expected cash in base currency (float + cash tenders).</param>
 /// <param name="CountedCashBase">The counted cash in base currency.</param>
@@ -211,6 +218,21 @@ public interface IReceiptingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The cash-up result.</returns>
     Task<Result<CashUpResult>> CloseSessionAsync(long companyId, long sessionId, DateOnly date, IReadOnlyList<FloatDeclaration> countedCash, string cashAccountCode, string shortagesAccountCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reverses a committed receipt (brief §RCP-7): un-allocates the debtor portion (restoring the settled
+    /// charges), posts the exact opposite GL of every line (Dr debtor control / Cr cash for the debtor
+    /// portion; Dr income/deposit/suspense / Cr cash for coded lines), and marks the receipt cancelled —
+    /// nothing is deleted. A cashier cannot reverse their own receipt. Requires a reason.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="receiptId">The receipt to reverse.</param>
+    /// <param name="date">The reversal (accounting) date.</param>
+    /// <param name="reverserUserId">The user performing the reversal (must not be the original cashier).</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The reversal result.</returns>
+    Task<Result<ReceiptReversalResult>> ReverseReceiptAsync(long companyId, long receiptId, DateOnly date, long reverserUserId, string reason, CancellationToken ct = default);
 
     /// <summary>Verifies a closed session by a supervisor (who must not be the cashier).</summary>
     /// <param name="companyId">The company.</param>

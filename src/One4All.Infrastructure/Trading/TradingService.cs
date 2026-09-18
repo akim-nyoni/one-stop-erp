@@ -270,6 +270,41 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
+    public async Task<Result<TradingPostingResult>> PostReceiptReversalAsync(long companyId, long customerId, string documentNumber, DateOnly date, CurrencyCode currency, decimal amount, string bankAccountCode, decimal? exchangeRate = null, CancellationToken ct = default)
+    {
+        Customer? customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == customerId && c.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (customer is null)
+        {
+            return Error.NotFound("Ar.CustomerNotFound", $"Customer {customerId} not found.");
+        }
+
+        Result<string> controlResult = await ControlCodeAsync(companyId, ControlAccountType.AccountsReceivable, ct).ConfigureAwait(false);
+        if (controlResult.IsFailure)
+        {
+            return controlResult.Error;
+        }
+
+        Result<decimal> rateResult = await ResolveRateAsync(companyId, currency, exchangeRate, date, ct).ConfigureAwait(false);
+        if (rateResult.IsFailure)
+        {
+            return rateResult.Error;
+        }
+
+        decimal rate = rateResult.Value;
+        decimal baseAmount = Round(amount * rate);
+
+        // The exact opposite of a receipt: Dr AR control, Cr bank/cash. Creates a debit adjustment item.
+        List<JournalLineRequest> lines =
+        [
+            Line(controlResult.Value, JournalSide.Debit, amount, rate, baseAmount),
+            Line(bankAccountCode, JournalSide.Credit, amount, rate, baseAmount),
+        ];
+
+        return await PostAndOpenAsync(companyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.Journal,
+            LedgerSign.Debit, documentNumber, date, date, currency, rate, amount, baseAmount, "Receipt reversal", lines, bankAccountCode, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<AllocationResult>> AllocateAsync(long companyId, TradingLedger ledger, long debitItemId, long creditItemId, decimal transactionAmount, DateOnly allocationDate, CancellationToken ct = default)
     {
         OpenItem? debit = await _db.OpenItems.FirstOrDefaultAsync(i => i.Id == debitItemId && i.CompanyId == companyId, ct).ConfigureAwait(false);

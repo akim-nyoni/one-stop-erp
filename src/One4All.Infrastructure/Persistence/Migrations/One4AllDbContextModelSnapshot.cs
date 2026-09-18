@@ -4119,6 +4119,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("CashAccountCode")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("cash_account_code");
+
                     b.Property<long>("CashierSessionId")
                         .HasColumnType("bigint")
                         .HasColumnName("cashier_session_id");
@@ -4148,6 +4153,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date")
                         .HasColumnName("date");
+
+                    b.Property<long?>("DebtorOpenItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("debtor_open_item_id");
 
                     b.Property<string>("JournalNumber")
                         .HasMaxLength(30)

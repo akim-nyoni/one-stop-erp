@@ -134,8 +134,14 @@ public sealed class Receipt : AuditableEntity, ICompanyScoped
     /// <summary>The status.</summary>
     public ReceiptStatus Status { get; private set; }
 
-    /// <summary>The GL journal number.</summary>
+    /// <summary>The GL journal number (coded lines).</summary>
     public string? JournalNumber { get; set; }
+
+    /// <summary>The AR credit open item raised for the debtor portion (for reversal).</summary>
+    public long? DebtorOpenItemId { get; set; }
+
+    /// <summary>The cash/bank control account the money was debited to (for reversal).</summary>
+    public string? CashAccountCode { get; set; }
 
     /// <summary>The lines (what the money is for).</summary>
     public IReadOnlyList<ReceiptLine> Lines => _lines.AsReadOnly();
