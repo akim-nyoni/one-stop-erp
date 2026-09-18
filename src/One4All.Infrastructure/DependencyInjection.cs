@@ -93,6 +93,9 @@ public static class DependencyInjection
         // Fixed Assets.
         services.AddScoped<Application.Abstractions.FixedAssets.IFixedAssetService, FixedAssets.FixedAssetService>();
 
+        // HR & Payroll.
+        services.AddScoped<Application.Abstractions.Payroll.IPayrollService, Payroll.PayrollService>();
+
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();

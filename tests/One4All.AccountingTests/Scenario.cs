@@ -113,6 +113,12 @@ public static class Scenario
         db.Accounts.Add(new LedgerAccount(company.Id, "7300", "Profit on Disposal", AccountType.Income));
         db.Accounts.Add(new LedgerAccount(company.Id, "7400", "Loss on Disposal", AccountType.Expense));
 
+        // Payroll: gross wages expense, statutory/deduction liabilities and net-pay control.
+        db.Accounts.Add(new LedgerAccount(company.Id, "6100", "Salaries & Wages", AccountType.Expense));
+        db.Accounts.Add(new LedgerAccount(company.Id, "2400", "PAYE Payable", AccountType.Liability));
+        db.Accounts.Add(new LedgerAccount(company.Id, "2410", "Pension Payable", AccountType.Liability));
+        db.Accounts.Add(new LedgerAccount(company.Id, "2420", "Net Pay Control", AccountType.Liability));
+
         // Foreign-currency bank (EUR) for FX revaluation, plus FX gain/loss control accounts.
         LedgerAccount foreignBank = new(company.Id, "1150", "Bank (EUR)", AccountType.Asset) { CurrencyRestriction = Eur };
         db.Accounts.Add(foreignBank);

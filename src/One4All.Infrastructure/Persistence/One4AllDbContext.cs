@@ -188,6 +188,15 @@ public class One4AllDbContext : DbContext
     /// <summary>CRM opportunities.</summary>
     public DbSet<Core.Crm.Opportunity> Opportunities => Set<Core.Crm.Opportunity>();
 
+    /// <summary>Employees.</summary>
+    public DbSet<Core.Payroll.Employee> Employees => Set<Core.Payroll.Employee>();
+
+    /// <summary>Pay elements.</summary>
+    public DbSet<Core.Payroll.PayElement> PayElements => Set<Core.Payroll.PayElement>();
+
+    /// <summary>Payslips.</summary>
+    public DbSet<Core.Payroll.Payslip> Payslips => Set<Core.Payroll.Payslip>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

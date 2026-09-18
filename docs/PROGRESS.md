@@ -124,6 +124,13 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 
 **Phase 11 status:** Fixed-asset register with depreciation runs and disposals through the engine, plus a lightweight CRM opportunity pipeline. Deferred depth: revaluation (IAS 16)/impairment (IAS 36), units-of-production, componentisation, CWIP capitalisation, asset verification/count, part-period conventions; CRM activities/quotation links/service-desk tickets.
 
+## Phase 11B — HR & Payroll
+| Increment | Status | Notes |
+|---|---|---|
+| **11B-1** HR core + formula-driven pay engine + payroll run (§4.15) | ✅ | `hr` + `pay` schemas. `Employee` (basic salary, department/cost-centre that drive the journal, pay-element assignments with overrides); `PayElement` (Earning/Deduction/EmployerContribution, calculation basis **fixed / % of basic / % of gross / rate×units / formula**, taxable flag, **calculation sequence**, GL account) — never code; `Payslip`/`PayslipLine` (immutable resolved lines + gross/deduction/net). `IPayrollService`: **calculate** one employee (preview), and **run** payroll for all active employees resolving elements in sequence — **formula elements reuse the report expression engine (§13.1)** — producing payslips and **one balanced GL journal** (Dr earning expenses, Cr deduction/statutory liabilities, Cr net-pay control). `AddPayroll` migration. Test: basic 2000 + 20% housing = 2400 gross; 5% pension = 100; **formula PAYE** 20% of (taxable − pension relief) over 1000 = 260; net 2040; journal Dr 6100 2400 / Cr PAYE 260 / Cr pension 100 / Cr net-pay 2040, TB balances. |
+
+**Phase 11B status:** Formula-driven payroll engine, payslips and the payroll journal through the central engine. Deferred depth: effective-dated tax tables & YTD cumulative PAYE, statutory returns, multi-currency taxation, leave & IAS 19 leave provision, loans/advances & third-party remittance to AP, split-pay & bank-detail dual-auth, establishment/post control, self-payslip SoD block (needs current-user gate), net-pay protection & arrears carry-forward.
+
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
 - **PostgreSQL 18** dev, min supported 16 (ADR-0002).
