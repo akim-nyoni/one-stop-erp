@@ -142,6 +142,11 @@ public readonly record struct ReceiptResult(long ReceiptId, string ReceiptNumber
 /// <param name="CodedReversalJournal">The sundry/deposit/suspense reversal journal number, when there were coded lines.</param>
 public readonly record struct ReceiptReversalResult(long ReceiptId, decimal Amount, string? DebtorReversalJournal, string? CodedReversalJournal);
 
+/// <summary>The result of a refund (brief §RCP-9).</summary>
+/// <param name="Amount">The amount refunded.</param>
+/// <param name="JournalNumber">The GL journal number.</param>
+public readonly record struct RefundResult(decimal Amount, string JournalNumber);
+
 /// <summary>The result of closing a session (blind cash-up).</summary>
 /// <param name="ExpectedCashBase">The expected cash in base currency (float + cash tenders).</param>
 /// <param name="CountedCashBase">The counted cash in base currency.</param>
@@ -233,6 +238,39 @@ public interface IReceiptingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The reversal result.</returns>
     Task<Result<ReceiptReversalResult>> ReverseReceiptAsync(long companyId, long receiptId, DateOnly date, long reverserUserId, string reason, CancellationToken ct = default);
+
+    /// <summary>
+    /// Refunds a payer's credit balance (overpayment / credit on account, brief §RCP-9): Dr debtor control,
+    /// Cr bank — paid through the bank/safe, never the till drawer — then clears the payer's outstanding
+    /// credit items. Refuses to refund more than the available credit. An approved act with a reason.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="customerId">The payer whose credit is refunded.</param>
+    /// <param name="amount">The amount to refund.</param>
+    /// <param name="date">The refund date.</param>
+    /// <param name="bankAccountCode">The bank/safe account the refund is paid from (credited).</param>
+    /// <param name="approverUserId">The approving user.</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The refund result.</returns>
+    Task<Result<RefundResult>> RefundCreditAsync(long companyId, long customerId, decimal amount, DateOnly date, string bankAccountCode, long approverUserId, string reason, CancellationToken ct = default);
+
+    /// <summary>
+    /// Refunds a deposit (brief §RCP-9): Dr deposit liability for the full amount, Cr bank for the net, and
+    /// Cr the forfeit account for any amount withheld. Releases the deposit liability. Approved, with a reason.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="amount">The deposit amount held.</param>
+    /// <param name="forfeitAmount">The amount forfeited/withheld (0 for a full refund).</param>
+    /// <param name="date">The refund date.</param>
+    /// <param name="depositLiabilityAccountCode">The deposit-liability account (debited).</param>
+    /// <param name="bankAccountCode">The bank account the net is paid from (credited).</param>
+    /// <param name="forfeitAccountCode">The income account credited with any forfeit (required when forfeiting).</param>
+    /// <param name="approverUserId">The approving user.</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The refund result.</returns>
+    Task<Result<RefundResult>> RefundDepositAsync(long companyId, decimal amount, decimal forfeitAmount, DateOnly date, string depositLiabilityAccountCode, string bankAccountCode, string? forfeitAccountCode, long approverUserId, string reason, CancellationToken ct = default);
 
     /// <summary>Verifies a closed session by a supervisor (who must not be the cashier).</summary>
     /// <param name="companyId">The company.</param>

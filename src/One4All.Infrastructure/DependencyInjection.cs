@@ -102,6 +102,7 @@ public static class DependencyInjection
         // Cashiering & Receipting.
         services.AddScoped<Application.Abstractions.Receipting.IPayerAccountProvider, Receipting.ArPayerAccountProvider>();
         services.AddScoped<Application.Abstractions.Receipting.IReceiptingService, Receipting.ReceiptingService>();
+        services.AddScoped<Application.Abstractions.Receipting.IBankingService, Receipting.BankingService>();
 
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());

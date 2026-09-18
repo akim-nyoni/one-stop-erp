@@ -209,6 +209,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Receipts.</summary>
     public DbSet<Core.Receipting.Receipt> Receipts => Set<Core.Receipting.Receipt>();
 
+    /// <summary>Banking deposits (treasury).</summary>
+    public DbSet<Core.Receipting.BankDeposit> BankDeposits => Set<Core.Receipting.BankDeposit>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

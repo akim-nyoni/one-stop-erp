@@ -320,6 +320,128 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
+    public async Task<Result<RefundResult>> RefundCreditAsync(long companyId, long customerId, decimal amount, DateOnly date, string bankAccountCode, long approverUserId, string reason, CancellationToken ct = default)
+    {
+        if (amount <= 0m)
+        {
+            return Error.Rule("Rcp.NonPositiveAmount", "The refund amount must be positive.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Rcp.ReasonRequired", "A refund requires a reason.");
+        }
+
+        Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        if (company is null)
+        {
+            return Error.NotFound("Rcp.CompanyNotFound", $"Company {companyId} not found.");
+        }
+
+        List<OpenItem> credits = await _db.Set<OpenItem>()
+            .Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == customerId && i.Sign == LedgerSign.Credit && i.OutstandingTransaction > 0m)
+            .OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        decimal available = credits.Sum(i => i.OutstandingTransaction);
+        if (amount > available + 0.0001m)
+        {
+            return Error.Rule("Rcp.InsufficientCredit", $"Refund {amount} exceeds the available credit {available} on the account.");
+        }
+
+        // Dr AR control / Cr bank (paid from the bank/safe), creating a debit adjustment.
+        Result<TradingPostingResult> reversal = await _salesLedger.PostReceiptReversalAsync(companyId, customerId, $"REFUND-{customerId}-{date:yyyyMMdd}", date, company.BaseCurrency, amount, bankAccountCode, ct: ct).ConfigureAwait(false);
+        if (reversal.IsFailure)
+        {
+            return reversal.Error;
+        }
+
+        // Clear the payer's credit items against the refund debit (oldest first).
+        decimal remaining = amount;
+        foreach (OpenItem credit in credits)
+        {
+            if (remaining <= 0m)
+            {
+                break;
+            }
+
+            decimal take = Math.Min(remaining, credit.OutstandingTransaction);
+            Result<AllocationResult> alloc = await _allocation.AllocateAsync(companyId, TradingLedger.AccountsReceivable, reversal.Value.OpenItemId, credit.Id, take, date, ct).ConfigureAwait(false);
+            if (alloc.IsFailure)
+            {
+                return alloc.Error;
+            }
+
+            remaining -= take;
+        }
+
+        return new RefundResult(amount, reversal.Value.JournalNumber);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<RefundResult>> RefundDepositAsync(long companyId, decimal amount, decimal forfeitAmount, DateOnly date, string depositLiabilityAccountCode, string bankAccountCode, string? forfeitAccountCode, long approverUserId, string reason, CancellationToken ct = default)
+    {
+        if (amount <= 0m)
+        {
+            return Error.Rule("Rcp.NonPositiveAmount", "The deposit amount must be positive.");
+        }
+
+        if (forfeitAmount < 0m || forfeitAmount > amount)
+        {
+            return Error.Rule("Rcp.InvalidForfeit", "The forfeit must be between zero and the deposit amount.");
+        }
+
+        if (forfeitAmount > 0m && string.IsNullOrWhiteSpace(forfeitAccountCode))
+        {
+            return Error.Validation("Rcp.ForfeitAccountRequired", "A forfeit requires an income account.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Rcp.ReasonRequired", "A deposit refund requires a reason.");
+        }
+
+        Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        if (company is null)
+        {
+            return Error.NotFound("Rcp.CompanyNotFound", $"Company {companyId} not found.");
+        }
+
+        decimal net = amount - forfeitAmount;
+        List<JournalLineRequest> lines =
+        [
+            new JournalLineRequest { AccountCode = depositLiabilityAccountCode, Side = JournalSide.Debit, TransactionAmount = amount },
+        ];
+        if (net > 0m)
+        {
+            lines.Add(new JournalLineRequest { AccountCode = bankAccountCode, Side = JournalSide.Credit, TransactionAmount = net });
+        }
+
+        if (forfeitAmount > 0m)
+        {
+            lines.Add(new JournalLineRequest { AccountCode = forfeitAccountCode!, Side = JournalSide.Credit, TransactionAmount = forfeitAmount });
+        }
+
+        Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId,
+            SourceModule = "GL",
+            PostingDate = date,
+            TransactionCurrency = company.BaseCurrency,
+            DocumentType = "DEP-REFUND",
+            Narrative = $"Deposit refund: {reason}",
+            Lines = lines,
+        }, ct).ConfigureAwait(false);
+
+        if (posted.IsFailure)
+        {
+            return posted.Error;
+        }
+
+        return new RefundResult(net, posted.Value.JournalNumber);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<ReceiptResult>> AllocateFromSuspenseAsync(long companyId, long customerId, decimal amount, DateOnly date, string suspenseAccountCode, ReceiptAllocationStrategy strategy, string reason, CancellationToken ct = default)
     {
         if (amount <= 0m)

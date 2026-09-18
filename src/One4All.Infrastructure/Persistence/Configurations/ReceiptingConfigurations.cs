@@ -77,6 +77,19 @@ internal sealed class ReceiptLineConfiguration : IEntityTypeConfiguration<Receip
     }
 }
 
+internal sealed class BankDepositConfiguration : IEntityTypeConfiguration<BankDeposit>
+{
+    public void Configure(EntityTypeBuilder<BankDeposit> b)
+    {
+        b.ToTable("bank_deposit", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(40);
+        b.Property(x => x.Currency).HasMaxLength(3);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}
+
 internal sealed class ReceiptTenderConfiguration : IEntityTypeConfiguration<ReceiptTender>
 {
     public void Configure(EntityTypeBuilder<ReceiptTender> b)
