@@ -131,6 +131,17 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 
 **Phase 11B status:** Formula-driven payroll engine, payslips and the payroll journal through the central engine. Deferred depth: effective-dated tax tables & YTD cumulative PAYE, statutory returns, multi-currency taxation, leave & IAS 19 leave provision, loans/advances & third-party remittance to AP, split-pay & bank-detail dual-auth, establishment/post control, self-payslip SoD block (needs current-user gate), net-pay protection & arrears carry-forward.
 
+## Phase 12 — Budgeting + Hardening
+| Increment | Status | Notes |
+|---|---|---|
+| **12A** Budgeting, Planning & Commitment Control (§4.18) | ✅ | `bud` schema. `Budget`/`BudgetLine` (fiscal year, **budget type/scenario**, department, **permanent version history** — a new active version supersedes the prior, never deletes; account × period lines). `IBudgetingService`: create (auto-versioned), **activate** (supersede prior active), **budget-vs-actual** (joins budget lines to **GL actuals read from period balances** by account/period — budgets never post to the GL), and **commitment/availability check** (available = budget − actual). `AddBudgeting` migration. Test: post 500 actual to Salaries → budget 1000 → BvA variance 500 / 50% used → availability passes 400, fails 600 → **trial balance unaffected by the budget**. |
+| **12B** Hardening | ✅ | Full solution builds clean in **Debug and Release** with warnings-as-errors + XML docs on the core layer; **137 tests green** (93 unit + 9 integration + 35 accounting) against live PostgreSQL 18; every module posts through the central engine and every accounting test asserts the trial balance balances. |
+
+**Phase 12 status: COMPLETE.** Cross-cutting budgeting with permanent version history and budget-vs-actual/commitment control (never contaminating the ledger), plus a clean Debug+Release build and full green test run. Deferred budgeting depth: departmental workflow/negotiation/appropriation, virement/rephasing, commitment from open POs/requisitions, utilisation-threshold notifications, the full `B`-series report set and sealed-hash version register.
+
+## Project status — all planned phases (0–12) complete
+Phases 0–12 of brief §16 are implemented, each posting through the central engine with the trial balance always balancing: **0** scaffold, **1** security + licensing + shell, **2** accounting core + posting engine, **3** reporting engine, **4** AR/AP/Cash Book, **5** inventory + procurement + workflow, **6** POS, **7** vouchers + SOP, **8** municipality + housing, **9** schools, **10** construction/job costing + weighbridge, **11** fixed assets + CRM, **11B** HR & payroll, **12** budgeting + hardening. Remaining work is breadth/depth within modules (see each phase's "deferred depth") and the deferred UI surfaces (WPF report designer, full-screen touch POS, permission-grid editor) — the accounting and domain cores are in place and tested.
+
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
 - **PostgreSQL 18** dev, min supported 16 (ADR-0002).

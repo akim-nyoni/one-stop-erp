@@ -197,6 +197,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Payslips.</summary>
     public DbSet<Core.Payroll.Payslip> Payslips => Set<Core.Payroll.Payslip>();
 
+    /// <summary>Budgets.</summary>
+    public DbSet<Core.Budgeting.Budget> Budgets => Set<Core.Budgeting.Budget>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -96,6 +96,9 @@ public static class DependencyInjection
         // HR & Payroll.
         services.AddScoped<Application.Abstractions.Payroll.IPayrollService, Payroll.PayrollService>();
 
+        // Budgeting, Planning & Commitment Control.
+        services.AddScoped<Application.Abstractions.Budgeting.IBudgetingService, Budgeting.BudgetingService>();
+
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();

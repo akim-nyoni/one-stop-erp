@@ -998,6 +998,147 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("bank_statement_line", "cb");
                 });
 
+            modelBuilder.Entity("One4All.Core.Budgeting.Budget", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DeletedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_on_utc");
+
+                    b.Property<string>("Department")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("department");
+
+                    b.Property<long>("FiscalYearId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fiscal_year_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("label");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
+                        .HasColumnName("type");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("version_number");
+
+                    b.HasKey("Id")
+                        .HasName("pk_budget");
+
+                    b.HasIndex("CompanyId", "FiscalYearId", "Type", "Department", "VersionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_budget_company_id_fiscal_year_id_type_department_version_nu");
+
+                    b.ToTable("budget", "bud");
+                });
+
+            modelBuilder.Entity("One4All.Core.Budgeting.BudgetLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("account_code");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("BudgetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("budget_id");
+
+                    b.Property<string>("CostCentre")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cost_centre");
+
+                    b.Property<int>("Period")
+                        .HasColumnType("integer")
+                        .HasColumnName("period");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_budget_line");
+
+                    b.HasIndex("BudgetId", "AccountCode", "Period")
+                        .HasDatabaseName("ix_budget_line_budget_id_account_code_period");
+
+                    b.ToTable("budget_line", "bud");
+                });
+
             modelBuilder.Entity("One4All.Core.Crm.Opportunity", b =>
                 {
                     b.Property<long>("Id")
@@ -6235,6 +6376,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tax_rate_tax_codes_tax_code_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Budgeting.BudgetLine", b =>
+                {
+                    b.HasOne("One4All.Core.Budgeting.Budget", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("BudgetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_budget_line_budgets_budget_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.OwnershipRecord", b =>
                 {
                     b.HasOne("One4All.Core.Housing.HousingStand", null)
@@ -6473,6 +6624,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Accounting.TaxCode", b =>
                 {
                     b.Navigation("Rates");
+                });
+
+            modelBuilder.Entity("One4All.Core.Budgeting.Budget", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.HousingStand", b =>
