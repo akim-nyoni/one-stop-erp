@@ -73,4 +73,18 @@ public sealed class Allocation : AuditableEntity, ICompanyScoped
 
     /// <summary>The GL journal that posted the realised FX (if any).</summary>
     public long? JournalEntryId { get; set; }
+
+    /// <summary>Whether this allocation has been reversed (un-allocated); retained, never deleted.</summary>
+    public bool IsReversed { get; private set; }
+
+    /// <summary>The date the allocation was reversed, if any.</summary>
+    public DateOnly? ReversedOn { get; private set; }
+
+    /// <summary>Marks the allocation reversed (brief §RCP-7).</summary>
+    /// <param name="reversedOn">The reversal date.</param>
+    public void Reverse(DateOnly reversedOn)
+    {
+        IsReversed = true;
+        ReversedOn = reversedOn;
+    }
 }

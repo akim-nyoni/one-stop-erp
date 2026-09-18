@@ -5988,6 +5988,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("debit_item_id");
 
+                    b.Property<bool>("IsReversed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_reversed");
+
                     b.Property<long?>("JournalEntryId")
                         .HasColumnType("bigint")
                         .HasColumnName("journal_entry_id");
@@ -6008,6 +6012,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("realised_fx_base");
+
+                    b.Property<DateOnly?>("ReversedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("reversed_on");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()

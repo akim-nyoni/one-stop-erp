@@ -321,7 +321,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         return new AllocationResult(allocation.Id, amount, realisedFx, fxJournalNumber);
     }
 
-    private async Task<Result<string>> PostRealisedFxAsync(long companyId, TradingLedger ledger, decimal realisedFx, DateOnly date, CancellationToken ct)
+    private async Task<Result<string>> PostRealisedFxAsync(long companyId, TradingLedger ledger, decimal realisedFx, DateOnly date, CancellationToken ct, bool reverse = false)
     {
         ControlAccountType controlType = ledger == TradingLedger.AccountsReceivable ? ControlAccountType.AccountsReceivable : ControlAccountType.AccountsPayable;
         Result<string> controlResult = await ControlCodeAsync(companyId, controlType, ct).ConfigureAwait(false);
@@ -330,6 +330,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
+        // Reversal keeps the same FX account as the original (netting it to nil), only swapping the sides.
         ControlAccountType fxType = realisedFx > 0m ? ControlAccountType.FxGain : ControlAccountType.FxLoss;
         Result<string> fxResult = await ControlCodeAsync(companyId, fxType, ct).ConfigureAwait(false);
         if (fxResult.IsFailure)
@@ -343,6 +344,10 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         // realisedFx > 0 (gain): Dr control, Cr FX gain. realisedFx < 0 (loss): Cr control, Dr FX loss.
         JournalSide controlSide = realisedFx > 0m ? JournalSide.Debit : JournalSide.Credit;
         JournalSide fxSide = realisedFx > 0m ? JournalSide.Credit : JournalSide.Debit;
+        if (reverse)
+        {
+            (controlSide, fxSide) = (fxSide, controlSide);
+        }
 
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
@@ -351,8 +356,8 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             PostingDate = date,
             TransactionCurrency = company.BaseCurrency,
             EnforceManualJournalRules = false,
-            DocumentType = "RealisedFx",
-            Narrative = "Realised exchange difference on allocation",
+            DocumentType = reverse ? "RealisedFxReversal" : "RealisedFx",
+            Narrative = reverse ? "Reversal of realised exchange difference" : "Realised exchange difference on allocation",
             Lines =
             [
                 new JournalLineRequest { AccountCode = controlResult.Value, Side = controlSide, TransactionAmount = magnitude },
@@ -361,6 +366,50 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         }, ct).ConfigureAwait(false);
 
         return posting.IsFailure ? posting.Error : posting.Value.JournalNumber;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<UnallocationResult>> UnallocateAsync(long companyId, long allocationId, DateOnly reversalDate, CancellationToken ct = default)
+    {
+        Allocation? allocation = await _db.Allocations.FirstOrDefaultAsync(a => a.Id == allocationId && a.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (allocation is null)
+        {
+            return Error.NotFound("Alloc.NotFound", $"Allocation {allocationId} not found.");
+        }
+
+        if (allocation.IsReversed)
+        {
+            return Error.Rule("Alloc.AlreadyReversed", $"Allocation {allocationId} has already been reversed.");
+        }
+
+        OpenItem? debit = await _db.OpenItems.FirstOrDefaultAsync(i => i.Id == allocation.DebitItemId && i.CompanyId == companyId, ct).ConfigureAwait(false);
+        OpenItem? credit = await _db.OpenItems.FirstOrDefaultAsync(i => i.Id == allocation.CreditItemId && i.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (debit is null || credit is null)
+        {
+            return Error.NotFound("Alloc.ItemNotFound", "One or both open items were not found.");
+        }
+
+        // Restore both items to their pre-allocation state using the exact base amounts drawn.
+        debit.RestoreOutstanding(allocation.TransactionAmount, allocation.DebitBase);
+        credit.RestoreOutstanding(allocation.TransactionAmount, allocation.CreditBase);
+
+        // Reverse any realised FX the allocation posted, netting the original gain/loss to nil.
+        string? fxReversalJournal = null;
+        if (allocation.RealisedFxBase != 0m)
+        {
+            Result<string> fxResult = await PostRealisedFxAsync(companyId, allocation.Ledger, allocation.RealisedFxBase, reversalDate, ct, reverse: true).ConfigureAwait(false);
+            if (fxResult.IsFailure)
+            {
+                return fxResult.Error;
+            }
+
+            fxReversalJournal = fxResult.Value;
+        }
+
+        allocation.Reverse(reversalDate);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return new UnallocationResult(allocation.Id, allocation.TransactionAmount, -allocation.RealisedFxBase, fxReversalJournal);
     }
 
     private async Task<Result<TradingPostingResult>> PostAndOpenAsync(

@@ -10,6 +10,13 @@ namespace One4All.Application.Abstractions.Trading;
 /// <param name="FxJournalNumber">The FX journal number, when a realised gain/loss was posted.</param>
 public readonly record struct AllocationResult(long AllocationId, decimal TransactionAmount, decimal RealisedFxBase, string? FxJournalNumber);
 
+/// <summary>The result of reversing an allocation (un-allocation).</summary>
+/// <param name="AllocationId">The reversed allocation id.</param>
+/// <param name="RestoredTransaction">The transaction-currency amount restored to each item.</param>
+/// <param name="ReversedFxBase">The realised FX that was reversed (opposite sign to the original), in base currency.</param>
+/// <param name="FxReversalJournalNumber">The FX reversal journal number, when the original allocation realised FX.</param>
+public readonly record struct UnallocationResult(long AllocationId, decimal RestoredTransaction, decimal ReversedFxBase, string? FxReversalJournalNumber);
+
 /// <summary>The Sales Ledger (AR) posting service (brief §4.5). All postings go through the central engine.</summary>
 public interface ISalesLedgerService
 {
@@ -70,4 +77,16 @@ public interface IAllocationService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The allocation result.</returns>
     Task<Result<AllocationResult>> AllocateAsync(long companyId, TradingLedger ledger, long debitItemId, long creditItemId, decimal transactionAmount, DateOnly allocationDate, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reverses an allocation (un-allocation, brief §RCP-7): restores the outstanding on both items to their
+    /// pre-allocation state, reverses any realised FX gain/loss the allocation posted, and marks the
+    /// allocation reversed (retained, never deleted). The foundation for receipt/payment reversal.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="allocationId">The allocation to reverse.</param>
+    /// <param name="reversalDate">The reversal (accounting) date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The un-allocation result.</returns>
+    Task<Result<UnallocationResult>> UnallocateAsync(long companyId, long allocationId, DateOnly reversalDate, CancellationToken ct = default);
 }

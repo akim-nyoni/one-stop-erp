@@ -131,4 +131,24 @@ public sealed class OpenItem : AuditableEntity, ICompanyScoped
         OutstandingTransaction = decimal.Round(OutstandingTransaction - transactionAmount, 4, MidpointRounding.ToEven);
         OutstandingBase = decimal.Round(OutstandingBase - baseAmount, 4, MidpointRounding.ToEven);
     }
+
+    /// <summary>
+    /// Restores outstanding amounts when an allocation is reversed (un-allocation, brief §RCP-7). The base
+    /// restoration mirrors the base amount that was originally drawn, so reversing an allocation returns the
+    /// item to exactly its pre-allocation state. Cannot restore more than the item's original amount.
+    /// </summary>
+    /// <param name="transactionAmount">The transaction-currency amount to restore.</param>
+    /// <param name="baseAmount">The base-currency amount to restore.</param>
+    /// <exception cref="InvalidOperationException">Thrown when the restoration exceeds the original amount.</exception>
+    public void RestoreOutstanding(decimal transactionAmount, decimal baseAmount)
+    {
+        if (OutstandingTransaction + transactionAmount > OriginalTransaction + 0.0001m)
+        {
+            throw new InvalidOperationException(
+                $"Restoring {transactionAmount} would exceed the original {OriginalTransaction} on {DocumentNumber}.");
+        }
+
+        OutstandingTransaction = decimal.Round(OutstandingTransaction + transactionAmount, 4, MidpointRounding.ToEven);
+        OutstandingBase = decimal.Round(OutstandingBase + baseAmount, 4, MidpointRounding.ToEven);
+    }
 }
