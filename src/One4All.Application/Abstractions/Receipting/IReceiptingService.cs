@@ -33,6 +33,41 @@ public interface IPayerAccountProvider
 /// <param name="Amount">The float amount.</param>
 public readonly record struct FloatDeclaration(CurrencyCode Currency, decimal Amount);
 
+/// <summary>How a debtor payment is spread across the account's outstanding items (brief §RCP-5).</summary>
+public enum ReceiptAllocationStrategy
+{
+    /// <summary>Oldest charge first (FIFO by document date).</summary>
+    OldestFirst = 0,
+
+    /// <summary>Newest / current charge first (keeps the payer out of further arrears).</summary>
+    NewestFirst = 1,
+
+    /// <summary>Largest outstanding item first.</summary>
+    LargestFirst = 2,
+
+    /// <summary>The cashier directs the allocation explicitly (permissioned, with a reason).</summary>
+    UserDirected = 3,
+}
+
+/// <summary>An explicit allocation instruction (for <see cref="ReceiptAllocationStrategy.UserDirected"/>).</summary>
+/// <param name="OpenItemId">The debit open item (invoice/charge) to settle.</param>
+/// <param name="Amount">The amount to apply to it.</param>
+public readonly record struct DirectedAllocation(long OpenItemId, decimal Amount);
+
+/// <summary>One line of a proposed allocation (shown before the receipt is committed, brief §RCP-5).</summary>
+/// <param name="OpenItemId">The debit open item.</param>
+/// <param name="DocumentNumber">Its document number.</param>
+/// <param name="DocumentDate">Its document date.</param>
+/// <param name="Outstanding">Its outstanding amount.</param>
+/// <param name="Applied">The amount this receipt would apply to it.</param>
+public readonly record struct AllocationPreviewLine(long OpenItemId, string DocumentNumber, DateOnly DocumentDate, decimal Outstanding, decimal Applied);
+
+/// <summary>A proposed allocation of a payment across an account's outstanding items.</summary>
+/// <param name="Lines">The per-item applications.</param>
+/// <param name="Allocated">The total that would be applied to debt.</param>
+/// <param name="CreditOnAccount">The overpayment that would remain as credit on account.</param>
+public readonly record struct AllocationPreview(IReadOnlyList<AllocationPreviewLine> Lines, decimal Allocated, decimal CreditOnAccount);
+
 /// <summary>A line on a receipt request.</summary>
 /// <param name="Type">The line type.</param>
 /// <param name="Amount">The amount.</param>
@@ -64,11 +99,26 @@ public sealed class ReceiptRequest
     /// <summary>The receipt date.</summary>
     public DateOnly Date { get; init; }
 
+    /// <summary>
+    /// The receipt currency. Defaults to the company base currency; a foreign currency lets a debtor pay a
+    /// base-currency debt in another currency, realising FX on allocation (brief §RCP-6).
+    /// </summary>
+    public CurrencyCode? Currency { get; init; }
+
+    /// <summary>The explicit exchange rate to base, when the receipt is in a foreign currency (else looked up).</summary>
+    public decimal? ExchangeRate { get; init; }
+
     /// <summary>The cash/bank control account debited with the money received.</summary>
     public string CashAccountCode { get; init; } = string.Empty;
 
     /// <summary>The credit-on-account (overpayment) liability account, when a debtor overpays.</summary>
     public string? CreditOnAccountCode { get; init; }
+
+    /// <summary>The strategy for spreading a debtor payment across outstanding items.</summary>
+    public ReceiptAllocationStrategy AllocationStrategy { get; init; } = ReceiptAllocationStrategy.OldestFirst;
+
+    /// <summary>Explicit allocations, when <see cref="AllocationStrategy"/> is user-directed.</summary>
+    public IReadOnlyList<DirectedAllocation> DirectedAllocations { get; init; } = [];
 
     /// <summary>The lines (what the money is for).</summary>
     public IReadOnlyList<ReceiptLineRequest> Lines { get; init; } = [];
@@ -110,7 +160,20 @@ public interface IReceiptingService
     Task<Result<long>> OpenSessionAsync(long companyId, long stationId, long cashierUserId, DateOnly date, IReadOnlyList<FloatDeclaration> floats, CancellationToken ct = default);
 
     /// <summary>
-    /// Posts a receipt: debtor-payment lines credit the debtor control (via AR, allocated oldest-first),
+    /// Previews how a debtor payment would be spread across the account's outstanding items under a
+    /// strategy — shown to the payer before the receipt is committed (brief §RCP-5), never writing.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="customerId">The debtor account.</param>
+    /// <param name="amount">The payment amount.</param>
+    /// <param name="strategy">The allocation strategy.</param>
+    /// <param name="directed">Explicit allocations, when the strategy is user-directed.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The proposed allocation.</returns>
+    Task<Result<AllocationPreview>> PreviewAllocationAsync(long companyId, long customerId, decimal amount, ReceiptAllocationStrategy strategy, IReadOnlyList<DirectedAllocation>? directed = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Posts a receipt: debtor-payment lines credit the debtor control (via AR, allocated by strategy),
     /// sundry lines credit the income vote, deposits credit the deposit liability, and unidentified money
     /// credits the suspense control — the money is debited to the cash/bank control.
     /// </summary>

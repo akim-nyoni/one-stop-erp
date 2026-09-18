@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Receipting;
+using One4All.Core.Accounting;
 using One4All.Application.Abstractions.Trading;
 using One4All.Core.Common;
 using One4All.Core.Receipting;
@@ -116,8 +117,9 @@ public sealed class ReceiptingService : IReceiptingService
 
         CashierStation station = await _db.Set<CashierStation>().FirstAsync(s => s.Id == session.StationId, ct).ConfigureAwait(false);
         string receiptNumber = await NextReceiptNumberAsync(request.CompanyId, station, ct).ConfigureAwait(false);
+        CurrencyCode currency = request.Currency ?? company.BaseCurrency;
 
-        Receipt receipt = new(request.CompanyId, session.Id, session.StationId, session.CashierUserId, receiptNumber, request.Date, request.PayerKind, request.PayerAccountId, company.BaseCurrency);
+        Receipt receipt = new(request.CompanyId, session.Id, session.StationId, session.CashierUserId, receiptNumber, request.Date, request.PayerKind, request.PayerAccountId, currency);
         foreach (ReceiptLineRequest line in request.Lines)
         {
             receipt.AddLine(line.Type, line.Amount, line.AccountCode, line.Narrative);
@@ -125,7 +127,7 @@ public sealed class ReceiptingService : IReceiptingService
 
         foreach (ReceiptTenderRequest tender in request.Tenders)
         {
-            receipt.AddTender(tender.Type, company.BaseCurrency, tender.Amount, tender.Reference);
+            receipt.AddTender(tender.Type, currency, tender.Amount, tender.Reference);
         }
 
         _db.Set<Receipt>().Add(receipt);
@@ -143,9 +145,10 @@ public sealed class ReceiptingService : IReceiptingService
                 CustomerId = request.PayerAccountId!.Value,
                 DocumentNumber = receiptNumber,
                 ReceiptDate = request.Date,
-                Currency = company.BaseCurrency,
+                Currency = currency,
                 Amount = debtorTotal,
                 BankAccountCode = request.CashAccountCode,
+                ExchangeRate = request.ExchangeRate,
                 Narrative = $"Receipt {receiptNumber}",
             }, ct).ConfigureAwait(false);
 
@@ -154,7 +157,16 @@ public sealed class ReceiptingService : IReceiptingService
                 return receiptPosting.Error;
             }
 
-            (allocatedToDebt, creditOnAccount) = await AllocateOldestFirstAsync(request.CompanyId, request.PayerAccountId!.Value, receiptPosting.Value.OpenItemId, debtorTotal, request.Date, ct).ConfigureAwait(false);
+            // Same-currency payments allocate here; a foreign-currency payment posts as an on-account credit
+            // (in its own currency) to be matched — realising FX — in the allocation workbench.
+            if (currency == company.BaseCurrency)
+            {
+                (allocatedToDebt, creditOnAccount) = await AllocateAsync(request.CompanyId, request.PayerAccountId!.Value, receiptPosting.Value.OpenItemId, debtorTotal, request.Date, request.AllocationStrategy, request.DirectedAllocations, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                creditOnAccount = debtorTotal;
+            }
         }
 
         // Sundry / deposit / suspense → Dr cash / Cr the coded account (never a guessed income account).
@@ -181,7 +193,7 @@ public sealed class ReceiptingService : IReceiptingService
                 CompanyId = request.CompanyId,
                 SourceModule = "GL",
                 PostingDate = request.Date,
-                TransactionCurrency = company.BaseCurrency,
+                TransactionCurrency = currency,
                 DocumentType = "RECEIPT",
                 DocumentNumber = receiptNumber,
                 Narrative = $"Receipt {receiptNumber}",
@@ -294,34 +306,119 @@ public sealed class ReceiptingService : IReceiptingService
         return Result.Success();
     }
 
-    private async Task<(decimal Allocated, decimal Remainder)> AllocateOldestFirstAsync(long companyId, long customerId, long creditItemId, decimal amount, DateOnly date, CancellationToken ct)
+    /// <inheritdoc />
+    public async Task<Result<AllocationPreview>> PreviewAllocationAsync(long companyId, long customerId, decimal amount, ReceiptAllocationStrategy strategy, IReadOnlyList<DirectedAllocation>? directed = null, CancellationToken ct = default)
     {
-        List<OpenItem> debits = await _db.Set<OpenItem>()
+        if (amount <= 0m)
+        {
+            return Error.Rule("Rcp.NonPositiveAmount", "The amount to allocate must be positive.");
+        }
+
+        List<OpenItem> debits = await OutstandingDebitsAsync(companyId, customerId, ct).ConfigureAwait(false);
+        Result<List<(OpenItem Item, decimal Applied)>> plan = BuildPlan(debits, amount, strategy, directed);
+        if (plan.IsFailure)
+        {
+            return plan.Error;
+        }
+
+        List<AllocationPreviewLine> lines = plan.Value
+            .Select(p => new AllocationPreviewLine(p.Item.Id, p.Item.DocumentNumber, p.Item.DocumentDate, p.Item.OutstandingTransaction, p.Applied))
+            .ToList();
+        decimal allocated = lines.Sum(l => l.Applied);
+        return new AllocationPreview(lines, allocated, amount - allocated);
+    }
+
+    private async Task<(decimal Allocated, decimal Remainder)> AllocateAsync(long companyId, long customerId, long creditItemId, decimal amount, DateOnly date, ReceiptAllocationStrategy strategy, IReadOnlyList<DirectedAllocation> directed, CancellationToken ct)
+    {
+        List<OpenItem> debits = await OutstandingDebitsAsync(companyId, customerId, ct).ConfigureAwait(false);
+        Result<List<(OpenItem Item, decimal Applied)>> plan = BuildPlan(debits, amount, strategy, directed);
+        if (plan.IsFailure)
+        {
+            return (0m, amount);
+        }
+
+        decimal allocated = 0m;
+        foreach ((OpenItem item, decimal applied) in plan.Value)
+        {
+            if (applied <= 0m)
+            {
+                continue;
+            }
+
+            Result<AllocationResult> result = await _allocation.AllocateAsync(companyId, TradingLedger.AccountsReceivable, item.Id, creditItemId, applied, date, ct).ConfigureAwait(false);
+            if (result.IsFailure)
+            {
+                break;
+            }
+
+            allocated += applied;
+        }
+
+        return (allocated, amount - allocated);
+    }
+
+    private async Task<List<OpenItem>> OutstandingDebitsAsync(long companyId, long customerId, CancellationToken ct) =>
+        await _db.Set<OpenItem>()
             .Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == customerId && i.Sign == LedgerSign.Debit && i.OutstandingTransaction > 0m)
-            .OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)
             .ToListAsync(ct).ConfigureAwait(false);
 
+    private static Result<List<(OpenItem Item, decimal Applied)>> BuildPlan(List<OpenItem> debits, decimal amount, ReceiptAllocationStrategy strategy, IReadOnlyList<DirectedAllocation>? directed)
+    {
+        List<(OpenItem Item, decimal Applied)> plan = [];
+
+        if (strategy == ReceiptAllocationStrategy.UserDirected)
+        {
+            if (directed is null || directed.Count == 0)
+            {
+                return Error.Validation("Rcp.NoDirectedAllocations", "A user-directed allocation requires explicit allocations.");
+            }
+
+            decimal directedTotal = directed.Sum(d => d.Amount);
+            if (directedTotal > amount + 0.0001m)
+            {
+                return Error.Rule("Rcp.OverDirected", $"Directed allocations ({directedTotal}) exceed the payment ({amount}).");
+            }
+
+            foreach (DirectedAllocation instruction in directed)
+            {
+                OpenItem? item = debits.FirstOrDefault(d => d.Id == instruction.OpenItemId);
+                if (item is null)
+                {
+                    return Error.NotFound("Rcp.DirectedItemNotFound", $"Open item {instruction.OpenItemId} is not an outstanding charge on this account.");
+                }
+
+                if (instruction.Amount > item.OutstandingTransaction + 0.0001m)
+                {
+                    return Error.Rule("Rcp.DirectedOverItem", $"Directed amount {instruction.Amount} exceeds the {item.OutstandingTransaction} outstanding on {item.DocumentNumber}.");
+                }
+
+                plan.Add((item, instruction.Amount));
+            }
+
+            return plan;
+        }
+
+        IEnumerable<OpenItem> ordered = strategy switch
+        {
+            ReceiptAllocationStrategy.NewestFirst => debits.OrderByDescending(i => i.DocumentDate).ThenByDescending(i => i.Id),
+            ReceiptAllocationStrategy.LargestFirst => debits.OrderByDescending(i => i.OutstandingTransaction).ThenBy(i => i.DocumentDate),
+            _ => debits.OrderBy(i => i.DocumentDate).ThenBy(i => i.Id),
+        };
+
         decimal remaining = amount;
-        decimal allocated = 0m;
-        foreach (OpenItem debit in debits)
+        foreach (OpenItem item in ordered)
         {
             if (remaining <= 0m)
             {
                 break;
             }
 
-            decimal take = Math.Min(remaining, debit.OutstandingTransaction);
-            Result<AllocationResult> result = await _allocation.AllocateAsync(companyId, TradingLedger.AccountsReceivable, debit.Id, creditItemId, take, date, ct).ConfigureAwait(false);
-            if (result.IsFailure)
-            {
-                break;
-            }
-
-            allocated += take;
+            decimal take = Math.Min(remaining, item.OutstandingTransaction);
+            plan.Add((item, take));
             remaining -= take;
         }
 
-        return (allocated, remaining);
+        return plan;
     }
 
     private async Task<string> NextReceiptNumberAsync(long companyId, CashierStation station, CancellationToken ct)
