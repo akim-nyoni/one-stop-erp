@@ -82,6 +82,9 @@ public sealed class ReportCatalogueSeeder
         yield return SystemReports.PayrollSummary();
         yield return SystemReports.PropertyRegister();
         yield return SystemReports.BudgetVsActual();
+        yield return SystemReports.PosSales();
+        yield return SystemReports.JobProfitability();
+        yield return SystemReports.ProgressCertificates();
 
         // Cashiering & Receipting catalogue (brief §RCP-16, the RC series).
         foreach (ReportDefinition definition in ReceiptingReports.All())

@@ -245,6 +245,36 @@ public static class SystemReports
         [new Column("AccountCode", "Account", 100), new Column("Budget", "Budget", 100, true), new Column("Actual", "Actual", 100, true), new Column("Variance", "Variance", 100, true)],
         [("FiscalYearId", ParameterType.Integer), ("Department", ParameterType.String), ("Period", ParameterType.Integer)]);
 
+    /// <summary>The POS Sales Summary report code.</summary>
+    public const string PosSalesCode = "POS-SUM";
+
+    /// <summary>The Job Profitability report code.</summary>
+    public const string JobProfitabilityCode = "JOB-PROF";
+
+    /// <summary>The Progress Certificates report code.</summary>
+    public const string ProgressCertificatesCode = "JOB-IPC";
+
+    /// <summary>Builds the POS Sales Summary definition (brief §4.1).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition PosSales() => Listing(PosSalesCode, "POS Sales Summary", "PointOfSale",
+        "Point-of-sale transactions with net, tax and gross for a period.", "PosSales",
+        [new Column("SaleNumber", "Sale", 110), new Column("SaleDate", "Date", 100), new Column("TotalNet", "Net", 100, true), new Column("TotalTax", "Tax", 90, true), new Column("TotalGross", "Gross", 100, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Job Profitability definition (brief §4.12).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition JobProfitability() => Listing(JobProfitabilityCode, "Job Profitability", "JobCosting",
+        "Contract value, budget, actual cost, certified-to-date and percentage complete per contract.", "JobProfitability",
+        [new Column("ContractNumber", "Contract", 90), new Column("Name", "Name", 160), new Column("ContractValue", "Value", 90, true), new Column("BudgetCost", "Budget", 90, true), new Column("ActualCost", "Actual", 90, true), new Column("CertifiedToDate", "Certified", 90, true), new Column("PercentComplete", "% Complete", 70)],
+        []);
+
+    /// <summary>Builds the Progress Certificates definition (brief §4.12).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition ProgressCertificates() => Listing(ProgressCertificatesCode, "Progress Certificates", "JobCosting",
+        "Interim payment certificates with gross, retention and net payable for a period.", "ProgressCertificates",
+        [new Column("CertificateNumber", "Certificate", 110), new Column("Date", "Date", 100), new Column("Gross", "Gross", 100, true), new Column("Retention", "Retention", 100, true), new Column("Net", "Net payable", 110, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
     /// <summary>Builds a generic listing report definition from a column spec.</summary>
     /// <param name="code">The report code.</param>
     /// <param name="name">The report name.</param>

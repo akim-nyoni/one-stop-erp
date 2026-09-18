@@ -102,6 +102,9 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.PayrollSummaryCode => SystemReports.PayrollSummary(),
         SystemReports.PropertyRegisterCode => SystemReports.PropertyRegister(),
         SystemReports.BudgetVsActualCode => SystemReports.BudgetVsActual(),
+        SystemReports.PosSalesCode => SystemReports.PosSales(),
+        SystemReports.JobProfitabilityCode => SystemReports.JobProfitability(),
+        SystemReports.ProgressCertificatesCode => SystemReports.ProgressCertificates(),
         _ => ReceiptingReports.All().FirstOrDefault(r => string.Equals(r.Code, code, StringComparison.OrdinalIgnoreCase)),
     };
 }
