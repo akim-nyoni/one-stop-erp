@@ -173,6 +173,15 @@ public class One4AllDbContext : DbContext
     /// <summary>Students.</summary>
     public DbSet<Core.Schools.Student> Students => Set<Core.Schools.Student>();
 
+    /// <summary>Construction contracts / jobs.</summary>
+    public DbSet<Core.JobCosting.JobContract> JobContracts => Set<Core.JobCosting.JobContract>();
+
+    /// <summary>Interim payment certificates.</summary>
+    public DbSet<Core.JobCosting.ProgressCertificate> ProgressCertificates => Set<Core.JobCosting.ProgressCertificate>();
+
+    /// <summary>Weighbridge tickets.</summary>
+    public DbSet<Core.JobCosting.WeighbridgeTicket> WeighbridgeTickets => Set<Core.JobCosting.WeighbridgeTicket>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

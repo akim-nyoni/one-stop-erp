@@ -108,6 +108,14 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 
 **Phase 9 status:** Fee billing core complete — structures, students, bursaries, and the per-term billing run posting to guardian AR. Deferred depth: deferred-income recognition across the term, sponsor split billing, sibling/staff-child discounts, optional-item opt-in, tuck shop/boarding/transport-route billing, hostel allocation.
 
+## Phase 10 — Construction / Job Costing + Weighbridge
+| Increment | Status | Notes |
+|---|---|---|
+| **10A** Job Costing / Project Accounting (§4.12) | ✅ | `job` schema. `JobContract` (contract value, budget, retention %, captured `JobCostEntry` list by source, actual cost, **cost-to-cost % complete**); `ProgressCertificate` (work done + materials − previous, retention split, net payable). `IJobCostingService`: create contract, **capture cost** (record-only — GL already hit at source via AP/stock/labour), **certify progress** (raises the net on the client AR + recognises **retention as a separate receivable**, both crediting contract revenue for the gross), and job profitability. `AddJobCosting` migration. Test: contract 1M/budget 800k/10% retention → capture 200k cost → IPC work 200k + materials 50k = 250k gross → net 225k debtors, retention receivable 25k, revenue 250k, % complete 25, TB balances. |
+| **10B** Weighbridge (bulk materials, §3) | ✅ | `WeighbridgeTicket`: first weigh (gross) / second weigh (tare), moisture deduction, net kg (floored at 0) → net tonnes → **net m³ via per-product conversion factor**. Feeds ticket→delivery→invoice. 4 unit tests (net zero before tare; 20 t / 13 m³ @ 0.65; deduction; negative-guard). |
+
+**Phase 10 status:** Job costing core (contracts, cost capture for profitability, interim payment certificates with retention → AR) and the weighbridge net/tonnage/volume engine. Deferred depth: WBS/BOQ import & budgets, variation orders, subcontractor ledger & WHT, retention release schedule, cost-to-cost WIP/revenue recognition postings, plant register, haulage-by-zone charging, ticket→invoice automation.
+
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
 - **PostgreSQL 18** dev, min supported 16 (ADR-0002).
