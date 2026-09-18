@@ -77,6 +77,38 @@ internal sealed class ReceiptLineConfiguration : IEntityTypeConfiguration<Receip
     }
 }
 
+internal sealed class ImportBatchConfiguration : IEntityTypeConfiguration<ImportBatch>
+{
+    public void Configure(EntityTypeBuilder<ImportBatch> b)
+    {
+        b.ToTable("import_batch", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.FileReference).HasMaxLength(200);
+        b.Property(x => x.FileHash).HasMaxLength(128);
+        b.Property(x => x.Source).HasConversion<int>();
+        b.Property(x => x.BankAccountCode).HasMaxLength(8);
+        b.Ignore(x => x.MatchedCount);
+        b.Ignore(x => x.UnmatchedCount);
+        b.Ignore(x => x.TotalAmount);
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.ImportBatchId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.FileHash }).IsUnique();
+    }
+}
+
+internal sealed class ImportLineConfiguration : IEntityTypeConfiguration<ImportLine>
+{
+    public void Configure(EntityTypeBuilder<ImportLine> b)
+    {
+        b.ToTable("import_line", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PayerReference).HasMaxLength(120);
+        b.Property(x => x.PayerName).HasMaxLength(200);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.ImportBatchId, x.Status });
+    }
+}
+
 internal sealed class BankDepositConfiguration : IEntityTypeConfiguration<BankDeposit>
 {
     public void Configure(EntityTypeBuilder<BankDeposit> b)

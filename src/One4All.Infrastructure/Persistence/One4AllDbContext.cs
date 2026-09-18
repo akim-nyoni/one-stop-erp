@@ -212,6 +212,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Banking deposits (treasury).</summary>
     public DbSet<Core.Receipting.BankDeposit> BankDeposits => Set<Core.Receipting.BankDeposit>();
 
+    /// <summary>Import batches (bulk/file-based receipting).</summary>
+    public DbSet<Core.Receipting.ImportBatch> ImportBatches => Set<Core.Receipting.ImportBatch>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

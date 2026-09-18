@@ -4183,6 +4183,138 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("station", "rcp");
                 });
 
+            modelBuilder.Entity("One4All.Core.Receipting.ImportBatch", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BankAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("bank_account_code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("FileHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("file_hash");
+
+                    b.Property<string>("FileReference")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("file_reference");
+
+                    b.Property<DateOnly>("ImportDate")
+                        .HasColumnType("date")
+                        .HasColumnName("import_date");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("integer")
+                        .HasColumnName("source");
+
+                    b.HasKey("Id")
+                        .HasName("pk_import_batch");
+
+                    b.HasIndex("CompanyId", "FileHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_import_batch_company_id_file_hash");
+
+                    b.ToTable("import_batch", "rcp");
+                });
+
+            modelBuilder.Entity("One4All.Core.Receipting.ImportLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("ImportBatchId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("import_batch_id");
+
+                    b.Property<long?>("MatchedCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("matched_customer_id");
+
+                    b.Property<long?>("OpenItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("open_item_id");
+
+                    b.Property<string>("PayerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("payer_name");
+
+                    b.Property<string>("PayerReference")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("payer_reference");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<DateOnly>("ValueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("value_date");
+
+                    b.HasKey("Id")
+                        .HasName("pk_import_line");
+
+                    b.HasIndex("ImportBatchId", "Status")
+                        .HasDatabaseName("ix_import_line_import_batch_id_status");
+
+                    b.ToTable("import_line", "rcp");
+                });
+
             modelBuilder.Entity("One4All.Core.Receipting.Receipt", b =>
                 {
                     b.Property<long>("Id")
@@ -6957,6 +7089,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_purchase_order_line_purchase_orders_purchase_order_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Receipting.ImportLine", b =>
+                {
+                    b.HasOne("One4All.Core.Receipting.ImportBatch", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("ImportBatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_import_line_import_batches_import_batch_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Receipting.ReceiptLine", b =>
                 {
                     b.HasOne("One4All.Core.Receipting.Receipt", null)
@@ -7182,6 +7324,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Receipting.CashierSession", b =>
                 {
                     b.Navigation("Floats");
+                });
+
+            modelBuilder.Entity("One4All.Core.Receipting.ImportBatch", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("One4All.Core.Receipting.Receipt", b =>
