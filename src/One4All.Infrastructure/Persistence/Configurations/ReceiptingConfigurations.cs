@@ -77,6 +77,47 @@ internal sealed class ReceiptLineConfiguration : IEntityTypeConfiguration<Receip
     }
 }
 
+internal sealed class AgentConfiguration : IEntityTypeConfiguration<Agent>
+{
+    public void Configure(EntityTypeBuilder<Agent> b)
+    {
+        b.ToTable("agent", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.CommissionPercent).HasPrecision(9, 4);
+        b.Ignore(x => x.Outstanding);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
+        b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+internal sealed class StationeryBookConfiguration : IEntityTypeConfiguration<StationeryBook>
+{
+    public void Configure(EntityTypeBuilder<StationeryBook> b)
+    {
+        b.ToTable("stationery_book", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.BookNumber).HasMaxLength(30);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Ignore(x => x.SerialCount);
+        b.HasMany(x => x.Captures).WithOne().HasForeignKey(x => x.StationeryBookId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Captures).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.BookNumber }).IsUnique().HasFilter("is_deleted = false");
+        b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+internal sealed class ManualReceiptCaptureConfiguration : IEntityTypeConfiguration<ManualReceiptCapture>
+{
+    public void Configure(EntityTypeBuilder<ManualReceiptCapture> b)
+    {
+        b.ToTable("manual_receipt_capture", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.StationeryBookId, x.Serial }).IsUnique();
+    }
+}
+
 internal sealed class ImportBatchConfiguration : IEntityTypeConfiguration<ImportBatch>
 {
     public void Configure(EntityTypeBuilder<ImportBatch> b)

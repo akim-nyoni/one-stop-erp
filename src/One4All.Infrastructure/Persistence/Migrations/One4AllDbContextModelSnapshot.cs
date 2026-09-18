@@ -3956,6 +3956,95 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("purchase_order_line", "pop");
                 });
 
+            modelBuilder.Entity("One4All.Core.Receipting.Agent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<decimal>("CollectedToDate")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("collected_to_date");
+
+                    b.Property<decimal>("CommissionPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("commission_percent");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DeletedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_on_utc");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<decimal>("RemittedToDate")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("remitted_to_date");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_agent");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_agent_company_id_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("agent", "rcp");
+                });
+
             modelBuilder.Entity("One4All.Core.Receipting.BankDeposit", b =>
                 {
                     b.Property<long>("Id")
@@ -4315,6 +4404,52 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("import_line", "rcp");
                 });
 
+            modelBuilder.Entity("One4All.Core.Receipting.ManualReceiptCapture", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateOnly>("CapturedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("captured_on");
+
+                    b.Property<DateOnly>("ReceiptDate")
+                        .HasColumnType("date")
+                        .HasColumnName("receipt_date");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("Serial")
+                        .HasColumnType("bigint")
+                        .HasColumnName("serial");
+
+                    b.Property<long>("StationeryBookId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stationery_book_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_manual_receipt_capture");
+
+                    b.HasIndex("StationeryBookId", "Serial")
+                        .IsUnique()
+                        .HasDatabaseName("ix_manual_receipt_capture_stationery_book_id_serial");
+
+                    b.ToTable("manual_receipt_capture", "rcp");
+                });
+
             modelBuilder.Entity("One4All.Core.Receipting.Receipt", b =>
                 {
                     b.Property<long>("Id")
@@ -4549,6 +4684,90 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_session_float_cashier_session_id");
 
                     b.ToTable("session_float", "rcp");
+                });
+
+            modelBuilder.Entity("One4All.Core.Receipting.StationeryBook", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BookNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("book_number");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DeletedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_on_utc");
+
+                    b.Property<long>("FromSerial")
+                        .HasColumnType("bigint")
+                        .HasColumnName("from_serial");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateOnly>("IssuedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("issued_on");
+
+                    b.Property<long>("IssuedToUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("issued_to_user_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("ToSerial")
+                        .HasColumnType("bigint")
+                        .HasColumnName("to_serial");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stationery_book");
+
+                    b.HasIndex("CompanyId", "BookNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stationery_book_company_id_book_number")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("stationery_book", "rcp");
                 });
 
             modelBuilder.Entity("One4All.Core.Reporting.ReportDefinitionRecord", b =>
@@ -7099,6 +7318,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_import_line_import_batches_import_batch_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Receipting.ManualReceiptCapture", b =>
+                {
+                    b.HasOne("One4All.Core.Receipting.StationeryBook", null)
+                        .WithMany("Captures")
+                        .HasForeignKey("StationeryBookId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_manual_receipt_capture_stationery_books_stationery_book_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Receipting.ReceiptLine", b =>
                 {
                     b.HasOne("One4All.Core.Receipting.Receipt", null)
@@ -7336,6 +7565,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Navigation("Lines");
 
                     b.Navigation("Tenders");
+                });
+
+            modelBuilder.Entity("One4All.Core.Receipting.StationeryBook", b =>
+                {
+                    b.Navigation("Captures");
                 });
 
             modelBuilder.Entity("One4All.Core.SalesOrders.SalesOrder", b =>

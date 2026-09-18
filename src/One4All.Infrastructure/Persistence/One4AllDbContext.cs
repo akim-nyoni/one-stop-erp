@@ -215,6 +215,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Import batches (bulk/file-based receipting).</summary>
     public DbSet<Core.Receipting.ImportBatch> ImportBatches => Set<Core.Receipting.ImportBatch>();
 
+    /// <summary>Collection agents.</summary>
+    public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
+
+    /// <summary>Pre-numbered stationery books.</summary>
+    public DbSet<Core.Receipting.StationeryBook> StationeryBooks => Set<Core.Receipting.StationeryBook>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

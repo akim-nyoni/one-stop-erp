@@ -104,6 +104,8 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Receipting.IReceiptingService, Receipting.ReceiptingService>();
         services.AddScoped<Application.Abstractions.Receipting.IBankingService, Receipting.BankingService>();
         services.AddScoped<Application.Abstractions.Receipting.IReceiptImportService, Receipting.ReceiptImportService>();
+        services.AddScoped<Application.Abstractions.Receipting.IAgentService, Receipting.AgentService>();
+        services.AddScoped<Application.Abstractions.Receipting.IStationeryService, Receipting.StationeryService>();
 
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());

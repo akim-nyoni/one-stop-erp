@@ -125,6 +125,8 @@ public static class Scenario
         db.Accounts.Add(new LedgerAccount(company.Id, "2600", "Suspense / Unallocated Control", AccountType.Liability));
         db.Accounts.Add(new LedgerAccount(company.Id, "7500", "Cash Shortages & Overages", AccountType.Expense));
         db.Accounts.Add(new LedgerAccount(company.Id, "1050", "Cash in Transit", AccountType.Asset));
+        db.Accounts.Add(new LedgerAccount(company.Id, "1300", "Agent Cash Control", AccountType.Asset));
+        db.Accounts.Add(new LedgerAccount(company.Id, "6200", "Agent Commission", AccountType.Expense));
 
         // Foreign-currency bank (EUR) for FX revaluation, plus FX gain/loss control accounts.
         LedgerAccount foreignBank = new(company.Id, "1150", "Bank (EUR)", AccountType.Asset) { CurrencyRestriction = Eur };
