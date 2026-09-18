@@ -213,6 +213,47 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
+    public async Task<Result<ReceiptResult>> AllocateFromSuspenseAsync(long companyId, long customerId, decimal amount, DateOnly date, string suspenseAccountCode, ReceiptAllocationStrategy strategy, string reason, CancellationToken ct = default)
+    {
+        if (amount <= 0m)
+        {
+            return Error.Rule("Rcp.NonPositiveAmount", "The amount to move out of suspense must be positive.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Rcp.ReasonRequired", "Allocating from suspense requires a reason.");
+        }
+
+        Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        if (company is null)
+        {
+            return Error.NotFound("Rcp.CompanyNotFound", $"Company {companyId} not found.");
+        }
+
+        // Dr suspense control / Cr AR control (via the AR ledger), then apply to the account's charges.
+        Result<TradingPostingResult> posting = await _salesLedger.PostReceiptAsync(new TradingReceiptRequest
+        {
+            CompanyId = companyId,
+            CustomerId = customerId,
+            DocumentNumber = $"SUS-{customerId}-{date:yyyyMMdd}",
+            ReceiptDate = date,
+            Currency = company.BaseCurrency,
+            Amount = amount,
+            BankAccountCode = suspenseAccountCode,
+            Narrative = $"Suspense allocation: {reason}",
+        }, ct).ConfigureAwait(false);
+
+        if (posting.IsFailure)
+        {
+            return posting.Error;
+        }
+
+        (decimal allocated, decimal remainder) = await AllocateAsync(companyId, customerId, posting.Value.OpenItemId, amount, date, strategy, [], ct).ConfigureAwait(false);
+        return new ReceiptResult(0, posting.Value.JournalNumber, amount, allocated, remainder);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<CashUpResult>> CloseSessionAsync(long companyId, long sessionId, DateOnly date, IReadOnlyList<FloatDeclaration> countedCash, string cashAccountCode, string shortagesAccountCode, CancellationToken ct = default)
     {
         CashierSession? session = await _db.Set<CashierSession>().Include(s => s.Floats)

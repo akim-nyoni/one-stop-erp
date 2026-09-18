@@ -183,6 +183,22 @@ public interface IReceiptingService
     Task<Result<ReceiptResult>> PostReceiptAsync(ReceiptRequest request, CancellationToken ct = default);
 
     /// <summary>
+    /// Allocates money out of the suspense/unallocated control to a debtor account (brief §RCP-6 suspense
+    /// workbench): Dr suspense control, Cr debtor control, then applies it to the account's outstanding
+    /// items by strategy. Never guesses income. A permissioned, audited act with a mandatory reason.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="customerId">The debtor account the money belongs to.</param>
+    /// <param name="amount">The amount to move out of suspense.</param>
+    /// <param name="date">The allocation date.</param>
+    /// <param name="suspenseAccountCode">The suspense/unallocated control account (debited).</param>
+    /// <param name="strategy">The allocation strategy.</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The amounts allocated to debt and left on account.</returns>
+    Task<Result<ReceiptResult>> AllocateFromSuspenseAsync(long companyId, long customerId, decimal amount, DateOnly date, string suspenseAccountCode, ReceiptAllocationStrategy strategy, string reason, CancellationToken ct = default);
+
+    /// <summary>
     /// Closes a session with a blind cash-up: computes expected cash (float + cash tenders) per currency,
     /// records the variance, and posts any shortage/overage to the shortages account.
     /// </summary>
