@@ -37,8 +37,11 @@ public sealed class ReportCatalogueSeeder
                 _db.ReportDefinitions.Add(new ReportDefinitionRecord(definition.Code, definition.Name, json, ReportScope.System, module: definition.Module));
                 changed++;
             }
-            else if (existing.DefinitionJson != json)
+            else if (Canonicalize(existing.DefinitionJson) != json)
             {
+                // The column is jsonb, which Postgres re-normalises on write, so the stored text never equals
+                // the serializer's output byte-for-byte. Compare canonically (round-trip through the same
+                // serializer) so an unchanged definition is not needlessly rewritten every run.
                 existing.UpdateDefinition(json);
                 changed++;
             }
@@ -52,9 +55,29 @@ public sealed class ReportCatalogueSeeder
         return changed;
     }
 
+    /// <summary>Re-serialises stored JSON through the same serializer so jsonb normalisation is ignored.</summary>
+    private static string Canonicalize(string storedJson)
+    {
+        try
+        {
+            return ReportDefinitionSerializer.Serialize(ReportDefinitionSerializer.Deserialize(storedJson));
+        }
+        catch (Exception)
+        {
+            // Unparseable stored JSON is treated as different so it gets refreshed.
+            return string.Empty;
+        }
+    }
+
     private static IEnumerable<ReportDefinition> SystemDefinitions()
     {
         yield return SystemReports.TrialBalance();
         yield return SystemReports.CustomerStatement();
+
+        // Cashiering & Receipting catalogue (brief §RCP-16, the RC series).
+        foreach (ReportDefinition definition in ReceiptingReports.All())
+        {
+            yield return definition;
+        }
     }
 }
