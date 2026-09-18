@@ -200,6 +200,15 @@ public class One4AllDbContext : DbContext
     /// <summary>Budgets.</summary>
     public DbSet<Core.Budgeting.Budget> Budgets => Set<Core.Budgeting.Budget>();
 
+    /// <summary>Cashiering stations.</summary>
+    public DbSet<Core.Receipting.CashierStation> CashierStations => Set<Core.Receipting.CashierStation>();
+
+    /// <summary>Cashier sessions.</summary>
+    public DbSet<Core.Receipting.CashierSession> CashierSessions => Set<Core.Receipting.CashierSession>();
+
+    /// <summary>Receipts.</summary>
+    public DbSet<Core.Receipting.Receipt> Receipts => Set<Core.Receipting.Receipt>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

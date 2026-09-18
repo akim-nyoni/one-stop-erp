@@ -75,6 +75,9 @@ public static class Schemas
     /// <summary>CRM &amp; Service Desk (leads, opportunities, activities).</summary>
     public const string Crm = "crm";
 
+    /// <summary>Cashiering &amp; Receipting (stations, sessions, receipts).</summary>
+    public const string Receipting = "rcp";
+
     /// <summary>Reporting: report definitions, schedules, delivery logs.</summary>
     public const string Reporting = "rpt";
 

@@ -99,6 +99,10 @@ public static class DependencyInjection
         // Budgeting, Planning & Commitment Control.
         services.AddScoped<Application.Abstractions.Budgeting.IBudgetingService, Budgeting.BudgetingService>();
 
+        // Cashiering & Receipting.
+        services.AddScoped<Application.Abstractions.Receipting.IPayerAccountProvider, Receipting.ArPayerAccountProvider>();
+        services.AddScoped<Application.Abstractions.Receipting.IReceiptingService, Receipting.ReceiptingService>();
+
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();

@@ -119,6 +119,12 @@ public static class Scenario
         db.Accounts.Add(new LedgerAccount(company.Id, "2410", "Pension Payable", AccountType.Liability));
         db.Accounts.Add(new LedgerAccount(company.Id, "2420", "Net Pay Control", AccountType.Liability));
 
+        // Receipting: sundry income, deposits, suspense and cash shortages/overages.
+        db.Accounts.Add(new LedgerAccount(company.Id, "4400", "Sundry Income", AccountType.Income));
+        db.Accounts.Add(new LedgerAccount(company.Id, "2500", "Consumer Deposits", AccountType.Liability));
+        db.Accounts.Add(new LedgerAccount(company.Id, "2600", "Suspense / Unallocated Control", AccountType.Liability));
+        db.Accounts.Add(new LedgerAccount(company.Id, "7500", "Cash Shortages & Overages", AccountType.Expense));
+
         // Foreign-currency bank (EUR) for FX revaluation, plus FX gain/loss control accounts.
         LedgerAccount foreignBank = new(company.Id, "1150", "Bank (EUR)", AccountType.Asset) { CurrencyRestriction = Eur };
         db.Accounts.Add(foreignBank);

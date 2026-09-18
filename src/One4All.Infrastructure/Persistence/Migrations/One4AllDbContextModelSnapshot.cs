@@ -3956,6 +3956,387 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("purchase_order_line", "pop");
                 });
 
+            modelBuilder.Entity("One4All.Core.Receipting.CashierSession", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("CashUpVarianceBase")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("cash_up_variance_base");
+
+                    b.Property<long>("CashierUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cashier_user_id");
+
+                    b.Property<DateOnly?>("ClosedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("closed_on");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("OpenedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("opened_on");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("StationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("station_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long?>("VerifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("verified_by_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_session");
+
+                    b.HasIndex("CompanyId", "CashierUserId", "Status")
+                        .HasDatabaseName("ix_session_company_id_cashier_user_id_status")
+                        .HasFilter("status = 1");
+
+                    b.ToTable("session", "rcp");
+                });
+
+            modelBuilder.Entity("One4All.Core.Receipting.CashierStation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DeletedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_on_utc");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ReceiptPrefix")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("receipt_prefix");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_station");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_station_company_id_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("station", "rcp");
+                });
+
+            modelBuilder.Entity("One4All.Core.Receipting.Receipt", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CashierSessionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cashier_session_id");
+
+                    b.Property<long>("CashierUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cashier_user_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("JournalNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long?>("PayerAccountId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("payer_account_id");
+
+                    b.Property<int>("PayerKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("payer_kind");
+
+                    b.Property<string>("ReceiptNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("receipt_number");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("StationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("station_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_receipt");
+
+                    b.HasIndex("CashierSessionId")
+                        .HasDatabaseName("ix_receipt_cashier_session_id");
+
+                    b.HasIndex("CompanyId", "StationId", "ReceiptNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_receipt_company_id_station_id_receipt_number");
+
+                    b.ToTable("receipt", "rcp");
+                });
+
+            modelBuilder.Entity("One4All.Core.Receipting.ReceiptLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("account_code");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Narrative")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("narrative");
+
+                    b.Property<long>("ReceiptId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("receipt_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_receipt_line");
+
+                    b.HasIndex("ReceiptId")
+                        .HasDatabaseName("ix_receipt_line_receipt_id");
+
+                    b.ToTable("receipt_line", "rcp");
+                });
+
+            modelBuilder.Entity("One4All.Core.Receipting.ReceiptTender", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<long>("ReceiptId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("receipt_id");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_receipt_tender");
+
+                    b.HasIndex("ReceiptId")
+                        .HasDatabaseName("ix_receipt_tender_receipt_id");
+
+                    b.ToTable("receipt_tender", "rcp");
+                });
+
+            modelBuilder.Entity("One4All.Core.Receipting.SessionFloat", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CashierSessionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cashier_session_id");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_session_float");
+
+                    b.HasIndex("CashierSessionId")
+                        .HasDatabaseName("ix_session_float_cashier_session_id");
+
+                    b.ToTable("session_float", "rcp");
+                });
+
             modelBuilder.Entity("One4All.Core.Reporting.ReportDefinitionRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -6486,6 +6867,36 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_purchase_order_line_purchase_orders_purchase_order_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Receipting.ReceiptLine", b =>
+                {
+                    b.HasOne("One4All.Core.Receipting.Receipt", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("ReceiptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_receipt_line_receipts_receipt_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Receipting.ReceiptTender", b =>
+                {
+                    b.HasOne("One4All.Core.Receipting.Receipt", null)
+                        .WithMany("Tenders")
+                        .HasForeignKey("ReceiptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_receipt_tender_receipts_receipt_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Receipting.SessionFloat", b =>
+                {
+                    b.HasOne("One4All.Core.Receipting.CashierSession", null)
+                        .WithMany("Floats")
+                        .HasForeignKey("CashierSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_session_float_cashier_sessions_cashier_session_id");
+                });
+
             modelBuilder.Entity("One4All.Core.SalesOrders.SalesOrderLine", b =>
                 {
                     b.HasOne("One4All.Core.SalesOrders.SalesOrder", null)
@@ -6676,6 +7087,18 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrder", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Receipting.CashierSession", b =>
+                {
+                    b.Navigation("Floats");
+                });
+
+            modelBuilder.Entity("One4All.Core.Receipting.Receipt", b =>
+                {
+                    b.Navigation("Lines");
+
+                    b.Navigation("Tenders");
                 });
 
             modelBuilder.Entity("One4All.Core.SalesOrders.SalesOrder", b =>
