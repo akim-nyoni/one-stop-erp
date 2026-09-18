@@ -72,6 +72,9 @@ public static class Schemas
     /// <summary>Budgeting, Planning &amp; Commitment Control.</summary>
     public const string Budget = "bud";
 
+    /// <summary>CRM &amp; Service Desk (leads, opportunities, activities).</summary>
+    public const string Crm = "crm";
+
     /// <summary>Reporting: report definitions, schedules, delivery logs.</summary>
     public const string Reporting = "rpt";
 

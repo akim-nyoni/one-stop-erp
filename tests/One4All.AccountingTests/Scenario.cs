@@ -106,6 +106,13 @@ public static class Scenario
         db.Accounts.Add(new LedgerAccount(company.Id, "4300", "Contract Revenue", AccountType.Income));
         db.Accounts.Add(new LedgerAccount(company.Id, "1250", "Retention Receivable", AccountType.Asset));
 
+        // Fixed assets: cost, accumulated depreciation (contra-asset), expense, disposal gain/loss.
+        db.Accounts.Add(new LedgerAccount(company.Id, "1600", "Motor Vehicles at Cost", AccountType.Asset));
+        db.Accounts.Add(new LedgerAccount(company.Id, "1650", "Accumulated Depreciation", AccountType.Asset));
+        db.Accounts.Add(new LedgerAccount(company.Id, "6000", "Depreciation Expense", AccountType.Expense));
+        db.Accounts.Add(new LedgerAccount(company.Id, "7300", "Profit on Disposal", AccountType.Income));
+        db.Accounts.Add(new LedgerAccount(company.Id, "7400", "Loss on Disposal", AccountType.Expense));
+
         // Foreign-currency bank (EUR) for FX revaluation, plus FX gain/loss control accounts.
         LedgerAccount foreignBank = new(company.Id, "1150", "Bank (EUR)", AccountType.Asset) { CurrencyRestriction = Eur };
         db.Accounts.Add(foreignBank);

@@ -116,6 +116,14 @@ _Running log of what's done, what's stubbed, and what's next. Updated every phas
 
 **Phase 10 status:** Job costing core (contracts, cost capture for profitability, interim payment certificates with retention → AR) and the weighbridge net/tonnage/volume engine. Deferred depth: WBS/BOQ import & budgets, variation orders, subcontractor ledger & WHT, retention release schedule, cost-to-cost WIP/revenue recognition postings, plant register, haulage-by-zone charging, ticket→invoice automation.
 
+## Phase 11 — Fixed Assets + CRM
+| Increment | Status | Notes |
+|---|---|---|
+| **11A** Fixed Assets (§4.14) | ✅ | `fa` schema. `FixedAsset` (cost, residual, accumulated depreciation, NBV; **straight-line** and **reducing-balance** methods, per-asset accounts). `IFixedAssetService`: **register** (capitalise Dr cost/Cr funding), **monthly depreciation run** (one journal across all active assets, Dr expense/Cr accumulated, never below residual), **dispose** (clear cost + accumulated, take proceeds, recognise profit/loss as the balancing figure). `AddFixedAssetsAndCrm` migration. Test: van 24k SL/24m → 3 monthly runs @1k → dispose for 22k (NBV 21k → gain 1k); cost & accum cleared, gain 1k, expense 3k, TB balances. |
+| **11B** CRM & Service Desk (§4.16, lightweight) | ✅ | `crm` schema. `Opportunity` pipeline (Lead→Qualified→Proposal→Negotiation→Won/Lost, stage-default probabilities, **probability-weighted value**, open/closed). 4 unit tests. |
+
+**Phase 11 status:** Fixed-asset register with depreciation runs and disposals through the engine, plus a lightweight CRM opportunity pipeline. Deferred depth: revaluation (IAS 16)/impairment (IAS 36), units-of-production, componentisation, CWIP capitalisation, asset verification/count, part-period conventions; CRM activities/quotation links/service-desk tickets.
+
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
 - **PostgreSQL 18** dev, min supported 16 (ADR-0002).

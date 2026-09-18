@@ -90,6 +90,9 @@ public static class DependencyInjection
         // Construction / Job Costing.
         services.AddScoped<Application.Abstractions.JobCosting.IJobCostingService, JobCosting.JobCostingService>();
 
+        // Fixed Assets.
+        services.AddScoped<Application.Abstractions.FixedAssets.IFixedAssetService, FixedAssets.FixedAssetService>();
+
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();

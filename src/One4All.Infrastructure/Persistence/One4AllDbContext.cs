@@ -182,6 +182,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Weighbridge tickets.</summary>
     public DbSet<Core.JobCosting.WeighbridgeTicket> WeighbridgeTickets => Set<Core.JobCosting.WeighbridgeTicket>();
 
+    /// <summary>Fixed assets.</summary>
+    public DbSet<Core.FixedAssets.FixedAsset> FixedAssets => Set<Core.FixedAssets.FixedAsset>();
+
+    /// <summary>CRM opportunities.</summary>
+    public DbSet<Core.Crm.Opportunity> Opportunities => Set<Core.Crm.Opportunity>();
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
