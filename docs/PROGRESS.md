@@ -162,6 +162,11 @@ Spec: [docs/modules/RECEIPTING.md](modules/RECEIPTING.md). Module code `RCP`, sc
 
 **Module RCP status:** the transaction/accounting core, the allocation engine (strategies + preview), multi-currency posting and the suspense recovery path are in place and tested — the "a receipt against a debtor never credits income" rule holds, blind cash-up posts variance, allocation strategies are honoured with a pre-commit preview, unidentified money is recoverable from suspense, and SoD/validation guards fail closed. UI, file imports, cross-currency debtor allocation, reversals/refunds/banking, agents and the `RC` reports remain.
 
+## Reporting — live data providers (whole-system)
+| Increment | Status | Notes |
+|---|---|---|
+| Generic report runner + data providers | ✅ | `IReportRunner` — one entry point for **every** report in the catalogue: resolves the definition by code (company → system, with a built-in fallback), dispatches the definition's data-source command to the `IReportDataProvider` that handles it, and renders to HTML/PDF/CSV/text through the banded engine. Providers wired across the system: **`GeneralLedgerReportDataProvider`** (TrialBalance, IncomeStatement, BalanceSheet, NominalActivity), **`TradingReportDataProvider`** (AgedDebtors, AgedCreditors, CustomerStatement), **`ReceiptingReportDataProvider`** (RC4 day book, RC29 suspense register, RC31 import batches, RC40 deposits held, RC45 agent reconciliation, RC20 stationery control — other RC codes render empty until wired). Added system definitions **GL-IS / GL-BS / AR-AGE / AP-AGE** (compact `SystemReports.Listing` builder) and seeded them. An unknown code returns `Report.NotFound`. Test: seed catalogue + post an invoice + register an agent, then render GL-TB, GL-IS, AR-AGE and RC45 as HTML (all show the live figures — 1,234 debtor/sales, the customer, the agent) and AR-AGE as CSV; missing code fails cleanly. |
+
 ## Decisions / deviations from brief
 - **.NET 10** not .NET 8 (ADR-0001) — only SDK on the machine.
 - **PostgreSQL 18** dev, min supported 16 (ADR-0002).

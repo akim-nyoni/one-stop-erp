@@ -73,6 +73,10 @@ public sealed class ReportCatalogueSeeder
     {
         yield return SystemReports.TrialBalance();
         yield return SystemReports.CustomerStatement();
+        yield return SystemReports.IncomeStatement();
+        yield return SystemReports.BalanceSheet();
+        yield return SystemReports.AgedDebtors();
+        yield return SystemReports.AgedCreditors();
 
         // Cashiering & Receipting catalogue (brief §RCP-16, the RC series).
         foreach (ReportDefinition definition in ReceiptingReports.All())

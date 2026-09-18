@@ -148,6 +148,111 @@ public static class SystemReports
         return def;
     }
 
+    /// <summary>The Income Statement report code.</summary>
+    public const string IncomeStatementCode = "GL-IS";
+
+    /// <summary>The Balance Sheet report code.</summary>
+    public const string BalanceSheetCode = "GL-BS";
+
+    /// <summary>The Aged Debtors report code.</summary>
+    public const string AgedDebtorsCode = "AR-AGE";
+
+    /// <summary>The Aged Creditors report code.</summary>
+    public const string AgedCreditorsCode = "AP-AGE";
+
+    /// <summary>A column in a generic listing report.</summary>
+    /// <param name="Field">The bound data field.</param>
+    /// <param name="Header">The column header.</param>
+    /// <param name="Width">The width in points.</param>
+    /// <param name="Money">Whether the column is a money amount (right-aligned, N2, totalled).</param>
+    public readonly record struct Column(string Field, string Header, double Width, bool Money = false);
+
+    /// <summary>Builds the Income Statement definition (brief §14 report 7).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition IncomeStatement() => Listing(IncomeStatementCode, "Income Statement", "GeneralLedger",
+        "Income and expenses for a period; the difference is the net profit.", "IncomeStatement",
+        [new Column("Category", "Section", 120), new Column("AccountName", "Account", 250), new Column("Amount", "Amount", 100, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Balance Sheet definition (brief §14 report 6).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition BalanceSheet() => Listing(BalanceSheetCode, "Balance Sheet", "GeneralLedger",
+        "Assets, liabilities and equity as at a date; assets equal liabilities plus equity.", "BalanceSheet",
+        [new Column("Category", "Section", 120), new Column("AccountName", "Account", 250), new Column("Amount", "Amount", 100, true)],
+        [("AsAtDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Aged Debtors definition (brief §14 report 29).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition AgedDebtors() => Listing(AgedDebtorsCode, "Aged Debtors", "Sales",
+        "Outstanding customer balances by ageing band as at a date.", "AgedDebtors",
+        [new Column("TraderCode", "Account", 80), new Column("TraderName", "Name", 150), new Column("Current", "Current", 70, true), new Column("Days1To30", "1-30", 60, true), new Column("Days31To60", "31-60", 60, true), new Column("Days61To90", "61-90", 60, true), new Column("Days91Plus", "91+", 60, true), new Column("Total", "Total", 80, true)],
+        [("AsAtDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Aged Creditors definition (brief §14 report 30).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition AgedCreditors() => Listing(AgedCreditorsCode, "Aged Creditors", "Purchasing",
+        "Outstanding supplier balances by ageing band as at a date.", "AgedCreditors",
+        [new Column("TraderCode", "Account", 80), new Column("TraderName", "Name", 150), new Column("Current", "Current", 70, true), new Column("Days1To30", "1-30", 60, true), new Column("Days31To60", "31-60", 60, true), new Column("Days61To90", "61-90", 60, true), new Column("Days91Plus", "91+", 60, true), new Column("Total", "Total", 80, true)],
+        [("AsAtDate", ParameterType.Date)]);
+
+    /// <summary>Builds a generic listing report definition from a column spec.</summary>
+    /// <param name="code">The report code.</param>
+    /// <param name="name">The report name.</param>
+    /// <param name="module">The owning module.</param>
+    /// <param name="description">The description.</param>
+    /// <param name="command">The data-source command.</param>
+    /// <param name="columns">The columns.</param>
+    /// <param name="parameters">The parameters (name + type).</param>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition Listing(string code, string name, string module, string description, string command, Column[] columns, (string Name, ParameterType Type)[] parameters)
+    {
+        ReportDefinition def = new() { Code = code, Name = name, Module = module, Description = description };
+        def.DataSources.Add(new ReportDataSource { Name = "Main", Kind = DataSourceKind.InMemory, Command = command });
+        foreach ((string paramName, ParameterType type) in parameters)
+        {
+            def.Parameters.Add(new ReportParameter { Name = paramName, Type = type, Prompt = paramName, Required = false });
+        }
+
+        def.Bands.Add(new ReportBand
+        {
+            Type = BandType.ReportHeader,
+            Height = 40,
+            Elements =
+            [
+                new ReportElement { Kind = ElementKind.Expression, Name = "company", Expression = "CompanyName", X = 0, Y = 0, Width = 400, Height = 16, Bold = true, FontSize = 13 },
+                Label("title", name, 0, 18, 500, 14, bold: true, size: 11),
+            ],
+        });
+
+        Column? lastMoney = columns.LastOrDefault(c => c.Money) is { Field.Length: > 0 } lm ? lm : null;
+        List<ReportElement> headers = [];
+        List<ReportElement> fields = [];
+        List<ReportElement> footer = [];
+        double x = 0;
+        foreach (Column col in columns)
+        {
+            ReportHAlign align = col.Money ? ReportHAlign.Right : ReportHAlign.Left;
+            headers.Add(Label($"h_{col.Field}", col.Header, x, 2, col.Width, 12, bold: true, align: align));
+            fields.Add(Field($"d_{col.Field}", col.Field, x, 0, col.Width, 12, format: col.Money ? "N2" : null, align: align));
+            if (lastMoney is { } money && money.Field == col.Field)
+            {
+                footer.Add(Aggregate($"t_{col.Field}", col.Field, x, 4, col.Width, 14, bold: true, align: ReportHAlign.Right));
+            }
+
+            x += col.Width + 6;
+        }
+
+        def.Bands.Add(new ReportBand { Type = BandType.PageHeader, Height = 18, Elements = headers });
+        def.Bands.Add(new ReportBand { Type = BandType.Detail, Height = 14, Elements = fields });
+        if (footer.Count > 0)
+        {
+            footer.Insert(0, Label("t_lbl", "Total", 0, 4, 80, 14, bold: true));
+            def.Bands.Add(new ReportBand { Type = BandType.ReportFooter, Height = 20, Elements = footer });
+        }
+
+        return def;
+    }
+
     private static ReportElement Label(string name, string text, double x, double y, double w, double h, bool bold = false, double size = 9, ReportHAlign align = ReportHAlign.Left) =>
         new() { Kind = ElementKind.Label, Name = name, Text = text, X = x, Y = y, Width = w, Height = h, Bold = bold, FontSize = size, HAlign = align };
 

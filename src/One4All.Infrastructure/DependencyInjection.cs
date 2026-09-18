@@ -59,6 +59,12 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Reporting.IFinancialReportRenderer, Reporting.FinancialReportRenderer>();
         services.AddScoped<Persistence.Seeding.ReportCatalogueSeeder>();
 
+        // Generic report runner + live data providers (whole-system report binding).
+        services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.GeneralLedgerReportDataProvider>();
+        services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.TradingReportDataProvider>();
+        services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.ReceiptingReportDataProvider>();
+        services.AddScoped<Application.Abstractions.Reporting.IReportRunner, Reporting.ReportRunner>();
+
         // Trading sub-ledgers (AR/AP + Cash Book).
         services.AddScoped<Trading.TradingService>();
         services.AddScoped<Application.Abstractions.Trading.ISalesLedgerService>(sp => sp.GetRequiredService<Trading.TradingService>());
