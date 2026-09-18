@@ -97,6 +97,11 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.BalanceSheetCode => SystemReports.BalanceSheet(),
         SystemReports.AgedDebtorsCode => SystemReports.AgedDebtors(),
         SystemReports.AgedCreditorsCode => SystemReports.AgedCreditors(),
+        SystemReports.StockValuationCode => SystemReports.StockValuation(),
+        SystemReports.AssetRegisterCode => SystemReports.AssetRegister(),
+        SystemReports.PayrollSummaryCode => SystemReports.PayrollSummary(),
+        SystemReports.PropertyRegisterCode => SystemReports.PropertyRegister(),
+        SystemReports.BudgetVsActualCode => SystemReports.BudgetVsActual(),
         _ => ReceiptingReports.All().FirstOrDefault(r => string.Equals(r.Code, code, StringComparison.OrdinalIgnoreCase)),
     };
 }

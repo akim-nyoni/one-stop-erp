@@ -1,0 +1,160 @@
+using Microsoft.EntityFrameworkCore;
+using One4All.Application.Abstractions.Budgeting;
+using One4All.Application.Abstractions.Inventory;
+using One4All.Application.Abstractions.Reporting;
+using One4All.Core.Budgeting;
+using One4All.Core.FixedAssets;
+using One4All.Core.Municipal;
+using One4All.Core.Payroll;
+using One4All.Core.Trading;
+using One4All.Infrastructure.Persistence;
+
+namespace One4All.Infrastructure.Reporting;
+
+/// <summary>
+/// Supplies live rows for the vertical-module reports (inventory, fixed assets, payroll, municipality and
+/// budgeting) from their read-side services and registers, so the whole system — not just the ledgers and
+/// receipting — renders live figures through the generic report runner.
+/// </summary>
+public sealed class VerticalReportDataProvider : IReportDataProvider
+{
+    private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "StockValuation", "AssetRegister", "PayrollSummary", "PropertyRegister", "BudgetVsActual",
+    };
+
+    private readonly One4AllDbContext _db;
+    private readonly IInventoryService _inventory;
+    private readonly IBudgetingService _budgeting;
+
+    /// <summary>Creates the provider.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="inventory">The inventory service (stock valuation).</param>
+    /// <param name="budgeting">The budgeting service (budget vs actual).</param>
+    public VerticalReportDataProvider(One4AllDbContext db, IInventoryService inventory, IBudgetingService budgeting)
+    {
+        _db = db;
+        _inventory = inventory;
+        _budgeting = budgeting;
+    }
+
+    /// <inheritdoc />
+    public bool CanHandle(string command) => Commands.Contains(command);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GetRowsAsync(long companyId, string command, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct = default)
+    {
+        return command.ToUpperInvariant() switch
+        {
+            "STOCKVALUATION" => await StockValuationAsync(companyId, ct).ConfigureAwait(false),
+            "ASSETREGISTER" => await AssetRegisterAsync(companyId, ct).ConfigureAwait(false),
+            "PAYROLLSUMMARY" => await PayrollSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "PROPERTYREGISTER" => await PropertyRegisterAsync(companyId, ct).ConfigureAwait(false),
+            "BUDGETVSACTUAL" => await BudgetVsActualAsync(companyId, parameters, ct).ConfigureAwait(false),
+            _ => [],
+        };
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> StockValuationAsync(long companyId, CancellationToken ct)
+    {
+        IReadOnlyList<StockValuationLine> lines = await _inventory.StockValuationAsync(companyId, null, ct).ConfigureAwait(false);
+        return lines.Select(l => Row(new()
+        {
+            ["ItemCode"] = l.ItemCode,
+            ["Description"] = l.Description,
+            ["WarehouseCode"] = l.WarehouseCode,
+            ["Quantity"] = l.Quantity,
+            ["AverageCost"] = l.AverageCost,
+            ["Value"] = l.Value,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AssetRegisterAsync(long companyId, CancellationToken ct)
+    {
+        List<FixedAsset> assets = await _db.Set<FixedAsset>()
+            .Where(a => a.CompanyId == companyId)
+            .OrderBy(a => a.AssetNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return assets.Select(a => Row(new()
+        {
+            ["AssetNumber"] = a.AssetNumber,
+            ["Description"] = a.Description,
+            ["Cost"] = a.Cost,
+            ["AccumulatedDepreciation"] = a.AccumulatedDepreciation,
+            ["NetBookValue"] = a.NetBookValue,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PayrollSummaryAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly to = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+        List<Payslip> payslips = await _db.Set<Payslip>()
+            .Where(p => p.CompanyId == companyId && p.PayDate >= from && p.PayDate <= to)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> employees = await _db.Set<Employee>()
+            .Where(e => e.CompanyId == companyId)
+            .ToDictionaryAsync(e => e.Id, e => $"{e.EmployeeNumber} — {e.FullName}", ct).ConfigureAwait(false);
+
+        return payslips
+            .OrderBy(p => employees.GetValueOrDefault(p.EmployeeId, string.Empty))
+            .Select(p => Row(new()
+            {
+                ["Employee"] = employees.GetValueOrDefault(p.EmployeeId, $"#{p.EmployeeId}"),
+                ["Gross"] = p.GrossEarnings,
+                ["Deductions"] = p.TotalDeductions,
+                ["Net"] = p.NetPay,
+            })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PropertyRegisterAsync(long companyId, CancellationToken ct)
+    {
+        List<Property> properties = await _db.Set<Property>()
+            .Where(p => p.CompanyId == companyId)
+            .OrderBy(p => p.StandNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> ratepayers = await _db.Set<Customer>()
+            .Where(c => c.CompanyId == companyId)
+            .ToDictionaryAsync(c => c.Id, c => c.Name, ct).ConfigureAwait(false);
+
+        return properties.Select(p => Row(new()
+        {
+            ["StandNumber"] = p.StandNumber,
+            ["Ward"] = p.Ward,
+            ["Ratepayer"] = ratepayers.GetValueOrDefault(p.RatepayerCustomerId, $"#{p.RatepayerCustomerId}"),
+            ["Valuation"] = p.Valuation,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BudgetVsActualAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        long fiscalYearId = ReportParameters.Long(parameters, "FiscalYearId");
+        string department = ReportParameters.String(parameters, "Department");
+        int period = (int)ReportParameters.Long(parameters, "Period");
+        if (fiscalYearId == 0)
+        {
+            return [];
+        }
+
+        if (period is < 1 or > 12)
+        {
+            period = 12;
+        }
+
+        var result = await _budgeting.BudgetVsActualAsync(companyId, fiscalYearId, BudgetType.OriginalApproved, string.IsNullOrWhiteSpace(department) ? null : department, period, ct).ConfigureAwait(false);
+        if (result.IsFailure)
+        {
+            return [];
+        }
+
+        return result.Value.Rows.Select(r => Row(new()
+        {
+            ["AccountCode"] = r.AccountCode,
+            ["Budget"] = r.Budget,
+            ["Actual"] = r.Actual,
+            ["Variance"] = r.Variance,
+        })).ToList();
+    }
+
+    private static IReadOnlyDictionary<string, object?> Row(Dictionary<string, object?> values) => values;
+}

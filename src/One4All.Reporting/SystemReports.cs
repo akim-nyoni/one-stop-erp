@@ -195,6 +195,56 @@ public static class SystemReports
         [new Column("TraderCode", "Account", 80), new Column("TraderName", "Name", 150), new Column("Current", "Current", 70, true), new Column("Days1To30", "1-30", 60, true), new Column("Days31To60", "31-60", 60, true), new Column("Days61To90", "61-90", 60, true), new Column("Days91Plus", "91+", 60, true), new Column("Total", "Total", 80, true)],
         [("AsAtDate", ParameterType.Date)]);
 
+    /// <summary>The Stock Valuation report code.</summary>
+    public const string StockValuationCode = "INV-VAL";
+
+    /// <summary>The Fixed Asset Register report code.</summary>
+    public const string AssetRegisterCode = "FA-REG";
+
+    /// <summary>The Payroll Summary report code.</summary>
+    public const string PayrollSummaryCode = "PAY-SUM";
+
+    /// <summary>The Property Register report code.</summary>
+    public const string PropertyRegisterCode = "MUN-PROP";
+
+    /// <summary>The Budget vs Actual report code.</summary>
+    public const string BudgetVsActualCode = "BUD-BVA";
+
+    /// <summary>Builds the Stock Valuation definition (brief §4.11 inventory).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition StockValuation() => Listing(StockValuationCode, "Stock Valuation", "Inventory",
+        "Quantity on hand and value at moving average cost, per item and warehouse.", "StockValuation",
+        [new Column("ItemCode", "Item", 90), new Column("Description", "Description", 180), new Column("WarehouseCode", "Warehouse", 90), new Column("Quantity", "Qty", 70, true), new Column("AverageCost", "Avg cost", 80, true), new Column("Value", "Value", 90, true)],
+        [("AsAtDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Fixed Asset Register definition (brief §4.14).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition AssetRegister() => Listing(AssetRegisterCode, "Fixed Asset Register", "FixedAssets",
+        "Assets with cost, accumulated depreciation and net book value.", "AssetRegister",
+        [new Column("AssetNumber", "Asset", 90), new Column("Description", "Description", 200), new Column("Cost", "Cost", 90, true), new Column("AccumulatedDepreciation", "Accum. depr.", 90, true), new Column("NetBookValue", "NBV", 90, true)],
+        [("AsAtDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Payroll Summary definition (brief §4.15.6).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition PayrollSummary() => Listing(PayrollSummaryCode, "Payroll Summary", "Payroll",
+        "Gross, deductions and net pay per employee for a period.", "PayrollSummary",
+        [new Column("Employee", "Employee", 220), new Column("Gross", "Gross", 100, true), new Column("Deductions", "Deductions", 100, true), new Column("Net", "Net", 100, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Property Register definition (brief §4.9 municipality).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition PropertyRegister() => Listing(PropertyRegisterCode, "Property Register", "Municipal",
+        "Stands on the municipal register with ward, valuation and ratepayer.", "PropertyRegister",
+        [new Column("StandNumber", "Stand", 100), new Column("Ward", "Ward", 120), new Column("Ratepayer", "Ratepayer", 150), new Column("Valuation", "Valuation", 110, true)],
+        []);
+
+    /// <summary>Builds the Budget vs Actual definition (brief §4.18.6).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition BudgetVsActual() => Listing(BudgetVsActualCode, "Budget vs Actual", "Budget",
+        "Active budget compared to GL actuals by account, with the variance.", "BudgetVsActual",
+        [new Column("AccountCode", "Account", 100), new Column("Budget", "Budget", 100, true), new Column("Actual", "Actual", 100, true), new Column("Variance", "Variance", 100, true)],
+        [("FiscalYearId", ParameterType.Integer), ("Department", ParameterType.String), ("Period", ParameterType.Integer)]);
+
     /// <summary>Builds a generic listing report definition from a column spec.</summary>
     /// <param name="code">The report code.</param>
     /// <param name="name">The report name.</param>
