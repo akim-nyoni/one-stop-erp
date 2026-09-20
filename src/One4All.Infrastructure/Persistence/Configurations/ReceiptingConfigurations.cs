@@ -54,6 +54,7 @@ internal sealed class ReceiptConfiguration : IEntityTypeConfiguration<Receipt>
         b.Property(x => x.Status).HasConversion<int>();
         b.Property(x => x.JournalNumber).HasMaxLength(30);
         b.Property(x => x.CashAccountCode).HasMaxLength(8);
+        b.Property(x => x.CancellationReason).HasMaxLength(300);
         b.Ignore(x => x.LineTotal);
         b.Ignore(x => x.TenderTotal);
         b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.ReceiptId).OnDelete(DeleteBehavior.Cascade);

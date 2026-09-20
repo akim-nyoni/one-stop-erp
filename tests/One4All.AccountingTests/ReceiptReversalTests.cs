@@ -100,6 +100,8 @@ public sealed class ReceiptReversalTests
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             Receipt receipt = await db.Set<Receipt>().FindAsync(receiptId) ?? throw new Xunit.Sdk.XunitException("receipt gone");
             receipt.Status.Should().Be(ReceiptStatus.Cancelled); // retained, not deleted
+            receipt.CancellationReason.Should().Be("Paid to the wrong account"); // reason captured
+            receipt.CancelledByUserId.Should().Be(Supervisor);
 
             ITradingReports reports = scope.ServiceProvider.GetRequiredService<ITradingReports>();
             (await reports.AgedDebtorsAsync(companyId, new DateOnly(2026, 1, 31))).Total.Should().Be(800m); // full debt restored

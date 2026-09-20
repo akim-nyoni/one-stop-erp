@@ -181,8 +181,21 @@ public sealed class Receipt : AuditableEntity, ICompanyScoped
         return tender;
     }
 
-    /// <summary>Cancels the receipt (retained, never deleted).</summary>
-    public void Cancel() => Status = ReceiptStatus.Cancelled;
+    /// <summary>The reason the receipt was cancelled/reversed, if any.</summary>
+    public string? CancellationReason { get; private set; }
+
+    /// <summary>The user who cancelled/reversed the receipt, if any.</summary>
+    public long? CancelledByUserId { get; private set; }
+
+    /// <summary>Cancels the receipt (retained, never deleted), recording who and why.</summary>
+    /// <param name="reason">The cancellation/reversal reason.</param>
+    /// <param name="byUserId">The user performing the cancellation.</param>
+    public void Cancel(string? reason = null, long? byUserId = null)
+    {
+        Status = ReceiptStatus.Cancelled;
+        CancellationReason = reason;
+        CancelledByUserId = byUserId;
+    }
 }
 
 /// <summary>One line of a receipt — what the money is for (<c>rcp.receipt_line</c>).</summary>

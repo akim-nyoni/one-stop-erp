@@ -4459,6 +4459,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("cancellation_reason");
+
+                    b.Property<long?>("CancelledByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cancelled_by_user_id");
+
                     b.Property<string>("CashAccountCode")
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")

@@ -314,7 +314,7 @@ public sealed class ReceiptingService : IReceiptingService
             codedJournal = posted.Value.JournalNumber;
         }
 
-        receipt.Cancel();
+        receipt.Cancel(reason, reverserUserId);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new ReceiptReversalResult(receipt.Id, receipt.LineTotal, debtorJournal, codedJournal);
     }

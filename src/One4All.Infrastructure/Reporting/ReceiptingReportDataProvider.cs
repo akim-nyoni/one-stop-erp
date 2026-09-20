@@ -154,7 +154,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .Where(r => r.CompanyId == companyId && r.Status == ReceiptStatus.Cancelled && r.Date >= from && r.Date <= to)
             .OrderBy(r => r.ReceiptNumber)
             .ToListAsync(ct).ConfigureAwait(false);
-        return receipts.Select(r => Row(new() { ["ReceiptNumber"] = r.ReceiptNumber, ["Reason"] = string.Empty, ["Supervisor"] = string.Empty, ["Amount"] = r.LineTotal })).ToList();
+        return receipts.Select(r => Row(new() { ["ReceiptNumber"] = r.ReceiptNumber, ["Reason"] = r.CancellationReason ?? string.Empty, ["Supervisor"] = r.CancelledByUserId is { } uid ? $"#{uid}" : string.Empty, ["Amount"] = r.LineTotal })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GapAnalysisAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
