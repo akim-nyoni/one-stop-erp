@@ -47,6 +47,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC38" => await PaymentHistoryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC39" => await CreditBalancesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC40" => await DepositsHeldAsync(companyId, ct).ConfigureAwait(false),
+            "RC41" => await RefundsRegisterAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC43" => await TopPayersAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC45" => await AgentReconciliationAsync(companyId, ct).ConfigureAwait(false),
             "RC46" => await AgentAgeingAsync(companyId, ct).ConfigureAwait(false),
@@ -179,6 +180,23 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
                 return Row(new() { ["Station"] = stationCodes.GetValueOrDefault(g.Key, g.Key.ToString()), ["FromNumber"] = min, ["ToNumber"] = max, ["Gaps"] = gaps });
             })
             .ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RefundsRegisterAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly to = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+        List<RefundRecord> refunds = await _db.Set<RefundRecord>()
+            .Where(r => r.CompanyId == companyId && r.Date >= from && r.Date <= to)
+            .OrderBy(r => r.Date).ThenBy(r => r.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return refunds.Select(r => Row(new()
+        {
+            ["Payer"] = r.PayerName,
+            ["Status"] = "Paid",
+            ["Days"] = 0,
+            ["Amount"] = r.Amount,
+        })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CashMovementsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

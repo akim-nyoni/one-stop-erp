@@ -218,6 +218,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Session cash movements (pickups, petty-cash pay-outs).</summary>
     public DbSet<Core.Receipting.SessionCashMovement> SessionCashMovements => Set<Core.Receipting.SessionCashMovement>();
 
+    /// <summary>Refunds paid to payers.</summary>
+    public DbSet<Core.Receipting.RefundRecord> Refunds => Set<Core.Receipting.RefundRecord>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 

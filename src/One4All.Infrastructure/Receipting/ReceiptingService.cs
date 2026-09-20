@@ -375,6 +375,9 @@ public sealed class ReceiptingService : IReceiptingService
             remaining -= take;
         }
 
+        string payerName = await _db.Set<Customer>().Where(c => c.Id == customerId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? $"#{customerId}";
+        _db.Set<RefundRecord>().Add(new RefundRecord(companyId, RefundType.CreditBalance, payerName, amount, date, reason, approverUserId, reversal.Value.JournalNumber));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new RefundResult(amount, reversal.Value.JournalNumber);
     }
 
@@ -438,6 +441,8 @@ public sealed class ReceiptingService : IReceiptingService
             return posted.Error;
         }
 
+        _db.Set<RefundRecord>().Add(new RefundRecord(companyId, RefundType.Deposit, "Deposit refund", net, date, reason, approverUserId, posted.Value.JournalNumber));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new RefundResult(net, posted.Value.JournalNumber);
     }
 

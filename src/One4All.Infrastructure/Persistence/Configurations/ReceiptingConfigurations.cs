@@ -118,6 +118,20 @@ internal sealed class ManualReceiptCaptureConfiguration : IEntityTypeConfigurati
     }
 }
 
+internal sealed class RefundRecordConfiguration : IEntityTypeConfiguration<RefundRecord>
+{
+    public void Configure(EntityTypeBuilder<RefundRecord> b)
+    {
+        b.ToTable("refund", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Type).HasConversion<int>();
+        b.Property(x => x.PayerName).HasMaxLength(200);
+        b.Property(x => x.Reason).HasMaxLength(300);
+        b.Property(x => x.JournalNumber).HasMaxLength(30);
+        b.HasIndex(x => new { x.CompanyId, x.Date });
+    }
+}
+
 internal sealed class SessionCashMovementConfiguration : IEntityTypeConfiguration<SessionCashMovement>
 {
     public void Configure(EntityTypeBuilder<SessionCashMovement> b)

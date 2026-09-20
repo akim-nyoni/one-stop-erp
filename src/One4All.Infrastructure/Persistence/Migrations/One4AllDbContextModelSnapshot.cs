@@ -4647,6 +4647,85 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("receipt_tender", "rcp");
                 });
 
+            modelBuilder.Entity("One4All.Core.Receipting.RefundRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("ApproverUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approver_user_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("JournalNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("PayerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("payer_name");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_refund");
+
+                    b.HasIndex("CompanyId", "Date")
+                        .HasDatabaseName("ix_refund_company_id_date");
+
+                    b.ToTable("refund", "rcp");
+                });
+
             modelBuilder.Entity("One4All.Core.Receipting.SessionCashMovement", b =>
                 {
                     b.Property<long>("Id")
