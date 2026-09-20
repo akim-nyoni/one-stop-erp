@@ -221,6 +221,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Refunds paid to payers.</summary>
     public DbSet<Core.Receipting.RefundRecord> Refunds => Set<Core.Receipting.RefundRecord>();
 
+    /// <summary>Receipt reprint log.</summary>
+    public DbSet<Core.Receipting.ReceiptReprint> ReceiptReprints => Set<Core.Receipting.ReceiptReprint>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 

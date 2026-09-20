@@ -627,6 +627,22 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
+    public async Task<Result<int>> ReprintReceiptAsync(long companyId, long receiptId, DateOnly date, long byUserId, CancellationToken ct = default)
+    {
+        Receipt? receipt = await _db.Set<Receipt>().FirstOrDefaultAsync(r => r.Id == receiptId && r.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (receipt is null)
+        {
+            return Error.NotFound("Rcp.ReceiptNotFound", $"Receipt {receiptId} not found.");
+        }
+
+        int priorCopies = await _db.Set<ReceiptReprint>().CountAsync(x => x.ReceiptId == receiptId, ct).ConfigureAwait(false);
+        int copyNumber = priorCopies + 1;
+        _db.Set<ReceiptReprint>().Add(new ReceiptReprint(companyId, receiptId, receipt.ReceiptNumber, copyNumber, date, byUserId));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return copyNumber;
+    }
+
+    /// <inheritdoc />
     public async Task<Result> VerifySessionAsync(long companyId, long sessionId, long supervisorUserId, CancellationToken ct = default)
     {
         CashierSession? session = await _db.Set<CashierSession>().FirstOrDefaultAsync(s => s.Id == sessionId && s.CompanyId == companyId, ct).ConfigureAwait(false);

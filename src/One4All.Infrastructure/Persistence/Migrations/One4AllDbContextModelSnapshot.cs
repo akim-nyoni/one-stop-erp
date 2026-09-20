@@ -4608,6 +4608,72 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("receipt_line", "rcp");
                 });
 
+            modelBuilder.Entity("One4All.Core.Receipting.ReceiptReprint", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<int>("CopyNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("copy_number");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("PrintedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("printed_by_user_id");
+
+                    b.Property<DateOnly>("PrintedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("printed_on");
+
+                    b.Property<long>("ReceiptId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("receipt_id");
+
+                    b.Property<string>("ReceiptNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("receipt_number");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_receipt_reprint");
+
+                    b.HasIndex("CompanyId", "ReceiptId")
+                        .HasDatabaseName("ix_receipt_reprint_company_id_receipt_id");
+
+                    b.ToTable("receipt_reprint", "rcp");
+                });
+
             modelBuilder.Entity("One4All.Core.Receipting.ReceiptTender", b =>
                 {
                     b.Property<long>("Id")

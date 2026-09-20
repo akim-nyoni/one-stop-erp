@@ -302,6 +302,18 @@ public interface IReceiptingService
     /// <returns>The GL journal number.</returns>
     Task<Result<string>> PettyCashPayoutAsync(long companyId, long sessionId, decimal amount, DateOnly date, string cashAccountCode, string expenseAccountCode, string reason, CancellationToken ct = default);
 
+    /// <summary>
+    /// Logs a reprint of a receipt (brief §RCP-15): reprints are watermarked COPY, numbered and logged.
+    /// Returns the copy number (1 for the first reprint).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="receiptId">The receipt.</param>
+    /// <param name="date">The reprint date.</param>
+    /// <param name="byUserId">The user reprinting.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The copy number.</returns>
+    Task<Result<int>> ReprintReceiptAsync(long companyId, long receiptId, DateOnly date, long byUserId, CancellationToken ct = default);
+
     /// <summary>Verifies a closed session by a supervisor (who must not be the cashier).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="sessionId">The session.</param>

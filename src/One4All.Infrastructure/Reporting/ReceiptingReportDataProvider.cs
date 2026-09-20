@@ -36,6 +36,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC12" => await GlReconciliationAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC14" => await TillVarianceAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC15" => await CancelledReceiptsAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC16" => await ReprintLogAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC17" => await GapAnalysisAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC20" => await StationeryControlAsync(companyId, ct).ConfigureAwait(false),
             "RC25" => await DailyBankingSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -155,6 +156,22 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .OrderBy(r => r.ReceiptNumber)
             .ToListAsync(ct).ConfigureAwait(false);
         return receipts.Select(r => Row(new() { ["ReceiptNumber"] = r.ReceiptNumber, ["Reason"] = r.CancellationReason ?? string.Empty, ["Supervisor"] = r.CancelledByUserId is { } uid ? $"#{uid}" : string.Empty, ["Amount"] = r.LineTotal })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReprintLogAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly to = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+        List<ReceiptReprint> reprints = await _db.Set<ReceiptReprint>()
+            .Where(r => r.CompanyId == companyId && r.PrintedOn >= from && r.PrintedOn <= to)
+            .OrderBy(r => r.PrintedOn).ThenBy(r => r.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return reprints.Select(r => Row(new()
+        {
+            ["ReceiptNumber"] = $"{r.ReceiptNumber} (copy {r.CopyNumber})",
+            ["PrintedOn"] = r.PrintedOn.ToDateTime(TimeOnly.MinValue),
+            ["PrintedBy"] = $"#{r.PrintedByUserId}",
+        })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GapAnalysisAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
