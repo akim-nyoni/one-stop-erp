@@ -215,6 +215,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Import batches (bulk/file-based receipting).</summary>
     public DbSet<Core.Receipting.ImportBatch> ImportBatches => Set<Core.Receipting.ImportBatch>();
 
+    /// <summary>Session cash movements (pickups, petty-cash pay-outs).</summary>
+    public DbSet<Core.Receipting.SessionCashMovement> SessionCashMovements => Set<Core.Receipting.SessionCashMovement>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 

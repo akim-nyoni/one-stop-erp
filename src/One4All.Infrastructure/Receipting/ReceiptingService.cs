@@ -483,6 +483,69 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
+    public Task<Result<string>> PickupAsync(long companyId, long sessionId, decimal amount, DateOnly date, string cashAccountCode, string safeAccountCode, string reason, CancellationToken ct = default) =>
+        RecordMovementAsync(companyId, sessionId, CashMovementType.Pickup, amount, date, debitAccountCode: safeAccountCode, creditAccountCode: cashAccountCode, "PICKUP", reason, ct);
+
+    /// <inheritdoc />
+    public Task<Result<string>> PettyCashPayoutAsync(long companyId, long sessionId, decimal amount, DateOnly date, string cashAccountCode, string expenseAccountCode, string reason, CancellationToken ct = default) =>
+        RecordMovementAsync(companyId, sessionId, CashMovementType.PettyCashPayout, amount, date, debitAccountCode: expenseAccountCode, creditAccountCode: cashAccountCode, "PETTYCASH", reason, ct);
+
+    private async Task<Result<string>> RecordMovementAsync(long companyId, long sessionId, CashMovementType type, decimal amount, DateOnly date, string debitAccountCode, string creditAccountCode, string documentType, string reason, CancellationToken ct)
+    {
+        if (amount <= 0m)
+        {
+            return Error.Rule("Rcp.NonPositiveAmount", "The amount must be positive.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Rcp.ReasonRequired", "A cash movement requires a reason.");
+        }
+
+        CashierSession? session = await _db.Set<CashierSession>().FirstOrDefaultAsync(s => s.Id == sessionId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (session is null)
+        {
+            return Error.NotFound("Rcp.SessionNotFound", $"Session {sessionId} not found.");
+        }
+
+        if (session.Status != SessionStatus.Open)
+        {
+            return Error.Rule("Rcp.SessionNotOpen", "Cash movements can only be recorded on an open session.");
+        }
+
+        Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        if (company is null)
+        {
+            return Error.NotFound("Rcp.CompanyNotFound", $"Company {companyId} not found.");
+        }
+
+        Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId,
+            SourceModule = "GL",
+            PostingDate = date,
+            TransactionCurrency = company.BaseCurrency,
+            DocumentType = documentType,
+            DocumentNumber = $"{documentType}-{sessionId}",
+            Narrative = $"{type}: {reason}",
+            Lines =
+            [
+                new JournalLineRequest { AccountCode = debitAccountCode, Side = JournalSide.Debit, TransactionAmount = amount },
+                new JournalLineRequest { AccountCode = creditAccountCode, Side = JournalSide.Credit, TransactionAmount = amount },
+            ],
+        }, ct).ConfigureAwait(false);
+
+        if (posted.IsFailure)
+        {
+            return posted.Error;
+        }
+
+        _db.Set<SessionCashMovement>().Add(new SessionCashMovement(companyId, sessionId, type, company.BaseCurrency, amount, date, reason));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return posted.Value.JournalNumber;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<CashUpResult>> CloseSessionAsync(long companyId, long sessionId, DateOnly date, IReadOnlyList<FloatDeclaration> countedCash, string cashAccountCode, string shortagesAccountCode, CancellationToken ct = default)
     {
         CashierSession? session = await _db.Set<CashierSession>().Include(s => s.Floats)
@@ -511,6 +574,12 @@ public sealed class ReceiptingService : IReceiptingService
             .Where(t => t.Type == TenderType.Cash && t.Currency == company.BaseCurrency)
             .SumAsync(t => t.Amount, ct).ConfigureAwait(false);
         expectedCash += cashTenders;
+
+        // Pickups to the safe and petty-cash pay-outs remove cash from the drawer during the shift.
+        decimal movements = await _db.Set<SessionCashMovement>()
+            .Where(m => m.CashierSessionId == sessionId && m.Currency == company.BaseCurrency)
+            .SumAsync(m => m.Amount, ct).ConfigureAwait(false);
+        expectedCash -= movements;
 
         decimal countedBase = countedCash.Where(c => c.Currency == company.BaseCurrency).Sum(c => c.Amount);
         decimal variance = countedBase - expectedCash;

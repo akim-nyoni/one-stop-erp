@@ -40,6 +40,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC20" => await StationeryControlAsync(companyId, ct).ConfigureAwait(false),
             "RC25" => await DailyBankingSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC26" => await CashInTransitAgeingAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC28" => await CashMovementsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC29" => await SuspenseRegisterAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC31" => await ImportBatchesAsync(companyId, ct).ConfigureAwait(false),
             "RC32" => await ImportExceptionsAsync(companyId, ct).ConfigureAwait(false),
@@ -178,6 +179,23 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
                 return Row(new() { ["Station"] = stationCodes.GetValueOrDefault(g.Key, g.Key.ToString()), ["FromNumber"] = min, ["ToNumber"] = max, ["Gaps"] = gaps });
             })
             .ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CashMovementsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly to = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+        List<SessionCashMovement> movements = await _db.Set<SessionCashMovement>()
+            .Where(m => m.CompanyId == companyId && m.Date >= from && m.Date <= to)
+            .OrderBy(m => m.Date).ThenBy(m => m.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return movements.Select(m => Row(new()
+        {
+            ["When"] = m.Date.ToDateTime(TimeOnly.MinValue),
+            ["Type"] = m.Type.ToString(),
+            ["Reason"] = m.Reason,
+            ["Amount"] = m.Amount,
+        })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DailyBankingSummaryAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

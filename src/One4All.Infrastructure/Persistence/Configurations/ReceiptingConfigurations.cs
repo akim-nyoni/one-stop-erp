@@ -118,6 +118,19 @@ internal sealed class ManualReceiptCaptureConfiguration : IEntityTypeConfigurati
     }
 }
 
+internal sealed class SessionCashMovementConfiguration : IEntityTypeConfiguration<SessionCashMovement>
+{
+    public void Configure(EntityTypeBuilder<SessionCashMovement> b)
+    {
+        b.ToTable("session_cash_movement", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Type).HasConversion<int>();
+        b.Property(x => x.Currency).HasMaxLength(3);
+        b.Property(x => x.Reason).HasMaxLength(300);
+        b.HasIndex(x => x.CashierSessionId);
+    }
+}
+
 internal sealed class ImportBatchConfiguration : IEntityTypeConfiguration<ImportBatch>
 {
     public void Configure(EntityTypeBuilder<ImportBatch> b)

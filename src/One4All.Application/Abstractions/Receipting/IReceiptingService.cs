@@ -272,6 +272,36 @@ public interface IReceiptingService
     /// <returns>The refund result.</returns>
     Task<Result<RefundResult>> RefundDepositAsync(long companyId, decimal amount, decimal forfeitAmount, DateOnly date, string depositLiabilityAccountCode, string bankAccountCode, string? forfeitAccountCode, long approverUserId, string reason, CancellationToken ct = default);
 
+    /// <summary>
+    /// Records a mid-shift pickup of cash to the safe (brief §RCP-3): Dr safe, Cr cash on hand. Reduces the
+    /// drawer, so the blind cash-up expects correspondingly less at close. Requires a reason.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="sessionId">The open session.</param>
+    /// <param name="amount">The amount picked up.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="cashAccountCode">The cash-on-hand account (credited).</param>
+    /// <param name="safeAccountCode">The safe account (debited).</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The GL journal number.</returns>
+    Task<Result<string>> PickupAsync(long companyId, long sessionId, decimal amount, DateOnly date, string cashAccountCode, string safeAccountCode, string reason, CancellationToken ct = default);
+
+    /// <summary>
+    /// Records a petty-cash pay-out at the counter (brief §RCP-3): Dr expense, Cr cash on hand. Reduces the
+    /// drawer. A distinct permission and a mandatory reason.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="sessionId">The open session.</param>
+    /// <param name="amount">The amount paid out.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="cashAccountCode">The cash-on-hand account (credited).</param>
+    /// <param name="expenseAccountCode">The expense account (debited).</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The GL journal number.</returns>
+    Task<Result<string>> PettyCashPayoutAsync(long companyId, long sessionId, decimal amount, DateOnly date, string cashAccountCode, string expenseAccountCode, string reason, CancellationToken ct = default);
+
     /// <summary>Verifies a closed session by a supervisor (who must not be the cashier).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="sessionId">The session.</param>
