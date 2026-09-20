@@ -105,6 +105,9 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.PosSalesCode => SystemReports.PosSales(),
         SystemReports.JobProfitabilityCode => SystemReports.JobProfitability(),
         SystemReports.ProgressCertificatesCode => SystemReports.ProgressCertificates(),
+        SystemReports.HousingStandsCode => SystemReports.HousingStands(),
+        SystemReports.StudentRegisterCode => SystemReports.StudentRegister(),
+        SystemReports.OpenPurchaseOrdersCode => SystemReports.OpenPurchaseOrders(),
         _ => ReceiptingReports.All().FirstOrDefault(r => string.Equals(r.Code, code, StringComparison.OrdinalIgnoreCase)),
     };
 }

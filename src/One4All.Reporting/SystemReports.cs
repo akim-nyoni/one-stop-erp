@@ -275,6 +275,36 @@ public static class SystemReports
         [new Column("CertificateNumber", "Certificate", 110), new Column("Date", "Date", 100), new Column("Gross", "Gross", 100, true), new Column("Retention", "Retention", 100, true), new Column("Net", "Net payable", 110, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
+    /// <summary>The Housing Stand Register report code.</summary>
+    public const string HousingStandsCode = "HSE-STAND";
+
+    /// <summary>The Student Register report code.</summary>
+    public const string StudentRegisterCode = "SCH-STU";
+
+    /// <summary>The Open Purchase Orders report code.</summary>
+    public const string OpenPurchaseOrdersCode = "POP-OPEN";
+
+    /// <summary>Builds the Housing Stand Register definition (brief §4.10).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition HousingStands() => Listing(HousingStandsCode, "Housing Stand Register", "Housing",
+        "Stands with status, apportioned cost, selling price and current holder.", "HousingStands",
+        [new Column("StandNumber", "Stand", 90), new Column("Status", "Status", 100), new Column("Holder", "Holder", 150), new Column("AllocatedCost", "Cost", 90, true), new Column("SellingPrice", "Price", 90, true)],
+        []);
+
+    /// <summary>Builds the Student Register definition (brief §4.11).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition StudentRegister() => Listing(StudentRegisterCode, "Student Register", "School",
+        "Enrolled students with grade, boarding status and bursary.", "StudentRegister",
+        [new Column("AdmissionNumber", "Admission", 100), new Column("FullName", "Name", 180), new Column("Grade", "Grade", 80), new Column("Boarder", "Boarder", 70), new Column("BursaryValue", "Bursary", 90, true)],
+        []);
+
+    /// <summary>Builds the Open Purchase Orders definition (brief §4.6/§4.12 procurement).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition OpenPurchaseOrders() => Listing(OpenPurchaseOrdersCode, "Open Purchase Orders", "Purchasing",
+        "Purchase orders not yet fully received/invoiced, with their order value.", "OpenPurchaseOrders",
+        [new Column("OrderNumber", "Order", 100), new Column("OrderDate", "Date", 100), new Column("Supplier", "Supplier", 160), new Column("Status", "Status", 100), new Column("TotalNet", "Value", 100, true)],
+        []);
+
     /// <summary>Builds a generic listing report definition from a column spec.</summary>
     /// <param name="code">The report code.</param>
     /// <param name="name">The report name.</param>
