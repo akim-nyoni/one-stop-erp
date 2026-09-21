@@ -227,6 +227,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Payment arrangements captured at the counter.</summary>
     public DbSet<Core.Receipting.PaymentArrangement> PaymentArrangements => Set<Core.Receipting.PaymentArrangement>();
 
+    /// <summary>Suspense allocation log.</summary>
+    public DbSet<Core.Receipting.SuspenseAllocation> SuspenseAllocations => Set<Core.Receipting.SuspenseAllocation>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 

@@ -119,6 +119,18 @@ internal sealed class ManualReceiptCaptureConfiguration : IEntityTypeConfigurati
     }
 }
 
+internal sealed class SuspenseAllocationConfiguration : IEntityTypeConfiguration<SuspenseAllocation>
+{
+    public void Configure(EntityTypeBuilder<SuspenseAllocation> b)
+    {
+        b.ToTable("suspense_allocation", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reason).HasMaxLength(300);
+        b.Property(x => x.JournalNumber).HasMaxLength(30);
+        b.HasIndex(x => new { x.CompanyId, x.Date });
+    }
+}
+
 internal sealed class PaymentArrangementConfiguration : IEntityTypeConfiguration<PaymentArrangement>
 {
     public void Configure(EntityTypeBuilder<PaymentArrangement> b)

@@ -94,6 +94,12 @@ public sealed class ReceiptSuspenseTests
             TrialBalanceReport tb = await gl.TrialBalanceAsync(companyId, new DateOnly(2026, 1, 31));
             tb.IsBalanced.Should().BeTrue();
             tb.Rows.Should().NotContain(r => r.AccountCode == "2600" && (r.Debit != 0m || r.Credit != 0m)); // suspense cleared to nil
+
+            // RC30 logs the suspense allocation with its reason.
+            IReportRunner runner = scope.ServiceProvider.GetRequiredService<IReportRunner>();
+            var rc30 = await runner.RenderAsync(companyId, "RC30", new Dictionary<string, object?> { ["FromDate"] = new DateOnly(2026, 1, 1), ["ToDate"] = new DateOnly(2026, 12, 31) }, ReportFormat.Html);
+            rc30.IsSuccess.Should().BeTrue(rc30.IsFailure ? rc30.Error.ToString() : null);
+            System.Text.Encoding.UTF8.GetString(rc30.Value.Content).Should().Contain("Identified as SB-1 payment").And.Contain("300.00");
         }
     }
 }

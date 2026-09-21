@@ -484,6 +484,8 @@ public sealed class ReceiptingService : IReceiptingService
         }
 
         (decimal allocated, decimal remainder) = await AllocateAsync(companyId, customerId, posting.Value.OpenItemId, amount, date, strategy, [], ct).ConfigureAwait(false);
+        _db.Set<SuspenseAllocation>().Add(new SuspenseAllocation(companyId, customerId, amount, date, reason, posting.Value.JournalNumber));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new ReceiptResult(0, posting.Value.JournalNumber, amount, allocated, remainder);
     }
 

@@ -43,6 +43,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC26" => await CashInTransitAgeingAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC28" => await CashMovementsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC29" => await SuspenseRegisterAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC30" => await SuspenseAllocationLogAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC31" => await ImportBatchesAsync(companyId, ct).ConfigureAwait(false),
             "RC32" => await ImportExceptionsAsync(companyId, ct).ConfigureAwait(false),
             "RC38" => await PaymentHistoryAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -254,6 +255,27 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .OrderBy(d => d.DepositDate)
             .ToListAsync(ct).ConfigureAwait(false);
         return deposits.Select(d => Row(new() { ["Reference"] = d.Reference, ["DepositDate"] = d.DepositDate.ToDateTime(TimeOnly.MinValue), ["Days"] = Math.Max(0, asAt.DayNumber - d.DepositDate.DayNumber), ["Amount"] = d.Amount })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SuspenseAllocationLogAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly to = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+        List<SuspenseAllocation> allocations = await _db.Set<SuspenseAllocation>()
+            .Where(a => a.CompanyId == companyId && a.Date >= from && a.Date <= to)
+            .OrderBy(a => a.Date).ThenBy(a => a.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> customers = await _db.Set<Core.Trading.Customer>()
+            .Where(c => c.CompanyId == companyId)
+            .ToDictionaryAsync(c => c.Id, c => $"{c.Code} — {c.Name}", ct).ConfigureAwait(false);
+
+        return allocations.Select(a => Row(new()
+        {
+            ["When"] = a.Date.ToDateTime(TimeOnly.MinValue),
+            ["Account"] = customers.GetValueOrDefault(a.CustomerId, $"#{a.CustomerId}"),
+            ["Reason"] = a.Reason,
+            ["Amount"] = a.Amount,
+        })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ImportExceptionsAsync(long companyId, CancellationToken ct)
