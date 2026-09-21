@@ -45,6 +45,13 @@ public sealed class RestaurantTable : SoftDeletableEntity, ICompanyScoped
     /// <summary>The active table group this table is combined into, if any.</summary>
     public long? GroupId { get; private set; }
 
+    /// <summary>The floor-plan section this table sits in, if any.</summary>
+    public long? SectionId { get; private set; }
+
+    /// <summary>Assigns the table to a floor-plan section (or clears it with null).</summary>
+    /// <param name="sectionId">The section, or null to unassign.</param>
+    public void AssignToSection(long? sectionId) => SectionId = sectionId;
+
     /// <summary>Marks the table occupied.</summary>
     public void Occupy() => Status = TableStatus.Occupied;
 

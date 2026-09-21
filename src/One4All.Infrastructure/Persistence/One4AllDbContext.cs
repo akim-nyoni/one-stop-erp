@@ -263,6 +263,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Combined table groups.</summary>
     public DbSet<Core.Restaurant.TableGroup> TableGroups => Set<Core.Restaurant.TableGroup>();
 
+    /// <summary>Floor-plan sections.</summary>
+    public DbSet<Core.Restaurant.FloorSection> FloorSections => Set<Core.Restaurant.FloorSection>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 

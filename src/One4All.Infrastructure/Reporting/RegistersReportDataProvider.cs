@@ -17,7 +17,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
         "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus", "KitchenTickets",
-        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups",
+        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales",
     };
 
     private readonly One4AllDbContext _db;
@@ -45,6 +45,8 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "RESERVATIONS" => await ReservationsAsync(companyId, ct).ConfigureAwait(false),
             "WAITLIST" => await WaitlistAsync(companyId, ct).ConfigureAwait(false),
             "TABLEGROUPS" => await TableGroupsAsync(companyId, ct).ConfigureAwait(false),
+            "FLOORPLAN" => await FloorPlanAsync(companyId, ct).ConfigureAwait(false),
+            "SECTIONSALES" => await SectionSalesAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -96,6 +98,70 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Tables"] = g.MemberCount,
             ["Seats"] = g.Seats,
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> FloorPlanAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Restaurant.FloorSection> sections = await _db.Set<Core.Restaurant.FloorSection>()
+            .Where(s => s.CompanyId == companyId)
+            .OrderBy(s => s.Name)
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<Core.Restaurant.RestaurantTable> tables = await _db.Set<Core.Restaurant.RestaurantTable>()
+            .Where(t => t.CompanyId == companyId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> staff = await _db.Set<Core.Security.User>()
+            .ToDictionaryAsync(u => u.Id, u => u.DisplayName, ct).ConfigureAwait(false);
+
+        return sections.Select(s =>
+        {
+            List<Core.Restaurant.RestaurantTable> inSection = tables.Where(t => t.SectionId == s.Id).ToList();
+            return Row(new()
+            {
+                ["Section"] = s.Name,
+                ["Tables"] = inSection.Count,
+                ["Seats"] = inSection.Sum(t => t.Seats),
+                ["Occupied"] = inSection.Count(t => t.Status == Core.Restaurant.TableStatus.Occupied),
+                ["Server"] = s.AssignedWaiterUserId is { } id ? staff.GetValueOrDefault(id, $"#{id}") : string.Empty,
+                ["Active"] = s.IsActive ? "Yes" : "No",
+            });
+        }).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SectionSalesAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly fromDate = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly toDate = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+
+        var billed = await (
+            from l in _db.Set<Core.Restaurant.TableOrderLine>()
+            join o in _db.Set<Core.Restaurant.TableOrder>() on l.TableOrderId equals o.Id
+            join t in _db.Set<Core.Restaurant.RestaurantTable>() on o.TableId equals t.Id
+            where o.CompanyId == companyId && o.OpenedOn >= fromDate && o.OpenedOn <= toDate && l.BilledQuantity > 0m
+            select new { t.SectionId, o.Id, l.BilledQuantity, l.Quantity, l.UnitPrice, l.TaxAmount })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<long, string> sectionNames = await _db.Set<Core.Restaurant.FloorSection>()
+            .Where(s => s.CompanyId == companyId)
+            .ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
+
+        return billed
+            .GroupBy(x => x.SectionId)
+            .Select(g =>
+            {
+                decimal net = g.Sum(x => decimal.Round(x.BilledQuantity * x.UnitPrice, 4, MidpointRounding.ToEven));
+                decimal tax = g.Sum(x => x.Quantity == 0m ? 0m : decimal.Round(x.TaxAmount * x.BilledQuantity / x.Quantity, 4, MidpointRounding.ToEven));
+                return (Name: g.Key is { } id ? sectionNames.GetValueOrDefault(id, $"#{id}") : "(Unassigned)", Orders: g.Select(x => x.Id).Distinct().Count(), Net: net, Tax: tax);
+            })
+            .OrderByDescending(r => r.Net)
+            .Select(r => Row(new()
+            {
+                ["Section"] = r.Name,
+                ["Orders"] = r.Orders,
+                ["Net"] = r.Net,
+                ["Tax"] = r.Tax,
+                ["Gross"] = r.Net + r.Tax,
+            }))
+            .ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReservationsAsync(long companyId, CancellationToken ct)

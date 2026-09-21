@@ -825,6 +825,83 @@ public sealed class RestaurantService : IRestaurantService
         return Result.Success();
     }
 
+    /// <inheritdoc />
+    public async Task<Result<long>> CreateSectionAsync(long companyId, string code, string name, string? description = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return Error.Validation("Res.SectionNoCode", "A floor section needs a code.");
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return Error.Validation("Res.SectionNoName", "A floor section needs a name.");
+        }
+
+        string normalized = code.Trim().ToUpperInvariant();
+        bool exists = await _db.Set<FloorSection>().AnyAsync(s => s.CompanyId == companyId && s.Code == normalized, ct).ConfigureAwait(false);
+        if (exists)
+        {
+            return Error.Rule("Res.SectionDuplicate", $"A floor section with code {normalized} already exists.");
+        }
+
+        FloorSection section = new(companyId, code, name, description);
+        _db.Set<FloorSection>().Add(section);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return section.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> AssignTableToSectionAsync(long companyId, long tableId, long? sectionId, CancellationToken ct = default)
+    {
+        RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == tableId && t.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (table is null)
+        {
+            return Result.Failure(Error.NotFound("Res.TableNotFound", $"Table {tableId} not found."));
+        }
+
+        if (sectionId is { } id)
+        {
+            bool sectionExists = await _db.Set<FloorSection>().AnyAsync(s => s.Id == id && s.CompanyId == companyId, ct).ConfigureAwait(false);
+            if (!sectionExists)
+            {
+                return Result.Failure(Error.NotFound("Res.SectionNotFound", $"Floor section {id} not found."));
+            }
+        }
+
+        table.AssignToSection(sectionId);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> AssignSectionServerAsync(long companyId, long sectionId, long? waiterUserId, CancellationToken ct = default)
+    {
+        FloorSection? section = await _db.Set<FloorSection>().FirstOrDefaultAsync(s => s.Id == sectionId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (section is null)
+        {
+            return Result.Failure(Error.NotFound("Res.SectionNotFound", $"Floor section {sectionId} not found."));
+        }
+
+        section.AssignServer(waiterUserId);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetSectionActiveAsync(long companyId, long sectionId, bool isActive, CancellationToken ct = default)
+    {
+        FloorSection? section = await _db.Set<FloorSection>().FirstOrDefaultAsync(s => s.Id == sectionId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (section is null)
+        {
+            return Result.Failure(Error.NotFound("Res.SectionNotFound", $"Floor section {sectionId} not found."));
+        }
+
+        section.SetActive(isActive);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
     /// <summary>Occupies a table and, when it is combined, every table in its group.</summary>
     private async Task OccupyTableAndGroupAsync(long companyId, RestaurantTable table, CancellationToken ct)
     {

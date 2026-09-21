@@ -297,4 +297,37 @@ public interface IRestaurantService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
     Task<Result> UncombineTablesAsync(long companyId, long groupId, CancellationToken ct = default);
+
+    /// <summary>Creates a floor-plan section (zone). Operational only (no GL).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="code">The short section code (unique per company).</param>
+    /// <param name="name">The section name.</param>
+    /// <param name="description">A description, if any.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created section id.</returns>
+    Task<Result<long>> CreateSectionAsync(long companyId, string code, string name, string? description = null, CancellationToken ct = default);
+
+    /// <summary>Assigns a table to a floor-plan section, or unassigns it when the section id is null.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="tableId">The table.</param>
+    /// <param name="sectionId">The section, or null to unassign.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> AssignTableToSectionAsync(long companyId, long tableId, long? sectionId, CancellationToken ct = default);
+
+    /// <summary>Assigns a server (waiter) to a section, or clears the assignment when the user id is null.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="sectionId">The section.</param>
+    /// <param name="waiterUserId">The server, or null to clear.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> AssignSectionServerAsync(long companyId, long sectionId, long? waiterUserId, CancellationToken ct = default);
+
+    /// <summary>Opens or closes a section for service (e.g. closing the patio when it rains).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="sectionId">The section.</param>
+    /// <param name="isActive">Whether the section is in service.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> SetSectionActiveAsync(long companyId, long sectionId, bool isActive, CancellationToken ct = default);
 }

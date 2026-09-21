@@ -336,6 +336,12 @@ public static class SystemReports
     /// <summary>The Combined Tables report code.</summary>
     public const string TableGroupsCode = "RES-COMB";
 
+    /// <summary>The Floor Plan report code.</summary>
+    public const string FloorPlanCode = "RES-SECT";
+
+    /// <summary>The Section Sales report code.</summary>
+    public const string SectionSalesCode = "RES-SSALES";
+
     /// <summary>Builds the Kitchen Order Tickets definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition KitchenTickets() => Listing(KitchenTicketsCode, "Kitchen Order Tickets", "Restaurant",
@@ -377,6 +383,20 @@ public static class SystemReports
         "Active table groups — the combined tables, their primary and total seats.", "TableGroups",
         [new Column("Group", "Group", 130), new Column("Primary", "Primary", 80), new Column("Tables", "Tables", 70), new Column("Seats", "Seats", 70)],
         []);
+
+    /// <summary>Builds the Floor Plan definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition FloorPlan() => Listing(FloorPlanCode, "Floor Plan", "Restaurant",
+        "Floor-plan sections with their tables, seats, live occupancy and assigned server.", "FloorPlan",
+        [new Column("Section", "Section", 140), new Column("Tables", "Tables", 70), new Column("Seats", "Seats", 70), new Column("Occupied", "Occupied", 80), new Column("Server", "Server", 120), new Column("Active", "Active", 70)],
+        []);
+
+    /// <summary>Builds the Section Sales definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition SectionSales() => Listing(SectionSalesCode, "Section Sales", "Restaurant",
+        "Billed sales by floor-plan section over a period — orders, net, tax and gross.", "SectionSales",
+        [new Column("Section", "Section", 140), new Column("Orders", "Orders", 70), new Column("Net", "Net", 100, true), new Column("Tax", "Tax", 90, true), new Column("Gross", "Gross", 100, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Table Status definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>

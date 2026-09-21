@@ -45,6 +45,21 @@ internal sealed class RestaurantTableConfiguration : IEntityTypeConfiguration<Re
         b.Property(x => x.Status).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.TableNumber }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => x.GroupId);
+        b.HasIndex(x => x.SectionId);
+        b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+internal sealed class FloorSectionConfiguration : IEntityTypeConfiguration<FloorSection>
+{
+    public void Configure(EntityTypeBuilder<FloorSection> b)
+    {
+        b.ToTable("floor_section", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.Description).HasMaxLength(400);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);
     }
 }
