@@ -111,7 +111,64 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, CancellationToken ct = default)
+    public async Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, CancellationToken ct = default)
+    {
+        Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
+        if (loaded.IsFailure)
+        {
+            return loaded.Error;
+        }
+
+        TableOrder order = loaded.Value;
+        // Bill everything still outstanding on the order.
+        List<(TableOrderLine Line, decimal Quantity)> portions = order.Lines
+            .Where(l => l.RemainingQuantity > 0m)
+            .Select(l => (l, l.RemainingQuantity))
+            .ToList();
+        if (portions.Count == 0)
+        {
+            return Error.Rule("Res.NothingToBill", "The order has nothing left to bill.");
+        }
+
+        return await PostBillAsync(companyId, order, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, CancellationToken ct = default)
+    {
+        if (portions.Count == 0)
+        {
+            return Error.Validation("Res.NoPortions", "A split bill needs at least one line portion.");
+        }
+
+        Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
+        if (loaded.IsFailure)
+        {
+            return loaded.Error;
+        }
+
+        TableOrder order = loaded.Value;
+        List<(TableOrderLine Line, decimal Quantity)> resolved = [];
+        foreach (SplitPortion portion in portions)
+        {
+            TableOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == portion.OrderLineId);
+            if (line is null)
+            {
+                return Error.NotFound("Res.LineNotFound", $"Order line {portion.OrderLineId} is not on this order.");
+            }
+
+            if (portion.Quantity <= 0m || portion.Quantity > line.RemainingQuantity + 0.0001m)
+            {
+                return Error.Rule("Res.InvalidPortion", $"Cannot bill {portion.Quantity} of '{line.Description}'; {line.RemainingQuantity} remains.");
+            }
+
+            resolved.Add((line, portion.Quantity));
+        }
+
+        return await PostBillAsync(companyId, order, warehouseId, date, resolved, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, ct).ConfigureAwait(false);
+    }
+
+    private async Task<Result<TableOrder>> LoadOpenOrderAsync(long companyId, long orderId, CancellationToken ct)
     {
         TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
         if (order is null)
@@ -129,26 +186,53 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.EmptyOrder", "An empty order cannot be billed.");
         }
 
+        return order;
+    }
+
+    private async Task<Result<BillResult>> PostBillAsync(long companyId, TableOrder order, long warehouseId, DateOnly date, List<(TableOrderLine Line, decimal Quantity)> portions, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, CancellationToken ct)
+    {
+        if (serviceChargeAmount < 0m)
+        {
+            return Error.Rule("Res.InvalidServiceCharge", "The service charge cannot be negative.");
+        }
+
+        if (serviceChargeAmount > 0m && string.IsNullOrWhiteSpace(serviceChargeAccountCode))
+        {
+            return Error.Validation("Res.ServiceChargeAccountRequired", "A service charge requires an income account.");
+        }
+
         Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         if (company is null)
         {
             return Error.NotFound("Res.CompanyNotFound", $"Company {companyId} not found.");
         }
 
-        decimal net = order.NetTotal;
-        decimal tax = order.TaxTotal;
-        decimal gross = order.GrossTotal;
-
-        // Revenue: Dr cash (gross), Cr revenue by account (net), Cr output tax (tax).
-        List<JournalLineRequest> lines = [new JournalLineRequest { AccountCode = cashAccountCode, Side = JournalSide.Debit, TransactionAmount = gross }];
-        foreach (IGrouping<string, TableOrderLine> revenueGroup in order.Lines.GroupBy(l => l.RevenueAccountCode))
+        // Net and tax for this bill (tax prorated by the billed quantity of each line).
+        decimal net = 0m;
+        decimal tax = 0m;
+        Dictionary<string, decimal> netByAccount = new(StringComparer.Ordinal);
+        foreach ((TableOrderLine line, decimal quantity) in portions)
         {
-            lines.Add(new JournalLineRequest { AccountCode = revenueGroup.Key, Side = JournalSide.Credit, TransactionAmount = revenueGroup.Sum(l => l.LineNet) });
+            decimal portionNet = decimal.Round(quantity * line.UnitPrice, 4, MidpointRounding.ToEven);
+            decimal portionTax = line.Quantity == 0m ? 0m : decimal.Round(line.TaxAmount * quantity / line.Quantity, 4, MidpointRounding.ToEven);
+            net += portionNet;
+            tax += portionTax;
+            netByAccount[line.RevenueAccountCode] = netByAccount.GetValueOrDefault(line.RevenueAccountCode) + portionNet;
         }
 
+        decimal gross = net + tax + serviceChargeAmount;
+
+        // Revenue: Dr cash (gross), Cr revenue by account (net), Cr output tax, Cr service-charge income.
+        List<JournalLineRequest> lines = [new JournalLineRequest { AccountCode = cashAccountCode, Side = JournalSide.Debit, TransactionAmount = gross }];
+        lines.AddRange(netByAccount.Select(kv => new JournalLineRequest { AccountCode = kv.Key, Side = JournalSide.Credit, TransactionAmount = kv.Value }));
         if (tax != 0m && !string.IsNullOrWhiteSpace(taxAccountCode))
         {
             lines.Add(new JournalLineRequest { AccountCode = taxAccountCode!, Side = JournalSide.Credit, TransactionAmount = tax });
+        }
+
+        if (serviceChargeAmount > 0m)
+        {
+            lines.Add(new JournalLineRequest { AccountCode = serviceChargeAccountCode!, Side = JournalSide.Credit, TransactionAmount = serviceChargeAmount });
         }
 
         Result<PostingReceipt> revenue = await _posting.PostAsync(new JournalRequest
@@ -158,7 +242,7 @@ public sealed class RestaurantService : IRestaurantService
             PostingDate = date,
             TransactionCurrency = company.BaseCurrency,
             DocumentType = "RES-BILL",
-            DocumentNumber = order.OrderNumber,
+            DocumentNumber = $"{order.OrderNumber}-{order.Lines.Sum(l => l.BilledQuantity):0.##}",
             Narrative = $"Restaurant bill {order.OrderNumber}",
             Lines = lines,
         }, ct).ConfigureAwait(false);
@@ -168,48 +252,52 @@ public sealed class RestaurantService : IRestaurantService
             return revenue.Error;
         }
 
-        // Cost of sales: explode each ordered menu item's recipe into stock issues (moving average).
-        List<long> menuIds = order.Lines.Select(l => l.MenuItemId).Distinct().ToList();
+        // Cost of sales: explode each billed portion's recipe into stock issues (moving average).
+        List<long> menuIds = portions.Select(p => p.Line.MenuItemId).Distinct().ToList();
         List<MenuItem> menus = await _db.Set<MenuItem>().Include(m => m.Recipe)
             .Where(m => m.CompanyId == companyId && menuIds.Contains(m.Id))
             .ToListAsync(ct).ConfigureAwait(false);
         Dictionary<long, IReadOnlyList<RecipeLine>> recipes = menus.ToDictionary(m => m.Id, m => m.Recipe);
 
         decimal costOfSales = 0m;
-        foreach (TableOrderLine orderLine in order.Lines)
+        foreach ((TableOrderLine line, decimal quantity) in portions)
         {
-            if (!recipes.TryGetValue(orderLine.MenuItemId, out IReadOnlyList<RecipeLine>? recipe))
+            if (recipes.TryGetValue(line.MenuItemId, out IReadOnlyList<RecipeLine>? recipe))
             {
-                continue;
-            }
-
-            foreach (RecipeLine ingredient in recipe)
-            {
-                Result<StockMovementResult> issue = await _inventory.IssueAsync(new IssueStockRequest
+                foreach (RecipeLine ingredient in recipe)
                 {
-                    CompanyId = companyId,
-                    ItemId = ingredient.IngredientItemId,
-                    WarehouseId = warehouseId,
-                    Date = date,
-                    Quantity = ingredient.Quantity * orderLine.Quantity,
-                    Reference = order.OrderNumber,
-                }, ct).ConfigureAwait(false);
+                    Result<StockMovementResult> issue = await _inventory.IssueAsync(new IssueStockRequest
+                    {
+                        CompanyId = companyId,
+                        ItemId = ingredient.IngredientItemId,
+                        WarehouseId = warehouseId,
+                        Date = date,
+                        Quantity = ingredient.Quantity * quantity,
+                        Reference = order.OrderNumber,
+                    }, ct).ConfigureAwait(false);
 
-                if (issue.IsFailure)
-                {
-                    return issue.Error;
+                    if (issue.IsFailure)
+                    {
+                        return issue.Error;
+                    }
+
+                    costOfSales += issue.Value.Value;
                 }
-
-                costOfSales += issue.Value.Value;
             }
+
+            line.Bill(quantity);
         }
 
-        order.MarkBilled(revenue.Value.JournalNumber);
-        RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == order.TableId, ct).ConfigureAwait(false);
-        table?.Free();
-        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        bool fullyBilled = order.IsFullyBilled;
+        if (fullyBilled)
+        {
+            order.MarkBilled(revenue.Value.JournalNumber);
+            RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == order.TableId, ct).ConfigureAwait(false);
+            table?.Free();
+        }
 
-        return new BillResult(net, tax, gross, costOfSales, revenue.Value.JournalNumber);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new BillResult(net, tax, serviceChargeAmount, gross, costOfSales, fullyBilled, revenue.Value.JournalNumber);
     }
 
     /// <inheritdoc />

@@ -7,13 +7,20 @@ namespace One4All.Application.Abstractions.Restaurant;
 /// <param name="Quantity">The quantity consumed per menu item sold.</param>
 public readonly record struct RecipeIngredient(long IngredientItemId, decimal Quantity);
 
-/// <summary>The result of billing a table order.</summary>
-/// <param name="Net">The net (tax-exclusive) total.</param>
-/// <param name="Tax">The tax total.</param>
-/// <param name="Gross">The gross total charged.</param>
+/// <summary>The result of billing a table order (or a split of it).</summary>
+/// <param name="Net">The net (tax-exclusive) total billed.</param>
+/// <param name="Tax">The tax total billed.</param>
+/// <param name="ServiceCharge">The service charge / gratuity added.</param>
+/// <param name="Gross">The gross total charged (net + tax + service charge).</param>
 /// <param name="CostOfSales">The cost of sales released by exploding the recipes.</param>
+/// <param name="FullyBilled">True when this bill settled the whole order (table freed).</param>
 /// <param name="RevenueJournalNumber">The revenue GL journal number.</param>
-public readonly record struct BillResult(decimal Net, decimal Tax, decimal Gross, decimal CostOfSales, string RevenueJournalNumber);
+public readonly record struct BillResult(decimal Net, decimal Tax, decimal ServiceCharge, decimal Gross, decimal CostOfSales, bool FullyBilled, string RevenueJournalNumber);
+
+/// <summary>A portion of an order to bill on a split.</summary>
+/// <param name="OrderLineId">The order line.</param>
+/// <param name="Quantity">The quantity of that line to bill now.</param>
+public readonly record struct SplitPortion(long OrderLineId, decimal Quantity);
 
 /// <summary>
 /// The optional Restaurant / Hospitality module. Sells <b>menu items</b> (composites priced to the guest,
@@ -73,9 +80,28 @@ public interface IRestaurantService
     /// <param name="date">The billing date.</param>
     /// <param name="cashAccountCode">The cash/tender account debited with the gross.</param>
     /// <param name="taxAccountCode">The output-tax account, when there is tax.</param>
+    /// <param name="serviceChargeAmount">An optional service charge / gratuity added to the bill.</param>
+    /// <param name="serviceChargeAccountCode">The service-charge income account (required when charging).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The bill result.</returns>
-    Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, CancellationToken ct = default);
+    Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Bills part of an order (a split): only the specified line portions. Posts revenue and recipe cost of
+    /// sales for that portion; when the last portion is billed the order is closed and the table freed.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The order.</param>
+    /// <param name="warehouseId">The warehouse the ingredients are issued from.</param>
+    /// <param name="date">The billing date.</param>
+    /// <param name="portions">The line portions to bill now.</param>
+    /// <param name="cashAccountCode">The cash/tender account debited with the gross.</param>
+    /// <param name="taxAccountCode">The output-tax account, when there is tax.</param>
+    /// <param name="serviceChargeAmount">An optional service charge / gratuity added to this split.</param>
+    /// <param name="serviceChargeAccountCode">The service-charge income account (required when charging).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The bill result.</returns>
+    Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, CancellationToken ct = default);
 
     /// <summary>Cancels an open order (nothing was billed) and frees the table. Requires a reason.</summary>
     /// <param name="companyId">The company.</param>

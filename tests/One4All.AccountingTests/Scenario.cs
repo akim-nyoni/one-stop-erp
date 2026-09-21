@@ -127,6 +127,7 @@ public static class Scenario
         db.Accounts.Add(new LedgerAccount(company.Id, "1050", "Cash in Transit", AccountType.Asset));
         db.Accounts.Add(new LedgerAccount(company.Id, "1010", "Cash in Safe", AccountType.Asset));
         db.Accounts.Add(new LedgerAccount(company.Id, "6300", "Petty Cash Expense", AccountType.Expense));
+        db.Accounts.Add(new LedgerAccount(company.Id, "4600", "Service Charge Income", AccountType.Income));
         db.Accounts.Add(new LedgerAccount(company.Id, "1300", "Agent Cash Control", AccountType.Asset));
         db.Accounts.Add(new LedgerAccount(company.Id, "6200", "Agent Commission", AccountType.Expense));
 

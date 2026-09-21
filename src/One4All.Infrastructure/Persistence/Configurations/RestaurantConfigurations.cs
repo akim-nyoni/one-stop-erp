@@ -75,6 +75,7 @@ internal sealed class TableOrderLineConfiguration : IEntityTypeConfiguration<Tab
         b.Property(x => x.Description).HasMaxLength(120);
         b.Property(x => x.Quantity).HasPrecision(19, 4);
         b.Property(x => x.UnitPrice).HasPrecision(19, 4);
+        b.Property(x => x.BilledQuantity).HasPrecision(19, 4);
         b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
         b.Property(x => x.CostOfSalesAccountCode).HasMaxLength(8);
         b.Ignore(x => x.LineNet);

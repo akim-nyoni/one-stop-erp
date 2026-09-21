@@ -5732,6 +5732,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<decimal>("BilledQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("billed_quantity");
+
                     b.Property<string>("CostOfSalesAccountCode")
                         .IsRequired()
                         .HasMaxLength(8)

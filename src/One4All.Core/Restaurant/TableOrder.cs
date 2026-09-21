@@ -122,6 +122,9 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
     /// <summary>The gross total.</summary>
     public decimal GrossTotal => NetTotal + TaxTotal;
 
+    /// <summary>True when every line has been fully billed (nothing left to split off).</summary>
+    public bool IsFullyBilled => _lines.All(l => l.RemainingQuantity <= 0m);
+
     /// <summary>Adds an ordered menu item.</summary>
     /// <param name="menuItemId">The menu item.</param>
     /// <param name="description">The description.</param>
@@ -205,9 +208,28 @@ public sealed class TableOrderLine : Entity
     /// <summary>The net line value (quantity × unit price).</summary>
     public decimal LineNet => decimal.Round(Quantity * UnitPrice, 4, MidpointRounding.ToEven);
 
+    /// <summary>The quantity already billed (for split bills).</summary>
+    public decimal BilledQuantity { get; private set; }
+
+    /// <summary>The quantity not yet billed.</summary>
+    public decimal RemainingQuantity => Quantity - BilledQuantity;
+
     /// <summary>The revenue account.</summary>
     public string RevenueAccountCode { get; private set; }
 
     /// <summary>The cost-of-sales account.</summary>
     public string CostOfSalesAccountCode { get; private set; }
+
+    /// <summary>Bills a quantity of this line (split bills).</summary>
+    /// <param name="quantity">The quantity billed now.</param>
+    /// <exception cref="InvalidOperationException">Thrown when billing more than remains.</exception>
+    public void Bill(decimal quantity)
+    {
+        if (quantity > RemainingQuantity + 0.0001m)
+        {
+            throw new InvalidOperationException($"Cannot bill {quantity}; only {RemainingQuantity} of '{Description}' remains.");
+        }
+
+        BilledQuantity = decimal.Round(BilledQuantity + quantity, 4, MidpointRounding.ToEven);
+    }
 }
