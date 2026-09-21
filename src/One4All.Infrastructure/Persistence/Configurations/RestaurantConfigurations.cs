@@ -116,6 +116,7 @@ internal sealed class TableOrderLineConfiguration : IEntityTypeConfiguration<Tab
         b.HasKey(x => x.Id);
         b.Property(x => x.Description).HasMaxLength(120);
         b.Property(x => x.Course).HasConversion<int>();
+        b.Property(x => x.SeatNumber);
         b.Property(x => x.Quantity).HasPrecision(19, 4);
         b.Property(x => x.UnitPrice).HasPrecision(19, 4);
         b.Property(x => x.BilledQuantity).HasPrecision(19, 4);

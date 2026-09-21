@@ -75,9 +75,10 @@ public interface IRestaurantService
     /// <param name="quantity">The quantity.</param>
     /// <param name="taxAmount">The tax on the line, if any.</param>
     /// <param name="course">The dining course the item belongs to (for course-by-course firing).</param>
+    /// <param name="seatNumber">The seat that ordered the item, for split-by-seat billing (optional).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The line net value.</returns>
-    Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, CancellationToken ct = default);
+    Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, int? seatNumber = null, CancellationToken ct = default);
 
     /// <summary>
     /// Bills an open order: posts revenue (Dr cash/Cr revenue/Cr tax) and cost of sales by exploding each
@@ -155,6 +156,37 @@ public interface IRestaurantService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The GL journal number.</returns>
     Task<Result<string>> PayTipAllocationAsync(long companyId, long allocationId, DateOnly date, string fundingAccountCode, CancellationToken ct = default);
+
+    /// <summary>Assigns an order line to a seat (or clears it with null) for split-by-seat billing.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The order.</param>
+    /// <param name="lineId">The order line.</param>
+    /// <param name="seatNumber">The seat, or null to clear.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> AssignLineToSeatAsync(long companyId, long orderId, long lineId, int? seatNumber, CancellationToken ct = default);
+
+    /// <summary>
+    /// Bills one seat's share of an order (split by seat): every not-yet-billed, non-voided line assigned to
+    /// that seat. Posts revenue and recipe cost of sales for those lines; when the last seat is billed the
+    /// order closes and the table frees. Optional service charge / tip / discount apply to this seat's bill.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The order.</param>
+    /// <param name="seatNumber">The seat to bill.</param>
+    /// <param name="warehouseId">The warehouse the ingredients are issued from.</param>
+    /// <param name="date">The billing date.</param>
+    /// <param name="cashAccountCode">The cash/tender account debited with the gross.</param>
+    /// <param name="taxAccountCode">The output-tax account, when there is tax.</param>
+    /// <param name="serviceChargeAmount">An optional service charge / gratuity (house income) added to this seat.</param>
+    /// <param name="serviceChargeAccountCode">The service-charge income account (required when charging).</param>
+    /// <param name="tipAmount">An optional tip (staff money — a liability) added to this seat.</param>
+    /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
+    /// <param name="discountAmount">An optional discount allowed (a contra-revenue) deducted from this seat.</param>
+    /// <param name="discountAccountCode">The discounts-allowed account (required when discounting).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The bill result.</returns>
+    Task<Result<BillResult>> BillSeatAsync(long companyId, long orderId, int seatNumber, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default);
 
     /// <summary>
     /// Voids an order line before it is billed (wrong order, kitchen error): it is excluded from the bill and

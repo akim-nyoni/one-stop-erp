@@ -167,10 +167,11 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
     /// <param name="revenueAccountCode">The revenue account.</param>
     /// <param name="costOfSalesAccountCode">The cost-of-sales account.</param>
     /// <param name="course">The dining course.</param>
+    /// <param name="seatNumber">The seat that ordered the item, if seat-tracked.</param>
     /// <returns>The created line.</returns>
-    public TableOrderLine AddLine(long menuItemId, string description, decimal quantity, decimal unitPrice, decimal taxAmount, string revenueAccountCode, string costOfSalesAccountCode, MenuCourse course = MenuCourse.Main)
+    public TableOrderLine AddLine(long menuItemId, string description, decimal quantity, decimal unitPrice, decimal taxAmount, string revenueAccountCode, string costOfSalesAccountCode, MenuCourse course = MenuCourse.Main, int? seatNumber = null)
     {
-        TableOrderLine line = new(menuItemId, description, quantity, unitPrice, taxAmount, revenueAccountCode, costOfSalesAccountCode, course);
+        TableOrderLine line = new(menuItemId, description, quantity, unitPrice, taxAmount, revenueAccountCode, costOfSalesAccountCode, course, seatNumber);
         _lines.Add(line);
         return line;
     }
@@ -210,7 +211,7 @@ public sealed class TableOrderLine : Entity
     /// <param name="taxAmount">The tax on the line.</param>
     /// <param name="revenueAccountCode">The revenue account.</param>
     /// <param name="costOfSalesAccountCode">The cost-of-sales account.</param>
-    public TableOrderLine(long menuItemId, string description, decimal quantity, decimal unitPrice, decimal taxAmount, string revenueAccountCode, string costOfSalesAccountCode, MenuCourse course = MenuCourse.Main)
+    public TableOrderLine(long menuItemId, string description, decimal quantity, decimal unitPrice, decimal taxAmount, string revenueAccountCode, string costOfSalesAccountCode, MenuCourse course = MenuCourse.Main, int? seatNumber = null)
     {
         MenuItemId = menuItemId;
         Description = description;
@@ -220,6 +221,7 @@ public sealed class TableOrderLine : Entity
         RevenueAccountCode = revenueAccountCode;
         CostOfSalesAccountCode = costOfSalesAccountCode;
         Course = course;
+        SeatNumber = seatNumber;
     }
 
     /// <summary>The owning order id.</summary>
@@ -230,6 +232,13 @@ public sealed class TableOrderLine : Entity
 
     /// <summary>The dining course this item belongs to (for course-by-course firing).</summary>
     public MenuCourse Course { get; private set; }
+
+    /// <summary>The seat that ordered the item, if seat-tracked (for split-by-seat billing).</summary>
+    public int? SeatNumber { get; private set; }
+
+    /// <summary>Assigns the line to a seat (or clears it with null).</summary>
+    /// <param name="seatNumber">The seat, or null to clear.</param>
+    public void AssignSeat(int? seatNumber) => SeatNumber = seatNumber;
 
     /// <summary>The description.</summary>
     public string Description { get; private set; }

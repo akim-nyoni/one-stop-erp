@@ -86,7 +86,7 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, CancellationToken ct = default)
+    public async Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, int? seatNumber = null, CancellationToken ct = default)
     {
         if (quantity <= 0m)
         {
@@ -115,7 +115,7 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.MenuItemUnavailable", $"Menu item {menu.Code} is not available.");
         }
 
-        TableOrderLine line = order.AddLine(menu.Id, menu.Name, quantity, menu.Price, taxAmount, menu.RevenueAccountCode, menu.CostOfSalesAccountCode, course);
+        TableOrderLine line = order.AddLine(menu.Id, menu.Name, quantity, menu.Price, taxAmount, menu.RevenueAccountCode, menu.CostOfSalesAccountCode, course, seatNumber);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return line.LineNet;
     }
@@ -181,6 +181,58 @@ public sealed class RestaurantService : IRestaurantService
         }
 
         return await PostBillAsync(companyId, order, warehouseId, date, resolved, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> AssignLineToSeatAsync(long companyId, long orderId, long lineId, int? seatNumber, CancellationToken ct = default)
+    {
+        if (seatNumber is <= 0)
+        {
+            return Result.Failure(Error.Rule("Res.InvalidSeat", "The seat number must be positive."));
+        }
+
+        TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Result.Failure(Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found."));
+        }
+
+        if (order.Status != TableOrderStatus.Open)
+        {
+            return Result.Failure(Error.Rule("Res.OrderNotOpen", "Only a line on an open order can be reseated."));
+        }
+
+        TableOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == lineId);
+        if (line is null)
+        {
+            return Result.Failure(Error.NotFound("Res.LineNotFound", $"Order line {lineId} is not on this order."));
+        }
+
+        line.AssignSeat(seatNumber);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<BillResult>> BillSeatAsync(long companyId, long orderId, int seatNumber, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
+    {
+        Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
+        if (loaded.IsFailure)
+        {
+            return loaded.Error;
+        }
+
+        TableOrder order = loaded.Value;
+        List<(TableOrderLine Line, decimal Quantity)> portions = order.Lines
+            .Where(l => l.SeatNumber == seatNumber && !l.IsVoided && l.RemainingQuantity > 0m)
+            .Select(l => (l, l.RemainingQuantity))
+            .ToList();
+        if (portions.Count == 0)
+        {
+            return Error.Rule("Res.NothingForSeat", $"Seat {seatNumber} has nothing left to bill.");
+        }
+
+        return await PostBillAsync(companyId, order, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

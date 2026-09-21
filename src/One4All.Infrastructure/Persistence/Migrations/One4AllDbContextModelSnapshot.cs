@@ -6063,6 +6063,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<int?>("SeatNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("seat_number");
+
                     b.Property<long>("TableOrderId")
                         .HasColumnType("bigint")
                         .HasColumnName("table_order_id");
