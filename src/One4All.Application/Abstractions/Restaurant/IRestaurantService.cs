@@ -406,6 +406,17 @@ public interface IRestaurantService
     Task<Result<long>> FireCourseAsync(long companyId, long orderId, MenuCourse course, string ticketNumber, DateOnly date, CancellationToken ct = default);
 
     /// <summary>
+    /// Refreshes menu availability against live stock for a warehouse: any recipe-backed menu item whose
+    /// ingredients cannot cover a single serving is automatically "86"d (made unavailable), and one that can is
+    /// brought back. Recipe-less items (drinks, etc.) are left untouched. Returns the number of items changed.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="warehouseId">The warehouse whose stock is checked.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of menu items whose availability changed.</returns>
+    Task<Result<int>> RefreshMenuAvailabilityAsync(long companyId, long warehouseId, CancellationToken ct = default);
+
+    /// <summary>
     /// Sets a menu item's availability ("86" it when out of stock, or bring it back). An unavailable item
     /// cannot be added to an order.
     /// </summary>

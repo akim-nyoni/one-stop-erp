@@ -1014,6 +1014,42 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
+    public async Task<Result<int>> RefreshMenuAvailabilityAsync(long companyId, long warehouseId, CancellationToken ct = default)
+    {
+        List<MenuItem> menu = await _db.Set<MenuItem>().Include(m => m.Recipe)
+            .Where(m => m.CompanyId == companyId)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<long, decimal> onHand = await _db.Set<Core.Inventory.StockBalance>()
+            .Where(b => b.CompanyId == companyId && b.WarehouseId == warehouseId)
+            .ToDictionaryAsync(b => b.ItemId, b => b.QuantityOnHand, ct).ConfigureAwait(false);
+
+        int changed = 0;
+        foreach (MenuItem item in menu)
+        {
+            // Only recipe-backed items are stock-gated; leave drinks and other recipe-less items alone.
+            if (item.Recipe.Count == 0)
+            {
+                continue;
+            }
+
+            bool canMake = item.Recipe.All(r => onHand.GetValueOrDefault(r.IngredientItemId) >= r.Quantity);
+            if (item.IsAvailable != canMake)
+            {
+                item.IsAvailable = canMake;
+                changed++;
+            }
+        }
+
+        if (changed > 0)
+        {
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
+        return changed;
+    }
+
+    /// <inheritdoc />
     public async Task<Result> SetMenuAvailabilityAsync(long companyId, long menuItemId, bool isAvailable, CancellationToken ct = default)
     {
         MenuItem? menu = await _db.Set<MenuItem>().FirstOrDefaultAsync(m => m.Id == menuItemId && m.CompanyId == companyId, ct).ConfigureAwait(false);
