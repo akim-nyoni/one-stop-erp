@@ -99,6 +99,22 @@ public interface IInventoryService
     /// <returns>The reversal movement result, or an error.</returns>
     Task<Result<StockMovementResult>> ReverseIssueAsync(long companyId, long movementId, DateOnly date, string? reference = null, CancellationToken ct = default);
 
+    /// <summary>
+    /// Transfers stock between two warehouses of the same company at the source's moving-average cost. Because
+    /// both warehouses share one stock-control account, the transfer is GL-neutral (no journal); it moves the
+    /// quantity and value between the warehouse balances and records paired transfer movements.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="itemId">The item.</param>
+    /// <param name="fromWarehouseId">The source warehouse (must hold enough stock).</param>
+    /// <param name="toWarehouseId">The destination warehouse.</param>
+    /// <param name="date">The transfer date.</param>
+    /// <param name="quantity">The quantity to move (positive).</param>
+    /// <param name="reference">An optional reference.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The value transferred (at the source's average cost), or an error.</returns>
+    Task<Result<decimal>> TransferAsync(long companyId, long itemId, long fromWarehouseId, long toWarehouseId, DateOnly date, decimal quantity, string? reference = null, CancellationToken ct = default);
+
     /// <summary>Produces the stock valuation for a company (optionally a single warehouse).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="warehouseId">Optional warehouse filter.</param>

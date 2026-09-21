@@ -195,6 +195,45 @@ public sealed class InventoryService : IInventoryService
     }
 
     /// <inheritdoc />
+    public async Task<Result<decimal>> TransferAsync(long companyId, long itemId, long fromWarehouseId, long toWarehouseId, DateOnly date, decimal quantity, string? reference = null, CancellationToken ct = default)
+    {
+        if (quantity <= 0m)
+        {
+            return Error.Rule("Inv.InvalidQuantity", "The transfer quantity must be positive.");
+        }
+
+        if (fromWarehouseId == toWarehouseId)
+        {
+            return Error.Rule("Inv.SameWarehouse", "The source and destination warehouses must differ.");
+        }
+
+        Result<(Item item, string stockCode, CurrencyCode currency)> setup = await SetupAsync(companyId, itemId, ct).ConfigureAwait(false);
+        if (setup.IsFailure)
+        {
+            return setup.Error;
+        }
+
+        StockBalance source = await LoadOrCreateBalanceAsync(companyId, itemId, fromWarehouseId, ct).ConfigureAwait(false);
+        if (source.QuantityOnHand < quantity)
+        {
+            return Error.Rule("Inv.InsufficientStock", $"Warehouse holds {source.QuantityOnHand}, less than the {quantity} to transfer.");
+        }
+
+        decimal unitCost = source.AverageCost;
+        decimal cost = source.Issue(quantity);
+
+        StockBalance destination = await LoadOrCreateBalanceAsync(companyId, itemId, toWarehouseId, ct).ConfigureAwait(false);
+        destination.Receive(quantity, unitCost);
+
+        // GL-neutral: both warehouses share one stock-control account, so no journal is posted.
+        _db.Set<StockMovement>().Add(new StockMovement(companyId, itemId, fromWarehouseId, date, StockMovementType.Transfer, -quantity, unitCost, -cost, reference));
+        _db.Set<StockMovement>().Add(new StockMovement(companyId, itemId, toWarehouseId, date, StockMovementType.Transfer, quantity, unitCost, cost, reference));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return cost;
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<StockValuationLine>> StockValuationAsync(long companyId, long? warehouseId = null, CancellationToken ct = default)
     {
         var query = from bal in _db.Set<StockBalance>()
