@@ -230,6 +230,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Suspense allocation log.</summary>
     public DbSet<Core.Receipting.SuspenseAllocation> SuspenseAllocations => Set<Core.Receipting.SuspenseAllocation>();
 
+    /// <summary>Dishonoured cheques / reversed payments.</summary>
+    public DbSet<Core.Receipting.DishonouredPayment> DishonouredPayments => Set<Core.Receipting.DishonouredPayment>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 

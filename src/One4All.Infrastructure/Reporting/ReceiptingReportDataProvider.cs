@@ -46,6 +46,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC30" => await SuspenseAllocationLogAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC31" => await ImportBatchesAsync(companyId, ct).ConfigureAwait(false),
             "RC32" => await ImportExceptionsAsync(companyId, ct).ConfigureAwait(false),
+            "RC34" => await DishonoursAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC38" => await PaymentHistoryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC39" => await CreditBalancesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC40" => await DepositsHeldAsync(companyId, ct).ConfigureAwait(false),
@@ -255,6 +256,23 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .OrderBy(d => d.DepositDate)
             .ToListAsync(ct).ConfigureAwait(false);
         return deposits.Select(d => Row(new() { ["Reference"] = d.Reference, ["DepositDate"] = d.DepositDate.ToDateTime(TimeOnly.MinValue), ["Days"] = Math.Max(0, asAt.DayNumber - d.DepositDate.DayNumber), ["Amount"] = d.Amount })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DishonoursAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly to = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+        List<DishonouredPayment> dishonours = await _db.Set<DishonouredPayment>()
+            .Where(d => d.CompanyId == companyId && d.Date >= from && d.Date <= to)
+            .OrderBy(d => d.Date).ThenBy(d => d.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return dishonours.Select(d => Row(new()
+        {
+            ["Reference"] = d.Reference,
+            ["Drawer"] = d.Drawer,
+            ["Penalty"] = d.Penalty,
+            ["Amount"] = d.Amount,
+        })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SuspenseAllocationLogAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

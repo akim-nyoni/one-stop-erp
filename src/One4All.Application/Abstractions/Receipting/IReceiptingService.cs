@@ -328,6 +328,23 @@ public interface IReceiptingService
     /// <returns>The created arrangement id.</returns>
     Task<Result<long>> CaptureArrangementAsync(long companyId, long customerId, decimal totalAmount, decimal instalmentAmount, DateOnly startDate, CancellationToken ct = default);
 
+    /// <summary>
+    /// Records a dishonoured cheque / reversed payment (brief §RCP-7): reverses the original receipt
+    /// (restoring the debt), raises a penalty on the payer's account when one is charged, and logs the event
+    /// for the dishonour register (RC34). Requires a reason and a user who is not the original cashier.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="receiptId">The receipt whose cheque bounced.</param>
+    /// <param name="date">The dishonour date.</param>
+    /// <param name="penaltyAmount">The penalty to charge (0 for none).</param>
+    /// <param name="penaltyAccountCode">The penalty-income account (when a penalty is charged).</param>
+    /// <param name="penaltyInvoiceNumber">The penalty invoice number (when a penalty is charged).</param>
+    /// <param name="reverserUserId">The user recording the dishonour (not the original cashier).</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or an error.</returns>
+    Task<Result> RecordDishonourAsync(long companyId, long receiptId, DateOnly date, decimal penaltyAmount, string? penaltyAccountCode, string? penaltyInvoiceNumber, long reverserUserId, string reason, CancellationToken ct = default);
+
     /// <summary>Verifies a closed session by a supervisor (who must not be the cashier).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="sessionId">The session.</param>

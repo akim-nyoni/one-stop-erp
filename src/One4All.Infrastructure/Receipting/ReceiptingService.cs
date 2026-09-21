@@ -629,6 +629,62 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
+    public async Task<Result> RecordDishonourAsync(long companyId, long receiptId, DateOnly date, decimal penaltyAmount, string? penaltyAccountCode, string? penaltyInvoiceNumber, long reverserUserId, string reason, CancellationToken ct = default)
+    {
+        Receipt? receipt = await _db.Set<Receipt>().Include(r => r.Tenders).Include(r => r.Lines)
+            .FirstOrDefaultAsync(r => r.Id == receiptId && r.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (receipt is null)
+        {
+            return Result.Failure(Error.NotFound("Rcp.ReceiptNotFound", $"Receipt {receiptId} not found."));
+        }
+
+        string reference = receipt.Tenders.FirstOrDefault(t => t.Type == TenderType.Cheque)?.Reference
+            ?? receipt.Tenders.FirstOrDefault()?.Reference
+            ?? receipt.ReceiptNumber;
+        string drawer = receipt.PayerKind == PayerKind.Anonymous ? "(sundry)" : $"{receipt.PayerKind} #{receipt.PayerAccountId}";
+        decimal amount = receipt.LineTotal;
+
+        // Reverse the original receipt — restores the debt and undoes every line.
+        Result<ReceiptReversalResult> reversal = await ReverseReceiptAsync(companyId, receiptId, date, reverserUserId, $"Dishonoured: {reason}", ct).ConfigureAwait(false);
+        if (reversal.IsFailure)
+        {
+            return Result.Failure(reversal.Error);
+        }
+
+        // Raise the penalty on the payer's account, when charged.
+        if (penaltyAmount > 0m)
+        {
+            if (receipt.PayerKind != PayerKind.ArCustomer || receipt.PayerAccountId is null || string.IsNullOrWhiteSpace(penaltyAccountCode))
+            {
+                return Result.Failure(Error.Rule("Rcp.PenaltyNotChargeable", "A penalty needs an AR payer account and a penalty-income account."));
+            }
+
+            Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+            Result<TradingPostingResult> penalty = await _salesLedger.PostInvoiceAsync(new SalesInvoiceRequest
+            {
+                CompanyId = companyId,
+                CustomerId = receipt.PayerAccountId.Value,
+                DocumentNumber = penaltyInvoiceNumber ?? $"{receipt.ReceiptNumber}-PEN",
+                DocumentDate = date,
+                Currency = company.BaseCurrency,
+                NetAmount = penaltyAmount,
+                TaxAmount = 0m,
+                SalesAccountCode = penaltyAccountCode!,
+                Narrative = $"Dishonour penalty — {receipt.ReceiptNumber}",
+            }, ct).ConfigureAwait(false);
+
+            if (penalty.IsFailure)
+            {
+                return Result.Failure(penalty.Error);
+            }
+        }
+
+        _db.Set<DishonouredPayment>().Add(new DishonouredPayment(companyId, receiptId, receipt.ReceiptNumber, reference, drawer, amount, penaltyAmount, date));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result<long>> CaptureArrangementAsync(long companyId, long customerId, decimal totalAmount, decimal instalmentAmount, DateOnly startDate, CancellationToken ct = default)
     {
         if (totalAmount <= 0m || instalmentAmount <= 0m)
