@@ -121,7 +121,7 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, CancellationToken ct = default)
+    public async Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
     {
         Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
         if (loaded.IsFailure)
@@ -140,11 +140,11 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.NothingToBill", "The order has nothing left to bill.");
         }
 
-        return await PostBillAsync(companyId, order, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, ct).ConfigureAwait(false);
+        return await PostBillAsync(companyId, order, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, CancellationToken ct = default)
+    public async Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
     {
         if (portions.Count == 0)
         {
@@ -180,7 +180,7 @@ public sealed class RestaurantService : IRestaurantService
             resolved.Add((line, portion.Quantity));
         }
 
-        return await PostBillAsync(companyId, order, warehouseId, date, resolved, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, ct).ConfigureAwait(false);
+        return await PostBillAsync(companyId, order, warehouseId, date, resolved, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -236,11 +236,11 @@ public sealed class RestaurantService : IRestaurantService
         return order;
     }
 
-    private async Task<Result<BillResult>> PostBillAsync(long companyId, TableOrder order, long warehouseId, DateOnly date, List<(TableOrderLine Line, decimal Quantity)> portions, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, CancellationToken ct)
+    private async Task<Result<BillResult>> PostBillAsync(long companyId, TableOrder order, long warehouseId, DateOnly date, List<(TableOrderLine Line, decimal Quantity)> portions, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, CancellationToken ct)
     {
-        if (serviceChargeAmount < 0m || tipAmount < 0m)
+        if (serviceChargeAmount < 0m || tipAmount < 0m || discountAmount < 0m)
         {
-            return Error.Rule("Res.InvalidExtra", "The service charge and tip cannot be negative.");
+            return Error.Rule("Res.InvalidExtra", "The service charge, tip and discount cannot be negative.");
         }
 
         if (serviceChargeAmount > 0m && string.IsNullOrWhiteSpace(serviceChargeAccountCode))
@@ -251,6 +251,11 @@ public sealed class RestaurantService : IRestaurantService
         if (tipAmount > 0m && string.IsNullOrWhiteSpace(tipsPayableAccountCode))
         {
             return Error.Validation("Res.TipsAccountRequired", "A tip requires a tips-payable account.");
+        }
+
+        if (discountAmount > 0m && string.IsNullOrWhiteSpace(discountAccountCode))
+        {
+            return Error.Validation("Res.DiscountAccountRequired", "A discount requires a discounts-allowed account.");
         }
 
         Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
@@ -278,14 +283,30 @@ public sealed class RestaurantService : IRestaurantService
             netByAccount[line.RevenueAccountCode] = netByAccount.GetValueOrDefault(line.RevenueAccountCode) + portionNet;
         }
 
-        decimal gross = net + tax + serviceChargeAmount + tipAmount;
-
-        // Post the guest's charge only when there is one (a fully-comped bill charges nothing but still costs).
-        string revenueJournal = string.Empty;
-        if (gross > 0m)
+        decimal chargeableBeforeDiscount = net + tax + serviceChargeAmount + tipAmount;
+        if (discountAmount > chargeableBeforeDiscount)
         {
-            // Dr cash (gross); Cr revenue (net), output tax, service-charge income and tips payable (a liability).
-            List<JournalLineRequest> lines = [new JournalLineRequest { AccountCode = cashAccountCode, Side = JournalSide.Debit, TransactionAmount = gross }];
+            return Error.Rule("Res.DiscountTooLarge", $"The discount {discountAmount} exceeds the bill total {chargeableBeforeDiscount}.");
+        }
+
+        decimal gross = chargeableBeforeDiscount - discountAmount;
+
+        // Post the guest's charge only when there is one (a fully-comped/-discounted bill charges nothing but still costs).
+        string revenueJournal = string.Empty;
+        if (chargeableBeforeDiscount > 0m)
+        {
+            // Dr cash (net of discount) + Dr discounts allowed; Cr revenue (full net), output tax, service charge and tips.
+            List<JournalLineRequest> lines = [];
+            if (gross > 0m)
+            {
+                lines.Add(new JournalLineRequest { AccountCode = cashAccountCode, Side = JournalSide.Debit, TransactionAmount = gross });
+            }
+
+            if (discountAmount > 0m)
+            {
+                lines.Add(new JournalLineRequest { AccountCode = discountAccountCode!, Side = JournalSide.Debit, TransactionAmount = discountAmount });
+            }
+
             lines.AddRange(netByAccount.Select(kv => new JournalLineRequest { AccountCode = kv.Key, Side = JournalSide.Credit, TransactionAmount = kv.Value }));
             if (tax != 0m && !string.IsNullOrWhiteSpace(taxAccountCode))
             {
@@ -367,7 +388,7 @@ public sealed class RestaurantService : IRestaurantService
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new BillResult(net, tax, serviceChargeAmount, tipAmount, gross, costOfSales, fullyBilled, revenueJournal);
+        return new BillResult(net, tax, serviceChargeAmount, tipAmount, discountAmount, gross, costOfSales, fullyBilled, revenueJournal);
     }
 
     /// <inheritdoc />

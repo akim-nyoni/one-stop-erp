@@ -13,11 +13,12 @@ public readonly record struct RecipeIngredient(long IngredientItemId, decimal Qu
 /// <param name="Tax">The tax total billed.</param>
 /// <param name="ServiceCharge">The service charge / gratuity (income to the house) added.</param>
 /// <param name="Tip">The tip (staff money — a liability, not income) added.</param>
-/// <param name="Gross">The gross total charged (net + tax + service charge + tip).</param>
+/// <param name="Discount">The discount allowed (a contra-revenue) deducted from the bill.</param>
+/// <param name="Gross">The gross total charged (net + tax + service charge + tip − discount).</param>
 /// <param name="CostOfSales">The cost of sales released by exploding the recipes.</param>
 /// <param name="FullyBilled">True when this bill settled the whole order (table freed).</param>
 /// <param name="RevenueJournalNumber">The revenue GL journal number.</param>
-public readonly record struct BillResult(decimal Net, decimal Tax, decimal ServiceCharge, decimal Tip, decimal Gross, decimal CostOfSales, bool FullyBilled, string RevenueJournalNumber);
+public readonly record struct BillResult(decimal Net, decimal Tax, decimal ServiceCharge, decimal Tip, decimal Discount, decimal Gross, decimal CostOfSales, bool FullyBilled, string RevenueJournalNumber);
 
 /// <summary>A staff member's share when distributing the tip pool.</summary>
 /// <param name="StaffUserId">The staff member.</param>
@@ -92,9 +93,11 @@ public interface IRestaurantService
     /// <param name="serviceChargeAccountCode">The service-charge income account (required when charging).</param>
     /// <param name="tipAmount">An optional tip (staff money — a liability) added to the bill.</param>
     /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
+    /// <param name="discountAmount">An optional discount allowed (a contra-revenue) deducted from the bill.</param>
+    /// <param name="discountAccountCode">The discounts-allowed account (required when discounting).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The bill result.</returns>
-    Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, CancellationToken ct = default);
+    Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default);
 
     /// <summary>
     /// Bills part of an order (a split): only the specified line portions. Posts revenue and recipe cost of
@@ -111,9 +114,11 @@ public interface IRestaurantService
     /// <param name="serviceChargeAccountCode">The service-charge income account (required when charging).</param>
     /// <param name="tipAmount">An optional tip (staff money — a liability) added to this split.</param>
     /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
+    /// <param name="discountAmount">An optional discount allowed (a contra-revenue) deducted from this split.</param>
+    /// <param name="discountAccountCode">The discounts-allowed account (required when discounting).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The bill result.</returns>
-    Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, CancellationToken ct = default);
+    Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default);
 
     /// <summary>
     /// Pays out accumulated tips to staff (brief: tips are staff money, a liability): Dr tips payable, Cr the
