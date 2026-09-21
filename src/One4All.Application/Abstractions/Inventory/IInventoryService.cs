@@ -86,6 +86,19 @@ public interface IInventoryService
     /// <returns>The movement result, or an error.</returns>
     Task<Result<StockMovementResult>> IssueAsync(IssueStockRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// Reverses a prior stock issue: returns the issued quantity to the warehouse at the <b>original</b> unit
+    /// cost applied and posts the exact inverse journal (Dr stock control, Cr cost of sales). Refuses a movement
+    /// that is not an issue or has already been reversed. Used to undo an issue (e.g. a reversed bill).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="movementId">The stock movement (an issue) to reverse.</param>
+    /// <param name="date">The reversal date.</param>
+    /// <param name="reference">An optional reference for the reversal movement.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The reversal movement result, or an error.</returns>
+    Task<Result<StockMovementResult>> ReverseIssueAsync(long companyId, long movementId, DateOnly date, string? reference = null, CancellationToken ct = default);
+
     /// <summary>Produces the stock valuation for a company (optionally a single warehouse).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="warehouseId">Optional warehouse filter.</param>

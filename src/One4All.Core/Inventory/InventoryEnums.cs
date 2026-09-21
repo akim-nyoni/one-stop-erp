@@ -49,4 +49,7 @@ public enum StockMovementType
 
     /// <summary>Adjustment (count/write-off), signed.</summary>
     Adjustment = 4,
+
+    /// <summary>Reversal of a prior movement (puts an issued quantity/value back at its original cost).</summary>
+    Reversal = 5,
 }

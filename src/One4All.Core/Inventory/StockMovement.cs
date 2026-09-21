@@ -65,4 +65,10 @@ public sealed class StockMovement : AuditableEntity, ICompanyScoped
 
     /// <summary>The GL journal that posted the movement.</summary>
     public long? JournalEntryId { get; set; }
+
+    /// <summary>True once this movement has been reversed (prevents a double reversal).</summary>
+    public bool IsReversed { get; private set; }
+
+    /// <summary>Marks the movement reversed.</summary>
+    public void MarkReversed() => IsReversed = true;
 }
