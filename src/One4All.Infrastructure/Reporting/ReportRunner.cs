@@ -122,6 +122,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.OrderTypeSalesCode => SystemReports.OrderTypeSales(),
         SystemReports.DeliveriesCode => SystemReports.Deliveries(),
         SystemReports.ServerSalesCode => SystemReports.ServerSales(),
+        SystemReports.CategorySalesCode => SystemReports.CategorySales(),
         _ => ReceiptingReports.All().FirstOrDefault(r => string.Equals(r.Code, code, StringComparison.OrdinalIgnoreCase)),
     };
 }

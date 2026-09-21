@@ -17,7 +17,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
         "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus", "KitchenTickets",
-        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales",
+        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales", "CategorySales",
     };
 
     private readonly One4AllDbContext _db;
@@ -51,6 +51,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "ORDERTYPESALES" => await OrderTypeSalesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "DELIVERIES" => await DeliveriesAsync(companyId, ct).ConfigureAwait(false),
             "SERVERSALES" => await ServerSalesAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "CATEGORYSALES" => await CategorySalesAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -102,6 +103,39 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Tables"] = g.MemberCount,
             ["Seats"] = g.Seats,
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CategorySalesAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly fromDate = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly toDate = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+
+        var billed = await (
+            from l in _db.Set<Core.Restaurant.TableOrderLine>()
+            join o in _db.Set<Core.Restaurant.TableOrder>() on l.TableOrderId equals o.Id
+            join m in _db.Set<Core.Restaurant.MenuItem>() on l.MenuItemId equals m.Id
+            where o.CompanyId == companyId && o.OpenedOn >= fromDate && o.OpenedOn <= toDate && !l.IsVoided && !l.IsComped && l.BilledQuantity > 0m
+            select new { m.Category, l.BilledQuantity, l.Quantity, l.UnitPrice, l.TaxAmount })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return billed
+            .GroupBy(x => x.Category ?? "(Uncategorised)")
+            .Select(g =>
+            {
+                decimal net = g.Sum(x => decimal.Round(x.BilledQuantity * x.UnitPrice, 4, MidpointRounding.ToEven));
+                decimal tax = g.Sum(x => x.Quantity == 0m ? 0m : decimal.Round(x.TaxAmount * x.BilledQuantity / x.Quantity, 4, MidpointRounding.ToEven));
+                return (Category: g.Key, Qty: g.Sum(x => x.BilledQuantity), Net: net, Tax: tax);
+            })
+            .OrderByDescending(r => r.Net)
+            .Select(r => Row(new()
+            {
+                ["Category"] = r.Category,
+                ["Qty"] = r.Qty,
+                ["Net"] = r.Net,
+                ["Tax"] = r.Tax,
+                ["Gross"] = r.Net + r.Tax,
+            }))
+            .ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ServerSalesAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

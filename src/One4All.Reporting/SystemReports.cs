@@ -354,6 +354,9 @@ public static class SystemReports
     /// <summary>The Server Sales report code.</summary>
     public const string ServerSalesCode = "RES-SERVER";
 
+    /// <summary>The Category Sales report code.</summary>
+    public const string CategorySalesCode = "RES-CAT";
+
     /// <summary>Builds the Kitchen Order Tickets definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition KitchenTickets() => Listing(KitchenTicketsCode, "Kitchen Order Tickets", "Restaurant",
@@ -436,6 +439,13 @@ public static class SystemReports
     public static ReportDefinition ServerSales() => Listing(ServerSalesCode, "Server Sales", "Restaurant",
         "Billed sales by waiter over a period — orders, net, tax and gross (for tip-out and performance).", "ServerSales",
         [new Column("Server", "Server", 140), new Column("Orders", "Orders", 70), new Column("Net", "Net", 100, true), new Column("Tax", "Tax", 90, true), new Column("Gross", "Gross", 100, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Category Sales definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition CategorySales() => Listing(CategorySalesCode, "Category Sales", "Restaurant",
+        "Billed sales by menu category (starters, mains, drinks…) over a period.", "CategorySales",
+        [new Column("Category", "Category", 150), new Column("Qty", "Qty", 70), new Column("Net", "Net", 100, true), new Column("Tax", "Tax", 90, true), new Column("Gross", "Gross", 100, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Table Status definition (Restaurant module).</summary>
