@@ -16,7 +16,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus",
+        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus", "KitchenTickets",
     };
 
     private readonly One4AllDbContext _db;
@@ -38,8 +38,24 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "OPENPURCHASEORDERS" => await OpenPurchaseOrdersAsync(companyId, ct).ConfigureAwait(false),
             "MENU" => await MenuAsync(companyId, ct).ConfigureAwait(false),
             "TABLESTATUS" => await TableStatusAsync(companyId, ct).ConfigureAwait(false),
+            "KITCHENTICKETS" => await KitchenTicketsAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> KitchenTicketsAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Restaurant.KitchenTicket> tickets = await _db.Set<Core.Restaurant.KitchenTicket>().Include(t => t.Lines)
+            .Where(t => t.CompanyId == companyId && t.Status != Core.Restaurant.KitchenTicketStatus.Served)
+            .OrderBy(t => t.SentOn).ThenBy(t => t.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return tickets.Select(t => Row(new()
+        {
+            ["Ticket"] = t.TicketNumber,
+            ["Status"] = t.Status.ToString(),
+            ["Items"] = t.Lines.Count,
+            ["Sent"] = t.SentOn.ToDateTime(TimeOnly.MinValue),
+        })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> MenuAsync(long companyId, CancellationToken ct)
@@ -54,6 +70,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Name"] = m.Name,
             ["Category"] = m.Category ?? string.Empty,
             ["Ingredients"] = m.Recipe.Count,
+            ["Available"] = m.IsAvailable ? "Yes" : "No",
             ["Price"] = m.Price,
         })).ToList();
     }

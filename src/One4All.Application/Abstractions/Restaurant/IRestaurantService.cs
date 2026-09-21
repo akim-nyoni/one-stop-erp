@@ -150,6 +150,17 @@ public interface IRestaurantService
     /// <returns>The created ticket id.</returns>
     Task<Result<long>> FireOrderAsync(long companyId, long orderId, string ticketNumber, DateOnly date, CancellationToken ct = default);
 
+    /// <summary>
+    /// Sets a menu item's availability ("86" it when out of stock, or bring it back). An unavailable item
+    /// cannot be added to an order.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="menuItemId">The menu item.</param>
+    /// <param name="isAvailable">Whether the item is available to order.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> SetMenuAvailabilityAsync(long companyId, long menuItemId, bool isAvailable, CancellationToken ct = default);
+
     /// <summary>Advances a kitchen ticket to the next preparation state (Sent → Preparing → Ready → Served).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="ticketId">The ticket.</param>

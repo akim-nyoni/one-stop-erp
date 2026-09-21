@@ -407,6 +407,20 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
+    public async Task<Result> SetMenuAvailabilityAsync(long companyId, long menuItemId, bool isAvailable, CancellationToken ct = default)
+    {
+        MenuItem? menu = await _db.Set<MenuItem>().FirstOrDefaultAsync(m => m.Id == menuItemId && m.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (menu is null)
+        {
+            return Result.Failure(Error.NotFound("Res.MenuItemNotFound", $"Menu item {menuItemId} not found."));
+        }
+
+        menu.IsAvailable = isAvailable;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result<long>> FireOrderAsync(long companyId, long orderId, string ticketNumber, DateOnly date, CancellationToken ct = default)
     {
         TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);

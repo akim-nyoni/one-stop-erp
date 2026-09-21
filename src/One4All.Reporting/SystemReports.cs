@@ -311,11 +311,21 @@ public static class SystemReports
     /// <summary>The Table Status report code.</summary>
     public const string TableStatusCode = "RES-TBL";
 
+    /// <summary>The Kitchen Order Tickets report code.</summary>
+    public const string KitchenTicketsCode = "RES-KOT";
+
     /// <summary>Builds the Menu definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition Menu() => Listing(MenuCode, "Menu", "Restaurant",
-        "Menu items with category, price and recipe ingredient count.", "Menu",
-        [new Column("Code", "Code", 90), new Column("Name", "Name", 180), new Column("Category", "Category", 100), new Column("Ingredients", "Ingredients", 90), new Column("Price", "Price", 90, true)],
+        "Menu items with category, price, recipe ingredient count and availability.", "Menu",
+        [new Column("Code", "Code", 90), new Column("Name", "Name", 160), new Column("Category", "Category", 90), new Column("Ingredients", "Ingredients", 80), new Column("Available", "Available", 70), new Column("Price", "Price", 90, true)],
+        []);
+
+    /// <summary>Builds the Kitchen Order Tickets definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition KitchenTickets() => Listing(KitchenTicketsCode, "Kitchen Order Tickets", "Restaurant",
+        "Open kitchen tickets (not yet served) with their status and item count.", "KitchenTickets",
+        [new Column("Ticket", "Ticket", 100), new Column("Status", "Status", 110), new Column("Items", "Items", 70), new Column("Sent", "Sent", 100)],
         []);
 
     /// <summary>Builds the Table Status definition (Restaurant module).</summary>
