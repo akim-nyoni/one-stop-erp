@@ -160,10 +160,11 @@ public sealed class Receipt : AuditableEntity, ICompanyScoped
     /// <param name="amount">The amount.</param>
     /// <param name="accountCode">The income/deposit/suspense account (null for a debtor payment).</param>
     /// <param name="narrative">A narrative.</param>
+    /// <param name="service">The service the money is for (water, rates, refuse…), for collection-by-service reporting.</param>
     /// <returns>The created line.</returns>
-    public ReceiptLine AddLine(ReceiptLineType type, decimal amount, string? accountCode, string? narrative)
+    public ReceiptLine AddLine(ReceiptLineType type, decimal amount, string? accountCode, string? narrative, string? service = null)
     {
-        ReceiptLine line = new(type, amount, accountCode, narrative);
+        ReceiptLine line = new(type, amount, accountCode, narrative, service);
         _lines.Add(line);
         return line;
     }
@@ -211,12 +212,14 @@ public sealed class ReceiptLine : Entity
     /// <param name="amount">The amount.</param>
     /// <param name="accountCode">The income/deposit/suspense account (null for a debtor payment).</param>
     /// <param name="narrative">A narrative.</param>
-    public ReceiptLine(ReceiptLineType type, decimal amount, string? accountCode, string? narrative)
+    /// <param name="service">The service the money is for (water, rates, refuse…).</param>
+    public ReceiptLine(ReceiptLineType type, decimal amount, string? accountCode, string? narrative, string? service = null)
     {
         Type = type;
         Amount = amount;
         AccountCode = accountCode;
         Narrative = narrative;
+        Service = service;
     }
 
     /// <summary>The owning receipt id.</summary>
@@ -233,6 +236,9 @@ public sealed class ReceiptLine : Entity
 
     /// <summary>A narrative.</summary>
     public string? Narrative { get; private set; }
+
+    /// <summary>The service the money is for (water, rates, refuse…), for collection-by-service reporting.</summary>
+    public string? Service { get; private set; }
 }
 
 /// <summary>One tender of a receipt — how it was paid (<c>rcp.receipt_tender</c>).</summary>

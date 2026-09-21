@@ -73,7 +73,8 @@ public readonly record struct AllocationPreview(IReadOnlyList<AllocationPreviewL
 /// <param name="Amount">The amount.</param>
 /// <param name="AccountCode">The income/deposit/suspense account (null for a debtor payment).</param>
 /// <param name="Narrative">A narrative.</param>
-public readonly record struct ReceiptLineRequest(ReceiptLineType Type, decimal Amount, string? AccountCode = null, string? Narrative = null);
+/// <param name="Service">The service the money is for (water, rates, refuse…), for collection-by-service reporting.</param>
+public readonly record struct ReceiptLineRequest(ReceiptLineType Type, decimal Amount, string? AccountCode = null, string? Narrative = null, string? Service = null);
 
 /// <summary>A tender on a receipt request.</summary>
 /// <param name="Type">The tender type.</param>

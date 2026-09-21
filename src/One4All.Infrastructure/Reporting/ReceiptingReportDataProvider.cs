@@ -30,6 +30,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC3" => await DailyCollectionSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC4" => await ReceiptDayBookAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC5" => await CollectionByVoteAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC6" => await CollectionByServiceAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC7" => await CollectionByTenderAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC8" => await CollectionByCurrencyAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC10" => await HourlyVolumeAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -91,6 +92,18 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .GroupBy(l => l.AccountCode!)
             .OrderBy(g => g.Key)
             .Select(g => Row(new() { ["AccountCode"] = g.Key, ["AccountName"] = names.GetValueOrDefault(g.Key, string.Empty), ["Amount"] = g.Sum(l => l.Amount) }))
+            .ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CollectionByServiceAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        (DateOnly from, DateOnly to) = Range(parameters);
+        List<Receipt> receipts = await CommittedReceiptsAsync(companyId, from, to, ct).ConfigureAwait(false);
+        return receipts.SelectMany(r => r.Lines)
+            .Where(l => !string.IsNullOrWhiteSpace(l.Service))
+            .GroupBy(l => l.Service!)
+            .OrderBy(g => g.Key)
+            .Select(g => Row(new() { ["Service"] = g.Key, ["Amount"] = g.Sum(l => l.Amount) }))
             .ToList();
     }
 

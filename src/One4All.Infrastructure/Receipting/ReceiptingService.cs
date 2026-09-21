@@ -122,7 +122,7 @@ public sealed class ReceiptingService : IReceiptingService
         Receipt receipt = new(request.CompanyId, session.Id, session.StationId, session.CashierUserId, receiptNumber, request.Date, request.PayerKind, request.PayerAccountId, currency);
         foreach (ReceiptLineRequest line in request.Lines)
         {
-            receipt.AddLine(line.Type, line.Amount, line.AccountCode, line.Narrative);
+            receipt.AddLine(line.Type, line.Amount, line.AccountCode, line.Narrative, line.Service);
         }
 
         foreach (ReceiptTenderRequest tender in request.Tenders)

@@ -75,6 +75,7 @@ internal sealed class ReceiptLineConfiguration : IEntityTypeConfiguration<Receip
         b.Property(x => x.Type).HasConversion<int>();
         b.Property(x => x.AccountCode).HasMaxLength(8);
         b.Property(x => x.Narrative).HasMaxLength(300);
+        b.Property(x => x.Service).HasMaxLength(60);
     }
 }
 

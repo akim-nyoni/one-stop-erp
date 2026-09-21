@@ -4741,6 +4741,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<string>("Service")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("service");
+
                     b.Property<int>("Type")
                         .HasColumnType("integer")
                         .HasColumnName("type");
