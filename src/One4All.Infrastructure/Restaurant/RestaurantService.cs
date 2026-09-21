@@ -19,16 +19,19 @@ public sealed class RestaurantService : IRestaurantService
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _posting;
     private readonly IInventoryService _inventory;
+    private readonly Application.Abstractions.Trading.ISalesLedgerService _sales;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="posting">The central posting engine.</param>
     /// <param name="inventory">The inventory service (recipe explosion → stock issues).</param>
-    public RestaurantService(One4AllDbContext db, IPostingEngine posting, IInventoryService inventory)
+    /// <param name="sales">The sales ledger (house-account / charge-to-room billing).</param>
+    public RestaurantService(One4AllDbContext db, IPostingEngine posting, IInventoryService inventory, Application.Abstractions.Trading.ISalesLedgerService sales)
     {
         _db = db;
         _posting = posting;
         _inventory = inventory;
+        _sales = sales;
     }
 
     /// <inheritdoc />
@@ -338,6 +341,81 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
+    public async Task<Result<BillResult>> BillToHouseAccountAsync(long companyId, long orderId, long customerId, long warehouseId, DateOnly date, string salesAccountCode, string? taxAccountCode = null, CancellationToken ct = default)
+    {
+        Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
+        if (loaded.IsFailure)
+        {
+            return loaded.Error;
+        }
+
+        TableOrder order = loaded.Value;
+        List<(TableOrderLine Line, decimal Quantity)> portions = order.Lines
+            .Where(l => !l.IsVoided && l.RemainingQuantity > 0m)
+            .Select(l => (l, l.RemainingQuantity))
+            .ToList();
+        if (portions.Count == 0)
+        {
+            return Error.Rule("Res.NothingToBill", "The order has nothing left to bill.");
+        }
+
+        Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        if (company is null)
+        {
+            return Error.NotFound("Res.CompanyNotFound", $"Company {companyId} not found.");
+        }
+
+        // Net and tax for the charge, excluding comped lines (they cost but do not invoice).
+        decimal net = 0m;
+        decimal tax = 0m;
+        foreach ((TableOrderLine line, decimal quantity) in portions)
+        {
+            if (line.IsComped)
+            {
+                continue;
+            }
+
+            net += decimal.Round(quantity * line.EffectiveUnitPrice, 4, MidpointRounding.ToEven);
+            tax += line.Quantity == 0m ? 0m : decimal.Round(line.TaxAmount * quantity / line.Quantity, 4, MidpointRounding.ToEven);
+        }
+
+        string invoiceJournal = string.Empty;
+        if (net + tax > 0m)
+        {
+            Result<Application.Abstractions.Trading.TradingPostingResult> invoice = await _sales.PostInvoiceAsync(new Application.Abstractions.Trading.SalesInvoiceRequest
+            {
+                CompanyId = companyId,
+                CustomerId = customerId,
+                DocumentNumber = order.OrderNumber,
+                DocumentDate = date,
+                Currency = company.BaseCurrency,
+                NetAmount = net,
+                TaxAmount = tax,
+                SalesAccountCode = salesAccountCode,
+                TaxAccountCode = taxAccountCode,
+                Narrative = $"Restaurant house account {order.OrderNumber}",
+            }, ct).ConfigureAwait(false);
+
+            if (invoice.IsFailure)
+            {
+                return invoice.Error;
+            }
+
+            invoiceJournal = invoice.Value.JournalNumber;
+        }
+
+        Result<decimal> cost = await IssueCostOfSalesAsync(companyId, order, warehouseId, date, portions, ct).ConfigureAwait(false);
+        if (cost.IsFailure)
+        {
+            return cost.Error;
+        }
+
+        bool fullyBilled = await CloseIfFullyBilledAsync(companyId, order, invoiceJournal, ct).ConfigureAwait(false);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new BillResult(net, tax, 0m, 0m, 0m, net + tax, cost.Value, fullyBilled, invoiceJournal);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<string>> PayTipsAsync(long companyId, decimal amount, DateOnly date, string tipsPayableAccountCode, string fundingAccountCode, CancellationToken ct = default)
     {
         if (amount <= 0m)
@@ -497,7 +575,21 @@ public sealed class RestaurantService : IRestaurantService
             revenueJournal = revenue.Value.JournalNumber;
         }
 
-        // Cost of sales: explode each billed portion's recipe into stock issues (moving average).
+        // Cost of sales: explode each billed portion's recipe (and modifiers) into stock issues.
+        Result<decimal> cost = await IssueCostOfSalesAsync(companyId, order, warehouseId, date, portions, ct).ConfigureAwait(false);
+        if (cost.IsFailure)
+        {
+            return cost.Error;
+        }
+
+        bool fullyBilled = await CloseIfFullyBilledAsync(companyId, order, revenueJournal, ct).ConfigureAwait(false);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new BillResult(net, tax, serviceChargeAmount, tipAmount, discountAmount, gross, cost.Value, fullyBilled, revenueJournal);
+    }
+
+    /// <summary>Explodes each billed portion's recipe and modifier ingredients into stock issues, billing the lines.</summary>
+    private async Task<Result<decimal>> IssueCostOfSalesAsync(long companyId, TableOrder order, long warehouseId, DateOnly date, List<(TableOrderLine Line, decimal Quantity)> portions, CancellationToken ct)
+    {
         List<long> menuIds = portions.Select(p => p.Line.MenuItemId).Distinct().ToList();
         List<MenuItem> menus = await _db.Set<MenuItem>().Include(m => m.Recipe)
             .Where(m => m.CompanyId == companyId && menuIds.Contains(m.Id))
@@ -511,16 +603,7 @@ public sealed class RestaurantService : IRestaurantService
             {
                 foreach (RecipeLine ingredient in recipe)
                 {
-                    Result<StockMovementResult> issue = await _inventory.IssueAsync(new IssueStockRequest
-                    {
-                        CompanyId = companyId,
-                        ItemId = ingredient.IngredientItemId,
-                        WarehouseId = warehouseId,
-                        Date = date,
-                        Quantity = ingredient.Quantity * quantity,
-                        Reference = order.OrderNumber,
-                    }, ct).ConfigureAwait(false);
-
+                    Result<StockMovementResult> issue = await IssueAsync(companyId, ingredient.IngredientItemId, warehouseId, date, ingredient.Quantity * quantity, order.OrderNumber, ct).ConfigureAwait(false);
                     if (issue.IsFailure)
                     {
                         return issue.Error;
@@ -538,16 +621,7 @@ public sealed class RestaurantService : IRestaurantService
                     continue;
                 }
 
-                Result<StockMovementResult> issue = await _inventory.IssueAsync(new IssueStockRequest
-                {
-                    CompanyId = companyId,
-                    ItemId = modifierItemId,
-                    WarehouseId = warehouseId,
-                    Date = date,
-                    Quantity = modifier.IngredientQuantity * quantity,
-                    Reference = order.OrderNumber,
-                }, ct).ConfigureAwait(false);
-
+                Result<StockMovementResult> issue = await IssueAsync(companyId, modifierItemId, warehouseId, date, modifier.IngredientQuantity * quantity, order.OrderNumber, ct).ConfigureAwait(false);
                 if (issue.IsFailure)
                 {
                     return issue.Error;
@@ -559,19 +633,36 @@ public sealed class RestaurantService : IRestaurantService
             line.Bill(quantity);
         }
 
-        bool fullyBilled = order.IsFullyBilled;
-        if (fullyBilled)
+        return costOfSales;
+    }
+
+    private async Task<Result<StockMovementResult>> IssueAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal quantity, string reference, CancellationToken ct)
+        => await _inventory.IssueAsync(new IssueStockRequest
         {
-            order.MarkBilled(revenueJournal);
-            if (order.TableId is { } tableId)
-            {
-                RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == tableId, ct).ConfigureAwait(false);
-                await FreeTableAndGroupAsync(companyId, table, ct).ConfigureAwait(false);
-            }
+            CompanyId = companyId,
+            ItemId = itemId,
+            WarehouseId = warehouseId,
+            Date = date,
+            Quantity = quantity,
+            Reference = reference,
+        }, ct).ConfigureAwait(false);
+
+    /// <summary>Marks the order billed and frees its table (if any) when everything billable has been billed.</summary>
+    private async Task<bool> CloseIfFullyBilledAsync(long companyId, TableOrder order, string revenueJournal, CancellationToken ct)
+    {
+        if (!order.IsFullyBilled)
+        {
+            return false;
         }
 
-        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new BillResult(net, tax, serviceChargeAmount, tipAmount, discountAmount, gross, costOfSales, fullyBilled, revenueJournal);
+        order.MarkBilled(revenueJournal);
+        if (order.TableId is { } tableId)
+        {
+            RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == tableId, ct).ConfigureAwait(false);
+            await FreeTableAndGroupAsync(companyId, table, ct).ConfigureAwait(false);
+        }
+
+        return true;
     }
 
     /// <inheritdoc />

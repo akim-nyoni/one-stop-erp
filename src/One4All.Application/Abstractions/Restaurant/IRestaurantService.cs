@@ -225,6 +225,23 @@ public interface IRestaurantService
     Task<Result> AssignLineToSeatAsync(long companyId, long orderId, long lineId, int? seatNumber, CancellationToken ct = default);
 
     /// <summary>
+    /// Charges an open order to a customer's account (house account / charge-to-room) instead of taking a
+    /// tender: raises a sales invoice on the debtor through the trading ledger (Dr AR control / Cr revenue /
+    /// Cr tax, ageing on the customer), recognises recipe cost of sales, and closes the order / frees the table.
+    /// Comped lines cost but do not invoice; a fully-comped order raises no invoice.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The order.</param>
+    /// <param name="customerId">The customer whose account is charged.</param>
+    /// <param name="warehouseId">The warehouse the ingredients are issued from.</param>
+    /// <param name="date">The billing date.</param>
+    /// <param name="salesAccountCode">The revenue account credited on the invoice.</param>
+    /// <param name="taxAccountCode">The output-tax account, when there is tax.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The bill result (RevenueJournalNumber is the invoice journal; Gross = net + tax).</returns>
+    Task<Result<BillResult>> BillToHouseAccountAsync(long companyId, long orderId, long customerId, long warehouseId, DateOnly date, string salesAccountCode, string? taxAccountCode = null, CancellationToken ct = default);
+
+    /// <summary>
     /// Bills one seat's share of an order (split by seat): every not-yet-billed, non-voided line assigned to
     /// that seat. Posts revenue and recipe cost of sales for those lines; when the last seat is billed the
     /// order closes and the table frees. Optional service charge / tip / discount apply to this seat's bill.
