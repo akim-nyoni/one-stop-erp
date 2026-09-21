@@ -239,4 +239,62 @@ public interface IRestaurantService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
     Task<Result> MarkReservationNoShowAsync(long companyId, long reservationId, CancellationToken ct = default);
+
+    /// <summary>Adds a walk-in party to the waitlist (queued for a table). Operational only (no GL).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="guestName">The guest's name.</param>
+    /// <param name="partySize">The number of covers.</param>
+    /// <param name="quotedMinutes">The quoted wait, in minutes.</param>
+    /// <param name="addedOn">When the party joined the queue.</param>
+    /// <param name="guestPhone">The guest's contact number, if any.</param>
+    /// <param name="notes">Any notes (seating preference), if any.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created waitlist entry id.</returns>
+    Task<Result<long>> AddToWaitlistAsync(long companyId, string guestName, int partySize, int quotedMinutes, DateTime addedOn, string? guestPhone = null, string? notes = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Seats a waiting party: opens a table order on the given (free) table and marks the entry seated,
+    /// linking the table and order.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="waitlistId">The waitlist entry.</param>
+    /// <param name="tableId">The table to seat the party at (must be free).</param>
+    /// <param name="orderNumber">The order number for the opened order.</param>
+    /// <param name="waiterUserId">The waiter.</param>
+    /// <param name="date">The open date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The opened order id.</returns>
+    Task<Result<long>> SeatFromWaitlistAsync(long companyId, long waitlistId, long tableId, string orderNumber, long waiterUserId, DateOnly date, CancellationToken ct = default);
+
+    /// <summary>Removes a waiting party from the queue (they left before being seated).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="waitlistId">The waitlist entry.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> RemoveFromWaitlistAsync(long companyId, long waitlistId, CancellationToken ct = default);
+
+    /// <summary>Marks a waiting party a no-show (called but did not return).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="waitlistId">The waitlist entry.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> MarkWaitlistNoShowAsync(long companyId, long waitlistId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Combines two or more free, ungrouped tables into one unit for a large party. The lowest-numbered table
+    /// becomes the primary the order is opened against; the whole group is occupied and freed together.
+    /// Operational only (no GL).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="tableIds">The tables to combine (at least two, all free and ungrouped).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created table group id.</returns>
+    Task<Result<long>> CombineTablesAsync(long companyId, IReadOnlyList<long> tableIds, CancellationToken ct = default);
+
+    /// <summary>Releases a table group, separating the tables again. Requires the group to be free (not seated).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="groupId">The table group.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> UncombineTablesAsync(long companyId, long groupId, CancellationToken ct = default);
 }

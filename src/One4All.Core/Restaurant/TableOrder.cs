@@ -42,11 +42,21 @@ public sealed class RestaurantTable : SoftDeletableEntity, ICompanyScoped
     /// <summary>The status.</summary>
     public TableStatus Status { get; private set; }
 
+    /// <summary>The active table group this table is combined into, if any.</summary>
+    public long? GroupId { get; private set; }
+
     /// <summary>Marks the table occupied.</summary>
     public void Occupy() => Status = TableStatus.Occupied;
 
     /// <summary>Frees the table.</summary>
     public void Free() => Status = TableStatus.Free;
+
+    /// <summary>Combines the table into a group (physically pushed together with others).</summary>
+    /// <param name="groupId">The table group.</param>
+    public void JoinGroup(long groupId) => GroupId = groupId;
+
+    /// <summary>Removes the table from its group.</summary>
+    public void LeaveGroup() => GroupId = null;
 }
 
 /// <summary>The lifecycle of a table order (Restaurant module).</summary>

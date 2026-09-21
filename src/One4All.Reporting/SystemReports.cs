@@ -330,6 +330,12 @@ public static class SystemReports
     /// <summary>The Table Reservations report code.</summary>
     public const string ReservationsCode = "RES-RESV";
 
+    /// <summary>The Waitlist report code.</summary>
+    public const string WaitlistCode = "RES-WAIT";
+
+    /// <summary>The Combined Tables report code.</summary>
+    public const string TableGroupsCode = "RES-COMB";
+
     /// <summary>Builds the Kitchen Order Tickets definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition KitchenTickets() => Listing(KitchenTicketsCode, "Kitchen Order Tickets", "Restaurant",
@@ -356,6 +362,20 @@ public static class SystemReports
     public static ReportDefinition Reservations() => Listing(ReservationsCode, "Table Reservations", "Restaurant",
         "Upcoming table bookings — when, table, guest, party size and contact.", "Reservations",
         [new Column("When", "When", 130), new Column("Table", "Table", 70), new Column("Guest", "Guest", 130), new Column("Party", "Party", 60), new Column("Phone", "Phone", 100)],
+        []);
+
+    /// <summary>Builds the Waitlist definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition Waitlist() => Listing(WaitlistCode, "Waitlist", "Restaurant",
+        "Walk-in parties currently queued for a table, in the order they joined.", "Waitlist",
+        [new Column("Added", "Added", 130), new Column("Guest", "Guest", 130), new Column("Party", "Party", 60), new Column("Quoted", "Quoted (min)", 90), new Column("Phone", "Phone", 100)],
+        []);
+
+    /// <summary>Builds the Combined Tables definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition TableGroups() => Listing(TableGroupsCode, "Combined Tables", "Restaurant",
+        "Active table groups — the combined tables, their primary and total seats.", "TableGroups",
+        [new Column("Group", "Group", 130), new Column("Primary", "Primary", 80), new Column("Tables", "Tables", 70), new Column("Seats", "Seats", 70)],
         []);
 
     /// <summary>Builds the Table Status definition (Restaurant module).</summary>

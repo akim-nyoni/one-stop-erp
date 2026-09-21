@@ -114,6 +114,8 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.TipAllocationsCode => SystemReports.TipAllocations(),
         SystemReports.MenuEngineeringCode => SystemReports.MenuEngineering(),
         SystemReports.ReservationsCode => SystemReports.Reservations(),
+        SystemReports.WaitlistCode => SystemReports.Waitlist(),
+        SystemReports.TableGroupsCode => SystemReports.TableGroups(),
         _ => ReceiptingReports.All().FirstOrDefault(r => string.Equals(r.Code, code, StringComparison.OrdinalIgnoreCase)),
     };
 }

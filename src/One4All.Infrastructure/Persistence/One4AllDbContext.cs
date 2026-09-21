@@ -257,6 +257,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Table reservations.</summary>
     public DbSet<Core.Restaurant.TableReservation> TableReservations => Set<Core.Restaurant.TableReservation>();
 
+    /// <summary>Walk-in waitlist entries.</summary>
+    public DbSet<Core.Restaurant.WaitlistEntry> WaitlistEntries => Set<Core.Restaurant.WaitlistEntry>();
+
+    /// <summary>Combined table groups.</summary>
+    public DbSet<Core.Restaurant.TableGroup> TableGroups => Set<Core.Restaurant.TableGroup>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 

@@ -63,6 +63,16 @@ public sealed class RestaurantService : IRestaurantService
             return Error.NotFound("Res.TableNotFound", $"Table {tableId} not found.");
         }
 
+        // A combined table is seated through its primary; a non-primary member cannot take its own order.
+        if (table.GroupId is { } groupId)
+        {
+            TableGroup? group = await _db.Set<TableGroup>().FirstOrDefaultAsync(g => g.Id == groupId && g.Status == TableGroupStatus.Active, ct).ConfigureAwait(false);
+            if (group is not null && group.PrimaryTableId != table.Id)
+            {
+                return Error.Rule("Res.TableInGroup", $"Table {table.TableNumber} is combined into a group; open the order on the primary table.");
+            }
+        }
+
         if (table.Status != TableStatus.Free)
         {
             return Error.Rule("Res.TableOccupied", $"Table {table.TableNumber} already has an open order.");
@@ -70,7 +80,7 @@ public sealed class RestaurantService : IRestaurantService
 
         TableOrder order = new(companyId, tableId, orderNumber, waiterUserId, date);
         _db.Set<TableOrder>().Add(order);
-        table.Occupy();
+        await OccupyTableAndGroupAsync(companyId, table, ct).ConfigureAwait(false);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return order.Id;
     }
@@ -335,7 +345,7 @@ public sealed class RestaurantService : IRestaurantService
         {
             order.MarkBilled(revenue.Value.JournalNumber);
             RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == order.TableId, ct).ConfigureAwait(false);
-            table?.Free();
+            await FreeTableAndGroupAsync(companyId, table, ct).ConfigureAwait(false);
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -363,7 +373,7 @@ public sealed class RestaurantService : IRestaurantService
 
         order.Cancel();
         RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == order.TableId, ct).ConfigureAwait(false);
-        table?.Free();
+        await FreeTableAndGroupAsync(companyId, table, ct).ConfigureAwait(false);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
@@ -399,8 +409,8 @@ public sealed class RestaurantService : IRestaurantService
         }
 
         RestaurantTable? oldTable = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == order.TableId, ct).ConfigureAwait(false);
-        oldTable?.Free();
-        destination.Occupy();
+        await FreeTableAndGroupAsync(companyId, oldTable, ct).ConfigureAwait(false);
+        await OccupyTableAndGroupAsync(companyId, destination, ct).ConfigureAwait(false);
         order.MoveToTable(newTableId);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
@@ -651,5 +661,204 @@ public sealed class RestaurantService : IRestaurantService
         reservation.MarkNoShow();
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> AddToWaitlistAsync(long companyId, string guestName, int partySize, int quotedMinutes, DateTime addedOn, string? guestPhone = null, string? notes = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(guestName))
+        {
+            return Error.Validation("Res.WaitlistNoGuest", "A waitlist entry needs a guest name.");
+        }
+
+        if (partySize <= 0)
+        {
+            return Error.Rule("Res.WaitlistInvalidParty", "The party size must be positive.");
+        }
+
+        if (quotedMinutes < 0)
+        {
+            return Error.Rule("Res.WaitlistInvalidQuote", "The quoted wait cannot be negative.");
+        }
+
+        WaitlistEntry entry = new(companyId, guestName, partySize, quotedMinutes, addedOn, guestPhone, notes);
+        _db.Set<WaitlistEntry>().Add(entry);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return entry.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> SeatFromWaitlistAsync(long companyId, long waitlistId, long tableId, string orderNumber, long waiterUserId, DateOnly date, CancellationToken ct = default)
+    {
+        WaitlistEntry? entry = await _db.Set<WaitlistEntry>().FirstOrDefaultAsync(w => w.Id == waitlistId && w.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (entry is null)
+        {
+            return Error.NotFound("Res.WaitlistNotFound", $"Waitlist entry {waitlistId} not found.");
+        }
+
+        if (entry.Status != WaitlistStatus.Waiting)
+        {
+            return Error.Rule("Res.WaitlistNotWaiting", $"Only a waiting party can be seated (it is {entry.Status}).");
+        }
+
+        Result<long> opened = await OpenOrderAsync(companyId, tableId, orderNumber, waiterUserId, date, ct).ConfigureAwait(false);
+        if (opened.IsFailure)
+        {
+            return opened.Error;
+        }
+
+        entry.Seat(tableId, opened.Value);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return opened.Value;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> RemoveFromWaitlistAsync(long companyId, long waitlistId, CancellationToken ct = default)
+    {
+        WaitlistEntry? entry = await _db.Set<WaitlistEntry>().FirstOrDefaultAsync(w => w.Id == waitlistId && w.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (entry is null)
+        {
+            return Result.Failure(Error.NotFound("Res.WaitlistNotFound", $"Waitlist entry {waitlistId} not found."));
+        }
+
+        if (entry.Status != WaitlistStatus.Waiting)
+        {
+            return Result.Failure(Error.Rule("Res.WaitlistNotWaiting", $"Only a waiting party can leave the queue (it is {entry.Status})."));
+        }
+
+        entry.Leave();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> MarkWaitlistNoShowAsync(long companyId, long waitlistId, CancellationToken ct = default)
+    {
+        WaitlistEntry? entry = await _db.Set<WaitlistEntry>().FirstOrDefaultAsync(w => w.Id == waitlistId && w.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (entry is null)
+        {
+            return Result.Failure(Error.NotFound("Res.WaitlistNotFound", $"Waitlist entry {waitlistId} not found."));
+        }
+
+        if (entry.Status != WaitlistStatus.Waiting)
+        {
+            return Result.Failure(Error.Rule("Res.WaitlistNotWaiting", $"Only a waiting party can be marked a no-show (it is {entry.Status})."));
+        }
+
+        entry.MarkNoShow();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> CombineTablesAsync(long companyId, IReadOnlyList<long> tableIds, CancellationToken ct = default)
+    {
+        List<long> distinct = tableIds.Distinct().ToList();
+        if (distinct.Count < 2)
+        {
+            return Error.Rule("Res.CombineTooFew", "Combining tables needs at least two distinct tables.");
+        }
+
+        List<RestaurantTable> tables = await _db.Set<RestaurantTable>()
+            .Where(t => t.CompanyId == companyId && distinct.Contains(t.Id))
+            .ToListAsync(ct).ConfigureAwait(false);
+        if (tables.Count != distinct.Count)
+        {
+            return Error.NotFound("Res.TableNotFound", "One or more tables were not found.");
+        }
+
+        if (tables.Any(t => t.Status != TableStatus.Free))
+        {
+            return Error.Rule("Res.CombineOccupied", "All tables to combine must be free.");
+        }
+
+        if (tables.Any(t => t.GroupId is not null))
+        {
+            return Error.Rule("Res.CombineAlreadyGrouped", "One or more tables are already combined into a group.");
+        }
+
+        List<RestaurantTable> ordered = tables.OrderBy(t => t.TableNumber, StringComparer.Ordinal).ToList();
+        RestaurantTable primary = ordered[0];
+        string label = string.Join("+", ordered.Select(t => t.TableNumber));
+        TableGroup group = new(companyId, label, primary.Id, ordered.Sum(t => t.Seats), ordered.Count);
+        _db.Set<TableGroup>().Add(group);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        foreach (RestaurantTable table in ordered)
+        {
+            table.JoinGroup(group.Id);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return group.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> UncombineTablesAsync(long companyId, long groupId, CancellationToken ct = default)
+    {
+        TableGroup? group = await _db.Set<TableGroup>().FirstOrDefaultAsync(g => g.Id == groupId && g.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (group is null)
+        {
+            return Result.Failure(Error.NotFound("Res.GroupNotFound", $"Table group {groupId} not found."));
+        }
+
+        if (group.Status != TableGroupStatus.Active)
+        {
+            return Result.Failure(Error.Rule("Res.GroupNotActive", "Only an active group can be released."));
+        }
+
+        List<RestaurantTable> members = await _db.Set<RestaurantTable>()
+            .Where(t => t.CompanyId == companyId && t.GroupId == groupId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        if (members.Any(t => t.Status != TableStatus.Free))
+        {
+            return Result.Failure(Error.Rule("Res.GroupSeated", "The group is seated; bill or cancel the order before releasing it."));
+        }
+
+        foreach (RestaurantTable table in members)
+        {
+            table.LeaveGroup();
+        }
+
+        group.Release();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <summary>Occupies a table and, when it is combined, every table in its group.</summary>
+    private async Task OccupyTableAndGroupAsync(long companyId, RestaurantTable table, CancellationToken ct)
+    {
+        table.Occupy();
+        if (table.GroupId is { } groupId)
+        {
+            List<RestaurantTable> members = await _db.Set<RestaurantTable>()
+                .Where(t => t.CompanyId == companyId && t.GroupId == groupId && t.Id != table.Id)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (RestaurantTable member in members)
+            {
+                member.Occupy();
+            }
+        }
+    }
+
+    /// <summary>Frees a table and, when it is combined, every table in its group.</summary>
+    private async Task FreeTableAndGroupAsync(long companyId, RestaurantTable? table, CancellationToken ct)
+    {
+        if (table is null)
+        {
+            return;
+        }
+
+        table.Free();
+        if (table.GroupId is { } groupId)
+        {
+            List<RestaurantTable> members = await _db.Set<RestaurantTable>()
+                .Where(t => t.CompanyId == companyId && t.GroupId == groupId && t.Id != table.Id)
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (RestaurantTable member in members)
+            {
+                member.Free();
+            }
+        }
     }
 }

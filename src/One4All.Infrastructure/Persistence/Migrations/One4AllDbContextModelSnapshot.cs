@@ -5713,6 +5713,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
 
+                    b.Property<long?>("GroupId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("group_id");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
@@ -5748,12 +5752,81 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_table");
 
+                    b.HasIndex("GroupId")
+                        .HasDatabaseName("ix_table_group_id");
+
                     b.HasIndex("CompanyId", "TableNumber")
                         .IsUnique()
                         .HasDatabaseName("ix_table_company_id_table_number")
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("table", "res");
+                });
+
+            modelBuilder.Entity("One4All.Core.Restaurant.TableGroup", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("label");
+
+                    b.Property<int>("MemberCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("member_count");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("PrimaryTableId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("primary_table_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Seats")
+                        .HasColumnType("integer")
+                        .HasColumnName("seats");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_table_group");
+
+                    b.HasIndex("CompanyId", "Status")
+                        .HasDatabaseName("ix_table_group_company_id_status");
+
+                    b.ToTable("table_group", "res");
                 });
 
             modelBuilder.Entity("One4All.Core.Restaurant.TableOrder", b =>
@@ -6059,6 +6132,90 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_tip_allocation_company_id_status");
 
                     b.ToTable("tip_allocation", "res");
+                });
+
+            modelBuilder.Entity("One4All.Core.Restaurant.WaitlistEntry", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("AddedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("added_on");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("GuestName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("guest_name");
+
+                    b.Property<string>("GuestPhone")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("guest_phone");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("notes");
+
+                    b.Property<int>("PartySize")
+                        .HasColumnType("integer")
+                        .HasColumnName("party_size");
+
+                    b.Property<int>("QuotedMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("quoted_minutes");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long?>("SeatedOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("seated_order_id");
+
+                    b.Property<long?>("SeatedTableId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("seated_table_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_waitlist");
+
+                    b.HasIndex("CompanyId", "Status", "AddedOn")
+                        .HasDatabaseName("ix_waitlist_company_id_status_added_on");
+
+                    b.ToTable("waitlist", "res");
                 });
 
             modelBuilder.Entity("One4All.Core.SalesOrders.SalesOrder", b =>

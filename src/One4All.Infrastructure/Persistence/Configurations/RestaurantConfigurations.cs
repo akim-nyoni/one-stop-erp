@@ -44,7 +44,34 @@ internal sealed class RestaurantTableConfiguration : IEntityTypeConfiguration<Re
         b.Property(x => x.TableNumber).HasMaxLength(20);
         b.Property(x => x.Status).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.TableNumber }).IsUnique().HasFilter("is_deleted = false");
+        b.HasIndex(x => x.GroupId);
         b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+internal sealed class TableGroupConfiguration : IEntityTypeConfiguration<TableGroup>
+{
+    public void Configure(EntityTypeBuilder<TableGroup> b)
+    {
+        b.ToTable("table_group", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Label).HasMaxLength(120);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}
+
+internal sealed class WaitlistEntryConfiguration : IEntityTypeConfiguration<WaitlistEntry>
+{
+    public void Configure(EntityTypeBuilder<WaitlistEntry> b)
+    {
+        b.ToTable("waitlist", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.GuestName).HasMaxLength(120);
+        b.Property(x => x.GuestPhone).HasMaxLength(40);
+        b.Property(x => x.Notes).HasMaxLength(400);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.Status, x.AddedOn });
     }
 }
 

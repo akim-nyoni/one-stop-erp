@@ -17,7 +17,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
         "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus", "KitchenTickets",
-        "TipAllocations", "MenuEngineering", "Reservations",
+        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups",
     };
 
     private readonly One4AllDbContext _db;
@@ -43,6 +43,8 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "TIPALLOCATIONS" => await TipAllocationsAsync(companyId, ct).ConfigureAwait(false),
             "MENUENGINEERING" => await MenuEngineeringAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RESERVATIONS" => await ReservationsAsync(companyId, ct).ConfigureAwait(false),
+            "WAITLIST" => await WaitlistAsync(companyId, ct).ConfigureAwait(false),
+            "TABLEGROUPS" => await TableGroupsAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -59,6 +61,40 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Status"] = t.Status.ToString(),
             ["Items"] = t.Lines.Count,
             ["Sent"] = t.SentOn.ToDateTime(TimeOnly.MinValue),
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> WaitlistAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Restaurant.WaitlistEntry> waiting = await _db.Set<Core.Restaurant.WaitlistEntry>()
+            .Where(w => w.CompanyId == companyId && w.Status == Core.Restaurant.WaitlistStatus.Waiting)
+            .OrderBy(w => w.AddedOn)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return waiting.Select(w => Row(new()
+        {
+            ["Added"] = w.AddedOn,
+            ["Guest"] = w.GuestName,
+            ["Party"] = w.PartySize,
+            ["Quoted"] = w.QuotedMinutes,
+            ["Phone"] = w.GuestPhone ?? string.Empty,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TableGroupsAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Restaurant.TableGroup> groups = await _db.Set<Core.Restaurant.TableGroup>()
+            .Where(g => g.CompanyId == companyId && g.Status == Core.Restaurant.TableGroupStatus.Active)
+            .OrderBy(g => g.Label)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> tables = await _db.Set<Core.Restaurant.RestaurantTable>()
+            .Where(t => t.CompanyId == companyId)
+            .ToDictionaryAsync(t => t.Id, t => t.TableNumber, ct).ConfigureAwait(false);
+        return groups.Select(g => Row(new()
+        {
+            ["Group"] = g.Label,
+            ["Primary"] = tables.GetValueOrDefault(g.PrimaryTableId, $"#{g.PrimaryTableId}"),
+            ["Tables"] = g.MemberCount,
+            ["Seats"] = g.Seats,
         })).ToList();
     }
 
