@@ -151,6 +151,31 @@ public interface IRestaurantService
     /// <returns>The GL journal number.</returns>
     Task<Result<string>> PayTipAllocationAsync(long companyId, long allocationId, DateOnly date, string fundingAccountCode, CancellationToken ct = default);
 
+    /// <summary>
+    /// Voids an order line before it is billed (wrong order, kitchen error): it is excluded from the bill and
+    /// consumes no stock. Requires a reason; the order must be open and nothing on the line already billed.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The order.</param>
+    /// <param name="lineId">The order line to void.</param>
+    /// <param name="reason">The mandatory void reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> VoidLineAsync(long companyId, long orderId, long lineId, string reason, CancellationToken ct = default);
+
+    /// <summary>
+    /// Comps an order line (complimentary): the item is still made and served — so billing recognises its cost
+    /// of sales via the recipe — but the guest is charged nothing (no revenue). Requires a reason; the order
+    /// must be open and nothing on the line already billed.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The order.</param>
+    /// <param name="lineId">The order line to comp.</param>
+    /// <param name="reason">The mandatory comp reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> CompLineAsync(long companyId, long orderId, long lineId, string reason, CancellationToken ct = default);
+
     /// <summary>Cancels an open order (nothing was billed) and frees the table. Requires a reason.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="orderId">The order.</param>

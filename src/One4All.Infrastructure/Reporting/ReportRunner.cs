@@ -118,6 +118,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.TableGroupsCode => SystemReports.TableGroups(),
         SystemReports.FloorPlanCode => SystemReports.FloorPlan(),
         SystemReports.SectionSalesCode => SystemReports.SectionSales(),
+        SystemReports.VoidsAndCompsCode => SystemReports.VoidsAndComps(),
         _ => ReceiptingReports.All().FirstOrDefault(r => string.Equals(r.Code, code, StringComparison.OrdinalIgnoreCase)),
     };
 }

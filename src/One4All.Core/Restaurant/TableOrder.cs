@@ -146,17 +146,17 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
     /// <summary>The order lines.</summary>
     public IReadOnlyList<TableOrderLine> Lines => _lines.AsReadOnly();
 
-    /// <summary>The net total (tax-exclusive).</summary>
-    public decimal NetTotal => _lines.Sum(l => l.LineNet);
+    /// <summary>The net total (tax-exclusive), excluding voided and comped lines.</summary>
+    public decimal NetTotal => _lines.Where(l => !l.IsVoided && !l.IsComped).Sum(l => l.LineNet);
 
-    /// <summary>The tax total.</summary>
-    public decimal TaxTotal => _lines.Sum(l => l.TaxAmount);
+    /// <summary>The tax total, excluding voided and comped lines.</summary>
+    public decimal TaxTotal => _lines.Where(l => !l.IsVoided && !l.IsComped).Sum(l => l.TaxAmount);
 
     /// <summary>The gross total.</summary>
     public decimal GrossTotal => NetTotal + TaxTotal;
 
-    /// <summary>True when every line has been fully billed (nothing left to split off).</summary>
-    public bool IsFullyBilled => _lines.All(l => l.RemainingQuantity <= 0m);
+    /// <summary>True when every non-voided line has been fully billed (nothing left to split off).</summary>
+    public bool IsFullyBilled => _lines.Where(l => !l.IsVoided).All(l => l.RemainingQuantity <= 0m);
 
     /// <summary>Adds an ordered menu item.</summary>
     /// <param name="menuItemId">The menu item.</param>
@@ -263,6 +263,34 @@ public sealed class TableOrderLine : Entity
 
     /// <summary>The cost-of-sales account.</summary>
     public string CostOfSalesAccountCode { get; private set; }
+
+    /// <summary>True when the line has been voided (removed before billing — never sold).</summary>
+    public bool IsVoided { get; private set; }
+
+    /// <summary>The void reason, if voided.</summary>
+    public string? VoidReason { get; private set; }
+
+    /// <summary>True when the line is comped (given free — still made, so it consumes stock, but no revenue).</summary>
+    public bool IsComped { get; private set; }
+
+    /// <summary>The comp reason, if comped.</summary>
+    public string? CompReason { get; private set; }
+
+    /// <summary>Voids the line (it will not be billed and does not consume stock).</summary>
+    /// <param name="reason">The void reason.</param>
+    public void Void(string reason)
+    {
+        IsVoided = true;
+        VoidReason = reason;
+    }
+
+    /// <summary>Comps the line (free to the guest — still made and served, so cost of sales is recognised).</summary>
+    /// <param name="reason">The comp reason.</param>
+    public void Comp(string reason)
+    {
+        IsComped = true;
+        CompReason = reason;
+    }
 
     /// <summary>Bills a quantity of this line (split bills).</summary>
     /// <param name="quantity">The quantity billed now.</param>

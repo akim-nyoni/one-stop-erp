@@ -342,6 +342,9 @@ public static class SystemReports
     /// <summary>The Section Sales report code.</summary>
     public const string SectionSalesCode = "RES-SSALES";
 
+    /// <summary>The Voids &amp; Comps report code.</summary>
+    public const string VoidsAndCompsCode = "RES-VOID";
+
     /// <summary>Builds the Kitchen Order Tickets definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition KitchenTickets() => Listing(KitchenTicketsCode, "Kitchen Order Tickets", "Restaurant",
@@ -396,6 +399,13 @@ public static class SystemReports
     public static ReportDefinition SectionSales() => Listing(SectionSalesCode, "Section Sales", "Restaurant",
         "Billed sales by floor-plan section over a period — orders, net, tax and gross.", "SectionSales",
         [new Column("Section", "Section", 140), new Column("Orders", "Orders", 70), new Column("Net", "Net", 100, true), new Column("Tax", "Tax", 90, true), new Column("Gross", "Gross", 100, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Voids &amp; Comps definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition VoidsAndComps() => Listing(VoidsAndCompsCode, "Voids &amp; Comps", "Restaurant",
+        "Voided and comped order lines over a period, with reasons — for manager oversight.", "VoidsAndComps",
+        [new Column("Date", "Date", 100), new Column("Order", "Order", 100), new Column("Item", "Item", 140), new Column("Qty", "Qty", 60), new Column("Type", "Type", 70), new Column("Reason", "Reason", 180)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Table Status definition (Restaurant module).</summary>

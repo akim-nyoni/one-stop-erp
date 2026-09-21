@@ -17,7 +17,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
         "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus", "KitchenTickets",
-        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales",
+        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps",
     };
 
     private readonly One4AllDbContext _db;
@@ -47,6 +47,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "TABLEGROUPS" => await TableGroupsAsync(companyId, ct).ConfigureAwait(false),
             "FLOORPLAN" => await FloorPlanAsync(companyId, ct).ConfigureAwait(false),
             "SECTIONSALES" => await SectionSalesAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "VOIDSANDCOMPS" => await VoidsAndCompsAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -97,6 +98,30 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Primary"] = tables.GetValueOrDefault(g.PrimaryTableId, $"#{g.PrimaryTableId}"),
             ["Tables"] = g.MemberCount,
             ["Seats"] = g.Seats,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VoidsAndCompsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly fromDate = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly toDate = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+
+        var rows = await (
+            from l in _db.Set<Core.Restaurant.TableOrderLine>()
+            join o in _db.Set<Core.Restaurant.TableOrder>() on l.TableOrderId equals o.Id
+            where o.CompanyId == companyId && o.OpenedOn >= fromDate && o.OpenedOn <= toDate && (l.IsVoided || l.IsComped)
+            orderby o.OpenedOn, o.OrderNumber
+            select new { o.OpenedOn, o.OrderNumber, l.Description, l.Quantity, l.IsComped, l.VoidReason, l.CompReason })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return rows.Select(r => Row(new()
+        {
+            ["Date"] = r.OpenedOn.ToDateTime(TimeOnly.MinValue),
+            ["Order"] = r.OrderNumber,
+            ["Item"] = r.Description,
+            ["Qty"] = r.Quantity,
+            ["Type"] = r.IsComped ? "Comp" : "Void",
+            ["Reason"] = (r.IsComped ? r.CompReason : r.VoidReason) ?? string.Empty,
         })).ToList();
     }
 

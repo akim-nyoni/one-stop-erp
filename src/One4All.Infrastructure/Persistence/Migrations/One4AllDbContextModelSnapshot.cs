@@ -6009,6 +6009,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("billed_quantity");
 
+                    b.Property<string>("CompReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("comp_reason");
+
                     b.Property<string>("CostOfSalesAccountCode")
                         .IsRequired()
                         .HasMaxLength(8)
@@ -6028,6 +6033,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("Fired")
                         .HasColumnType("boolean")
                         .HasColumnName("fired");
+
+                    b.Property<bool>("IsComped")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_comped");
+
+                    b.Property<bool>("IsVoided")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_voided");
 
                     b.Property<long>("MenuItemId")
                         .HasColumnType("bigint")
@@ -6063,6 +6076,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("unit_price");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("void_reason");
 
                     b.HasKey("Id")
                         .HasName("pk_order_line");

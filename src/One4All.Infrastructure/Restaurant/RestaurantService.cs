@@ -130,9 +130,9 @@ public sealed class RestaurantService : IRestaurantService
         }
 
         TableOrder order = loaded.Value;
-        // Bill everything still outstanding on the order.
+        // Bill everything still outstanding on the order (voided lines are excluded).
         List<(TableOrderLine Line, decimal Quantity)> portions = order.Lines
-            .Where(l => l.RemainingQuantity > 0m)
+            .Where(l => !l.IsVoided && l.RemainingQuantity > 0m)
             .Select(l => (l, l.RemainingQuantity))
             .ToList();
         if (portions.Count == 0)
@@ -165,6 +165,11 @@ public sealed class RestaurantService : IRestaurantService
             if (line is null)
             {
                 return Error.NotFound("Res.LineNotFound", $"Order line {portion.OrderLineId} is not on this order.");
+            }
+
+            if (line.IsVoided)
+            {
+                return Error.Rule("Res.LineVoided", $"Order line {portion.OrderLineId} was voided and cannot be billed.");
             }
 
             if (portion.Quantity <= 0m || portion.Quantity > line.RemainingQuantity + 0.0001m)
@@ -260,6 +265,12 @@ public sealed class RestaurantService : IRestaurantService
         Dictionary<string, decimal> netByAccount = new(StringComparer.Ordinal);
         foreach ((TableOrderLine line, decimal quantity) in portions)
         {
+            // A comped line is still made (cost of sales below) but earns no revenue.
+            if (line.IsComped)
+            {
+                continue;
+            }
+
             decimal portionNet = decimal.Round(quantity * line.UnitPrice, 4, MidpointRounding.ToEven);
             decimal portionTax = line.Quantity == 0m ? 0m : decimal.Round(line.TaxAmount * quantity / line.Quantity, 4, MidpointRounding.ToEven);
             net += portionNet;
@@ -269,39 +280,46 @@ public sealed class RestaurantService : IRestaurantService
 
         decimal gross = net + tax + serviceChargeAmount + tipAmount;
 
-        // Dr cash (gross); Cr revenue (net), output tax, service-charge income and tips payable (a liability).
-        List<JournalLineRequest> lines = [new JournalLineRequest { AccountCode = cashAccountCode, Side = JournalSide.Debit, TransactionAmount = gross }];
-        lines.AddRange(netByAccount.Select(kv => new JournalLineRequest { AccountCode = kv.Key, Side = JournalSide.Credit, TransactionAmount = kv.Value }));
-        if (tax != 0m && !string.IsNullOrWhiteSpace(taxAccountCode))
+        // Post the guest's charge only when there is one (a fully-comped bill charges nothing but still costs).
+        string revenueJournal = string.Empty;
+        if (gross > 0m)
         {
-            lines.Add(new JournalLineRequest { AccountCode = taxAccountCode!, Side = JournalSide.Credit, TransactionAmount = tax });
-        }
+            // Dr cash (gross); Cr revenue (net), output tax, service-charge income and tips payable (a liability).
+            List<JournalLineRequest> lines = [new JournalLineRequest { AccountCode = cashAccountCode, Side = JournalSide.Debit, TransactionAmount = gross }];
+            lines.AddRange(netByAccount.Select(kv => new JournalLineRequest { AccountCode = kv.Key, Side = JournalSide.Credit, TransactionAmount = kv.Value }));
+            if (tax != 0m && !string.IsNullOrWhiteSpace(taxAccountCode))
+            {
+                lines.Add(new JournalLineRequest { AccountCode = taxAccountCode!, Side = JournalSide.Credit, TransactionAmount = tax });
+            }
 
-        if (serviceChargeAmount > 0m)
-        {
-            lines.Add(new JournalLineRequest { AccountCode = serviceChargeAccountCode!, Side = JournalSide.Credit, TransactionAmount = serviceChargeAmount });
-        }
+            if (serviceChargeAmount > 0m)
+            {
+                lines.Add(new JournalLineRequest { AccountCode = serviceChargeAccountCode!, Side = JournalSide.Credit, TransactionAmount = serviceChargeAmount });
+            }
 
-        if (tipAmount > 0m)
-        {
-            lines.Add(new JournalLineRequest { AccountCode = tipsPayableAccountCode!, Side = JournalSide.Credit, TransactionAmount = tipAmount });
-        }
+            if (tipAmount > 0m)
+            {
+                lines.Add(new JournalLineRequest { AccountCode = tipsPayableAccountCode!, Side = JournalSide.Credit, TransactionAmount = tipAmount });
+            }
 
-        Result<PostingReceipt> revenue = await _posting.PostAsync(new JournalRequest
-        {
-            CompanyId = companyId,
-            SourceModule = "RES",
-            PostingDate = date,
-            TransactionCurrency = company.BaseCurrency,
-            DocumentType = "RES-BILL",
-            DocumentNumber = $"{order.OrderNumber}-{order.Lines.Sum(l => l.BilledQuantity):0.##}",
-            Narrative = $"Restaurant bill {order.OrderNumber}",
-            Lines = lines,
-        }, ct).ConfigureAwait(false);
+            Result<PostingReceipt> revenue = await _posting.PostAsync(new JournalRequest
+            {
+                CompanyId = companyId,
+                SourceModule = "RES",
+                PostingDate = date,
+                TransactionCurrency = company.BaseCurrency,
+                DocumentType = "RES-BILL",
+                DocumentNumber = $"{order.OrderNumber}-{order.Lines.Sum(l => l.BilledQuantity):0.##}",
+                Narrative = $"Restaurant bill {order.OrderNumber}",
+                Lines = lines,
+            }, ct).ConfigureAwait(false);
 
-        if (revenue.IsFailure)
-        {
-            return revenue.Error;
+            if (revenue.IsFailure)
+            {
+                return revenue.Error;
+            }
+
+            revenueJournal = revenue.Value.JournalNumber;
         }
 
         // Cost of sales: explode each billed portion's recipe into stock issues (moving average).
@@ -343,13 +361,68 @@ public sealed class RestaurantService : IRestaurantService
         bool fullyBilled = order.IsFullyBilled;
         if (fullyBilled)
         {
-            order.MarkBilled(revenue.Value.JournalNumber);
+            order.MarkBilled(revenueJournal);
             RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == order.TableId, ct).ConfigureAwait(false);
             await FreeTableAndGroupAsync(companyId, table, ct).ConfigureAwait(false);
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new BillResult(net, tax, serviceChargeAmount, tipAmount, gross, costOfSales, fullyBilled, revenue.Value.JournalNumber);
+        return new BillResult(net, tax, serviceChargeAmount, tipAmount, gross, costOfSales, fullyBilled, revenueJournal);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> VoidLineAsync(long companyId, long orderId, long lineId, string reason, CancellationToken ct = default)
+        => await MarkLineAsync(companyId, orderId, lineId, reason, comp: false, ct).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<Result> CompLineAsync(long companyId, long orderId, long lineId, string reason, CancellationToken ct = default)
+        => await MarkLineAsync(companyId, orderId, lineId, reason, comp: true, ct).ConfigureAwait(false);
+
+    private async Task<Result> MarkLineAsync(long companyId, long orderId, long lineId, string reason, bool comp, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Result.Failure(Error.Validation("Res.ReasonRequired", $"A {(comp ? "comp" : "void")} requires a reason."));
+        }
+
+        TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Result.Failure(Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found."));
+        }
+
+        if (order.Status != TableOrderStatus.Open)
+        {
+            return Result.Failure(Error.Rule("Res.OrderNotOpen", $"Only a line on an open order can be {(comp ? "comped" : "voided")}."));
+        }
+
+        TableOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == lineId);
+        if (line is null)
+        {
+            return Result.Failure(Error.NotFound("Res.LineNotFound", $"Order line {lineId} is not on this order."));
+        }
+
+        if (line.BilledQuantity > 0m)
+        {
+            return Result.Failure(Error.Rule("Res.LineAlreadyBilled", "A line that has already been billed cannot be voided or comped."));
+        }
+
+        if (line.IsVoided || line.IsComped)
+        {
+            return Result.Failure(Error.Rule("Res.LineAlreadyMarked", "The line is already voided or comped."));
+        }
+
+        if (comp)
+        {
+            line.Comp(reason);
+        }
+        else
+        {
+            line.Void(reason);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 
     /// <inheritdoc />
