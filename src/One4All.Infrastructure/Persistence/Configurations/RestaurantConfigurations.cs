@@ -50,6 +50,18 @@ internal sealed class RestaurantTableConfiguration : IEntityTypeConfiguration<Re
     }
 }
 
+internal sealed class RestaurantPolicyConfiguration : IEntityTypeConfiguration<RestaurantPolicy>
+{
+    public void Configure(EntityTypeBuilder<RestaurantPolicy> b)
+    {
+        b.ToTable("policy", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AutoGratuityPercent).HasPrecision(9, 4);
+        b.Property(x => x.ServiceChargeAccountCode).HasMaxLength(8);
+        b.HasIndex(x => x.CompanyId).IsUnique();
+    }
+}
+
 internal sealed class FloorSectionConfiguration : IEntityTypeConfiguration<FloorSection>
 {
     public void Configure(EntityTypeBuilder<FloorSection> b)
@@ -99,6 +111,7 @@ internal sealed class TableOrderConfiguration : IEntityTypeConfiguration<TableOr
         b.Property(x => x.OrderNumber).HasMaxLength(40);
         b.Property(x => x.Status).HasConversion<int>();
         b.Property(x => x.JournalNumber).HasMaxLength(30);
+        b.Property(x => x.PartySize);
         b.Ignore(x => x.NetTotal);
         b.Ignore(x => x.TaxTotal);
         b.Ignore(x => x.GrossTotal);

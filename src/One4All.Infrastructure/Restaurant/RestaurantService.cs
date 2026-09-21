@@ -55,7 +55,7 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<long>> OpenOrderAsync(long companyId, long tableId, string orderNumber, long waiterUserId, DateOnly date, CancellationToken ct = default)
+    public async Task<Result<long>> OpenOrderAsync(long companyId, long tableId, string orderNumber, long waiterUserId, DateOnly date, int partySize = 1, CancellationToken ct = default)
     {
         RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == tableId && t.CompanyId == companyId, ct).ConfigureAwait(false);
         if (table is null)
@@ -78,7 +78,7 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.TableOccupied", $"Table {table.TableNumber} already has an open order.");
         }
 
-        TableOrder order = new(companyId, tableId, orderNumber, waiterUserId, date);
+        TableOrder order = new(companyId, tableId, orderNumber, waiterUserId, date, partySize);
         _db.Set<TableOrder>().Add(order);
         await OccupyTableAndGroupAsync(companyId, table, ct).ConfigureAwait(false);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -787,7 +787,7 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.ReservationNotBooked", $"Only a booked reservation can be seated (it is {reservation.Status}).");
         }
 
-        Result<long> opened = await OpenOrderAsync(companyId, reservation.TableId, orderNumber, waiterUserId, date, ct).ConfigureAwait(false);
+        Result<long> opened = await OpenOrderAsync(companyId, reservation.TableId, orderNumber, waiterUserId, date, reservation.PartySize, ct).ConfigureAwait(false);
         if (opened.IsFailure)
         {
             return opened.Error;
@@ -879,7 +879,7 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.WaitlistNotWaiting", $"Only a waiting party can be seated (it is {entry.Status}).");
         }
 
-        Result<long> opened = await OpenOrderAsync(companyId, tableId, orderNumber, waiterUserId, date, ct).ConfigureAwait(false);
+        Result<long> opened = await OpenOrderAsync(companyId, tableId, orderNumber, waiterUserId, date, entry.PartySize, ct).ConfigureAwait(false);
         if (opened.IsFailure)
         {
             return opened.Error;
@@ -1078,6 +1078,56 @@ public sealed class RestaurantService : IRestaurantService
         section.SetActive(isActive);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetAutoGratuityPolicyAsync(long companyId, int minPartySize, decimal percent, string serviceChargeAccountCode, CancellationToken ct = default)
+    {
+        if (minPartySize > 0 && string.IsNullOrWhiteSpace(serviceChargeAccountCode))
+        {
+            return Result.Failure(Error.Validation("Res.GratuityAccountRequired", "Auto-gratuity requires a service-charge income account."));
+        }
+
+        RestaurantPolicy? policy = await _db.Set<RestaurantPolicy>().FirstOrDefaultAsync(p => p.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (policy is null)
+        {
+            _db.Set<RestaurantPolicy>().Add(new RestaurantPolicy(companyId, minPartySize, percent, serviceChargeAccountCode));
+        }
+        else
+        {
+            policy.Set(minPartySize, percent, serviceChargeAccountCode);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<AutoGratuityQuote>> QuoteAutoGratuityAsync(long companyId, long orderId, CancellationToken ct = default)
+    {
+        TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found.");
+        }
+
+        RestaurantPolicy? policy = await _db.Set<RestaurantPolicy>().FirstOrDefaultAsync(p => p.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (policy is null || policy.AutoGratuityMinParty <= 0 || policy.AutoGratuityPercent <= 0m || order.PartySize < policy.AutoGratuityMinParty)
+        {
+            return new AutoGratuityQuote(false, 0m, null);
+        }
+
+        // Gratuity on the net of the still-billable, non-voided, non-comped lines.
+        decimal net = order.Lines
+            .Where(l => !l.IsVoided && !l.IsComped && l.RemainingQuantity > 0m)
+            .Sum(l => decimal.Round(l.RemainingQuantity * l.UnitPrice, 4, MidpointRounding.ToEven));
+        if (net <= 0m)
+        {
+            return new AutoGratuityQuote(false, 0m, null);
+        }
+
+        decimal amount = decimal.Round(net * policy.AutoGratuityPercent / 100m, 2, MidpointRounding.ToEven);
+        return new AutoGratuityQuote(amount > 0m, amount, policy.ServiceChargeAccountCode);
     }
 
     /// <summary>Occupies a table and, when it is combined, every table in its group.</summary>

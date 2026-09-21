@@ -112,13 +112,15 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
     /// <param name="orderNumber">The order number.</param>
     /// <param name="waiterUserId">The waiter.</param>
     /// <param name="openedOn">The open date.</param>
-    public TableOrder(long companyId, long tableId, string orderNumber, long waiterUserId, DateOnly openedOn)
+    /// <param name="partySize">The number of covers at the table.</param>
+    public TableOrder(long companyId, long tableId, string orderNumber, long waiterUserId, DateOnly openedOn, int partySize = 1)
     {
         CompanyId = companyId;
         TableId = tableId;
         OrderNumber = orderNumber;
         WaiterUserId = waiterUserId;
         OpenedOn = openedOn;
+        PartySize = partySize < 1 ? 1 : partySize;
         Status = TableOrderStatus.Open;
     }
 
@@ -133,6 +135,9 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
 
     /// <summary>The waiter.</summary>
     public long WaiterUserId { get; private set; }
+
+    /// <summary>The number of covers at the table.</summary>
+    public int PartySize { get; private set; }
 
     /// <summary>The open date.</summary>
     public DateOnly OpenedOn { get; private set; }

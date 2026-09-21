@@ -20,6 +20,12 @@ public readonly record struct RecipeIngredient(long IngredientItemId, decimal Qu
 /// <param name="RevenueJournalNumber">The revenue GL journal number.</param>
 public readonly record struct BillResult(decimal Net, decimal Tax, decimal ServiceCharge, decimal Tip, decimal Discount, decimal Gross, decimal CostOfSales, bool FullyBilled, string RevenueJournalNumber);
 
+/// <summary>The automatic gratuity (service charge) suggested for an order under the company policy.</summary>
+/// <param name="Applies">True when the party qualifies and a gratuity is suggested.</param>
+/// <param name="Amount">The gratuity amount (net × policy percent), rounded to 2dp.</param>
+/// <param name="ServiceChargeAccountCode">The income account the gratuity should book to.</param>
+public readonly record struct AutoGratuityQuote(bool Applies, decimal Amount, string? ServiceChargeAccountCode);
+
 /// <summary>A staff member's share when distributing the tip pool.</summary>
 /// <param name="StaffUserId">The staff member.</param>
 /// <param name="Weight">The relative weight of their share.</param>
@@ -64,9 +70,10 @@ public interface IRestaurantService
     /// <param name="orderNumber">The order number.</param>
     /// <param name="waiterUserId">The waiter.</param>
     /// <param name="date">The open date.</param>
+    /// <param name="partySize">The number of covers (drives auto-gratuity for large parties).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The created order id.</returns>
-    Task<Result<long>> OpenOrderAsync(long companyId, long tableId, string orderNumber, long waiterUserId, DateOnly date, CancellationToken ct = default);
+    Task<Result<long>> OpenOrderAsync(long companyId, long tableId, string orderNumber, long waiterUserId, DateOnly date, int partySize = 1, CancellationToken ct = default);
 
     /// <summary>Adds a menu item to an open order at its menu price.</summary>
     /// <param name="companyId">The company.</param>
@@ -406,4 +413,26 @@ public interface IRestaurantService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
     Task<Result> SetSectionActiveAsync(long companyId, long sectionId, bool isActive, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sets the company's automatic-gratuity policy: parties of <paramref name="minPartySize"/> or more have a
+    /// service charge of <paramref name="percent"/>% of the net suggested at billing. Upserts the single policy row.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="minPartySize">The party-size threshold (0 disables auto-gratuity).</param>
+    /// <param name="percent">The gratuity percentage of the net.</param>
+    /// <param name="serviceChargeAccountCode">The service-charge income account the gratuity books to.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> SetAutoGratuityPolicyAsync(long companyId, int minPartySize, decimal percent, string serviceChargeAccountCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Quotes the automatic gratuity for an order from the company policy and the order's party size and current
+    /// net. Pass the returned amount/account as the service charge when billing to apply it.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The order.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The gratuity quote (Applies=false when no policy, party too small, or nothing ordered).</returns>
+    Task<Result<AutoGratuityQuote>> QuoteAutoGratuityAsync(long companyId, long orderId, CancellationToken ct = default);
 }
