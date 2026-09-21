@@ -88,6 +88,20 @@ public interface IPosService
     /// <returns>The sale result, or an error.</returns>
     Task<Result<CompleteSaleResult>> CompleteSaleAsync(CompleteSaleRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// Voids/refunds a completed sale: posts the exact inverse of the sale's tender/revenue/tax journal
+    /// (refunding the tenders) and reverses each cost-of-sales stock issue back into inventory at its original
+    /// cost. Requires a reason; refuses a sale that is not completed. Returns the reversal journal number.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="saleId">The sale to void.</param>
+    /// <param name="date">The void date.</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="taxAccountCode">The output-tax account (required when the sale had tax).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The reversal journal number.</returns>
+    Task<Result<string>> VoidSaleAsync(long companyId, long saleId, DateOnly date, string reason, string? taxAccountCode = null, CancellationToken ct = default);
+
     /// <summary>Produces an X-read (mid-shift, non-resetting) for a session.</summary>
     /// <param name="tillSessionId">The session.</param>
     /// <param name="ct">Cancellation token.</param>

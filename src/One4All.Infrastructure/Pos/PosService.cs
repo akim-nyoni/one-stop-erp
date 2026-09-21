@@ -136,6 +136,84 @@ public sealed class PosService : IPosService
     }
 
     /// <inheritdoc />
+    public async Task<Result<string>> VoidSaleAsync(long companyId, long saleId, DateOnly date, string reason, string? taxAccountCode = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Pos.ReasonRequired", "Voiding a sale requires a reason.");
+        }
+
+        Sale? sale = await _db.Set<Sale>().Include(s => s.Lines).Include(s => s.Tenders)
+            .FirstOrDefaultAsync(s => s.Id == saleId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (sale is null)
+        {
+            return Error.NotFound("Pos.SaleNotFound", $"Sale {saleId} not found.");
+        }
+
+        if (sale.Status != SaleStatus.Completed)
+        {
+            return Error.Rule("Pos.SaleNotCompleted", "Only a completed sale can be voided.");
+        }
+
+        if (sale.TotalTax != 0m && string.IsNullOrWhiteSpace(taxAccountCode))
+        {
+            return Error.Validation("Pos.TaxAccountRequired", "Voiding a sale with tax needs the output-tax account.");
+        }
+
+        // Inverse of the sale journal: refund tenders (Cr), unwind revenue and tax (Dr).
+        List<JournalLineRequest> lines = [];
+        foreach (SaleTender tender in sale.Tenders)
+        {
+            lines.Add(new JournalLineRequest { AccountCode = tender.AccountCode, Side = tender.IsChange ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = tender.BaseAmount });
+        }
+
+        foreach (SaleLine line in sale.Lines)
+        {
+            lines.Add(new JournalLineRequest { AccountCode = line.RevenueAccountCode, Side = JournalSide.Debit, TransactionAmount = line.LineNet });
+        }
+
+        if (sale.TotalTax != 0m)
+        {
+            lines.Add(new JournalLineRequest { AccountCode = taxAccountCode!, Side = JournalSide.Debit, TransactionAmount = sale.TotalTax });
+        }
+
+        Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId,
+            SourceModule = "POS",
+            PostingDate = date,
+            TransactionCurrency = sale.BaseCurrency,
+            EnforceManualJournalRules = false,
+            DocumentType = "PosSaleVoid",
+            DocumentNumber = sale.SaleNumber,
+            Narrative = $"Void POS sale {sale.SaleNumber}: {reason}",
+            Lines = lines,
+        }, ct).ConfigureAwait(false);
+
+        if (posting.IsFailure)
+        {
+            return posting.Error;
+        }
+
+        // Reverse the cost-of-sales stock issues raised by the sale.
+        List<StockMovement> issues = await _db.Set<StockMovement>()
+            .Where(m => m.CompanyId == companyId && m.Reference == sale.SaleNumber && m.Type == StockMovementType.Issue && !m.IsReversed)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (StockMovement issue in issues)
+        {
+            Result<StockMovementResult> reversed = await _inventory.ReverseIssueAsync(companyId, issue.Id, date, $"VOID:{sale.SaleNumber}", ct).ConfigureAwait(false);
+            if (reversed.IsFailure)
+            {
+                return reversed.Error;
+            }
+        }
+
+        sale.Void();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return posting.Value.JournalNumber;
+    }
+
+    /// <inheritdoc />
     public Task<Result<TillRead>> XReadAsync(long tillSessionId, CancellationToken ct = default) => ReadAsync(tillSessionId, close: false, ct);
 
     /// <inheritdoc />
