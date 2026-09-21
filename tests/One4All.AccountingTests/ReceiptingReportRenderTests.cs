@@ -94,6 +94,7 @@ public sealed class ReceiptingReportRenderTests
             (await Html(runner, companyId, "RC39", asAt)).Should().Contain("OVP").And.Contain("100.00");                 // credit balances
             (await Html(runner, companyId, "RC51", range)).Should().Contain("2026-03");                                  // collection trend
             (await Html(runner, companyId, "RC17", new())).Should().Contain("RP");                                       // gap analysis (station code)
+            (await Html(runner, companyId, "RC10", new() { ["Date"] = new DateOnly(2026, 3, 10) })).Should().Contain(":00").And.Contain("TILL-RPT"); // hourly volume by capture hour
         }
     }
 

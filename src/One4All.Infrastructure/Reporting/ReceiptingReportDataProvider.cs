@@ -32,6 +32,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC5" => await CollectionByVoteAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC7" => await CollectionByTenderAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC8" => await CollectionByCurrencyAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC10" => await HourlyVolumeAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC11" => await CashierProductivityAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC12" => await GlReconciliationAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC13" => await CashControlReconciliationAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -112,6 +113,28 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .GroupBy(t => t.Currency.ToString())
             .OrderBy(g => g.Key)
             .Select(g => Row(new() { ["Currency"] = g.Key, ["Transaction"] = g.Sum(t => t.Amount), ["Rate"] = string.Empty, ["BaseAmount"] = g.Sum(t => t.Amount) }))
+            .ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> HourlyVolumeAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly date = ReportParameters.Date(parameters, "Date");
+        List<Receipt> receipts = await CommittedReceiptsAsync(companyId, date, date, ct).ConfigureAwait(false);
+        Dictionary<long, string> stations = await _db.Set<CashierStation>()
+            .Where(s => s.CompanyId == companyId)
+            .ToDictionaryAsync(s => s.Id, s => s.Code, ct).ConfigureAwait(false);
+
+        // Hour comes from the capture timestamp (receipts carry a business Date only).
+        return receipts
+            .GroupBy(r => new { Hour = r.CreatedOnUtc.UtcDateTime.Hour, r.StationId })
+            .OrderBy(g => g.Key.Hour).ThenBy(g => g.Key.StationId)
+            .Select(g => Row(new()
+            {
+                ["Hour"] = $"{g.Key.Hour:D2}:00",
+                ["Station"] = stations.GetValueOrDefault(g.Key.StationId, g.Key.StationId.ToString()),
+                ["Transactions"] = g.Count(),
+                ["AvgSeconds"] = 0,
+            }))
             .ToList();
     }
 
