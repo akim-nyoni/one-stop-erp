@@ -119,6 +119,17 @@ internal sealed class ManualReceiptCaptureConfiguration : IEntityTypeConfigurati
     }
 }
 
+internal sealed class PaymentArrangementConfiguration : IEntityTypeConfiguration<PaymentArrangement>
+{
+    public void Configure(EntityTypeBuilder<PaymentArrangement> b)
+    {
+        b.ToTable("payment_arrangement", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.CustomerId });
+    }
+}
+
 internal sealed class ReceiptReprintConfiguration : IEntityTypeConfiguration<ReceiptReprint>
 {
     public void Configure(EntityTypeBuilder<ReceiptReprint> b)

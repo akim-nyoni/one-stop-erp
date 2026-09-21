@@ -627,6 +627,31 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
+    public async Task<Result<long>> CaptureArrangementAsync(long companyId, long customerId, decimal totalAmount, decimal instalmentAmount, DateOnly startDate, CancellationToken ct = default)
+    {
+        if (totalAmount <= 0m || instalmentAmount <= 0m)
+        {
+            return Error.Rule("Rcp.InvalidArrangement", "The total and instalment amounts must be positive.");
+        }
+
+        if (instalmentAmount > totalAmount + 0.0001m)
+        {
+            return Error.Rule("Rcp.InstalmentTooLarge", "The instalment cannot exceed the total.");
+        }
+
+        bool customerExists = await _db.Set<Customer>().AnyAsync(c => c.Id == customerId && c.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (!customerExists)
+        {
+            return Error.NotFound("Rcp.CustomerNotFound", $"Customer {customerId} not found.");
+        }
+
+        PaymentArrangement arrangement = new(companyId, customerId, totalAmount, instalmentAmount, startDate);
+        _db.Set<PaymentArrangement>().Add(arrangement);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return arrangement.Id;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<int>> ReprintReceiptAsync(long companyId, long receiptId, DateOnly date, long byUserId, CancellationToken ct = default)
     {
         Receipt? receipt = await _db.Set<Receipt>().FirstOrDefaultAsync(r => r.Id == receiptId && r.CompanyId == companyId, ct).ConfigureAwait(false);

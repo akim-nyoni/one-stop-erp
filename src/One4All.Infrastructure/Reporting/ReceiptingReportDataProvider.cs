@@ -49,6 +49,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC39" => await CreditBalancesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC40" => await DepositsHeldAsync(companyId, ct).ConfigureAwait(false),
             "RC41" => await RefundsRegisterAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC42" => await ArrangementsAsync(companyId, ct).ConfigureAwait(false),
             "RC43" => await TopPayersAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC45" => await AgentReconciliationAsync(companyId, ct).ConfigureAwait(false),
             "RC46" => await AgentAgeingAsync(companyId, ct).ConfigureAwait(false),
@@ -295,6 +296,25 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
                 return Row(new() { ["Account"] = code, ["Name"] = name, ["Days"] = days, ["Credit"] = g.Sum(x => x.OutstandingTransaction) });
             })
             .ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ArrangementsAsync(long companyId, CancellationToken ct)
+    {
+        List<PaymentArrangement> arrangements = await _db.Set<PaymentArrangement>()
+            .Where(a => a.CompanyId == companyId)
+            .OrderBy(a => a.StartDate).ThenBy(a => a.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> customers = await _db.Set<Core.Trading.Customer>()
+            .Where(c => c.CompanyId == companyId)
+            .ToDictionaryAsync(c => c.Id, c => $"{c.Code} — {c.Name}", ct).ConfigureAwait(false);
+
+        return arrangements.Select(a => Row(new()
+        {
+            ["Account"] = customers.GetValueOrDefault(a.CustomerId, $"#{a.CustomerId}"),
+            ["StartDate"] = a.StartDate.ToDateTime(TimeOnly.MinValue),
+            ["Status"] = a.Status.ToString(),
+            ["Instalment"] = a.InstalmentAmount,
+        })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TopPayersAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

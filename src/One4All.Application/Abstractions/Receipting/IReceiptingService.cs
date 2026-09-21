@@ -314,6 +314,20 @@ public interface IReceiptingService
     /// <returns>The copy number.</returns>
     Task<Result<int>> ReprintReceiptAsync(long companyId, long receiptId, DateOnly date, long byUserId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Captures a payment arrangement at the counter (brief §RCP-16 RC42): a promise to clear a balance in
+    /// instalments. Not a GL posting — receipts against the account settle the debt; the arrangement tracks
+    /// the promise for credit control.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="customerId">The payer account.</param>
+    /// <param name="totalAmount">The balance to clear.</param>
+    /// <param name="instalmentAmount">The instalment amount.</param>
+    /// <param name="startDate">The start date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created arrangement id.</returns>
+    Task<Result<long>> CaptureArrangementAsync(long companyId, long customerId, decimal totalAmount, decimal instalmentAmount, DateOnly startDate, CancellationToken ct = default);
+
     /// <summary>Verifies a closed session by a supervisor (who must not be the cashier).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="sessionId">The session.</param>

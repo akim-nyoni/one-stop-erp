@@ -224,6 +224,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Receipt reprint log.</summary>
     public DbSet<Core.Receipting.ReceiptReprint> ReceiptReprints => Set<Core.Receipting.ReceiptReprint>();
 
+    /// <summary>Payment arrangements captured at the counter.</summary>
+    public DbSet<Core.Receipting.PaymentArrangement> PaymentArrangements => Set<Core.Receipting.PaymentArrangement>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 
