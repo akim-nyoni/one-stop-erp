@@ -34,6 +34,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC8" => await CollectionByCurrencyAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC11" => await CashierProductivityAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC12" => await GlReconciliationAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC13" => await CashControlReconciliationAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC14" => await TillVarianceAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC15" => await CancelledReceiptsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC16" => await ReprintLogAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -139,6 +140,48 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             Row(new() { ["Component"] = "Deposits (liability)", ["Amount"] = Sum(ReceiptLineType.Deposit) }),
             Row(new() { ["Component"] = "Suspense (unallocated)", ["Amount"] = Sum(ReceiptLineType.Suspense) }),
         ];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CashControlReconciliationAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        (string Param, string Label)[] stages =
+        [
+            ("CashAccount", "Cash on hand"),
+            ("SafeAccount", "Cash in safe"),
+            ("TransitAccount", "Cash in transit"),
+            ("BankAccount", "Bank"),
+        ];
+
+        // Sum GL period-balance movement per supplied cash account (debit/credit, base currency).
+        Dictionary<string, (decimal Debit, decimal Credit)> balances = new(StringComparer.Ordinal);
+        List<string> codes = stages.Select(s => ReportParameters.String(parameters, s.Param)).Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+        if (codes.Count > 0)
+        {
+            var rows = await _db.Set<Core.Accounting.GlPeriodBalance>()
+                .Where(b => b.CompanyId == companyId && codes.Contains(b.AccountCode))
+                .GroupBy(b => b.AccountCode)
+                .Select(g => new { AccountCode = g.Key, Debit = g.Sum(x => x.BaseDebit), Credit = g.Sum(x => x.BaseCredit) })
+                .ToListAsync(ct).ConfigureAwait(false);
+            foreach (var r in rows)
+            {
+                balances[r.AccountCode] = (r.Debit, r.Credit);
+            }
+        }
+
+        List<IReadOnlyDictionary<string, object?>> result = [];
+        foreach ((string param, string label) in stages)
+        {
+            string code = ReportParameters.String(parameters, param);
+            if (string.IsNullOrWhiteSpace(code))
+            {
+                continue;
+            }
+
+            (decimal debit, decimal credit) = balances.GetValueOrDefault(code);
+            result.Add(Row(new() { ["Stage"] = $"{label} ({code})", ["Debit"] = debit, ["Credit"] = credit }));
+        }
+
+        return result;
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TillVarianceAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

@@ -48,8 +48,8 @@ public static class ReceiptingReports
         // Reconciliation and control
         yield return Listing("RC12", "Receipting-to-GL Reconciliation", "Total collected = debtor control movement + sundry income + deposit movement + suspense movement.",
             [new Col("Component", "Component", 260), new Col("Amount", "Amount", 100, true)], ["FromDate", "ToDate"]);
-        yield return Listing("RC13", "Cash Control Account Reconciliation", "Till → safe → cash in transit → bank.",
-            [new Col("Stage", "Stage", 200), new Col("Debit", "Debit", 100, true), new Col("Credit", "Credit", 100, true)], ["AsAtDate"]);
+        yield return Listing("RC13", "Cash Control Account Reconciliation", "Till → safe → cash in transit → bank; supply the account codes for each stage.",
+            [new Col("Stage", "Stage", 200), new Col("Debit", "Debit", 100, true), new Col("Credit", "Credit", 100, true)], ["CashAccount", "SafeAccount", "TransitAccount", "BankAccount"]);
         yield return Listing("RC14", "Till Variance Report", "Shortages and overages by cashier and period, with recovery status.",
             [new Col("Cashier", "Cashier", 150), new Col("Session", "Session", 90), new Col("Variance", "Variance", 100, true), new Col("Status", "Recovery", 90)], ["FromDate", "ToDate"]);
         yield return Listing("RC15", "Cancelled & Reversed Receipts", "With reason, authorising supervisor and value.",
