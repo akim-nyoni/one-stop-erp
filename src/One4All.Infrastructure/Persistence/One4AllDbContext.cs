@@ -251,6 +251,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Kitchen order tickets.</summary>
     public DbSet<Core.Restaurant.KitchenTicket> KitchenTickets => Set<Core.Restaurant.KitchenTicket>();
 
+    /// <summary>Tip pool allocations.</summary>
+    public DbSet<Core.Restaurant.TipAllocation> TipAllocations => Set<Core.Restaurant.TipAllocation>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 

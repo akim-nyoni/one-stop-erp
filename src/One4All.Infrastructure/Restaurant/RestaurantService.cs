@@ -421,6 +421,79 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
+    public async Task<Result<int>> DistributeTipsAsync(long companyId, DateOnly date, decimal totalAmount, string tipsPayableAccountCode, IReadOnlyList<TipShare> shares, CancellationToken ct = default)
+    {
+        if (totalAmount <= 0m)
+        {
+            return Error.Rule("Res.NonPositiveAmount", "The amount to distribute must be positive.");
+        }
+
+        if (shares.Count == 0)
+        {
+            return Error.Validation("Res.NoShares", "Distributing tips needs at least one staff share.");
+        }
+
+        decimal totalWeight = shares.Sum(s => s.Weight);
+        if (totalWeight <= 0m)
+        {
+            return Error.Rule("Res.InvalidWeights", "The share weights must sum to a positive value.");
+        }
+
+        decimal allocated = 0m;
+        for (int i = 0; i < shares.Count; i++)
+        {
+            decimal amount = i == shares.Count - 1
+                ? totalAmount - allocated // last share absorbs the rounding remainder
+                : decimal.Round(totalAmount * shares[i].Weight / totalWeight, 2, MidpointRounding.ToEven);
+            allocated += amount;
+            _db.Set<TipAllocation>().Add(new TipAllocation(companyId, shares[i].StaffUserId, amount, date, tipsPayableAccountCode));
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return shares.Count;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<string>> PayTipAllocationAsync(long companyId, long allocationId, DateOnly date, string fundingAccountCode, CancellationToken ct = default)
+    {
+        TipAllocation? allocation = await _db.Set<TipAllocation>().FirstOrDefaultAsync(a => a.Id == allocationId && a.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (allocation is null)
+        {
+            return Error.NotFound("Res.TipAllocationNotFound", $"Tip allocation {allocationId} not found.");
+        }
+
+        if (allocation.Status == TipAllocationStatus.Paid)
+        {
+            return Error.Rule("Res.TipAlreadyPaid", $"Tip allocation {allocationId} is already paid.");
+        }
+
+        Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId,
+            SourceModule = "RES",
+            PostingDate = date,
+            TransactionCurrency = company.BaseCurrency,
+            DocumentType = "RES-TIP-PAY",
+            Narrative = $"Tip paid to staff #{allocation.StaffUserId}",
+            Lines =
+            [
+                new JournalLineRequest { AccountCode = allocation.TipsPayableAccountCode, Side = JournalSide.Debit, TransactionAmount = allocation.Amount },
+                new JournalLineRequest { AccountCode = fundingAccountCode, Side = JournalSide.Credit, TransactionAmount = allocation.Amount },
+            ],
+        }, ct).ConfigureAwait(false);
+
+        if (posted.IsFailure)
+        {
+            return posted.Error;
+        }
+
+        allocation.MarkPaid(date);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return posted.Value.JournalNumber;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<long>> FireOrderAsync(long companyId, long orderId, string ticketNumber, DateOnly date, CancellationToken ct = default)
     {
         TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);

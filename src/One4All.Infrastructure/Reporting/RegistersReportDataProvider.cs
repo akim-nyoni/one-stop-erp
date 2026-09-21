@@ -17,6 +17,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
         "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus", "KitchenTickets",
+        "TipAllocations", "MenuEngineering",
     };
 
     private readonly One4AllDbContext _db;
@@ -39,6 +40,8 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "MENU" => await MenuAsync(companyId, ct).ConfigureAwait(false),
             "TABLESTATUS" => await TableStatusAsync(companyId, ct).ConfigureAwait(false),
             "KITCHENTICKETS" => await KitchenTicketsAsync(companyId, ct).ConfigureAwait(false),
+            "TIPALLOCATIONS" => await TipAllocationsAsync(companyId, ct).ConfigureAwait(false),
+            "MENUENGINEERING" => await MenuEngineeringAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -56,6 +59,99 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Items"] = t.Lines.Count,
             ["Sent"] = t.SentOn.ToDateTime(TimeOnly.MinValue),
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TipAllocationsAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Restaurant.TipAllocation> allocations = await _db.Set<Core.Restaurant.TipAllocation>()
+            .Where(a => a.CompanyId == companyId)
+            .OrderBy(a => a.Date).ThenBy(a => a.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> staff = await _db.Set<Core.Security.User>()
+            .ToDictionaryAsync(u => u.Id, u => u.DisplayName, ct).ConfigureAwait(false);
+        return allocations.Select(a => Row(new()
+        {
+            ["Staff"] = staff.GetValueOrDefault(a.StaffUserId, $"#{a.StaffUserId}"),
+            ["Date"] = a.Date.ToDateTime(TimeOnly.MinValue),
+            ["Status"] = a.Status.ToString(),
+            ["Amount"] = a.Amount,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> MenuEngineeringAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly fromDate = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly toDate = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+
+        List<Core.Restaurant.MenuItem> menu = await _db.Set<Core.Restaurant.MenuItem>().Include(m => m.Recipe)
+            .Where(m => m.CompanyId == companyId)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        // Standard recipe cost per menu item from the ingredients' current weighted-average cost.
+        Dictionary<long, decimal> itemCost = await _db.Set<Core.Inventory.StockBalance>()
+            .Where(b => b.CompanyId == companyId)
+            .GroupBy(b => b.ItemId)
+            .Select(g => new { ItemId = g.Key, Qty = g.Sum(x => x.QuantityOnHand), Value = g.Sum(x => x.TotalValue) })
+            .ToDictionaryAsync(x => x.ItemId, x => x.Qty > 0m ? decimal.Round(x.Value / x.Qty, 4, MidpointRounding.ToEven) : 0m, ct)
+            .ConfigureAwait(false);
+
+        Dictionary<long, decimal> recipeCost = menu.ToDictionary(
+            m => m.Id,
+            m => m.Recipe.Sum(r => r.Quantity * itemCost.GetValueOrDefault(r.IngredientItemId, 0m)));
+
+        // Billed sales quantity per menu item over the period (order reference date = opened-on).
+        List<Core.Restaurant.TableOrderLine> lines = await (
+            from l in _db.Set<Core.Restaurant.TableOrderLine>()
+            join o in _db.Set<Core.Restaurant.TableOrder>() on l.TableOrderId equals o.Id
+            where o.CompanyId == companyId && o.OpenedOn >= fromDate && o.OpenedOn <= toDate && l.BilledQuantity > 0m
+            select l).ToListAsync(ct).ConfigureAwait(false);
+
+        var sales = lines.GroupBy(l => l.MenuItemId).ToDictionary(
+            g => g.Key,
+            g => (Qty: g.Sum(l => l.BilledQuantity), Revenue: g.Sum(l => decimal.Round(l.BilledQuantity * l.UnitPrice, 4, MidpointRounding.ToEven))));
+
+        var rows = menu.Select(m =>
+        {
+            (decimal Qty, decimal Revenue) s = sales.GetValueOrDefault(m.Id, (0m, 0m));
+            decimal cost = decimal.Round(s.Qty * recipeCost.GetValueOrDefault(m.Id, 0m), 4, MidpointRounding.ToEven);
+            decimal margin = s.Revenue - cost;
+            decimal unitMargin = s.Qty > 0m ? margin / s.Qty : 0m;
+            return (Item: m, s.Qty, s.Revenue, Cost: cost, Margin: margin, UnitMargin: unitMargin);
+        }).ToList();
+
+        // Menu-engineering classification: popularity (qty) × profitability (unit margin) against the averages.
+        List<(Core.Restaurant.MenuItem Item, decimal Qty, decimal Revenue, decimal Cost, decimal Margin, decimal UnitMargin)> sold =
+            rows.Where(r => r.Qty > 0m).ToList();
+        decimal avgQty = sold.Count > 0 ? sold.Average(r => r.Qty) : 0m;
+        decimal avgUnitMargin = sold.Count > 0 ? sold.Average(r => r.UnitMargin) : 0m;
+
+        return rows.OrderByDescending(r => r.Margin).ThenBy(r => r.Item.Code).Select(r => Row(new()
+        {
+            ["Item"] = r.Item.Name,
+            ["QtySold"] = r.Qty,
+            ["Revenue"] = r.Revenue,
+            ["Cost"] = r.Cost,
+            ["Margin"] = r.Margin,
+            ["Class"] = Classify(r.Qty, r.UnitMargin, avgQty, avgUnitMargin),
+        })).ToList();
+    }
+
+    private static string Classify(decimal qty, decimal unitMargin, decimal avgQty, decimal avgUnitMargin)
+    {
+        if (qty <= 0m)
+        {
+            return "Unsold";
+        }
+
+        bool popular = qty >= avgQty;
+        bool profitable = unitMargin >= avgUnitMargin;
+        return (popular, profitable) switch
+        {
+            (true, true) => "Star",
+            (true, false) => "Plowhorse",
+            (false, true) => "Puzzle",
+            _ => "Dog",
+        };
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> MenuAsync(long companyId, CancellationToken ct)

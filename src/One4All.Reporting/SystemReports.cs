@@ -321,12 +321,32 @@ public static class SystemReports
         [new Column("Code", "Code", 90), new Column("Name", "Name", 160), new Column("Category", "Category", 90), new Column("Ingredients", "Ingredients", 80), new Column("Available", "Available", 70), new Column("Price", "Price", 90, true)],
         []);
 
+    /// <summary>The Tip Allocations report code.</summary>
+    public const string TipAllocationsCode = "RES-TIPS";
+
+    /// <summary>The Menu Engineering report code.</summary>
+    public const string MenuEngineeringCode = "RES-MIX";
+
     /// <summary>Builds the Kitchen Order Tickets definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition KitchenTickets() => Listing(KitchenTicketsCode, "Kitchen Order Tickets", "Restaurant",
         "Open kitchen tickets (not yet served) with their status and item count.", "KitchenTickets",
         [new Column("Ticket", "Ticket", 100), new Column("Status", "Status", 110), new Column("Items", "Items", 70), new Column("Sent", "Sent", 100)],
         []);
+
+    /// <summary>Builds the Tip Allocations definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition TipAllocations() => Listing(TipAllocationsCode, "Tip Allocations", "Restaurant",
+        "Pooled tips allocated to staff, with amount and payment status.", "TipAllocations",
+        [new Column("Staff", "Staff", 120), new Column("Date", "Date", 100), new Column("Status", "Status", 90), new Column("Amount", "Amount", 100, true)],
+        []);
+
+    /// <summary>Builds the Menu Engineering definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition MenuEngineering() => Listing(MenuEngineeringCode, "Menu Engineering", "Restaurant",
+        "Sales mix by menu item — quantity, revenue, recipe cost, margin and menu-engineering class.", "MenuEngineering",
+        [new Column("Item", "Item", 150), new Column("QtySold", "Qty", 70), new Column("Revenue", "Revenue", 90, true), new Column("Cost", "Cost", 90, true), new Column("Margin", "Margin", 90, true), new Column("Class", "Class", 90)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Table Status definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>

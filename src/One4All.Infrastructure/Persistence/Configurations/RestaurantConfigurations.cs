@@ -97,6 +97,18 @@ internal sealed class KitchenTicketConfiguration : IEntityTypeConfiguration<Kitc
     }
 }
 
+internal sealed class TipAllocationConfiguration : IEntityTypeConfiguration<TipAllocation>
+{
+    public void Configure(EntityTypeBuilder<TipAllocation> b)
+    {
+        b.ToTable("tip_allocation", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.TipsPayableAccountCode).HasMaxLength(8);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}
+
 internal sealed class KitchenTicketLineConfiguration : IEntityTypeConfiguration<KitchenTicketLine>
 {
     public void Configure(EntityTypeBuilder<KitchenTicketLine> b)

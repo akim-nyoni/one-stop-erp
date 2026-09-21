@@ -19,6 +19,11 @@ public readonly record struct RecipeIngredient(long IngredientItemId, decimal Qu
 /// <param name="RevenueJournalNumber">The revenue GL journal number.</param>
 public readonly record struct BillResult(decimal Net, decimal Tax, decimal ServiceCharge, decimal Tip, decimal Gross, decimal CostOfSales, bool FullyBilled, string RevenueJournalNumber);
 
+/// <summary>A staff member's share when distributing the tip pool.</summary>
+/// <param name="StaffUserId">The staff member.</param>
+/// <param name="Weight">The relative weight of their share.</param>
+public readonly record struct TipShare(long StaffUserId, decimal Weight);
+
 /// <summary>A portion of an order to bill on a split.</summary>
 /// <param name="OrderLineId">The order line.</param>
 /// <param name="Quantity">The quantity of that line to bill now.</param>
@@ -121,6 +126,29 @@ public interface IRestaurantService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The GL journal number.</returns>
     Task<Result<string>> PayTipsAsync(long companyId, decimal amount, DateOnly date, string tipsPayableAccountCode, string fundingAccountCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Distributes an amount from the pooled tips among staff by weight (tip pooling). Assigns who within the
+    /// tips-payable liability is owed what — no GL, since the liability already exists. The shares sum exactly
+    /// to the amount (rounding remainder on the last share).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="date">The distribution date.</param>
+    /// <param name="totalAmount">The amount to distribute.</param>
+    /// <param name="tipsPayableAccountCode">The tips-payable account the pool sits in.</param>
+    /// <param name="shares">The staff shares (by weight).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of allocations created.</returns>
+    Task<Result<int>> DistributeTipsAsync(long companyId, DateOnly date, decimal totalAmount, string tipsPayableAccountCode, IReadOnlyList<TipShare> shares, CancellationToken ct = default);
+
+    /// <summary>Pays a staff member's tip allocation: Dr tips payable, Cr the funding account; marks it paid.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="allocationId">The tip allocation.</param>
+    /// <param name="date">The payout date.</param>
+    /// <param name="fundingAccountCode">The cash/bank account the payout is made from (credited).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The GL journal number.</returns>
+    Task<Result<string>> PayTipAllocationAsync(long companyId, long allocationId, DateOnly date, string fundingAccountCode, CancellationToken ct = default);
 
     /// <summary>Cancels an open order (nothing was billed) and frees the table. Requires a reason.</summary>
     /// <param name="companyId">The company.</param>

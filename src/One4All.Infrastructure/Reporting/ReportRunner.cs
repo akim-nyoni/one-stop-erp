@@ -111,6 +111,8 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.MenuCode => SystemReports.Menu(),
         SystemReports.TableStatusCode => SystemReports.TableStatus(),
         SystemReports.KitchenTicketsCode => SystemReports.KitchenTickets(),
+        SystemReports.TipAllocationsCode => SystemReports.TipAllocations(),
+        SystemReports.MenuEngineeringCode => SystemReports.MenuEngineering(),
         _ => ReceiptingReports.All().FirstOrDefault(r => string.Equals(r.Code, code, StringComparison.OrdinalIgnoreCase)),
     };
 }
