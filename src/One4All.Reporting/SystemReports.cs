@@ -360,6 +360,9 @@ public static class SystemReports
     /// <summary>The Wastage report code.</summary>
     public const string WastageCode = "RES-WASTE";
 
+    /// <summary>The Bills report code.</summary>
+    public const string BillsCode = "RES-BILLS";
+
     /// <summary>Builds the Kitchen Order Tickets definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition KitchenTickets() => Listing(KitchenTicketsCode, "Kitchen Order Tickets", "Restaurant",
@@ -456,6 +459,13 @@ public static class SystemReports
     public static ReportDefinition Wastage() => Listing(WastageCode, "Stock Wastage", "Restaurant",
         "Spoilage / waste of stock ingredients over a period, with reasons and value written off.", "Wastage",
         [new Column("Date", "Date", 100), new Column("Item", "Item", 130), new Column("Qty", "Qty", 70), new Column("Value", "Value", 100, true), new Column("Reason", "Reason", 200)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Bills definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition Bills() => Listing(BillsCode, "Bills", "Restaurant",
+        "Every restaurant bill over a period — net, tax, service charge, tip, discount and gross.", "Bills",
+        [new Column("Date", "Date", 95), new Column("Order", "Order", 90), new Column("Net", "Net", 90, true), new Column("Tax", "Tax", 80, true), new Column("Service", "Service", 80, true), new Column("Tip", "Tip", 70, true), new Column("Discount", "Discount", 85, true), new Column("Gross", "Gross", 95, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Table Status definition (Restaurant module).</summary>

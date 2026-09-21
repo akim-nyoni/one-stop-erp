@@ -272,6 +272,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Stock wastage records.</summary>
     public DbSet<Core.Restaurant.WastageRecord> WastageRecords => Set<Core.Restaurant.WastageRecord>();
 
+    /// <summary>Persisted restaurant bills (audit trail).</summary>
+    public DbSet<Core.Restaurant.RestaurantBill> RestaurantBills => Set<Core.Restaurant.RestaurantBill>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 

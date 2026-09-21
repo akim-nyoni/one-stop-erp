@@ -104,6 +104,7 @@ public sealed class ReportCatalogueSeeder
         yield return SystemReports.ServerSales();
         yield return SystemReports.CategorySales();
         yield return SystemReports.Wastage();
+        yield return SystemReports.Bills();
 
         // Cashiering & Receipting catalogue (brief §RCP-16, the RC series).
         foreach (ReportDefinition definition in ReceiptingReports.All())

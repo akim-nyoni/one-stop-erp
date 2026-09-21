@@ -642,6 +642,7 @@ public sealed class RestaurantService : IRestaurantService
         }
 
         bool fullyBilled = await CloseIfFullyBilledAsync(companyId, order, invoiceJournal, ct).ConfigureAwait(false);
+        _db.Set<RestaurantBill>().Add(new RestaurantBill(companyId, order.Id, date, net, tax, 0m, 0m, 0m, net + tax, cost.Value, invoiceJournal));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new BillResult(net, tax, 0m, 0m, 0m, net + tax, cost.Value, fullyBilled, invoiceJournal);
     }
@@ -823,6 +824,7 @@ public sealed class RestaurantService : IRestaurantService
         }
 
         bool fullyBilled = await CloseIfFullyBilledAsync(companyId, order, revenueJournal, ct).ConfigureAwait(false);
+        _db.Set<RestaurantBill>().Add(new RestaurantBill(companyId, order.Id, date, net, tax, serviceChargeAmount, tipAmount, discountAmount, gross, cost.Value, revenueJournal));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new BillResult(net, tax, serviceChargeAmount, tipAmount, discountAmount, gross, cost.Value, fullyBilled, revenueJournal);
     }

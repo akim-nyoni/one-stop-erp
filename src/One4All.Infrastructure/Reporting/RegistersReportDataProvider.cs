@@ -17,7 +17,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
         "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus", "KitchenTickets",
-        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales", "CategorySales", "Wastage",
+        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales", "CategorySales", "Wastage", "Bills",
     };
 
     private readonly One4AllDbContext _db;
@@ -53,6 +53,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "SERVERSALES" => await ServerSalesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "CATEGORYSALES" => await CategorySalesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "WASTAGE" => await WastageAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "BILLS" => await BillsAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -103,6 +104,32 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Primary"] = tables.GetValueOrDefault(g.PrimaryTableId, $"#{g.PrimaryTableId}"),
             ["Tables"] = g.MemberCount,
             ["Seats"] = g.Seats,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BillsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly fromDate = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly toDate = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+
+        var rows = await (
+            from bill in _db.Set<Core.Restaurant.RestaurantBill>()
+            join o in _db.Set<Core.Restaurant.TableOrder>() on bill.TableOrderId equals o.Id
+            where bill.CompanyId == companyId && bill.Date >= fromDate && bill.Date <= toDate
+            orderby bill.Date, o.OrderNumber
+            select new { bill.Date, o.OrderNumber, bill.Net, bill.Tax, bill.ServiceCharge, bill.Tip, bill.Discount, bill.Gross })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return rows.Select(r => Row(new()
+        {
+            ["Date"] = r.Date.ToDateTime(TimeOnly.MinValue),
+            ["Order"] = r.OrderNumber,
+            ["Net"] = r.Net,
+            ["Tax"] = r.Tax,
+            ["Service"] = r.ServiceCharge,
+            ["Tip"] = r.Tip,
+            ["Discount"] = r.Discount,
+            ["Gross"] = r.Gross,
         })).ToList();
     }
 

@@ -64,6 +64,25 @@ internal sealed class RestaurantTableConfiguration : IEntityTypeConfiguration<Re
     }
 }
 
+internal sealed class RestaurantBillConfiguration : IEntityTypeConfiguration<RestaurantBill>
+{
+    public void Configure(EntityTypeBuilder<RestaurantBill> b)
+    {
+        b.ToTable("bill", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Net).HasPrecision(19, 4);
+        b.Property(x => x.Tax).HasPrecision(19, 4);
+        b.Property(x => x.ServiceCharge).HasPrecision(19, 4);
+        b.Property(x => x.Tip).HasPrecision(19, 4);
+        b.Property(x => x.Discount).HasPrecision(19, 4);
+        b.Property(x => x.Gross).HasPrecision(19, 4);
+        b.Property(x => x.CostOfSales).HasPrecision(19, 4);
+        b.Property(x => x.RevenueJournalNumber).HasMaxLength(30);
+        b.HasIndex(x => new { x.CompanyId, x.Date });
+        b.HasIndex(x => x.TableOrderId);
+    }
+}
+
 internal sealed class WastageRecordConfiguration : IEntityTypeConfiguration<WastageRecord>
 {
     public void Configure(EntityTypeBuilder<WastageRecord> b)
