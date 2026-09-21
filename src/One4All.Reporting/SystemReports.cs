@@ -351,6 +351,9 @@ public static class SystemReports
     /// <summary>The Active Deliveries report code.</summary>
     public const string DeliveriesCode = "RES-DELIV";
 
+    /// <summary>The Server Sales report code.</summary>
+    public const string ServerSalesCode = "RES-SERVER";
+
     /// <summary>Builds the Kitchen Order Tickets definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition KitchenTickets() => Listing(KitchenTicketsCode, "Kitchen Order Tickets", "Restaurant",
@@ -427,6 +430,13 @@ public static class SystemReports
         "Delivery orders still in progress — customer, address, driver and dispatch state.", "Deliveries",
         [new Column("Order", "Order", 100), new Column("Customer", "Customer", 120), new Column("Address", "Address", 180), new Column("Driver", "Driver", 110), new Column("Status", "Status", 110)],
         []);
+
+    /// <summary>Builds the Server Sales definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition ServerSales() => Listing(ServerSalesCode, "Server Sales", "Restaurant",
+        "Billed sales by waiter over a period — orders, net, tax and gross (for tip-out and performance).", "ServerSales",
+        [new Column("Server", "Server", 140), new Column("Orders", "Orders", 70), new Column("Net", "Net", 100, true), new Column("Tax", "Tax", 90, true), new Column("Gross", "Gross", 100, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Table Status definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>

@@ -660,6 +660,25 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
+    public async Task<Result> ReassignWaiterAsync(long companyId, long orderId, long newWaiterUserId, CancellationToken ct = default)
+    {
+        TableOrder? order = await _db.Set<TableOrder>().FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Result.Failure(Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found."));
+        }
+
+        if (order.Status != TableOrderStatus.Open)
+        {
+            return Result.Failure(Error.Rule("Res.OrderNotOpen", "Only an open order can be reassigned."));
+        }
+
+        order.Reassign(newWaiterUserId);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result> TransferOrderAsync(long companyId, long orderId, long newTableId, CancellationToken ct = default)
     {
         TableOrder? order = await _db.Set<TableOrder>().FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);

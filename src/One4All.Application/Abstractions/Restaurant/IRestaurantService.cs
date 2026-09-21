@@ -279,6 +279,14 @@ public interface IRestaurantService
     /// <returns>Success or an error.</returns>
     Task<Result> CancelOrderAsync(long companyId, long orderId, string reason, CancellationToken ct = default);
 
+    /// <summary>Reassigns an open order to another waiter (shift change or section handover).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The open order.</param>
+    /// <param name="newWaiterUserId">The new waiter.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> ReassignWaiterAsync(long companyId, long orderId, long newWaiterUserId, CancellationToken ct = default);
+
     /// <summary>Transfers an open order to another free table, freeing the original.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="orderId">The order.</param>

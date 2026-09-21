@@ -301,6 +301,10 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
     /// <summary>Moves the order to another table.</summary>
     /// <param name="tableId">The new table.</param>
     public void MoveToTable(long tableId) => TableId = tableId;
+
+    /// <summary>Reassigns the order to another waiter (shift change or section handover).</summary>
+    /// <param name="waiterUserId">The new waiter.</param>
+    public void Reassign(long waiterUserId) => WaiterUserId = waiterUserId;
 }
 
 /// <summary>
