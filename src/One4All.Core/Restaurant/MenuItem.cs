@@ -11,6 +11,7 @@ namespace One4All.Core.Restaurant;
 public sealed class MenuItem : SoftDeletableEntity, ICompanyScoped
 {
     private readonly List<RecipeLine> _recipe = [];
+    private readonly List<MenuItemPrice> _prices = [];
 
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private MenuItem()
@@ -81,6 +82,69 @@ public sealed class MenuItem : SoftDeletableEntity, ICompanyScoped
         _recipe.Add(line);
         return line;
     }
+
+    /// <summary>Alternate prices by price level (e.g. LUNCH, HAPPYHOUR, DELIVERY).</summary>
+    public IReadOnlyList<MenuItemPrice> Prices => _prices.AsReadOnly();
+
+    /// <summary>Sets (adds or updates) the price for a named price level.</summary>
+    /// <param name="priceLevel">The price level, normalised to upper case.</param>
+    /// <param name="price">The price at that level.</param>
+    public void SetPrice(string priceLevel, decimal price)
+    {
+        string level = priceLevel.Trim().ToUpperInvariant();
+        MenuItemPrice? existing = _prices.FirstOrDefault(p => p.PriceLevel == level);
+        if (existing is null)
+        {
+            _prices.Add(new MenuItemPrice(level, price));
+        }
+        else
+        {
+            existing.SetPrice(price);
+        }
+    }
+
+    /// <summary>The price for a named price level, or the base price when the level is null/blank or has none.</summary>
+    /// <param name="priceLevel">The price level, if any.</param>
+    /// <returns>The applicable price.</returns>
+    public decimal PriceFor(string? priceLevel)
+    {
+        if (string.IsNullOrWhiteSpace(priceLevel))
+        {
+            return Price;
+        }
+
+        string level = priceLevel.Trim().ToUpperInvariant();
+        return _prices.FirstOrDefault(p => p.PriceLevel == level)?.Price ?? Price;
+    }
+}
+
+/// <summary>An alternate price for a menu item at a named price level (<c>res.menu_item_price</c>).</summary>
+public sealed class MenuItemPrice : Entity
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private MenuItemPrice() => PriceLevel = string.Empty;
+
+    /// <summary>Creates a price-level price.</summary>
+    /// <param name="priceLevel">The price level (normalised upper case).</param>
+    /// <param name="price">The price.</param>
+    public MenuItemPrice(string priceLevel, decimal price)
+    {
+        PriceLevel = priceLevel;
+        Price = price;
+    }
+
+    /// <summary>The owning menu item id.</summary>
+    public long MenuItemId { get; private set; }
+
+    /// <summary>The price level (e.g. LUNCH, HAPPYHOUR, DELIVERY).</summary>
+    public string PriceLevel { get; private set; }
+
+    /// <summary>The price at that level.</summary>
+    public decimal Price { get; private set; }
+
+    /// <summary>Updates the price.</summary>
+    /// <param name="price">The new price.</param>
+    public void SetPrice(decimal price) => Price = price;
 }
 
 /// <summary>One ingredient of a menu item's recipe (<c>res.recipe_line</c>).</summary>

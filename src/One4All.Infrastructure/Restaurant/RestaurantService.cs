@@ -153,7 +153,7 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, int? seatNumber = null, CancellationToken ct = default)
+    public async Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, int? seatNumber = null, string? priceLevel = null, CancellationToken ct = default)
     {
         if (quantity <= 0m)
         {
@@ -171,7 +171,7 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.OrderNotOpen", "Items can only be added to an open order.");
         }
 
-        MenuItem? menu = await _db.Set<MenuItem>().FirstOrDefaultAsync(m => m.Id == menuItemId && m.CompanyId == companyId, ct).ConfigureAwait(false);
+        MenuItem? menu = await _db.Set<MenuItem>().Include(m => m.Prices).FirstOrDefaultAsync(m => m.Id == menuItemId && m.CompanyId == companyId, ct).ConfigureAwait(false);
         if (menu is null)
         {
             return Error.NotFound("Res.MenuItemNotFound", $"Menu item {menuItemId} not found.");
@@ -182,9 +182,33 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.MenuItemUnavailable", $"Menu item {menu.Code} is not available.");
         }
 
-        TableOrderLine line = order.AddLine(menu.Id, menu.Name, quantity, menu.Price, taxAmount, menu.RevenueAccountCode, menu.CostOfSalesAccountCode, course, seatNumber);
+        TableOrderLine line = order.AddLine(menu.Id, menu.Name, quantity, menu.PriceFor(priceLevel), taxAmount, menu.RevenueAccountCode, menu.CostOfSalesAccountCode, course, seatNumber);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return line.LineNet;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetMenuItemPriceLevelAsync(long companyId, long menuItemId, string priceLevel, decimal price, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(priceLevel))
+        {
+            return Result.Failure(Error.Validation("Res.PriceLevelRequired", "A price level is required."));
+        }
+
+        if (price < 0m)
+        {
+            return Result.Failure(Error.Rule("Res.PriceLevelNegative", "A price-level price cannot be negative."));
+        }
+
+        MenuItem? menu = await _db.Set<MenuItem>().Include(m => m.Prices).FirstOrDefaultAsync(m => m.Id == menuItemId && m.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (menu is null)
+        {
+            return Result.Failure(Error.NotFound("Res.MenuItemNotFound", $"Menu item {menuItemId} not found."));
+        }
+
+        menu.SetPrice(priceLevel, price);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 
     /// <inheritdoc />

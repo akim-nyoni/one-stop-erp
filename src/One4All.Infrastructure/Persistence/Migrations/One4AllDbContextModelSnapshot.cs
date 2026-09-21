@@ -5734,6 +5734,46 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("menu_item", "res");
                 });
 
+            modelBuilder.Entity("One4All.Core.Restaurant.MenuItemPrice", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("MenuItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("menu_item_id");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("price");
+
+                    b.Property<string>("PriceLevel")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("price_level");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_menu_item_price");
+
+                    b.HasIndex("MenuItemId", "PriceLevel")
+                        .IsUnique()
+                        .HasDatabaseName("ix_menu_item_price_menu_item_id_price_level");
+
+                    b.ToTable("menu_item_price", "res");
+                });
+
             modelBuilder.Entity("One4All.Core.Restaurant.OrderLineModifier", b =>
                 {
                     b.Property<long>("Id")
@@ -8995,6 +9035,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_kitchen_ticket_line_kitchen_tickets_kitchen_ticket_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Restaurant.MenuItemPrice", b =>
+                {
+                    b.HasOne("One4All.Core.Restaurant.MenuItem", null)
+                        .WithMany("Prices")
+                        .HasForeignKey("MenuItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_menu_item_price_menu_items_menu_item_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Restaurant.OrderLineModifier", b =>
                 {
                     b.HasOne("One4All.Core.Restaurant.TableOrderLine", null)
@@ -9246,6 +9296,8 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("One4All.Core.Restaurant.MenuItem", b =>
                 {
+                    b.Navigation("Prices");
+
                     b.Navigation("Recipe");
                 });
 

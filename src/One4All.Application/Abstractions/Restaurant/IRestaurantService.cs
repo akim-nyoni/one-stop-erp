@@ -118,9 +118,19 @@ public interface IRestaurantService
     /// <param name="taxAmount">The tax on the line, if any.</param>
     /// <param name="course">The dining course the item belongs to (for course-by-course firing).</param>
     /// <param name="seatNumber">The seat that ordered the item, for split-by-seat billing (optional).</param>
+    /// <param name="priceLevel">The price level to charge (e.g. LUNCH, HAPPYHOUR); the base price when null.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The line net value.</returns>
-    Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, int? seatNumber = null, CancellationToken ct = default);
+    Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, int? seatNumber = null, string? priceLevel = null, CancellationToken ct = default);
+
+    /// <summary>Sets (adds or updates) a menu item's price at a named price level (e.g. LUNCH, HAPPYHOUR, DELIVERY).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="menuItemId">The menu item.</param>
+    /// <param name="priceLevel">The price level.</param>
+    /// <param name="price">The price at that level.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> SetMenuItemPriceLevelAsync(long companyId, long menuItemId, string priceLevel, decimal price, CancellationToken ct = default);
 
     /// <summary>
     /// Adds a modifier to an order line (e.g. "extra cheese" +2, "no onions" 0). The price delta changes the

@@ -19,8 +19,22 @@ internal sealed class MenuItemConfiguration : IEntityTypeConfiguration<MenuItem>
         b.Property(x => x.Price).HasPrecision(19, 4);
         b.HasMany(x => x.Recipe).WithOne().HasForeignKey(x => x.MenuItemId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Recipe).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasMany(x => x.Prices).WithOne().HasForeignKey(x => x.MenuItemId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Prices).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+internal sealed class MenuItemPriceConfiguration : IEntityTypeConfiguration<MenuItemPrice>
+{
+    public void Configure(EntityTypeBuilder<MenuItemPrice> b)
+    {
+        b.ToTable("menu_item_price", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PriceLevel).HasMaxLength(30);
+        b.Property(x => x.Price).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.MenuItemId, x.PriceLevel }).IsUnique();
     }
 }
 
