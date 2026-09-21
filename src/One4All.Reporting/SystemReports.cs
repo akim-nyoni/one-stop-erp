@@ -363,6 +363,9 @@ public static class SystemReports
     /// <summary>The Bills report code.</summary>
     public const string BillsCode = "RES-BILLS";
 
+    /// <summary>The Menu Cost Card report code.</summary>
+    public const string MenuCostCode = "RES-COST";
+
     /// <summary>Builds the Kitchen Order Tickets definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition KitchenTickets() => Listing(KitchenTicketsCode, "Kitchen Order Tickets", "Restaurant",
@@ -467,6 +470,13 @@ public static class SystemReports
         "Every restaurant bill over a period — net, tax, service charge, tip, discount and gross.", "Bills",
         [new Column("Date", "Date", 95), new Column("Order", "Order", 90), new Column("Net", "Net", 90, true), new Column("Tax", "Tax", 80, true), new Column("Service", "Service", 80, true), new Column("Tip", "Tip", 70, true), new Column("Discount", "Discount", 85, true), new Column("Gross", "Gross", 95, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Menu Cost Card definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition MenuCost() => Listing(MenuCostCode, "Menu Cost Card", "Restaurant",
+        "Every menu item's price, recipe cost (from ingredient average cost), gross margin and food-cost %.", "MenuCost",
+        [new Column("Code", "Code", 90), new Column("Name", "Name", 150), new Column("Price", "Price", 90, true), new Column("Cost", "Cost", 90, true), new Column("Margin", "Margin", 90, true), new Column("FoodCostPct", "Food %", 80, true)],
+        []);
 
     /// <summary>Builds the Table Status definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>

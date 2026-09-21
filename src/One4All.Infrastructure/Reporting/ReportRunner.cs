@@ -125,6 +125,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.CategorySalesCode => SystemReports.CategorySales(),
         SystemReports.WastageCode => SystemReports.Wastage(),
         SystemReports.BillsCode => SystemReports.Bills(),
+        SystemReports.MenuCostCode => SystemReports.MenuCost(),
         _ => ReceiptingReports.All().FirstOrDefault(r => string.Equals(r.Code, code, StringComparison.OrdinalIgnoreCase)),
     };
 }

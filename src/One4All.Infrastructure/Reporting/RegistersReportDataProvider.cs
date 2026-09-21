@@ -17,7 +17,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
         "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus", "KitchenTickets",
-        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales", "CategorySales", "Wastage", "Bills",
+        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales", "CategorySales", "Wastage", "Bills", "MenuCost",
     };
 
     private readonly One4AllDbContext _db;
@@ -54,6 +54,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "CATEGORYSALES" => await CategorySalesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "WASTAGE" => await WastageAsync(companyId, parameters, ct).ConfigureAwait(false),
             "BILLS" => await BillsAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "MENUCOST" => await MenuCostAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -105,6 +106,37 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Tables"] = g.MemberCount,
             ["Seats"] = g.Seats,
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> MenuCostAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Restaurant.MenuItem> menu = await _db.Set<Core.Restaurant.MenuItem>().Include(m => m.Recipe)
+            .Where(m => m.CompanyId == companyId)
+            .OrderBy(m => m.Code)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<long, decimal> itemCost = await _db.Set<Core.Inventory.StockBalance>()
+            .Where(b => b.CompanyId == companyId)
+            .GroupBy(b => b.ItemId)
+            .Select(g => new { ItemId = g.Key, Qty = g.Sum(x => x.QuantityOnHand), Value = g.Sum(x => x.TotalValue) })
+            .ToDictionaryAsync(x => x.ItemId, x => x.Qty > 0m ? decimal.Round(x.Value / x.Qty, 4, MidpointRounding.ToEven) : 0m, ct)
+            .ConfigureAwait(false);
+
+        return menu.Select(m =>
+        {
+            decimal cost = m.Recipe.Sum(r => r.Quantity * itemCost.GetValueOrDefault(r.IngredientItemId, 0m));
+            decimal margin = m.Price - cost;
+            decimal foodPct = m.Price > 0m ? decimal.Round(cost / m.Price * 100m, 2, MidpointRounding.ToEven) : 0m;
+            return Row(new()
+            {
+                ["Code"] = m.Code,
+                ["Name"] = m.Name,
+                ["Price"] = m.Price,
+                ["Cost"] = decimal.Round(cost, 2, MidpointRounding.ToEven),
+                ["Margin"] = decimal.Round(margin, 2, MidpointRounding.ToEven),
+                ["FoodCostPct"] = foodPct,
+            });
+        }).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BillsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
