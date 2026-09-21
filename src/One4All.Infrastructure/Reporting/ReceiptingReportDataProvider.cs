@@ -51,6 +51,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC30" => await SuspenseAllocationLogAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC31" => await ImportBatchesAsync(companyId, ct).ConfigureAwait(false),
             "RC32" => await ImportExceptionsAsync(companyId, ct).ConfigureAwait(false),
+            "RC33" => await PendingTendersAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC34" => await DishonoursAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC38" => await PaymentHistoryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC39" => await CreditBalancesAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -389,6 +390,22 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .OrderBy(d => d.DepositDate)
             .ToListAsync(ct).ConfigureAwait(false);
         return deposits.Select(d => Row(new() { ["Reference"] = d.Reference, ["DepositDate"] = d.DepositDate.ToDateTime(TimeOnly.MinValue), ["Days"] = Math.Max(0, asAt.DayNumber - d.DepositDate.DayNumber), ["Amount"] = d.Amount })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PendingTendersAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly asAt = ReportParameters.Date(parameters, "AsAtDate");
+        List<PendingTender> pending = await _db.Set<PendingTender>()
+            .Where(t => t.CompanyId == companyId && t.Status == PendingTenderStatus.Pending)
+            .OrderBy(t => t.Date)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return pending.Select(t => Row(new()
+        {
+            ["Reference"] = t.Reference ?? t.ReceiptNumber,
+            ["Tender"] = t.TenderType.ToString(),
+            ["Days"] = Math.Max(0, asAt.DayNumber - t.Date.DayNumber),
+            ["Amount"] = t.Amount,
+        })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DishonoursAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

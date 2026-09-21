@@ -119,6 +119,11 @@ public sealed class ReceiptingService : IReceiptingService
         string receiptNumber = await NextReceiptNumberAsync(request.CompanyId, station, ct).ConfigureAwait(false);
         CurrencyCode currency = request.Currency ?? company.BaseCurrency;
 
+        // A pending receipt (a claimed bank transfer/cheque) posts to the uncleared-effects control until the
+        // bank statement confirms it, rather than straight to cash/bank.
+        bool pending = request.Pending && !string.IsNullOrWhiteSpace(request.PendingAccountCode);
+        string cashCode = pending ? request.PendingAccountCode! : request.CashAccountCode;
+
         Receipt receipt = new(request.CompanyId, session.Id, session.StationId, session.CashierUserId, receiptNumber, request.Date, request.PayerKind, request.PayerAccountId, currency);
         foreach (ReceiptLineRequest line in request.Lines)
         {
@@ -147,7 +152,7 @@ public sealed class ReceiptingService : IReceiptingService
                 ReceiptDate = request.Date,
                 Currency = currency,
                 Amount = debtorTotal,
-                BankAccountCode = request.CashAccountCode,
+                BankAccountCode = cashCode,
                 ExchangeRate = request.ExchangeRate,
                 Narrative = $"Receipt {receiptNumber}",
             }, ct).ConfigureAwait(false);
@@ -158,7 +163,7 @@ public sealed class ReceiptingService : IReceiptingService
             }
 
             receipt.DebtorOpenItemId = receiptPosting.Value.OpenItemId;
-            receipt.CashAccountCode = request.CashAccountCode;
+            receipt.CashAccountCode = cashCode;
 
             // Same-currency payments allocate here; a foreign-currency payment posts as an on-account credit
             // (in its own currency) to be matched — realising FX — in the allocation workbench.
@@ -179,7 +184,7 @@ public sealed class ReceiptingService : IReceiptingService
             decimal codedTotal = codedLines.Sum(l => l.Amount);
             List<JournalLineRequest> journalLines =
             [
-                new JournalLineRequest { AccountCode = request.CashAccountCode, Side = JournalSide.Debit, TransactionAmount = codedTotal },
+                new JournalLineRequest { AccountCode = cashCode, Side = JournalSide.Debit, TransactionAmount = codedTotal },
             ];
             foreach (ReceiptLineRequest line in codedLines)
             {
@@ -212,6 +217,18 @@ public sealed class ReceiptingService : IReceiptingService
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // Log each tender as pending (unconfirmed) so it clears to the bank on statement confirmation.
+        if (pending)
+        {
+            foreach (ReceiptTenderRequest tender in request.Tenders)
+            {
+                _db.Set<PendingTender>().Add(new PendingTender(request.CompanyId, receipt.Id, receiptNumber, tender.Type, tender.Reference, tender.Amount, request.Date, cashCode));
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
         return new ReceiptResult(receipt.Id, receiptNumber, total, allocatedToDebt, creditOnAccount);
     }
 
@@ -682,6 +699,47 @@ public sealed class ReceiptingService : IReceiptingService
         _db.Set<DishonouredPayment>().Add(new DishonouredPayment(companyId, receiptId, receipt.ReceiptNumber, reference, drawer, amount, penaltyAmount, date));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<string>> ConfirmPendingTenderAsync(long companyId, long pendingTenderId, DateOnly date, string bankAccountCode, CancellationToken ct = default)
+    {
+        PendingTender? tender = await _db.Set<PendingTender>().FirstOrDefaultAsync(t => t.Id == pendingTenderId && t.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (tender is null)
+        {
+            return Error.NotFound("Rcp.PendingTenderNotFound", $"Pending tender {pendingTenderId} not found.");
+        }
+
+        if (tender.Status == PendingTenderStatus.Confirmed)
+        {
+            return Error.Rule("Rcp.AlreadyConfirmed", $"Pending tender {pendingTenderId} is already confirmed.");
+        }
+
+        Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId,
+            SourceModule = "GL",
+            PostingDate = date,
+            TransactionCurrency = company.BaseCurrency,
+            DocumentType = "TENDER-CLR",
+            DocumentNumber = tender.ReceiptNumber,
+            Narrative = $"Pending tender cleared — {tender.ReceiptNumber}",
+            Lines =
+            [
+                new JournalLineRequest { AccountCode = bankAccountCode, Side = JournalSide.Debit, TransactionAmount = tender.Amount },
+                new JournalLineRequest { AccountCode = tender.PendingAccountCode, Side = JournalSide.Credit, TransactionAmount = tender.Amount },
+            ],
+        }, ct).ConfigureAwait(false);
+
+        if (posted.IsFailure)
+        {
+            return posted.Error;
+        }
+
+        tender.Confirm(date);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return posted.Value.JournalNumber;
     }
 
     /// <inheritdoc />

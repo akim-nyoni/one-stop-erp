@@ -112,6 +112,12 @@ public sealed class ReceiptRequest
     /// <summary>The cash/bank control account debited with the money received.</summary>
     public string CashAccountCode { get; init; } = string.Empty;
 
+    /// <summary>Whether the tender is pending (a claimed bank transfer/cheque not yet confirmed).</summary>
+    public bool Pending { get; init; }
+
+    /// <summary>The uncleared-effects control account a pending receipt posts to until confirmed.</summary>
+    public string? PendingAccountCode { get; init; }
+
     /// <summary>The credit-on-account (overpayment) liability account, when a debtor overpays.</summary>
     public string? CreditOnAccountCode { get; init; }
 
@@ -345,6 +351,18 @@ public interface IReceiptingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success, or an error.</returns>
     Task<Result> RecordDishonourAsync(long companyId, long receiptId, DateOnly date, decimal penaltyAmount, string? penaltyAccountCode, string? penaltyInvoiceNumber, long reverserUserId, string reason, CancellationToken ct = default);
+
+    /// <summary>
+    /// Confirms a pending tender on the bank statement (brief §RCP-7): Dr bank, Cr the uncleared-effects
+    /// control the pending receipt posted to. Clears it from the pending pool.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="pendingTenderId">The pending tender.</param>
+    /// <param name="date">The confirmation date.</param>
+    /// <param name="bankAccountCode">The bank account the funds cleared into (debited).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The GL journal number.</returns>
+    Task<Result<string>> ConfirmPendingTenderAsync(long companyId, long pendingTenderId, DateOnly date, string bankAccountCode, CancellationToken ct = default);
 
     /// <summary>Verifies a closed session by a supervisor (who must not be the cashier).</summary>
     /// <param name="companyId">The company.</param>

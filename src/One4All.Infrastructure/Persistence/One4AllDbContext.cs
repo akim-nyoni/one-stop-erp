@@ -233,6 +233,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Dishonoured cheques / reversed payments.</summary>
     public DbSet<Core.Receipting.DishonouredPayment> DishonouredPayments => Set<Core.Receipting.DishonouredPayment>();
 
+    /// <summary>Pending / unconfirmed tenders.</summary>
+    public DbSet<Core.Receipting.PendingTender> PendingTenders => Set<Core.Receipting.PendingTender>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 

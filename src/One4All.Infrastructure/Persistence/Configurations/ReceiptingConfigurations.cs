@@ -120,6 +120,21 @@ internal sealed class ManualReceiptCaptureConfiguration : IEntityTypeConfigurati
     }
 }
 
+internal sealed class PendingTenderConfiguration : IEntityTypeConfiguration<PendingTender>
+{
+    public void Configure(EntityTypeBuilder<PendingTender> b)
+    {
+        b.ToTable("pending_tender", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ReceiptNumber).HasMaxLength(30);
+        b.Property(x => x.TenderType).HasConversion<int>();
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.Property(x => x.PendingAccountCode).HasMaxLength(8);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}
+
 internal sealed class DishonouredPaymentConfiguration : IEntityTypeConfiguration<DishonouredPayment>
 {
     public void Configure(EntityTypeBuilder<DishonouredPayment> b)
