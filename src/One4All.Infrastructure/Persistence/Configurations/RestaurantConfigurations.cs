@@ -79,5 +79,31 @@ internal sealed class TableOrderLineConfiguration : IEntityTypeConfiguration<Tab
         b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
         b.Property(x => x.CostOfSalesAccountCode).HasMaxLength(8);
         b.Ignore(x => x.LineNet);
+        b.Ignore(x => x.RemainingQuantity);
+    }
+}
+
+internal sealed class KitchenTicketConfiguration : IEntityTypeConfiguration<KitchenTicket>
+{
+    public void Configure(EntityTypeBuilder<KitchenTicket> b)
+    {
+        b.ToTable("kitchen_ticket", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.TicketNumber).HasMaxLength(40);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.KitchenTicketId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}
+
+internal sealed class KitchenTicketLineConfiguration : IEntityTypeConfiguration<KitchenTicketLine>
+{
+    public void Configure(EntityTypeBuilder<KitchenTicketLine> b)
+    {
+        b.ToTable("kitchen_ticket_line", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Description).HasMaxLength(120);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
     }
 }

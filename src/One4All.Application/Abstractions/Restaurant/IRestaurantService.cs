@@ -1,4 +1,5 @@
 using One4All.Core.Common;
+using One4All.Core.Restaurant;
 
 namespace One4All.Application.Abstractions.Restaurant;
 
@@ -10,12 +11,13 @@ public readonly record struct RecipeIngredient(long IngredientItemId, decimal Qu
 /// <summary>The result of billing a table order (or a split of it).</summary>
 /// <param name="Net">The net (tax-exclusive) total billed.</param>
 /// <param name="Tax">The tax total billed.</param>
-/// <param name="ServiceCharge">The service charge / gratuity added.</param>
-/// <param name="Gross">The gross total charged (net + tax + service charge).</param>
+/// <param name="ServiceCharge">The service charge / gratuity (income to the house) added.</param>
+/// <param name="Tip">The tip (staff money — a liability, not income) added.</param>
+/// <param name="Gross">The gross total charged (net + tax + service charge + tip).</param>
 /// <param name="CostOfSales">The cost of sales released by exploding the recipes.</param>
 /// <param name="FullyBilled">True when this bill settled the whole order (table freed).</param>
 /// <param name="RevenueJournalNumber">The revenue GL journal number.</param>
-public readonly record struct BillResult(decimal Net, decimal Tax, decimal ServiceCharge, decimal Gross, decimal CostOfSales, bool FullyBilled, string RevenueJournalNumber);
+public readonly record struct BillResult(decimal Net, decimal Tax, decimal ServiceCharge, decimal Tip, decimal Gross, decimal CostOfSales, bool FullyBilled, string RevenueJournalNumber);
 
 /// <summary>A portion of an order to bill on a split.</summary>
 /// <param name="OrderLineId">The order line.</param>
@@ -80,11 +82,13 @@ public interface IRestaurantService
     /// <param name="date">The billing date.</param>
     /// <param name="cashAccountCode">The cash/tender account debited with the gross.</param>
     /// <param name="taxAccountCode">The output-tax account, when there is tax.</param>
-    /// <param name="serviceChargeAmount">An optional service charge / gratuity added to the bill.</param>
+    /// <param name="serviceChargeAmount">An optional service charge / gratuity (house income) added to the bill.</param>
     /// <param name="serviceChargeAccountCode">The service-charge income account (required when charging).</param>
+    /// <param name="tipAmount">An optional tip (staff money — a liability) added to the bill.</param>
+    /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The bill result.</returns>
-    Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, CancellationToken ct = default);
+    Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, CancellationToken ct = default);
 
     /// <summary>
     /// Bills part of an order (a split): only the specified line portions. Posts revenue and recipe cost of
@@ -97,11 +101,26 @@ public interface IRestaurantService
     /// <param name="portions">The line portions to bill now.</param>
     /// <param name="cashAccountCode">The cash/tender account debited with the gross.</param>
     /// <param name="taxAccountCode">The output-tax account, when there is tax.</param>
-    /// <param name="serviceChargeAmount">An optional service charge / gratuity added to this split.</param>
+    /// <param name="serviceChargeAmount">An optional service charge / gratuity (house income) added to this split.</param>
     /// <param name="serviceChargeAccountCode">The service-charge income account (required when charging).</param>
+    /// <param name="tipAmount">An optional tip (staff money — a liability) added to this split.</param>
+    /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The bill result.</returns>
-    Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, CancellationToken ct = default);
+    Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Pays out accumulated tips to staff (brief: tips are staff money, a liability): Dr tips payable, Cr the
+    /// funding account. Clears the tips-payable balance.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="amount">The amount paid out.</param>
+    /// <param name="date">The payout date.</param>
+    /// <param name="tipsPayableAccountCode">The tips-payable liability account (debited).</param>
+    /// <param name="fundingAccountCode">The cash/bank account the payout is made from (credited).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The GL journal number.</returns>
+    Task<Result<string>> PayTipsAsync(long companyId, decimal amount, DateOnly date, string tipsPayableAccountCode, string fundingAccountCode, CancellationToken ct = default);
 
     /// <summary>Cancels an open order (nothing was billed) and frees the table. Requires a reason.</summary>
     /// <param name="companyId">The company.</param>
@@ -118,4 +137,24 @@ public interface IRestaurantService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
     Task<Result> TransferOrderAsync(long companyId, long orderId, long newTableId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Fires the order's not-yet-fired lines to the kitchen as a kitchen order ticket (KOT). Operational
+    /// only (no GL). New lines added later can be fired again as a further ticket (course firing).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The open order.</param>
+    /// <param name="ticketNumber">The ticket number.</param>
+    /// <param name="date">The fire date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created ticket id.</returns>
+    Task<Result<long>> FireOrderAsync(long companyId, long orderId, string ticketNumber, DateOnly date, CancellationToken ct = default);
+
+    /// <summary>Advances a kitchen ticket to the next preparation state (Sent → Preparing → Ready → Served).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="ticketId">The ticket.</param>
+    /// <param name="status">The new status (must be later than the current one).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> AdvanceTicketAsync(long companyId, long ticketId, KitchenTicketStatus status, CancellationToken ct = default);
 }

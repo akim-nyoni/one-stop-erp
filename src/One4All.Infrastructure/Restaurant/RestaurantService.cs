@@ -111,7 +111,7 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, CancellationToken ct = default)
+    public async Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, CancellationToken ct = default)
     {
         Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
         if (loaded.IsFailure)
@@ -130,11 +130,11 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.NothingToBill", "The order has nothing left to bill.");
         }
 
-        return await PostBillAsync(companyId, order, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, ct).ConfigureAwait(false);
+        return await PostBillAsync(companyId, order, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, CancellationToken ct = default)
+    public async Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, CancellationToken ct = default)
     {
         if (portions.Count == 0)
         {
@@ -165,7 +165,39 @@ public sealed class RestaurantService : IRestaurantService
             resolved.Add((line, portion.Quantity));
         }
 
-        return await PostBillAsync(companyId, order, warehouseId, date, resolved, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, ct).ConfigureAwait(false);
+        return await PostBillAsync(companyId, order, warehouseId, date, resolved, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<string>> PayTipsAsync(long companyId, decimal amount, DateOnly date, string tipsPayableAccountCode, string fundingAccountCode, CancellationToken ct = default)
+    {
+        if (amount <= 0m)
+        {
+            return Error.Rule("Res.NonPositiveAmount", "The tips payout must be positive.");
+        }
+
+        Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        if (company is null)
+        {
+            return Error.NotFound("Res.CompanyNotFound", $"Company {companyId} not found.");
+        }
+
+        Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId,
+            SourceModule = "RES",
+            PostingDate = date,
+            TransactionCurrency = company.BaseCurrency,
+            DocumentType = "RES-TIPS",
+            Narrative = "Tips paid out to staff",
+            Lines =
+            [
+                new JournalLineRequest { AccountCode = tipsPayableAccountCode, Side = JournalSide.Debit, TransactionAmount = amount },
+                new JournalLineRequest { AccountCode = fundingAccountCode, Side = JournalSide.Credit, TransactionAmount = amount },
+            ],
+        }, ct).ConfigureAwait(false);
+
+        return posted.IsFailure ? posted.Error : posted.Value.JournalNumber;
     }
 
     private async Task<Result<TableOrder>> LoadOpenOrderAsync(long companyId, long orderId, CancellationToken ct)
@@ -189,16 +221,21 @@ public sealed class RestaurantService : IRestaurantService
         return order;
     }
 
-    private async Task<Result<BillResult>> PostBillAsync(long companyId, TableOrder order, long warehouseId, DateOnly date, List<(TableOrderLine Line, decimal Quantity)> portions, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, CancellationToken ct)
+    private async Task<Result<BillResult>> PostBillAsync(long companyId, TableOrder order, long warehouseId, DateOnly date, List<(TableOrderLine Line, decimal Quantity)> portions, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, CancellationToken ct)
     {
-        if (serviceChargeAmount < 0m)
+        if (serviceChargeAmount < 0m || tipAmount < 0m)
         {
-            return Error.Rule("Res.InvalidServiceCharge", "The service charge cannot be negative.");
+            return Error.Rule("Res.InvalidExtra", "The service charge and tip cannot be negative.");
         }
 
         if (serviceChargeAmount > 0m && string.IsNullOrWhiteSpace(serviceChargeAccountCode))
         {
             return Error.Validation("Res.ServiceChargeAccountRequired", "A service charge requires an income account.");
+        }
+
+        if (tipAmount > 0m && string.IsNullOrWhiteSpace(tipsPayableAccountCode))
+        {
+            return Error.Validation("Res.TipsAccountRequired", "A tip requires a tips-payable account.");
         }
 
         Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
@@ -220,9 +257,9 @@ public sealed class RestaurantService : IRestaurantService
             netByAccount[line.RevenueAccountCode] = netByAccount.GetValueOrDefault(line.RevenueAccountCode) + portionNet;
         }
 
-        decimal gross = net + tax + serviceChargeAmount;
+        decimal gross = net + tax + serviceChargeAmount + tipAmount;
 
-        // Revenue: Dr cash (gross), Cr revenue by account (net), Cr output tax, Cr service-charge income.
+        // Dr cash (gross); Cr revenue (net), output tax, service-charge income and tips payable (a liability).
         List<JournalLineRequest> lines = [new JournalLineRequest { AccountCode = cashAccountCode, Side = JournalSide.Debit, TransactionAmount = gross }];
         lines.AddRange(netByAccount.Select(kv => new JournalLineRequest { AccountCode = kv.Key, Side = JournalSide.Credit, TransactionAmount = kv.Value }));
         if (tax != 0m && !string.IsNullOrWhiteSpace(taxAccountCode))
@@ -233,6 +270,11 @@ public sealed class RestaurantService : IRestaurantService
         if (serviceChargeAmount > 0m)
         {
             lines.Add(new JournalLineRequest { AccountCode = serviceChargeAccountCode!, Side = JournalSide.Credit, TransactionAmount = serviceChargeAmount });
+        }
+
+        if (tipAmount > 0m)
+        {
+            lines.Add(new JournalLineRequest { AccountCode = tipsPayableAccountCode!, Side = JournalSide.Credit, TransactionAmount = tipAmount });
         }
 
         Result<PostingReceipt> revenue = await _posting.PostAsync(new JournalRequest
@@ -297,7 +339,7 @@ public sealed class RestaurantService : IRestaurantService
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new BillResult(net, tax, serviceChargeAmount, gross, costOfSales, fullyBilled, revenue.Value.JournalNumber);
+        return new BillResult(net, tax, serviceChargeAmount, tipAmount, gross, costOfSales, fullyBilled, revenue.Value.JournalNumber);
     }
 
     /// <inheritdoc />
@@ -360,6 +402,56 @@ public sealed class RestaurantService : IRestaurantService
         oldTable?.Free();
         destination.Occupy();
         order.MoveToTable(newTableId);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> FireOrderAsync(long companyId, long orderId, string ticketNumber, DateOnly date, CancellationToken ct = default)
+    {
+        TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found.");
+        }
+
+        if (order.Status != TableOrderStatus.Open)
+        {
+            return Error.Rule("Res.OrderNotOpen", "Only an open order can be fired to the kitchen.");
+        }
+
+        List<TableOrderLine> toFire = order.Lines.Where(l => !l.Fired).ToList();
+        if (toFire.Count == 0)
+        {
+            return Error.Rule("Res.NothingToFire", "There are no new lines to fire to the kitchen.");
+        }
+
+        KitchenTicket ticket = new(companyId, orderId, ticketNumber, date);
+        foreach (TableOrderLine line in toFire)
+        {
+            ticket.AddLine(line.MenuItemId, line.Description, line.Quantity);
+            line.MarkFired();
+        }
+
+        _db.Set<KitchenTicket>().Add(ticket);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return ticket.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> AdvanceTicketAsync(long companyId, long ticketId, KitchenTicketStatus status, CancellationToken ct = default)
+    {
+        KitchenTicket? ticket = await _db.Set<KitchenTicket>().FirstOrDefaultAsync(t => t.Id == ticketId && t.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (ticket is null)
+        {
+            return Result.Failure(Error.NotFound("Res.TicketNotFound", $"Kitchen ticket {ticketId} not found."));
+        }
+
+        if (!ticket.Advance(status))
+        {
+            return Result.Failure(Error.Rule("Res.TicketNotAdvanced", $"Ticket {ticket.TicketNumber} cannot move from {ticket.Status} to {status}."));
+        }
+
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }

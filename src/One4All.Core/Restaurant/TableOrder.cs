@@ -208,6 +208,12 @@ public sealed class TableOrderLine : Entity
     /// <summary>The net line value (quantity × unit price).</summary>
     public decimal LineNet => decimal.Round(Quantity * UnitPrice, 4, MidpointRounding.ToEven);
 
+    /// <summary>Whether the line has been fired to the kitchen (on a kitchen order ticket).</summary>
+    public bool Fired { get; private set; }
+
+    /// <summary>Marks the line fired to the kitchen.</summary>
+    public void MarkFired() => Fired = true;
+
     /// <summary>The quantity already billed (for split bills).</summary>
     public decimal BilledQuantity { get; private set; }
 

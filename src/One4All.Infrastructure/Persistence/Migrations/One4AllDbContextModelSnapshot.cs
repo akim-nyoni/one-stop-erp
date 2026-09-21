@@ -5441,6 +5441,111 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("report_definition", "rpt");
                 });
 
+            modelBuilder.Entity("One4All.Core.Restaurant.KitchenTicket", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateOnly>("SentOn")
+                        .HasColumnType("date")
+                        .HasColumnName("sent_on");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("TableOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("table_order_id");
+
+                    b.Property<string>("TicketNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ticket_number");
+
+                    b.HasKey("Id")
+                        .HasName("pk_kitchen_ticket");
+
+                    b.HasIndex("CompanyId", "Status")
+                        .HasDatabaseName("ix_kitchen_ticket_company_id_status");
+
+                    b.ToTable("kitchen_ticket", "res");
+                });
+
+            modelBuilder.Entity("One4All.Core.Restaurant.KitchenTicketLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("description");
+
+                    b.Property<long>("KitchenTicketId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("kitchen_ticket_id");
+
+                    b.Property<long>("MenuItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("menu_item_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_kitchen_ticket_line");
+
+                    b.HasIndex("KitchenTicketId")
+                        .HasDatabaseName("ix_kitchen_ticket_line_kitchen_ticket_id");
+
+                    b.ToTable("kitchen_ticket_line", "res");
+                });
+
             modelBuilder.Entity("One4All.Core.Restaurant.MenuItem", b =>
                 {
                     b.Property<long>("Id")
@@ -5748,6 +5853,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)")
                         .HasColumnName("description");
+
+                    b.Property<bool>("Fired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("fired");
 
                     b.Property<long>("MenuItemId")
                         .HasColumnType("bigint")
@@ -8301,6 +8410,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_session_float_cashier_sessions_cashier_session_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Restaurant.KitchenTicketLine", b =>
+                {
+                    b.HasOne("One4All.Core.Restaurant.KitchenTicket", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("KitchenTicketId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_kitchen_ticket_line_kitchen_tickets_kitchen_ticket_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Restaurant.RecipeLine", b =>
                 {
                     b.HasOne("One4All.Core.Restaurant.MenuItem", null)
@@ -8533,6 +8652,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Receipting.StationeryBook", b =>
                 {
                     b.Navigation("Captures");
+                });
+
+            modelBuilder.Entity("One4All.Core.Restaurant.KitchenTicket", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("One4All.Core.Restaurant.MenuItem", b =>
