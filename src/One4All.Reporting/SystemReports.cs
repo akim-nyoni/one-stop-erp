@@ -305,6 +305,26 @@ public static class SystemReports
         [new Column("OrderNumber", "Order", 100), new Column("OrderDate", "Date", 100), new Column("Supplier", "Supplier", 160), new Column("Status", "Status", 100), new Column("TotalNet", "Value", 100, true)],
         []);
 
+    /// <summary>The Menu report code.</summary>
+    public const string MenuCode = "RES-MENU";
+
+    /// <summary>The Table Status report code.</summary>
+    public const string TableStatusCode = "RES-TBL";
+
+    /// <summary>Builds the Menu definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition Menu() => Listing(MenuCode, "Menu", "Restaurant",
+        "Menu items with category, price and recipe ingredient count.", "Menu",
+        [new Column("Code", "Code", 90), new Column("Name", "Name", 180), new Column("Category", "Category", 100), new Column("Ingredients", "Ingredients", 90), new Column("Price", "Price", 90, true)],
+        []);
+
+    /// <summary>Builds the Table Status definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition TableStatus() => Listing(TableStatusCode, "Table Status", "Restaurant",
+        "Tables with seats and current status.", "TableStatus",
+        [new Column("TableNumber", "Table", 100), new Column("Seats", "Seats", 80), new Column("Status", "Status", 120)],
+        []);
+
     /// <summary>Builds a generic listing report definition from a column spec.</summary>
     /// <param name="code">The report code.</param>
     /// <param name="name">The report name.</param>

@@ -39,6 +39,9 @@ public static class Schemas
     /// <summary>Point of Sale.</summary>
     public const string PointOfSale = "pos";
 
+    /// <summary>Restaurant / Hospitality (menu items, recipes, tables).</summary>
+    public const string Restaurant = "res";
+
     /// <summary>Voucher management (gift cards, coupons, payment vouchers).</summary>
     public const string Vouchers = "vou";
 

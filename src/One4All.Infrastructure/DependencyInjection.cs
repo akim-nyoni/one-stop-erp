@@ -108,6 +108,9 @@ public static class DependencyInjection
         // Budgeting, Planning & Commitment Control.
         services.AddScoped<Application.Abstractions.Budgeting.IBudgetingService, Budgeting.BudgetingService>();
 
+        // Restaurant / Hospitality (optional module).
+        services.AddScoped<Application.Abstractions.Restaurant.IRestaurantService, Restaurant.RestaurantService>();
+
         // Cashiering & Receipting.
         services.AddScoped<Application.Abstractions.Receipting.IPayerAccountProvider, Receipting.ArPayerAccountProvider>();
         services.AddScoped<Application.Abstractions.Receipting.IReceiptingService, Receipting.ReceiptingService>();

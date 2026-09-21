@@ -239,6 +239,15 @@ public class One4AllDbContext : DbContext
     /// <summary>Segregation-of-duties violation attempts.</summary>
     public DbSet<Core.Receipting.SegregationViolation> SegregationViolations => Set<Core.Receipting.SegregationViolation>();
 
+    /// <summary>Restaurant menu items.</summary>
+    public DbSet<Core.Restaurant.MenuItem> MenuItems => Set<Core.Restaurant.MenuItem>();
+
+    /// <summary>Restaurant tables.</summary>
+    public DbSet<Core.Restaurant.RestaurantTable> RestaurantTables => Set<Core.Restaurant.RestaurantTable>();
+
+    /// <summary>Restaurant table orders.</summary>
+    public DbSet<Core.Restaurant.TableOrder> TableOrders => Set<Core.Restaurant.TableOrder>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 

@@ -16,7 +16,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "HousingStands", "StudentRegister", "OpenPurchaseOrders",
+        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus",
     };
 
     private readonly One4AllDbContext _db;
@@ -36,8 +36,40 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "HOUSINGSTANDS" => await HousingStandsAsync(companyId, ct).ConfigureAwait(false),
             "STUDENTREGISTER" => await StudentRegisterAsync(companyId, ct).ConfigureAwait(false),
             "OPENPURCHASEORDERS" => await OpenPurchaseOrdersAsync(companyId, ct).ConfigureAwait(false),
+            "MENU" => await MenuAsync(companyId, ct).ConfigureAwait(false),
+            "TABLESTATUS" => await TableStatusAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> MenuAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Restaurant.MenuItem> items = await _db.Set<Core.Restaurant.MenuItem>().Include(m => m.Recipe)
+            .Where(m => m.CompanyId == companyId)
+            .OrderBy(m => m.Code)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return items.Select(m => Row(new()
+        {
+            ["Code"] = m.Code,
+            ["Name"] = m.Name,
+            ["Category"] = m.Category ?? string.Empty,
+            ["Ingredients"] = m.Recipe.Count,
+            ["Price"] = m.Price,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TableStatusAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Restaurant.RestaurantTable> tables = await _db.Set<Core.Restaurant.RestaurantTable>()
+            .Where(t => t.CompanyId == companyId)
+            .OrderBy(t => t.TableNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return tables.Select(t => Row(new()
+        {
+            ["TableNumber"] = t.TableNumber,
+            ["Seats"] = t.Seats,
+            ["Status"] = t.Status.ToString(),
+        })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> HousingStandsAsync(long companyId, CancellationToken ct)
