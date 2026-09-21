@@ -31,6 +31,11 @@ public readonly record struct AutoGratuityQuote(bool Applies, decimal Amount, st
 /// <param name="Weight">The relative weight of their share.</param>
 public readonly record struct TipShare(long StaffUserId, decimal Weight);
 
+/// <summary>One tender used to settle a bill (split payment).</summary>
+/// <param name="AccountCode">The cash/bank/liability account the tender debits.</param>
+/// <param name="Amount">The amount taken on this tender.</param>
+public readonly record struct TenderLine(string AccountCode, decimal Amount);
+
 /// <summary>A portion of an order to bill on a split.</summary>
 /// <param name="OrderLineId">The order line.</param>
 /// <param name="Quantity">The quantity of that line to bill now.</param>
@@ -249,6 +254,27 @@ public interface IRestaurantService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
     Task<Result> AssignLineToSeatAsync(long companyId, long orderId, long lineId, int? seatNumber, CancellationToken ct = default);
+
+    /// <summary>
+    /// Bills an open order settled across several tenders (split payment — e.g. part cash, part card): the
+    /// tenders must sum to the gross (net + tax + service charge + tip − discount). Posts revenue and recipe
+    /// cost of sales and closes the order / frees the table, exactly like <see cref="BillOrderAsync"/>.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The order.</param>
+    /// <param name="warehouseId">The warehouse the ingredients are issued from.</param>
+    /// <param name="date">The billing date.</param>
+    /// <param name="tenders">The tenders settling the bill (must sum to the gross).</param>
+    /// <param name="taxAccountCode">The output-tax account, when there is tax.</param>
+    /// <param name="serviceChargeAmount">An optional service charge / gratuity (house income).</param>
+    /// <param name="serviceChargeAccountCode">The service-charge income account (required when charging).</param>
+    /// <param name="tipAmount">An optional tip (staff money — a liability).</param>
+    /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
+    /// <param name="discountAmount">An optional discount allowed (a contra-revenue).</param>
+    /// <param name="discountAccountCode">The discounts-allowed account (required when discounting).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The bill result.</returns>
+    Task<Result<BillResult>> BillWithTendersAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<TenderLine> tenders, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default);
 
     /// <summary>
     /// Settles an open order with a gift card: the tender debits the gift-card liability (Dr gift-card liability

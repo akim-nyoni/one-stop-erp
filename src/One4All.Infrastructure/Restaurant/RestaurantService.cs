@@ -348,6 +348,39 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
+    public async Task<Result<BillResult>> BillWithTendersAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<TenderLine> tenders, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
+    {
+        if (tenders.Count == 0)
+        {
+            return Error.Validation("Res.NoTenders", "A split-tender bill needs at least one tender.");
+        }
+
+        if (tenders.Any(t => t.Amount < 0m || string.IsNullOrWhiteSpace(t.AccountCode)))
+        {
+            return Error.Rule("Res.InvalidTender", "Each tender needs a non-negative amount and an account.");
+        }
+
+        Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
+        if (loaded.IsFailure)
+        {
+            return loaded.Error;
+        }
+
+        TableOrder order = loaded.Value;
+        List<(TableOrderLine Line, decimal Quantity)> portions = order.Lines
+            .Where(l => !l.IsVoided && l.RemainingQuantity > 0m)
+            .Select(l => (l, l.RemainingQuantity))
+            .ToList();
+        if (portions.Count == 0)
+        {
+            return Error.Rule("Res.NothingToBill", "The order has nothing left to bill.");
+        }
+
+        // The first tender account is only a fallback label; PostBillAsync uses the tender list for the debits.
+        return await PostBillAsync(companyId, order, warehouseId, date, portions, tenders[0].AccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct, tenders).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
     {
         if (portions.Count == 0)
@@ -632,7 +665,7 @@ public sealed class RestaurantService : IRestaurantService
         return order;
     }
 
-    private async Task<Result<BillResult>> PostBillAsync(long companyId, TableOrder order, long warehouseId, DateOnly date, List<(TableOrderLine Line, decimal Quantity)> portions, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, CancellationToken ct)
+    private async Task<Result<BillResult>> PostBillAsync(long companyId, TableOrder order, long warehouseId, DateOnly date, List<(TableOrderLine Line, decimal Quantity)> portions, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, CancellationToken ct, IReadOnlyList<TenderLine>? tenders = null)
     {
         if (serviceChargeAmount < 0m || tipAmount < 0m || discountAmount < 0m)
         {
@@ -687,13 +720,22 @@ public sealed class RestaurantService : IRestaurantService
 
         decimal gross = chargeableBeforeDiscount - discountAmount;
 
+        if (tenders is not null && decimal.Round(tenders.Sum(t => t.Amount), 4, MidpointRounding.ToEven) != decimal.Round(gross, 4, MidpointRounding.ToEven))
+        {
+            return Error.Rule("Res.TendersMismatch", $"The tenders ({tenders.Sum(t => t.Amount):0.00}) do not sum to the bill gross ({gross:0.00}).");
+        }
+
         // Post the guest's charge only when there is one (a fully-comped/-discounted bill charges nothing but still costs).
         string revenueJournal = string.Empty;
         if (chargeableBeforeDiscount > 0m)
         {
-            // Dr cash (net of discount) + Dr discounts allowed; Cr revenue (full net), output tax, service charge and tips.
+            // Dr tenders (net of discount) + Dr discounts allowed; Cr revenue (full net), output tax, service charge and tips.
             List<JournalLineRequest> lines = [];
-            if (gross > 0m)
+            if (tenders is not null)
+            {
+                lines.AddRange(tenders.Where(t => t.Amount != 0m).Select(t => new JournalLineRequest { AccountCode = t.AccountCode, Side = JournalSide.Debit, TransactionAmount = t.Amount }));
+            }
+            else if (gross > 0m)
             {
                 lines.Add(new JournalLineRequest { AccountCode = cashAccountCode, Side = JournalSide.Debit, TransactionAmount = gross });
             }
