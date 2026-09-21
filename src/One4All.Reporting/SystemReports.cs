@@ -327,6 +327,9 @@ public static class SystemReports
     /// <summary>The Menu Engineering report code.</summary>
     public const string MenuEngineeringCode = "RES-MIX";
 
+    /// <summary>The Table Reservations report code.</summary>
+    public const string ReservationsCode = "RES-RESV";
+
     /// <summary>Builds the Kitchen Order Tickets definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition KitchenTickets() => Listing(KitchenTicketsCode, "Kitchen Order Tickets", "Restaurant",
@@ -347,6 +350,13 @@ public static class SystemReports
         "Sales mix by menu item — quantity, revenue, recipe cost, margin and menu-engineering class.", "MenuEngineering",
         [new Column("Item", "Item", 150), new Column("QtySold", "Qty", 70), new Column("Revenue", "Revenue", 90, true), new Column("Cost", "Cost", 90, true), new Column("Margin", "Margin", 90, true), new Column("Class", "Class", 90)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Table Reservations definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition Reservations() => Listing(ReservationsCode, "Table Reservations", "Restaurant",
+        "Upcoming table bookings — when, table, guest, party size and contact.", "Reservations",
+        [new Column("When", "When", 130), new Column("Table", "Table", 70), new Column("Guest", "Guest", 130), new Column("Party", "Party", 60), new Column("Phone", "Phone", 100)],
+        []);
 
     /// <summary>Builds the Table Status definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>

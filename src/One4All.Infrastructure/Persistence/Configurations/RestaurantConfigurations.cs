@@ -109,6 +109,22 @@ internal sealed class TipAllocationConfiguration : IEntityTypeConfiguration<TipA
     }
 }
 
+internal sealed class TableReservationConfiguration : IEntityTypeConfiguration<TableReservation>
+{
+    public void Configure(EntityTypeBuilder<TableReservation> b)
+    {
+        b.ToTable("reservation", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.GuestName).HasMaxLength(120);
+        b.Property(x => x.GuestPhone).HasMaxLength(40);
+        b.Property(x => x.Notes).HasMaxLength(400);
+        b.Property(x => x.CancellationReason).HasMaxLength(400);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.TableId, x.ReservedFor });
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}
+
 internal sealed class KitchenTicketLineConfiguration : IEntityTypeConfiguration<KitchenTicketLine>
 {
     public void Configure(EntityTypeBuilder<KitchenTicketLine> b)

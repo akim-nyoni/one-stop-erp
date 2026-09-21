@@ -17,7 +17,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
         "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus", "KitchenTickets",
-        "TipAllocations", "MenuEngineering",
+        "TipAllocations", "MenuEngineering", "Reservations",
     };
 
     private readonly One4AllDbContext _db;
@@ -42,6 +42,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "KITCHENTICKETS" => await KitchenTicketsAsync(companyId, ct).ConfigureAwait(false),
             "TIPALLOCATIONS" => await TipAllocationsAsync(companyId, ct).ConfigureAwait(false),
             "MENUENGINEERING" => await MenuEngineeringAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RESERVATIONS" => await ReservationsAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -58,6 +59,25 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Status"] = t.Status.ToString(),
             ["Items"] = t.Lines.Count,
             ["Sent"] = t.SentOn.ToDateTime(TimeOnly.MinValue),
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReservationsAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Restaurant.TableReservation> reservations = await _db.Set<Core.Restaurant.TableReservation>()
+            .Where(r => r.CompanyId == companyId && r.Status == Core.Restaurant.ReservationStatus.Booked)
+            .OrderBy(r => r.ReservedFor)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> tables = await _db.Set<Core.Restaurant.RestaurantTable>()
+            .Where(t => t.CompanyId == companyId)
+            .ToDictionaryAsync(t => t.Id, t => t.TableNumber, ct).ConfigureAwait(false);
+        return reservations.Select(r => Row(new()
+        {
+            ["When"] = r.ReservedFor,
+            ["Table"] = tables.GetValueOrDefault(r.TableId, $"#{r.TableId}"),
+            ["Guest"] = r.GuestName,
+            ["Party"] = r.PartySize,
+            ["Phone"] = r.GuestPhone ?? string.Empty,
         })).ToList();
     }
 

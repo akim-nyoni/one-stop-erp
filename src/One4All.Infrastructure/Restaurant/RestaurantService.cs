@@ -542,4 +542,114 @@ public sealed class RestaurantService : IRestaurantService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
+
+    /// <summary>The turn-time window within which two bookings on the same table clash.</summary>
+    private static readonly TimeSpan TurnTime = TimeSpan.FromMinutes(90);
+
+    /// <inheritdoc />
+    public async Task<Result<long>> ReserveTableAsync(long companyId, long tableId, string guestName, int partySize, DateTime reservedFor, string? guestPhone = null, string? notes = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(guestName))
+        {
+            return Error.Validation("Res.ReservationNoGuest", "A reservation needs a guest name.");
+        }
+
+        if (partySize <= 0)
+        {
+            return Error.Rule("Res.ReservationInvalidParty", "The party size must be positive.");
+        }
+
+        RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == tableId && t.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (table is null)
+        {
+            return Error.NotFound("Res.TableNotFound", $"Table {tableId} not found.");
+        }
+
+        if (partySize > table.Seats)
+        {
+            return Error.Rule("Res.ReservationTooLarge", $"Table {table.TableNumber} seats {table.Seats}; the party of {partySize} is too large.");
+        }
+
+        // A table may hold only one live booking within a turn-time window.
+        List<TableReservation> live = await _db.Set<TableReservation>()
+            .Where(r => r.CompanyId == companyId && r.TableId == tableId && r.Status == ReservationStatus.Booked)
+            .ToListAsync(ct).ConfigureAwait(false);
+        if (live.Any(r => (r.ReservedFor - reservedFor).Duration() < TurnTime))
+        {
+            return Error.Rule("Res.ReservationClash", $"Table {table.TableNumber} already has a booking within {TurnTime.TotalMinutes:0} minutes of that time.");
+        }
+
+        TableReservation reservation = new(companyId, tableId, guestName, partySize, reservedFor, guestPhone, notes);
+        _db.Set<TableReservation>().Add(reservation);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return reservation.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> SeatReservationAsync(long companyId, long reservationId, string orderNumber, long waiterUserId, DateOnly date, CancellationToken ct = default)
+    {
+        TableReservation? reservation = await _db.Set<TableReservation>().FirstOrDefaultAsync(r => r.Id == reservationId && r.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (reservation is null)
+        {
+            return Error.NotFound("Res.ReservationNotFound", $"Reservation {reservationId} not found.");
+        }
+
+        if (reservation.Status != ReservationStatus.Booked)
+        {
+            return Error.Rule("Res.ReservationNotBooked", $"Only a booked reservation can be seated (it is {reservation.Status}).");
+        }
+
+        Result<long> opened = await OpenOrderAsync(companyId, reservation.TableId, orderNumber, waiterUserId, date, ct).ConfigureAwait(false);
+        if (opened.IsFailure)
+        {
+            return opened.Error;
+        }
+
+        reservation.Seat(opened.Value);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return opened.Value;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> CancelReservationAsync(long companyId, long reservationId, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Result.Failure(Error.Validation("Res.ReservationNoReason", "Cancelling a reservation needs a reason."));
+        }
+
+        TableReservation? reservation = await _db.Set<TableReservation>().FirstOrDefaultAsync(r => r.Id == reservationId && r.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (reservation is null)
+        {
+            return Result.Failure(Error.NotFound("Res.ReservationNotFound", $"Reservation {reservationId} not found."));
+        }
+
+        if (reservation.Status != ReservationStatus.Booked)
+        {
+            return Result.Failure(Error.Rule("Res.ReservationNotBooked", $"Only a booked reservation can be cancelled (it is {reservation.Status})."));
+        }
+
+        reservation.Cancel(reason);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> MarkReservationNoShowAsync(long companyId, long reservationId, CancellationToken ct = default)
+    {
+        TableReservation? reservation = await _db.Set<TableReservation>().FirstOrDefaultAsync(r => r.Id == reservationId && r.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (reservation is null)
+        {
+            return Result.Failure(Error.NotFound("Res.ReservationNotFound", $"Reservation {reservationId} not found."));
+        }
+
+        if (reservation.Status != ReservationStatus.Booked)
+        {
+            return Result.Failure(Error.Rule("Res.ReservationNotBooked", $"Only a booked reservation can be marked a no-show (it is {reservation.Status})."));
+        }
+
+        reservation.MarkNoShow();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
 }

@@ -196,4 +196,47 @@ public interface IRestaurantService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
     Task<Result> AdvanceTicketAsync(long companyId, long ticketId, KitchenTicketStatus status, CancellationToken ct = default);
+
+    /// <summary>
+    /// Books a table for a guest at a future time. Refuses a party larger than the table seats and a clash
+    /// with another live booking on the same table within the turn-time window. Operational only (no GL).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="tableId">The table to reserve.</param>
+    /// <param name="guestName">The guest's name.</param>
+    /// <param name="partySize">The number of covers.</param>
+    /// <param name="reservedFor">The date and time the table is booked for.</param>
+    /// <param name="guestPhone">The guest's contact number, if any.</param>
+    /// <param name="notes">Any notes (occasion, seating preference), if any.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created reservation id.</returns>
+    Task<Result<long>> ReserveTableAsync(long companyId, long tableId, string guestName, int partySize, DateTime reservedFor, string? guestPhone = null, string? notes = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Seats a booked reservation: opens a table order on the reserved (free) table and marks the reservation
+    /// seated, linking the order.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="reservationId">The reservation.</param>
+    /// <param name="orderNumber">The order number for the opened order.</param>
+    /// <param name="waiterUserId">The waiter.</param>
+    /// <param name="date">The open date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The opened order id.</returns>
+    Task<Result<long>> SeatReservationAsync(long companyId, long reservationId, string orderNumber, long waiterUserId, DateOnly date, CancellationToken ct = default);
+
+    /// <summary>Cancels a booked reservation with a reason.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="reservationId">The reservation.</param>
+    /// <param name="reason">The mandatory cancellation reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> CancelReservationAsync(long companyId, long reservationId, string reason, CancellationToken ct = default);
+
+    /// <summary>Marks a booked reservation a no-show (the guest never arrived).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="reservationId">The reservation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> MarkReservationNoShowAsync(long companyId, long reservationId, CancellationToken ct = default);
 }
