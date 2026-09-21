@@ -76,4 +76,20 @@ public interface IRestaurantService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The bill result.</returns>
     Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, CancellationToken ct = default);
+
+    /// <summary>Cancels an open order (nothing was billed) and frees the table. Requires a reason.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The order.</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> CancelOrderAsync(long companyId, long orderId, string reason, CancellationToken ct = default);
+
+    /// <summary>Transfers an open order to another free table, freeing the original.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The order.</param>
+    /// <param name="newTableId">The destination table (must be free).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> TransferOrderAsync(long companyId, long orderId, long newTableId, CancellationToken ct = default);
 }

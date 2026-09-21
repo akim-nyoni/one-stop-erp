@@ -145,6 +145,13 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
         Status = TableOrderStatus.Billed;
         JournalNumber = journalNumber;
     }
+
+    /// <summary>Cancels the order (nothing was billed).</summary>
+    public void Cancel() => Status = TableOrderStatus.Cancelled;
+
+    /// <summary>Moves the order to another table.</summary>
+    /// <param name="tableId">The new table.</param>
+    public void MoveToTable(long tableId) => TableId = tableId;
 }
 
 /// <summary>One ordered menu item on a table order (<c>res.order_line</c>).</summary>

@@ -211,4 +211,68 @@ public sealed class RestaurantService : IRestaurantService
 
         return new BillResult(net, tax, gross, costOfSales, revenue.Value.JournalNumber);
     }
+
+    /// <inheritdoc />
+    public async Task<Result> CancelOrderAsync(long companyId, long orderId, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Result.Failure(Error.Validation("Res.ReasonRequired", "Cancelling an order requires a reason."));
+        }
+
+        TableOrder? order = await _db.Set<TableOrder>().FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Result.Failure(Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found."));
+        }
+
+        if (order.Status != TableOrderStatus.Open)
+        {
+            return Result.Failure(Error.Rule("Res.OrderNotOpen", "Only an open order can be cancelled."));
+        }
+
+        order.Cancel();
+        RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == order.TableId, ct).ConfigureAwait(false);
+        table?.Free();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> TransferOrderAsync(long companyId, long orderId, long newTableId, CancellationToken ct = default)
+    {
+        TableOrder? order = await _db.Set<TableOrder>().FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Result.Failure(Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found."));
+        }
+
+        if (order.Status != TableOrderStatus.Open)
+        {
+            return Result.Failure(Error.Rule("Res.OrderNotOpen", "Only an open order can be transferred."));
+        }
+
+        RestaurantTable? destination = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == newTableId && t.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (destination is null)
+        {
+            return Result.Failure(Error.NotFound("Res.TableNotFound", $"Table {newTableId} not found."));
+        }
+
+        if (destination.Id == order.TableId)
+        {
+            return Result.Success();
+        }
+
+        if (destination.Status != TableStatus.Free)
+        {
+            return Result.Failure(Error.Rule("Res.TableOccupied", $"Table {destination.TableNumber} is not free."));
+        }
+
+        RestaurantTable? oldTable = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == order.TableId, ct).ConfigureAwait(false);
+        oldTable?.Free();
+        destination.Occupy();
+        order.MoveToTable(newTableId);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
 }
