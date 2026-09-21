@@ -6062,6 +6062,19 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("customer_phone");
 
+                    b.Property<string>("DeliveryAddress")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("delivery_address");
+
+                    b.Property<int?>("DeliveryStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("delivery_status");
+
+                    b.Property<long?>("DriverUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("driver_user_id");
+
                     b.Property<string>("JournalNumber")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")

@@ -86,9 +86,29 @@ public interface IRestaurantService
     /// <param name="date">The open date.</param>
     /// <param name="customerName">The customer's name, if any.</param>
     /// <param name="customerPhone">The customer's contact number, if any.</param>
+    /// <param name="deliveryAddress">The delivery address (delivery orders), if any.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The created order id.</returns>
-    Task<Result<long>> OpenOffPremiseOrderAsync(long companyId, string orderNumber, OrderType orderType, long waiterUserId, DateOnly date, string? customerName = null, string? customerPhone = null, CancellationToken ct = default);
+    Task<Result<long>> OpenOffPremiseOrderAsync(long companyId, string orderNumber, OrderType orderType, long waiterUserId, DateOnly date, string? customerName = null, string? customerPhone = null, string? deliveryAddress = null, CancellationToken ct = default);
+
+    /// <summary>Assigns a driver to a delivery order (moving it from Pending to Assigned). Delivery orders only.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The delivery order.</param>
+    /// <param name="driverUserId">The driver.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> AssignDeliveryDriverAsync(long companyId, long orderId, long driverUserId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Advances a delivery order's dispatch state (Pending → Assigned → OutForDelivery → Delivered; Failed from
+    /// any active state). Refuses a backward move or a change once delivered/failed.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The delivery order.</param>
+    /// <param name="status">The new dispatch state.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> AdvanceDeliveryAsync(long companyId, long orderId, DeliveryStatus status, CancellationToken ct = default);
 
     /// <summary>Adds a menu item to an open order at its menu price.</summary>
     /// <param name="companyId">The company.</param>

@@ -17,7 +17,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
         "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus", "KitchenTickets",
-        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales",
+        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries",
     };
 
     private readonly One4AllDbContext _db;
@@ -49,6 +49,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "SECTIONSALES" => await SectionSalesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "VOIDSANDCOMPS" => await VoidsAndCompsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "ORDERTYPESALES" => await OrderTypeSalesAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "DELIVERIES" => await DeliveriesAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -99,6 +100,25 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Primary"] = tables.GetValueOrDefault(g.PrimaryTableId, $"#{g.PrimaryTableId}"),
             ["Tables"] = g.MemberCount,
             ["Seats"] = g.Seats,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DeliveriesAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Restaurant.TableOrder> deliveries = await _db.Set<Core.Restaurant.TableOrder>()
+            .Where(o => o.CompanyId == companyId && o.OrderType == Core.Restaurant.OrderType.Delivery
+                && o.DeliveryStatus != Core.Restaurant.DeliveryStatus.Delivered && o.DeliveryStatus != Core.Restaurant.DeliveryStatus.Failed)
+            .OrderBy(o => o.DeliveryStatus).ThenBy(o => o.OrderNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> staff = await _db.Set<Core.Security.User>()
+            .ToDictionaryAsync(u => u.Id, u => u.DisplayName, ct).ConfigureAwait(false);
+        return deliveries.Select(o => Row(new()
+        {
+            ["Order"] = o.OrderNumber,
+            ["Customer"] = o.CustomerName ?? string.Empty,
+            ["Address"] = o.DeliveryAddress ?? string.Empty,
+            ["Driver"] = o.DriverUserId is { } id ? staff.GetValueOrDefault(id, $"#{id}") : string.Empty,
+            ["Status"] = o.DeliveryStatus?.ToString() ?? string.Empty,
         })).ToList();
     }
 

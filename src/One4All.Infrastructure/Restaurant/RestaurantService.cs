@@ -86,17 +86,64 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<long>> OpenOffPremiseOrderAsync(long companyId, string orderNumber, OrderType orderType, long waiterUserId, DateOnly date, string? customerName = null, string? customerPhone = null, CancellationToken ct = default)
+    public async Task<Result<long>> OpenOffPremiseOrderAsync(long companyId, string orderNumber, OrderType orderType, long waiterUserId, DateOnly date, string? customerName = null, string? customerPhone = null, string? deliveryAddress = null, CancellationToken ct = default)
     {
         if (orderType == OrderType.DineIn)
         {
             return Error.Rule("Res.DineInNeedsTable", "A dine-in order must be opened at a table; use OpenOrderAsync.");
         }
 
-        TableOrder order = new(companyId, orderNumber, orderType, waiterUserId, date, customerName, customerPhone);
+        TableOrder order = new(companyId, orderNumber, orderType, waiterUserId, date, customerName, customerPhone, deliveryAddress);
         _db.Set<TableOrder>().Add(order);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return order.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> AssignDeliveryDriverAsync(long companyId, long orderId, long driverUserId, CancellationToken ct = default)
+    {
+        TableOrder? order = await _db.Set<TableOrder>().FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Result.Failure(Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found."));
+        }
+
+        if (order.OrderType != OrderType.Delivery || order.DeliveryStatus is null)
+        {
+            return Result.Failure(Error.Rule("Res.NotADelivery", "Only a delivery order can have a driver assigned."));
+        }
+
+        if (order.DeliveryStatus is DeliveryStatus.Delivered or DeliveryStatus.Failed)
+        {
+            return Result.Failure(Error.Rule("Res.DeliveryClosed", "The delivery is already completed."));
+        }
+
+        order.AssignDriver(driverUserId);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> AdvanceDeliveryAsync(long companyId, long orderId, DeliveryStatus status, CancellationToken ct = default)
+    {
+        TableOrder? order = await _db.Set<TableOrder>().FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Result.Failure(Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found."));
+        }
+
+        if (order.OrderType != OrderType.Delivery || order.DeliveryStatus is null)
+        {
+            return Result.Failure(Error.Rule("Res.NotADelivery", "Only a delivery order has a dispatch state."));
+        }
+
+        if (!order.AdvanceDelivery(status))
+        {
+            return Result.Failure(Error.Rule("Res.DeliveryNotAdvanced", $"The delivery cannot move from {order.DeliveryStatus} to {status}."));
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 
     /// <inheritdoc />

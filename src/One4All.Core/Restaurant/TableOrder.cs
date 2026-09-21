@@ -95,6 +95,25 @@ public enum OrderType
     Delivery = 3,
 }
 
+/// <summary>The dispatch state of a delivery order (Restaurant module).</summary>
+public enum DeliveryStatus
+{
+    /// <summary>Awaiting a driver.</summary>
+    Pending = 1,
+
+    /// <summary>A driver has been assigned.</summary>
+    Assigned = 2,
+
+    /// <summary>Out for delivery.</summary>
+    OutForDelivery = 3,
+
+    /// <summary>Delivered to the customer.</summary>
+    Delivered = 4,
+
+    /// <summary>Delivery failed (customer unreachable, etc.).</summary>
+    Failed = 5,
+}
+
 /// <summary>The lifecycle of a table order (Restaurant module).</summary>
 public enum TableOrderStatus
 {
@@ -146,7 +165,8 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
     /// <param name="openedOn">The open date.</param>
     /// <param name="customerName">The customer's name, if any.</param>
     /// <param name="customerPhone">The customer's contact number, if any.</param>
-    public TableOrder(long companyId, string orderNumber, OrderType orderType, long waiterUserId, DateOnly openedOn, string? customerName = null, string? customerPhone = null)
+    /// <param name="deliveryAddress">The delivery address (delivery orders), if any.</param>
+    public TableOrder(long companyId, string orderNumber, OrderType orderType, long waiterUserId, DateOnly openedOn, string? customerName = null, string? customerPhone = null, string? deliveryAddress = null)
     {
         CompanyId = companyId;
         TableId = null;
@@ -157,6 +177,8 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
         OrderType = orderType;
         CustomerName = customerName;
         CustomerPhone = customerPhone;
+        DeliveryAddress = deliveryAddress;
+        DeliveryStatus = orderType == OrderType.Delivery ? Restaurant.DeliveryStatus.Pending : null;
         Status = TableOrderStatus.Open;
     }
 
@@ -174,6 +196,45 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
 
     /// <summary>The customer's contact number (off-premise orders), if any.</summary>
     public string? CustomerPhone { get; private set; }
+
+    /// <summary>The delivery address (delivery orders), if any.</summary>
+    public string? DeliveryAddress { get; private set; }
+
+    /// <summary>The driver assigned to a delivery order, if any.</summary>
+    public long? DriverUserId { get; private set; }
+
+    /// <summary>The dispatch state of a delivery order (null for non-delivery orders).</summary>
+    public DeliveryStatus? DeliveryStatus { get; private set; }
+
+    /// <summary>Assigns a driver to the delivery order (moving it from Pending to Assigned).</summary>
+    /// <param name="driverUserId">The driver.</param>
+    public void AssignDriver(long driverUserId)
+    {
+        DriverUserId = driverUserId;
+        if (DeliveryStatus == Restaurant.DeliveryStatus.Pending)
+        {
+            DeliveryStatus = Restaurant.DeliveryStatus.Assigned;
+        }
+    }
+
+    /// <summary>Advances the delivery dispatch state (forward only; Failed allowed from any active state).</summary>
+    /// <param name="status">The new dispatch state.</param>
+    /// <returns>True when applied; false when it would move backwards or the order is not a live delivery.</returns>
+    public bool AdvanceDelivery(DeliveryStatus status)
+    {
+        if (DeliveryStatus is not { } current || current is Restaurant.DeliveryStatus.Delivered or Restaurant.DeliveryStatus.Failed)
+        {
+            return false;
+        }
+
+        if (status != Restaurant.DeliveryStatus.Failed && (int)status <= (int)current)
+        {
+            return false;
+        }
+
+        DeliveryStatus = status;
+        return true;
+    }
 
     /// <summary>The order number.</summary>
     public string OrderNumber { get; private set; }

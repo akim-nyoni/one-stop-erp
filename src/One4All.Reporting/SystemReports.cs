@@ -348,6 +348,9 @@ public static class SystemReports
     /// <summary>The Sales by Order Type report code.</summary>
     public const string OrderTypeSalesCode = "RES-OTYPE";
 
+    /// <summary>The Active Deliveries report code.</summary>
+    public const string DeliveriesCode = "RES-DELIV";
+
     /// <summary>Builds the Kitchen Order Tickets definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition KitchenTickets() => Listing(KitchenTicketsCode, "Kitchen Order Tickets", "Restaurant",
@@ -417,6 +420,13 @@ public static class SystemReports
         "Billed sales split by fulfilment type (dine-in / takeaway / delivery) over a period.", "OrderTypeSales",
         [new Column("Type", "Type", 120), new Column("Orders", "Orders", 70), new Column("Net", "Net", 100, true), new Column("Tax", "Tax", 90, true), new Column("Gross", "Gross", 100, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Active Deliveries definition (Restaurant module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition Deliveries() => Listing(DeliveriesCode, "Active Deliveries", "Restaurant",
+        "Delivery orders still in progress — customer, address, driver and dispatch state.", "Deliveries",
+        [new Column("Order", "Order", 100), new Column("Customer", "Customer", 120), new Column("Address", "Address", 180), new Column("Driver", "Driver", 110), new Column("Status", "Status", 110)],
+        []);
 
     /// <summary>Builds the Table Status definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
