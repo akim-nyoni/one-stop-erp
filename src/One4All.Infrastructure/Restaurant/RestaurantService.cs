@@ -20,18 +20,21 @@ public sealed class RestaurantService : IRestaurantService
     private readonly IPostingEngine _posting;
     private readonly IInventoryService _inventory;
     private readonly Application.Abstractions.Trading.ISalesLedgerService _sales;
+    private readonly Application.Abstractions.Vouchers.IVoucherService _vouchers;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="posting">The central posting engine.</param>
     /// <param name="inventory">The inventory service (recipe explosion → stock issues).</param>
     /// <param name="sales">The sales ledger (house-account / charge-to-room billing).</param>
-    public RestaurantService(One4AllDbContext db, IPostingEngine posting, IInventoryService inventory, Application.Abstractions.Trading.ISalesLedgerService sales)
+    /// <param name="vouchers">The voucher service (gift-card tender).</param>
+    public RestaurantService(One4AllDbContext db, IPostingEngine posting, IInventoryService inventory, Application.Abstractions.Trading.ISalesLedgerService sales, Application.Abstractions.Vouchers.IVoucherService vouchers)
     {
         _db = db;
         _posting = posting;
         _inventory = inventory;
         _sales = sales;
+        _vouchers = vouchers;
     }
 
     /// <inheritdoc />
@@ -338,6 +341,71 @@ public sealed class RestaurantService : IRestaurantService
         }
 
         return await PostBillAsync(companyId, order, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<BillResult>> BillToVoucherAsync(long companyId, long orderId, string cardNumber, long warehouseId, DateOnly date, string giftCardLiabilityAccountCode, string? taxAccountCode = null, CancellationToken ct = default)
+    {
+        Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
+        if (loaded.IsFailure)
+        {
+            return loaded.Error;
+        }
+
+        TableOrder order = loaded.Value;
+        List<(TableOrderLine Line, decimal Quantity)> portions = order.Lines
+            .Where(l => !l.IsVoided && l.RemainingQuantity > 0m)
+            .Select(l => (l, l.RemainingQuantity))
+            .ToList();
+        if (portions.Count == 0)
+        {
+            return Error.Rule("Res.NothingToBill", "The order has nothing left to bill.");
+        }
+
+        // Amount the card must cover (net + tax of the non-comped lines).
+        decimal gross = 0m;
+        foreach ((TableOrderLine line, decimal quantity) in portions)
+        {
+            if (line.IsComped)
+            {
+                continue;
+            }
+
+            gross += decimal.Round(quantity * line.EffectiveUnitPrice, 4, MidpointRounding.ToEven);
+            gross += line.Quantity == 0m ? 0m : decimal.Round(line.TaxAmount * quantity / line.Quantity, 4, MidpointRounding.ToEven);
+        }
+
+        if (gross > 0m)
+        {
+            Result<Application.Abstractions.Vouchers.GiftCardResult> balance = await _vouchers.GetBalanceAsync(companyId, cardNumber, ct).ConfigureAwait(false);
+            if (balance.IsFailure)
+            {
+                return balance.Error;
+            }
+
+            if (balance.Value.Balance < gross)
+            {
+                return Error.Rule("Res.VoucherInsufficient", $"Gift card {cardNumber} has {balance.Value.Balance:0.00}, which does not cover the bill of {gross:0.00}.");
+            }
+        }
+
+        // The tender debits the gift-card liability (like cash), then the card balance is reduced.
+        Result<BillResult> bill = await PostBillAsync(companyId, order, warehouseId, date, portions, giftCardLiabilityAccountCode, taxAccountCode, 0m, null, 0m, null, 0m, null, ct).ConfigureAwait(false);
+        if (bill.IsFailure)
+        {
+            return bill.Error;
+        }
+
+        if (bill.Value.Gross > 0m)
+        {
+            Result<Application.Abstractions.Vouchers.GiftCardResult> redeemed = await _vouchers.RedeemAsync(companyId, cardNumber, bill.Value.Gross, ct).ConfigureAwait(false);
+            if (redeemed.IsFailure)
+            {
+                return redeemed.Error;
+            }
+        }
+
+        return bill;
     }
 
     /// <inheritdoc />

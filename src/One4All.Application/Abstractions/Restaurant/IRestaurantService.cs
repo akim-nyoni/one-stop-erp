@@ -225,6 +225,22 @@ public interface IRestaurantService
     Task<Result> AssignLineToSeatAsync(long companyId, long orderId, long lineId, int? seatNumber, CancellationToken ct = default);
 
     /// <summary>
+    /// Settles an open order with a gift card: the tender debits the gift-card liability (Dr gift-card liability
+    /// / Cr revenue / Cr tax) and the card balance is reduced by the same amount. Requires the card to cover the
+    /// whole bill. Recognises recipe cost of sales and closes the order / frees the table.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The order.</param>
+    /// <param name="cardNumber">The gift-card number.</param>
+    /// <param name="warehouseId">The warehouse the ingredients are issued from.</param>
+    /// <param name="date">The billing date.</param>
+    /// <param name="giftCardLiabilityAccountCode">The gift-card liability account debited by the tender.</param>
+    /// <param name="taxAccountCode">The output-tax account, when there is tax.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The bill result (RevenueJournalNumber is the revenue journal; Gross = amount redeemed).</returns>
+    Task<Result<BillResult>> BillToVoucherAsync(long companyId, long orderId, string cardNumber, long warehouseId, DateOnly date, string giftCardLiabilityAccountCode, string? taxAccountCode = null, CancellationToken ct = default);
+
+    /// <summary>
     /// Charges an open order to a customer's account (house account / charge-to-room) instead of taking a
     /// tender: raises a sales invoice on the debtor through the trading ledger (Dr AR control / Cr revenue /
     /// Cr tax, ageing on the customer), recognises recipe cost of sales, and closes the order / frees the table.
