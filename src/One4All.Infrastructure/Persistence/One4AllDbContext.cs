@@ -269,6 +269,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Per-company Restaurant policy (auto-gratuity).</summary>
     public DbSet<Core.Restaurant.RestaurantPolicy> RestaurantPolicies => Set<Core.Restaurant.RestaurantPolicy>();
 
+    /// <summary>Stock wastage records.</summary>
+    public DbSet<Core.Restaurant.WastageRecord> WastageRecords => Set<Core.Restaurant.WastageRecord>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 

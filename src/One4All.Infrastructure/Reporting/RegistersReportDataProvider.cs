@@ -17,7 +17,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
         "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus", "KitchenTickets",
-        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales", "CategorySales",
+        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales", "CategorySales", "Wastage",
     };
 
     private readonly One4AllDbContext _db;
@@ -52,6 +52,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "DELIVERIES" => await DeliveriesAsync(companyId, ct).ConfigureAwait(false),
             "SERVERSALES" => await ServerSalesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "CATEGORYSALES" => await CategorySalesAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "WASTAGE" => await WastageAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -102,6 +103,29 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Primary"] = tables.GetValueOrDefault(g.PrimaryTableId, $"#{g.PrimaryTableId}"),
             ["Tables"] = g.MemberCount,
             ["Seats"] = g.Seats,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> WastageAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly fromDate = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly toDate = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+
+        var rows = await (
+            from w in _db.Set<Core.Restaurant.WastageRecord>()
+            join i in _db.Set<Core.Inventory.Item>() on w.ItemId equals i.Id
+            where w.CompanyId == companyId && w.Date >= fromDate && w.Date <= toDate
+            orderby w.Date, i.Code
+            select new { w.Date, i.Code, w.Quantity, w.Value, w.Reason })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return rows.Select(r => Row(new()
+        {
+            ["Date"] = r.Date.ToDateTime(TimeOnly.MinValue),
+            ["Item"] = r.Code,
+            ["Qty"] = r.Quantity,
+            ["Value"] = r.Value,
+            ["Reason"] = r.Reason,
         })).ToList();
     }
 

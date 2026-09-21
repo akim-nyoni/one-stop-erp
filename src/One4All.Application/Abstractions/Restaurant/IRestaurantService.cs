@@ -123,6 +123,22 @@ public interface IRestaurantService
     /// <returns>The line net value.</returns>
     Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, int? seatNumber = null, string? priceLevel = null, CancellationToken ct = default);
 
+    /// <summary>
+    /// Records spoilage / waste of a stock ingredient: issues the stock at moving-average cost and books the
+    /// loss to a wastage expense account (Dr wastage / Cr stock, keeping it out of cost of sales). Requires a
+    /// reason and a positive quantity.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="itemId">The stock item wasted.</param>
+    /// <param name="warehouseId">The warehouse it is issued from.</param>
+    /// <param name="date">The wastage date.</param>
+    /// <param name="quantity">The quantity wasted (positive).</param>
+    /// <param name="wastageAccountCode">The wastage expense account charged.</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The value written off.</returns>
+    Task<Result<decimal>> RecordWastageAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal quantity, string wastageAccountCode, string reason, CancellationToken ct = default);
+
     /// <summary>Sets (adds or updates) a menu item's price at a named price level (e.g. LUNCH, HAPPYHOUR, DELIVERY).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="menuItemId">The menu item.</param>

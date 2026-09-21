@@ -212,6 +212,78 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
+    public async Task<Result<decimal>> RecordWastageAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal quantity, string wastageAccountCode, string reason, CancellationToken ct = default)
+    {
+        if (quantity <= 0m)
+        {
+            return Error.Rule("Res.WastageInvalidQuantity", "The wastage quantity must be positive.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Res.WastageNoReason", "Recording wastage needs a reason.");
+        }
+
+        if (string.IsNullOrWhiteSpace(wastageAccountCode))
+        {
+            return Error.Validation("Res.WastageNoAccount", "Recording wastage needs a wastage expense account.");
+        }
+
+        Core.Inventory.Item? item = await _db.Set<Core.Inventory.Item>().FirstOrDefaultAsync(i => i.Id == itemId && i.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (item is null)
+        {
+            return Error.NotFound("Res.ItemNotFound", $"Item {itemId} not found.");
+        }
+
+        if (string.IsNullOrWhiteSpace(item.CostOfSalesAccountCode))
+        {
+            return Error.Rule("Res.ItemNoCosAccount", $"Item {item.Code} has no cost-of-sales account to reclassify from.");
+        }
+
+        Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        if (company is null)
+        {
+            return Error.NotFound("Res.CompanyNotFound", $"Company {companyId} not found.");
+        }
+
+        // Issue the stock (Dr cost of sales / Cr stock at moving average).
+        Result<StockMovementResult> issue = await IssueAsync(companyId, itemId, warehouseId, date, quantity, $"WASTE:{reason}", ct).ConfigureAwait(false);
+        if (issue.IsFailure)
+        {
+            return issue.Error;
+        }
+
+        decimal value = issue.Value.Value;
+        if (value > 0m)
+        {
+            // Reclassify the cost from cost of sales to the wastage expense account (Dr wastage / Cr COS).
+            Result<PostingReceipt> reclass = await _posting.PostAsync(new JournalRequest
+            {
+                CompanyId = companyId,
+                SourceModule = "RES",
+                PostingDate = date,
+                TransactionCurrency = company.BaseCurrency,
+                DocumentType = "RES-WASTE",
+                Narrative = $"Wastage {item.Code}: {reason}",
+                Lines =
+                [
+                    new JournalLineRequest { AccountCode = wastageAccountCode, Side = JournalSide.Debit, TransactionAmount = value },
+                    new JournalLineRequest { AccountCode = item.CostOfSalesAccountCode!, Side = JournalSide.Credit, TransactionAmount = value },
+                ],
+            }, ct).ConfigureAwait(false);
+
+            if (reclass.IsFailure)
+            {
+                return reclass.Error;
+            }
+        }
+
+        _db.Set<WastageRecord>().Add(new WastageRecord(companyId, itemId, warehouseId, date, quantity, value, reason, wastageAccountCode));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return value;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<decimal>> AddItemModifierAsync(long companyId, long orderId, long lineId, string description, decimal priceDelta, long? ingredientItemId = null, decimal ingredientQuantity = 0m, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(description))

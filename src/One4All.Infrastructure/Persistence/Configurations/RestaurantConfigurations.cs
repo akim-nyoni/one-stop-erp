@@ -64,6 +64,20 @@ internal sealed class RestaurantTableConfiguration : IEntityTypeConfiguration<Re
     }
 }
 
+internal sealed class WastageRecordConfiguration : IEntityTypeConfiguration<WastageRecord>
+{
+    public void Configure(EntityTypeBuilder<WastageRecord> b)
+    {
+        b.ToTable("wastage", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.Property(x => x.Value).HasPrecision(19, 4);
+        b.Property(x => x.Reason).HasMaxLength(200);
+        b.Property(x => x.WastageAccountCode).HasMaxLength(8);
+        b.HasIndex(x => new { x.CompanyId, x.Date });
+    }
+}
+
 internal sealed class RestaurantPolicyConfiguration : IEntityTypeConfiguration<RestaurantPolicy>
 {
     public void Configure(EntityTypeBuilder<RestaurantPolicy> b)
