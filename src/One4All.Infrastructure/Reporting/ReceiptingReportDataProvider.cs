@@ -56,6 +56,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC41" => await RefundsRegisterAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC42" => await ArrangementsAsync(companyId, ct).ConfigureAwait(false),
             "RC43" => await TopPayersAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC44" => await DormantAccountsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC45" => await AgentReconciliationAsync(companyId, ct).ConfigureAwait(false),
             "RC46" => await AgentAgeingAsync(companyId, ct).ConfigureAwait(false),
             "RC51" => await CollectionTrendAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -462,6 +463,58 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .OrderByDescending(r => (decimal)r["Amount"]!)
             .Take(20)
             .ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DormantAccountsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly asAt = ReportParameters.Date(parameters, "AsAtDate");
+        DateOnly cutoff = asAt.AddMonths(-3); // no payment in the last 3 months
+
+        // Outstanding net balance per debtor (debits − credits) from the AR sub-ledger.
+        var balances = await _db.Set<Core.Trading.OpenItem>()
+            .Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsReceivable && i.OutstandingTransaction > 0m)
+            .Select(i => new { i.TraderId, i.Sign, i.OutstandingTransaction })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<long, decimal> netByTrader = balances
+            .GroupBy(b => b.TraderId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Where(x => x.Sign == Core.Trading.LedgerSign.Debit).Sum(x => x.OutstandingTransaction)
+                   - g.Where(x => x.Sign == Core.Trading.LedgerSign.Credit).Sum(x => x.OutstandingTransaction));
+
+        // Last committed receipt date per payer.
+        var lastPayments = await _db.Set<Receipt>()
+            .Where(r => r.CompanyId == companyId && r.Status == ReceiptStatus.Committed && r.PayerAccountId != null)
+            .GroupBy(r => r.PayerAccountId!.Value)
+            .Select(g => new { TraderId = g.Key, Last = g.Max(r => r.Date) })
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, DateOnly> lastByTrader = lastPayments.ToDictionary(x => x.TraderId, x => x.Last);
+
+        Dictionary<long, (string Code, string Name)> customers = await _db.Set<Core.Trading.Customer>()
+            .Where(c => c.CompanyId == companyId)
+            .ToDictionaryAsync(c => c.Id, c => (c.Code, c.Name), ct).ConfigureAwait(false);
+
+        List<IReadOnlyDictionary<string, object?>> result = [];
+        foreach ((long traderId, decimal balance) in netByTrader.Where(kv => kv.Value > 0m).OrderBy(kv => kv.Key))
+        {
+            bool hasRecent = lastByTrader.TryGetValue(traderId, out DateOnly last) && last >= cutoff;
+            if (hasRecent)
+            {
+                continue;
+            }
+
+            (string code, string name) = customers.GetValueOrDefault(traderId, (traderId.ToString(), string.Empty));
+            result.Add(Row(new()
+            {
+                ["Account"] = code,
+                ["Name"] = name,
+                ["LastPayment"] = lastByTrader.TryGetValue(traderId, out DateOnly lp) ? lp.ToDateTime(TimeOnly.MinValue) : (object?)"never",
+                ["Balance"] = balance,
+            }));
+        }
+
+        return result;
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AgentAgeingAsync(long companyId, CancellationToken ct)
