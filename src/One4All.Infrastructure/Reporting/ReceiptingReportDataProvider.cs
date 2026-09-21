@@ -41,6 +41,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC17" => await GapAnalysisAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC18" => await BackDatedReceiptsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC20" => await StationeryControlAsync(companyId, ct).ConfigureAwait(false),
+            "RC21" => await AuditTrailAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC25" => await DailyBankingSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC26" => await CashInTransitAgeingAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC28" => await CashMovementsAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -277,6 +278,35 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             ["Type"] = m.Type.ToString(),
             ["Reason"] = m.Reason,
             ["Amount"] = m.Amount,
+        })).ToList();
+    }
+
+    private static readonly string[] ReceiptingEntityTypes =
+    [
+        "Receipt", "CashierSession", "BankDeposit", "RefundRecord", "ReceiptReprint",
+        "PaymentArrangement", "SuspenseAllocation", "DishonouredPayment", "ImportBatch",
+        "Agent", "StationeryBook", "SessionCashMovement",
+    ];
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AuditTrailAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly to = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+        DateTimeOffset fromUtc = new(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+        DateTimeOffset toUtc = new(to.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
+
+        var entries = await _db.Set<Core.Audit.ChangeLogEntry>()
+            .Where(c => c.CompanyId == companyId && ReceiptingEntityTypes.Contains(c.EntityType) && c.OccurredOnUtc >= fromUtc && c.OccurredOnUtc <= toUtc)
+            .OrderBy(c => c.Id)
+            .Select(c => new { c.OccurredOnUtc, c.Action, c.UserName, c.EntityType, c.EntityId })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return entries.Select(c => Row(new()
+        {
+            ["When"] = c.OccurredOnUtc.UtcDateTime,
+            ["Action"] = c.Action.ToString(),
+            ["User"] = string.IsNullOrEmpty(c.UserName) ? "system" : c.UserName,
+            ["Detail"] = $"{c.EntityType} {c.EntityId}",
         })).ToList();
     }
 
