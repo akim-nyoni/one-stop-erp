@@ -197,9 +197,49 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
     public void MoveToTable(long tableId) => TableId = tableId;
 }
 
+/// <summary>
+/// A customization applied to an order line (<c>res.order_line_modifier</c>) — e.g. "extra cheese" (+price)
+/// or "no onions" (0). May consume extra stock of an ingredient on billing.
+/// </summary>
+public sealed class OrderLineModifier : Entity
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private OrderLineModifier() => Description = string.Empty;
+
+    /// <summary>Creates a modifier.</summary>
+    /// <param name="description">The modifier description.</param>
+    /// <param name="priceDelta">The price change per unit of the line (may be negative or zero).</param>
+    /// <param name="ingredientItemId">An extra stock ingredient consumed, if any.</param>
+    /// <param name="ingredientQuantity">The extra ingredient quantity per unit of the line.</param>
+    public OrderLineModifier(string description, decimal priceDelta, long? ingredientItemId = null, decimal ingredientQuantity = 0m)
+    {
+        Description = description;
+        PriceDelta = priceDelta;
+        IngredientItemId = ingredientItemId;
+        IngredientQuantity = ingredientQuantity;
+    }
+
+    /// <summary>The owning order line id.</summary>
+    public long TableOrderLineId { get; private set; }
+
+    /// <summary>The modifier description.</summary>
+    public string Description { get; private set; }
+
+    /// <summary>The price change per unit of the line (may be negative or zero).</summary>
+    public decimal PriceDelta { get; private set; }
+
+    /// <summary>An extra stock ingredient consumed, if any.</summary>
+    public long? IngredientItemId { get; private set; }
+
+    /// <summary>The extra ingredient quantity per unit of the line.</summary>
+    public decimal IngredientQuantity { get; private set; }
+}
+
 /// <summary>One ordered menu item on a table order (<c>res.order_line</c>).</summary>
 public sealed class TableOrderLine : Entity
 {
+    private readonly List<OrderLineModifier> _modifiers = [];
+
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private TableOrderLine()
     {
@@ -257,8 +297,30 @@ public sealed class TableOrderLine : Entity
     /// <summary>The tax on the line.</summary>
     public decimal TaxAmount { get; private set; }
 
-    /// <summary>The net line value (quantity × unit price).</summary>
-    public decimal LineNet => decimal.Round(Quantity * UnitPrice, 4, MidpointRounding.ToEven);
+    /// <summary>The modifiers applied to this line.</summary>
+    public IReadOnlyList<OrderLineModifier> Modifiers => _modifiers.AsReadOnly();
+
+    /// <summary>The total per-unit price change from modifiers.</summary>
+    public decimal ModifierDelta => _modifiers.Sum(m => m.PriceDelta);
+
+    /// <summary>The effective unit price including modifiers.</summary>
+    public decimal EffectiveUnitPrice => UnitPrice + ModifierDelta;
+
+    /// <summary>The net line value (quantity × effective unit price, including modifiers).</summary>
+    public decimal LineNet => decimal.Round(Quantity * EffectiveUnitPrice, 4, MidpointRounding.ToEven);
+
+    /// <summary>Adds a modifier to the line.</summary>
+    /// <param name="description">The modifier description.</param>
+    /// <param name="priceDelta">The price change per unit of the line.</param>
+    /// <param name="ingredientItemId">An extra stock ingredient consumed, if any.</param>
+    /// <param name="ingredientQuantity">The extra ingredient quantity per unit of the line.</param>
+    /// <returns>The created modifier.</returns>
+    public OrderLineModifier AddModifier(string description, decimal priceDelta, long? ingredientItemId = null, decimal ingredientQuantity = 0m)
+    {
+        OrderLineModifier modifier = new(description, priceDelta, ingredientItemId, ingredientQuantity);
+        _modifiers.Add(modifier);
+        return modifier;
+    }
 
     /// <summary>Whether the line has been fired to the kitchen (on a kitchen order ticket).</summary>
     public bool Fired { get; private set; }

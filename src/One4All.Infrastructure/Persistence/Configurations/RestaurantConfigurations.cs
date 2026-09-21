@@ -139,6 +139,23 @@ internal sealed class TableOrderLineConfiguration : IEntityTypeConfiguration<Tab
         b.Property(x => x.CompReason).HasMaxLength(200);
         b.Ignore(x => x.LineNet);
         b.Ignore(x => x.RemainingQuantity);
+        b.Ignore(x => x.ModifierDelta);
+        b.Ignore(x => x.EffectiveUnitPrice);
+        b.HasMany(x => x.Modifiers).WithOne().HasForeignKey(x => x.TableOrderLineId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Modifiers).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class OrderLineModifierConfiguration : IEntityTypeConfiguration<OrderLineModifier>
+{
+    public void Configure(EntityTypeBuilder<OrderLineModifier> b)
+    {
+        b.ToTable("order_line_modifier", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Description).HasMaxLength(120);
+        b.Property(x => x.PriceDelta).HasPrecision(19, 4);
+        b.Property(x => x.IngredientQuantity).HasPrecision(19, 4);
+        b.HasIndex(x => x.TableOrderLineId);
     }
 }
 

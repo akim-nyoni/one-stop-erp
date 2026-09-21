@@ -5734,6 +5734,54 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("menu_item", "res");
                 });
 
+            modelBuilder.Entity("One4All.Core.Restaurant.OrderLineModifier", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("description");
+
+                    b.Property<long?>("IngredientItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ingredient_item_id");
+
+                    b.Property<decimal>("IngredientQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("ingredient_quantity");
+
+                    b.Property<decimal>("PriceDelta")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("price_delta");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("TableOrderLineId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("table_order_line_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_order_line_modifier");
+
+                    b.HasIndex("TableOrderLineId")
+                        .HasDatabaseName("ix_order_line_modifier_table_order_line_id");
+
+                    b.ToTable("order_line_modifier", "res");
+                });
+
             modelBuilder.Entity("One4All.Core.Restaurant.RecipeLine", b =>
                 {
                     b.Property<long>("Id")
@@ -8920,6 +8968,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_kitchen_ticket_line_kitchen_tickets_kitchen_ticket_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Restaurant.OrderLineModifier", b =>
+                {
+                    b.HasOne("One4All.Core.Restaurant.TableOrderLine", null)
+                        .WithMany("Modifiers")
+                        .HasForeignKey("TableOrderLineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_order_line_modifier_table_order_line_table_order_line_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Restaurant.RecipeLine", b =>
                 {
                     b.HasOne("One4All.Core.Restaurant.MenuItem", null)
@@ -9167,6 +9225,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Restaurant.TableOrder", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Restaurant.TableOrderLine", b =>
+                {
+                    b.Navigation("Modifiers");
                 });
 
             modelBuilder.Entity("One4All.Core.SalesOrders.SalesOrder", b =>

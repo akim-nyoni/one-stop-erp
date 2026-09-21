@@ -88,6 +88,22 @@ public interface IRestaurantService
     Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, int? seatNumber = null, CancellationToken ct = default);
 
     /// <summary>
+    /// Adds a modifier to an order line (e.g. "extra cheese" +2, "no onions" 0). The price delta changes the
+    /// line's effective price; an optional ingredient consumes extra stock on billing. Order must be open and
+    /// the line not yet billed.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The order.</param>
+    /// <param name="lineId">The order line to modify.</param>
+    /// <param name="description">The modifier description.</param>
+    /// <param name="priceDelta">The price change per unit of the line (may be negative or zero).</param>
+    /// <param name="ingredientItemId">An extra stock ingredient consumed, if any.</param>
+    /// <param name="ingredientQuantity">The extra ingredient quantity per unit of the line.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The line's new net value.</returns>
+    Task<Result<decimal>> AddItemModifierAsync(long companyId, long orderId, long lineId, string description, decimal priceDelta, long? ingredientItemId = null, decimal ingredientQuantity = 0m, CancellationToken ct = default);
+
+    /// <summary>
     /// Bills an open order: posts revenue (Dr cash/Cr revenue/Cr tax) and cost of sales by exploding each
     /// line's recipe into stock issues, marks the order billed and frees the table.
     /// </summary>

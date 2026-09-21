@@ -121,6 +121,47 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
+    public async Task<Result<decimal>> AddItemModifierAsync(long companyId, long orderId, long lineId, string description, decimal priceDelta, long? ingredientItemId = null, decimal ingredientQuantity = 0m, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return Error.Validation("Res.ModifierNoDescription", "A modifier needs a description.");
+        }
+
+        if (ingredientItemId is not null && ingredientQuantity <= 0m)
+        {
+            return Error.Rule("Res.ModifierInvalidQuantity", "A modifier ingredient needs a positive quantity.");
+        }
+
+        TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).ThenInclude(l => l.Modifiers)
+            .FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found.");
+        }
+
+        if (order.Status != TableOrderStatus.Open)
+        {
+            return Error.Rule("Res.OrderNotOpen", "Modifiers can only be added to an open order.");
+        }
+
+        TableOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == lineId);
+        if (line is null)
+        {
+            return Error.NotFound("Res.LineNotFound", $"Order line {lineId} is not on this order.");
+        }
+
+        if (line.BilledQuantity > 0m)
+        {
+            return Error.Rule("Res.LineAlreadyBilled", "A line that has already been billed cannot be modified.");
+        }
+
+        line.AddModifier(description, priceDelta, ingredientItemId, ingredientQuantity);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return line.LineNet;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
     {
         Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
@@ -269,7 +310,7 @@ public sealed class RestaurantService : IRestaurantService
 
     private async Task<Result<TableOrder>> LoadOpenOrderAsync(long companyId, long orderId, CancellationToken ct)
     {
-        TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).ThenInclude(l => l.Modifiers).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
         if (order is null)
         {
             return Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found.");
@@ -328,7 +369,7 @@ public sealed class RestaurantService : IRestaurantService
                 continue;
             }
 
-            decimal portionNet = decimal.Round(quantity * line.UnitPrice, 4, MidpointRounding.ToEven);
+            decimal portionNet = decimal.Round(quantity * line.EffectiveUnitPrice, 4, MidpointRounding.ToEven);
             decimal portionTax = line.Quantity == 0m ? 0m : decimal.Round(line.TaxAmount * quantity / line.Quantity, 4, MidpointRounding.ToEven);
             net += portionNet;
             tax += portionTax;
@@ -426,6 +467,32 @@ public sealed class RestaurantService : IRestaurantService
 
                     costOfSales += issue.Value.Value;
                 }
+            }
+
+            // Modifier ingredients (e.g. extra cheese) consume additional stock.
+            foreach (OrderLineModifier modifier in line.Modifiers)
+            {
+                if (modifier.IngredientItemId is not { } modifierItemId || modifier.IngredientQuantity <= 0m)
+                {
+                    continue;
+                }
+
+                Result<StockMovementResult> issue = await _inventory.IssueAsync(new IssueStockRequest
+                {
+                    CompanyId = companyId,
+                    ItemId = modifierItemId,
+                    WarehouseId = warehouseId,
+                    Date = date,
+                    Quantity = modifier.IngredientQuantity * quantity,
+                    Reference = order.OrderNumber,
+                }, ct).ConfigureAwait(false);
+
+                if (issue.IsFailure)
+                {
+                    return issue.Error;
+                }
+
+                costOfSales += issue.Value.Value;
             }
 
             line.Bill(quantity);
