@@ -350,9 +350,10 @@ public interface IRestaurantService
     /// <param name="orderId">The order.</param>
     /// <param name="lineId">The order line to void.</param>
     /// <param name="reason">The mandatory void reason.</param>
+    /// <param name="authorizedByUserId">The authorising manager, recorded for oversight (optional).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
-    Task<Result> VoidLineAsync(long companyId, long orderId, long lineId, string reason, CancellationToken ct = default);
+    Task<Result> VoidLineAsync(long companyId, long orderId, long lineId, string reason, long? authorizedByUserId = null, CancellationToken ct = default);
 
     /// <summary>
     /// Comps an order line (complimentary): the item is still made and served — so billing recognises its cost
@@ -363,9 +364,10 @@ public interface IRestaurantService
     /// <param name="orderId">The order.</param>
     /// <param name="lineId">The order line to comp.</param>
     /// <param name="reason">The mandatory comp reason.</param>
+    /// <param name="authorizedByUserId">The authorising manager, recorded for oversight (optional).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
-    Task<Result> CompLineAsync(long companyId, long orderId, long lineId, string reason, CancellationToken ct = default);
+    Task<Result> CompLineAsync(long companyId, long orderId, long lineId, string reason, long? authorizedByUserId = null, CancellationToken ct = default);
 
     /// <summary>Cancels an open order (nothing was billed) and frees the table. Requires a reason.</summary>
     /// <param name="companyId">The company.</param>

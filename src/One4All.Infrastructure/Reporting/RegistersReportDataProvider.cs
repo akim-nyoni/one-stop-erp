@@ -258,8 +258,11 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             join o in _db.Set<Core.Restaurant.TableOrder>() on l.TableOrderId equals o.Id
             where o.CompanyId == companyId && o.OpenedOn >= fromDate && o.OpenedOn <= toDate && (l.IsVoided || l.IsComped)
             orderby o.OpenedOn, o.OrderNumber
-            select new { o.OpenedOn, o.OrderNumber, l.Description, l.Quantity, l.IsComped, l.VoidReason, l.CompReason })
+            select new { o.OpenedOn, o.OrderNumber, l.Description, l.Quantity, l.IsComped, l.VoidReason, l.CompReason, l.AuthorizedByUserId })
             .ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<long, string> staff = await _db.Set<Core.Security.User>()
+            .ToDictionaryAsync(u => u.Id, u => u.DisplayName, ct).ConfigureAwait(false);
 
         return rows.Select(r => Row(new()
         {
@@ -269,6 +272,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Qty"] = r.Quantity,
             ["Type"] = r.IsComped ? "Comp" : "Void",
             ["Reason"] = (r.IsComped ? r.CompReason : r.VoidReason) ?? string.Empty,
+            ["Authorised"] = r.AuthorizedByUserId is { } id ? staff.GetValueOrDefault(id, $"#{id}") : string.Empty,
         })).ToList();
     }
 

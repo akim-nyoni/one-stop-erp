@@ -906,14 +906,14 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result> VoidLineAsync(long companyId, long orderId, long lineId, string reason, CancellationToken ct = default)
-        => await MarkLineAsync(companyId, orderId, lineId, reason, comp: false, ct).ConfigureAwait(false);
+    public async Task<Result> VoidLineAsync(long companyId, long orderId, long lineId, string reason, long? authorizedByUserId = null, CancellationToken ct = default)
+        => await MarkLineAsync(companyId, orderId, lineId, reason, comp: false, authorizedByUserId, ct).ConfigureAwait(false);
 
     /// <inheritdoc />
-    public async Task<Result> CompLineAsync(long companyId, long orderId, long lineId, string reason, CancellationToken ct = default)
-        => await MarkLineAsync(companyId, orderId, lineId, reason, comp: true, ct).ConfigureAwait(false);
+    public async Task<Result> CompLineAsync(long companyId, long orderId, long lineId, string reason, long? authorizedByUserId = null, CancellationToken ct = default)
+        => await MarkLineAsync(companyId, orderId, lineId, reason, comp: true, authorizedByUserId, ct).ConfigureAwait(false);
 
-    private async Task<Result> MarkLineAsync(long companyId, long orderId, long lineId, string reason, bool comp, CancellationToken ct)
+    private async Task<Result> MarkLineAsync(long companyId, long orderId, long lineId, string reason, bool comp, long? authorizedByUserId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
@@ -949,11 +949,11 @@ public sealed class RestaurantService : IRestaurantService
 
         if (comp)
         {
-            line.Comp(reason);
+            line.Comp(reason, authorizedByUserId);
         }
         else
         {
-            line.Void(reason);
+            line.Void(reason, authorizedByUserId);
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

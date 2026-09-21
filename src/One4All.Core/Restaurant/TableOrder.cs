@@ -469,20 +469,27 @@ public sealed class TableOrderLine : Entity
     /// <summary>The comp reason, if comped.</summary>
     public string? CompReason { get; private set; }
 
+    /// <summary>The manager/user who authorised the void or comp, if recorded.</summary>
+    public long? AuthorizedByUserId { get; private set; }
+
     /// <summary>Voids the line (it will not be billed and does not consume stock).</summary>
     /// <param name="reason">The void reason.</param>
-    public void Void(string reason)
+    /// <param name="authorizedByUserId">The authorising manager, if recorded.</param>
+    public void Void(string reason, long? authorizedByUserId = null)
     {
         IsVoided = true;
         VoidReason = reason;
+        AuthorizedByUserId = authorizedByUserId;
     }
 
     /// <summary>Comps the line (free to the guest — still made and served, so cost of sales is recognised).</summary>
     /// <param name="reason">The comp reason.</param>
-    public void Comp(string reason)
+    /// <param name="authorizedByUserId">The authorising manager, if recorded.</param>
+    public void Comp(string reason, long? authorizedByUserId = null)
     {
         IsComped = true;
         CompReason = reason;
+        AuthorizedByUserId = authorizedByUserId;
     }
 
     /// <summary>Bills a quantity of this line (split bills).</summary>

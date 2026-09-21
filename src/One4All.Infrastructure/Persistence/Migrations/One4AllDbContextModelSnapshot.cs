@@ -6188,6 +6188,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<long?>("AuthorizedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("authorized_by_user_id");
+
                     b.Property<decimal>("BilledQuantity")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")

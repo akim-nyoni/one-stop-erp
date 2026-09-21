@@ -419,8 +419,8 @@ public static class SystemReports
     /// <summary>Builds the Voids &amp; Comps definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition VoidsAndComps() => Listing(VoidsAndCompsCode, "Voids &amp; Comps", "Restaurant",
-        "Voided and comped order lines over a period, with reasons — for manager oversight.", "VoidsAndComps",
-        [new Column("Date", "Date", 100), new Column("Order", "Order", 100), new Column("Item", "Item", 140), new Column("Qty", "Qty", 60), new Column("Type", "Type", 70), new Column("Reason", "Reason", 180)],
+        "Voided and comped order lines over a period, with reasons and the authorising manager — for oversight.", "VoidsAndComps",
+        [new Column("Date", "Date", 100), new Column("Order", "Order", 90), new Column("Item", "Item", 130), new Column("Qty", "Qty", 55), new Column("Type", "Type", 60), new Column("Reason", "Reason", 160), new Column("Authorised", "Authorised", 120)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Sales by Order Type definition (Restaurant module).</summary>

@@ -171,6 +171,7 @@ internal sealed class TableOrderLineConfiguration : IEntityTypeConfiguration<Tab
         b.Property(x => x.CostOfSalesAccountCode).HasMaxLength(8);
         b.Property(x => x.VoidReason).HasMaxLength(200);
         b.Property(x => x.CompReason).HasMaxLength(200);
+        b.Property(x => x.AuthorizedByUserId);
         b.Ignore(x => x.LineNet);
         b.Ignore(x => x.RemainingQuantity);
         b.Ignore(x => x.ModifierDelta);
