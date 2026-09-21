@@ -39,6 +39,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC15" => await CancelledReceiptsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC16" => await ReprintLogAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC17" => await GapAnalysisAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC18" => await BackDatedReceiptsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC20" => await StationeryControlAsync(companyId, ct).ConfigureAwait(false),
             "RC25" => await DailyBankingSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC26" => await CashInTransitAgeingAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -277,6 +278,28 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             ["Reason"] = m.Reason,
             ["Amount"] = m.Amount,
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BackDatedReceiptsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly to = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+        List<Receipt> receipts = await _db.Set<Receipt>().Include(r => r.Lines)
+            .Where(r => r.CompanyId == companyId && r.Date >= from && r.Date <= to)
+            .OrderBy(r => r.ReceiptNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        // Back-dated = the business date precedes the date the receipt was actually captured.
+        return receipts
+            .Where(r => r.Date < DateOnly.FromDateTime(r.CreatedOnUtc.UtcDateTime))
+            .Select(r => Row(new()
+            {
+                ["ReceiptNumber"] = r.ReceiptNumber,
+                ["ReceiptDate"] = r.Date.ToDateTime(TimeOnly.MinValue),
+                ["CapturedOn"] = r.CreatedOnUtc.UtcDateTime.Date,
+                ["Amount"] = r.LineTotal,
+            }))
+            .ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DailyBankingSummaryAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
