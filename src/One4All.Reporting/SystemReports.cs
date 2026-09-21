@@ -198,6 +198,9 @@ public static class SystemReports
     /// <summary>The Stock Valuation report code.</summary>
     public const string StockValuationCode = "INV-VAL";
 
+    /// <summary>The Stock Movements report code.</summary>
+    public const string StockMovementsCode = "INV-MOVE";
+
     /// <summary>The Fixed Asset Register report code.</summary>
     public const string AssetRegisterCode = "FA-REG";
 
@@ -216,6 +219,13 @@ public static class SystemReports
         "Quantity on hand and value at moving average cost, per item and warehouse.", "StockValuation",
         [new Column("ItemCode", "Item", 90), new Column("Description", "Description", 180), new Column("WarehouseCode", "Warehouse", 90), new Column("Quantity", "Qty", 70, true), new Column("AverageCost", "Avg cost", 80, true), new Column("Value", "Value", 90, true)],
         [("AsAtDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Stock Movements definition (inventory transaction history).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition StockMovements() => Listing(StockMovementsCode, "Stock Movements", "Inventory",
+        "Every stock movement over a period — receipts, issues, transfers, adjustments and reversals.", "StockMovements",
+        [new Column("Date", "Date", 95), new Column("Item", "Item", 100), new Column("Warehouse", "Warehouse", 90), new Column("Type", "Type", 90), new Column("Qty", "Qty", 70, true), new Column("Value", "Value", 90, true), new Column("Reference", "Reference", 120)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Fixed Asset Register definition (brief §4.14).</summary>
     /// <returns>The definition.</returns>

@@ -20,7 +20,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "AssetRegister", "PayrollSummary", "PropertyRegister", "BudgetVsActual",
+        "StockValuation", "StockMovements", "AssetRegister", "PayrollSummary", "PropertyRegister", "BudgetVsActual",
     };
 
     private readonly One4AllDbContext _db;
@@ -47,12 +47,39 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
         return command.ToUpperInvariant() switch
         {
             "STOCKVALUATION" => await StockValuationAsync(companyId, ct).ConfigureAwait(false),
+            "STOCKMOVEMENTS" => await StockMovementsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "ASSETREGISTER" => await AssetRegisterAsync(companyId, ct).ConfigureAwait(false),
             "PAYROLLSUMMARY" => await PayrollSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "PROPERTYREGISTER" => await PropertyRegisterAsync(companyId, ct).ConfigureAwait(false),
             "BUDGETVSACTUAL" => await BudgetVsActualAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> StockMovementsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly fromDate = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly toDate = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+
+        var rows = await (
+            from m in _db.Set<Core.Inventory.StockMovement>()
+            join i in _db.Set<Core.Inventory.Item>() on m.ItemId equals i.Id
+            join w in _db.Set<Core.Inventory.Warehouse>() on m.WarehouseId equals w.Id
+            where m.CompanyId == companyId && m.Date >= fromDate && m.Date <= toDate
+            orderby m.Date, m.Id
+            select new { m.Date, i.Code, WarehouseCode = w.Code, m.Type, m.Quantity, m.Value, m.Reference })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return rows.Select(r => Row(new()
+        {
+            ["Date"] = r.Date.ToDateTime(TimeOnly.MinValue),
+            ["Item"] = r.Code,
+            ["Warehouse"] = r.WarehouseCode,
+            ["Type"] = r.Type.ToString(),
+            ["Qty"] = r.Quantity,
+            ["Value"] = r.Value,
+            ["Reference"] = r.Reference ?? string.Empty,
+        })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> StockValuationAsync(long companyId, CancellationToken ct)
