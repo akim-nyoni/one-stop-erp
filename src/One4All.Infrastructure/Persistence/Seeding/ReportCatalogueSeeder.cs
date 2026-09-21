@@ -99,6 +99,7 @@ public sealed class ReportCatalogueSeeder
         yield return SystemReports.FloorPlan();
         yield return SystemReports.SectionSales();
         yield return SystemReports.VoidsAndComps();
+        yield return SystemReports.OrderTypeSales();
 
         // Cashiering & Receipting catalogue (brief §RCP-16, the RC series).
         foreach (ReportDefinition definition in ReceiptingReports.All())

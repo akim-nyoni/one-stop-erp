@@ -17,7 +17,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
         "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus", "KitchenTickets",
-        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps",
+        "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales",
     };
 
     private readonly One4AllDbContext _db;
@@ -48,6 +48,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "FLOORPLAN" => await FloorPlanAsync(companyId, ct).ConfigureAwait(false),
             "SECTIONSALES" => await SectionSalesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "VOIDSANDCOMPS" => await VoidsAndCompsAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "ORDERTYPESALES" => await OrderTypeSalesAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -99,6 +100,38 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Tables"] = g.MemberCount,
             ["Seats"] = g.Seats,
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> OrderTypeSalesAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly fromDate = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly toDate = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+
+        var billed = await (
+            from l in _db.Set<Core.Restaurant.TableOrderLine>()
+            join o in _db.Set<Core.Restaurant.TableOrder>() on l.TableOrderId equals o.Id
+            where o.CompanyId == companyId && o.OpenedOn >= fromDate && o.OpenedOn <= toDate && !l.IsVoided && !l.IsComped && l.BilledQuantity > 0m
+            select new { o.OrderType, o.Id, l.BilledQuantity, l.Quantity, l.UnitPrice, l.TaxAmount })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return billed
+            .GroupBy(x => x.OrderType)
+            .Select(g =>
+            {
+                decimal net = g.Sum(x => decimal.Round(x.BilledQuantity * x.UnitPrice, 4, MidpointRounding.ToEven));
+                decimal tax = g.Sum(x => x.Quantity == 0m ? 0m : decimal.Round(x.TaxAmount * x.BilledQuantity / x.Quantity, 4, MidpointRounding.ToEven));
+                return (Type: g.Key.ToString(), Orders: g.Select(x => x.Id).Distinct().Count(), Net: net, Tax: tax);
+            })
+            .OrderBy(r => r.Type)
+            .Select(r => Row(new()
+            {
+                ["Type"] = r.Type,
+                ["Orders"] = r.Orders,
+                ["Net"] = r.Net,
+                ["Tax"] = r.Tax,
+                ["Gross"] = r.Net + r.Tax,
+            }))
+            .ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VoidsAndCompsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

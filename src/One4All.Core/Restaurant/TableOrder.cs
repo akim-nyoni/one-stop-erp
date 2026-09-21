@@ -82,6 +82,19 @@ public enum MenuCourse
     Dessert = 4,
 }
 
+/// <summary>How an order is fulfilled (Restaurant module).</summary>
+public enum OrderType
+{
+    /// <summary>Dine-in at a table.</summary>
+    DineIn = 1,
+
+    /// <summary>Takeaway / collection — no table.</summary>
+    Takeaway = 2,
+
+    /// <summary>Delivery to the guest — no table.</summary>
+    Delivery = 3,
+}
+
 /// <summary>The lifecycle of a table order (Restaurant module).</summary>
 public enum TableOrderStatus
 {
@@ -121,14 +134,46 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
         WaiterUserId = waiterUserId;
         OpenedOn = openedOn;
         PartySize = partySize < 1 ? 1 : partySize;
+        OrderType = OrderType.DineIn;
+        Status = TableOrderStatus.Open;
+    }
+
+    /// <summary>Opens an off-premise (takeaway or delivery) order with no table.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderNumber">The order number.</param>
+    /// <param name="orderType">The fulfilment type (takeaway or delivery).</param>
+    /// <param name="waiterUserId">The staff member taking the order.</param>
+    /// <param name="openedOn">The open date.</param>
+    /// <param name="customerName">The customer's name, if any.</param>
+    /// <param name="customerPhone">The customer's contact number, if any.</param>
+    public TableOrder(long companyId, string orderNumber, OrderType orderType, long waiterUserId, DateOnly openedOn, string? customerName = null, string? customerPhone = null)
+    {
+        CompanyId = companyId;
+        TableId = null;
+        OrderNumber = orderNumber;
+        WaiterUserId = waiterUserId;
+        OpenedOn = openedOn;
+        PartySize = 1;
+        OrderType = orderType;
+        CustomerName = customerName;
+        CustomerPhone = customerPhone;
         Status = TableOrderStatus.Open;
     }
 
     /// <inheritdoc />
     public long CompanyId { get; private set; }
 
-    /// <summary>The table.</summary>
-    public long TableId { get; private set; }
+    /// <summary>The table, or null for an off-premise (takeaway/delivery) order.</summary>
+    public long? TableId { get; private set; }
+
+    /// <summary>How the order is fulfilled.</summary>
+    public OrderType OrderType { get; private set; }
+
+    /// <summary>The customer's name (off-premise orders), if any.</summary>
+    public string? CustomerName { get; private set; }
+
+    /// <summary>The customer's contact number (off-premise orders), if any.</summary>
+    public string? CustomerPhone { get; private set; }
 
     /// <summary>The order number.</summary>
     public string OrderNumber { get; private set; }

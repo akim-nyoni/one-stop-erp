@@ -110,6 +110,9 @@ internal sealed class TableOrderConfiguration : IEntityTypeConfiguration<TableOr
         b.HasKey(x => x.Id);
         b.Property(x => x.OrderNumber).HasMaxLength(40);
         b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.OrderType).HasConversion<int>();
+        b.Property(x => x.CustomerName).HasMaxLength(120);
+        b.Property(x => x.CustomerPhone).HasMaxLength(40);
         b.Property(x => x.JournalNumber).HasMaxLength(30);
         b.Property(x => x.PartySize);
         b.Ignore(x => x.NetTotal);

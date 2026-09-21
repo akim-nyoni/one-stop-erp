@@ -86,6 +86,20 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
+    public async Task<Result<long>> OpenOffPremiseOrderAsync(long companyId, string orderNumber, OrderType orderType, long waiterUserId, DateOnly date, string? customerName = null, string? customerPhone = null, CancellationToken ct = default)
+    {
+        if (orderType == OrderType.DineIn)
+        {
+            return Error.Rule("Res.DineInNeedsTable", "A dine-in order must be opened at a table; use OpenOrderAsync.");
+        }
+
+        TableOrder order = new(companyId, orderNumber, orderType, waiterUserId, date, customerName, customerPhone);
+        _db.Set<TableOrder>().Add(order);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return order.Id;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, int? seatNumber = null, CancellationToken ct = default)
     {
         if (quantity <= 0m)
@@ -502,8 +516,11 @@ public sealed class RestaurantService : IRestaurantService
         if (fullyBilled)
         {
             order.MarkBilled(revenueJournal);
-            RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == order.TableId, ct).ConfigureAwait(false);
-            await FreeTableAndGroupAsync(companyId, table, ct).ConfigureAwait(false);
+            if (order.TableId is { } tableId)
+            {
+                RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == tableId, ct).ConfigureAwait(false);
+                await FreeTableAndGroupAsync(companyId, table, ct).ConfigureAwait(false);
+            }
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -585,8 +602,12 @@ public sealed class RestaurantService : IRestaurantService
         }
 
         order.Cancel();
-        RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == order.TableId, ct).ConfigureAwait(false);
-        await FreeTableAndGroupAsync(companyId, table, ct).ConfigureAwait(false);
+        if (order.TableId is { } tableId)
+        {
+            RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == tableId, ct).ConfigureAwait(false);
+            await FreeTableAndGroupAsync(companyId, table, ct).ConfigureAwait(false);
+        }
+
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }

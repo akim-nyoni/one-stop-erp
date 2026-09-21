@@ -6052,6 +6052,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<string>("CustomerName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("customer_name");
+
+                    b.Property<string>("CustomerPhone")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("customer_phone");
+
                     b.Property<string>("JournalNumber")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
@@ -6075,6 +6085,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("order_number");
 
+                    b.Property<int>("OrderType")
+                        .HasColumnType("integer")
+                        .HasColumnName("order_type");
+
                     b.Property<int>("PartySize")
                         .HasColumnType("integer")
                         .HasColumnName("party_size");
@@ -6089,7 +6103,7 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("status");
 
-                    b.Property<long>("TableId")
+                    b.Property<long?>("TableId")
                         .HasColumnType("bigint")
                         .HasColumnName("table_id");
 

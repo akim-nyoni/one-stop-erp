@@ -75,6 +75,21 @@ public interface IRestaurantService
     /// <returns>The created order id.</returns>
     Task<Result<long>> OpenOrderAsync(long companyId, long tableId, string orderNumber, long waiterUserId, DateOnly date, int partySize = 1, CancellationToken ct = default);
 
+    /// <summary>
+    /// Opens an off-premise order (takeaway or delivery) with no table. Items are added and billed exactly as a
+    /// dine-in order, but nothing occupies the floor. Refuses <see cref="OrderType.DineIn"/> (use a table).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderNumber">The order number.</param>
+    /// <param name="orderType">The fulfilment type (takeaway or delivery).</param>
+    /// <param name="waiterUserId">The staff member taking the order.</param>
+    /// <param name="date">The open date.</param>
+    /// <param name="customerName">The customer's name, if any.</param>
+    /// <param name="customerPhone">The customer's contact number, if any.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created order id.</returns>
+    Task<Result<long>> OpenOffPremiseOrderAsync(long companyId, string orderNumber, OrderType orderType, long waiterUserId, DateOnly date, string? customerName = null, string? customerPhone = null, CancellationToken ct = default);
+
     /// <summary>Adds a menu item to an open order at its menu price.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="orderId">The order.</param>
