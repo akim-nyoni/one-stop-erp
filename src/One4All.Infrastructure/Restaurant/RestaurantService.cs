@@ -160,7 +160,7 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.InvalidQuantity", "The quantity must be positive.");
         }
 
-        TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).ThenInclude(l => l.Modifiers).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
         if (order is null)
         {
             return Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found.");
@@ -182,9 +182,43 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.MenuItemUnavailable", $"Menu item {menu.Code} is not available.");
         }
 
+        // Enforce the bar-tab spend limit against the running net (existing lines + this one).
+        if (order.SpendLimit is { } limit)
+        {
+            decimal prospective = order.NetTotal + decimal.Round(quantity * menu.PriceFor(priceLevel), 4, MidpointRounding.ToEven);
+            if (prospective > limit)
+            {
+                return Error.Rule("Res.SpendLimitExceeded", $"Adding this item would take the tab to {prospective:0.00}, over the {limit:0.00} limit.");
+            }
+        }
+
         TableOrderLine line = order.AddLine(menu.Id, menu.Name, quantity, menu.PriceFor(priceLevel), taxAmount, menu.RevenueAccountCode, menu.CostOfSalesAccountCode, course, seatNumber);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return line.LineNet;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetOrderSpendLimitAsync(long companyId, long orderId, decimal? limit, CancellationToken ct = default)
+    {
+        if (limit is < 0m)
+        {
+            return Result.Failure(Error.Rule("Res.SpendLimitNegative", "The spend limit cannot be negative."));
+        }
+
+        TableOrder? order = await _db.Set<TableOrder>().FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Result.Failure(Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found."));
+        }
+
+        if (order.Status != TableOrderStatus.Open)
+        {
+            return Result.Failure(Error.Rule("Res.OrderNotOpen", "Only an open order's spend limit can be set."));
+        }
+
+        order.SetSpendLimit(limit);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 
     /// <inheritdoc />

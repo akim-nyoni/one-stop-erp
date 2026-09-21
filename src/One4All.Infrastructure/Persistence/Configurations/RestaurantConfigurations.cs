@@ -144,6 +144,7 @@ internal sealed class TableOrderConfiguration : IEntityTypeConfiguration<TableOr
         b.Property(x => x.DeliveryAddress).HasMaxLength(400);
         b.Property(x => x.DeliveryStatus).HasConversion<int>();
         b.Property(x => x.JournalNumber).HasMaxLength(30);
+        b.Property(x => x.SpendLimit).HasPrecision(19, 4);
         b.Property(x => x.PartySize);
         b.Ignore(x => x.NetTotal);
         b.Ignore(x => x.TaxTotal);

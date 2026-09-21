@@ -254,6 +254,13 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
     /// <summary>The GL journal number for the bill (revenue).</summary>
     public string? JournalNumber { get; set; }
 
+    /// <summary>An optional pre-authorised spend limit (bar tab); items that would exceed the net limit are refused.</summary>
+    public decimal? SpendLimit { get; private set; }
+
+    /// <summary>Sets or clears the pre-authorised spend limit (bar tab).</summary>
+    /// <param name="limit">The net spend limit, or null to clear it.</param>
+    public void SetSpendLimit(decimal? limit) => SpendLimit = limit;
+
     /// <summary>The order lines.</summary>
     public IReadOnlyList<TableOrderLine> Lines => _lines.AsReadOnly();
 

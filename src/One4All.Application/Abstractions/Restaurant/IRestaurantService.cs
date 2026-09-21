@@ -170,6 +170,17 @@ public interface IRestaurantService
     Task<Result<decimal>> AddItemModifierAsync(long companyId, long orderId, long lineId, string description, decimal priceDelta, long? ingredientItemId = null, decimal ingredientQuantity = 0m, CancellationToken ct = default);
 
     /// <summary>
+    /// Sets or clears an order's pre-authorised spend limit (bar tab). Once set, adding an item whose net would
+    /// push the running tab over the limit is refused. Pass null to remove the limit.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The open order.</param>
+    /// <param name="limit">The net spend limit, or null to clear it.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> SetOrderSpendLimitAsync(long companyId, long orderId, decimal? limit, CancellationToken ct = default);
+
+    /// <summary>
     /// Bills an open order: posts revenue (Dr cash/Cr revenue/Cr tax) and cost of sales by exploding each
     /// line's recipe into stock issues, marks the order billed and frees the table.
     /// </summary>
