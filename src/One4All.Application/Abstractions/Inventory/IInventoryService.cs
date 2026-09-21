@@ -115,6 +115,23 @@ public interface IInventoryService
     /// <returns>The value transferred (at the source's average cost), or an error.</returns>
     Task<Result<decimal>> TransferAsync(long companyId, long itemId, long fromWarehouseId, long toWarehouseId, DateOnly date, decimal quantity, string? reference = null, CancellationToken ct = default);
 
+    /// <summary>
+    /// Adjusts stock to a physical count (stocktake): computes the variance against the on-hand quantity and
+    /// posts it at moving-average cost against a stock-adjustment account — a surplus increases stock
+    /// (Dr stock / Cr adjustment), a shortage decreases it (Dr adjustment / Cr stock). A nil variance is a
+    /// no-op. Records an Adjustment movement and returns the signed variance value (+ surplus, − shortage).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="itemId">The item.</param>
+    /// <param name="warehouseId">The warehouse counted.</param>
+    /// <param name="date">The stocktake date.</param>
+    /// <param name="countedQuantity">The physically counted quantity (the new on-hand).</param>
+    /// <param name="adjustmentAccountCode">The stock-adjustment / shrinkage account for the variance.</param>
+    /// <param name="reference">An optional reference (e.g. the stocktake number).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The signed variance value (+ surplus, − shortage), or an error.</returns>
+    Task<Result<decimal>> AdjustAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, string adjustmentAccountCode, string? reference = null, CancellationToken ct = default);
+
     /// <summary>Produces the stock valuation for a company (optionally a single warehouse).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="warehouseId">Optional warehouse filter.</param>

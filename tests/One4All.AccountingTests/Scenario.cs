@@ -131,6 +131,7 @@ public static class Scenario
         db.Accounts.Add(new LedgerAccount(company.Id, "2450", "Tips Payable", AccountType.Liability));
         db.Accounts.Add(new LedgerAccount(company.Id, "4700", "Discounts Allowed", AccountType.Income));
         db.Accounts.Add(new LedgerAccount(company.Id, "5200", "Stock Wastage", AccountType.Expense));
+        db.Accounts.Add(new LedgerAccount(company.Id, "5300", "Stock Adjustment", AccountType.Expense));
         db.Accounts.Add(new LedgerAccount(company.Id, "1300", "Agent Cash Control", AccountType.Asset));
         db.Accounts.Add(new LedgerAccount(company.Id, "6200", "Agent Commission", AccountType.Expense));
 
