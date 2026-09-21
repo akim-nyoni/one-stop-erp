@@ -115,6 +115,7 @@ internal sealed class TableOrderLineConfiguration : IEntityTypeConfiguration<Tab
         b.ToTable("order_line", Schemas.Restaurant);
         b.HasKey(x => x.Id);
         b.Property(x => x.Description).HasMaxLength(120);
+        b.Property(x => x.Course).HasConversion<int>();
         b.Property(x => x.Quantity).HasPrecision(19, 4);
         b.Property(x => x.UnitPrice).HasPrecision(19, 4);
         b.Property(x => x.BilledQuantity).HasPrecision(19, 4);
@@ -132,6 +133,7 @@ internal sealed class KitchenTicketConfiguration : IEntityTypeConfiguration<Kitc
         b.ToTable("kitchen_ticket", Schemas.Restaurant);
         b.HasKey(x => x.Id);
         b.Property(x => x.TicketNumber).HasMaxLength(40);
+        b.Property(x => x.Course).HasConversion<int>();
         b.Property(x => x.Status).HasConversion<int>();
         b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.KitchenTicketId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);

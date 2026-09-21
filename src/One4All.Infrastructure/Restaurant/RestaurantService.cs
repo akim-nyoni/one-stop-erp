@@ -86,7 +86,7 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, CancellationToken ct = default)
+    public async Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, CancellationToken ct = default)
     {
         if (quantity <= 0m)
         {
@@ -115,7 +115,7 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.MenuItemUnavailable", $"Menu item {menu.Code} is not available.");
         }
 
-        TableOrderLine line = order.AddLine(menu.Id, menu.Name, quantity, menu.Price, taxAmount, menu.RevenueAccountCode, menu.CostOfSalesAccountCode);
+        TableOrderLine line = order.AddLine(menu.Id, menu.Name, quantity, menu.Price, taxAmount, menu.RevenueAccountCode, menu.CostOfSalesAccountCode, course);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return line.LineNet;
     }
@@ -524,6 +524,38 @@ public sealed class RestaurantService : IRestaurantService
         }
 
         KitchenTicket ticket = new(companyId, orderId, ticketNumber, date);
+        foreach (TableOrderLine line in toFire)
+        {
+            ticket.AddLine(line.MenuItemId, line.Description, line.Quantity);
+            line.MarkFired();
+        }
+
+        _db.Set<KitchenTicket>().Add(ticket);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return ticket.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> FireCourseAsync(long companyId, long orderId, MenuCourse course, string ticketNumber, DateOnly date, CancellationToken ct = default)
+    {
+        TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found.");
+        }
+
+        if (order.Status != TableOrderStatus.Open)
+        {
+            return Error.Rule("Res.OrderNotOpen", "Only an open order can be fired to the kitchen.");
+        }
+
+        List<TableOrderLine> toFire = order.Lines.Where(l => !l.Fired && l.Course == course).ToList();
+        if (toFire.Count == 0)
+        {
+            return Error.Rule("Res.NothingToFire", $"There are no unfired {course} lines to fire.");
+        }
+
+        KitchenTicket ticket = new(companyId, orderId, ticketNumber, date, course);
         foreach (TableOrderLine line in toFire)
         {
             ticket.AddLine(line.MenuItemId, line.Description, line.Quantity);

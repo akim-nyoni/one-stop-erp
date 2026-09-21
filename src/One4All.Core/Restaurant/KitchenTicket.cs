@@ -34,12 +34,14 @@ public sealed class KitchenTicket : AuditableEntity, ICompanyScoped
     /// <param name="tableOrderId">The table order the items came from.</param>
     /// <param name="ticketNumber">The ticket number.</param>
     /// <param name="sentOn">The date the ticket was fired.</param>
-    public KitchenTicket(long companyId, long tableOrderId, string ticketNumber, DateOnly sentOn)
+    /// <param name="course">The course this ticket fires, if it is a single-course ticket.</param>
+    public KitchenTicket(long companyId, long tableOrderId, string ticketNumber, DateOnly sentOn, MenuCourse? course = null)
     {
         CompanyId = companyId;
         TableOrderId = tableOrderId;
         TicketNumber = ticketNumber;
         SentOn = sentOn;
+        Course = course;
         Status = KitchenTicketStatus.Sent;
     }
 
@@ -54,6 +56,9 @@ public sealed class KitchenTicket : AuditableEntity, ICompanyScoped
 
     /// <summary>The date the ticket was fired.</summary>
     public DateOnly SentOn { get; private set; }
+
+    /// <summary>The course this ticket fires, if it is a single-course ticket.</summary>
+    public MenuCourse? Course { get; private set; }
 
     /// <summary>The status.</summary>
     public KitchenTicketStatus Status { get; private set; }

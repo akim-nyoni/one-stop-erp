@@ -73,9 +73,10 @@ public interface IRestaurantService
     /// <param name="menuItemId">The menu item.</param>
     /// <param name="quantity">The quantity.</param>
     /// <param name="taxAmount">The tax on the line, if any.</param>
+    /// <param name="course">The dining course the item belongs to (for course-by-course firing).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The line net value.</returns>
-    Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, CancellationToken ct = default);
+    Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, CancellationToken ct = default);
 
     /// <summary>
     /// Bills an open order: posts revenue (Dr cash/Cr revenue/Cr tax) and cost of sales by exploding each
@@ -177,6 +178,19 @@ public interface IRestaurantService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The created ticket id.</returns>
     Task<Result<long>> FireOrderAsync(long companyId, long orderId, string ticketNumber, DateOnly date, CancellationToken ct = default);
+
+    /// <summary>
+    /// Fires only the not-yet-fired lines of a single course (coursing): sends that course to the kitchen as
+    /// its own ticket, leaving later courses to be fired when the table is ready. Operational only (no GL).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The open order.</param>
+    /// <param name="course">The course to fire.</param>
+    /// <param name="ticketNumber">The ticket number.</param>
+    /// <param name="date">The fire date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created ticket id.</returns>
+    Task<Result<long>> FireCourseAsync(long companyId, long orderId, MenuCourse course, string ticketNumber, DateOnly date, CancellationToken ct = default);
 
     /// <summary>
     /// Sets a menu item's availability ("86" it when out of stock, or bring it back). An unavailable item

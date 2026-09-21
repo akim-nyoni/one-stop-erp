@@ -5537,6 +5537,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<int?>("Course")
+                        .HasColumnType("integer")
+                        .HasColumnName("course");
+
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("created_by_user_id");
@@ -6010,6 +6014,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")
                         .HasColumnName("cost_of_sales_account_code");
+
+                    b.Property<int>("Course")
+                        .HasColumnType("integer")
+                        .HasColumnName("course");
 
                     b.Property<string>("Description")
                         .IsRequired()

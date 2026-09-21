@@ -66,6 +66,22 @@ public sealed class RestaurantTable : SoftDeletableEntity, ICompanyScoped
     public void LeaveGroup() => GroupId = null;
 }
 
+/// <summary>A dining course (Restaurant module) — the order items are fired to the kitchen course by course.</summary>
+public enum MenuCourse
+{
+    /// <summary>Drinks — usually fired first.</summary>
+    Drinks = 1,
+
+    /// <summary>Starter / appetiser.</summary>
+    Starter = 2,
+
+    /// <summary>Main course.</summary>
+    Main = 3,
+
+    /// <summary>Dessert.</summary>
+    Dessert = 4,
+}
+
 /// <summary>The lifecycle of a table order (Restaurant module).</summary>
 public enum TableOrderStatus
 {
@@ -150,10 +166,11 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
     /// <param name="taxAmount">The tax on the line.</param>
     /// <param name="revenueAccountCode">The revenue account.</param>
     /// <param name="costOfSalesAccountCode">The cost-of-sales account.</param>
+    /// <param name="course">The dining course.</param>
     /// <returns>The created line.</returns>
-    public TableOrderLine AddLine(long menuItemId, string description, decimal quantity, decimal unitPrice, decimal taxAmount, string revenueAccountCode, string costOfSalesAccountCode)
+    public TableOrderLine AddLine(long menuItemId, string description, decimal quantity, decimal unitPrice, decimal taxAmount, string revenueAccountCode, string costOfSalesAccountCode, MenuCourse course = MenuCourse.Main)
     {
-        TableOrderLine line = new(menuItemId, description, quantity, unitPrice, taxAmount, revenueAccountCode, costOfSalesAccountCode);
+        TableOrderLine line = new(menuItemId, description, quantity, unitPrice, taxAmount, revenueAccountCode, costOfSalesAccountCode, course);
         _lines.Add(line);
         return line;
     }
@@ -193,7 +210,7 @@ public sealed class TableOrderLine : Entity
     /// <param name="taxAmount">The tax on the line.</param>
     /// <param name="revenueAccountCode">The revenue account.</param>
     /// <param name="costOfSalesAccountCode">The cost-of-sales account.</param>
-    public TableOrderLine(long menuItemId, string description, decimal quantity, decimal unitPrice, decimal taxAmount, string revenueAccountCode, string costOfSalesAccountCode)
+    public TableOrderLine(long menuItemId, string description, decimal quantity, decimal unitPrice, decimal taxAmount, string revenueAccountCode, string costOfSalesAccountCode, MenuCourse course = MenuCourse.Main)
     {
         MenuItemId = menuItemId;
         Description = description;
@@ -202,6 +219,7 @@ public sealed class TableOrderLine : Entity
         TaxAmount = taxAmount;
         RevenueAccountCode = revenueAccountCode;
         CostOfSalesAccountCode = costOfSalesAccountCode;
+        Course = course;
     }
 
     /// <summary>The owning order id.</summary>
@@ -209,6 +227,9 @@ public sealed class TableOrderLine : Entity
 
     /// <summary>The menu item.</summary>
     public long MenuItemId { get; private set; }
+
+    /// <summary>The dining course this item belongs to (for course-by-course firing).</summary>
+    public MenuCourse Course { get; private set; }
 
     /// <summary>The description.</summary>
     public string Description { get; private set; }
