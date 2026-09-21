@@ -44,6 +44,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC18" => await BackDatedReceiptsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC20" => await StationeryControlAsync(companyId, ct).ConfigureAwait(false),
             "RC21" => await AuditTrailAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC22" => await SodViolationsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC25" => await DailyBankingSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC26" => await CashInTransitAgeingAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC28" => await CashMovementsAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -325,6 +326,22 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
         "PaymentArrangement", "SuspenseAllocation", "DishonouredPayment", "ImportBatch",
         "Agent", "StationeryBook", "SessionCashMovement",
     ];
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SodViolationsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly to = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+        List<SegregationViolation> violations = await _db.Set<SegregationViolation>()
+            .Where(v => v.CompanyId == companyId && v.OccurredOn >= from && v.OccurredOn <= to)
+            .OrderBy(v => v.OccurredOn).ThenBy(v => v.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return violations.Select(v => Row(new()
+        {
+            ["User"] = $"#{v.UserId}",
+            ["Conflict"] = v.Conflict,
+            ["When"] = v.OccurredOn.ToDateTime(TimeOnly.MinValue),
+        })).ToList();
+    }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AuditTrailAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
     {

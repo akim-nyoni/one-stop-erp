@@ -254,6 +254,7 @@ public sealed class ReceiptingService : IReceiptingService
 
         if (receipt.CashierUserId == reverserUserId)
         {
+            await LogViolationAsync(companyId, reverserUserId, $"Attempted to reverse own receipt {receipt.ReceiptNumber}", date, ct).ConfigureAwait(false);
             return Error.Rule("Rcp.SelfReverse", "A cashier cannot reverse their own receipt (segregation of duties).");
         }
 
@@ -799,6 +800,7 @@ public sealed class ReceiptingService : IReceiptingService
 
         if (session.CashierUserId == supervisorUserId)
         {
+            await LogViolationAsync(companyId, supervisorUserId, $"Attempted to verify own cash-up (session {sessionId})", session.ClosedOn ?? session.OpenedOn, ct).ConfigureAwait(false);
             return Result.Failure(Error.Rule("Rcp.SelfVerify", "A cashier cannot verify their own cash-up (segregation of duties)."));
         }
 
@@ -920,6 +922,12 @@ public sealed class ReceiptingService : IReceiptingService
         }
 
         return plan;
+    }
+
+    private async Task LogViolationAsync(long companyId, long userId, string conflict, DateOnly date, CancellationToken ct)
+    {
+        _db.Set<SegregationViolation>().Add(new SegregationViolation(companyId, userId, conflict, date));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     private async Task<string> NextReceiptNumberAsync(long companyId, CashierStation station, CancellationToken ct)

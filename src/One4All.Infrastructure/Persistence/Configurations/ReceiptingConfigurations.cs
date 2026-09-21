@@ -120,6 +120,17 @@ internal sealed class ManualReceiptCaptureConfiguration : IEntityTypeConfigurati
     }
 }
 
+internal sealed class SegregationViolationConfiguration : IEntityTypeConfiguration<SegregationViolation>
+{
+    public void Configure(EntityTypeBuilder<SegregationViolation> b)
+    {
+        b.ToTable("sod_violation", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Conflict).HasMaxLength(300);
+        b.HasIndex(x => new { x.CompanyId, x.OccurredOn });
+    }
+}
+
 internal sealed class PendingTenderConfiguration : IEntityTypeConfiguration<PendingTender>
 {
     public void Configure(EntityTypeBuilder<PendingTender> b)

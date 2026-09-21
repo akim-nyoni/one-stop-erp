@@ -236,6 +236,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Pending / unconfirmed tenders.</summary>
     public DbSet<Core.Receipting.PendingTender> PendingTenders => Set<Core.Receipting.PendingTender>();
 
+    /// <summary>Segregation-of-duties violation attempts.</summary>
+    public DbSet<Core.Receipting.SegregationViolation> SegregationViolations => Set<Core.Receipting.SegregationViolation>();
+
     /// <summary>Collection agents.</summary>
     public DbSet<Core.Receipting.Agent> Agents => Set<Core.Receipting.Agent>();
 
