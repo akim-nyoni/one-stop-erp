@@ -321,6 +321,20 @@ public interface IRestaurantService
     Task<Result<BillResult>> BillToHouseAccountAsync(long companyId, long orderId, long customerId, long warehouseId, DateOnly date, string salesAccountCode, string? taxAccountCode = null, CancellationToken ct = default);
 
     /// <summary>
+    /// Reverses a previously-posted, tender-settled bill (rung in error): posts the exact inverse of the bill's
+    /// revenue journal (refunding the tender and unwinding revenue/tax/service/tip/discount) and reverses each
+    /// cost-of-sales stock issue back into inventory at its original cost. Refuses a bill already reversed or one
+    /// charged to a house account (reverse that through the AR credit-note flow). Requires a reason.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="billId">The bill to reverse.</param>
+    /// <param name="date">The reversal date.</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The reversal journal number (empty when the bill charged nothing).</returns>
+    Task<Result<string>> ReverseBillAsync(long companyId, long billId, DateOnly date, string reason, CancellationToken ct = default);
+
+    /// <summary>
     /// Bills one seat's share of an order (split by seat): every not-yet-billed, non-voided line assigned to
     /// that seat. Posts revenue and recipe cost of sales for those lines; when the last seat is billed the
     /// order closes and the table frees. Optional service charge / tip / discount apply to this seat's bill.

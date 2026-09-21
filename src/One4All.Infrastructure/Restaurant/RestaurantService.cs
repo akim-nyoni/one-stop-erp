@@ -572,6 +572,75 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
+    public async Task<Result<string>> ReverseBillAsync(long companyId, long billId, DateOnly date, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Res.ReasonRequired", "Reversing a bill requires a reason.");
+        }
+
+        RestaurantBill? bill = await _db.Set<RestaurantBill>().Include(b => b.Postings).Include(b => b.Issues)
+            .FirstOrDefaultAsync(b => b.Id == billId && b.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (bill is null)
+        {
+            return Error.NotFound("Res.BillNotFound", $"Bill {billId} not found.");
+        }
+
+        if (bill.IsReversed)
+        {
+            return Error.Rule("Res.BillAlreadyReversed", $"Bill {billId} has already been reversed.");
+        }
+
+        if (!bill.TenderReversible)
+        {
+            return Error.Rule("Res.BillNotReversible", "A house-account bill is reversed through the AR credit-note flow.");
+        }
+
+        // Reverse the revenue journal (post the exact inverse of the captured lines).
+        string reversalJournal = string.Empty;
+        if (bill.Postings.Count > 0)
+        {
+            Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+            Result<PostingReceipt> reversal = await _posting.PostAsync(new JournalRequest
+            {
+                CompanyId = companyId,
+                SourceModule = "RES",
+                PostingDate = date,
+                TransactionCurrency = company.BaseCurrency,
+                DocumentType = "RES-BILL-REV",
+                Narrative = $"Reverse bill {bill.RevenueJournalNumber}: {reason}",
+                Lines = bill.Postings.Select(p => new JournalLineRequest
+                {
+                    AccountCode = p.AccountCode,
+                    Side = p.IsDebit ? JournalSide.Credit : JournalSide.Debit, // inverse
+                    TransactionAmount = p.Amount,
+                }).ToList(),
+            }, ct).ConfigureAwait(false);
+
+            if (reversal.IsFailure)
+            {
+                return reversal.Error;
+            }
+
+            reversalJournal = reversal.Value.JournalNumber;
+        }
+
+        // Reverse each cost-of-sales stock issue back into inventory.
+        foreach (RestaurantBillIssue issue in bill.Issues)
+        {
+            Result<StockMovementResult> reversedIssue = await _inventory.ReverseIssueAsync(companyId, issue.StockMovementId, date, $"REV-BILL:{billId}", ct).ConfigureAwait(false);
+            if (reversedIssue.IsFailure)
+            {
+                return reversedIssue.Error;
+            }
+        }
+
+        bill.MarkReversed(date, reversalJournal);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return reversalJournal;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<BillResult>> BillToHouseAccountAsync(long companyId, long orderId, long customerId, long warehouseId, DateOnly date, string salesAccountCode, string? taxAccountCode = null, CancellationToken ct = default)
     {
         Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
@@ -635,16 +704,17 @@ public sealed class RestaurantService : IRestaurantService
             invoiceJournal = invoice.Value.JournalNumber;
         }
 
-        Result<decimal> cost = await IssueCostOfSalesAsync(companyId, order, warehouseId, date, portions, ct).ConfigureAwait(false);
+        Result<(decimal Cost, List<long> MovementIds)> cost = await IssueCostOfSalesAsync(companyId, order, warehouseId, date, portions, ct).ConfigureAwait(false);
         if (cost.IsFailure)
         {
             return cost.Error;
         }
 
         bool fullyBilled = await CloseIfFullyBilledAsync(companyId, order, invoiceJournal, ct).ConfigureAwait(false);
-        _db.Set<RestaurantBill>().Add(new RestaurantBill(companyId, order.Id, date, net, tax, 0m, 0m, 0m, net + tax, cost.Value, invoiceJournal));
+        // A house-account charge is reversed through the AR credit-note flow, not the restaurant reversal.
+        _db.Set<RestaurantBill>().Add(new RestaurantBill(companyId, order.Id, date, net, tax, 0m, 0m, 0m, net + tax, cost.Value.Cost, invoiceJournal, tenderReversible: false));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new BillResult(net, tax, 0m, 0m, 0m, net + tax, cost.Value, fullyBilled, invoiceJournal);
+        return new BillResult(net, tax, 0m, 0m, 0m, net + tax, cost.Value.Cost, fullyBilled, invoiceJournal);
     }
 
     /// <inheritdoc />
@@ -762,6 +832,7 @@ public sealed class RestaurantService : IRestaurantService
 
         // Post the guest's charge only when there is one (a fully-comped/-discounted bill charges nothing but still costs).
         string revenueJournal = string.Empty;
+        List<JournalLineRequest> postedLines = [];
         if (chargeableBeforeDiscount > 0m)
         {
             // Dr tenders (net of discount) + Dr discounts allowed; Cr revenue (full net), output tax, service charge and tips.
@@ -814,23 +885,35 @@ public sealed class RestaurantService : IRestaurantService
             }
 
             revenueJournal = revenue.Value.JournalNumber;
+            postedLines = lines;
         }
 
         // Cost of sales: explode each billed portion's recipe (and modifiers) into stock issues.
-        Result<decimal> cost = await IssueCostOfSalesAsync(companyId, order, warehouseId, date, portions, ct).ConfigureAwait(false);
+        Result<(decimal Cost, List<long> MovementIds)> cost = await IssueCostOfSalesAsync(companyId, order, warehouseId, date, portions, ct).ConfigureAwait(false);
         if (cost.IsFailure)
         {
             return cost.Error;
         }
 
         bool fullyBilled = await CloseIfFullyBilledAsync(companyId, order, revenueJournal, ct).ConfigureAwait(false);
-        _db.Set<RestaurantBill>().Add(new RestaurantBill(companyId, order.Id, date, net, tax, serviceChargeAmount, tipAmount, discountAmount, gross, cost.Value, revenueJournal));
+        RestaurantBill billRecord = new(companyId, order.Id, date, net, tax, serviceChargeAmount, tipAmount, discountAmount, gross, cost.Value.Cost, revenueJournal, tenderReversible: true);
+        foreach (JournalLineRequest jl in postedLines)
+        {
+            billRecord.AddPosting(jl.AccountCode, jl.Side == JournalSide.Debit, jl.TransactionAmount);
+        }
+
+        foreach (long movementId in cost.Value.MovementIds)
+        {
+            billRecord.AddIssue(movementId);
+        }
+
+        _db.Set<RestaurantBill>().Add(billRecord);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new BillResult(net, tax, serviceChargeAmount, tipAmount, discountAmount, gross, cost.Value, fullyBilled, revenueJournal);
+        return new BillResult(net, tax, serviceChargeAmount, tipAmount, discountAmount, gross, cost.Value.Cost, fullyBilled, revenueJournal);
     }
 
     /// <summary>Explodes each billed portion's recipe and modifier ingredients into stock issues, billing the lines.</summary>
-    private async Task<Result<decimal>> IssueCostOfSalesAsync(long companyId, TableOrder order, long warehouseId, DateOnly date, List<(TableOrderLine Line, decimal Quantity)> portions, CancellationToken ct)
+    private async Task<Result<(decimal Cost, List<long> MovementIds)>> IssueCostOfSalesAsync(long companyId, TableOrder order, long warehouseId, DateOnly date, List<(TableOrderLine Line, decimal Quantity)> portions, CancellationToken ct)
     {
         List<long> menuIds = portions.Select(p => p.Line.MenuItemId).Distinct().ToList();
         List<MenuItem> menus = await _db.Set<MenuItem>().Include(m => m.Recipe)
@@ -839,6 +922,7 @@ public sealed class RestaurantService : IRestaurantService
         Dictionary<long, IReadOnlyList<RecipeLine>> recipes = menus.ToDictionary(m => m.Id, m => m.Recipe);
 
         decimal costOfSales = 0m;
+        List<long> movementIds = [];
         foreach ((TableOrderLine line, decimal quantity) in portions)
         {
             if (recipes.TryGetValue(line.MenuItemId, out IReadOnlyList<RecipeLine>? recipe))
@@ -852,6 +936,7 @@ public sealed class RestaurantService : IRestaurantService
                     }
 
                     costOfSales += issue.Value.Value;
+                    movementIds.Add(issue.Value.MovementId);
                 }
             }
 
@@ -870,12 +955,13 @@ public sealed class RestaurantService : IRestaurantService
                 }
 
                 costOfSales += issue.Value.Value;
+                movementIds.Add(issue.Value.MovementId);
             }
 
             line.Bill(quantity);
         }
 
-        return costOfSales;
+        return (costOfSales, movementIds);
     }
 
     private async Task<Result<StockMovementResult>> IssueAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal quantity, string reference, CancellationToken ct)

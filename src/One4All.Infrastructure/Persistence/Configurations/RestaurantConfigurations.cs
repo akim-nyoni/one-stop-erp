@@ -78,8 +78,35 @@ internal sealed class RestaurantBillConfiguration : IEntityTypeConfiguration<Res
         b.Property(x => x.Gross).HasPrecision(19, 4);
         b.Property(x => x.CostOfSales).HasPrecision(19, 4);
         b.Property(x => x.RevenueJournalNumber).HasMaxLength(30);
+        b.Property(x => x.ReversalJournalNumber).HasMaxLength(30);
+        b.HasMany(x => x.Postings).WithOne().HasForeignKey(x => x.RestaurantBillId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Postings).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasMany(x => x.Issues).WithOne().HasForeignKey(x => x.RestaurantBillId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Issues).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.Date });
         b.HasIndex(x => x.TableOrderId);
+    }
+}
+
+internal sealed class RestaurantBillPostingConfiguration : IEntityTypeConfiguration<RestaurantBillPosting>
+{
+    public void Configure(EntityTypeBuilder<RestaurantBillPosting> b)
+    {
+        b.ToTable("bill_posting", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AccountCode).HasMaxLength(8);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.HasIndex(x => x.RestaurantBillId);
+    }
+}
+
+internal sealed class RestaurantBillIssueConfiguration : IEntityTypeConfiguration<RestaurantBillIssue>
+{
+    public void Configure(EntityTypeBuilder<RestaurantBillIssue> b)
+    {
+        b.ToTable("bill_issue", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => x.RestaurantBillId);
     }
 }
 

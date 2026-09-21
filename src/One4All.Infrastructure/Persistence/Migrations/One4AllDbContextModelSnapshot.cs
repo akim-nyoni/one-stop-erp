@@ -5903,6 +5903,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("gross");
 
+                    b.Property<bool>("IsReversed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_reversed");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -5921,6 +5925,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("revenue_journal_number");
+
+                    b.Property<string>("ReversalJournalNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("reversal_journal_number");
+
+                    b.Property<DateOnly?>("ReversedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("reversed_on");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
@@ -5942,6 +5955,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("tax");
 
+                    b.Property<bool>("TenderReversible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("tender_reversible");
+
                     b.Property<decimal>("Tip")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -5957,6 +5974,81 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_bill_company_id_date");
 
                     b.ToTable("bill", "res");
+                });
+
+            modelBuilder.Entity("One4All.Core.Restaurant.RestaurantBillIssue", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("RestaurantBillId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("restaurant_bill_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("StockMovementId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stock_movement_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bill_issue");
+
+                    b.HasIndex("RestaurantBillId")
+                        .HasDatabaseName("ix_bill_issue_restaurant_bill_id");
+
+                    b.ToTable("bill_issue", "res");
+                });
+
+            modelBuilder.Entity("One4All.Core.Restaurant.RestaurantBillPosting", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("account_code");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<bool>("IsDebit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_debit");
+
+                    b.Property<long>("RestaurantBillId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("restaurant_bill_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bill_posting");
+
+                    b.HasIndex("RestaurantBillId")
+                        .HasDatabaseName("ix_bill_posting_restaurant_bill_id");
+
+                    b.ToTable("bill_posting", "res");
                 });
 
             modelBuilder.Entity("One4All.Core.Restaurant.RestaurantPolicy", b =>
@@ -9252,6 +9344,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_recipe_line_menu_items_menu_item_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Restaurant.RestaurantBillIssue", b =>
+                {
+                    b.HasOne("One4All.Core.Restaurant.RestaurantBill", null)
+                        .WithMany("Issues")
+                        .HasForeignKey("RestaurantBillId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_bill_issue_bill_restaurant_bill_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Restaurant.RestaurantBillPosting", b =>
+                {
+                    b.HasOne("One4All.Core.Restaurant.RestaurantBill", null)
+                        .WithMany("Postings")
+                        .HasForeignKey("RestaurantBillId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_bill_posting_bill_restaurant_bill_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Restaurant.TableOrderLine", b =>
                 {
                     b.HasOne("One4All.Core.Restaurant.TableOrder", null)
@@ -9486,6 +9598,13 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Navigation("Prices");
 
                     b.Navigation("Recipe");
+                });
+
+            modelBuilder.Entity("One4All.Core.Restaurant.RestaurantBill", b =>
+                {
+                    b.Navigation("Issues");
+
+                    b.Navigation("Postings");
                 });
 
             modelBuilder.Entity("One4All.Core.Restaurant.TableOrder", b =>
