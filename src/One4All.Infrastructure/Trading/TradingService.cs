@@ -38,6 +38,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return Error.NotFound("Ar.CustomerNotFound", $"Customer {request.CustomerId} not found.");
         }
 
+        if (customer.OnHold)
+        {
+            return Error.Rule("Ar.CustomerOnHold", $"Customer {customer.Code} is on hold; no new invoices can be posted.");
+        }
+
         Result<string> controlResult = await ControlCodeAsync(request.CompanyId, ControlAccountType.AccountsReceivable, ct).ConfigureAwait(false);
         if (controlResult.IsFailure)
         {
@@ -55,6 +60,19 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         decimal baseNet = Round(request.NetAmount * rate);
         decimal baseTax = Round(request.TaxAmount * rate);
         decimal baseGross = baseNet + baseTax;
+
+        // Credit-limit control: refuse when this invoice would take the customer's outstanding balance over the limit.
+        if (customer.CreditLimit > 0m)
+        {
+            IQueryable<OpenItem> ar = _db.OpenItems.Where(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == customer.Id);
+            decimal debits = await ar.Where(i => i.Sign == LedgerSign.Debit).SumAsync(i => (decimal?)i.OutstandingBase, ct).ConfigureAwait(false) ?? 0m;
+            decimal credits = await ar.Where(i => i.Sign == LedgerSign.Credit).SumAsync(i => (decimal?)i.OutstandingBase, ct).ConfigureAwait(false) ?? 0m;
+            decimal outstanding = debits - credits;
+            if (outstanding + baseGross > customer.CreditLimit)
+            {
+                return Error.Rule("Ar.CreditLimitExceeded", $"Customer {customer.Code}: this invoice would take the balance to {outstanding + baseGross:0.00}, over the credit limit of {customer.CreditLimit:0.00}.");
+            }
+        }
 
         List<JournalLineRequest> lines =
         [
