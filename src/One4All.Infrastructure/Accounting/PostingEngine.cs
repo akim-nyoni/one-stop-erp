@@ -118,6 +118,70 @@ public sealed class PostingEngine : IPostingEngine
         return new PostingReceipt(journal.Id, journalNumber, request.PostingDate, totalBaseDebit, request.Deferred);
     }
 
+    /// <inheritdoc />
+    public async Task<Result<PostingReceipt>> ReverseAsync(long companyId, long journalId, DateOnly date, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Gl.ReasonRequired", "A journal reversal requires a reason.");
+        }
+
+        JournalEntry? original = await _db.Journals.Include(j => j.Lines)
+            .FirstOrDefaultAsync(j => j.Id == journalId && j.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (original is null)
+        {
+            return Error.NotFound("Gl.JournalNotFound", $"Journal {journalId} not found.");
+        }
+
+        if (original.IsReversal)
+        {
+            return Error.Rule("Gl.NotReversible", "A reversal journal cannot itself be reversed.");
+        }
+
+        bool alreadyReversed = await _db.Journals.AnyAsync(j => j.CompanyId == companyId && j.ReversalOfJournalId == journalId, ct).ConfigureAwait(false);
+        if (alreadyReversed)
+        {
+            return Error.Rule("Gl.AlreadyReversed", $"Journal {journalId} has already been reversed.");
+        }
+
+        // Post the exact inverse: swap each line's debit and credit (preserving the original base amounts).
+        List<JournalLineRequest> lines = original.Lines.Select(l => new JournalLineRequest
+        {
+            AccountCode = l.AccountCode,
+            CostCentre = string.IsNullOrEmpty(l.CostCentre) ? null : l.CostCentre,
+            Department = string.IsNullOrEmpty(l.Department) ? null : l.Department,
+            Side = l.TransactionDebit != 0m ? JournalSide.Credit : JournalSide.Debit,
+            TransactionAmount = l.TransactionDebit != 0m ? l.TransactionDebit : l.TransactionCredit,
+            ExchangeRate = l.ExchangeRate,
+            BaseAmount = l.TransactionDebit != 0m ? l.BaseDebit : l.BaseCredit,
+        }).ToList();
+
+        Result<PostingReceipt> posted = await PostAsync(new JournalRequest
+        {
+            CompanyId = companyId,
+            SourceModule = original.SourceModule,
+            PostingDate = date,
+            TransactionCurrency = original.TransactionCurrency,
+            EnforceManualJournalRules = false,
+            DocumentType = "REVERSAL",
+            DocumentNumber = original.JournalNumber,
+            Narrative = $"Reversal of {original.JournalNumber}: {reason}",
+            Lines = lines,
+        }, ct).ConfigureAwait(false);
+
+        if (posted.IsFailure)
+        {
+            return posted.Error;
+        }
+
+        // The original stays Posted so it and its inverse both net to zero in the ledger (accrual-style reversal).
+        JournalEntry reversal = await _db.Journals.FirstAsync(j => j.Id == posted.Value.JournalId, ct).ConfigureAwait(false);
+        reversal.MarkAsReversalOf(original.Id);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return posted.Value;
+    }
+
     private async Task<Result<JournalLine>> BuildLineAsync(JournalRequest request, JournalLineRequest lineRequest, CurrencyCode baseCurrency, CancellationToken ct)
     {
         AccountKey key = lineRequest.ToKey();

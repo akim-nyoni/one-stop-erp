@@ -24,4 +24,17 @@ public interface IPostingEngine
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A receipt on success, or an <see cref="Error"/> describing the rejection.</returns>
     Task<Result<PostingReceipt>> PostAsync(JournalRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reverses a posted journal by posting its exact inverse (every debit becomes a credit and vice versa) on
+    /// the given date, linking the two and marking the original reversed. Used for accruals, prepayments and
+    /// error corrections. Refuses a journal that is already reversed or is itself a reversal.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="journalId">The journal to reverse.</param>
+    /// <param name="date">The reversal posting date (an open period for the journal's module).</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The reversal journal's receipt, or an error.</returns>
+    Task<Result<PostingReceipt>> ReverseAsync(long companyId, long journalId, DateOnly date, string reason, CancellationToken ct = default);
 }
