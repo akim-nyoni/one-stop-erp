@@ -204,6 +204,9 @@ public static class SystemReports
     /// <summary>The Reorder report code.</summary>
     public const string ReorderCode = "INV-REORDER";
 
+    /// <summary>The Slow-moving Stock report code.</summary>
+    public const string SlowStockCode = "INV-SLOW";
+
     /// <summary>The Fixed Asset Register report code.</summary>
     public const string AssetRegisterCode = "FA-REG";
 
@@ -236,6 +239,13 @@ public static class SystemReports
         "Items at or below their reorder level, with the suggested reorder quantity — a purchasing aid.", "Reorder",
         [new Column("ItemCode", "Item", 100), new Column("Description", "Description", 190), new Column("OnHand", "On hand", 80, true), new Column("ReorderLevel", "Reorder level", 90, true), new Column("Suggested", "Suggested order", 100, true)],
         []);
+
+    /// <summary>Builds the Slow-moving Stock definition (dead-stock analysis).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition SlowStock() => Listing(SlowStockCode, "Slow-moving Stock", "Inventory",
+        "Items on hand with no movement since the given date — capital tied up in dead stock.", "SlowStock",
+        [new Column("ItemCode", "Item", 100), new Column("Description", "Description", 180), new Column("Warehouse", "Warehouse", 90), new Column("Quantity", "Qty", 70, true), new Column("Value", "Value", 90, true), new Column("LastMovement", "Last movement", 110)],
+        [("SinceDate", ParameterType.Date)]);
 
     /// <summary>Builds the Fixed Asset Register definition (brief §4.14).</summary>
     /// <returns>The definition.</returns>

@@ -20,7 +20,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "AssetRegister", "PayrollSummary", "PropertyRegister", "BudgetVsActual",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AssetRegister", "PayrollSummary", "PropertyRegister", "BudgetVsActual",
     };
 
     private readonly One4AllDbContext _db;
@@ -49,12 +49,47 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "STOCKVALUATION" => await StockValuationAsync(companyId, ct).ConfigureAwait(false),
             "STOCKMOVEMENTS" => await StockMovementsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "REORDER" => await ReorderAsync(companyId, ct).ConfigureAwait(false),
+            "SLOWSTOCK" => await SlowStockAsync(companyId, parameters, ct).ConfigureAwait(false),
             "ASSETREGISTER" => await AssetRegisterAsync(companyId, ct).ConfigureAwait(false),
             "PAYROLLSUMMARY" => await PayrollSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "PROPERTYREGISTER" => await PropertyRegisterAsync(companyId, ct).ConfigureAwait(false),
             "BUDGETVSACTUAL" => await BudgetVsActualAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SlowStockAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly since = ReportParameters.Date(parameters, "SinceDate");
+
+        var balances = await (
+            from b in _db.Set<Core.Inventory.StockBalance>()
+            join i in _db.Set<Core.Inventory.Item>() on b.ItemId equals i.Id
+            join w in _db.Set<Core.Inventory.Warehouse>() on b.WarehouseId equals w.Id
+            where b.CompanyId == companyId && b.QuantityOnHand > 0m
+            select new { b.ItemId, b.WarehouseId, i.Code, i.Description, WarehouseCode = w.Code, b.QuantityOnHand, b.TotalValue })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<(long, long), DateOnly> lastMovement = await _db.Set<Core.Inventory.StockMovement>()
+            .Where(m => m.CompanyId == companyId)
+            .GroupBy(m => new { m.ItemId, m.WarehouseId })
+            .Select(g => new { g.Key.ItemId, g.Key.WarehouseId, Last = g.Max(x => x.Date) })
+            .ToDictionaryAsync(x => (x.ItemId, x.WarehouseId), x => x.Last, ct).ConfigureAwait(false);
+
+        return balances
+            .Select(b => (b, Last: lastMovement.TryGetValue((b.ItemId, b.WarehouseId), out DateOnly d) ? (DateOnly?)d : null))
+            .Where(x => x.Last is null || x.Last < since)
+            .OrderByDescending(x => x.b.TotalValue)
+            .Select(x => Row(new()
+            {
+                ["ItemCode"] = x.b.Code,
+                ["Description"] = x.b.Description,
+                ["Warehouse"] = x.b.WarehouseCode,
+                ["Quantity"] = x.b.QuantityOnHand,
+                ["Value"] = x.b.TotalValue,
+                ["LastMovement"] = x.Last is { } lm ? lm.ToDateTime(TimeOnly.MinValue) : (object?)string.Empty,
+            }))
+            .ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReorderAsync(long companyId, CancellationToken ct)

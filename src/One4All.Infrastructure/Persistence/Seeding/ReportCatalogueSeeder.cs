@@ -80,6 +80,7 @@ public sealed class ReportCatalogueSeeder
         yield return SystemReports.StockValuation();
         yield return SystemReports.StockMovements();
         yield return SystemReports.Reorder();
+        yield return SystemReports.SlowStock();
         yield return SystemReports.AssetRegister();
         yield return SystemReports.PayrollSummary();
         yield return SystemReports.PropertyRegister();
