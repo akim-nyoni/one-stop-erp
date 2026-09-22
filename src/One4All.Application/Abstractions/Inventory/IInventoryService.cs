@@ -50,6 +50,9 @@ public sealed class IssueStockRequest
 
     /// <summary>An optional reference.</summary>
     public string? Reference { get; init; }
+
+    /// <summary>When true, allows the issue to take the balance negative (backorder); otherwise an over-issue is refused.</summary>
+    public bool AllowNegative { get; init; }
 }
 
 /// <summary>The result of a stock movement.</summary>

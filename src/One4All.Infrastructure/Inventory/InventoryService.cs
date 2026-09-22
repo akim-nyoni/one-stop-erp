@@ -87,6 +87,11 @@ public sealed class InventoryService : IInventoryService
         }
 
         StockBalance balance = await LoadOrCreateBalanceAsync(request.CompanyId, request.ItemId, request.WarehouseId, ct).ConfigureAwait(false);
+        if (!request.AllowNegative && balance.QuantityOnHand < request.Quantity)
+        {
+            return Error.Rule("Inv.InsufficientStock", $"Item '{item.Code}' has {balance.QuantityOnHand} on hand, less than the {request.Quantity} to issue.");
+        }
+
         decimal averageCost = balance.AverageCost;
         decimal cost = balance.Issue(request.Quantity);
 
