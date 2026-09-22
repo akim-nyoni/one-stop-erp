@@ -201,6 +201,9 @@ public static class SystemReports
     /// <summary>The Stock Movements report code.</summary>
     public const string StockMovementsCode = "INV-MOVE";
 
+    /// <summary>The Reorder report code.</summary>
+    public const string ReorderCode = "INV-REORDER";
+
     /// <summary>The Fixed Asset Register report code.</summary>
     public const string AssetRegisterCode = "FA-REG";
 
@@ -226,6 +229,13 @@ public static class SystemReports
         "Every stock movement over a period — receipts, issues, transfers, adjustments and reversals.", "StockMovements",
         [new Column("Date", "Date", 95), new Column("Item", "Item", 100), new Column("Warehouse", "Warehouse", 90), new Column("Type", "Type", 90), new Column("Qty", "Qty", 70, true), new Column("Value", "Value", 90, true), new Column("Reference", "Reference", 120)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Reorder definition (inventory replenishment).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition Reorder() => Listing(ReorderCode, "Reorder Report", "Inventory",
+        "Items at or below their reorder level, with the suggested reorder quantity — a purchasing aid.", "Reorder",
+        [new Column("ItemCode", "Item", 100), new Column("Description", "Description", 190), new Column("OnHand", "On hand", 80, true), new Column("ReorderLevel", "Reorder level", 90, true), new Column("Suggested", "Suggested order", 100, true)],
+        []);
 
     /// <summary>Builds the Fixed Asset Register definition (brief §4.14).</summary>
     /// <returns>The definition.</returns>

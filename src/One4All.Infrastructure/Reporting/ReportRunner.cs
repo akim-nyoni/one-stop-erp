@@ -99,6 +99,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.AgedCreditorsCode => SystemReports.AgedCreditors(),
         SystemReports.StockValuationCode => SystemReports.StockValuation(),
         SystemReports.StockMovementsCode => SystemReports.StockMovements(),
+        SystemReports.ReorderCode => SystemReports.Reorder(),
         SystemReports.AssetRegisterCode => SystemReports.AssetRegister(),
         SystemReports.PayrollSummaryCode => SystemReports.PayrollSummary(),
         SystemReports.PropertyRegisterCode => SystemReports.PropertyRegister(),

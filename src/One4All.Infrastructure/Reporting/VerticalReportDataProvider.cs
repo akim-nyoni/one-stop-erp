@@ -20,7 +20,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "AssetRegister", "PayrollSummary", "PropertyRegister", "BudgetVsActual",
+        "StockValuation", "StockMovements", "Reorder", "AssetRegister", "PayrollSummary", "PropertyRegister", "BudgetVsActual",
     };
 
     private readonly One4AllDbContext _db;
@@ -48,12 +48,40 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
         {
             "STOCKVALUATION" => await StockValuationAsync(companyId, ct).ConfigureAwait(false),
             "STOCKMOVEMENTS" => await StockMovementsAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "REORDER" => await ReorderAsync(companyId, ct).ConfigureAwait(false),
             "ASSETREGISTER" => await AssetRegisterAsync(companyId, ct).ConfigureAwait(false),
             "PAYROLLSUMMARY" => await PayrollSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "PROPERTYREGISTER" => await PropertyRegisterAsync(companyId, ct).ConfigureAwait(false),
             "BUDGETVSACTUAL" => await BudgetVsActualAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReorderAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Inventory.Item> items = await _db.Set<Core.Inventory.Item>()
+            .Where(i => i.CompanyId == companyId && i.ReorderLevel > 0m)
+            .OrderBy(i => i.Code)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<long, decimal> onHand = await _db.Set<Core.Inventory.StockBalance>()
+            .Where(b => b.CompanyId == companyId)
+            .GroupBy(b => b.ItemId)
+            .Select(g => new { ItemId = g.Key, Qty = g.Sum(x => x.QuantityOnHand) })
+            .ToDictionaryAsync(x => x.ItemId, x => x.Qty, ct).ConfigureAwait(false);
+
+        return items
+            .Select(i => (Item: i, Qty: onHand.GetValueOrDefault(i.Id)))
+            .Where(x => x.Qty <= x.Item.ReorderLevel)
+            .Select(x => Row(new()
+            {
+                ["ItemCode"] = x.Item.Code,
+                ["Description"] = x.Item.Description,
+                ["OnHand"] = x.Qty,
+                ["ReorderLevel"] = x.Item.ReorderLevel,
+                ["Suggested"] = x.Item.ReorderQuantity > 0m ? x.Item.ReorderQuantity : x.Item.ReorderLevel - x.Qty,
+            }))
+            .ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> StockMovementsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
