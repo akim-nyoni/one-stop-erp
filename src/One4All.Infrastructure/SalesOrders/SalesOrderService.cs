@@ -90,6 +90,73 @@ public sealed class SalesOrderService : ISalesOrderService
     }
 
     /// <inheritdoc />
+    public async Task<Result<decimal>> ReturnDespatchAsync(long companyId, long salesOrderId, long salesOrderLineId, long warehouseId, DateOnly date, decimal quantity, string reason, CancellationToken ct = default)
+    {
+        if (quantity <= 0m)
+        {
+            return Error.Rule("Sop.InvalidQuantity", "The return quantity must be positive.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Sop.ReasonRequired", "A despatch return requires a reason.");
+        }
+
+        SalesOrder? order = await _db.Set<SalesOrder>().Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.Id == salesOrderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Error.NotFound("Sop.OrderNotFound", $"Sales order {salesOrderId} not found.");
+        }
+
+        SalesOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == salesOrderLineId);
+        if (line is null)
+        {
+            return Error.NotFound("Sop.LineNotFound", $"Order line {salesOrderLineId} not found.");
+        }
+
+        decimal returnable = line.DespatchedQuantity - line.InvoicedQuantity;
+        if (quantity > returnable)
+        {
+            return Error.Rule("Sop.NotReturnable", $"Order line {line.Id}: cannot return {quantity}; only {returnable} despatched and uninvoiced.");
+        }
+
+        Item? item = await _db.Set<Item>().FirstOrDefaultAsync(i => i.Id == line.ItemId, ct).ConfigureAwait(false);
+        decimal returnedValue = 0m;
+        if (item is { IsStockTracked: true } && !string.IsNullOrEmpty(item.CostOfSalesAccountCode))
+        {
+            // Return the goods to stock at the current average cost, reversing cost of sales.
+            decimal averageCost = await _db.Set<StockBalance>()
+                .Where(b => b.CompanyId == companyId && b.ItemId == line.ItemId && b.WarehouseId == warehouseId)
+                .Select(b => b.AverageCost).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+
+            Result<StockMovementResult> receipt = await _inventory.ReceiveAsync(new ReceiveStockRequest
+            {
+                CompanyId = companyId,
+                ItemId = line.ItemId,
+                WarehouseId = warehouseId,
+                Date = date,
+                Quantity = quantity,
+                UnitCost = averageCost,
+                CreditAccountCode = item.CostOfSalesAccountCode!,
+                Reference = $"RET:{order.OrderNumber}",
+            }, ct).ConfigureAwait(false);
+
+            if (receipt.IsFailure)
+            {
+                return receipt.Error;
+            }
+
+            returnedValue = receipt.Value.Value;
+        }
+
+        line.ReturnDespatch(quantity);
+        order.RecomputeStatus();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return returnedValue;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<InvoiceOrderResult>> InvoiceAsync(InvoiceOrderRequest request, CancellationToken ct = default)
     {
         SalesOrder? order = await _db.Set<SalesOrder>().Include(o => o.Lines)

@@ -119,6 +119,23 @@ public interface ISalesOrderService
     /// <returns>The despatch result.</returns>
     Task<Result<DespatchResult>> DespatchAsync(DespatchRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// Returns a despatched-but-not-yet-invoiced quantity of an order line back into stock (goods came back
+    /// before invoicing): receives the quantity at the current average cost against the item's cost-of-sales
+    /// account (Dr stock / Cr COGS) and reduces the line's despatched total. Refuses more than the
+    /// despatched-uninvoiced balance. Returns the value returned to stock.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="salesOrderId">The sales order.</param>
+    /// <param name="salesOrderLineId">The order line.</param>
+    /// <param name="warehouseId">The warehouse the goods return to.</param>
+    /// <param name="date">The return date.</param>
+    /// <param name="quantity">The quantity returned (positive).</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The value returned to stock.</returns>
+    Task<Result<decimal>> ReturnDespatchAsync(long companyId, long salesOrderId, long salesOrderLineId, long warehouseId, DateOnly date, decimal quantity, string reason, CancellationToken ct = default);
+
     /// <summary>Invoices the despatched-but-uninvoiced quantity, raising the AR invoice.</summary>
     /// <param name="request">The request.</param>
     /// <param name="ct">Cancellation token.</param>

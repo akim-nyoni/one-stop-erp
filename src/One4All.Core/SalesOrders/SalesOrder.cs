@@ -166,6 +166,10 @@ public sealed class SalesOrderLine : Entity
     /// <param name="quantity">The quantity.</param>
     public void Despatch(decimal quantity) => DespatchedQuantity += quantity;
 
+    /// <summary>Returns a despatched (not-yet-invoiced) quantity, reducing the despatched total.</summary>
+    /// <param name="quantity">The quantity returned.</param>
+    public void ReturnDespatch(decimal quantity) => DespatchedQuantity -= quantity;
+
     /// <summary>Records an invoiced quantity.</summary>
     /// <param name="quantity">The quantity.</param>
     public void Invoice(decimal quantity) => InvoicedQuantity += quantity;
