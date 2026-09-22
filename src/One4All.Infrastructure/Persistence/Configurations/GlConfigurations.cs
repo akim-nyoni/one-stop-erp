@@ -110,3 +110,36 @@ internal sealed class GlPeriodBalanceConfiguration : IEntityTypeConfiguration<Gl
         b.HasIndex(x => new { x.CompanyId, x.FiscalPeriodId, x.AccountCode, x.CostCentre, x.Department }).IsUnique();
     }
 }
+
+internal sealed class RecurringJournalConfiguration : IEntityTypeConfiguration<RecurringJournal>
+{
+    public void Configure(EntityTypeBuilder<RecurringJournal> b)
+    {
+        b.ToTable("recurring_journal", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.Property(x => x.SourceModule).HasMaxLength(10);
+        b.Property(x => x.Narrative).HasMaxLength(400);
+        b.Ignore(x => x.TotalDebit);
+        b.Ignore(x => x.TotalCredit);
+        b.Ignore(x => x.IsBalanced);
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.RecurringJournalId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class RecurringJournalLineConfiguration : IEntityTypeConfiguration<RecurringJournalLine>
+{
+    public void Configure(EntityTypeBuilder<RecurringJournalLine> b)
+    {
+        b.ToTable("recurring_journal_line", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AccountCode).HasMaxLength(8);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.CostCentre).HasMaxLength(3);
+        b.Property(x => x.Department).HasMaxLength(3);
+        b.HasIndex(x => x.RecurringJournalId);
+    }
+}

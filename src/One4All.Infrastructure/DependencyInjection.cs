@@ -50,6 +50,7 @@ public static class DependencyInjection
 
         // Accounting.
         services.AddScoped<IPostingEngine, PostingEngine>();
+        services.AddScoped<IRecurringJournalService, Accounting.RecurringJournalService>();
         services.AddScoped<IPeriodService, PeriodService>();
         services.AddScoped<IYearEndService, YearEndService>();
         services.AddScoped<ITaxCalculator, TaxCalculator>();

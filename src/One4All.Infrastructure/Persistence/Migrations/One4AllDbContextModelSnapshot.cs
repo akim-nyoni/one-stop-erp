@@ -566,6 +566,131 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("account", "gl");
                 });
 
+            modelBuilder.Entity("One4All.Core.Accounting.RecurringJournal", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Narrative")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("narrative");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("SourceModule")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("source_module");
+
+                    b.HasKey("Id")
+                        .HasName("pk_recurring_journal");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_recurring_journal_company_id_code");
+
+                    b.ToTable("recurring_journal", "gl");
+                });
+
+            modelBuilder.Entity("One4All.Core.Accounting.RecurringJournalLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("account_code");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("CostCentre")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("cost_centre");
+
+                    b.Property<string>("Department")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("department");
+
+                    b.Property<bool>("IsDebit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_debit");
+
+                    b.Property<long>("RecurringJournalId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("recurring_journal_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_recurring_journal_line");
+
+                    b.HasIndex("RecurringJournalId")
+                        .HasDatabaseName("ix_recurring_journal_line_recurring_journal_id");
+
+                    b.ToTable("recurring_journal_line", "gl");
+                });
+
             modelBuilder.Entity("One4All.Core.Accounting.TaxCode", b =>
                 {
                     b.Property<long>("Id")
@@ -9134,6 +9259,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_journal_line_journals_journal_entry_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Accounting.RecurringJournalLine", b =>
+                {
+                    b.HasOne("One4All.Core.Accounting.RecurringJournal", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("RecurringJournalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_recurring_journal_line_recurring_journals_recurring_journal");
+                });
+
             modelBuilder.Entity("One4All.Core.Accounting.TaxRate", b =>
                 {
                     b.HasOne("One4All.Core.Accounting.TaxCode", null)
@@ -9505,6 +9640,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("One4All.Core.Accounting.JournalEntry", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Accounting.RecurringJournal", b =>
                 {
                     b.Navigation("Lines");
                 });
