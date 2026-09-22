@@ -123,6 +123,7 @@ public sealed class PosService : IPosService
                     Date = request.SaleDate,
                     Quantity = line.Quantity,
                     Reference = request.SaleNumber,
+                    AllowNegative = true, // the sale is committed; let stock go negative and reconcile by stocktake
                 }, ct).ConfigureAwait(false);
 
                 if (issue.IsFailure)

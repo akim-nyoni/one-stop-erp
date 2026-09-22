@@ -280,8 +280,8 @@ public sealed class RestaurantService : IRestaurantService
             return Error.NotFound("Res.CompanyNotFound", $"Company {companyId} not found.");
         }
 
-        // Issue the stock (Dr cost of sales / Cr stock at moving average).
-        Result<StockMovementResult> issue = await IssueAsync(companyId, itemId, warehouseId, date, quantity, $"WASTE:{reason}", ct).ConfigureAwait(false);
+        // Issue the stock (Dr cost of sales / Cr stock at moving average); wastage of stock you do not have is refused.
+        Result<StockMovementResult> issue = await IssueAsync(companyId, itemId, warehouseId, date, quantity, $"WASTE:{reason}", ct, allowNegative: false).ConfigureAwait(false);
         if (issue.IsFailure)
         {
             return issue.Error;
@@ -964,7 +964,7 @@ public sealed class RestaurantService : IRestaurantService
         return (costOfSales, movementIds);
     }
 
-    private async Task<Result<StockMovementResult>> IssueAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal quantity, string reference, CancellationToken ct)
+    private async Task<Result<StockMovementResult>> IssueAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal quantity, string reference, CancellationToken ct, bool allowNegative = true)
         => await _inventory.IssueAsync(new IssueStockRequest
         {
             CompanyId = companyId,
@@ -973,6 +973,7 @@ public sealed class RestaurantService : IRestaurantService
             Date = date,
             Quantity = quantity,
             Reference = reference,
+            AllowNegative = allowNegative, // billing COGS = food already served; wastage passes false
         }, ct).ConfigureAwait(false);
 
     /// <summary>Marks the order billed and frees its table (if any) when everything billable has been billed.</summary>
