@@ -90,6 +90,59 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
+    public async Task<Result<TradingPostingResult>> WriteOffAsync(long companyId, long openItemId, DateOnly date, string badDebtAccountCode, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Ar.ReasonRequired", "A bad-debt write-off requires a reason.");
+        }
+
+        if (string.IsNullOrWhiteSpace(badDebtAccountCode))
+        {
+            return Error.Validation("Ar.NoBadDebtAccount", "A bad-debt write-off requires a bad-debt account.");
+        }
+
+        OpenItem? item = await _db.OpenItems.FirstOrDefaultAsync(i => i.Id == openItemId && i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable, ct).ConfigureAwait(false);
+        if (item is null)
+        {
+            return Error.NotFound("Ar.OpenItemNotFound", $"AR open item {openItemId} not found.");
+        }
+
+        if (item.Sign != LedgerSign.Debit || item.OutstandingTransaction <= 0m)
+        {
+            return Error.Rule("Ar.NothingToWriteOff", "Only an outstanding debtor item (invoice) can be written off.");
+        }
+
+        // Post the write-off as a "receipt" whose money side is the bad-debt expense (Dr bad debt / Cr AR control).
+        Result<TradingPostingResult> writeOff = await PostReceiptAsync(new ReceiptRequest
+        {
+            CompanyId = companyId,
+            CustomerId = item.TraderId,
+            DocumentNumber = $"WO{openItemId}",
+            ReceiptDate = date,
+            Currency = item.Currency,
+            Amount = item.OutstandingTransaction,
+            BankAccountCode = badDebtAccountCode,
+            ExchangeRate = item.ExchangeRate,
+            Narrative = $"Bad-debt write-off of {item.DocumentNumber}: {reason}",
+        }, ct).ConfigureAwait(false);
+
+        if (writeOff.IsFailure)
+        {
+            return writeOff.Error;
+        }
+
+        // Allocate the write-off against the invoice so it settles and stops ageing.
+        Result<AllocationResult> allocation = await AllocateAsync(companyId, TradingLedger.AccountsReceivable, openItemId, writeOff.Value.OpenItemId, item.OutstandingTransaction, date, ct).ConfigureAwait(false);
+        if (allocation.IsFailure)
+        {
+            return allocation.Error;
+        }
+
+        return writeOff.Value;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<TradingPostingResult>> PostReceiptAsync(ReceiptRequest request, CancellationToken ct = default)
     {
         Customer? customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false);

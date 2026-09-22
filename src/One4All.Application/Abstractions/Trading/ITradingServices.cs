@@ -55,6 +55,20 @@ public interface ISalesLedgerService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The posting result (the debit adjustment open item).</returns>
     Task<Result<TradingPostingResult>> PostReceiptReversalAsync(long companyId, long customerId, string documentNumber, DateOnly date, CurrencyCode currency, decimal amount, string bankAccountCode, decimal? exchangeRate = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Writes off an uncollectable customer open item as a bad debt: posts the remaining outstanding to a
+    /// bad-debt-expense account (Dr bad debt, Cr AR control) and allocates it against the item so it is settled
+    /// and no longer ages. Requires a reason; refuses a fully-settled item.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="openItemId">The AR open item (invoice) to write off.</param>
+    /// <param name="date">The write-off date.</param>
+    /// <param name="badDebtAccountCode">The bad-debt-expense account debited.</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The posting result (the write-off credit open item).</returns>
+    Task<Result<TradingPostingResult>> WriteOffAsync(long companyId, long openItemId, DateOnly date, string badDebtAccountCode, string reason, CancellationToken ct = default);
 }
 
 /// <summary>The Purchase Ledger (AP) posting service (brief §4.6).</summary>
