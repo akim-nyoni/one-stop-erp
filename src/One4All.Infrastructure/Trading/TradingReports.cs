@@ -84,6 +84,31 @@ public sealed class TradingReports : ITradingReports
         return new TraderStatement(customer.Code, customer.Name, customer.Currency.Value, lines, balance);
     }
 
+    public async Task<TraderStatement?> SupplierStatementAsync(long companyId, long supplierId, CancellationToken ct = default)
+    {
+        Supplier? supplier = await _db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (supplier is null)
+        {
+            return null;
+        }
+
+        List<OpenItem> items = await _db.OpenItems
+            .Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsPayable && i.TraderId == supplierId && i.OutstandingTransaction != 0m)
+            .OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        // For a payable, a credit (invoice) is the positive balance; a debit (payment/credit note) reduces it.
+        List<StatementLineRow> lines = items
+            .Select(i => new StatementLineRow(
+                i.DocumentDate, i.ItemType, i.DocumentNumber, i.DueDate,
+                i.Sign == LedgerSign.Credit ? i.OriginalTransaction : -i.OriginalTransaction,
+                i.Sign == LedgerSign.Credit ? i.OutstandingTransaction : -i.OutstandingTransaction))
+            .ToList();
+
+        decimal balance = lines.Sum(l => l.Outstanding);
+        return new TraderStatement(supplier.Code, supplier.Name, supplier.Currency.Value, lines, balance);
+    }
+
     private async Task<Dictionary<long, (string, string)>> LoadTradersAsync(long companyId, TradingLedger ledger, CancellationToken ct)
     {
         if (ledger == TradingLedger.AccountsReceivable)

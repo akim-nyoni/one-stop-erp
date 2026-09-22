@@ -66,4 +66,11 @@ public interface ITradingReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The statement, or null if the customer is unknown.</returns>
     Task<TraderStatement?> CustomerStatementAsync(long companyId, long customerId, CancellationToken ct = default);
+
+    /// <summary>Produces an open-item statement for a supplier (AP).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="supplierId">The supplier.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The statement, or null if the supplier is unknown.</returns>
+    Task<TraderStatement?> SupplierStatementAsync(long companyId, long supplierId, CancellationToken ct = default);
 }
