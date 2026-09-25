@@ -228,6 +228,9 @@ public static class SystemReports
     /// <summary>The CRM Pipeline report code.</summary>
     public const string PipelineCode = "CRM-PIPE";
 
+    /// <summary>The Expense Claims report code.</summary>
+    public const string ExpenseClaimsCode = "EXP-CLAIMS";
+
     /// <summary>Builds the Stock Valuation definition (brief §4.11 inventory).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition StockValuation() => Listing(StockValuationCode, "Stock Valuation", "Inventory",
@@ -303,6 +306,13 @@ public static class SystemReports
     public static ReportDefinition Pipeline() => Listing(PipelineCode, "Sales Pipeline", "CRM",
         "Open opportunities by stage — estimated value, win probability and the probability-weighted value.", "Pipeline",
         [new Column("Name", "Opportunity", 170), new Column("Contact", "Contact", 130), new Column("Stage", "Stage", 100), new Column("Probability", "Prob %", 70, true), new Column("Estimated", "Estimated", 100, true), new Column("Weighted", "Weighted", 100, true)],
+        []);
+
+    /// <summary>Builds the Expense Claims definition (Expenses module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition ExpenseClaims() => Listing(ExpenseClaimsCode, "Expense Claims", "Expenses",
+        "Employee expense claims with reference, date, total, status and reimbursement journal.", "ExpenseClaims",
+        [new Column("Reference", "Reference", 100), new Column("Employee", "Employee", 180), new Column("ClaimDate", "Date", 95), new Column("Total", "Total", 100, true), new Column("Status", "Status", 90), new Column("Journal", "Journal", 100)],
         []);
 
     /// <summary>The POS Sales Summary report code.</summary>

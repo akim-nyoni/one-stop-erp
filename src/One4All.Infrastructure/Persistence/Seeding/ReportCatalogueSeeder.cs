@@ -88,6 +88,7 @@ public sealed class ReportCatalogueSeeder
         yield return SystemReports.PropertyRegister();
         yield return SystemReports.BudgetVsActual();
         yield return SystemReports.Pipeline();
+        yield return SystemReports.ExpenseClaims();
         yield return SystemReports.PosSales();
         yield return SystemReports.JobProfitability();
         yield return SystemReports.ProgressCertificates();

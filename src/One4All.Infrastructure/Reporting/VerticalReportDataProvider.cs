@@ -20,7 +20,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AssetRegister", "PayrollSummary", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "Pipeline",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AssetRegister", "PayrollSummary", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "Pipeline", "ExpenseClaims",
     };
 
     private readonly One4AllDbContext _db;
@@ -57,6 +57,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "PROPERTYREGISTER" => await PropertyRegisterAsync(companyId, ct).ConfigureAwait(false),
             "BUDGETVSACTUAL" => await BudgetVsActualAsync(companyId, parameters, ct).ConfigureAwait(false),
             "PIPELINE" => await PipelineAsync(companyId, ct).ConfigureAwait(false),
+            "EXPENSECLAIMS" => await ExpenseClaimsAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -193,6 +194,28 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             ["Probability"] = o.ProbabilityPercent,
             ["Estimated"] = o.EstimatedValue,
             ["Weighted"] = o.WeightedValue,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ExpenseClaimsAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Expenses.ExpenseClaim> claims = await _db.Set<Core.Expenses.ExpenseClaim>()
+            .Include(c => c.Lines)
+            .Where(c => c.CompanyId == companyId)
+            .OrderByDescending(c => c.ClaimDate)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> employees = await _db.Set<Core.Payroll.Employee>()
+            .Where(e => e.CompanyId == companyId)
+            .ToDictionaryAsync(e => e.Id, e => e.FullName, ct).ConfigureAwait(false);
+
+        return claims.Select(c => Row(new()
+        {
+            ["Reference"] = c.Reference,
+            ["Employee"] = employees.GetValueOrDefault(c.EmployeeId, $"#{c.EmployeeId}"),
+            ["ClaimDate"] = c.ClaimDate.ToDateTime(TimeOnly.MinValue),
+            ["Total"] = c.Total,
+            ["Status"] = c.Status.ToString(),
+            ["Journal"] = c.JournalNumber ?? string.Empty,
         })).ToList();
     }
 
