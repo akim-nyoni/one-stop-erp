@@ -72,6 +72,9 @@ public static class Schemas
     /// <summary>Payroll (walled-garden schema).</summary>
     public const string Payroll = "pay";
 
+    /// <summary>Employee expense claims.</summary>
+    public const string Expenses = "exp";
+
     /// <summary>Budgeting, Planning &amp; Commitment Control.</summary>
     public const string Budget = "bud";
 

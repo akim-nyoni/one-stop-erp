@@ -108,6 +108,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Payroll.IPayrollService, Payroll.PayrollService>();
         services.AddScoped<Application.Abstractions.Payroll.IEmployeeLoanService, Payroll.EmployeeLoanService>();
         services.AddScoped<Application.Abstractions.Payroll.ILeaveService, Payroll.LeaveService>();
+        services.AddScoped<Application.Abstractions.Expenses.IExpenseClaimService, Expenses.ExpenseClaimService>();
 
         // Budgeting, Planning & Commitment Control.
         services.AddScoped<Application.Abstractions.Budgeting.IBudgetingService, Budgeting.BudgetingService>();

@@ -1350,6 +1350,122 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("opportunity", "crm");
                 });
 
+            modelBuilder.Entity("One4All.Core.Expenses.ExpenseClaim", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<DateOnly>("ClaimDate")
+                        .HasColumnType("date")
+                        .HasColumnName("claim_date");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<string>("JournalNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("reference");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_claim");
+
+                    b.HasIndex("CompanyId", "EmployeeId", "Status")
+                        .HasDatabaseName("ix_claim_company_id_employee_id_status");
+
+                    b.ToTable("claim", "exp");
+                });
+
+            modelBuilder.Entity("One4All.Core.Expenses.ExpenseClaimLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("ExpenseAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("expense_account_code");
+
+                    b.Property<long>("ExpenseClaimId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("expense_claim_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_claim_line");
+
+                    b.HasIndex("ExpenseClaimId")
+                        .HasDatabaseName("ix_claim_line_expense_claim_id");
+
+                    b.ToTable("claim_line", "exp");
+                });
+
             modelBuilder.Entity("One4All.Core.FixedAssets.FixedAsset", b =>
                 {
                     b.Property<long>("Id")
@@ -9437,6 +9553,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_budget_line_budgets_budget_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Expenses.ExpenseClaimLine", b =>
+                {
+                    b.HasOne("One4All.Core.Expenses.ExpenseClaim", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("ExpenseClaimId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_claim_line_claim_expense_claim_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.OwnershipRecord", b =>
                 {
                     b.HasOne("One4All.Core.Housing.HousingStand", null)
@@ -9803,6 +9929,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("One4All.Core.Budgeting.Budget", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Expenses.ExpenseClaim", b =>
                 {
                     b.Navigation("Lines");
                 });
