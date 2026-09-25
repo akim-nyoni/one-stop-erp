@@ -121,4 +121,23 @@ public interface IAllocationService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The un-allocation result.</returns>
     Task<Result<UnallocationResult>> UnallocateAsync(long companyId, long allocationId, DateOnly reversalDate, CancellationToken ct = default);
+
+    /// <summary>
+    /// Offsets a customer's outstanding invoice against a supplier's outstanding invoice for the same trading
+    /// partner (a contra settlement): raises an AR credit and an AP debit for the amount against a contra
+    /// clearing account (which nets to zero) and allocates each against the named items. Refuses an amount
+    /// greater than either item's outstanding balance.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="customerId">The customer whose debtor balance is reduced.</param>
+    /// <param name="customerInvoiceItemId">The customer AR invoice open item to settle.</param>
+    /// <param name="supplierId">The supplier whose creditor balance is reduced.</param>
+    /// <param name="supplierInvoiceItemId">The supplier AP invoice open item to settle.</param>
+    /// <param name="amount">The contra amount (base currency; both items must be base-currency).</param>
+    /// <param name="date">The contra (accounting) date.</param>
+    /// <param name="contraClearingAccountCode">The clearing account both legs pass through (nets to zero).</param>
+    /// <param name="documentNumber">The contra document number.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> ContraAsync(long companyId, long customerId, long customerInvoiceItemId, long supplierId, long supplierInvoiceItemId, decimal amount, DateOnly date, string contraClearingAccountCode, string documentNumber, CancellationToken ct = default);
 }

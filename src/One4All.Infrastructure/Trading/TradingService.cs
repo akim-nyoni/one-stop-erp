@@ -90,6 +90,63 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
+    public async Task<Result> ContraAsync(long companyId, long customerId, long customerInvoiceItemId, long supplierId, long supplierInvoiceItemId, decimal amount, DateOnly date, string contraClearingAccountCode, string documentNumber, CancellationToken ct = default)
+    {
+        if (amount <= 0m)
+        {
+            return Result.Failure(Error.Rule("Ar.ContraNonPositive", "The contra amount must be positive."));
+        }
+
+        if (string.IsNullOrWhiteSpace(contraClearingAccountCode))
+        {
+            return Result.Failure(Error.Validation("Ar.NoContraAccount", "A contra needs a clearing account."));
+        }
+
+        OpenItem? arItem = await _db.OpenItems.FirstOrDefaultAsync(i => i.Id == customerInvoiceItemId && i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == customerId, ct).ConfigureAwait(false);
+        OpenItem? apItem = await _db.OpenItems.FirstOrDefaultAsync(i => i.Id == supplierInvoiceItemId && i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsPayable && i.TraderId == supplierId, ct).ConfigureAwait(false);
+        if (arItem is null || apItem is null)
+        {
+            return Result.Failure(Error.NotFound("Ar.ContraItemNotFound", "The customer or supplier invoice open item was not found."));
+        }
+
+        if (amount > arItem.OutstandingTransaction || amount > apItem.OutstandingTransaction)
+        {
+            return Result.Failure(Error.Rule("Ar.ContraTooLarge", $"The contra {amount:0.00} exceeds an item's outstanding (AR {arItem.OutstandingTransaction:0.00}, AP {apItem.OutstandingTransaction:0.00})."));
+        }
+
+        // AR leg: a receipt to the clearing account settles the debtor invoice.
+        Result<TradingPostingResult> arReceipt = await PostReceiptAsync(new ReceiptRequest
+        {
+            CompanyId = companyId, CustomerId = customerId, DocumentNumber = documentNumber, ReceiptDate = date,
+            Currency = arItem.Currency, Amount = amount, BankAccountCode = contraClearingAccountCode, Narrative = "Contra settlement",
+        }, ct).ConfigureAwait(false);
+        if (arReceipt.IsFailure)
+        {
+            return Result.Failure(arReceipt.Error);
+        }
+
+        Result<AllocationResult> arAlloc = await AllocateAsync(companyId, TradingLedger.AccountsReceivable, customerInvoiceItemId, arReceipt.Value.OpenItemId, amount, date, ct).ConfigureAwait(false);
+        if (arAlloc.IsFailure)
+        {
+            return Result.Failure(arAlloc.Error);
+        }
+
+        // AP leg: a payment from the clearing account settles the creditor invoice (clearing nets to zero).
+        Result<TradingPostingResult> apPayment = await PostPaymentAsync(new PaymentRequest
+        {
+            CompanyId = companyId, SupplierId = supplierId, DocumentNumber = documentNumber, PaymentDate = date,
+            Currency = apItem.Currency, Amount = amount, BankAccountCode = contraClearingAccountCode, Narrative = "Contra settlement",
+        }, ct).ConfigureAwait(false);
+        if (apPayment.IsFailure)
+        {
+            return Result.Failure(apPayment.Error);
+        }
+
+        Result<AllocationResult> apAlloc = await AllocateAsync(companyId, TradingLedger.AccountsPayable, apPayment.Value.OpenItemId, supplierInvoiceItemId, amount, date, ct).ConfigureAwait(false);
+        return apAlloc.IsFailure ? Result.Failure(apAlloc.Error) : Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result<TradingPostingResult>> WriteOffAsync(long companyId, long openItemId, DateOnly date, string badDebtAccountCode, string reason, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(reason))
