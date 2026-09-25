@@ -410,6 +410,9 @@ public static class SystemReports
     /// <summary>The Recurring Invoices report code.</summary>
     public const string RecurringInvoicesCode = "AR-RECUR";
 
+    /// <summary>The Recurring Purchases report code.</summary>
+    public const string RecurringPurchasesCode = "AP-RECUR";
+
     /// <summary>Builds the Housing Stand Register definition (brief §4.10).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition HousingStands() => Listing(HousingStandsCode, "Housing Stand Register", "Housing",
@@ -443,6 +446,13 @@ public static class SystemReports
     public static ReportDefinition RecurringInvoices() => Listing(RecurringInvoicesCode, "Recurring Invoices", "Sales",
         "Standing recurring-invoice templates with amount, tax, interval, next run date and active flag.", "RecurringInvoices",
         [new Column("Reference", "Reference", 100), new Column("Customer", "Customer", 170), new Column("NetAmount", "Net", 90, true), new Column("TaxAmount", "Tax", 80, true), new Column("IntervalMonths", "Every (mo)", 80, true), new Column("NextRunDate", "Next run", 95), new Column("Active", "Active", 60)],
+        []);
+
+    /// <summary>Builds the Recurring Purchases definition (standing payables).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition RecurringPurchases() => Listing(RecurringPurchasesCode, "Recurring Purchases", "Purchasing",
+        "Standing recurring supplier-invoice templates with amount, tax, interval, next run date and active flag.", "RecurringPurchases",
+        [new Column("Reference", "Reference", 100), new Column("Supplier", "Supplier", 170), new Column("NetAmount", "Net", 90, true), new Column("TaxAmount", "Tax", 80, true), new Column("IntervalMonths", "Every (mo)", 80, true), new Column("NextRunDate", "Next run", 95), new Column("Active", "Active", 60)],
         []);
 
     /// <summary>The Menu report code.</summary>

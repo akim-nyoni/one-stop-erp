@@ -16,7 +16,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Quotations", "RecurringInvoices", "Menu", "TableStatus", "KitchenTickets",
+        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Quotations", "RecurringInvoices", "RecurringPurchases", "Menu", "TableStatus", "KitchenTickets",
         "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales", "CategorySales", "Wastage", "Bills", "MenuCost",
     };
 
@@ -39,6 +39,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "OPENPURCHASEORDERS" => await OpenPurchaseOrdersAsync(companyId, ct).ConfigureAwait(false),
             "QUOTATIONS" => await QuotationsAsync(companyId, ct).ConfigureAwait(false),
             "RECURRINGINVOICES" => await RecurringInvoicesAsync(companyId, ct).ConfigureAwait(false),
+            "RECURRINGPURCHASES" => await RecurringPurchasesAsync(companyId, ct).ConfigureAwait(false),
             "MENU" => await MenuAsync(companyId, ct).ConfigureAwait(false),
             "TABLESTATUS" => await TableStatusAsync(companyId, ct).ConfigureAwait(false),
             "KITCHENTICKETS" => await KitchenTicketsAsync(companyId, ct).ConfigureAwait(false),
@@ -636,6 +637,28 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
         {
             ["Reference"] = t.Reference,
             ["Customer"] = customers.GetValueOrDefault(t.CustomerId, $"#{t.CustomerId}"),
+            ["NetAmount"] = t.NetAmount,
+            ["TaxAmount"] = t.TaxAmount,
+            ["IntervalMonths"] = t.IntervalMonths,
+            ["NextRunDate"] = t.NextRunDate.ToDateTime(TimeOnly.MinValue),
+            ["Active"] = t.IsActive ? "Yes" : string.Empty,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RecurringPurchasesAsync(long companyId, CancellationToken ct)
+    {
+        List<RecurringPurchaseInvoice> templates = await _db.Set<RecurringPurchaseInvoice>()
+            .Where(t => t.CompanyId == companyId)
+            .OrderBy(t => t.Reference)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> suppliers = await _db.Set<Supplier>()
+            .Where(s => s.CompanyId == companyId)
+            .ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
+
+        return templates.Select(t => Row(new()
+        {
+            ["Reference"] = t.Reference,
+            ["Supplier"] = suppliers.GetValueOrDefault(t.SupplierId, $"#{t.SupplierId}"),
             ["NetAmount"] = t.NetAmount,
             ["TaxAmount"] = t.TaxAmount,
             ["IntervalMonths"] = t.IntervalMonths,
