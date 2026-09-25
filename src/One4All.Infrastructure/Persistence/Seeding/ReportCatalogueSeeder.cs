@@ -101,6 +101,7 @@ public sealed class ReportCatalogueSeeder
         yield return SystemReports.StudentRegister();
         yield return SystemReports.OpenPurchaseOrders();
         yield return SystemReports.Quotations();
+        yield return SystemReports.RecurringInvoices();
         yield return SystemReports.Menu();
         yield return SystemReports.TableStatus();
         yield return SystemReports.KitchenTickets();

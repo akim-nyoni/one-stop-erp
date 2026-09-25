@@ -16,7 +16,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Quotations", "Menu", "TableStatus", "KitchenTickets",
+        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Quotations", "RecurringInvoices", "Menu", "TableStatus", "KitchenTickets",
         "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales", "CategorySales", "Wastage", "Bills", "MenuCost",
     };
 
@@ -38,6 +38,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "STUDENTREGISTER" => await StudentRegisterAsync(companyId, ct).ConfigureAwait(false),
             "OPENPURCHASEORDERS" => await OpenPurchaseOrdersAsync(companyId, ct).ConfigureAwait(false),
             "QUOTATIONS" => await QuotationsAsync(companyId, ct).ConfigureAwait(false),
+            "RECURRINGINVOICES" => await RecurringInvoicesAsync(companyId, ct).ConfigureAwait(false),
             "MENU" => await MenuAsync(companyId, ct).ConfigureAwait(false),
             "TABLESTATUS" => await TableStatusAsync(companyId, ct).ConfigureAwait(false),
             "KITCHENTICKETS" => await KitchenTicketsAsync(companyId, ct).ConfigureAwait(false),
@@ -618,6 +619,28 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["ValidUntil"] = q.ValidUntil.ToDateTime(TimeOnly.MinValue),
             ["Total"] = q.Total,
             ["Status"] = q.Status.ToString(),
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RecurringInvoicesAsync(long companyId, CancellationToken ct)
+    {
+        List<RecurringSalesInvoice> templates = await _db.Set<RecurringSalesInvoice>()
+            .Where(t => t.CompanyId == companyId)
+            .OrderBy(t => t.Reference)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> customers = await _db.Set<Customer>()
+            .Where(c => c.CompanyId == companyId)
+            .ToDictionaryAsync(c => c.Id, c => c.Name, ct).ConfigureAwait(false);
+
+        return templates.Select(t => Row(new()
+        {
+            ["Reference"] = t.Reference,
+            ["Customer"] = customers.GetValueOrDefault(t.CustomerId, $"#{t.CustomerId}"),
+            ["NetAmount"] = t.NetAmount,
+            ["TaxAmount"] = t.TaxAmount,
+            ["IntervalMonths"] = t.IntervalMonths,
+            ["NextRunDate"] = t.NextRunDate.ToDateTime(TimeOnly.MinValue),
+            ["Active"] = t.IsActive ? "Yes" : string.Empty,
         })).ToList();
     }
 
