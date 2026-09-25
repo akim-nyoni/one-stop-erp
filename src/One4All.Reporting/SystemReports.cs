@@ -257,6 +257,16 @@ public static class SystemReports
     /// <summary>The Expense Claims report code.</summary>
     public const string ExpenseClaimsCode = "EXP-CLAIMS";
 
+    /// <summary>The Inventory ABC Analysis report code.</summary>
+    public const string AbcAnalysisCode = "INV-ABC";
+
+    /// <summary>Builds the Inventory ABC Analysis definition (Pareto value classification).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition AbcAnalysis() => Listing(AbcAnalysisCode, "Inventory ABC Analysis", "Inventory",
+        "Items ranked by stock value with the cumulative percentage and Pareto class (A/B/C).", "AbcAnalysis",
+        [new Column("ItemCode", "Item", 100), new Column("Description", "Description", 200), new Column("Value", "Value", 100, true), new Column("CumulativePercent", "Cum %", 80, true), new Column("Class", "Class", 60)],
+        []);
+
     /// <summary>Builds the Cash-Flow Forecast definition (treasury).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition CashFlowForecast() => Listing(CashFlowForecastCode, "Cash-Flow Forecast", "CashBook",

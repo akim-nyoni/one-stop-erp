@@ -21,7 +21,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AssetRegister", "DepreciationForecast", "PayrollSummary", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "Pipeline", "ExpenseClaims",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "AssetRegister", "DepreciationForecast", "PayrollSummary", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "Pipeline", "ExpenseClaims",
     };
 
     private readonly One4AllDbContext _db;
@@ -54,6 +54,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "STOCKMOVEMENTS" => await StockMovementsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "REORDER" => await ReorderAsync(companyId, ct).ConfigureAwait(false),
             "SLOWSTOCK" => await SlowStockAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "ABCANALYSIS" => await AbcAnalysisAsync(companyId, ct).ConfigureAwait(false),
             "ASSETREGISTER" => await AssetRegisterAsync(companyId, ct).ConfigureAwait(false),
             "DEPRECIATIONFORECAST" => await DepreciationForecastAsync(companyId, parameters, ct).ConfigureAwait(false),
             "PAYROLLSUMMARY" => await PayrollSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -99,6 +100,44 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
                 ["LastMovement"] = x.Last is { } lm ? lm.ToDateTime(TimeOnly.MinValue) : (object?)string.Empty,
             }))
             .ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AbcAnalysisAsync(long companyId, CancellationToken ct)
+    {
+        var items = await (
+            from b in _db.Set<Core.Inventory.StockBalance>()
+            join i in _db.Set<Core.Inventory.Item>() on b.ItemId equals i.Id
+            where b.CompanyId == companyId
+            group new { b.TotalValue } by new { i.Code, i.Description } into g
+            select new { g.Key.Code, g.Key.Description, Value = g.Sum(x => x.TotalValue) })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        List<(string Code, string Description, decimal Value)> ranked = items
+            .Where(x => x.Value > 0m)
+            .OrderByDescending(x => x.Value)
+            .Select(x => (x.Code, x.Description, x.Value))
+            .ToList();
+
+        decimal total = ranked.Sum(x => x.Value);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        decimal cumulative = 0m;
+        foreach ((string code, string description, decimal value) in ranked)
+        {
+            cumulative += value;
+            decimal cumulativePercent = total == 0m ? 0m : decimal.Round(cumulative / total * 100m, 2, MidpointRounding.ToEven);
+            // Pareto bands: A holds the top ~80% of value, B the next ~15%, C the tail.
+            string abcClass = cumulativePercent <= 80m ? "A" : cumulativePercent <= 95m ? "B" : "C";
+            rows.Add(Row(new()
+            {
+                ["ItemCode"] = code,
+                ["Description"] = description,
+                ["Value"] = value,
+                ["CumulativePercent"] = cumulativePercent,
+                ["Class"] = abcClass,
+            }));
+        }
+
+        return rows;
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReorderAsync(long companyId, CancellationToken ct)
