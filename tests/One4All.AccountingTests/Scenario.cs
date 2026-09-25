@@ -143,6 +143,8 @@ public static class Scenario
         db.Accounts.Add(new LedgerAccount(company.Id, "6800", "Office Supplies", AccountType.Expense));
         db.Accounts.Add(new LedgerAccount(company.Id, "2470", "Accruals", AccountType.Liability));
         db.Accounts.Add(new LedgerAccount(company.Id, "1360", "Prepayments", AccountType.Asset));
+        db.Accounts.Add(new LedgerAccount(company.Id, "6900", "Bank Charges", AccountType.Expense));
+        db.Accounts.Add(new LedgerAccount(company.Id, "4800", "Interest Income", AccountType.Income));
         db.Accounts.Add(new LedgerAccount(company.Id, "1300", "Agent Cash Control", AccountType.Asset));
         db.Accounts.Add(new LedgerAccount(company.Id, "6200", "Agent Commission", AccountType.Expense));
 

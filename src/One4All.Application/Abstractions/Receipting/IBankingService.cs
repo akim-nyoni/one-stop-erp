@@ -54,4 +54,32 @@ public interface IBankingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The GL journal number.</returns>
     Task<Result<string>> TransferAsync(long companyId, decimal amount, DateOnly date, string reference, string fromAccountCode, string toAccountCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Posts a bank charge (fees, commission): Dr the charge expense account, Cr the bank account. Refuses a
+    /// non-positive amount.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="amount">The charge amount (positive).</param>
+    /// <param name="date">The charge date.</param>
+    /// <param name="reference">The charge reference.</param>
+    /// <param name="bankAccountCode">The bank account (credited).</param>
+    /// <param name="chargeAccountCode">The bank-charges expense account (debited).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The GL journal number.</returns>
+    Task<Result<string>> PostBankChargeAsync(long companyId, decimal amount, DateOnly date, string reference, string bankAccountCode, string chargeAccountCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Posts bank interest received: Dr the bank account, Cr the interest-income account. Refuses a non-positive
+    /// amount.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="amount">The interest amount (positive).</param>
+    /// <param name="date">The interest date.</param>
+    /// <param name="reference">The interest reference.</param>
+    /// <param name="bankAccountCode">The bank account (debited).</param>
+    /// <param name="interestIncomeAccountCode">The interest-income account (credited).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The GL journal number.</returns>
+    Task<Result<string>> PostInterestReceivedAsync(long companyId, decimal amount, DateOnly date, string reference, string bankAccountCode, string interestIncomeAccountCode, CancellationToken ct = default);
 }

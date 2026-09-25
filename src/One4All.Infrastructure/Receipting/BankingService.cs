@@ -151,4 +151,44 @@ public sealed class BankingService : IBankingService
 
         return posted.IsFailure ? posted.Error : posted.Value.JournalNumber;
     }
+
+    /// <inheritdoc />
+    public Task<Result<string>> PostBankChargeAsync(long companyId, decimal amount, DateOnly date, string reference, string bankAccountCode, string chargeAccountCode, CancellationToken ct = default)
+        => PostCashEntryAsync(companyId, amount, date, reference, chargeAccountCode, bankAccountCode, "CB-CHG", $"Bank charge ({reference})", "Cb.ChargeNonPositive", "The bank charge must be positive.", ct);
+
+    /// <inheritdoc />
+    public Task<Result<string>> PostInterestReceivedAsync(long companyId, decimal amount, DateOnly date, string reference, string bankAccountCode, string interestIncomeAccountCode, CancellationToken ct = default)
+        => PostCashEntryAsync(companyId, amount, date, reference, bankAccountCode, interestIncomeAccountCode, "CB-INT", $"Bank interest ({reference})", "Cb.InterestNonPositive", "The interest amount must be positive.", ct);
+
+    private async Task<Result<string>> PostCashEntryAsync(long companyId, decimal amount, DateOnly date, string reference, string debitAccountCode, string creditAccountCode, string documentType, string narrative, string nonPositiveCode, string nonPositiveMessage, CancellationToken ct)
+    {
+        if (amount <= 0m)
+        {
+            return Error.Rule(nonPositiveCode, nonPositiveMessage);
+        }
+
+        Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        if (company is null)
+        {
+            return Error.NotFound("Cb.CompanyNotFound", $"Company {companyId} not found.");
+        }
+
+        Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId,
+            SourceModule = "CB",
+            PostingDate = date,
+            TransactionCurrency = company.BaseCurrency,
+            DocumentType = documentType,
+            DocumentNumber = reference,
+            Narrative = narrative,
+            Lines =
+            [
+                new JournalLineRequest { AccountCode = debitAccountCode, Side = JournalSide.Debit, TransactionAmount = amount },
+                new JournalLineRequest { AccountCode = creditAccountCode, Side = JournalSide.Credit, TransactionAmount = amount },
+            ],
+        }, ct).ConfigureAwait(false);
+
+        return posted.IsFailure ? posted.Error : posted.Value.JournalNumber;
+    }
 }
