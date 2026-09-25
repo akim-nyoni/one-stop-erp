@@ -107,6 +107,29 @@ public sealed class RecurringJournalService : IRecurringJournalService
     }
 
     /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<RecurringRunLine>>> PostAllActiveAsync(long companyId, DateOnly date, CancellationToken ct = default)
+    {
+        List<RecurringJournal> templates = await _db.Set<RecurringJournal>()
+            .Where(r => r.CompanyId == companyId && r.IsActive)
+            .OrderBy(r => r.Code)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        List<RecurringRunLine> results = [];
+        foreach (RecurringJournal template in templates)
+        {
+            Result<string> posted = await PostAsync(companyId, template.Id, date, ct: ct).ConfigureAwait(false);
+            if (posted.IsFailure)
+            {
+                return posted.Error;
+            }
+
+            results.Add(new RecurringRunLine(template.Code, posted.Value));
+        }
+
+        return results;
+    }
+
+    /// <inheritdoc />
     public async Task<Result> SetActiveAsync(long companyId, long recurringJournalId, bool isActive, CancellationToken ct = default)
     {
         RecurringJournal? template = await _db.Set<RecurringJournal>().FirstOrDefaultAsync(r => r.Id == recurringJournalId && r.CompanyId == companyId, ct).ConfigureAwait(false);

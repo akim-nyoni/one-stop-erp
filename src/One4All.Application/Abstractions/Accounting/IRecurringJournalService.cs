@@ -10,6 +10,11 @@ namespace One4All.Application.Abstractions.Accounting;
 /// <param name="Department">The department, if any.</param>
 public readonly record struct RecurringJournalLineInput(string AccountCode, bool IsDebit, decimal Amount, string? CostCentre = null, string? Department = null);
 
+/// <summary>The result of posting one template in a recurring-journal run.</summary>
+/// <param name="Code">The template code.</param>
+/// <param name="JournalNumber">The generated journal number.</param>
+public readonly record struct RecurringRunLine(string Code, string JournalNumber);
+
 /// <summary>
 /// Manages recurring-journal templates: balanced sets of lines saved once and posted repeatedly (rent,
 /// standing charges, provisions). Each post generates a real journal through the central posting engine.
@@ -38,6 +43,16 @@ public interface IRecurringJournalService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The generated journal number.</returns>
     Task<Result<string>> PostAsync(long companyId, long recurringJournalId, DateOnly date, string? documentNumber = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Posts every active, balanced recurring template for the company on the given date (a month-end run).
+    /// Stops and returns the error if any template fails to post; templates posted before the failure stand.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="date">The posting date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>One result line per template posted.</returns>
+    Task<Result<IReadOnlyList<RecurringRunLine>>> PostAllActiveAsync(long companyId, DateOnly date, CancellationToken ct = default);
 
     /// <summary>Activates or deactivates a template.</summary>
     /// <param name="companyId">The company.</param>
