@@ -73,4 +73,27 @@ public interface ITradingReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The statement, or null if the supplier is unknown.</returns>
     Task<TraderStatement?> SupplierStatementAsync(long companyId, long supplierId, CancellationToken ct = default);
+
+    /// <summary>Produces a remittance advice for a supplier payment: the invoices it settled.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="paymentOpenItemId">The AP payment open item.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The remittance advice, or null if the item is not an AP payment.</returns>
+    Task<RemittanceAdvice?> RemittanceAdviceAsync(long companyId, long paymentOpenItemId, CancellationToken ct = default);
 }
+
+/// <summary>One settled invoice on a remittance advice.</summary>
+/// <param name="InvoiceNumber">The supplier invoice number.</param>
+/// <param name="InvoiceDate">The invoice date.</param>
+/// <param name="AllocatedAmount">The amount of the payment applied to it.</param>
+public sealed record RemittanceLine(string InvoiceNumber, DateOnly InvoiceDate, decimal AllocatedAmount);
+
+/// <summary>A remittance advice: which invoices a supplier payment settled.</summary>
+/// <param name="SupplierCode">The supplier code.</param>
+/// <param name="SupplierName">The supplier name.</param>
+/// <param name="PaymentNumber">The payment document number.</param>
+/// <param name="PaymentDate">The payment date.</param>
+/// <param name="Currency">The payment currency.</param>
+/// <param name="Lines">The invoices settled by the payment.</param>
+/// <param name="TotalAllocated">The total allocated across the lines.</param>
+public sealed record RemittanceAdvice(string SupplierCode, string SupplierName, string PaymentNumber, DateOnly PaymentDate, string Currency, IReadOnlyList<RemittanceLine> Lines, decimal TotalAllocated);

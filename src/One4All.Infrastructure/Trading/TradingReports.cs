@@ -109,6 +109,34 @@ public sealed class TradingReports : ITradingReports
         return new TraderStatement(supplier.Code, supplier.Name, supplier.Currency.Value, lines, balance);
     }
 
+    public async Task<RemittanceAdvice?> RemittanceAdviceAsync(long companyId, long paymentOpenItemId, CancellationToken ct = default)
+    {
+        OpenItem? payment = await _db.OpenItems.FirstOrDefaultAsync(
+            i => i.Id == paymentOpenItemId && i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsPayable && i.ItemType == OpenItemType.Payment, ct).ConfigureAwait(false);
+        if (payment is null)
+        {
+            return null;
+        }
+
+        Supplier? supplier = await _db.Suppliers.FirstOrDefaultAsync(s => s.Id == payment.TraderId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (supplier is null)
+        {
+            return null;
+        }
+
+        // The payment is the debit item on AP allocations; the credit items are the invoices it settled.
+        var rows = await (
+            from a in _db.Set<Allocation>()
+            join inv in _db.OpenItems on a.CreditItemId equals inv.Id
+            where a.CompanyId == companyId && a.Ledger == TradingLedger.AccountsPayable && a.DebitItemId == paymentOpenItemId && !a.IsReversed
+            orderby inv.DocumentDate, inv.DocumentNumber
+            select new { inv.DocumentNumber, inv.DocumentDate, a.TransactionAmount })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        List<RemittanceLine> lines = rows.Select(r => new RemittanceLine(r.DocumentNumber, r.DocumentDate, r.TransactionAmount)).ToList();
+        return new RemittanceAdvice(supplier.Code, supplier.Name, payment.DocumentNumber, payment.DocumentDate, payment.Currency.Value, lines, lines.Sum(l => l.AllocatedAmount));
+    }
+
     private async Task<Dictionary<long, (string, string)>> LoadTradersAsync(long companyId, TradingLedger ledger, CancellationToken ct)
     {
         if (ledger == TradingLedger.AccountsReceivable)
