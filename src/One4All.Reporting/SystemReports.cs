@@ -160,6 +160,9 @@ public static class SystemReports
     /// <summary>The Trial Balance Movement report code.</summary>
     public const string TrialBalanceMovementCode = "GL-TBMOV";
 
+    /// <summary>The Chart of Accounts report code.</summary>
+    public const string ChartOfAccountsCode = "GL-COA";
+
     /// <summary>The Aged Debtors report code.</summary>
     public const string AgedDebtorsCode = "AR-AGE";
 
@@ -192,6 +195,13 @@ public static class SystemReports
         "Every posted journal over a period — date, number, source module, document, narrative and base total.", "JournalDaybook",
         [new Column("Date", "Date", 95), new Column("JournalNumber", "Journal", 110), new Column("SourceModule", "Module", 70), new Column("DocumentType", "Doc type", 90), new Column("DocumentNumber", "Doc no.", 100), new Column("Narrative", "Narrative", 200), new Column("Amount", "Amount", 100, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Chart of Accounts definition (reference listing).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition ChartOfAccounts() => Listing(ChartOfAccountsCode, "Chart of Accounts", "GeneralLedger",
+        "Every ledger account with its type, report category, control flag and active status.", "ChartOfAccounts",
+        [new Column("AccountCode", "Account", 90), new Column("AccountName", "Name", 220), new Column("Type", "Type", 90), new Column("ReportCategory", "Category", 140), new Column("IsControl", "Control", 70), new Column("IsActive", "Active", 60)],
+        []);
 
     /// <summary>Builds the Trial Balance Movement definition (opening/movement/closing per account).</summary>
     /// <returns>The definition.</returns>

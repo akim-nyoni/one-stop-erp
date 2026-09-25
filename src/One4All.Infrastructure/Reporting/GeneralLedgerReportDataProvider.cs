@@ -10,7 +10,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook", "TrialBalanceMovement",
+        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts",
     };
 
     private readonly IGeneralLedgerReports _reports;
@@ -33,6 +33,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             "NOMINALACTIVITY" => await NominalActivityAsync(companyId, parameters, ct).ConfigureAwait(false),
             "JOURNALDAYBOOK" => await JournalDaybookAsync(companyId, parameters, ct).ConfigureAwait(false),
             "TRIALBALANCEMOVEMENT" => await TrialBalanceMovementAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "CHARTOFACCOUNTS" => await ChartOfAccountsAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -125,6 +126,20 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             ["Debit"] = r.Debit,
             ["Credit"] = r.Credit,
             ["Closing"] = r.Closing,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ChartOfAccountsAsync(long companyId, CancellationToken ct)
+    {
+        ChartOfAccountsReport report = await _reports.ChartOfAccountsAsync(companyId, ct).ConfigureAwait(false);
+        return report.Rows.Select(r => Row(new()
+        {
+            ["AccountCode"] = r.AccountCode,
+            ["AccountName"] = r.AccountName,
+            ["Type"] = r.Type,
+            ["ReportCategory"] = r.ReportCategory,
+            ["IsControl"] = r.IsControl ? "Yes" : string.Empty,
+            ["IsActive"] = r.IsActive ? "Yes" : string.Empty,
         })).ToList();
     }
 

@@ -77,6 +77,7 @@ public sealed class ReportCatalogueSeeder
         yield return SystemReports.BalanceSheet();
         yield return SystemReports.JournalDaybook();
         yield return SystemReports.TrialBalanceMovement();
+        yield return SystemReports.ChartOfAccounts();
         yield return SystemReports.AgedDebtors();
         yield return SystemReports.AgedCreditors();
         yield return SystemReports.CreditExposure();

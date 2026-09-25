@@ -262,6 +262,21 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         return new TrialBalanceMovementReport(companyId, fromDate, toDate, rows);
     }
 
+    /// <inheritdoc />
+    public async Task<ChartOfAccountsReport> ChartOfAccountsAsync(long companyId, CancellationToken ct = default)
+    {
+        List<LedgerAccount> accounts = await _db.Accounts
+            .Where(a => a.CompanyId == companyId)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        List<ChartOfAccountsRow> rows = accounts
+            .OrderBy(a => a.AccountCode, StringComparer.Ordinal)
+            .Select(a => new ChartOfAccountsRow(a.AccountCode, a.Name, a.Type.ToString(), a.ReportCategory, a.IsControlAccount, a.IsActive))
+            .ToList();
+
+        return new ChartOfAccountsReport(companyId, rows);
+    }
+
     private async Task<string> BaseCurrencyAsync(long companyId, CancellationToken ct)
     {
         Company? company = await _db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);

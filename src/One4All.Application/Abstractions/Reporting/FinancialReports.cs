@@ -132,6 +132,20 @@ public sealed record TrialBalanceMovementRow(string AccountCode, string AccountN
 /// <param name="Rows">The per-account rows with any non-zero opening, movement or closing.</param>
 public sealed record TrialBalanceMovementReport(long CompanyId, DateOnly FromDate, DateOnly ToDate, IReadOnlyList<TrialBalanceMovementRow> Rows);
 
+/// <summary>One account on the chart-of-accounts listing.</summary>
+/// <param name="AccountCode">The account code.</param>
+/// <param name="AccountName">The account name.</param>
+/// <param name="Type">The account type (Asset/Liability/Income/…).</param>
+/// <param name="ReportCategory">The report category grouping.</param>
+/// <param name="IsControl">Whether the account is a control account.</param>
+/// <param name="IsActive">Whether the account is active.</param>
+public sealed record ChartOfAccountsRow(string AccountCode, string AccountName, string Type, string ReportCategory, bool IsControl, bool IsActive);
+
+/// <summary>The chart-of-accounts listing.</summary>
+/// <param name="CompanyId">The company.</param>
+/// <param name="Rows">The account rows, ordered by code.</param>
+public sealed record ChartOfAccountsReport(long CompanyId, IReadOnlyList<ChartOfAccountsRow> Rows);
+
 /// <summary>
 /// Read-side services producing the core general-ledger financial reports from posted data (brief §16
 /// Phase 2). Every report is derived from <c>gl.period_balance</c> / <c>gl.journal_line</c>; the trial
@@ -139,6 +153,12 @@ public sealed record TrialBalanceMovementReport(long CompanyId, DateOnly FromDat
 /// </summary>
 public interface IGeneralLedgerReports
 {
+    /// <summary>Produces the chart-of-accounts listing (reference report), ordered by account code.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The chart-of-accounts report.</returns>
+    Task<ChartOfAccountsReport> ChartOfAccountsAsync(long companyId, CancellationToken ct = default);
+
     /// <summary>
     /// Produces the trial balance with movement for a date range: per account the opening balance brought
     /// forward (everything before the range), the debits and credits within the range, and the closing balance.
