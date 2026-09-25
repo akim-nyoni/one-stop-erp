@@ -203,6 +203,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Employee loans.</summary>
     public DbSet<Core.Payroll.EmployeeLoan> EmployeeLoans => Set<Core.Payroll.EmployeeLoan>();
 
+    /// <summary>Employee leave balances.</summary>
+    public DbSet<Core.Payroll.EmployeeLeaveBalance> EmployeeLeaveBalances => Set<Core.Payroll.EmployeeLeaveBalance>();
+
     /// <summary>Budgets.</summary>
     public DbSet<Core.Budgeting.Budget> Budgets => Set<Core.Budgeting.Budget>();
 

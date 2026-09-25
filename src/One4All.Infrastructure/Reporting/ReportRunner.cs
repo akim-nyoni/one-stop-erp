@@ -104,6 +104,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.AssetRegisterCode => SystemReports.AssetRegister(),
         SystemReports.PayrollSummaryCode => SystemReports.PayrollSummary(),
         SystemReports.EmployeeLoansCode => SystemReports.EmployeeLoans(),
+        SystemReports.LeaveBalancesCode => SystemReports.LeaveBalances(),
         SystemReports.PropertyRegisterCode => SystemReports.PropertyRegister(),
         SystemReports.BudgetVsActualCode => SystemReports.BudgetVsActual(),
         SystemReports.PosSalesCode => SystemReports.PosSales(),

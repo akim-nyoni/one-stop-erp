@@ -84,6 +84,7 @@ public sealed class ReportCatalogueSeeder
         yield return SystemReports.AssetRegister();
         yield return SystemReports.PayrollSummary();
         yield return SystemReports.EmployeeLoans();
+        yield return SystemReports.LeaveBalances();
         yield return SystemReports.PropertyRegister();
         yield return SystemReports.BudgetVsActual();
         yield return SystemReports.PosSales();

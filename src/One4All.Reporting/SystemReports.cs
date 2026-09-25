@@ -216,6 +216,9 @@ public static class SystemReports
     /// <summary>The Employee Loans report code.</summary>
     public const string EmployeeLoansCode = "PAY-LOANS";
 
+    /// <summary>The Leave Balances report code.</summary>
+    public const string LeaveBalancesCode = "PAY-LEAVE";
+
     /// <summary>The Property Register report code.</summary>
     public const string PropertyRegisterCode = "MUN-PROP";
 
@@ -269,6 +272,13 @@ public static class SystemReports
     public static ReportDefinition EmployeeLoans() => Listing(EmployeeLoansCode, "Employee Loans", "Payroll",
         "Outstanding employee loans — principal, balance, installment and status.", "EmployeeLoans",
         [new Column("Employee", "Employee", 180), new Column("Reference", "Reference", 100), new Column("Principal", "Principal", 100, true), new Column("Outstanding", "Outstanding", 100, true), new Column("Installment", "Installment", 100, true)],
+        []);
+
+    /// <summary>Builds the Leave Balances definition (Payroll module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition LeaveBalances() => Listing(LeaveBalancesCode, "Leave Balances", "Payroll",
+        "Employee leave balances by type — days accrued, taken and available.", "LeaveBalances",
+        [new Column("Employee", "Employee", 180), new Column("LeaveType", "Type", 90), new Column("Accrued", "Accrued", 90, true), new Column("Taken", "Taken", 90, true), new Column("Balance", "Balance", 90, true)],
         []);
 
     /// <summary>Builds the Property Register definition (brief §4.9 municipality).</summary>

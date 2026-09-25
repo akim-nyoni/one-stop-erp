@@ -20,7 +20,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AssetRegister", "PayrollSummary", "EmployeeLoans", "PropertyRegister", "BudgetVsActual",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AssetRegister", "PayrollSummary", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual",
     };
 
     private readonly One4AllDbContext _db;
@@ -53,6 +53,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "ASSETREGISTER" => await AssetRegisterAsync(companyId, ct).ConfigureAwait(false),
             "PAYROLLSUMMARY" => await PayrollSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "EMPLOYEELOANS" => await EmployeeLoansAsync(companyId, ct).ConfigureAwait(false),
+            "LEAVEBALANCES" => await LeaveBalancesAsync(companyId, ct).ConfigureAwait(false),
             "PROPERTYREGISTER" => await PropertyRegisterAsync(companyId, ct).ConfigureAwait(false),
             "BUDGETVSACTUAL" => await BudgetVsActualAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
@@ -174,6 +175,27 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             ["AccumulatedDepreciation"] = a.AccumulatedDepreciation,
             ["NetBookValue"] = a.NetBookValue,
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LeaveBalancesAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Payroll.EmployeeLeaveBalance> balances = await _db.Set<Core.Payroll.EmployeeLeaveBalance>()
+            .Where(b => b.CompanyId == companyId)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> employees = await _db.Set<Core.Payroll.Employee>()
+            .Where(e => e.CompanyId == companyId)
+            .ToDictionaryAsync(e => e.Id, e => e.FullName, ct).ConfigureAwait(false);
+
+        return balances
+            .OrderBy(b => employees.GetValueOrDefault(b.EmployeeId, string.Empty)).ThenBy(b => b.LeaveType)
+            .Select(b => Row(new()
+            {
+                ["Employee"] = employees.GetValueOrDefault(b.EmployeeId, $"#{b.EmployeeId}"),
+                ["LeaveType"] = b.LeaveType,
+                ["Accrued"] = b.AccruedDays,
+                ["Taken"] = b.TakenDays,
+                ["Balance"] = b.BalanceDays,
+            })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EmployeeLoansAsync(long companyId, CancellationToken ct)

@@ -93,3 +93,17 @@ internal sealed class EmployeeLoanConfiguration : IEntityTypeConfiguration<Emplo
         b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.Status });
     }
 }
+
+internal sealed class EmployeeLeaveBalanceConfiguration : IEntityTypeConfiguration<EmployeeLeaveBalance>
+{
+    public void Configure(EntityTypeBuilder<EmployeeLeaveBalance> b)
+    {
+        b.ToTable("leave_balance", Schemas.Payroll);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.LeaveType).HasMaxLength(20);
+        b.Property(x => x.AccruedDays).HasPrecision(9, 4);
+        b.Property(x => x.TakenDays).HasPrecision(9, 4);
+        b.Ignore(x => x.BalanceDays);
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.LeaveType }).IsUnique();
+    }
+}
