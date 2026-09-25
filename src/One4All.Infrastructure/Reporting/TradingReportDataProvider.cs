@@ -11,7 +11,7 @@ public sealed class TradingReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "AgedDebtors", "AgedCreditors", "CustomerStatement",
+        "AgedDebtors", "AgedCreditors", "CustomerStatement", "CreditExposure",
     };
 
     private readonly ITradingReports _reports;
@@ -32,6 +32,7 @@ public sealed class TradingReportDataProvider : IReportDataProvider
             "AGEDDEBTORS" => Ageing(await _reports.AgedDebtorsAsync(companyId, asAt, ct).ConfigureAwait(false)),
             "AGEDCREDITORS" => Ageing(await _reports.AgedCreditorsAsync(companyId, asAt, ct).ConfigureAwait(false)),
             "CUSTOMERSTATEMENT" => await CustomerStatementAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "CREDITEXPOSURE" => CreditExposure(await _reports.CreditExposureAsync(companyId, asAt, ct).ConfigureAwait(false)),
             _ => [],
         };
     }
@@ -47,6 +48,18 @@ public sealed class TradingReportDataProvider : IReportDataProvider
             ["Days61To90"] = r.Days61To90,
             ["Days91Plus"] = r.Days91Plus,
             ["Total"] = r.Total,
+        }).ToList();
+
+    private static IReadOnlyList<IReadOnlyDictionary<string, object?>> CreditExposure(CreditExposureReport report) =>
+        report.Rows.Select(r => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
+        {
+            ["CustomerCode"] = r.CustomerCode,
+            ["CustomerName"] = r.CustomerName,
+            ["CreditLimit"] = r.CreditLimit,
+            ["Balance"] = r.Balance,
+            ["Available"] = r.Available,
+            ["OnHold"] = r.OnHold ? "Yes" : string.Empty,
+            ["OverLimit"] = r.OverLimit ? "Yes" : string.Empty,
         }).ToList();
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CustomerStatementAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

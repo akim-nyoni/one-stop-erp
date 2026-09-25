@@ -137,6 +137,36 @@ public sealed class TradingReports : ITradingReports
         return new RemittanceAdvice(supplier.Code, supplier.Name, payment.DocumentNumber, payment.DocumentDate, payment.Currency.Value, lines, lines.Sum(l => l.AllocatedAmount));
     }
 
+    /// <inheritdoc />
+    public async Task<CreditExposureReport> CreditExposureAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+    {
+        List<Customer> customers = await _db.Customers
+            .Where(c => c.CompanyId == companyId)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        // Current receivable balance per customer: debit items positive, credit items negative.
+        Dictionary<long, decimal> balances = (await _db.OpenItems
+            .Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.OutstandingBase != 0m && i.DocumentDate <= asAtDate)
+            .ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(i => i.TraderId)
+            .ToDictionary(g => g.Key, g => g.Sum(i => i.Sign == LedgerSign.Debit ? i.OutstandingBase : -i.OutstandingBase));
+
+        List<CreditExposureRow> rows = customers
+            .Select(c =>
+            {
+                decimal balance = balances.GetValueOrDefault(c.Id, 0m);
+                bool unlimited = c.CreditLimit == 0m;
+                decimal available = unlimited ? 0m : c.CreditLimit - balance;
+                bool overLimit = !unlimited && balance > c.CreditLimit;
+                return new CreditExposureRow(c.Code, c.Name, c.CreditLimit, balance, available, c.OnHold, overLimit);
+            })
+            .Where(r => r.Balance != 0m || r.CreditLimit != 0m || r.OnHold)
+            .OrderBy(r => r.CustomerCode, StringComparer.Ordinal)
+            .ToList();
+
+        return new CreditExposureReport(asAtDate, rows);
+    }
+
     private async Task<Dictionary<long, (string, string)>> LoadTradersAsync(long companyId, TradingLedger ledger, CancellationToken ct)
     {
         if (ledger == TradingLedger.AccountsReceivable)

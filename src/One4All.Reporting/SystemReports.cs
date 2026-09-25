@@ -163,6 +163,9 @@ public static class SystemReports
     /// <summary>The Aged Creditors report code.</summary>
     public const string AgedCreditorsCode = "AP-AGE";
 
+    /// <summary>The Customer Credit Exposure report code.</summary>
+    public const string CreditExposureCode = "AR-CREDIT";
+
     /// <summary>A column in a generic listing report.</summary>
     /// <param name="Field">The bound data field.</param>
     /// <param name="Header">The column header.</param>
@@ -203,6 +206,13 @@ public static class SystemReports
     public static ReportDefinition AgedCreditors() => Listing(AgedCreditorsCode, "Aged Creditors", "Purchasing",
         "Outstanding supplier balances by ageing band as at a date.", "AgedCreditors",
         [new Column("TraderCode", "Account", 80), new Column("TraderName", "Name", 150), new Column("Current", "Current", 70, true), new Column("Days1To30", "1-30", 60, true), new Column("Days31To60", "31-60", 60, true), new Column("Days61To90", "61-90", 60, true), new Column("Days91Plus", "91+", 60, true), new Column("Total", "Total", 80, true)],
+        [("AsAtDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Customer Credit Exposure definition (credit control).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition CreditExposure() => Listing(CreditExposureCode, "Customer Credit Exposure", "Sales",
+        "Each customer's credit limit, current balance and remaining credit, flagging on-hold and over-limit accounts.", "CreditExposure",
+        [new Column("CustomerCode", "Account", 90), new Column("CustomerName", "Name", 170), new Column("CreditLimit", "Limit", 90, true), new Column("Balance", "Balance", 90, true), new Column("Available", "Available", 90, true), new Column("OnHold", "On hold", 70), new Column("OverLimit", "Over limit", 70)],
         [("AsAtDate", ParameterType.Date)]);
 
     /// <summary>The Stock Valuation report code.</summary>

@@ -43,9 +43,35 @@ public sealed record StatementLineRow(DateOnly Date, OpenItemType DocumentType, 
 /// <param name="Balance">The outstanding balance in transaction currency.</param>
 public sealed record TraderStatement(string TraderCode, string TraderName, string Currency, IReadOnlyList<StatementLineRow> Lines, decimal Balance);
 
+/// <summary>One customer's credit-control exposure (base currency).</summary>
+/// <param name="CustomerCode">The customer code.</param>
+/// <param name="CustomerName">The customer name.</param>
+/// <param name="CreditLimit">The approved credit limit (0 = unlimited).</param>
+/// <param name="Balance">The current outstanding receivable balance.</param>
+/// <param name="Available">The remaining credit (limit − balance; 0 for an unlimited customer).</param>
+/// <param name="OnHold">Whether the account is on stop.</param>
+/// <param name="OverLimit">Whether the balance has breached a finite limit.</param>
+public sealed record CreditExposureRow(string CustomerCode, string CustomerName, decimal CreditLimit, decimal Balance, decimal Available, bool OnHold, bool OverLimit);
+
+/// <summary>A customer credit-control exposure report as at a date.</summary>
+/// <param name="AsAtDate">The as-at date.</param>
+/// <param name="Rows">The per-customer rows.</param>
+public sealed record CreditExposureReport(DateOnly AsAtDate, IReadOnlyList<CreditExposureRow> Rows);
+
 /// <summary>Aged-balance and statement reports for the trader ledgers (brief §4.5/§4.6).</summary>
 public interface ITradingReports
 {
+    /// <summary>
+    /// Produces the customer credit-control exposure as at a date: each customer's credit limit, current
+    /// receivable balance, remaining credit and on-hold / over-limit flags. Customers with a balance or a
+    /// finite limit are included.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAtDate">The as-at date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The credit-exposure report.</returns>
+    Task<CreditExposureReport> CreditExposureAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
+
     /// <summary>Produces the aged debtors report as at a date.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="asAtDate">The as-at date.</param>
