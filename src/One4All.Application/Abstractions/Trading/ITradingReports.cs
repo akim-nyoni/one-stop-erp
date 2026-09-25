@@ -58,9 +58,33 @@ public sealed record CreditExposureRow(string CustomerCode, string CustomerName,
 /// <param name="Rows">The per-customer rows.</param>
 public sealed record CreditExposureReport(DateOnly AsAtDate, IReadOnlyList<CreditExposureRow> Rows);
 
+/// <summary>One time-bucket of the cash-flow forecast (base currency).</summary>
+/// <param name="Bucket">The bucket label (e.g. "Overdue", "Due 0-30").</param>
+/// <param name="Inflow">Expected receipts from receivables falling due in the bucket.</param>
+/// <param name="Outflow">Expected payments on payables falling due in the bucket.</param>
+/// <param name="Net">Inflow − Outflow for the bucket.</param>
+/// <param name="RunningNet">The cumulative net across this and earlier buckets.</param>
+public sealed record CashFlowForecastRow(string Bucket, decimal Inflow, decimal Outflow, decimal Net, decimal RunningNet);
+
+/// <summary>A short-term cash-flow forecast from open receivables and payables, bucketed by due date.</summary>
+/// <param name="AsAtDate">The as-at date the buckets are measured from.</param>
+/// <param name="Rows">The per-bucket rows.</param>
+public sealed record CashFlowForecastReport(DateOnly AsAtDate, IReadOnlyList<CashFlowForecastRow> Rows);
+
 /// <summary>Aged-balance and statement reports for the trader ledgers (brief §4.5/§4.6).</summary>
 public interface ITradingReports
 {
+    /// <summary>
+    /// Produces a short-term cash-flow forecast: outstanding receivables (inflows) and payables (outflows)
+    /// bucketed by when they fall due relative to <paramref name="asAtDate"/> — overdue, then 0-30 / 31-60 /
+    /// 61-90 / 90+ days ahead — with the net and running net per bucket.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAtDate">The date the buckets are measured from.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The cash-flow forecast.</returns>
+    Task<CashFlowForecastReport> CashFlowForecastAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
+
     /// <summary>
     /// Produces the customer credit-control exposure as at a date: each customer's credit limit, current
     /// receivable balance, remaining credit and on-hold / over-limit flags. Customers with a balance or a

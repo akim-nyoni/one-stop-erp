@@ -11,7 +11,7 @@ public sealed class TradingReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "AgedDebtors", "AgedCreditors", "CustomerStatement", "CreditExposure",
+        "AgedDebtors", "AgedCreditors", "CustomerStatement", "CreditExposure", "CashFlowForecast",
     };
 
     private readonly ITradingReports _reports;
@@ -33,6 +33,7 @@ public sealed class TradingReportDataProvider : IReportDataProvider
             "AGEDCREDITORS" => Ageing(await _reports.AgedCreditorsAsync(companyId, asAt, ct).ConfigureAwait(false)),
             "CUSTOMERSTATEMENT" => await CustomerStatementAsync(companyId, parameters, ct).ConfigureAwait(false),
             "CREDITEXPOSURE" => CreditExposure(await _reports.CreditExposureAsync(companyId, asAt, ct).ConfigureAwait(false)),
+            "CASHFLOWFORECAST" => CashFlowForecast(await _reports.CashFlowForecastAsync(companyId, asAt, ct).ConfigureAwait(false)),
             _ => [],
         };
     }
@@ -60,6 +61,16 @@ public sealed class TradingReportDataProvider : IReportDataProvider
             ["Available"] = r.Available,
             ["OnHold"] = r.OnHold ? "Yes" : string.Empty,
             ["OverLimit"] = r.OverLimit ? "Yes" : string.Empty,
+        }).ToList();
+
+    private static IReadOnlyList<IReadOnlyDictionary<string, object?>> CashFlowForecast(CashFlowForecastReport report) =>
+        report.Rows.Select(r => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
+        {
+            ["Bucket"] = r.Bucket,
+            ["Inflow"] = r.Inflow,
+            ["Outflow"] = r.Outflow,
+            ["Net"] = r.Net,
+            ["RunningNet"] = r.RunningNet,
         }).ToList();
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CustomerStatementAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

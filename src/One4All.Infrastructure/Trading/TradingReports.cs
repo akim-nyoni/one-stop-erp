@@ -167,6 +167,47 @@ public sealed class TradingReports : ITradingReports
         return new CreditExposureReport(asAtDate, rows);
     }
 
+    /// <inheritdoc />
+    public async Task<CashFlowForecastReport> CashFlowForecastAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+    {
+        List<OpenItem> items = await _db.OpenItems
+            .Where(i => i.CompanyId == companyId && i.OutstandingBase != 0m
+                && (i.Ledger == TradingLedger.AccountsReceivable || i.Ledger == TradingLedger.AccountsPayable))
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        string[] labels = ["Overdue", "Due 0-30", "Due 31-60", "Due 61-90", "Due 90+"];
+        decimal[] inflow = new decimal[labels.Length];
+        decimal[] outflow = new decimal[labels.Length];
+
+        foreach (OpenItem item in items)
+        {
+            int daysAhead = item.DueDate.DayNumber - asAtDate.DayNumber;
+            int bucket = daysAhead < 0 ? 0 : daysAhead <= 30 ? 1 : daysAhead <= 60 ? 2 : daysAhead <= 90 ? 3 : 4;
+
+            if (item.Ledger == TradingLedger.AccountsReceivable)
+            {
+                // A debtor invoice (debit) is an inflow; a credit reduces it.
+                inflow[bucket] += item.Sign == LedgerSign.Debit ? item.OutstandingBase : -item.OutstandingBase;
+            }
+            else
+            {
+                // A creditor invoice (credit) is an outflow; a debit reduces it.
+                outflow[bucket] += item.Sign == LedgerSign.Credit ? item.OutstandingBase : -item.OutstandingBase;
+            }
+        }
+
+        List<CashFlowForecastRow> rows = [];
+        decimal running = 0m;
+        for (int b = 0; b < labels.Length; b++)
+        {
+            decimal net = inflow[b] - outflow[b];
+            running += net;
+            rows.Add(new CashFlowForecastRow(labels[b], inflow[b], outflow[b], net, running));
+        }
+
+        return new CashFlowForecastReport(asAtDate, rows);
+    }
+
     private async Task<Dictionary<long, (string, string)>> LoadTradersAsync(long companyId, TradingLedger ledger, CancellationToken ct)
     {
         if (ledger == TradingLedger.AccountsReceivable)
