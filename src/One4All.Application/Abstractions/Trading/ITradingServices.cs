@@ -91,6 +91,21 @@ public interface IPurchaseLedgerService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The posting result.</returns>
     Task<Result<TradingPostingResult>> PostCreditNoteAsync(PurchaseCreditNoteRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Writes back an outstanding creditor balance the business will not pay (e.g. a stale supplier invoice
+    /// or a trivial residual): posts Dr AP control / Cr the write-back income account for the item's
+    /// outstanding amount and allocates it against the invoice so it settles and stops appearing. Refuses a
+    /// missing reason/account, or an item that is not an outstanding creditor balance.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="openItemId">The AP open item (a creditor invoice) to write back.</param>
+    /// <param name="date">The write-back date.</param>
+    /// <param name="writeBackAccountCode">The income account credited with the released liability.</param>
+    /// <param name="reason">The reason for the write-back (required for the audit trail).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The posting result of the write-back.</returns>
+    Task<Result<TradingPostingResult>> WriteBackAsync(long companyId, long openItemId, DateOnly date, string writeBackAccountCode, string reason, CancellationToken ct = default);
 }
 
 /// <summary>Matches credit items against debit items and realises FX (brief §4.5 allocation/matching).</summary>

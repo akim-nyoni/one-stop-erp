@@ -200,6 +200,59 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
+    public async Task<Result<TradingPostingResult>> WriteBackAsync(long companyId, long openItemId, DateOnly date, string writeBackAccountCode, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Ap.ReasonRequired", "A creditor write-back requires a reason.");
+        }
+
+        if (string.IsNullOrWhiteSpace(writeBackAccountCode))
+        {
+            return Error.Validation("Ap.NoWriteBackAccount", "A creditor write-back requires a write-back income account.");
+        }
+
+        OpenItem? item = await _db.OpenItems.FirstOrDefaultAsync(i => i.Id == openItemId && i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsPayable, ct).ConfigureAwait(false);
+        if (item is null)
+        {
+            return Error.NotFound("Ap.OpenItemNotFound", $"AP open item {openItemId} not found.");
+        }
+
+        if (item.Sign != LedgerSign.Credit || item.OutstandingTransaction <= 0m)
+        {
+            return Error.Rule("Ap.NothingToWriteBack", "Only an outstanding creditor item (invoice) can be written back.");
+        }
+
+        // Post the write-back as a "payment" whose money side is the write-back income (Dr AP control / Cr income).
+        Result<TradingPostingResult> writeBack = await PostPaymentAsync(new PaymentRequest
+        {
+            CompanyId = companyId,
+            SupplierId = item.TraderId,
+            DocumentNumber = $"WB{openItemId}",
+            PaymentDate = date,
+            Currency = item.Currency,
+            Amount = item.OutstandingTransaction,
+            BankAccountCode = writeBackAccountCode,
+            ExchangeRate = item.ExchangeRate,
+            Narrative = $"Creditor write-back of {item.DocumentNumber}: {reason}",
+        }, ct).ConfigureAwait(false);
+
+        if (writeBack.IsFailure)
+        {
+            return writeBack.Error;
+        }
+
+        // On AP the payment is the debit item, the invoice the credit item; allocate so the invoice settles.
+        Result<AllocationResult> allocation = await AllocateAsync(companyId, TradingLedger.AccountsPayable, writeBack.Value.OpenItemId, openItemId, item.OutstandingTransaction, date, ct).ConfigureAwait(false);
+        if (allocation.IsFailure)
+        {
+            return allocation.Error;
+        }
+
+        return writeBack.Value;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<TradingPostingResult>> PostReceiptAsync(ReceiptRequest request, CancellationToken ct = default)
     {
         Customer? customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
