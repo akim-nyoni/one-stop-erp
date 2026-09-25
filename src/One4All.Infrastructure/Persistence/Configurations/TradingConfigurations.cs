@@ -84,3 +84,20 @@ internal sealed class AllocationConfiguration : IEntityTypeConfiguration<Allocat
         b.HasIndex(x => x.CreditItemId);
     }
 }
+
+internal sealed class RecurringSalesInvoiceConfiguration : IEntityTypeConfiguration<RecurringSalesInvoice>
+{
+    public void Configure(EntityTypeBuilder<RecurringSalesInvoice> b)
+    {
+        b.ToTable("recurring_invoice", Schemas.AccountsReceivable);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(30);
+        b.Property(x => x.Currency).HasMaxLength(3);
+        b.Property(x => x.NetAmount).HasPrecision(19, 4);
+        b.Property(x => x.TaxAmount).HasPrecision(19, 4);
+        b.Property(x => x.SalesAccountCode).HasMaxLength(8);
+        b.Property(x => x.TaxAccountCode).HasMaxLength(8);
+        b.Property(x => x.Narrative).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.IsActive, x.NextRunDate });
+    }
+}

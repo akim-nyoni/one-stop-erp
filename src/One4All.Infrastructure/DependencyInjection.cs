@@ -77,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Trading.IAllocationService>(sp => sp.GetRequiredService<Trading.TradingService>());
         services.AddScoped<Application.Abstractions.Trading.ITradingReports, Trading.TradingReports>();
         services.AddScoped<Application.Abstractions.Trading.IPaymentRunService, Trading.PaymentRunService>();
+        services.AddScoped<Application.Abstractions.Trading.IRecurringSalesInvoiceService, Trading.RecurringSalesInvoiceService>();
         services.AddScoped<Application.Abstractions.Banking.IBankReconciliationService, Banking.BankReconciliationService>();
 
         // Generic workflow / approvals engine.
