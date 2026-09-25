@@ -16,7 +16,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Quotations", "RecurringInvoices", "RecurringPurchases", "Menu", "TableStatus", "KitchenTickets",
+        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Quotations", "RecurringInvoices", "RecurringPurchases", "SalesBackOrders", "Menu", "TableStatus", "KitchenTickets",
         "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales", "CategorySales", "Wastage", "Bills", "MenuCost",
     };
 
@@ -40,6 +40,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "QUOTATIONS" => await QuotationsAsync(companyId, ct).ConfigureAwait(false),
             "RECURRINGINVOICES" => await RecurringInvoicesAsync(companyId, ct).ConfigureAwait(false),
             "RECURRINGPURCHASES" => await RecurringPurchasesAsync(companyId, ct).ConfigureAwait(false),
+            "SALESBACKORDERS" => await SalesBackOrdersAsync(companyId, ct).ConfigureAwait(false),
             "MENU" => await MenuAsync(companyId, ct).ConfigureAwait(false),
             "TABLESTATUS" => await TableStatusAsync(companyId, ct).ConfigureAwait(false),
             "KITCHENTICKETS" => await KitchenTicketsAsync(companyId, ct).ConfigureAwait(false),
@@ -665,6 +666,43 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["NextRunDate"] = t.NextRunDate.ToDateTime(TimeOnly.MinValue),
             ["Active"] = t.IsActive ? "Yes" : string.Empty,
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SalesBackOrdersAsync(long companyId, CancellationToken ct)
+    {
+        List<One4All.Core.SalesOrders.SalesOrder> orders = await _db.Set<One4All.Core.SalesOrders.SalesOrder>().Include(o => o.Lines)
+            .Where(o => o.CompanyId == companyId && o.Status != One4All.Core.SalesOrders.SalesOrderStatus.Cancelled)
+            .OrderBy(o => o.OrderNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> customers = await _db.Set<Customer>()
+            .Where(c => c.CompanyId == companyId)
+            .ToDictionaryAsync(c => c.Id, c => c.Name, ct).ConfigureAwait(false);
+
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (One4All.Core.SalesOrders.SalesOrder order in orders)
+        {
+            foreach (One4All.Core.SalesOrders.SalesOrderLine line in order.Lines)
+            {
+                decimal outstanding = line.OrderedQuantity - line.DespatchedQuantity;
+                if (outstanding <= 0m)
+                {
+                    continue;
+                }
+
+                rows.Add(Row(new()
+                {
+                    ["OrderNumber"] = order.OrderNumber,
+                    ["Customer"] = customers.GetValueOrDefault(order.CustomerId, $"#{order.CustomerId}"),
+                    ["OrderDate"] = order.OrderDate.ToDateTime(TimeOnly.MinValue),
+                    ["Description"] = line.Description,
+                    ["Ordered"] = line.OrderedQuantity,
+                    ["Despatched"] = line.DespatchedQuantity,
+                    ["Outstanding"] = outstanding,
+                }));
+            }
+        }
+
+        return rows;
     }
 
     private static IReadOnlyDictionary<string, object?> Row(Dictionary<string, object?> values) => values;

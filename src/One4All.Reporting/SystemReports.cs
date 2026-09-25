@@ -437,6 +437,9 @@ public static class SystemReports
     /// <summary>The Sales Quotations report code.</summary>
     public const string QuotationsCode = "SOP-QUOTE";
 
+    /// <summary>The Sales Back-Orders report code.</summary>
+    public const string SalesBackOrdersCode = "SOP-BO";
+
     /// <summary>The Recurring Invoices report code.</summary>
     public const string RecurringInvoicesCode = "AR-RECUR";
 
@@ -476,6 +479,13 @@ public static class SystemReports
     public static ReportDefinition RecurringInvoices() => Listing(RecurringInvoicesCode, "Recurring Invoices", "Sales",
         "Standing recurring-invoice templates with amount, tax, interval, next run date and active flag.", "RecurringInvoices",
         [new Column("Reference", "Reference", 100), new Column("Customer", "Customer", 170), new Column("NetAmount", "Net", 90, true), new Column("TaxAmount", "Tax", 80, true), new Column("IntervalMonths", "Every (mo)", 80, true), new Column("NextRunDate", "Next run", 95), new Column("Active", "Active", 60)],
+        []);
+
+    /// <summary>Builds the Sales Back-Orders definition (undespatched order lines).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition SalesBackOrders() => Listing(SalesBackOrdersCode, "Sales Back-Orders", "SalesOrders",
+        "Order lines not yet fully despatched, with the ordered, despatched and outstanding quantities.", "SalesBackOrders",
+        [new Column("OrderNumber", "Order", 100), new Column("Customer", "Customer", 160), new Column("OrderDate", "Date", 95), new Column("Description", "Item", 170), new Column("Ordered", "Ordered", 80, true), new Column("Despatched", "Despatched", 90, true), new Column("Outstanding", "Outstanding", 90, true)],
         []);
 
     /// <summary>Builds the Recurring Purchases definition (standing payables).</summary>
