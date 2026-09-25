@@ -213,6 +213,9 @@ public static class SystemReports
     /// <summary>The Payroll Summary report code.</summary>
     public const string PayrollSummaryCode = "PAY-SUM";
 
+    /// <summary>The Employee Loans report code.</summary>
+    public const string EmployeeLoansCode = "PAY-LOANS";
+
     /// <summary>The Property Register report code.</summary>
     public const string PropertyRegisterCode = "MUN-PROP";
 
@@ -260,6 +263,13 @@ public static class SystemReports
         "Gross, deductions and net pay per employee for a period.", "PayrollSummary",
         [new Column("Employee", "Employee", 220), new Column("Gross", "Gross", 100, true), new Column("Deductions", "Deductions", 100, true), new Column("Net", "Net", 100, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Employee Loans definition (Payroll module).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition EmployeeLoans() => Listing(EmployeeLoansCode, "Employee Loans", "Payroll",
+        "Outstanding employee loans — principal, balance, installment and status.", "EmployeeLoans",
+        [new Column("Employee", "Employee", 180), new Column("Reference", "Reference", 100), new Column("Principal", "Principal", 100, true), new Column("Outstanding", "Outstanding", 100, true), new Column("Installment", "Installment", 100, true)],
+        []);
 
     /// <summary>Builds the Property Register definition (brief §4.9 municipality).</summary>
     /// <returns>The definition.</returns>

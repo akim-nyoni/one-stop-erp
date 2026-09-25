@@ -20,7 +20,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AssetRegister", "PayrollSummary", "PropertyRegister", "BudgetVsActual",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AssetRegister", "PayrollSummary", "EmployeeLoans", "PropertyRegister", "BudgetVsActual",
     };
 
     private readonly One4AllDbContext _db;
@@ -52,6 +52,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "SLOWSTOCK" => await SlowStockAsync(companyId, parameters, ct).ConfigureAwait(false),
             "ASSETREGISTER" => await AssetRegisterAsync(companyId, ct).ConfigureAwait(false),
             "PAYROLLSUMMARY" => await PayrollSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "EMPLOYEELOANS" => await EmployeeLoansAsync(companyId, ct).ConfigureAwait(false),
             "PROPERTYREGISTER" => await PropertyRegisterAsync(companyId, ct).ConfigureAwait(false),
             "BUDGETVSACTUAL" => await BudgetVsActualAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
@@ -172,6 +173,26 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             ["Cost"] = a.Cost,
             ["AccumulatedDepreciation"] = a.AccumulatedDepreciation,
             ["NetBookValue"] = a.NetBookValue,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EmployeeLoansAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Payroll.EmployeeLoan> loans = await _db.Set<Core.Payroll.EmployeeLoan>()
+            .Where(l => l.CompanyId == companyId && l.Status == Core.Payroll.EmployeeLoanStatus.Active)
+            .OrderByDescending(l => l.Outstanding)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> employees = await _db.Set<Core.Payroll.Employee>()
+            .Where(e => e.CompanyId == companyId)
+            .ToDictionaryAsync(e => e.Id, e => e.FullName, ct).ConfigureAwait(false);
+
+        return loans.Select(l => Row(new()
+        {
+            ["Employee"] = employees.GetValueOrDefault(l.EmployeeId, $"#{l.EmployeeId}"),
+            ["Reference"] = l.Reference,
+            ["Principal"] = l.Principal,
+            ["Outstanding"] = l.Outstanding,
+            ["Installment"] = l.Installment,
         })).ToList();
     }
 
