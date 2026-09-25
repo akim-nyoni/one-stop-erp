@@ -242,4 +242,37 @@ public sealed class FixedAssetService : IFixedAssetService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new RevaluationResult(delta, asset.NetBookValue, posted.Value.JournalNumber);
     }
+
+    /// <inheritdoc />
+    public async Task<Result> TransferAsync(long companyId, long assetId, string? newLocation, string? newCustodian, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(newLocation) && string.IsNullOrWhiteSpace(newCustodian))
+        {
+            return Result.Failure(Error.Validation("Fa.NothingToTransfer", "Provide a new location and/or custodian."));
+        }
+
+        FixedAsset? asset = await _db.Set<FixedAsset>().FirstOrDefaultAsync(a => a.Id == assetId && a.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (asset is null)
+        {
+            return Result.Failure(Error.NotFound("Fa.AssetNotFound", $"Asset {assetId} not found."));
+        }
+
+        if (asset.Status == FixedAssetStatus.Disposed)
+        {
+            return Result.Failure(Error.Rule("Fa.AlreadyDisposed", $"Asset {asset.AssetNumber} is disposed and cannot be transferred."));
+        }
+
+        if (!string.IsNullOrWhiteSpace(newLocation))
+        {
+            asset.Location = newLocation;
+        }
+
+        if (!string.IsNullOrWhiteSpace(newCustodian))
+        {
+            asset.Custodian = newCustodian;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
 }

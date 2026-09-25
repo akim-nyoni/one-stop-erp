@@ -126,4 +126,16 @@ public interface IFixedAssetService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The revaluation result (nil-delta revaluations still succeed, posting nothing).</returns>
     Task<Result<RevaluationResult>> RevalueAsync(long companyId, long assetId, decimal newCarryingAmount, DateOnly date, string revaluationReserveAccountCode, string impairmentExpenseAccountCode, string documentNumber, CancellationToken ct = default);
+
+    /// <summary>
+    /// Transfers an asset to a new location and/or custodian (an asset-register movement — operational, no GL).
+    /// A null location or custodian leaves that attribute unchanged. Refuses a disposed asset.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="assetId">The asset.</param>
+    /// <param name="newLocation">The new location, or null to keep it.</param>
+    /// <param name="newCustodian">The new custodian, or null to keep it.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> TransferAsync(long companyId, long assetId, string? newLocation, string? newCustodian, CancellationToken ct = default);
 }
