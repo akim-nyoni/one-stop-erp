@@ -230,6 +230,9 @@ public static class SystemReports
     /// <summary>The Fixed Asset Register report code.</summary>
     public const string AssetRegisterCode = "FA-REG";
 
+    /// <summary>The Depreciation Forecast report code.</summary>
+    public const string DepreciationForecastCode = "FA-FCST";
+
     /// <summary>The Payroll Summary report code.</summary>
     public const string PayrollSummaryCode = "PAY-SUM";
 
@@ -285,6 +288,13 @@ public static class SystemReports
         "Assets with cost, accumulated depreciation and net book value.", "AssetRegister",
         [new Column("AssetNumber", "Asset", 90), new Column("Description", "Description", 200), new Column("Cost", "Cost", 90, true), new Column("AccumulatedDepreciation", "Accum. depr.", 90, true), new Column("NetBookValue", "NBV", 90, true)],
         [("AsAtDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Depreciation Forecast definition (fixed assets).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition DepreciationForecast() => Listing(DepreciationForecastCode, "Depreciation Forecast", "FixedAssets",
+        "Projected monthly depreciation across active assets and the aggregate closing net book value.", "DepreciationForecast",
+        [new Column("Period", "Month", 90), new Column("Charge", "Depreciation", 110, true), new Column("ClosingNetBookValue", "Closing NBV", 120, true)],
+        [("StartMonth", ParameterType.Date), ("Months", ParameterType.Integer)]);
 
     /// <summary>Builds the Payroll Summary definition (brief §4.15.6).</summary>
     /// <returns>The definition.</returns>

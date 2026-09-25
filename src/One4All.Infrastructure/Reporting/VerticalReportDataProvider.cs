@@ -3,6 +3,7 @@ using One4All.Application.Abstractions.Budgeting;
 using One4All.Application.Abstractions.Inventory;
 using One4All.Application.Abstractions.Reporting;
 using One4All.Core.Budgeting;
+using One4All.Core.Common;
 using One4All.Core.FixedAssets;
 using One4All.Core.Municipal;
 using One4All.Core.Payroll;
@@ -20,22 +21,25 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AssetRegister", "PayrollSummary", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "Pipeline", "ExpenseClaims",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AssetRegister", "DepreciationForecast", "PayrollSummary", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "Pipeline", "ExpenseClaims",
     };
 
     private readonly One4AllDbContext _db;
     private readonly IInventoryService _inventory;
     private readonly IBudgetingService _budgeting;
+    private readonly One4All.Application.Abstractions.FixedAssets.IFixedAssetService _fixedAssets;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="inventory">The inventory service (stock valuation).</param>
     /// <param name="budgeting">The budgeting service (budget vs actual).</param>
-    public VerticalReportDataProvider(One4AllDbContext db, IInventoryService inventory, IBudgetingService budgeting)
+    /// <param name="fixedAssets">The fixed-asset service (depreciation forecast).</param>
+    public VerticalReportDataProvider(One4AllDbContext db, IInventoryService inventory, IBudgetingService budgeting, One4All.Application.Abstractions.FixedAssets.IFixedAssetService fixedAssets)
     {
         _db = db;
         _inventory = inventory;
         _budgeting = budgeting;
+        _fixedAssets = fixedAssets;
     }
 
     /// <inheritdoc />
@@ -51,6 +55,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "REORDER" => await ReorderAsync(companyId, ct).ConfigureAwait(false),
             "SLOWSTOCK" => await SlowStockAsync(companyId, parameters, ct).ConfigureAwait(false),
             "ASSETREGISTER" => await AssetRegisterAsync(companyId, ct).ConfigureAwait(false),
+            "DEPRECIATIONFORECAST" => await DepreciationForecastAsync(companyId, parameters, ct).ConfigureAwait(false),
             "PAYROLLSUMMARY" => await PayrollSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "EMPLOYEELOANS" => await EmployeeLoansAsync(companyId, ct).ConfigureAwait(false),
             "LEAVEBALANCES" => await LeaveBalancesAsync(companyId, ct).ConfigureAwait(false),
@@ -160,6 +165,27 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             ["Quantity"] = l.Quantity,
             ["AverageCost"] = l.AverageCost,
             ["Value"] = l.Value,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DepreciationForecastAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly start = ReportParameters.Date(parameters, "StartMonth");
+        long months = ReportParameters.Long(parameters, "Months");
+        int horizon = months <= 0 ? 12 : (int)Math.Min(months, 600);
+
+        Result<Application.Abstractions.FixedAssets.DepreciationForecastReport> report =
+            await _fixedAssets.DepreciationForecastAsync(companyId, start, horizon, ct).ConfigureAwait(false);
+        if (report.IsFailure)
+        {
+            return [];
+        }
+
+        return report.Value.Periods.Select(p => Row(new()
+        {
+            ["Period"] = p.Period,
+            ["Charge"] = p.Charge,
+            ["ClosingNetBookValue"] = p.ClosingNetBookValue,
         })).ToList();
     }
 

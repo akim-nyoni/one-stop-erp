@@ -275,4 +275,53 @@ public sealed class FixedAssetService : IFixedAssetService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
+
+    /// <inheritdoc />
+    public async Task<Result<DepreciationForecastReport>> DepreciationForecastAsync(long companyId, DateOnly startMonth, int months, CancellationToken ct = default)
+    {
+        if (months <= 0)
+        {
+            return Error.Rule("Fa.ForecastMonths", "The number of months to forecast must be positive.");
+        }
+
+        List<FixedAsset> assets = await _db.Set<FixedAsset>()
+            .Where(a => a.CompanyId == companyId && a.Status == FixedAssetStatus.Active)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        // Simulate each asset month by month on local balances, never touching the entities.
+        (decimal Nbv, decimal Residual, decimal Straight, decimal RbRate, DepreciationMethod Method, bool ByLife)[] state = assets
+            .Select(a => (a.NetBookValue, a.ResidualValue,
+                a.UsefulLifeMonths <= 0 ? 0m : decimal.Round(a.DepreciableAmount / a.UsefulLifeMonths, 4, MidpointRounding.ToEven),
+                a.ReducingBalanceRatePercent, a.Method, a.Method == DepreciationMethod.StraightLine))
+            .ToArray();
+
+        DateOnly month = new(startMonth.Year, startMonth.Month, 1);
+        List<DepreciationForecastPeriod> periods = [];
+        for (int m = 0; m < months; m++)
+        {
+            decimal periodCharge = 0m;
+            decimal closingNbv = 0m;
+            for (int i = 0; i < state.Length; i++)
+            {
+                decimal remaining = state[i].Nbv - state[i].Residual;
+                decimal charge = 0m;
+                if (remaining > 0m)
+                {
+                    charge = state[i].ByLife
+                        ? state[i].Straight
+                        : decimal.Round(state[i].Nbv * state[i].RbRate / 100m, 4, MidpointRounding.ToEven);
+                    if (charge > remaining) { charge = remaining; }
+                    state[i].Nbv -= charge;
+                }
+
+                periodCharge += charge;
+                closingNbv += state[i].Nbv;
+            }
+
+            periods.Add(new DepreciationForecastPeriod(month.ToString("yyyy-MM"), periodCharge, closingNbv));
+            month = month.AddMonths(1);
+        }
+
+        return new DepreciationForecastReport(new DateOnly(startMonth.Year, startMonth.Month, 1), months, periods);
+    }
 }

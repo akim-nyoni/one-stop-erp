@@ -138,4 +138,28 @@ public interface IFixedAssetService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
     Task<Result> TransferAsync(long companyId, long assetId, string? newLocation, string? newCustodian, CancellationToken ct = default);
+
+    /// <summary>
+    /// Projects future depreciation across all active assets for a number of months from a start month, without
+    /// posting anything. Each period carries the total charge for that month and the aggregate closing net book
+    /// value, so the schedule can feed a budget or an asset-replacement plan.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="startMonth">The first month to forecast (day is ignored).</param>
+    /// <param name="months">The number of months to project (positive).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The depreciation forecast.</returns>
+    Task<Result<DepreciationForecastReport>> DepreciationForecastAsync(long companyId, DateOnly startMonth, int months, CancellationToken ct = default);
 }
+
+/// <summary>One month of a depreciation forecast.</summary>
+/// <param name="Period">The month label (yyyy-MM).</param>
+/// <param name="Charge">The total depreciation charge across active assets that month.</param>
+/// <param name="ClosingNetBookValue">The aggregate net book value at the end of the month.</param>
+public sealed record DepreciationForecastPeriod(string Period, decimal Charge, decimal ClosingNetBookValue);
+
+/// <summary>A forward depreciation schedule across all active assets.</summary>
+/// <param name="StartMonth">The first month forecast.</param>
+/// <param name="Months">The number of months projected.</param>
+/// <param name="Periods">The per-month rows.</param>
+public sealed record DepreciationForecastReport(DateOnly StartMonth, int Months, IReadOnlyList<DepreciationForecastPeriod> Periods);
