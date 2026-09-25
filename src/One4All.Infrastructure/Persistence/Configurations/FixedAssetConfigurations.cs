@@ -29,6 +29,19 @@ internal sealed class FixedAssetConfiguration : IEntityTypeConfiguration<FixedAs
     }
 }
 
+internal sealed class AssetMaintenanceConfiguration : IEntityTypeConfiguration<AssetMaintenance>
+{
+    public void Configure(EntityTypeBuilder<AssetMaintenance> b)
+    {
+        b.ToTable("asset_maintenance", Schemas.FixedAssets);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Description).HasMaxLength(300);
+        b.Property(x => x.Provider).HasMaxLength(120);
+        b.Property(x => x.Cost).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.AssetId, x.Date });
+    }
+}
+
 internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opportunity>
 {
     public void Configure(EntityTypeBuilder<Opportunity> b)

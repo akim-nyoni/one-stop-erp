@@ -21,7 +21,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "AssetRegister", "DepreciationForecast", "PayrollSummary", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "Pipeline", "ExpenseClaims",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "PayrollSummary", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "Pipeline", "ExpenseClaims",
     };
 
     private readonly One4AllDbContext _db;
@@ -57,6 +57,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "ABCANALYSIS" => await AbcAnalysisAsync(companyId, ct).ConfigureAwait(false),
             "ASSETREGISTER" => await AssetRegisterAsync(companyId, ct).ConfigureAwait(false),
             "DEPRECIATIONFORECAST" => await DepreciationForecastAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "ASSETMAINTENANCE" => await AssetMaintenanceAsync(companyId, ct).ConfigureAwait(false),
             "PAYROLLSUMMARY" => await PayrollSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "EMPLOYEELOANS" => await EmployeeLoansAsync(companyId, ct).ConfigureAwait(false),
             "LEAVEBALANCES" => await LeaveBalancesAsync(companyId, ct).ConfigureAwait(false),
@@ -225,6 +226,27 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             ["Period"] = p.Period,
             ["Charge"] = p.Charge,
             ["ClosingNetBookValue"] = p.ClosingNetBookValue,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AssetMaintenanceAsync(long companyId, CancellationToken ct)
+    {
+        var rows = await (
+            from m in _db.Set<Core.FixedAssets.AssetMaintenance>()
+            join a in _db.Set<Core.FixedAssets.FixedAsset>() on m.AssetId equals a.Id
+            where m.CompanyId == companyId
+            orderby m.Date descending, a.AssetNumber
+            select new { a.AssetNumber, a.Description, MaintDate = m.Date, MaintDescription = m.Description, m.Cost, m.Provider })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return rows.Select(r => Row(new()
+        {
+            ["AssetNumber"] = r.AssetNumber,
+            ["Asset"] = r.Description,
+            ["Date"] = r.MaintDate.ToDateTime(TimeOnly.MinValue),
+            ["Work"] = r.MaintDescription,
+            ["Provider"] = r.Provider ?? string.Empty,
+            ["Cost"] = r.Cost,
         })).ToList();
     }
 

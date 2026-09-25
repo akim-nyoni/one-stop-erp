@@ -108,6 +108,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.AbcAnalysisCode => SystemReports.AbcAnalysis(),
         SystemReports.AssetRegisterCode => SystemReports.AssetRegister(),
         SystemReports.DepreciationForecastCode => SystemReports.DepreciationForecast(),
+        SystemReports.AssetMaintenanceCode => SystemReports.AssetMaintenance(),
         SystemReports.PayrollSummaryCode => SystemReports.PayrollSummary(),
         SystemReports.EmployeeLoansCode => SystemReports.EmployeeLoans(),
         SystemReports.LeaveBalancesCode => SystemReports.LeaveBalances(),

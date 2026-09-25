@@ -246,6 +246,9 @@ public static class SystemReports
     /// <summary>The Depreciation Forecast report code.</summary>
     public const string DepreciationForecastCode = "FA-FCST";
 
+    /// <summary>The Asset Maintenance Log report code.</summary>
+    public const string AssetMaintenanceCode = "FA-MAINT";
+
     /// <summary>The Payroll Summary report code.</summary>
     public const string PayrollSummaryCode = "PAY-SUM";
 
@@ -325,6 +328,13 @@ public static class SystemReports
         "Projected monthly depreciation across active assets and the aggregate closing net book value.", "DepreciationForecast",
         [new Column("Period", "Month", 90), new Column("Charge", "Depreciation", 110, true), new Column("ClosingNetBookValue", "Closing NBV", 120, true)],
         [("StartMonth", ParameterType.Date), ("Months", ParameterType.Integer)]);
+
+    /// <summary>Builds the Asset Maintenance Log definition (fixed assets).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition AssetMaintenance() => Listing(AssetMaintenanceCode, "Asset Maintenance Log", "FixedAssets",
+        "Maintenance and service events logged against assets, newest first, with the informational cost.", "AssetMaintenance",
+        [new Column("AssetNumber", "Asset", 90), new Column("Asset", "Description", 160), new Column("Date", "Date", 95), new Column("Work", "Work done", 200), new Column("Provider", "Provider", 120), new Column("Cost", "Cost", 90, true)],
+        []);
 
     /// <summary>Builds the Payroll Summary definition (brief §4.15.6).</summary>
     /// <returns>The definition.</returns>

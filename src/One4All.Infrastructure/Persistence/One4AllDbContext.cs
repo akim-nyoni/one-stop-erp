@@ -197,6 +197,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Fixed assets.</summary>
     public DbSet<Core.FixedAssets.FixedAsset> FixedAssets => Set<Core.FixedAssets.FixedAsset>();
 
+    /// <summary>Fixed-asset maintenance log entries.</summary>
+    public DbSet<Core.FixedAssets.AssetMaintenance> AssetMaintenance => Set<Core.FixedAssets.AssetMaintenance>();
+
     /// <summary>CRM opportunities.</summary>
     public DbSet<Core.Crm.Opportunity> Opportunities => Set<Core.Crm.Opportunity>();
 

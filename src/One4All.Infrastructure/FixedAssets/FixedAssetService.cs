@@ -277,6 +277,36 @@ public sealed class FixedAssetService : IFixedAssetService
     }
 
     /// <inheritdoc />
+    public async Task<Result<long>> RecordMaintenanceAsync(long companyId, long assetId, DateOnly date, string description, decimal cost, string? provider, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return Error.Validation("Fa.MaintenanceNoDescription", "A maintenance log needs a description.");
+        }
+
+        if (cost < 0m)
+        {
+            return Error.Rule("Fa.MaintenanceNegativeCost", "The maintenance cost cannot be negative.");
+        }
+
+        FixedAsset? asset = await _db.Set<FixedAsset>().FirstOrDefaultAsync(a => a.Id == assetId && a.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (asset is null)
+        {
+            return Error.NotFound("Fa.AssetNotFound", $"Asset {assetId} not found.");
+        }
+
+        if (asset.Status == FixedAssetStatus.Disposed)
+        {
+            return Error.Rule("Fa.AlreadyDisposed", $"Asset {asset.AssetNumber} is disposed; no maintenance can be logged.");
+        }
+
+        AssetMaintenance log = new(companyId, assetId, date, description, cost, provider);
+        _db.Set<AssetMaintenance>().Add(log);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return log.Id;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<DepreciationForecastReport>> DepreciationForecastAsync(long companyId, DateOnly startMonth, int months, CancellationToken ct = default)
     {
         if (months <= 0)

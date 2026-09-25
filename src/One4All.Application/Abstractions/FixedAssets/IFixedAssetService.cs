@@ -150,6 +150,21 @@ public interface IFixedAssetService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The depreciation forecast.</returns>
     Task<Result<DepreciationForecastReport>> DepreciationForecastAsync(long companyId, DateOnly startMonth, int months, CancellationToken ct = default);
+
+    /// <summary>
+    /// Logs a maintenance/service event against an asset (operational history — no GL posting; the spend is
+    /// captured separately through the supplier invoice or expense claim that pays for it). Refuses an unknown
+    /// or disposed asset, an empty description, or a negative cost.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="assetId">The asset serviced.</param>
+    /// <param name="date">The service date.</param>
+    /// <param name="description">What was done.</param>
+    /// <param name="cost">The informational cost (non-negative).</param>
+    /// <param name="provider">The service provider, if any.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created maintenance-log id.</returns>
+    Task<Result<long>> RecordMaintenanceAsync(long companyId, long assetId, DateOnly date, string description, decimal cost, string? provider, CancellationToken ct = default);
 }
 
 /// <summary>One month of a depreciation forecast.</summary>
