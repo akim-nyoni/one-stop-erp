@@ -146,6 +146,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Sales orders.</summary>
     public DbSet<Core.SalesOrders.SalesOrder> SalesOrders => Set<Core.SalesOrders.SalesOrder>();
 
+    /// <summary>Sales quotations.</summary>
+    public DbSet<Core.SalesOrders.Quotation> Quotations => Set<Core.SalesOrders.Quotation>();
+
     /// <summary>Municipal tariffs.</summary>
     public DbSet<Core.Municipal.Tariff> Tariffs => Set<Core.Municipal.Tariff>();
 

@@ -34,3 +34,34 @@ internal sealed class SalesOrderLineConfiguration : IEntityTypeConfiguration<Sal
         b.Property(x => x.InvoicedQuantity).HasPrecision(19, 4);
     }
 }
+
+internal sealed class QuotationConfiguration : IEntityTypeConfiguration<Quotation>
+{
+    public void Configure(EntityTypeBuilder<Quotation> b)
+    {
+        b.ToTable("quotation", Schemas.SalesOrders);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.QuoteNumber).HasMaxLength(40);
+        b.Property(x => x.Currency).HasMaxLength(3);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Ignore(x => x.Total);
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.QuotationId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.QuoteNumber }).IsUnique();
+    }
+}
+
+internal sealed class QuotationLineConfiguration : IEntityTypeConfiguration<QuotationLine>
+{
+    public void Configure(EntityTypeBuilder<QuotationLine> b)
+    {
+        b.ToTable("quotation_line", Schemas.SalesOrders);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Description).HasMaxLength(300);
+        b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
+        b.Property(x => x.TaxCode).HasMaxLength(20);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.Property(x => x.UnitPrice).HasPrecision(19, 6);
+        b.HasIndex(x => x.QuotationId);
+    }
+}
