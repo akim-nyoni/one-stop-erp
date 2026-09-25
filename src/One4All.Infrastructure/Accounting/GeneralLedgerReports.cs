@@ -235,6 +235,33 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         return new JournalDaybookReport(companyId, fromDate, toDate, lines, lines.Sum(l => l.Amount));
     }
 
+    /// <inheritdoc />
+    public async Task<TrialBalanceMovementReport> TrialBalanceMovementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    {
+        Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> opening = await SumByAccountAsync(companyId, null, fromDate.AddDays(-1), ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> movement = await SumByAccountAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
+
+        List<TrialBalanceMovementRow> rows = [];
+        foreach (string code in opening.Keys.Union(movement.Keys).OrderBy(k => k, StringComparer.Ordinal))
+        {
+            (decimal od, decimal oc) = opening.GetValueOrDefault(code, (0m, 0m));
+            (decimal md, decimal mc) = movement.GetValueOrDefault(code, (0m, 0m));
+            decimal openingNet = od - oc;
+            decimal closingNet = openingNet + (md - mc);
+
+            if (openingNet == 0m && md == 0m && mc == 0m && closingNet == 0m)
+            {
+                continue;
+            }
+
+            string name = accounts.TryGetValue(code, out AccountMeta? meta) ? meta.Name : code;
+            rows.Add(new TrialBalanceMovementRow(code, name, openingNet, md, mc, closingNet));
+        }
+
+        return new TrialBalanceMovementReport(companyId, fromDate, toDate, rows);
+    }
+
     private async Task<string> BaseCurrencyAsync(long companyId, CancellationToken ct)
     {
         Company? company = await _db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);

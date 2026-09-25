@@ -10,7 +10,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook",
+        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook", "TrialBalanceMovement",
     };
 
     private readonly IGeneralLedgerReports _reports;
@@ -32,6 +32,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             "BALANCESHEET" => await BalanceSheetAsync(companyId, parameters, ct).ConfigureAwait(false),
             "NOMINALACTIVITY" => await NominalActivityAsync(companyId, parameters, ct).ConfigureAwait(false),
             "JOURNALDAYBOOK" => await JournalDaybookAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "TRIALBALANCEMOVEMENT" => await TrialBalanceMovementAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -108,6 +109,22 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             ["DocumentNumber"] = l.DocumentNumber ?? string.Empty,
             ["Narrative"] = l.Narrative ?? string.Empty,
             ["Amount"] = l.Amount,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TrialBalanceMovementAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly to = ReportParameters.Date(parameters, "ToDate");
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
+        TrialBalanceMovementReport report = await _reports.TrialBalanceMovementAsync(companyId, from, to, ct).ConfigureAwait(false);
+        return report.Rows.Select(r => Row(new()
+        {
+            ["AccountCode"] = r.AccountCode,
+            ["AccountName"] = r.AccountName,
+            ["Opening"] = r.Opening,
+            ["Debit"] = r.Debit,
+            ["Credit"] = r.Credit,
+            ["Closing"] = r.Closing,
         })).ToList();
     }
 

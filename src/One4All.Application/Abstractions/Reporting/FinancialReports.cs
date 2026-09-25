@@ -116,6 +116,22 @@ public sealed record JournalDaybookLine(DateOnly Date, string JournalNumber, str
 public sealed record JournalDaybookReport(
     long CompanyId, DateOnly FromDate, DateOnly ToDate, IReadOnlyList<JournalDaybookLine> Lines, decimal Total);
 
+/// <summary>One account row of the trial-balance movement report (base currency).</summary>
+/// <param name="AccountCode">The account code.</param>
+/// <param name="AccountName">The account name.</param>
+/// <param name="Opening">The net balance brought forward at the start of the range (debit positive).</param>
+/// <param name="Debit">Debits posted within the range.</param>
+/// <param name="Credit">Credits posted within the range.</param>
+/// <param name="Closing">The net balance carried forward at the end of the range (debit positive).</param>
+public sealed record TrialBalanceMovementRow(string AccountCode, string AccountName, decimal Opening, decimal Debit, decimal Credit, decimal Closing);
+
+/// <summary>The trial balance with period movement between two dates.</summary>
+/// <param name="CompanyId">The company.</param>
+/// <param name="FromDate">Start of the range.</param>
+/// <param name="ToDate">End of the range.</param>
+/// <param name="Rows">The per-account rows with any non-zero opening, movement or closing.</param>
+public sealed record TrialBalanceMovementReport(long CompanyId, DateOnly FromDate, DateOnly ToDate, IReadOnlyList<TrialBalanceMovementRow> Rows);
+
 /// <summary>
 /// Read-side services producing the core general-ledger financial reports from posted data (brief §16
 /// Phase 2). Every report is derived from <c>gl.period_balance</c> / <c>gl.journal_line</c>; the trial
@@ -123,6 +139,17 @@ public sealed record JournalDaybookReport(
 /// </summary>
 public interface IGeneralLedgerReports
 {
+    /// <summary>
+    /// Produces the trial balance with movement for a date range: per account the opening balance brought
+    /// forward (everything before the range), the debits and credits within the range, and the closing balance.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromDate">Start of the range.</param>
+    /// <param name="toDate">End of the range.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The trial-balance movement report.</returns>
+    Task<TrialBalanceMovementReport> TrialBalanceMovementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
+
     /// <summary>Produces the trial balance as at a date.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="asAtDate">The as-at date.</param>

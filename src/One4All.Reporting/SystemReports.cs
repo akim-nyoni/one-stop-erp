@@ -157,6 +157,9 @@ public static class SystemReports
     /// <summary>The Journal Daybook report code.</summary>
     public const string JournalDaybookCode = "GL-DAYBOOK";
 
+    /// <summary>The Trial Balance Movement report code.</summary>
+    public const string TrialBalanceMovementCode = "GL-TBMOV";
+
     /// <summary>The Aged Debtors report code.</summary>
     public const string AgedDebtorsCode = "AR-AGE";
 
@@ -188,6 +191,13 @@ public static class SystemReports
     public static ReportDefinition JournalDaybook() => Listing(JournalDaybookCode, "Journal Daybook", "GeneralLedger",
         "Every posted journal over a period — date, number, source module, document, narrative and base total.", "JournalDaybook",
         [new Column("Date", "Date", 95), new Column("JournalNumber", "Journal", 110), new Column("SourceModule", "Module", 70), new Column("DocumentType", "Doc type", 90), new Column("DocumentNumber", "Doc no.", 100), new Column("Narrative", "Narrative", 200), new Column("Amount", "Amount", 100, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Trial Balance Movement definition (opening/movement/closing per account).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition TrialBalanceMovement() => Listing(TrialBalanceMovementCode, "Trial Balance Movement", "GeneralLedger",
+        "Per account: opening balance brought forward, debits and credits in the period, and the closing balance.", "TrialBalanceMovement",
+        [new Column("AccountCode", "Account", 90), new Column("AccountName", "Name", 200), new Column("Opening", "Opening", 100, true), new Column("Debit", "Debit", 90, true), new Column("Credit", "Credit", 90, true), new Column("Closing", "Closing", 100, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Balance Sheet definition (brief §14 report 6).</summary>
