@@ -104,6 +104,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Recurring sales-invoice templates.</summary>
     public DbSet<Core.Trading.RecurringSalesInvoice> RecurringSalesInvoices => Set<Core.Trading.RecurringSalesInvoice>();
 
+    /// <summary>Recurring purchase-invoice templates.</summary>
+    public DbSet<Core.Trading.RecurringPurchaseInvoice> RecurringPurchaseInvoices => Set<Core.Trading.RecurringPurchaseInvoice>();
+
     /// <summary>Bank/cash accounts.</summary>
     public DbSet<Core.Banking.BankAccount> BankAccounts => Set<Core.Banking.BankAccount>();
 
