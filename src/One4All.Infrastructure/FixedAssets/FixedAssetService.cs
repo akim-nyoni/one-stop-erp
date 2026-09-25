@@ -181,4 +181,65 @@ public sealed class FixedAssetService : IFixedAssetService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new DisposalResult(proceeds, nbv, gainOrLoss, posted.Value.JournalNumber);
     }
+
+    /// <inheritdoc />
+    public async Task<Result<RevaluationResult>> RevalueAsync(long companyId, long assetId, decimal newCarryingAmount, DateOnly date, string revaluationReserveAccountCode, string impairmentExpenseAccountCode, string documentNumber, CancellationToken ct = default)
+    {
+        if (newCarryingAmount < 0m)
+        {
+            return Error.Rule("Fa.NegativeCarryingAmount", "The revalued carrying amount cannot be negative.");
+        }
+
+        FixedAsset? asset = await _db.Set<FixedAsset>().FirstOrDefaultAsync(a => a.Id == assetId && a.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (asset is null)
+        {
+            return Error.NotFound("Fa.AssetNotFound", $"Asset {assetId} not found.");
+        }
+
+        if (asset.Status == FixedAssetStatus.Disposed)
+        {
+            return Error.Rule("Fa.AlreadyDisposed", $"Asset {asset.AssetNumber} is disposed and cannot be revalued.");
+        }
+
+        decimal delta = newCarryingAmount - asset.NetBookValue;
+        if (delta == 0m)
+        {
+            return new RevaluationResult(0m, newCarryingAmount, string.Empty);
+        }
+
+        // Uplift → Dr asset cost / Cr revaluation reserve; write-down → Dr impairment expense / Cr asset cost.
+        List<JournalLineRequest> lines = delta > 0m
+            ?
+            [
+                new JournalLineRequest { AccountCode = asset.CostAccountCode, Side = JournalSide.Debit, TransactionAmount = delta },
+                new JournalLineRequest { AccountCode = revaluationReserveAccountCode, Side = JournalSide.Credit, TransactionAmount = delta },
+            ]
+            :
+            [
+                new JournalLineRequest { AccountCode = impairmentExpenseAccountCode, Side = JournalSide.Debit, TransactionAmount = -delta },
+                new JournalLineRequest { AccountCode = asset.CostAccountCode, Side = JournalSide.Credit, TransactionAmount = -delta },
+            ];
+
+        Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId,
+            SourceModule = "GL",
+            PostingDate = date,
+            TransactionCurrency = company.BaseCurrency,
+            DocumentType = "FA-REVAL",
+            DocumentNumber = documentNumber,
+            Narrative = $"Revaluation of asset {asset.AssetNumber}",
+            Lines = lines,
+        }, ct).ConfigureAwait(false);
+
+        if (posted.IsFailure)
+        {
+            return posted.Error;
+        }
+
+        asset.Revalue(delta);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new RevaluationResult(delta, asset.NetBookValue, posted.Value.JournalNumber);
+    }
 }

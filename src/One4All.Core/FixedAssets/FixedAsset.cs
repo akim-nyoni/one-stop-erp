@@ -171,4 +171,12 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Marks the asset disposed.</summary>
     public void Dispose() => Status = FixedAssetStatus.Disposed;
+
+    /// <summary>
+    /// Revalues the asset by adjusting its gross cost by <paramref name="delta"/> (a positive uplift or a
+    /// negative write-down), leaving accumulated depreciation unchanged so the net book value moves by the same
+    /// amount. Future depreciation is then based on the revalued carrying amount.
+    /// </summary>
+    /// <param name="delta">The change to the carrying amount (+ up, − down).</param>
+    public void Revalue(decimal delta) => Cost += delta;
 }

@@ -65,6 +65,12 @@ public readonly record struct DepreciationRunResult(int AssetsDepreciated, decim
 /// <param name="JournalNumber">The disposal journal number.</param>
 public readonly record struct DisposalResult(decimal Proceeds, decimal NetBookValue, decimal GainOrLoss, string JournalNumber);
 
+/// <summary>The result of revaluing an asset.</summary>
+/// <param name="Delta">The change to the carrying amount (+ uplift to reserve, − write-down to expense).</param>
+/// <param name="NewCarryingAmount">The net book value after the revaluation.</param>
+/// <param name="JournalNumber">The revaluation journal number.</param>
+public readonly record struct RevaluationResult(decimal Delta, decimal NewCarryingAmount, string JournalNumber);
+
 /// <summary>
 /// Fixed Assets (brief §4.14). Registers assets, runs monthly depreciation posting to the GL, and disposes
 /// assets recognising the profit or loss — all through the central posting engine.
@@ -103,4 +109,21 @@ public interface IFixedAssetService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The disposal result.</returns>
     Task<Result<DisposalResult>> DisposeAsync(long companyId, long assetId, decimal proceeds, DateOnly date, string fundingAccountCode, string gainAccountCode, string lossAccountCode, string documentNumber, CancellationToken ct = default);
+
+    /// <summary>
+    /// Revalues an active asset to a new carrying amount (IAS 16): an uplift increases the asset cost against a
+    /// revaluation-reserve equity account (Dr asset cost / Cr reserve); a write-down reduces the asset cost
+    /// against an impairment-expense account (Dr expense / Cr asset cost). Future depreciation follows the
+    /// revalued amount. Refuses a disposed asset or a negative carrying amount.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="assetId">The asset.</param>
+    /// <param name="newCarryingAmount">The revalued net book value.</param>
+    /// <param name="date">The revaluation date.</param>
+    /// <param name="revaluationReserveAccountCode">The revaluation-reserve equity account (credited on an uplift).</param>
+    /// <param name="impairmentExpenseAccountCode">The impairment-expense account (debited on a write-down).</param>
+    /// <param name="documentNumber">The revaluation document number.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The revaluation result (nil-delta revaluations still succeed, posting nothing).</returns>
+    Task<Result<RevaluationResult>> RevalueAsync(long companyId, long assetId, decimal newCarryingAmount, DateOnly date, string revaluationReserveAccountCode, string impairmentExpenseAccountCode, string documentNumber, CancellationToken ct = default);
 }
