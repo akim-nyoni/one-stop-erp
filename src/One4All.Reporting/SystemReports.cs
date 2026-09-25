@@ -225,6 +225,9 @@ public static class SystemReports
     /// <summary>The Budget vs Actual report code.</summary>
     public const string BudgetVsActualCode = "BUD-BVA";
 
+    /// <summary>The CRM Pipeline report code.</summary>
+    public const string PipelineCode = "CRM-PIPE";
+
     /// <summary>Builds the Stock Valuation definition (brief §4.11 inventory).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition StockValuation() => Listing(StockValuationCode, "Stock Valuation", "Inventory",
@@ -294,6 +297,13 @@ public static class SystemReports
         "Active budget compared to GL actuals by account, with the variance.", "BudgetVsActual",
         [new Column("AccountCode", "Account", 100), new Column("Budget", "Budget", 100, true), new Column("Actual", "Actual", 100, true), new Column("Variance", "Variance", 100, true)],
         [("FiscalYearId", ParameterType.Integer), ("Department", ParameterType.String), ("Period", ParameterType.Integer)]);
+
+    /// <summary>Builds the CRM Pipeline definition (brief §4.16).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition Pipeline() => Listing(PipelineCode, "Sales Pipeline", "CRM",
+        "Open opportunities by stage — estimated value, win probability and the probability-weighted value.", "Pipeline",
+        [new Column("Name", "Opportunity", 170), new Column("Contact", "Contact", 130), new Column("Stage", "Stage", 100), new Column("Probability", "Prob %", 70, true), new Column("Estimated", "Estimated", 100, true), new Column("Weighted", "Weighted", 100, true)],
+        []);
 
     /// <summary>The POS Sales Summary report code.</summary>
     public const string PosSalesCode = "POS-SUM";

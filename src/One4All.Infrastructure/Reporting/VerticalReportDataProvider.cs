@@ -20,7 +20,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AssetRegister", "PayrollSummary", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AssetRegister", "PayrollSummary", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "Pipeline",
     };
 
     private readonly One4AllDbContext _db;
@@ -56,6 +56,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "LEAVEBALANCES" => await LeaveBalancesAsync(companyId, ct).ConfigureAwait(false),
             "PROPERTYREGISTER" => await PropertyRegisterAsync(companyId, ct).ConfigureAwait(false),
             "BUDGETVSACTUAL" => await BudgetVsActualAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "PIPELINE" => await PipelineAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -174,6 +175,24 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             ["Cost"] = a.Cost,
             ["AccumulatedDepreciation"] = a.AccumulatedDepreciation,
             ["NetBookValue"] = a.NetBookValue,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PipelineAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Crm.Opportunity> opps = await _db.Set<Core.Crm.Opportunity>()
+            .Where(o => o.CompanyId == companyId && o.Stage != Core.Crm.OpportunityStage.Won && o.Stage != Core.Crm.OpportunityStage.Lost)
+            .OrderByDescending(o => o.EstimatedValue)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return opps.Select(o => Row(new()
+        {
+            ["Name"] = o.Name,
+            ["Contact"] = o.ContactName,
+            ["Stage"] = o.Stage.ToString(),
+            ["Probability"] = o.ProbabilityPercent,
+            ["Estimated"] = o.EstimatedValue,
+            ["Weighted"] = o.WeightedValue,
         })).ToList();
     }
 
