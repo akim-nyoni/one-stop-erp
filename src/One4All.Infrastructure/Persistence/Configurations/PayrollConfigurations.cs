@@ -77,3 +77,19 @@ internal sealed class PayslipLineConfiguration : IEntityTypeConfiguration<Paysli
         b.Property(x => x.Type).HasConversion<int>();
     }
 }
+
+internal sealed class EmployeeLoanConfiguration : IEntityTypeConfiguration<EmployeeLoan>
+{
+    public void Configure(EntityTypeBuilder<EmployeeLoan> b)
+    {
+        b.ToTable("employee_loan", Schemas.Payroll);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(40);
+        b.Property(x => x.Principal).HasPrecision(19, 4);
+        b.Property(x => x.Installment).HasPrecision(19, 4);
+        b.Property(x => x.Outstanding).HasPrecision(19, 4);
+        b.Property(x => x.LoanReceivableAccountCode).HasMaxLength(8);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.Status });
+    }
+}

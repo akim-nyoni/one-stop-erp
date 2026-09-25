@@ -200,6 +200,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Payslips.</summary>
     public DbSet<Core.Payroll.Payslip> Payslips => Set<Core.Payroll.Payslip>();
 
+    /// <summary>Employee loans.</summary>
+    public DbSet<Core.Payroll.EmployeeLoan> EmployeeLoans => Set<Core.Payroll.EmployeeLoan>();
+
     /// <summary>Budgets.</summary>
     public DbSet<Core.Budgeting.Budget> Budgets => Set<Core.Budgeting.Budget>();
 
