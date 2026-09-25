@@ -113,4 +113,42 @@ public sealed class BankingService : IBankingService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return posted.Value.JournalNumber;
     }
+
+    /// <inheritdoc />
+    public async Task<Result<string>> TransferAsync(long companyId, decimal amount, DateOnly date, string reference, string fromAccountCode, string toAccountCode, CancellationToken ct = default)
+    {
+        if (amount <= 0m)
+        {
+            return Error.Rule("Cb.TransferNonPositive", "The transfer amount must be positive.");
+        }
+
+        if (string.Equals(fromAccountCode, toAccountCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return Error.Rule("Cb.SameAccount", "The source and destination accounts must differ.");
+        }
+
+        Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        if (company is null)
+        {
+            return Error.NotFound("Cb.CompanyNotFound", $"Company {companyId} not found.");
+        }
+
+        Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId,
+            SourceModule = "CB",
+            PostingDate = date,
+            TransactionCurrency = company.BaseCurrency,
+            DocumentType = "CB-XFER",
+            DocumentNumber = reference,
+            Narrative = $"Bank transfer {fromAccountCode} → {toAccountCode}",
+            Lines =
+            [
+                new JournalLineRequest { AccountCode = toAccountCode, Side = JournalSide.Debit, TransactionAmount = amount },
+                new JournalLineRequest { AccountCode = fromAccountCode, Side = JournalSide.Credit, TransactionAmount = amount },
+            ],
+        }, ct).ConfigureAwait(false);
+
+        return posted.IsFailure ? posted.Error : posted.Value.JournalNumber;
+    }
 }

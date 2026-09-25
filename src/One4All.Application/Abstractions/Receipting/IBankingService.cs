@@ -40,4 +40,18 @@ public interface IBankingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The GL journal number.</returns>
     Task<Result<string>> ConfirmBankedAsync(long companyId, long depositId, DateOnly date, string cashInTransitAccountCode, string bankAccountCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Transfers funds between two of the company's own cash/bank accounts (e.g. bank to petty cash): Dr the
+    /// destination account, Cr the source account. Refuses a non-positive amount or the same account both sides.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="amount">The amount transferred (positive).</param>
+    /// <param name="date">The transfer date.</param>
+    /// <param name="reference">The transfer reference.</param>
+    /// <param name="fromAccountCode">The source cash/bank account (credited).</param>
+    /// <param name="toAccountCode">The destination cash/bank account (debited).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The GL journal number.</returns>
+    Task<Result<string>> TransferAsync(long companyId, decimal amount, DateOnly date, string reference, string fromAccountCode, string toAccountCode, CancellationToken ct = default);
 }
