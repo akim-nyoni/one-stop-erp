@@ -154,6 +154,9 @@ public static class SystemReports
     /// <summary>The Balance Sheet report code.</summary>
     public const string BalanceSheetCode = "GL-BS";
 
+    /// <summary>The Journal Daybook report code.</summary>
+    public const string JournalDaybookCode = "GL-DAYBOOK";
+
     /// <summary>The Aged Debtors report code.</summary>
     public const string AgedDebtorsCode = "AR-AGE";
 
@@ -172,6 +175,13 @@ public static class SystemReports
     public static ReportDefinition IncomeStatement() => Listing(IncomeStatementCode, "Income Statement", "GeneralLedger",
         "Income and expenses for a period; the difference is the net profit.", "IncomeStatement",
         [new Column("Category", "Section", 120), new Column("AccountName", "Account", 250), new Column("Amount", "Amount", 100, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Journal Daybook definition (audit journal listing).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition JournalDaybook() => Listing(JournalDaybookCode, "Journal Daybook", "GeneralLedger",
+        "Every posted journal over a period — date, number, source module, document, narrative and base total.", "JournalDaybook",
+        [new Column("Date", "Date", 95), new Column("JournalNumber", "Journal", 110), new Column("SourceModule", "Module", 70), new Column("DocumentType", "Doc type", 90), new Column("DocumentNumber", "Doc no.", 100), new Column("Narrative", "Narrative", 200), new Column("Amount", "Amount", 100, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Balance Sheet definition (brief §14 report 6).</summary>

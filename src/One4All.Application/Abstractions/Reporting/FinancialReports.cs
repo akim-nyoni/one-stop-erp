@@ -97,6 +97,25 @@ public sealed record NominalActivityReport(
     long CompanyId, string AccountCode, string AccountName, decimal OpeningBalance,
     IReadOnlyList<NominalActivityLine> Lines, decimal ClosingBalance);
 
+/// <summary>One posted journal in the daybook (journal-listing) enquiry.</summary>
+/// <param name="Date">The posting date.</param>
+/// <param name="JournalNumber">The journal number.</param>
+/// <param name="SourceModule">The originating module (GL, AR, AP, CB, POS, …).</param>
+/// <param name="DocumentType">The document type.</param>
+/// <param name="DocumentNumber">The document number.</param>
+/// <param name="Narrative">The journal narrative.</param>
+/// <param name="Amount">The journal's base-currency total (sum of debits = sum of credits).</param>
+public sealed record JournalDaybookLine(DateOnly Date, string JournalNumber, string SourceModule, string? DocumentType, string? DocumentNumber, string? Narrative, decimal Amount);
+
+/// <summary>The journal daybook: posted journals over a date range, newest first (audit day-book).</summary>
+/// <param name="CompanyId">The company.</param>
+/// <param name="FromDate">Start of the range.</param>
+/// <param name="ToDate">End of the range.</param>
+/// <param name="Lines">The journal lines.</param>
+/// <param name="Total">The sum of the journals' base totals.</param>
+public sealed record JournalDaybookReport(
+    long CompanyId, DateOnly FromDate, DateOnly ToDate, IReadOnlyList<JournalDaybookLine> Lines, decimal Total);
+
 /// <summary>
 /// Read-side services producing the core general-ledger financial reports from posted data (brief §16
 /// Phase 2). Every report is derived from <c>gl.period_balance</c> / <c>gl.journal_line</c>; the trial
@@ -134,4 +153,12 @@ public interface IGeneralLedgerReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The nominal activity report.</returns>
     Task<NominalActivityReport> NominalActivityAsync(long companyId, string accountCode, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
+
+    /// <summary>Produces the journal daybook (posted journals) for a date range.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromDate">Start of the range.</param>
+    /// <param name="toDate">End of the range.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The journal daybook report.</returns>
+    Task<JournalDaybookReport> JournalDaybookAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
 }

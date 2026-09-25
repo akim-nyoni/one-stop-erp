@@ -207,6 +207,34 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         return new NominalActivityReport(companyId, code, name, opening, lines, running);
     }
 
+    /// <inheritdoc />
+    public async Task<JournalDaybookReport> JournalDaybookAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    {
+        // One row per posted journal in the range, with its base total (sum of debit lines = sum of credits).
+        var journals = await (
+            from j in _db.Journals
+            where j.CompanyId == companyId && j.Status == JournalStatus.Posted &&
+                  j.PostingDate >= fromDate && j.PostingDate <= toDate
+            orderby j.PostingDate descending, j.JournalNumber descending
+            select new
+            {
+                j.PostingDate,
+                j.JournalNumber,
+                j.SourceModule,
+                j.DocumentType,
+                j.DocumentNumber,
+                j.Narrative,
+                Amount = _db.Set<JournalLine>().Where(l => l.JournalEntryId == j.Id).Sum(l => (decimal?)l.BaseDebit) ?? 0m,
+            })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        List<JournalDaybookLine> lines = journals
+            .Select(j => new JournalDaybookLine(j.PostingDate, j.JournalNumber, j.SourceModule, j.DocumentType, j.DocumentNumber, j.Narrative, j.Amount))
+            .ToList();
+
+        return new JournalDaybookReport(companyId, fromDate, toDate, lines, lines.Sum(l => l.Amount));
+    }
+
     private async Task<string> BaseCurrencyAsync(long companyId, CancellationToken ct)
     {
         Company? company = await _db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);

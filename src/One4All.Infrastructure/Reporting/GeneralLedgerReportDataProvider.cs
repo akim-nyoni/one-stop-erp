@@ -10,7 +10,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity",
+        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook",
     };
 
     private readonly IGeneralLedgerReports _reports;
@@ -31,6 +31,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             "INCOMESTATEMENT" => await IncomeStatementAsync(companyId, parameters, ct).ConfigureAwait(false),
             "BALANCESHEET" => await BalanceSheetAsync(companyId, parameters, ct).ConfigureAwait(false),
             "NOMINALACTIVITY" => await NominalActivityAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "JOURNALDAYBOOK" => await JournalDaybookAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -90,6 +91,23 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             ["Debit"] = l.Debit,
             ["Credit"] = l.Credit,
             ["RunningBalance"] = l.RunningBalance,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> JournalDaybookAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly to = ReportParameters.Date(parameters, "ToDate");
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
+        JournalDaybookReport report = await _reports.JournalDaybookAsync(companyId, from, to, ct).ConfigureAwait(false);
+        return report.Lines.Select(l => Row(new()
+        {
+            ["Date"] = l.Date.ToDateTime(TimeOnly.MinValue),
+            ["JournalNumber"] = l.JournalNumber,
+            ["SourceModule"] = l.SourceModule,
+            ["DocumentType"] = l.DocumentType ?? string.Empty,
+            ["DocumentNumber"] = l.DocumentNumber ?? string.Empty,
+            ["Narrative"] = l.Narrative ?? string.Empty,
+            ["Amount"] = l.Amount,
         })).ToList();
     }
 
