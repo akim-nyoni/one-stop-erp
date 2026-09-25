@@ -16,7 +16,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Menu", "TableStatus", "KitchenTickets",
+        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Quotations", "Menu", "TableStatus", "KitchenTickets",
         "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales", "CategorySales", "Wastage", "Bills", "MenuCost",
     };
 
@@ -37,6 +37,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "HOUSINGSTANDS" => await HousingStandsAsync(companyId, ct).ConfigureAwait(false),
             "STUDENTREGISTER" => await StudentRegisterAsync(companyId, ct).ConfigureAwait(false),
             "OPENPURCHASEORDERS" => await OpenPurchaseOrdersAsync(companyId, ct).ConfigureAwait(false),
+            "QUOTATIONS" => await QuotationsAsync(companyId, ct).ConfigureAwait(false),
             "MENU" => await MenuAsync(companyId, ct).ConfigureAwait(false),
             "TABLESTATUS" => await TableStatusAsync(companyId, ct).ConfigureAwait(false),
             "KITCHENTICKETS" => await KitchenTicketsAsync(companyId, ct).ConfigureAwait(false),
@@ -596,6 +597,27 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Supplier"] = suppliers.GetValueOrDefault(o.SupplierId, $"#{o.SupplierId}"),
             ["Status"] = o.Status.ToString(),
             ["TotalNet"] = o.TotalNet,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> QuotationsAsync(long companyId, CancellationToken ct)
+    {
+        List<One4All.Core.SalesOrders.Quotation> quotes = await _db.Set<One4All.Core.SalesOrders.Quotation>().Include(q => q.Lines)
+            .Where(q => q.CompanyId == companyId)
+            .OrderByDescending(q => q.QuoteDate)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> customers = await _db.Set<Customer>()
+            .Where(c => c.CompanyId == companyId)
+            .ToDictionaryAsync(c => c.Id, c => c.Name, ct).ConfigureAwait(false);
+
+        return quotes.Select(q => Row(new()
+        {
+            ["QuoteNumber"] = q.QuoteNumber,
+            ["Customer"] = customers.GetValueOrDefault(q.CustomerId, $"#{q.CustomerId}"),
+            ["QuoteDate"] = q.QuoteDate.ToDateTime(TimeOnly.MinValue),
+            ["ValidUntil"] = q.ValidUntil.ToDateTime(TimeOnly.MinValue),
+            ["Total"] = q.Total,
+            ["Status"] = q.Status.ToString(),
         })).ToList();
     }
 

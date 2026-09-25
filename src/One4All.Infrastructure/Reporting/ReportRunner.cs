@@ -119,6 +119,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.HousingStandsCode => SystemReports.HousingStands(),
         SystemReports.StudentRegisterCode => SystemReports.StudentRegister(),
         SystemReports.OpenPurchaseOrdersCode => SystemReports.OpenPurchaseOrders(),
+        SystemReports.QuotationsCode => SystemReports.Quotations(),
         SystemReports.MenuCode => SystemReports.Menu(),
         SystemReports.TableStatusCode => SystemReports.TableStatus(),
         SystemReports.KitchenTicketsCode => SystemReports.KitchenTickets(),

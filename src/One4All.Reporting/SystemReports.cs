@@ -394,6 +394,9 @@ public static class SystemReports
     /// <summary>The Open Purchase Orders report code.</summary>
     public const string OpenPurchaseOrdersCode = "POP-OPEN";
 
+    /// <summary>The Sales Quotations report code.</summary>
+    public const string QuotationsCode = "SOP-QUOTE";
+
     /// <summary>Builds the Housing Stand Register definition (brief §4.10).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition HousingStands() => Listing(HousingStandsCode, "Housing Stand Register", "Housing",
@@ -413,6 +416,13 @@ public static class SystemReports
     public static ReportDefinition OpenPurchaseOrders() => Listing(OpenPurchaseOrdersCode, "Open Purchase Orders", "Purchasing",
         "Purchase orders not yet fully received/invoiced, with their order value.", "OpenPurchaseOrders",
         [new Column("OrderNumber", "Order", 100), new Column("OrderDate", "Date", 100), new Column("Supplier", "Supplier", 160), new Column("Status", "Status", 100), new Column("TotalNet", "Value", 100, true)],
+        []);
+
+    /// <summary>Builds the Sales Quotations definition (brief §4.13).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition Quotations() => Listing(QuotationsCode, "Sales Quotations", "SalesOrders",
+        "Quotations with customer, dates, value and status, newest first.", "Quotations",
+        [new Column("QuoteNumber", "Quote", 100), new Column("Customer", "Customer", 170), new Column("QuoteDate", "Date", 95), new Column("ValidUntil", "Valid until", 95), new Column("Total", "Value", 100, true), new Column("Status", "Status", 90)],
         []);
 
     /// <summary>The Menu report code.</summary>
