@@ -163,6 +163,12 @@ public static class SystemReports
     /// <summary>The Chart of Accounts report code.</summary>
     public const string ChartOfAccountsCode = "GL-COA";
 
+    /// <summary>The Customer Register report code.</summary>
+    public const string CustomerRegisterCode = "AR-CUST";
+
+    /// <summary>The Supplier Register report code.</summary>
+    public const string SupplierRegisterCode = "AP-SUP";
+
     /// <summary>The Aged Debtors report code.</summary>
     public const string AgedDebtorsCode = "AR-AGE";
 
@@ -219,6 +225,20 @@ public static class SystemReports
         "Assets, liabilities and equity as at a date; assets equal liabilities plus equity.", "BalanceSheet",
         [new Column("Category", "Section", 120), new Column("AccountName", "Account", 250), new Column("Amount", "Amount", 100, true)],
         [("AsAtDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Customer Register definition (AR master listing).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition CustomerRegister() => Listing(CustomerRegisterCode, "Customer Register", "Sales",
+        "Customer master: code, name, currency, credit limit, payment terms and on-hold flag.", "CustomerRegister",
+        [new Column("Code", "Account", 90), new Column("Name", "Name", 200), new Column("Currency", "Ccy", 55), new Column("CreditLimit", "Credit limit", 100, true), new Column("TermsDays", "Terms", 60, true), new Column("OnHold", "On hold", 70)],
+        []);
+
+    /// <summary>Builds the Supplier Register definition (AP master listing).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition SupplierRegister() => Listing(SupplierRegisterCode, "Supplier Register", "Purchasing",
+        "Supplier master: code, name, currency, payment terms and on-hold flag.", "SupplierRegister",
+        [new Column("Code", "Account", 90), new Column("Name", "Name", 200), new Column("Currency", "Ccy", 55), new Column("TermsDays", "Terms", 60, true), new Column("OnHold", "On hold", 70)],
+        []);
 
     /// <summary>Builds the Aged Debtors definition (brief §14 report 29).</summary>
     /// <returns>The definition.</returns>

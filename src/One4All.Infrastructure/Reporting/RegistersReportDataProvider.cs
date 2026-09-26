@@ -16,7 +16,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "PurchaseRequisitions", "Quotations", "RecurringInvoices", "RecurringPurchases", "SalesBackOrders", "Menu", "TableStatus", "KitchenTickets",
+        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "PurchaseRequisitions", "Quotations", "RecurringInvoices", "RecurringPurchases", "SalesBackOrders", "CustomerRegister", "SupplierRegister", "Menu", "TableStatus", "KitchenTickets",
         "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales", "CategorySales", "Wastage", "Bills", "MenuCost",
     };
 
@@ -42,6 +42,8 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "RECURRINGINVOICES" => await RecurringInvoicesAsync(companyId, ct).ConfigureAwait(false),
             "RECURRINGPURCHASES" => await RecurringPurchasesAsync(companyId, ct).ConfigureAwait(false),
             "SALESBACKORDERS" => await SalesBackOrdersAsync(companyId, ct).ConfigureAwait(false),
+            "CUSTOMERREGISTER" => await CustomerRegisterAsync(companyId, ct).ConfigureAwait(false),
+            "SUPPLIERREGISTER" => await SupplierRegisterAsync(companyId, ct).ConfigureAwait(false),
             "MENU" => await MenuAsync(companyId, ct).ConfigureAwait(false),
             "TABLESTATUS" => await TableStatusAsync(companyId, ct).ConfigureAwait(false),
             "KITCHENTICKETS" => await KitchenTicketsAsync(companyId, ct).ConfigureAwait(false),
@@ -724,6 +726,43 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             ["Total"] = r.Total,
             ["Status"] = r.Status.ToString(),
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CustomerRegisterAsync(long companyId, CancellationToken ct)
+    {
+        List<Customer> customers = await _db.Set<Customer>()
+            .Where(c => c.CompanyId == companyId)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return customers
+            .OrderBy(c => c.Code, StringComparer.Ordinal)
+            .Select(c => Row(new()
+            {
+                ["Code"] = c.Code,
+                ["Name"] = c.Name,
+                ["Currency"] = c.Currency.Value,
+                ["CreditLimit"] = c.CreditLimit,
+                ["TermsDays"] = c.PaymentTermsDays,
+                ["OnHold"] = c.OnHold ? "Yes" : string.Empty,
+            })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SupplierRegisterAsync(long companyId, CancellationToken ct)
+    {
+        List<Supplier> suppliers = await _db.Set<Supplier>()
+            .Where(s => s.CompanyId == companyId)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return suppliers
+            .OrderBy(s => s.Code, StringComparer.Ordinal)
+            .Select(s => Row(new()
+            {
+                ["Code"] = s.Code,
+                ["Name"] = s.Name,
+                ["Currency"] = s.Currency.Value,
+                ["TermsDays"] = s.PaymentTermsDays,
+                ["OnHold"] = s.OnHold ? "Yes" : string.Empty,
+            })).ToList();
     }
 
     private static IReadOnlyDictionary<string, object?> Row(Dictionary<string, object?> values) => values;
