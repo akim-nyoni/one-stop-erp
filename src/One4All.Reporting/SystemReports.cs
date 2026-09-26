@@ -315,6 +315,16 @@ public static class SystemReports
     /// <summary>The Inventory ABC Analysis report code.</summary>
     public const string AbcAnalysisCode = "INV-ABC";
 
+    /// <summary>The Item Master report code.</summary>
+    public const string ItemMasterCode = "INV-ITEMS";
+
+    /// <summary>Builds the Item Master definition (stock item reference listing).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition ItemMaster() => Listing(ItemMasterCode, "Item Master", "Inventory",
+        "Stock item master: code, description, unit, reorder level, default accounts and active status.", "ItemMaster",
+        [new Column("Code", "Item", 100), new Column("Description", "Description", 200), new Column("Uom", "UoM", 60), new Column("ReorderLevel", "Reorder", 80, true), new Column("RevenueAccount", "Revenue", 80), new Column("CostAccount", "COS", 70), new Column("Active", "Active", 60)],
+        []);
+
     /// <summary>Builds the Inventory ABC Analysis definition (Pareto value classification).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition AbcAnalysis() => Listing(AbcAnalysisCode, "Inventory ABC Analysis", "Inventory",

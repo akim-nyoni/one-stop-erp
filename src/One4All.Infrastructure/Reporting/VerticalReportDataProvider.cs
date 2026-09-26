@@ -21,7 +21,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "PayrollSummary", "PayrollDeductions", "EmployeeRegister", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "Pipeline", "ExpenseClaims",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "ItemMaster", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "PayrollSummary", "PayrollDeductions", "EmployeeRegister", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "Pipeline", "ExpenseClaims",
     };
 
     private readonly One4AllDbContext _db;
@@ -55,6 +55,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "REORDER" => await ReorderAsync(companyId, ct).ConfigureAwait(false),
             "SLOWSTOCK" => await SlowStockAsync(companyId, parameters, ct).ConfigureAwait(false),
             "ABCANALYSIS" => await AbcAnalysisAsync(companyId, ct).ConfigureAwait(false),
+            "ITEMMASTER" => await ItemMasterAsync(companyId, ct).ConfigureAwait(false),
             "ASSETREGISTER" => await AssetRegisterAsync(companyId, ct).ConfigureAwait(false),
             "DEPRECIATIONFORECAST" => await DepreciationForecastAsync(companyId, parameters, ct).ConfigureAwait(false),
             "ASSETMAINTENANCE" => await AssetMaintenanceAsync(companyId, ct).ConfigureAwait(false),
@@ -104,6 +105,25 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
                 ["LastMovement"] = x.Last is { } lm ? lm.ToDateTime(TimeOnly.MinValue) : (object?)string.Empty,
             }))
             .ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ItemMasterAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Inventory.Item> items = await _db.Set<Core.Inventory.Item>()
+            .Where(i => i.CompanyId == companyId)
+            .OrderBy(i => i.Code)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return items.Select(i => Row(new()
+        {
+            ["Code"] = i.Code,
+            ["Description"] = i.Description,
+            ["Uom"] = i.UnitOfMeasure,
+            ["ReorderLevel"] = i.ReorderLevel,
+            ["RevenueAccount"] = i.RevenueAccountCode ?? string.Empty,
+            ["CostAccount"] = i.CostOfSalesAccountCode ?? string.Empty,
+            ["Active"] = i.IsActive ? "Yes" : string.Empty,
+        })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AbcAnalysisAsync(long companyId, CancellationToken ct)
