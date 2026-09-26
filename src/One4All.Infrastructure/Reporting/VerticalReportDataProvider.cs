@@ -21,7 +21,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "ItemMaster", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "PayrollSummary", "PayrollDeductions", "EmployeeRegister", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "Pipeline", "ExpenseClaims",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "ItemMaster", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "AssetDisposals", "PayrollSummary", "PayrollDeductions", "EmployeeRegister", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "Pipeline", "ExpenseClaims",
     };
 
     private readonly One4AllDbContext _db;
@@ -59,6 +59,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "ASSETREGISTER" => await AssetRegisterAsync(companyId, ct).ConfigureAwait(false),
             "DEPRECIATIONFORECAST" => await DepreciationForecastAsync(companyId, parameters, ct).ConfigureAwait(false),
             "ASSETMAINTENANCE" => await AssetMaintenanceAsync(companyId, ct).ConfigureAwait(false),
+            "ASSETDISPOSALS" => await AssetDisposalsAsync(companyId, ct).ConfigureAwait(false),
             "PAYROLLSUMMARY" => await PayrollSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "PAYROLLDEDUCTIONS" => await PayrollDeductionsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "EMPLOYEEREGISTER" => await EmployeeRegisterAsync(companyId, ct).ConfigureAwait(false),
@@ -249,6 +250,24 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             ["Period"] = p.Period,
             ["Charge"] = p.Charge,
             ["ClosingNetBookValue"] = p.ClosingNetBookValue,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AssetDisposalsAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.FixedAssets.AssetDisposal> disposals = await _db.Set<Core.FixedAssets.AssetDisposal>()
+            .Where(d => d.CompanyId == companyId)
+            .OrderByDescending(d => d.Date)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return disposals.Select(d => Row(new()
+        {
+            ["AssetNumber"] = d.AssetNumber,
+            ["Date"] = d.Date.ToDateTime(TimeOnly.MinValue),
+            ["Proceeds"] = d.Proceeds,
+            ["NetBookValue"] = d.NetBookValue,
+            ["GainOrLoss"] = d.GainOrLoss,
+            ["Journal"] = d.JournalNumber,
         })).ToList();
     }
 

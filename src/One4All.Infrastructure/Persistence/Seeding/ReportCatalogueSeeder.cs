@@ -94,6 +94,7 @@ public sealed class ReportCatalogueSeeder
         yield return SystemReports.AssetRegister();
         yield return SystemReports.DepreciationForecast();
         yield return SystemReports.AssetMaintenance();
+        yield return SystemReports.AssetDisposals();
         yield return SystemReports.PayrollSummary();
         yield return SystemReports.EmployeeLoans();
         yield return SystemReports.PayrollDeductions();

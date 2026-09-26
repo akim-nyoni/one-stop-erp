@@ -282,6 +282,9 @@ public static class SystemReports
     /// <summary>The Asset Maintenance Log report code.</summary>
     public const string AssetMaintenanceCode = "FA-MAINT";
 
+    /// <summary>The Asset Disposals report code.</summary>
+    public const string AssetDisposalsCode = "FA-DISP";
+
     /// <summary>The Payroll Summary report code.</summary>
     public const string PayrollSummaryCode = "PAY-SUM";
 
@@ -387,6 +390,13 @@ public static class SystemReports
         "Projected monthly depreciation across active assets and the aggregate closing net book value.", "DepreciationForecast",
         [new Column("Period", "Month", 90), new Column("Charge", "Depreciation", 110, true), new Column("ClosingNetBookValue", "Closing NBV", 120, true)],
         [("StartMonth", ParameterType.Date), ("Months", ParameterType.Integer)]);
+
+    /// <summary>Builds the Asset Disposals definition (fixed assets).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition AssetDisposals() => Listing(AssetDisposalsCode, "Asset Disposals", "FixedAssets",
+        "Disposed assets with proceeds, net book value at disposal, the gain or loss, and the journal — newest first.", "AssetDisposals",
+        [new Column("AssetNumber", "Asset", 90), new Column("Date", "Date", 95), new Column("Proceeds", "Proceeds", 100, true), new Column("NetBookValue", "NBV", 100, true), new Column("GainOrLoss", "Gain/(loss)", 100, true), new Column("Journal", "Journal", 100)],
+        []);
 
     /// <summary>Builds the Asset Maintenance Log definition (fixed assets).</summary>
     /// <returns>The definition.</returns>

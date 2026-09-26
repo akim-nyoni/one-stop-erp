@@ -178,6 +178,7 @@ public sealed class FixedAssetService : IFixedAssetService
         }
 
         asset.Dispose();
+        _db.Set<AssetDisposal>().Add(new AssetDisposal(companyId, asset.Id, asset.AssetNumber, date, proceeds, nbv, gainOrLoss, posted.Value.JournalNumber));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new DisposalResult(proceeds, nbv, gainOrLoss, posted.Value.JournalNumber);
     }

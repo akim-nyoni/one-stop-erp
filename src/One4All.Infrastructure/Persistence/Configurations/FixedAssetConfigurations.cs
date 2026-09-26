@@ -42,6 +42,21 @@ internal sealed class AssetMaintenanceConfiguration : IEntityTypeConfiguration<A
     }
 }
 
+internal sealed class AssetDisposalConfiguration : IEntityTypeConfiguration<AssetDisposal>
+{
+    public void Configure(EntityTypeBuilder<AssetDisposal> b)
+    {
+        b.ToTable("asset_disposal", Schemas.FixedAssets);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AssetNumber).HasMaxLength(40);
+        b.Property(x => x.Proceeds).HasPrecision(19, 4);
+        b.Property(x => x.NetBookValue).HasPrecision(19, 4);
+        b.Property(x => x.GainOrLoss).HasPrecision(19, 4);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+        b.HasIndex(x => new { x.CompanyId, x.Date });
+    }
+}
+
 internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opportunity>
 {
     public void Configure(EntityTypeBuilder<Opportunity> b)
