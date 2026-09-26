@@ -10,7 +10,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts",
+        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts", "FinancialSnapshot",
     };
 
     private readonly IGeneralLedgerReports _reports;
@@ -34,6 +34,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             "JOURNALDAYBOOK" => await JournalDaybookAsync(companyId, parameters, ct).ConfigureAwait(false),
             "TRIALBALANCEMOVEMENT" => await TrialBalanceMovementAsync(companyId, parameters, ct).ConfigureAwait(false),
             "CHARTOFACCOUNTS" => await ChartOfAccountsAsync(companyId, ct).ConfigureAwait(false),
+            "FINANCIALSNAPSHOT" => await FinancialSnapshotAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -140,6 +141,16 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             ["ReportCategory"] = r.ReportCategory,
             ["IsControl"] = r.IsControl ? "Yes" : string.Empty,
             ["IsActive"] = r.IsActive ? "Yes" : string.Empty,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> FinancialSnapshotAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        FinancialSnapshotReport report = await _reports.FinancialSnapshotAsync(companyId, ReportParameters.Date(parameters, "AsAtDate"), ct).ConfigureAwait(false);
+        return report.Rows.Select(r => Row(new()
+        {
+            ["Metric"] = r.Metric,
+            ["Amount"] = r.Amount,
         })).ToList();
     }
 

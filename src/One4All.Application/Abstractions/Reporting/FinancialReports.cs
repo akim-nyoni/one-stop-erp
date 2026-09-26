@@ -146,6 +146,16 @@ public sealed record ChartOfAccountsRow(string AccountCode, string AccountName, 
 /// <param name="Rows">The account rows, ordered by code.</param>
 public sealed record ChartOfAccountsReport(long CompanyId, IReadOnlyList<ChartOfAccountsRow> Rows);
 
+/// <summary>One headline figure on the financial snapshot.</summary>
+/// <param name="Metric">The metric name.</param>
+/// <param name="Amount">The amount (base currency).</param>
+public sealed record FinancialSnapshotRow(string Metric, decimal Amount);
+
+/// <summary>An executive financial snapshot as at a date (balance-sheet totals plus year-to-date profit).</summary>
+/// <param name="AsAtDate">The as-at date.</param>
+/// <param name="Rows">The headline figures.</param>
+public sealed record FinancialSnapshotReport(DateOnly AsAtDate, IReadOnlyList<FinancialSnapshotRow> Rows);
+
 /// <summary>
 /// Read-side services producing the core general-ledger financial reports from posted data (brief §16
 /// Phase 2). Every report is derived from <c>gl.period_balance</c> / <c>gl.journal_line</c>; the trial
@@ -153,6 +163,17 @@ public sealed record ChartOfAccountsReport(long CompanyId, IReadOnlyList<ChartOf
 /// </summary>
 public interface IGeneralLedgerReports
 {
+    /// <summary>
+    /// Produces an executive financial snapshot as at a date: total assets, liabilities and equity (from the
+    /// balance sheet) plus year-to-date income, expenses and net profit (from the income statement for
+    /// 1 January to the as-at date). A one-glance owner's summary.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAtDate">The as-at date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The financial snapshot.</returns>
+    Task<FinancialSnapshotReport> FinancialSnapshotAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
+
     /// <summary>Produces the chart-of-accounts listing (reference report), ordered by account code.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="ct">Cancellation token.</param>

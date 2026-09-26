@@ -163,6 +163,9 @@ public static class SystemReports
     /// <summary>The Chart of Accounts report code.</summary>
     public const string ChartOfAccountsCode = "GL-COA";
 
+    /// <summary>The Financial Snapshot report code.</summary>
+    public const string FinancialSnapshotCode = "GL-SNAP";
+
     /// <summary>The Customer Register report code.</summary>
     public const string CustomerRegisterCode = "AR-CUST";
 
@@ -204,6 +207,13 @@ public static class SystemReports
         "Every posted journal over a period — date, number, source module, document, narrative and base total.", "JournalDaybook",
         [new Column("Date", "Date", 95), new Column("JournalNumber", "Journal", 110), new Column("SourceModule", "Module", 70), new Column("DocumentType", "Doc type", 90), new Column("DocumentNumber", "Doc no.", 100), new Column("Narrative", "Narrative", 200), new Column("Amount", "Amount", 100, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Financial Snapshot definition (executive summary).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition FinancialSnapshot() => Listing(FinancialSnapshotCode, "Financial Snapshot", "GeneralLedger",
+        "Headline figures as at a date: assets, liabilities, equity and year-to-date income, expenses and net profit.", "FinancialSnapshot",
+        [new Column("Metric", "Metric", 220), new Column("Amount", "Amount", 130, true)],
+        [("AsAtDate", ParameterType.Date)]);
 
     /// <summary>Builds the Chart of Accounts definition (reference listing).</summary>
     /// <returns>The definition.</returns>

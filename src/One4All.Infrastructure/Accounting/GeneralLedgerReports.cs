@@ -277,6 +277,25 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         return new ChartOfAccountsReport(companyId, rows);
     }
 
+    /// <inheritdoc />
+    public async Task<FinancialSnapshotReport> FinancialSnapshotAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+    {
+        BalanceSheet bs = await BalanceSheetAsync(companyId, asAtDate, ct).ConfigureAwait(false);
+        IncomeStatement pl = await IncomeStatementAsync(companyId, new DateOnly(asAtDate.Year, 1, 1), asAtDate, ct).ConfigureAwait(false);
+
+        List<FinancialSnapshotRow> rows =
+        [
+            new FinancialSnapshotRow("Total Assets", bs.TotalAssets),
+            new FinancialSnapshotRow("Total Liabilities", bs.TotalLiabilities),
+            new FinancialSnapshotRow("Total Equity", bs.TotalEquity),
+            new FinancialSnapshotRow("Income (YTD)", pl.TotalIncome),
+            new FinancialSnapshotRow("Expenses (YTD)", pl.TotalExpenses),
+            new FinancialSnapshotRow("Net Profit (YTD)", pl.NetProfit),
+        ];
+
+        return new FinancialSnapshotReport(asAtDate, rows);
+    }
+
     private async Task<string> BaseCurrencyAsync(long companyId, CancellationToken ct)
     {
         Company? company = await _db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
