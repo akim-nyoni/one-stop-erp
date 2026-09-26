@@ -283,6 +283,9 @@ public static class SystemReports
     /// <summary>The CRM Pipeline report code.</summary>
     public const string PipelineCode = "CRM-PIPE";
 
+    /// <summary>The Budget Listing report code.</summary>
+    public const string BudgetListCode = "BUD-LIST";
+
     /// <summary>The Expense Claims report code.</summary>
     public const string ExpenseClaimsCode = "EXP-CLAIMS";
 
@@ -400,6 +403,13 @@ public static class SystemReports
         "Active budget compared to GL actuals by account, with the variance.", "BudgetVsActual",
         [new Column("AccountCode", "Account", 100), new Column("Budget", "Budget", 100, true), new Column("Actual", "Actual", 100, true), new Column("Variance", "Variance", 100, true)],
         [("FiscalYearId", ParameterType.Integer), ("Department", ParameterType.String), ("Period", ParameterType.Integer)]);
+
+    /// <summary>Builds the Budget Listing definition (budget register).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition BudgetList() => Listing(BudgetListCode, "Budget Listing", "Budget",
+        "All budget versions with type, department, status, active flag and annual total.", "BudgetList",
+        [new Column("Label", "Budget", 180), new Column("Type", "Type", 100), new Column("Department", "Department", 110), new Column("Version", "Ver", 50, true), new Column("Status", "Status", 90), new Column("Active", "Active", 60), new Column("AnnualTotal", "Annual total", 110, true)],
+        []);
 
     /// <summary>Builds the CRM Pipeline definition (brief §4.16).</summary>
     /// <returns>The definition.</returns>

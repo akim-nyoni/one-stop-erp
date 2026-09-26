@@ -21,7 +21,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "PayrollSummary", "PayrollDeductions", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "Pipeline", "ExpenseClaims",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "PayrollSummary", "PayrollDeductions", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "Pipeline", "ExpenseClaims",
     };
 
     private readonly One4AllDbContext _db;
@@ -64,6 +64,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "LEAVEBALANCES" => await LeaveBalancesAsync(companyId, ct).ConfigureAwait(false),
             "PROPERTYREGISTER" => await PropertyRegisterAsync(companyId, ct).ConfigureAwait(false),
             "BUDGETVSACTUAL" => await BudgetVsActualAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "BUDGETLIST" => await BudgetListAsync(companyId, ct).ConfigureAwait(false),
             "PIPELINE" => await PipelineAsync(companyId, ct).ConfigureAwait(false),
             "EXPENSECLAIMS" => await ExpenseClaimsAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
@@ -411,6 +412,26 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             ["Ratepayer"] = ratepayers.GetValueOrDefault(p.RatepayerCustomerId, $"#{p.RatepayerCustomerId}"),
             ["Valuation"] = p.Valuation,
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BudgetListAsync(long companyId, CancellationToken ct)
+    {
+        List<Budget> budgets = await _db.Set<Budget>().Include(b => b.Lines)
+            .Where(b => b.CompanyId == companyId)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return budgets
+            .OrderBy(b => b.Label).ThenBy(b => b.VersionNumber)
+            .Select(b => Row(new()
+            {
+                ["Label"] = b.Label,
+                ["Type"] = b.Type.ToString(),
+                ["Department"] = b.Department ?? string.Empty,
+                ["Version"] = b.VersionNumber,
+                ["Status"] = b.Status.ToString(),
+                ["Active"] = b.IsActive ? "Yes" : string.Empty,
+                ["AnnualTotal"] = b.AnnualTotal,
+            })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BudgetVsActualAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
