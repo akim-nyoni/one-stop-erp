@@ -156,6 +156,19 @@ public sealed record FinancialSnapshotRow(string Metric, decimal Amount);
 /// <param name="Rows">The headline figures.</param>
 public sealed record FinancialSnapshotReport(DateOnly AsAtDate, IReadOnlyList<FinancialSnapshotRow> Rows);
 
+/// <summary>One control account's reconciliation of GL balance against its sub-ledger (base currency).</summary>
+/// <param name="Control">The control account (e.g. "Accounts Receivable").</param>
+/// <param name="AccountCode">The GL account code.</param>
+/// <param name="GlBalance">The GL balance in the account's natural sign.</param>
+/// <param name="SubLedgerBalance">The sub-ledger total that should equal it.</param>
+/// <param name="Difference">GL − sub-ledger (should be zero).</param>
+public sealed record ControlReconciliationRow(string Control, string AccountCode, decimal GlBalance, decimal SubLedgerBalance, decimal Difference);
+
+/// <summary>The control-account reconciliation as at a date.</summary>
+/// <param name="AsAtDate">The as-at date.</param>
+/// <param name="Rows">The per-control rows.</param>
+public sealed record ControlReconciliationReport(DateOnly AsAtDate, IReadOnlyList<ControlReconciliationRow> Rows);
+
 /// <summary>The VAT/sales-tax return for a period (base currency).</summary>
 /// <param name="FromDate">Start of the return period.</param>
 /// <param name="ToDate">End of the return period.</param>
@@ -182,6 +195,17 @@ public interface IGeneralLedgerReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The VAT return.</returns>
     Task<VatReturnReport> VatReturnAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reconciles the GL control accounts (AR, AP, Stock) against their sub-ledgers as at a date: the GL balance
+    /// in the account's natural sign versus the sub-ledger total (open receivables, open payables, stock value),
+    /// with the difference — which should be zero when the ledgers agree.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAtDate">The as-at date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The control-account reconciliation.</returns>
+    Task<ControlReconciliationReport> ControlReconciliationAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
 
     /// <summary>
     /// Produces an executive financial snapshot as at a date: total assets, liabilities and equity (from the

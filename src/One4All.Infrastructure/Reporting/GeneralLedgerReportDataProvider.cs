@@ -10,7 +10,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts", "FinancialSnapshot", "VatReturn",
+        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts", "FinancialSnapshot", "VatReturn", "ControlReconciliation",
     };
 
     private readonly IGeneralLedgerReports _reports;
@@ -36,6 +36,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             "CHARTOFACCOUNTS" => await ChartOfAccountsAsync(companyId, ct).ConfigureAwait(false),
             "FINANCIALSNAPSHOT" => await FinancialSnapshotAsync(companyId, parameters, ct).ConfigureAwait(false),
             "VATRETURN" => await VatReturnAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "CONTROLRECONCILIATION" => await ControlReconciliationAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -166,6 +167,19 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             Row(new() { ["Metric"] = "Input VAT (purchases)", ["Amount"] = report.InputTax }),
             Row(new() { ["Metric"] = "Net VAT Payable", ["Amount"] = report.NetPayable }),
         ];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ControlReconciliationAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        ControlReconciliationReport report = await _reports.ControlReconciliationAsync(companyId, ReportParameters.Date(parameters, "AsAtDate"), ct).ConfigureAwait(false);
+        return report.Rows.Select(r => Row(new()
+        {
+            ["Control"] = r.Control,
+            ["AccountCode"] = r.AccountCode,
+            ["GlBalance"] = r.GlBalance,
+            ["SubLedgerBalance"] = r.SubLedgerBalance,
+            ["Difference"] = r.Difference,
+        })).ToList();
     }
 
     private static IReadOnlyDictionary<string, object?> Row(Dictionary<string, object?> values) => values;

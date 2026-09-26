@@ -315,6 +315,48 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         return new VatReturnReport(fromDate, toDate, outputTax, inputTax, outputTax - inputTax);
     }
 
+    /// <inheritdoc />
+    public async Task<ControlReconciliationReport> ControlReconciliationAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+    {
+        var controls = await _db.Accounts
+            .Where(a => a.CompanyId == companyId && (a.ControlAccountType == ControlAccountType.AccountsReceivable
+                || a.ControlAccountType == ControlAccountType.AccountsPayable || a.ControlAccountType == ControlAccountType.Stock))
+            .Select(a => new { a.AccountCode, a.Name, a.ControlAccountType })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<string, (decimal debit, decimal credit)> movement = await SumByAccountAsync(companyId, null, asAtDate, ct).ConfigureAwait(false);
+
+        // Sub-ledger totals.
+        List<Core.Trading.OpenItem> arItems = await _db.OpenItems
+            .Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsReceivable && i.OutstandingBase != 0m && i.DocumentDate <= asAtDate)
+            .ToListAsync(ct).ConfigureAwait(false);
+        decimal arSub = arItems.Sum(i => i.Sign == Core.Trading.LedgerSign.Debit ? i.OutstandingBase : -i.OutstandingBase);
+
+        List<Core.Trading.OpenItem> apItems = await _db.OpenItems
+            .Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsPayable && i.OutstandingBase != 0m && i.DocumentDate <= asAtDate)
+            .ToListAsync(ct).ConfigureAwait(false);
+        decimal apSub = apItems.Sum(i => i.Sign == Core.Trading.LedgerSign.Credit ? i.OutstandingBase : -i.OutstandingBase);
+
+        decimal stockSub = await _db.Set<Core.Inventory.StockBalance>()
+            .Where(b => b.CompanyId == companyId)
+            .SumAsync(b => (decimal?)b.TotalValue, ct).ConfigureAwait(false) ?? 0m;
+
+        List<ControlReconciliationRow> rows = [];
+        foreach (var c in controls.OrderBy(c => c.AccountCode, StringComparer.Ordinal))
+        {
+            (decimal d, decimal cr) = movement.GetValueOrDefault(c.AccountCode, (0m, 0m));
+            (decimal glNatural, decimal sub, string label) = c.ControlAccountType switch
+            {
+                ControlAccountType.AccountsReceivable => (d - cr, arSub, "Accounts Receivable"),
+                ControlAccountType.AccountsPayable => (cr - d, apSub, "Accounts Payable"),
+                _ => (d - cr, stockSub, "Stock"),
+            };
+            rows.Add(new ControlReconciliationRow(label, c.AccountCode, glNatural, sub, glNatural - sub));
+        }
+
+        return new ControlReconciliationReport(asAtDate, rows);
+    }
+
     private async Task<string> BaseCurrencyAsync(long companyId, CancellationToken ct)
     {
         Company? company = await _db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);

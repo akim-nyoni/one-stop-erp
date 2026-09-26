@@ -169,6 +169,9 @@ public static class SystemReports
     /// <summary>The VAT Return report code.</summary>
     public const string VatReturnCode = "GL-VAT";
 
+    /// <summary>The Control-Account Reconciliation report code.</summary>
+    public const string ControlReconciliationCode = "GL-CTRL";
+
     /// <summary>The Customer Register report code.</summary>
     public const string CustomerRegisterCode = "AR-CUST";
 
@@ -210,6 +213,13 @@ public static class SystemReports
         "Every posted journal over a period — date, number, source module, document, narrative and base total.", "JournalDaybook",
         [new Column("Date", "Date", 95), new Column("JournalNumber", "Journal", 110), new Column("SourceModule", "Module", 70), new Column("DocumentType", "Doc type", 90), new Column("DocumentNumber", "Doc no.", 100), new Column("Narrative", "Narrative", 200), new Column("Amount", "Amount", 100, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Control-Account Reconciliation definition (GL vs sub-ledgers).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition ControlReconciliation() => Listing(ControlReconciliationCode, "Control Reconciliation", "GeneralLedger",
+        "GL control-account balances (AR, AP, Stock) versus their sub-ledger totals, with the difference — zero when they agree.", "ControlReconciliation",
+        [new Column("Control", "Control", 160), new Column("AccountCode", "Account", 90), new Column("GlBalance", "GL balance", 110, true), new Column("SubLedgerBalance", "Sub-ledger", 110, true), new Column("Difference", "Difference", 100, true)],
+        [("AsAtDate", ParameterType.Date)]);
 
     /// <summary>Builds the VAT Return definition (output vs input tax for a period).</summary>
     /// <returns>The definition.</returns>
