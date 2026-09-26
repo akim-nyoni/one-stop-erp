@@ -322,6 +322,9 @@ public static class SystemReports
     /// <summary>The Budget Listing report code.</summary>
     public const string BudgetListCode = "BUD-LIST";
 
+    /// <summary>The Recurring Journals report code.</summary>
+    public const string RecurringJournalsCode = "GL-RECUR";
+
     /// <summary>The Expense Claims report code.</summary>
     public const string ExpenseClaimsCode = "EXP-CLAIMS";
 
@@ -473,6 +476,13 @@ public static class SystemReports
         "Active budget compared to GL actuals by account, with the variance.", "BudgetVsActual",
         [new Column("AccountCode", "Account", 100), new Column("Budget", "Budget", 100, true), new Column("Actual", "Actual", 100, true), new Column("Variance", "Variance", 100, true)],
         [("FiscalYearId", ParameterType.Integer), ("Department", ParameterType.String), ("Period", ParameterType.Integer)]);
+
+    /// <summary>Builds the Recurring Journals definition (standing GL journal templates).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition RecurringJournals() => Listing(RecurringJournalsCode, "Recurring Journals", "GeneralLedger",
+        "Standing recurring journal templates with code, description, source module, value, balanced and active flags.", "RecurringJournals",
+        [new Column("Code", "Code", 100), new Column("Description", "Description", 200), new Column("SourceModule", "Module", 70), new Column("Amount", "Amount", 100, true), new Column("Balanced", "Balanced", 70), new Column("Active", "Active", 60)],
+        []);
 
     /// <summary>Builds the Budget Listing definition (budget register).</summary>
     /// <returns>The definition.</returns>

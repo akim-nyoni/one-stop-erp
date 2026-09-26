@@ -125,6 +125,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.PropertyRegisterCode => SystemReports.PropertyRegister(),
         SystemReports.BudgetVsActualCode => SystemReports.BudgetVsActual(),
         SystemReports.BudgetListCode => SystemReports.BudgetList(),
+        SystemReports.RecurringJournalsCode => SystemReports.RecurringJournals(),
         SystemReports.PipelineCode => SystemReports.Pipeline(),
         SystemReports.ExpenseClaimsCode => SystemReports.ExpenseClaims(),
         SystemReports.PosSalesCode => SystemReports.PosSales(),

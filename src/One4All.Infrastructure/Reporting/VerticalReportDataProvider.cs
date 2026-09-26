@@ -21,7 +21,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "StockAgeing", "AbcAnalysis", "ItemMaster", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "AssetDisposals", "PayrollSummary", "PayrollDeductions", "EmployeeRegister", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "Pipeline", "ExpenseClaims",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "StockAgeing", "AbcAnalysis", "ItemMaster", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "AssetDisposals", "PayrollSummary", "PayrollDeductions", "EmployeeRegister", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "RecurringJournals", "Pipeline", "ExpenseClaims",
     };
 
     private readonly One4AllDbContext _db;
@@ -69,6 +69,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "PROPERTYREGISTER" => await PropertyRegisterAsync(companyId, ct).ConfigureAwait(false),
             "BUDGETVSACTUAL" => await BudgetVsActualAsync(companyId, parameters, ct).ConfigureAwait(false),
             "BUDGETLIST" => await BudgetListAsync(companyId, ct).ConfigureAwait(false),
+            "RECURRINGJOURNALS" => await RecurringJournalsAsync(companyId, ct).ConfigureAwait(false),
             "PIPELINE" => await PipelineAsync(companyId, ct).ConfigureAwait(false),
             "EXPENSECLAIMS" => await ExpenseClaimsAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
@@ -508,6 +509,24 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             ["Ward"] = p.Ward,
             ["Ratepayer"] = ratepayers.GetValueOrDefault(p.RatepayerCustomerId, $"#{p.RatepayerCustomerId}"),
             ["Valuation"] = p.Valuation,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RecurringJournalsAsync(long companyId, CancellationToken ct)
+    {
+        List<Core.Accounting.RecurringJournal> journals = await _db.Set<Core.Accounting.RecurringJournal>().Include(j => j.Lines)
+            .Where(j => j.CompanyId == companyId)
+            .OrderBy(j => j.Code)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return journals.Select(j => Row(new()
+        {
+            ["Code"] = j.Code,
+            ["Description"] = j.Description,
+            ["SourceModule"] = j.SourceModule,
+            ["Amount"] = j.TotalDebit,
+            ["Balanced"] = j.IsBalanced ? "Yes" : string.Empty,
+            ["Active"] = j.IsActive ? "Yes" : string.Empty,
         })).ToList();
     }
 
