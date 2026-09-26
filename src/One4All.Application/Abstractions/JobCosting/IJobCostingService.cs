@@ -77,4 +77,26 @@ public interface IJobCostingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The profitability snapshot.</returns>
     Task<Result<JobProfitability>> GetProfitabilityAsync(long companyId, long contractId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Releases held retention on a contract (e.g. at the end of the defects-liability period): moves the amount
+    /// from the retention-receivable account onto the client's AR account so it ages and becomes collectible
+    /// (Dr AR control / Cr retention receivable, creating an AR open item), and reduces the retention held.
+    /// Refuses a non-positive amount or more than the retention held.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="contractId">The contract.</param>
+    /// <param name="amount">The retention amount to release (positive, ≤ retention held).</param>
+    /// <param name="date">The release date.</param>
+    /// <param name="retentionReceivableAccountCode">The retention-receivable account the retention was held in (credited).</param>
+    /// <param name="documentNumber">The release document number.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The release result.</returns>
+    Task<Result<RetentionReleaseResult>> ReleaseRetentionAsync(long companyId, long contractId, decimal amount, DateOnly date, string retentionReceivableAccountCode, string documentNumber, CancellationToken ct = default);
 }
+
+/// <summary>The result of releasing retention.</summary>
+/// <param name="OpenItemId">The AR open item raised for the released retention.</param>
+/// <param name="JournalNumber">The GL journal number.</param>
+/// <param name="Amount">The amount released.</param>
+public readonly record struct RetentionReleaseResult(long OpenItemId, string JournalNumber, decimal Amount);

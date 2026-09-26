@@ -144,4 +144,52 @@ public sealed class JobCostingService : IJobCostingService
 
         return new JobProfitability(contract.ContractValue, contract.BudgetCost, contract.ActualCost, contract.CertifiedToDate, contract.PercentComplete);
     }
+
+    /// <inheritdoc />
+    public async Task<Result<RetentionReleaseResult>> ReleaseRetentionAsync(long companyId, long contractId, decimal amount, DateOnly date, string retentionReceivableAccountCode, string documentNumber, CancellationToken ct = default)
+    {
+        if (amount <= 0m)
+        {
+            return Error.Rule("Job.RetentionNonPositive", "The retention amount to release must be positive.");
+        }
+
+        JobContract? contract = await _db.Set<JobContract>()
+            .FirstOrDefaultAsync(c => c.Id == contractId && c.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (contract is null)
+        {
+            return Error.NotFound("Job.ContractNotFound", $"Contract {contractId} not found.");
+        }
+
+        if (amount > contract.RetentionHeld)
+        {
+            return Error.Rule("Job.RetentionExceedsHeld", $"The release {amount:0.00} exceeds the retention held {contract.RetentionHeld:0.00}.");
+        }
+
+        Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+
+        // Move the retention from the holding receivable onto the client's AR so it ages and can be collected:
+        // an AR invoice whose revenue side is the retention-receivable account (Dr AR control / Cr retention receivable).
+        Result<TradingPostingResult> ar = await _salesLedger.PostInvoiceAsync(new SalesInvoiceRequest
+        {
+            CompanyId = companyId,
+            CustomerId = contract.CustomerId,
+            DocumentNumber = documentNumber,
+            DocumentDate = date,
+            Currency = company.BaseCurrency,
+            NetAmount = amount,
+            TaxAmount = 0m,
+            SalesAccountCode = retentionReceivableAccountCode,
+            Narrative = $"Retention release — {contract.ContractNumber}",
+        }, ct).ConfigureAwait(false);
+
+        if (ar.IsFailure)
+        {
+            return ar.Error;
+        }
+
+        contract.ReleaseRetention(amount);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return new RetentionReleaseResult(ar.Value.OpenItemId, ar.Value.JournalNumber, amount);
+    }
 }
