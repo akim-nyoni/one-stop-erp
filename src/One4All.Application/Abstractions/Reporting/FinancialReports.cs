@@ -156,6 +156,14 @@ public sealed record FinancialSnapshotRow(string Metric, decimal Amount);
 /// <param name="Rows">The headline figures.</param>
 public sealed record FinancialSnapshotReport(DateOnly AsAtDate, IReadOnlyList<FinancialSnapshotRow> Rows);
 
+/// <summary>The VAT/sales-tax return for a period (base currency).</summary>
+/// <param name="FromDate">Start of the return period.</param>
+/// <param name="ToDate">End of the return period.</param>
+/// <param name="OutputTax">Output tax on sales (net credit on VAT-output control accounts).</param>
+/// <param name="InputTax">Input tax on purchases (net debit on VAT-input control accounts).</param>
+/// <param name="NetPayable">Output tax − input tax (positive is payable to the authority).</param>
+public sealed record VatReturnReport(DateOnly FromDate, DateOnly ToDate, decimal OutputTax, decimal InputTax, decimal NetPayable);
+
 /// <summary>
 /// Read-side services producing the core general-ledger financial reports from posted data (brief §16
 /// Phase 2). Every report is derived from <c>gl.period_balance</c> / <c>gl.journal_line</c>; the trial
@@ -163,6 +171,18 @@ public sealed record FinancialSnapshotReport(DateOnly AsAtDate, IReadOnlyList<Fi
 /// </summary>
 public interface IGeneralLedgerReports
 {
+    /// <summary>
+    /// Produces the VAT/sales-tax return for a period: output tax raised on sales (net credit on VAT-output
+    /// control accounts) less input tax on purchases (net debit on VAT-input control accounts), giving the net
+    /// amount payable to the authority. Control accounts are found by their control-account type.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromDate">Start of the return period.</param>
+    /// <param name="toDate">End of the return period.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The VAT return.</returns>
+    Task<VatReturnReport> VatReturnAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
+
     /// <summary>
     /// Produces an executive financial snapshot as at a date: total assets, liabilities and equity (from the
     /// balance sheet) plus year-to-date income, expenses and net profit (from the income statement for

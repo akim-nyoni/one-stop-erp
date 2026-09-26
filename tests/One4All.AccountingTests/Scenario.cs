@@ -79,6 +79,10 @@ public static class Scenario
         vatOutput.MakeControlAccount(ControlAccountType.VatOutput);
         db.Accounts.Add(vatOutput);
 
+        LedgerAccount vatInput = new(company.Id, "2210", "VAT Input", AccountType.Asset);
+        vatInput.MakeControlAccount(ControlAccountType.VatInput);
+        db.Accounts.Add(vatInput);
+
         LedgerAccount apControl = new(company.Id, "2100", "Accounts Payable Control", AccountType.Liability);
         apControl.MakeControlAccount(ControlAccountType.AccountsPayable);
         db.Accounts.Add(apControl);

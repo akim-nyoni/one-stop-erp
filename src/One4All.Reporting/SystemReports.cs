@@ -166,6 +166,9 @@ public static class SystemReports
     /// <summary>The Financial Snapshot report code.</summary>
     public const string FinancialSnapshotCode = "GL-SNAP";
 
+    /// <summary>The VAT Return report code.</summary>
+    public const string VatReturnCode = "GL-VAT";
+
     /// <summary>The Customer Register report code.</summary>
     public const string CustomerRegisterCode = "AR-CUST";
 
@@ -206,6 +209,13 @@ public static class SystemReports
     public static ReportDefinition JournalDaybook() => Listing(JournalDaybookCode, "Journal Daybook", "GeneralLedger",
         "Every posted journal over a period — date, number, source module, document, narrative and base total.", "JournalDaybook",
         [new Column("Date", "Date", 95), new Column("JournalNumber", "Journal", 110), new Column("SourceModule", "Module", 70), new Column("DocumentType", "Doc type", 90), new Column("DocumentNumber", "Doc no.", 100), new Column("Narrative", "Narrative", 200), new Column("Amount", "Amount", 100, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the VAT Return definition (output vs input tax for a period).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition VatReturn() => Listing(VatReturnCode, "VAT Return", "GeneralLedger",
+        "Output tax on sales less input tax on purchases for a period, giving the net VAT payable.", "VatReturn",
+        [new Column("Metric", "Metric", 220), new Column("Amount", "Amount", 130, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Financial Snapshot definition (executive summary).</summary>

@@ -296,6 +296,25 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         return new FinancialSnapshotReport(asAtDate, rows);
     }
 
+    /// <inheritdoc />
+    public async Task<VatReturnReport> VatReturnAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    {
+        // Resolve the VAT control accounts by their control-account type.
+        List<string> outputCodes = await _db.Accounts
+            .Where(a => a.CompanyId == companyId && a.ControlAccountType == ControlAccountType.VatOutput)
+            .Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false);
+        List<string> inputCodes = await _db.Accounts
+            .Where(a => a.CompanyId == companyId && a.ControlAccountType == ControlAccountType.VatInput)
+            .Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<string, (decimal debit, decimal credit)> movement = await SumByAccountAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
+
+        decimal outputTax = outputCodes.Sum(c => movement.TryGetValue(c, out (decimal d, decimal cr) v) ? v.cr - v.d : 0m);
+        decimal inputTax = inputCodes.Sum(c => movement.TryGetValue(c, out (decimal d, decimal cr) v) ? v.d - v.cr : 0m);
+
+        return new VatReturnReport(fromDate, toDate, outputTax, inputTax, outputTax - inputTax);
+    }
+
     private async Task<string> BaseCurrencyAsync(long companyId, CancellationToken ct)
     {
         Company? company = await _db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);

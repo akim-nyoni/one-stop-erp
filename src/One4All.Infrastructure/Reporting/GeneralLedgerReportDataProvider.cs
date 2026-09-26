@@ -10,7 +10,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts", "FinancialSnapshot",
+        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts", "FinancialSnapshot", "VatReturn",
     };
 
     private readonly IGeneralLedgerReports _reports;
@@ -35,6 +35,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             "TRIALBALANCEMOVEMENT" => await TrialBalanceMovementAsync(companyId, parameters, ct).ConfigureAwait(false),
             "CHARTOFACCOUNTS" => await ChartOfAccountsAsync(companyId, ct).ConfigureAwait(false),
             "FINANCIALSNAPSHOT" => await FinancialSnapshotAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "VATRETURN" => await VatReturnAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -152,6 +153,19 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             ["Metric"] = r.Metric,
             ["Amount"] = r.Amount,
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VatReturnAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly to = ReportParameters.Date(parameters, "ToDate");
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
+        VatReturnReport report = await _reports.VatReturnAsync(companyId, from, to, ct).ConfigureAwait(false);
+        return
+        [
+            Row(new() { ["Metric"] = "Output VAT (sales)", ["Amount"] = report.OutputTax }),
+            Row(new() { ["Metric"] = "Input VAT (purchases)", ["Amount"] = report.InputTax }),
+            Row(new() { ["Metric"] = "Net VAT Payable", ["Amount"] = report.NetPayable }),
+        ];
     }
 
     private static IReadOnlyDictionary<string, object?> Row(Dictionary<string, object?> values) => values;

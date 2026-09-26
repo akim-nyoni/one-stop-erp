@@ -79,6 +79,7 @@ public sealed class ReportCatalogueSeeder
         yield return SystemReports.TrialBalanceMovement();
         yield return SystemReports.ChartOfAccounts();
         yield return SystemReports.FinancialSnapshot();
+        yield return SystemReports.VatReturn();
         yield return SystemReports.CustomerRegister();
         yield return SystemReports.SupplierRegister();
         yield return SystemReports.AgedDebtors();
