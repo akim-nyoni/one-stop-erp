@@ -271,6 +271,9 @@ public static class SystemReports
     /// <summary>The Payroll Deductions report code.</summary>
     public const string PayrollDeductionsCode = "PAY-DED";
 
+    /// <summary>The Employee Register report code.</summary>
+    public const string EmployeeRegisterCode = "HR-EMP";
+
     /// <summary>The Leave Balances report code.</summary>
     public const string LeaveBalancesCode = "PAY-LEAVE";
 
@@ -368,6 +371,13 @@ public static class SystemReports
         "Gross, deductions and net pay per employee for a period.", "PayrollSummary",
         [new Column("Employee", "Employee", 220), new Column("Gross", "Gross", 100, true), new Column("Deductions", "Deductions", 100, true), new Column("Net", "Net", 100, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Employee Register definition (HR reference listing).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition EmployeeRegister() => Listing(EmployeeRegisterCode, "Employee Register", "HumanResources",
+        "All employees with number, name, department, cost centre, status and basic salary.", "EmployeeRegister",
+        [new Column("EmployeeNumber", "Number", 90), new Column("FullName", "Name", 200), new Column("Department", "Department", 120), new Column("CostCentre", "Cost centre", 110), new Column("Status", "Status", 90), new Column("BasicSalary", "Basic", 100, true)],
+        []);
 
     /// <summary>Builds the Payroll Deductions definition (statutory-return view).</summary>
     /// <returns>The definition.</returns>

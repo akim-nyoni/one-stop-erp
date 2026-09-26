@@ -21,7 +21,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "PayrollSummary", "PayrollDeductions", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "Pipeline", "ExpenseClaims",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "PayrollSummary", "PayrollDeductions", "EmployeeRegister", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "Pipeline", "ExpenseClaims",
     };
 
     private readonly One4AllDbContext _db;
@@ -60,6 +60,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "ASSETMAINTENANCE" => await AssetMaintenanceAsync(companyId, ct).ConfigureAwait(false),
             "PAYROLLSUMMARY" => await PayrollSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "PAYROLLDEDUCTIONS" => await PayrollDeductionsAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "EMPLOYEEREGISTER" => await EmployeeRegisterAsync(companyId, ct).ConfigureAwait(false),
             "EMPLOYEELOANS" => await EmployeeLoansAsync(companyId, ct).ConfigureAwait(false),
             "LEAVEBALANCES" => await LeaveBalancesAsync(companyId, ct).ConfigureAwait(false),
             "PROPERTYREGISTER" => await PropertyRegisterAsync(companyId, ct).ConfigureAwait(false),
@@ -346,6 +347,24 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             ["Principal"] = l.Principal,
             ["Outstanding"] = l.Outstanding,
             ["Installment"] = l.Installment,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EmployeeRegisterAsync(long companyId, CancellationToken ct)
+    {
+        List<Employee> employees = await _db.Set<Employee>()
+            .Where(e => e.CompanyId == companyId)
+            .OrderBy(e => e.EmployeeNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return employees.Select(e => Row(new()
+        {
+            ["EmployeeNumber"] = e.EmployeeNumber,
+            ["FullName"] = e.FullName,
+            ["Department"] = e.Department ?? string.Empty,
+            ["CostCentre"] = e.CostCentre ?? string.Empty,
+            ["Status"] = e.Status.ToString(),
+            ["BasicSalary"] = e.BasicSalary,
         })).ToList();
     }
 
