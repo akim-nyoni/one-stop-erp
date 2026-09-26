@@ -16,7 +16,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "Quotations", "RecurringInvoices", "RecurringPurchases", "SalesBackOrders", "Menu", "TableStatus", "KitchenTickets",
+        "HousingStands", "StudentRegister", "OpenPurchaseOrders", "PurchaseRequisitions", "Quotations", "RecurringInvoices", "RecurringPurchases", "SalesBackOrders", "Menu", "TableStatus", "KitchenTickets",
         "TipAllocations", "MenuEngineering", "Reservations", "Waitlist", "TableGroups", "FloorPlan", "SectionSales", "VoidsAndComps", "OrderTypeSales", "Deliveries", "ServerSales", "CategorySales", "Wastage", "Bills", "MenuCost",
     };
 
@@ -37,6 +37,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
             "HOUSINGSTANDS" => await HousingStandsAsync(companyId, ct).ConfigureAwait(false),
             "STUDENTREGISTER" => await StudentRegisterAsync(companyId, ct).ConfigureAwait(false),
             "OPENPURCHASEORDERS" => await OpenPurchaseOrdersAsync(companyId, ct).ConfigureAwait(false),
+            "PURCHASEREQUISITIONS" => await PurchaseRequisitionsAsync(companyId, ct).ConfigureAwait(false),
             "QUOTATIONS" => await QuotationsAsync(companyId, ct).ConfigureAwait(false),
             "RECURRINGINVOICES" => await RecurringInvoicesAsync(companyId, ct).ConfigureAwait(false),
             "RECURRINGPURCHASES" => await RecurringPurchasesAsync(companyId, ct).ConfigureAwait(false),
@@ -703,6 +704,26 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
         }
 
         return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PurchaseRequisitionsAsync(long companyId, CancellationToken ct)
+    {
+        List<PurchaseRequisition> reqs = await _db.Set<PurchaseRequisition>().Include(r => r.Lines)
+            .Where(r => r.CompanyId == companyId)
+            .OrderByDescending(r => r.RequestedDate)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> suppliers = await _db.Set<Supplier>()
+            .Where(s => s.CompanyId == companyId)
+            .ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
+
+        return reqs.Select(r => Row(new()
+        {
+            ["RequisitionNumber"] = r.RequisitionNumber,
+            ["Supplier"] = suppliers.GetValueOrDefault(r.SupplierId, $"#{r.SupplierId}"),
+            ["RequestedDate"] = r.RequestedDate.ToDateTime(TimeOnly.MinValue),
+            ["Total"] = r.Total,
+            ["Status"] = r.Status.ToString(),
+        })).ToList();
     }
 
     private static IReadOnlyDictionary<string, object?> Row(Dictionary<string, object?> values) => values;

@@ -454,6 +454,9 @@ public static class SystemReports
     /// <summary>The Open Purchase Orders report code.</summary>
     public const string OpenPurchaseOrdersCode = "POP-OPEN";
 
+    /// <summary>The Purchase Requisitions report code.</summary>
+    public const string PurchaseRequisitionsCode = "POP-REQ";
+
     /// <summary>The Sales Quotations report code.</summary>
     public const string QuotationsCode = "SOP-QUOTE";
 
@@ -485,6 +488,13 @@ public static class SystemReports
     public static ReportDefinition OpenPurchaseOrders() => Listing(OpenPurchaseOrdersCode, "Open Purchase Orders", "Purchasing",
         "Purchase orders not yet fully received/invoiced, with their order value.", "OpenPurchaseOrders",
         [new Column("OrderNumber", "Order", 100), new Column("OrderDate", "Date", 100), new Column("Supplier", "Supplier", 160), new Column("Status", "Status", 100), new Column("TotalNet", "Value", 100, true)],
+        []);
+
+    /// <summary>Builds the Purchase Requisitions definition (brief §4.12).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition PurchaseRequisitions() => Listing(PurchaseRequisitionsCode, "Purchase Requisitions", "Purchasing",
+        "Requisitions with supplier, date, estimated value and status, newest first.", "PurchaseRequisitions",
+        [new Column("RequisitionNumber", "Requisition", 110), new Column("Supplier", "Supplier", 170), new Column("RequestedDate", "Date", 95), new Column("Total", "Value", 100, true), new Column("Status", "Status", 90)],
         []);
 
     /// <summary>Builds the Sales Quotations definition (brief §4.13).</summary>

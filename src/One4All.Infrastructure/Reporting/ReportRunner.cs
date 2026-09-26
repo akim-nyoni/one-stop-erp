@@ -125,6 +125,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.HousingStandsCode => SystemReports.HousingStands(),
         SystemReports.StudentRegisterCode => SystemReports.StudentRegister(),
         SystemReports.OpenPurchaseOrdersCode => SystemReports.OpenPurchaseOrders(),
+        SystemReports.PurchaseRequisitionsCode => SystemReports.PurchaseRequisitions(),
         SystemReports.QuotationsCode => SystemReports.Quotations(),
         SystemReports.SalesBackOrdersCode => SystemReports.SalesBackOrders(),
         SystemReports.RecurringInvoicesCode => SystemReports.RecurringInvoices(),
