@@ -71,9 +71,36 @@ public sealed record CashFlowForecastRow(string Bucket, decimal Inflow, decimal 
 /// <param name="Rows">The per-bucket rows.</param>
 public sealed record CashFlowForecastReport(DateOnly AsAtDate, IReadOnlyList<CashFlowForecastRow> Rows);
 
+/// <summary>One outstanding supplier invoice on the payments-due schedule (base currency).</summary>
+/// <param name="SupplierCode">The supplier code.</param>
+/// <param name="SupplierName">The supplier name.</param>
+/// <param name="DocumentNumber">The invoice number.</param>
+/// <param name="DocumentDate">The invoice date.</param>
+/// <param name="DueDate">The due date.</param>
+/// <param name="Outstanding">The outstanding amount payable.</param>
+/// <param name="DaysUntilDue">Days from the as-at date until due (negative when overdue).</param>
+public sealed record PaymentDueRow(string SupplierCode, string SupplierName, string DocumentNumber, DateOnly DocumentDate, DateOnly DueDate, decimal Outstanding, int DaysUntilDue);
+
+/// <summary>The payments-due schedule: outstanding payables ordered by due date.</summary>
+/// <param name="AsAtDate">The as-at date.</param>
+/// <param name="Rows">The invoice rows.</param>
+/// <param name="Total">The total outstanding across the rows.</param>
+public sealed record PaymentsDueReport(DateOnly AsAtDate, IReadOnlyList<PaymentDueRow> Rows, decimal Total);
+
 /// <summary>Aged-balance and statement reports for the trader ledgers (brief §4.5/§4.6).</summary>
 public interface ITradingReports
 {
+    /// <summary>
+    /// Produces the payments-due schedule: every outstanding supplier invoice ordered by due date, with the
+    /// days until due (negative when overdue) relative to <paramref name="asAtDate"/> — the line-level companion
+    /// to the bucketed cash-flow forecast, driving the payment run.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAtDate">The as-at date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The payments-due schedule.</returns>
+    Task<PaymentsDueReport> PaymentsDueAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
+
     /// <summary>
     /// Produces a short-term cash-flow forecast: outstanding receivables (inflows) and payables (outflows)
     /// bucketed by when they fall due relative to <paramref name="asAtDate"/> — overdue, then 0-30 / 31-60 /

@@ -175,6 +175,9 @@ public static class SystemReports
     /// <summary>The Cash-Flow Forecast report code.</summary>
     public const string CashFlowForecastCode = "CB-FLOW";
 
+    /// <summary>The Payments Due report code.</summary>
+    public const string PaymentsDueCode = "AP-DUE";
+
     /// <summary>A column in a generic listing report.</summary>
     /// <param name="Field">The bound data field.</param>
     /// <param name="Header">The column header.</param>
@@ -295,6 +298,13 @@ public static class SystemReports
     public static ReportDefinition CashFlowForecast() => Listing(CashFlowForecastCode, "Cash-Flow Forecast", "CashBook",
         "Expected receipts and payments from open receivables and payables, bucketed by due date, with the running net.", "CashFlowForecast",
         [new Column("Bucket", "Period", 110), new Column("Inflow", "Receipts", 100, true), new Column("Outflow", "Payments", 100, true), new Column("Net", "Net", 100, true), new Column("RunningNet", "Running net", 110, true)],
+        [("AsAtDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Payments Due definition (payables schedule).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition PaymentsDue() => Listing(PaymentsDueCode, "Payments Due", "Purchasing",
+        "Outstanding supplier invoices ordered by due date, with days until due (negative when overdue).", "PaymentsDue",
+        [new Column("SupplierCode", "Account", 80), new Column("SupplierName", "Supplier", 150), new Column("DocumentNumber", "Invoice", 100), new Column("DueDate", "Due", 95), new Column("DaysUntilDue", "Days", 60, true), new Column("Outstanding", "Outstanding", 100, true)],
         [("AsAtDate", ParameterType.Date)]);
 
     /// <summary>Builds the Stock Valuation definition (brief §4.11 inventory).</summary>

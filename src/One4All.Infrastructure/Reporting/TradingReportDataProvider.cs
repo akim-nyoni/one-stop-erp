@@ -11,7 +11,7 @@ public sealed class TradingReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "AgedDebtors", "AgedCreditors", "CustomerStatement", "CreditExposure", "CashFlowForecast",
+        "AgedDebtors", "AgedCreditors", "CustomerStatement", "CreditExposure", "CashFlowForecast", "PaymentsDue",
     };
 
     private readonly ITradingReports _reports;
@@ -34,6 +34,7 @@ public sealed class TradingReportDataProvider : IReportDataProvider
             "CUSTOMERSTATEMENT" => await CustomerStatementAsync(companyId, parameters, ct).ConfigureAwait(false),
             "CREDITEXPOSURE" => CreditExposure(await _reports.CreditExposureAsync(companyId, asAt, ct).ConfigureAwait(false)),
             "CASHFLOWFORECAST" => CashFlowForecast(await _reports.CashFlowForecastAsync(companyId, asAt, ct).ConfigureAwait(false)),
+            "PAYMENTSDUE" => PaymentsDue(await _reports.PaymentsDueAsync(companyId, asAt, ct).ConfigureAwait(false)),
             _ => [],
         };
     }
@@ -71,6 +72,17 @@ public sealed class TradingReportDataProvider : IReportDataProvider
             ["Outflow"] = r.Outflow,
             ["Net"] = r.Net,
             ["RunningNet"] = r.RunningNet,
+        }).ToList();
+
+    private static IReadOnlyList<IReadOnlyDictionary<string, object?>> PaymentsDue(PaymentsDueReport report) =>
+        report.Rows.Select(r => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
+        {
+            ["SupplierCode"] = r.SupplierCode,
+            ["SupplierName"] = r.SupplierName,
+            ["DocumentNumber"] = r.DocumentNumber,
+            ["DueDate"] = r.DueDate.ToDateTime(TimeOnly.MinValue),
+            ["DaysUntilDue"] = r.DaysUntilDue,
+            ["Outstanding"] = r.Outstanding,
         }).ToList();
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CustomerStatementAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

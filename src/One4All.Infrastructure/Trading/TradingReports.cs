@@ -208,6 +208,33 @@ public sealed class TradingReports : ITradingReports
         return new CashFlowForecastReport(asAtDate, rows);
     }
 
+    /// <inheritdoc />
+    public async Task<PaymentsDueReport> PaymentsDueAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+    {
+        List<OpenItem> invoices = await _db.OpenItems
+            .Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsPayable
+                && i.ItemType == OpenItemType.Invoice && i.OutstandingBase != 0m)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<long, (string Code, string Name)> suppliers = await _db.Suppliers
+            .Where(s => s.CompanyId == companyId)
+            .ToDictionaryAsync(s => s.Id, s => (s.Code, s.Name), ct).ConfigureAwait(false);
+
+        List<PaymentDueRow> rows = invoices
+            .Select(i =>
+            {
+                (string code, string name) = suppliers.GetValueOrDefault(i.TraderId, ($"#{i.TraderId}", string.Empty));
+                // A creditor invoice is credit-sign; the outstanding payable is that credit balance.
+                decimal outstanding = i.Sign == LedgerSign.Credit ? i.OutstandingBase : -i.OutstandingBase;
+                return new PaymentDueRow(code, name, i.DocumentNumber, i.DocumentDate, i.DueDate, outstanding, i.DueDate.DayNumber - asAtDate.DayNumber);
+            })
+            .Where(r => r.Outstanding > 0m)
+            .OrderBy(r => r.DueDate).ThenBy(r => r.SupplierCode, StringComparer.Ordinal)
+            .ToList();
+
+        return new PaymentsDueReport(asAtDate, rows, rows.Sum(r => r.Outstanding));
+    }
+
     private async Task<Dictionary<long, (string, string)>> LoadTradersAsync(long companyId, TradingLedger ledger, CancellationToken ct)
     {
         if (ledger == TradingLedger.AccountsReceivable)
