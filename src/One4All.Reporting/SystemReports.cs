@@ -534,6 +534,9 @@ public static class SystemReports
     /// <summary>The Progress Certificates report code.</summary>
     public const string ProgressCertificatesCode = "JOB-IPC";
 
+    /// <summary>The Job WIP (work in progress) report code.</summary>
+    public const string JobWipCode = "JOB-WIP";
+
     /// <summary>Builds the POS Sales Summary definition (brief §4.1).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition PosSales() => Listing(PosSalesCode, "POS Sales Summary", "PointOfSale",
@@ -554,6 +557,13 @@ public static class SystemReports
         "Interim payment certificates with gross, retention and net payable for a period.", "ProgressCertificates",
         [new Column("CertificateNumber", "Certificate", 110), new Column("Date", "Date", 100), new Column("Gross", "Gross", 100, true), new Column("Retention", "Retention", 100, true), new Column("Net", "Net payable", 110, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Job WIP definition (IFRS 15 contract asset/liability position).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition JobWip() => Listing(JobWipCode, "Job WIP", "JobCosting",
+        "Per contract: revenue recognised on cost-to-cost completion versus certified-to-date, giving the WIP position (contract asset if positive, liability if negative).", "JobWip",
+        [new Column("ContractNumber", "Contract", 100), new Column("Name", "Name", 160), new Column("ContractValue", "Contract", 100, true), new Column("PercentComplete", "% complete", 80, true), new Column("RevenueRecognised", "Recognised", 100, true), new Column("CertifiedToDate", "Certified", 100, true), new Column("WipPosition", "WIP", 100, true)],
+        []);
 
     /// <summary>The Housing Stand Register report code.</summary>
     public const string HousingStandsCode = "HSE-STAND";

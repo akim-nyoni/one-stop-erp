@@ -133,6 +133,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.PosSalesCode => SystemReports.PosSales(),
         SystemReports.JobProfitabilityCode => SystemReports.JobProfitability(),
         SystemReports.ProgressCertificatesCode => SystemReports.ProgressCertificates(),
+        SystemReports.JobWipCode => SystemReports.JobWip(),
         SystemReports.HousingStandsCode => SystemReports.HousingStands(),
         SystemReports.StudentRegisterCode => SystemReports.StudentRegister(),
         SystemReports.OpenPurchaseOrdersCode => SystemReports.OpenPurchaseOrders(),

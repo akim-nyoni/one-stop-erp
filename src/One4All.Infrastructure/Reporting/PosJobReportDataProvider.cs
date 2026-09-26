@@ -14,7 +14,7 @@ public sealed class PosJobReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "PosSales", "JobProfitability", "ProgressCertificates",
+        "PosSales", "JobProfitability", "ProgressCertificates", "JobWip",
     };
 
     private readonly One4AllDbContext _db;
@@ -34,6 +34,7 @@ public sealed class PosJobReportDataProvider : IReportDataProvider
             "POSSALES" => await PosSalesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "JOBPROFITABILITY" => await JobProfitabilityAsync(companyId, ct).ConfigureAwait(false),
             "PROGRESSCERTIFICATES" => await ProgressCertificatesAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "JOBWIP" => await JobWipAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -74,6 +75,32 @@ public sealed class PosJobReportDataProvider : IReportDataProvider
             ["CertifiedToDate"] = c.CertifiedToDate,
             ["PercentComplete"] = c.PercentComplete,
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> JobWipAsync(long companyId, CancellationToken ct)
+    {
+        List<JobContract> contracts = await _db.Set<JobContract>().Include(c => c.Costs)
+            .Where(c => c.CompanyId == companyId)
+            .OrderBy(c => c.ContractNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return contracts.Select(c =>
+        {
+            // Revenue recognised on a cost-to-cost (input) basis vs what has actually been certified/billed.
+            decimal recognised = decimal.Round(c.ContractValue * c.PercentComplete / 100m, 2, MidpointRounding.ToEven);
+            decimal wip = recognised - c.CertifiedToDate; // + under-billed (contract asset), − over-billed (contract liability)
+            return Row(new()
+            {
+                ["ContractNumber"] = c.ContractNumber,
+                ["Name"] = c.Name,
+                ["ContractValue"] = c.ContractValue,
+                ["ActualCost"] = c.ActualCost,
+                ["PercentComplete"] = c.PercentComplete,
+                ["RevenueRecognised"] = recognised,
+                ["CertifiedToDate"] = c.CertifiedToDate,
+                ["WipPosition"] = wip,
+            });
+        }).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ProgressCertificatesAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
