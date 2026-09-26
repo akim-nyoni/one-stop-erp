@@ -124,6 +124,24 @@ public interface IPurchaseLedgerService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The posting result of the write-back.</returns>
     Task<Result<TradingPostingResult>> WriteBackAsync(long companyId, long openItemId, DateOnly date, string writeBackAccountCode, string reason, CancellationToken ct = default);
+
+    /// <summary>
+    /// Pays a supplier invoice early and takes a settlement discount: posts the cash payment (Dr AP / Cr bank)
+    /// and the discount received (Dr AP / Cr discounts-received income), then allocates both against the invoice
+    /// so it fully settles. Refuses non-positive amounts, or a cash+discount total that exceeds the invoice's
+    /// outstanding balance.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="invoiceOpenItemId">The AP invoice being settled.</param>
+    /// <param name="date">The settlement date.</param>
+    /// <param name="cashAmount">The cash paid (positive).</param>
+    /// <param name="discountAmount">The settlement discount taken (positive).</param>
+    /// <param name="bankAccountCode">The bank/cash account the payment is drawn from (credited).</param>
+    /// <param name="discountReceivedAccountCode">The discounts-received income account (credited with the discount).</param>
+    /// <param name="documentNumber">The payment document number.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The posting result of the cash payment.</returns>
+    Task<Result<TradingPostingResult>> PayWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode, string documentNumber, CancellationToken ct = default);
 }
 
 /// <summary>Matches credit items against debit items and realises FX (brief §4.5 allocation/matching).</summary>

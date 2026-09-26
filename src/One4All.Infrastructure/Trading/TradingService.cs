@@ -514,6 +514,69 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
+    public async Task<Result<TradingPostingResult>> PayWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode, string documentNumber, CancellationToken ct = default)
+    {
+        if (cashAmount <= 0m || discountAmount <= 0m)
+        {
+            return Error.Rule("Ap.SettlementNonPositive", "The cash and discount amounts must both be positive.");
+        }
+
+        OpenItem? invoice = await _db.OpenItems.FirstOrDefaultAsync(i => i.Id == invoiceOpenItemId && i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsPayable, ct).ConfigureAwait(false);
+        if (invoice is null)
+        {
+            return Error.NotFound("Ap.OpenItemNotFound", $"AP open item {invoiceOpenItemId} not found.");
+        }
+
+        if (invoice.Sign != LedgerSign.Credit || invoice.OutstandingTransaction <= 0m)
+        {
+            return Error.Rule("Ap.NothingToSettle", "Only an outstanding creditor item (invoice) can be settled.");
+        }
+
+        if (cashAmount + discountAmount > invoice.OutstandingTransaction)
+        {
+            return Error.Rule("Ap.SettlementExceedsOutstanding", $"The cash {cashAmount:0.00} plus discount {discountAmount:0.00} exceeds the outstanding {invoice.OutstandingTransaction:0.00}.");
+        }
+
+        // Cash payment: Dr AP control / Cr bank.
+        Result<TradingPostingResult> cash = await PostPaymentAsync(new PaymentRequest
+        {
+            CompanyId = companyId, SupplierId = invoice.TraderId, DocumentNumber = documentNumber, PaymentDate = date,
+            Currency = invoice.Currency, Amount = cashAmount, BankAccountCode = bankAccountCode, ExchangeRate = invoice.ExchangeRate,
+            Narrative = $"Payment with settlement discount for {invoice.DocumentNumber}",
+        }, ct).ConfigureAwait(false);
+        if (cash.IsFailure)
+        {
+            return cash.Error;
+        }
+
+        Result<AllocationResult> allocCash = await AllocateAsync(companyId, TradingLedger.AccountsPayable, cash.Value.OpenItemId, invoiceOpenItemId, cashAmount, date, ct).ConfigureAwait(false);
+        if (allocCash.IsFailure)
+        {
+            return allocCash.Error;
+        }
+
+        // Discount: posted as a "payment" whose money side is the discounts-received income (Dr AP / Cr income).
+        Result<TradingPostingResult> discount = await PostPaymentAsync(new PaymentRequest
+        {
+            CompanyId = companyId, SupplierId = invoice.TraderId, DocumentNumber = $"{documentNumber}-DISC", PaymentDate = date,
+            Currency = invoice.Currency, Amount = discountAmount, BankAccountCode = discountReceivedAccountCode, ExchangeRate = invoice.ExchangeRate,
+            Narrative = $"Settlement discount received for {invoice.DocumentNumber}",
+        }, ct).ConfigureAwait(false);
+        if (discount.IsFailure)
+        {
+            return discount.Error;
+        }
+
+        Result<AllocationResult> allocDiscount = await AllocateAsync(companyId, TradingLedger.AccountsPayable, discount.Value.OpenItemId, invoiceOpenItemId, discountAmount, date, ct).ConfigureAwait(false);
+        if (allocDiscount.IsFailure)
+        {
+            return allocDiscount.Error;
+        }
+
+        return cash.Value;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<TradingPostingResult>> PostReceiptReversalAsync(long companyId, long customerId, string documentNumber, DateOnly date, CurrencyCode currency, decimal amount, string bankAccountCode, decimal? exchangeRate = null, CancellationToken ct = default)
     {
         Customer? customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == customerId && c.CompanyId == companyId, ct).ConfigureAwait(false);
