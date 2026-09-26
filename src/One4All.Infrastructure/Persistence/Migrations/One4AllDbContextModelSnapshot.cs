@@ -4417,6 +4417,131 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("purchase_order_line", "pop");
                 });
 
+            modelBuilder.Entity("One4All.Core.Procurement.PurchaseRequisition", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long?>("PurchaseOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("purchase_order_id");
+
+                    b.Property<DateOnly>("RequestedDate")
+                        .HasColumnType("date")
+                        .HasColumnName("requested_date");
+
+                    b.Property<string>("RequisitionNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("requisition_number");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_requisition");
+
+                    b.HasIndex("CompanyId", "RequisitionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_requisition_company_id_requisition_number");
+
+                    b.ToTable("requisition", "pop");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.PurchaseRequisitionLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("description");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<long>("PurchaseRequisitionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("purchase_requisition_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id")
+                        .HasName("pk_requisition_line");
+
+                    b.HasIndex("PurchaseRequisitionId")
+                        .HasDatabaseName("ix_requisition_line_purchase_requisition_id");
+
+                    b.ToTable("requisition_line", "pop");
+                });
+
             modelBuilder.Entity("One4All.Core.Receipting.Agent", b =>
                 {
                     b.Property<long>("Id")
@@ -10063,6 +10188,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_purchase_order_line_purchase_orders_purchase_order_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Procurement.PurchaseRequisitionLine", b =>
+                {
+                    b.HasOne("One4All.Core.Procurement.PurchaseRequisition", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("PurchaseRequisitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_requisition_line_requisition_purchase_requisition_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Receipting.ImportLine", b =>
                 {
                     b.HasOne("One4All.Core.Receipting.ImportBatch", null)
@@ -10391,6 +10526,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrder", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.PurchaseRequisition", b =>
                 {
                     b.Navigation("Lines");
                 });

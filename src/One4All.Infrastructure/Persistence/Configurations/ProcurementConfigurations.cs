@@ -57,3 +57,32 @@ internal sealed class GrnLineConfiguration : IEntityTypeConfiguration<GrnLine>
         b.Property(x => x.UnitPrice).HasPrecision(19, 6);
     }
 }
+
+internal sealed class PurchaseRequisitionConfiguration : IEntityTypeConfiguration<PurchaseRequisition>
+{
+    public void Configure(EntityTypeBuilder<PurchaseRequisition> b)
+    {
+        b.ToTable("requisition", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.RequisitionNumber).HasMaxLength(40);
+        b.Property(x => x.Currency).HasMaxLength(3);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Ignore(x => x.Total);
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.PurchaseRequisitionId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.RequisitionNumber }).IsUnique();
+    }
+}
+
+internal sealed class PurchaseRequisitionLineConfiguration : IEntityTypeConfiguration<PurchaseRequisitionLine>
+{
+    public void Configure(EntityTypeBuilder<PurchaseRequisitionLine> b)
+    {
+        b.ToTable("requisition_line", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Description).HasMaxLength(300);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.Property(x => x.UnitPrice).HasPrecision(19, 6);
+        b.HasIndex(x => x.PurchaseRequisitionId);
+    }
+}

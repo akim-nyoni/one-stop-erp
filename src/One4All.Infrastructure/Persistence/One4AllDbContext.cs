@@ -134,6 +134,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Purchase orders.</summary>
     public DbSet<Core.Procurement.PurchaseOrder> PurchaseOrders => Set<Core.Procurement.PurchaseOrder>();
 
+    /// <summary>Purchase requisitions.</summary>
+    public DbSet<Core.Procurement.PurchaseRequisition> PurchaseRequisitions => Set<Core.Procurement.PurchaseRequisition>();
+
     /// <summary>Goods-received notes.</summary>
     public DbSet<Core.Procurement.GoodsReceivedNote> GoodsReceivedNotes => Set<Core.Procurement.GoodsReceivedNote>();
 

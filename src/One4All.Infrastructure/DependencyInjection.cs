@@ -87,6 +87,7 @@ public static class DependencyInjection
         // Inventory + Procurement.
         services.AddScoped<Application.Abstractions.Inventory.IInventoryService, Inventory.InventoryService>();
         services.AddScoped<Application.Abstractions.Procurement.IProcurementService, Procurement.ProcurementService>();
+        services.AddScoped<Application.Abstractions.Procurement.IPurchaseRequisitionService, Procurement.PurchaseRequisitionService>();
         services.AddScoped<Application.Abstractions.Pos.IPosService, Pos.PosService>();
         services.AddScoped<Application.Abstractions.Vouchers.IVoucherService, Vouchers.VoucherService>();
         services.AddScoped<Application.Abstractions.SalesOrders.ISalesOrderService, SalesOrders.SalesOrderService>();
