@@ -345,6 +345,9 @@ public static class SystemReports
     /// <summary>The Recurring Journals report code.</summary>
     public const string RecurringJournalsCode = "GL-RECUR";
 
+    /// <summary>The Period Status report code.</summary>
+    public const string PeriodStatusCode = "SYS-PERIOD";
+
     /// <summary>The Expense Claims report code.</summary>
     public const string ExpenseClaimsCode = "EXP-CLAIMS";
 
@@ -496,6 +499,13 @@ public static class SystemReports
         "Active budget compared to GL actuals by account, with the variance.", "BudgetVsActual",
         [new Column("AccountCode", "Account", 100), new Column("Budget", "Budget", 100, true), new Column("Actual", "Actual", 100, true), new Column("Variance", "Variance", 100, true)],
         [("FiscalYearId", ParameterType.Integer), ("Department", ParameterType.String), ("Period", ParameterType.Integer)]);
+
+    /// <summary>Builds the Period Status definition (month-end close aid).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition PeriodStatus() => Listing(PeriodStatusCode, "Period Status", "System",
+        "Accounting periods with their open/closed status for the key ledgers (GL, AR, AP) — a month-end close aid.", "PeriodStatus",
+        [new Column("Period", "Period", 140), new Column("Start", "Start", 95), new Column("End", "End", 95), new Column("GL", "GL", 80), new Column("AR", "AR", 80), new Column("AP", "AP", 80)],
+        []);
 
     /// <summary>Builds the Recurring Journals definition (standing GL journal templates).</summary>
     /// <returns>The definition.</returns>

@@ -21,7 +21,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "StockAgeing", "AbcAnalysis", "ItemMaster", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "AssetDisposals", "PayrollSummary", "PayrollDeductions", "EmployeeRegister", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "RecurringJournals", "Pipeline", "ExpenseClaims",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "StockAgeing", "AbcAnalysis", "ItemMaster", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "AssetDisposals", "PayrollSummary", "PayrollDeductions", "EmployeeRegister", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "RecurringJournals", "PeriodStatus", "Pipeline", "ExpenseClaims",
     };
 
     private readonly One4AllDbContext _db;
@@ -70,6 +70,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "BUDGETVSACTUAL" => await BudgetVsActualAsync(companyId, parameters, ct).ConfigureAwait(false),
             "BUDGETLIST" => await BudgetListAsync(companyId, ct).ConfigureAwait(false),
             "RECURRINGJOURNALS" => await RecurringJournalsAsync(companyId, ct).ConfigureAwait(false),
+            "PERIODSTATUS" => await PeriodStatusAsync(companyId, ct).ConfigureAwait(false),
             "PIPELINE" => await PipelineAsync(companyId, ct).ConfigureAwait(false),
             "EXPENSECLAIMS" => await ExpenseClaimsAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
@@ -510,6 +511,30 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             ["Ratepayer"] = ratepayers.GetValueOrDefault(p.RatepayerCustomerId, $"#{p.RatepayerCustomerId}"),
             ["Valuation"] = p.Valuation,
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PeriodStatusAsync(long companyId, CancellationToken ct)
+    {
+        List<long> yearIds = await _db.Set<Core.System.FiscalYear>()
+            .Where(y => y.CompanyId == companyId)
+            .Select(y => y.Id).ToListAsync(ct).ConfigureAwait(false);
+
+        List<Core.System.FiscalPeriod> periods = await _db.Set<Core.System.FiscalPeriod>()
+            .Include(p => p.ModuleStatuses)
+            .Where(p => yearIds.Contains(p.FiscalYearId))
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return periods
+            .OrderBy(p => p.StartDate)
+            .Select(p => Row(new()
+            {
+                ["Period"] = p.Name,
+                ["Start"] = p.StartDate.ToDateTime(TimeOnly.MinValue),
+                ["End"] = p.EndDate.ToDateTime(TimeOnly.MinValue),
+                ["GL"] = p.StatusFor("GL").ToString(),
+                ["AR"] = p.StatusFor("AR").ToString(),
+                ["AP"] = p.StatusFor("AP").ToString(),
+            })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RecurringJournalsAsync(long companyId, CancellationToken ct)
