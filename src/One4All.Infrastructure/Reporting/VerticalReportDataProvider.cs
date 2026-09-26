@@ -21,7 +21,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "ItemMaster", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "AssetDisposals", "PayrollSummary", "PayrollDeductions", "EmployeeRegister", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "Pipeline", "ExpenseClaims",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "StockAgeing", "AbcAnalysis", "ItemMaster", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "AssetDisposals", "PayrollSummary", "PayrollDeductions", "EmployeeRegister", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "Pipeline", "ExpenseClaims",
     };
 
     private readonly One4AllDbContext _db;
@@ -54,6 +54,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "STOCKMOVEMENTS" => await StockMovementsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "REORDER" => await ReorderAsync(companyId, ct).ConfigureAwait(false),
             "SLOWSTOCK" => await SlowStockAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "STOCKAGEING" => await StockAgeingAsync(companyId, parameters, ct).ConfigureAwait(false),
             "ABCANALYSIS" => await AbcAnalysisAsync(companyId, ct).ConfigureAwait(false),
             "ITEMMASTER" => await ItemMasterAsync(companyId, ct).ConfigureAwait(false),
             "ASSETREGISTER" => await AssetRegisterAsync(companyId, ct).ConfigureAwait(false),
@@ -105,6 +106,44 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
                 ["Value"] = x.b.TotalValue,
                 ["LastMovement"] = x.Last is { } lm ? lm.ToDateTime(TimeOnly.MinValue) : (object?)string.Empty,
             }))
+            .ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> StockAgeingAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly asAt = ReportParameters.Date(parameters, "AsAtDate");
+
+        var balances = await (
+            from b in _db.Set<Core.Inventory.StockBalance>()
+            join i in _db.Set<Core.Inventory.Item>() on b.ItemId equals i.Id
+            join w in _db.Set<Core.Inventory.Warehouse>() on b.WarehouseId equals w.Id
+            where b.CompanyId == companyId && b.QuantityOnHand > 0m
+            select new { b.ItemId, b.WarehouseId, i.Code, i.Description, WarehouseCode = w.Code, b.QuantityOnHand, b.TotalValue })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<(long, long), DateOnly> lastMovement = await _db.Set<Core.Inventory.StockMovement>()
+            .Where(m => m.CompanyId == companyId)
+            .GroupBy(m => new { m.ItemId, m.WarehouseId })
+            .Select(g => new { g.Key.ItemId, g.Key.WarehouseId, Last = g.Max(x => x.Date) })
+            .ToDictionaryAsync(x => (x.ItemId, x.WarehouseId), x => x.Last, ct).ConfigureAwait(false);
+
+        return balances
+            .Select(b => (b, Last: lastMovement.TryGetValue((b.ItemId, b.WarehouseId), out DateOnly d) ? (DateOnly?)d : null))
+            .OrderByDescending(x => x.b.TotalValue)
+            .Select(x =>
+            {
+                int age = x.Last is { } lm ? asAt.DayNumber - lm.DayNumber : int.MaxValue;
+                string band = age <= 30 ? "0-30" : age <= 60 ? "31-60" : age <= 90 ? "61-90" : "90+";
+                return Row(new()
+                {
+                    ["ItemCode"] = x.b.Code,
+                    ["Description"] = x.b.Description,
+                    ["Warehouse"] = x.b.WarehouseCode,
+                    ["Quantity"] = x.b.QuantityOnHand,
+                    ["Value"] = x.b.TotalValue,
+                    ["AgeBand"] = band,
+                });
+            })
             .ToList();
     }
 

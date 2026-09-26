@@ -110,6 +110,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.StockMovementsCode => SystemReports.StockMovements(),
         SystemReports.ReorderCode => SystemReports.Reorder(),
         SystemReports.SlowStockCode => SystemReports.SlowStock(),
+        SystemReports.StockAgeingCode => SystemReports.StockAgeing(),
         SystemReports.AbcAnalysisCode => SystemReports.AbcAnalysis(),
         SystemReports.ItemMasterCode => SystemReports.ItemMaster(),
         SystemReports.AssetRegisterCode => SystemReports.AssetRegister(),

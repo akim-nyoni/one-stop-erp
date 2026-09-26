@@ -331,6 +331,16 @@ public static class SystemReports
     /// <summary>The Item Master report code.</summary>
     public const string ItemMasterCode = "INV-ITEMS";
 
+    /// <summary>The Stock Ageing report code.</summary>
+    public const string StockAgeingCode = "INV-AGE";
+
+    /// <summary>Builds the Stock Ageing definition (on-hand value by age since last movement).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition StockAgeing() => Listing(StockAgeingCode, "Stock Ageing", "Inventory",
+        "On-hand items with their value and the age band since last movement (0-30 / 31-60 / 61-90 / 90+ days).", "StockAgeing",
+        [new Column("ItemCode", "Item", 100), new Column("Description", "Description", 190), new Column("Warehouse", "Warehouse", 90), new Column("Quantity", "Qty", 70, true), new Column("Value", "Value", 90, true), new Column("AgeBand", "Age band", 80)],
+        [("AsAtDate", ParameterType.Date)]);
+
     /// <summary>Builds the Item Master definition (stock item reference listing).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition ItemMaster() => Listing(ItemMasterCode, "Item Master", "Inventory",
