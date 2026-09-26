@@ -69,6 +69,24 @@ public interface ISalesLedgerService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The posting result (the write-off credit open item).</returns>
     Task<Result<TradingPostingResult>> WriteOffAsync(long companyId, long openItemId, DateOnly date, string badDebtAccountCode, string reason, CancellationToken ct = default);
+
+    /// <summary>
+    /// Settles a customer invoice where the customer pays early and takes a settlement (early-payment) discount:
+    /// posts the cash receipt (Dr bank / Cr AR) and the discount (Dr discounts-allowed / Cr AR), then allocates
+    /// both against the invoice so it fully settles. Refuses non-positive amounts, or a cash+discount total that
+    /// exceeds the invoice's outstanding balance.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="invoiceOpenItemId">The AR invoice being settled.</param>
+    /// <param name="date">The settlement date.</param>
+    /// <param name="cashAmount">The cash received (positive).</param>
+    /// <param name="discountAmount">The settlement discount granted (positive).</param>
+    /// <param name="bankAccountCode">The bank/cash account the receipt is banked to (debited).</param>
+    /// <param name="discountAccountCode">The discounts-allowed account (debited with the discount).</param>
+    /// <param name="documentNumber">The receipt document number.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The posting result of the cash receipt.</returns>
+    Task<Result<TradingPostingResult>> SettleWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountAccountCode, string documentNumber, CancellationToken ct = default);
 }
 
 /// <summary>The Purchase Ledger (AP) posting service (brief §4.6).</summary>
