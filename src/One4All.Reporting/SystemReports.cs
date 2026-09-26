@@ -268,6 +268,9 @@ public static class SystemReports
     /// <summary>The Employee Loans report code.</summary>
     public const string EmployeeLoansCode = "PAY-LOANS";
 
+    /// <summary>The Payroll Deductions report code.</summary>
+    public const string PayrollDeductionsCode = "PAY-DED";
+
     /// <summary>The Leave Balances report code.</summary>
     public const string LeaveBalancesCode = "PAY-LEAVE";
 
@@ -361,6 +364,13 @@ public static class SystemReports
     public static ReportDefinition PayrollSummary() => Listing(PayrollSummaryCode, "Payroll Summary", "Payroll",
         "Gross, deductions and net pay per employee for a period.", "PayrollSummary",
         [new Column("Employee", "Employee", 220), new Column("Gross", "Gross", 100, true), new Column("Deductions", "Deductions", 100, true), new Column("Net", "Net", 100, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Payroll Deductions definition (statutory-return view).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition PayrollDeductions() => Listing(PayrollDeductionsCode, "Payroll Deductions", "Payroll",
+        "Deductions aggregated by element across payslips in the period, with the number of employees affected.", "PayrollDeductions",
+        [new Column("ElementCode", "Element", 100), new Column("Description", "Description", 200), new Column("Employees", "Employees", 90, true), new Column("Amount", "Amount", 110, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Employee Loans definition (Payroll module).</summary>

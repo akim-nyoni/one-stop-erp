@@ -21,7 +21,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "PayrollSummary", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "Pipeline", "ExpenseClaims",
+        "StockValuation", "StockMovements", "Reorder", "SlowStock", "AbcAnalysis", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "PayrollSummary", "PayrollDeductions", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "Pipeline", "ExpenseClaims",
     };
 
     private readonly One4AllDbContext _db;
@@ -59,6 +59,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "DEPRECIATIONFORECAST" => await DepreciationForecastAsync(companyId, parameters, ct).ConfigureAwait(false),
             "ASSETMAINTENANCE" => await AssetMaintenanceAsync(companyId, ct).ConfigureAwait(false),
             "PAYROLLSUMMARY" => await PayrollSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "PAYROLLDEDUCTIONS" => await PayrollDeductionsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "EMPLOYEELOANS" => await EmployeeLoansAsync(companyId, ct).ConfigureAwait(false),
             "LEAVEBALANCES" => await LeaveBalancesAsync(companyId, ct).ConfigureAwait(false),
             "PROPERTYREGISTER" => await PropertyRegisterAsync(companyId, ct).ConfigureAwait(false),
@@ -345,6 +346,30 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             ["Outstanding"] = l.Outstanding,
             ["Installment"] = l.Installment,
         })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PayrollDeductionsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue;
+        DateOnly to = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+        List<Payslip> payslips = await _db.Set<Payslip>()
+            .Include(p => p.Lines)
+            .Where(p => p.CompanyId == companyId && p.PayDate >= from && p.PayDate <= to)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        // Aggregate deduction lines by element across all payslips in the period (statutory-return view).
+        return payslips
+            .SelectMany(p => p.Lines)
+            .Where(l => l.Type == Core.Payroll.PayElementType.Deduction)
+            .GroupBy(l => new { l.ElementCode, l.Description })
+            .OrderBy(g => g.Key.ElementCode, StringComparer.Ordinal)
+            .Select(g => Row(new()
+            {
+                ["ElementCode"] = g.Key.ElementCode,
+                ["Description"] = g.Key.Description,
+                ["Employees"] = g.Count(),
+                ["Amount"] = g.Sum(l => l.Amount),
+            })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PayrollSummaryAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
