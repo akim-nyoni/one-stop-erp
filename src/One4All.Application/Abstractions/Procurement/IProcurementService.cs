@@ -102,6 +102,14 @@ public readonly record struct GrnResult(long GrnId, decimal AccruedValue);
 /// <param name="InvoiceValue">The invoice value posted to AP.</param>
 public readonly record struct MatchInvoiceResult(long OpenItemId, string JournalNumber, decimal InvoiceValue);
 
+/// <summary>The result of a goods return to a supplier.</summary>
+/// <param name="OpenItemId">The created AP debit-note open item (reduces the payable).</param>
+/// <param name="JournalNumber">The GL journal number.</param>
+/// <param name="StockValue">The value removed from stock at moving-average cost.</param>
+/// <param name="CreditValue">The credit raised against the supplier (quantity × return price).</param>
+/// <param name="PriceVariance">Credit value − stock value; positive is a gain (credited to variance), negative a loss.</param>
+public readonly record struct SupplierReturnResult(long OpenItemId, string JournalNumber, decimal StockValue, decimal CreditValue, decimal PriceVariance);
+
 /// <summary>
 /// Procurement service (brief §4.3): purchase orders, goods-received notes (GRNI accrual through the
 /// inventory receipt), and the three-way invoice match (PO ↔ GRN ↔ invoice) that clears GRNI to accounts
@@ -126,4 +134,25 @@ public interface IProcurementService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The match result, or an error when the match is out of tolerance.</returns>
     Task<Result<MatchInvoiceResult>> MatchInvoiceAsync(MatchInvoiceRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns received goods to a supplier: removes the quantity from stock at the current moving-average cost
+    /// (Cr stock control), raises an allocatable AP debit note at the agreed return price (Dr AP control), and
+    /// books any difference between the return price and the average cost to a purchase-price-variance account.
+    /// The debit note reduces the supplier balance and can be allocated against the original invoice. Refuses a
+    /// non-positive quantity, a negative return price, an unknown supplier/item, or a return exceeding the
+    /// quantity on hand.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="supplierId">The supplier the goods go back to.</param>
+    /// <param name="itemId">The stock item.</param>
+    /// <param name="warehouseId">The warehouse the goods leave.</param>
+    /// <param name="quantity">The quantity returned (positive).</param>
+    /// <param name="returnUnitPrice">The agreed per-unit credit price (usually the original PO price).</param>
+    /// <param name="date">The return date.</param>
+    /// <param name="documentNumber">The return document number.</param>
+    /// <param name="priceVarianceAccountCode">The purchase-price-variance account for any divergence from average cost.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The return result.</returns>
+    Task<Result<SupplierReturnResult>> ReturnToSupplierAsync(long companyId, long supplierId, long itemId, long warehouseId, decimal quantity, decimal returnUnitPrice, DateOnly date, string documentNumber, string priceVarianceAccountCode, CancellationToken ct = default);
 }

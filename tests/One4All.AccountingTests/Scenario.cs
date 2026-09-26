@@ -150,6 +150,7 @@ public static class Scenario
         db.Accounts.Add(new LedgerAccount(company.Id, "6900", "Bank Charges", AccountType.Expense));
         db.Accounts.Add(new LedgerAccount(company.Id, "4800", "Interest Income", AccountType.Income));
         db.Accounts.Add(new LedgerAccount(company.Id, "4950", "Discounts Received", AccountType.Income));
+        db.Accounts.Add(new LedgerAccount(company.Id, "5400", "Purchase Price Variance", AccountType.Expense));
         db.Accounts.Add(new LedgerAccount(company.Id, "1300", "Agent Cash Control", AccountType.Asset));
         db.Accounts.Add(new LedgerAccount(company.Id, "6200", "Agent Commission", AccountType.Expense));
 

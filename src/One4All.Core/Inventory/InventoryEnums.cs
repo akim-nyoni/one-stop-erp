@@ -52,4 +52,7 @@ public enum StockMovementType
 
     /// <summary>Reversal of a prior movement (puts an issued quantity/value back at its original cost).</summary>
     Reversal = 5,
+
+    /// <summary>Return of goods to a supplier (quantity out at moving-average cost).</summary>
+    SupplierReturn = 6,
 }

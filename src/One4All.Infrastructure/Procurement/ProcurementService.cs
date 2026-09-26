@@ -193,6 +193,102 @@ public sealed class ProcurementService : IProcurementService
         return new MatchInvoiceResult(openItem.Id, posting.Value.JournalNumber, invoiceValue);
     }
 
+    /// <inheritdoc />
+    public async Task<Result<SupplierReturnResult>> ReturnToSupplierAsync(long companyId, long supplierId, long itemId, long warehouseId, decimal quantity, decimal returnUnitPrice, DateOnly date, string documentNumber, string priceVarianceAccountCode, CancellationToken ct = default)
+    {
+        if (quantity <= 0m)
+        {
+            return Error.Rule("Pop.ReturnQuantity", "The return quantity must be positive.");
+        }
+
+        if (returnUnitPrice < 0m)
+        {
+            return Error.Rule("Pop.ReturnPrice", "The return price cannot be negative.");
+        }
+
+        Supplier? supplier = await _db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (supplier is null)
+        {
+            return Error.NotFound("Pop.SupplierNotFound", $"Supplier {supplierId} not found.");
+        }
+
+        Core.Inventory.Item? item = await _db.Set<Core.Inventory.Item>().FirstOrDefaultAsync(i => i.Id == itemId && i.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (item is null)
+        {
+            return Error.NotFound("Pop.ItemNotFound", $"Item {itemId} not found.");
+        }
+
+        string? stockCode = await ControlCodeAsync(companyId, ControlAccountType.Stock, ct).ConfigureAwait(false);
+        string? apCode = await ControlCodeAsync(companyId, ControlAccountType.AccountsPayable, ct).ConfigureAwait(false);
+        if (stockCode is null || apCode is null)
+        {
+            return Error.Rule("Pop.NoControlAccounts", "Stock and/or AP control accounts are not configured.");
+        }
+
+        Core.Inventory.StockBalance? balance = await _db.Set<Core.Inventory.StockBalance>()
+            .FirstOrDefaultAsync(b => b.CompanyId == companyId && b.ItemId == itemId && b.WarehouseId == warehouseId, ct).ConfigureAwait(false);
+        if (balance is null || balance.QuantityOnHand < quantity)
+        {
+            return Error.Rule("Pop.InsufficientStock", $"Item '{item.Code}' has {balance?.QuantityOnHand ?? 0m} on hand, less than the {quantity} to return.");
+        }
+
+        Company company = await _db.Companies.FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        decimal averageCost = balance.AverageCost;
+        decimal stockValue = balance.Issue(quantity);                                  // removes stock at moving-average cost
+        decimal creditValue = decimal.Round(quantity * returnUnitPrice, 4, MidpointRounding.ToEven);
+        decimal variance = creditValue - stockValue;                                   // + gain, − loss
+
+        // Dr AP control (credit note), Cr stock control at average cost, PPV takes the difference.
+        List<JournalLineRequest> lines =
+        [
+            new JournalLineRequest { AccountCode = apCode, Side = JournalSide.Debit, TransactionAmount = creditValue },
+            new JournalLineRequest { AccountCode = stockCode, Side = JournalSide.Credit, TransactionAmount = stockValue },
+        ];
+        if (variance > 0m)
+        {
+            lines.Add(new JournalLineRequest { AccountCode = priceVarianceAccountCode, Side = JournalSide.Credit, TransactionAmount = variance });
+        }
+        else if (variance < 0m)
+        {
+            lines.Add(new JournalLineRequest { AccountCode = priceVarianceAccountCode, Side = JournalSide.Debit, TransactionAmount = -variance });
+        }
+
+        Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId,
+            SourceModule = "POP",
+            PostingDate = date,
+            TransactionCurrency = company.BaseCurrency,
+            EnforceManualJournalRules = false,
+            DocumentType = "SupplierReturn",
+            DocumentNumber = documentNumber,
+            Narrative = $"Goods return to {supplier.Code} ({item.Code})",
+            Lines = lines,
+        }, ct).ConfigureAwait(false);
+
+        if (posting.IsFailure)
+        {
+            return posting.Error;
+        }
+
+        _db.Set<Core.Inventory.StockMovement>().Add(new Core.Inventory.StockMovement(companyId, itemId, warehouseId, date, Core.Inventory.StockMovementType.SupplierReturn, -quantity, averageCost, -stockValue, documentNumber)
+        {
+            JournalEntryId = posting.Value.JournalId,
+        });
+
+        // Debit-sign AP open item: a credit note that reduces the payable and can be allocated to the invoice.
+        OpenItem creditNote = new(companyId, TradingLedger.AccountsPayable, supplierId, OpenItemType.CreditNote, LedgerSign.Debit,
+            documentNumber, date, date, company.BaseCurrency, 1m, creditValue, creditValue)
+        {
+            JournalEntryId = posting.Value.JournalId,
+            Narrative = $"Goods return ({item.Code})",
+        };
+        _db.OpenItems.Add(creditNote);
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new SupplierReturnResult(creditNote.Id, posting.Value.JournalNumber, stockValue, creditValue, variance);
+    }
+
     private async Task<string?> ControlCodeAsync(long companyId, ControlAccountType type, CancellationToken ct) =>
         await _db.Accounts.Where(a => a.CompanyId == companyId && a.ControlAccountType == type)
             .Select(a => a.AccountCode).FirstOrDefaultAsync(ct).ConfigureAwait(false);
