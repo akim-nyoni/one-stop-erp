@@ -82,6 +82,7 @@ public partial class ReportViewerWindow : Window
     private static string FilterFor(ReportFormat format) => format switch
     {
         ReportFormat.Pdf => "PDF document (*.pdf)|*.pdf",
+        ReportFormat.Xlsx => "Excel workbook (*.xlsx)|*.xlsx",
         ReportFormat.Csv => "CSV file (*.csv)|*.csv",
         ReportFormat.Text => "Text file (*.txt)|*.txt",
         _ => "HTML file (*.html)|*.html",

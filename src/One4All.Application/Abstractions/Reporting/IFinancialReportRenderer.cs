@@ -16,6 +16,9 @@ public enum ReportFormat
 
     /// <summary>Plain text / ESC-POS.</summary>
     Text = 3,
+
+    /// <summary>Excel workbook (.xlsx / OpenXML SpreadsheetML).</summary>
+    Xlsx = 4,
 }
 
 /// <summary>A rendered report document.</summary>

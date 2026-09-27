@@ -87,7 +87,7 @@ public sealed partial class ReportViewerViewModel : ObservableObject
 
     /// <summary>The export formats offered.</summary>
     public IReadOnlyList<ReportFormat> AvailableFormats { get; } =
-        [ReportFormat.Html, ReportFormat.Pdf, ReportFormat.Csv, ReportFormat.Text];
+        [ReportFormat.Html, ReportFormat.Pdf, ReportFormat.Xlsx, ReportFormat.Csv, ReportFormat.Text];
 
     /// <summary>The selected report; changing it rebuilds the parameter prompts.</summary>
     [ObservableProperty]

@@ -67,6 +67,12 @@ public sealed class ReportRunner : IReportRunner
             return new RenderedDocument(csv, "text/csv", $"{baseName}.csv");
         }
 
+        if (format == ReportFormat.Xlsx)
+        {
+            byte[] xlsx = new XlsxReportExporter().Export(input.Rows, input.Definition.Name);
+            return new RenderedDocument(xlsx, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"{baseName}.xlsx");
+        }
+
         RenderModel model = _engine.Build(input);
         (byte[] bytes, string contentType, string ext) = format switch
         {
