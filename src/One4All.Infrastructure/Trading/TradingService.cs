@@ -81,7 +81,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         ];
         if (request.TaxAmount != 0m && request.TaxAccountCode is not null)
         {
-            lines.Add(Line(request.TaxAccountCode, JournalSide.Credit, request.TaxAmount, rate, baseTax));
+            lines.Add(Line(request.TaxAccountCode, JournalSide.Credit, request.TaxAmount, rate, baseTax, request.TaxCode));
         }
 
         return await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.Invoice,
@@ -470,7 +470,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         ];
         if (request.TaxAmount != 0m && request.TaxAccountCode is not null)
         {
-            lines.Add(Line(request.TaxAccountCode, JournalSide.Debit, request.TaxAmount, rate, baseTax));
+            lines.Add(Line(request.TaxAccountCode, JournalSide.Debit, request.TaxAmount, rate, baseTax, request.TaxCode));
         }
 
         return await PostAndOpenAsync(request.CompanyId, "AP", TradingLedger.AccountsPayable, supplier.Id, OpenItemType.Invoice,
@@ -833,8 +833,8 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         return rate.Quotation == QuotationType.Direct ? rate.Rate : 1m / rate.Rate;
     }
 
-    private static JournalLineRequest Line(string account, JournalSide side, decimal txn, decimal rate, decimal baseAmount) =>
-        new() { AccountCode = account, Side = side, TransactionAmount = txn, ExchangeRate = rate, BaseAmount = baseAmount };
+    private static JournalLineRequest Line(string account, JournalSide side, decimal txn, decimal rate, decimal baseAmount, string? taxCode = null) =>
+        new() { AccountCode = account, Side = side, TransactionAmount = txn, ExchangeRate = rate, BaseAmount = baseAmount, TaxCode = taxCode };
 
     private static decimal Round(decimal value) => decimal.Round(value, Scale, MidpointRounding.ToEven);
 }

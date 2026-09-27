@@ -38,6 +38,9 @@ public sealed class SalesInvoiceRequest
     /// <summary>The output-tax account code (credited), when there is tax.</summary>
     public string? TaxAccountCode { get; init; }
 
+    /// <summary>The tax code (e.g. "VAT15") tagged on the tax line for the VAT breakdown by rate/code.</summary>
+    public string? TaxCode { get; init; }
+
     /// <summary>Optional explicit exchange rate; otherwise the daily rate is used.</summary>
     public decimal? ExchangeRate { get; init; }
 
@@ -105,6 +108,9 @@ public sealed class PurchaseInvoiceRequest
 
     /// <summary>The input-tax account code (debited), when there is recoverable tax.</summary>
     public string? TaxAccountCode { get; init; }
+
+    /// <summary>The tax code (e.g. "VAT15") tagged on the tax line for the VAT breakdown by rate/code.</summary>
+    public string? TaxCode { get; init; }
 
     /// <summary>Optional explicit exchange rate.</summary>
     public decimal? ExchangeRate { get; init; }

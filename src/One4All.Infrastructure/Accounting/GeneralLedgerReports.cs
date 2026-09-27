@@ -357,6 +357,41 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         return new ControlReconciliationReport(asAtDate, rows);
     }
 
+    /// <inheritdoc />
+    public async Task<VatReturnByCodeReport> VatReturnByCodeAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    {
+        HashSet<string> outputCodes = (await _db.Accounts
+            .Where(a => a.CompanyId == companyId && a.ControlAccountType == ControlAccountType.VatOutput)
+            .Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false)).ToHashSet();
+        HashSet<string> inputCodes = (await _db.Accounts
+            .Where(a => a.CompanyId == companyId && a.ControlAccountType == ControlAccountType.VatInput)
+            .Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false)).ToHashSet();
+
+        List<string> vatCodes = outputCodes.Union(inputCodes).ToList();
+
+        var lines = await (
+            from l in _db.Set<JournalLine>()
+            join j in _db.Journals on l.JournalEntryId equals j.Id
+            where j.CompanyId == companyId && j.Status == JournalStatus.Posted && j.PostingDate >= fromDate && j.PostingDate <= toDate
+                && vatCodes.Contains(l.AccountCode)
+            select new { l.AccountCode, l.TaxCode, l.BaseDebit, l.BaseCredit })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        List<VatCodeRow> rows = lines
+            .GroupBy(l => string.IsNullOrWhiteSpace(l.TaxCode) ? "(untagged)" : l.TaxCode!)
+            .Select(g =>
+            {
+                decimal output = g.Where(l => outputCodes.Contains(l.AccountCode)).Sum(l => l.BaseCredit - l.BaseDebit);
+                decimal input = g.Where(l => inputCodes.Contains(l.AccountCode)).Sum(l => l.BaseDebit - l.BaseCredit);
+                return new VatCodeRow(g.Key, output, input, output - input);
+            })
+            .Where(r => r.OutputTax != 0m || r.InputTax != 0m)
+            .OrderBy(r => r.TaxCode, StringComparer.Ordinal)
+            .ToList();
+
+        return new VatReturnByCodeReport(fromDate, toDate, rows, rows.Sum(r => r.Net));
+    }
+
     private async Task<string> BaseCurrencyAsync(long companyId, CancellationToken ct)
     {
         Company? company = await _db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);

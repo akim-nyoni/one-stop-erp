@@ -10,7 +10,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts", "FinancialSnapshot", "VatReturn", "ControlReconciliation",
+        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts", "FinancialSnapshot", "VatReturn", "ControlReconciliation", "VatReturnByCode",
     };
 
     private readonly IGeneralLedgerReports _reports;
@@ -37,6 +37,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             "FINANCIALSNAPSHOT" => await FinancialSnapshotAsync(companyId, parameters, ct).ConfigureAwait(false),
             "VATRETURN" => await VatReturnAsync(companyId, parameters, ct).ConfigureAwait(false),
             "CONTROLRECONCILIATION" => await ControlReconciliationAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "VATRETURNBYCODE" => await VatReturnByCodeAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -179,6 +180,20 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             ["GlBalance"] = r.GlBalance,
             ["SubLedgerBalance"] = r.SubLedgerBalance,
             ["Difference"] = r.Difference,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VatReturnByCodeAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly to = ReportParameters.Date(parameters, "ToDate");
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
+        VatReturnByCodeReport report = await _reports.VatReturnByCodeAsync(companyId, from, to, ct).ConfigureAwait(false);
+        return report.Rows.Select(r => Row(new()
+        {
+            ["TaxCode"] = r.TaxCode,
+            ["OutputTax"] = r.OutputTax,
+            ["InputTax"] = r.InputTax,
+            ["Net"] = r.Net,
         })).ToList();
     }
 

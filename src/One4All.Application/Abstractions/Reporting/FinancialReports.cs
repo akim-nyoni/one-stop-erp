@@ -169,6 +169,20 @@ public sealed record ControlReconciliationRow(string Control, string AccountCode
 /// <param name="Rows">The per-control rows.</param>
 public sealed record ControlReconciliationReport(DateOnly AsAtDate, IReadOnlyList<ControlReconciliationRow> Rows);
 
+/// <summary>One tax-code line of the VAT breakdown (base currency).</summary>
+/// <param name="TaxCode">The tax code (or "(untagged)" for VAT lines without a code).</param>
+/// <param name="OutputTax">Output tax raised under this code (net credit on VAT-output accounts).</param>
+/// <param name="InputTax">Input tax incurred under this code (net debit on VAT-input accounts).</param>
+/// <param name="Net">Output − input for the code.</param>
+public sealed record VatCodeRow(string TaxCode, decimal OutputTax, decimal InputTax, decimal Net);
+
+/// <summary>The VAT return broken down by tax code for a period.</summary>
+/// <param name="FromDate">Start of the period.</param>
+/// <param name="ToDate">End of the period.</param>
+/// <param name="Rows">The per-code rows.</param>
+/// <param name="NetPayable">Total output − input across all codes.</param>
+public sealed record VatReturnByCodeReport(DateOnly FromDate, DateOnly ToDate, IReadOnlyList<VatCodeRow> Rows, decimal NetPayable);
+
 /// <summary>The VAT/sales-tax return for a period (base currency).</summary>
 /// <param name="FromDate">Start of the return period.</param>
 /// <param name="ToDate">End of the return period.</param>
@@ -195,6 +209,18 @@ public interface IGeneralLedgerReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The VAT return.</returns>
     Task<VatReturnReport> VatReturnAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
+
+    /// <summary>
+    /// Produces the VAT return broken down by tax code: for each code tagged on the VAT-control-account lines,
+    /// the output tax (net credit on VAT-output accounts) and input tax (net debit on VAT-input accounts) for a
+    /// period. VAT lines posted without a tax code are grouped under "(untagged)".
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromDate">Start of the period.</param>
+    /// <param name="toDate">End of the period.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The VAT return by code.</returns>
+    Task<VatReturnByCodeReport> VatReturnByCodeAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
 
     /// <summary>
     /// Reconciles the GL control accounts (AR, AP, Stock) against their sub-ledgers as at a date: the GL balance

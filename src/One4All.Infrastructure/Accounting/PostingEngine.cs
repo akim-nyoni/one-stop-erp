@@ -240,9 +240,11 @@ public sealed class PostingEngine : IPostingEngine
 
         decimal baseAmount = lineRequest.BaseAmount ?? decimal.Round(lineRequest.TransactionAmount * rate, Money.StorageScale, MidpointRounding.ToEven);
 
-        return lineRequest.Side == JournalSide.Debit
+        JournalLine line = lineRequest.Side == JournalSide.Debit
             ? JournalLine.Debit(key, lineCurrency, lineRequest.TransactionAmount, rate, baseAmount, lineRequest.Narrative)
             : JournalLine.Credit(key, lineCurrency, lineRequest.TransactionAmount, rate, baseAmount, lineRequest.Narrative);
+        line.SetTaxCode(lineRequest.TaxCode);
+        return line;
     }
 
     private async Task<Result<(FiscalYear, FiscalPeriod)>> ResolvePeriodAsync(long companyId, string moduleCode, DateOnly date, bool allowFuture, CancellationToken ct)

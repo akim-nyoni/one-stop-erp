@@ -93,6 +93,9 @@ public sealed class JournalLineRequest
     /// <summary>Optional line narrative.</summary>
     public string? Narrative { get; init; }
 
+    /// <summary>The tax code this line relates to — set on tax-account lines so VAT can be analysed by rate/code.</summary>
+    public string? TaxCode { get; init; }
+
     /// <summary>Builds the composite account key for this line.</summary>
     /// <returns>The account key.</returns>
     public AccountKey ToKey() => new(AccountCode, CostCentre, Department);

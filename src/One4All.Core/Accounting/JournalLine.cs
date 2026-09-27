@@ -82,6 +82,13 @@ public sealed class JournalLine : Entity
     /// <summary>Optional line narrative.</summary>
     public string? Narrative { get; private set; }
 
+    /// <summary>The tax code this line relates to (set on tax-account lines so VAT can be analysed by rate/code).</summary>
+    public string? TaxCode { get; private set; }
+
+    /// <summary>Tags this line with a tax code (for the VAT breakdown by code).</summary>
+    /// <param name="taxCode">The tax code, or null.</param>
+    public void SetTaxCode(string? taxCode) => TaxCode = taxCode;
+
     /// <summary>Creates a debit line.</summary>
     /// <param name="key">The composite account key.</param>
     /// <param name="transactionCurrency">The transaction currency.</param>

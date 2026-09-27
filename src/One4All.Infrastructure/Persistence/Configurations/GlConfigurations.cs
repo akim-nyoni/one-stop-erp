@@ -91,6 +91,7 @@ internal sealed class JournalLineConfiguration : IEntityTypeConfiguration<Journa
         b.Property(x => x.TransactionCurrency).HasMaxLength(3);
         b.Property(x => x.ExchangeRate).HasPrecision(19, 6);
         b.Property(x => x.Narrative).HasMaxLength(512);
+        b.Property(x => x.TaxCode).HasMaxLength(20);
         b.Ignore(x => x.Key);
         b.HasIndex(x => new { x.AccountCode, x.CostCentre, x.Department });
     }

@@ -437,6 +437,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<string>("TaxCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("tax_code");
+
                     b.Property<decimal>("TransactionCredit")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")

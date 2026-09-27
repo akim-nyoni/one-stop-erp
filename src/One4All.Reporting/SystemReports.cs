@@ -172,6 +172,9 @@ public static class SystemReports
     /// <summary>The Control-Account Reconciliation report code.</summary>
     public const string ControlReconciliationCode = "GL-CTRL";
 
+    /// <summary>The VAT Return by Code report code.</summary>
+    public const string VatReturnByCodeCode = "GL-VATC";
+
     /// <summary>The Customer Register report code.</summary>
     public const string CustomerRegisterCode = "AR-CUST";
 
@@ -212,6 +215,13 @@ public static class SystemReports
     public static ReportDefinition JournalDaybook() => Listing(JournalDaybookCode, "Journal Daybook", "GeneralLedger",
         "Every posted journal over a period — date, number, source module, document, narrative and base total.", "JournalDaybook",
         [new Column("Date", "Date", 95), new Column("JournalNumber", "Journal", 110), new Column("SourceModule", "Module", 70), new Column("DocumentType", "Doc type", 90), new Column("DocumentNumber", "Doc no.", 100), new Column("Narrative", "Narrative", 200), new Column("Amount", "Amount", 100, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the VAT Return by Code definition (multi-rate breakdown).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition VatReturnByCode() => Listing(VatReturnByCodeCode, "VAT Return by Code", "GeneralLedger",
+        "Output and input tax by tax code for a period, with the net per code — the multi-rate VAT breakdown.", "VatReturnByCode",
+        [new Column("TaxCode", "Tax code", 120), new Column("OutputTax", "Output", 110, true), new Column("InputTax", "Input", 110, true), new Column("Net", "Net", 110, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Control-Account Reconciliation definition (GL vs sub-ledgers).</summary>

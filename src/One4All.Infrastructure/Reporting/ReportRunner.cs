@@ -101,6 +101,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.FinancialSnapshotCode => SystemReports.FinancialSnapshot(),
         SystemReports.VatReturnCode => SystemReports.VatReturn(),
         SystemReports.ControlReconciliationCode => SystemReports.ControlReconciliation(),
+        SystemReports.VatReturnByCodeCode => SystemReports.VatReturnByCode(),
         SystemReports.CustomerRegisterCode => SystemReports.CustomerRegister(),
         SystemReports.SupplierRegisterCode => SystemReports.SupplierRegister(),
         SystemReports.AgedDebtorsCode => SystemReports.AgedDebtors(),
