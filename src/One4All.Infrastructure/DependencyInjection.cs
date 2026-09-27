@@ -132,6 +132,7 @@ public static class DependencyInjection
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();
+        services.AddSingleton<IMachineIdProvider, WmiMachineIdProvider>();
         services.AddSingleton<ILicenceService, LicenceService>();
 
         // Raw-SQL runner + seeders.

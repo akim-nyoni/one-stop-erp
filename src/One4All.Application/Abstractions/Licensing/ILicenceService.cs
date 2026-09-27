@@ -12,6 +12,13 @@ public interface ILicenceService
     /// <summary>The current validation result (never null; an absent/invalid licence yields a failed result).</summary>
     LicenseValidationResult Current { get; }
 
+    /// <summary>
+    /// This machine's serialized fingerprint (<c>sha256:</c>-prefixed component hashes). Display it in
+    /// System Manager so the vendor can bind a licence to this machine, and it is the fingerprint the
+    /// installed licence is validated against.
+    /// </summary>
+    string MachineFingerprint { get; }
+
     /// <summary>True when a module is licensed and not expired.</summary>
     /// <param name="moduleCode">The module code (e.g. GL, POS, MUNI, HSE, BUD, PAY).</param>
     /// <returns>True when licensed.</returns>
