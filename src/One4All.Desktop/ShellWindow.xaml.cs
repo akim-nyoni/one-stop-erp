@@ -25,4 +25,10 @@ public partial class ShellWindow : Window
         ReportViewerWindow viewer = new(_services) { Owner = this };
         viewer.Show();
     }
+
+    private void OpenReportDesigner_Click(object sender, RoutedEventArgs e)
+    {
+        ReportDesignerWindow designer = new(_services) { Owner = this };
+        designer.Show();
+    }
 }

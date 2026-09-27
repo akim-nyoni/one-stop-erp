@@ -1,0 +1,120 @@
+<Window x:Class="One4All.Desktop.ReportDesignerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="One4All — Report Designer" Height="680" Width="1080"
+        WindowStartupLocation="CenterOwner" Background="White">
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom" Background="{StaticResource BrandBrush}">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="White" FontSize="12" Margin="10,4" />
+        </Border>
+
+        <!-- Top: open + report properties + save -->
+        <Border DockPanel.Dock="Top" Background="{StaticResource ToolbarBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="10,8">
+            <WrapPanel>
+                <TextBlock Text="Open:" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="#445" />
+                <ComboBox Width="240" Height="26" ItemsSource="{Binding SourceReports}" SelectedItem="{Binding SelectedSource}" DisplayMemberPath="Display" Margin="0,0,16,0" />
+                <TextBlock Text="Code:" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="#445" />
+                <TextBox Width="120" Height="24" VerticalContentAlignment="Center" Padding="4,0" Text="{Binding Code, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,16,0" />
+                <TextBlock Text="Name:" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="#445" />
+                <TextBox Width="240" Height="24" VerticalContentAlignment="Center" Padding="4,0" Text="{Binding ReportName, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,16,0" />
+                <Button Content="Save as company report" Height="26" Padding="10,0" Click="Save_Click"
+                        Background="{StaticResource BrandBrush}" Foreground="White" FontWeight="SemiBold" />
+            </WrapPanel>
+        </Border>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="260" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Design canvas: draggable column blocks laid out as a page-header strip + detail row -->
+            <DockPanel Grid.Column="0" Margin="12">
+                <DockPanel DockPanel.Dock="Top" LastChildFill="False" Margin="0,0,0,8">
+                    <TextBlock Text="Layout — drag a column left or right to reorder" Foreground="#556" VerticalAlignment="Center" DockPanel.Dock="Left" />
+                    <Button Content="Remove" Padding="8,2" DockPanel.Dock="Right" Margin="4,0,0,0" Command="{Binding RemoveColumnCommand}" />
+                    <Button Content="Add" Padding="8,2" DockPanel.Dock="Right" Margin="4,0,0,0" Command="{Binding AddColumnCommand}" />
+                    <Button Content="Move right" Padding="8,2" DockPanel.Dock="Right" Margin="4,0,0,0" Command="{Binding MoveRightCommand}" />
+                    <Button Content="Move left" Padding="8,2" DockPanel.Dock="Right" Command="{Binding MoveLeftCommand}" />
+                </DockPanel>
+                <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Background="#FCFDFC" VerticalAlignment="Top">
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="10">
+                            <TextBlock Text="Column headers" FontSize="10" Foreground="#99A" Margin="2,0,0,4" />
+                            <ListBox x:Name="ColumnStrip" ItemsSource="{Binding Columns}" SelectedItem="{Binding SelectedColumn}"
+                                     BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="AllowDrop" Value="True" />
+                                        <Setter Property="Margin" Value="0,0,6,0" />
+                                        <Setter Property="Padding" Value="0" />
+                                        <EventSetter Event="PreviewMouseLeftButtonDown" Handler="Block_PreviewMouseLeftButtonDown" />
+                                        <EventSetter Event="PreviewMouseMove" Handler="Block_PreviewMouseMove" />
+                                        <EventSetter Event="Drop" Handler="Block_Drop" />
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Width="{Binding Width}" Height="52" CornerRadius="3" BorderThickness="1"
+                                                BorderBrush="{StaticResource BorderBrush}" Background="White">
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Header}" FontWeight="SemiBold" FontSize="12"
+                                                           TextTrimming="CharacterEllipsis" Margin="6,0" Foreground="#334" />
+                                                <TextBlock Text="{Binding Field}" FontSize="10" Foreground="#99A"
+                                                           TextTrimming="CharacterEllipsis" Margin="6,2,6,0" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <Rectangle Height="1" Fill="{StaticResource BorderBrush}" Margin="0,8" />
+                            <TextBlock Text="Detail row (sample)" FontSize="10" Foreground="#99A" Margin="2,0,0,4" />
+                            <ItemsControl ItemsSource="{Binding Columns}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Width="{Binding Width}" Height="22" Margin="0,0,6,0" Background="#F3F6F3">
+                                            <TextBlock Text="{Binding Field}" FontSize="10" Foreground="#889" Margin="6,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="1" Width="3" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{StaticResource BorderBrush}" />
+
+            <!-- Right: column property editor -->
+            <DockPanel Grid.Column="2" Background="{StaticResource TreeBrush}">
+                <Border DockPanel.Dock="Top" Background="#ECF1EC" Padding="10,6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                    <TextBlock Text="Column" FontWeight="SemiBold" Foreground="#445" />
+                </Border>
+                <StackPanel Margin="12" DataContext="{Binding SelectedColumn}">
+                    <TextBlock Text="Field" FontSize="12" Foreground="#556" />
+                    <TextBox Height="24" VerticalContentAlignment="Center" Padding="4,0" Margin="0,0,0,10"
+                             Text="{Binding Field, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Text="Header" FontSize="12" Foreground="#556" />
+                    <TextBox Height="24" VerticalContentAlignment="Center" Padding="4,0" Margin="0,0,0,10"
+                             Text="{Binding Header, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Text="Width (pt)" FontSize="12" Foreground="#556" />
+                    <TextBox Height="24" VerticalContentAlignment="Center" Padding="4,0" Margin="0,0,0,10"
+                             Text="{Binding Width, UpdateSourceTrigger=PropertyChanged}" />
+                    <CheckBox Content="Money column (right-aligned, N2, totalled)" IsChecked="{Binding Money}" Margin="0,0,0,14" />
+                </StackPanel>
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+
+    <Window.Resources>
+        <!-- Toolbar action buttons for column add/remove/move sit under the canvas -->
+    </Window.Resources>
+</Window>

@@ -903,6 +903,46 @@ public static class SystemReports
         return def;
     }
 
+    /// <summary>
+    /// Reconstructs the <see cref="Column"/> list from a listing definition previously built by
+    /// <see cref="Listing"/> — pairing each <c>d_*</c> detail field with its <c>h_*</c> page-header label —
+    /// so a designer can round-trip a listing report (extract → edit → rebuild via <see cref="Listing"/>).
+    /// Returns an empty array for a definition that is not in the listing shape.
+    /// </summary>
+    /// <param name="definition">The report definition.</param>
+    /// <returns>The reconstructed columns, in render order.</returns>
+    public static Column[] ExtractListingColumns(ReportDefinition definition)
+    {
+        ReportBand? detail = definition.BandOfType(BandType.Detail);
+        ReportBand? pageHeader = definition.BandOfType(BandType.PageHeader);
+        if (detail is null)
+        {
+            return [];
+        }
+
+        Dictionary<string, string> headers = pageHeader?.Elements
+            .Where(e => e.Kind == ElementKind.Label && e.Name.StartsWith("h_", StringComparison.Ordinal))
+            .ToDictionary(e => e.Name["h_".Length..], e => e.Text ?? string.Empty) ?? [];
+
+        return detail.Elements
+            .Where(e => e.Kind == ElementKind.Field && e.Name.StartsWith("d_", StringComparison.Ordinal) && !string.IsNullOrEmpty(e.FieldName))
+            .OrderBy(e => e.X)
+            .Select(e =>
+            {
+                string field = e.FieldName!;
+                string header = headers.TryGetValue(field, out string? h) && !string.IsNullOrEmpty(h) ? h : field;
+                bool money = string.Equals(e.Format, "N2", StringComparison.OrdinalIgnoreCase);
+                return new Column(field, header, e.Width, money);
+            })
+            .ToArray();
+    }
+
+    /// <summary>The data-source command backing a definition (the key the report data provider handles).</summary>
+    /// <param name="definition">The report definition.</param>
+    /// <returns>The command, or the report code when no data source is defined.</returns>
+    public static string CommandOf(ReportDefinition definition) =>
+        definition.DataSources.FirstOrDefault()?.Command ?? definition.Code;
+
     private static ReportElement Label(string name, string text, double x, double y, double w, double h, bool bold = false, double size = 9, ReportHAlign align = ReportHAlign.Left) =>
         new() { Kind = ElementKind.Label, Name = name, Text = text, X = x, Y = y, Width = w, Height = h, Bold = bold, FontSize = size, HAlign = align };
 

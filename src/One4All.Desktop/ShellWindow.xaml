@@ -52,6 +52,7 @@
             <MenuItem Header="_Enquiries" />
             <MenuItem Header="_Reports">
                 <MenuItem Header="Report Viewer…" Click="OpenReportViewer_Click" />
+                <MenuItem Header="Report Designer…" Click="OpenReportDesigner_Click" />
             </MenuItem>
             <MenuItem Header="_Utilities" />
             <MenuItem Header="_Help" />
