@@ -79,7 +79,7 @@ public partial class App : System.Windows.Application
         }
 
         ILicenceService licence = Services.GetRequiredService<ILicenceService>();
-        ShellWindow shell = new(new ShellViewModel(result, licence));
+        ShellWindow shell = new(new ShellViewModel(result, licence), Services);
         MainWindow = shell;
         shell.Show();
         return true;

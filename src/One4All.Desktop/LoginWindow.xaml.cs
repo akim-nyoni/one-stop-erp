@@ -46,7 +46,7 @@ public partial class LoginWindow : Window
             }
 
             ILicenceService licence = _services.GetRequiredService<ILicenceService>();
-            ShellWindow shell = new(new ShellViewModel(result, licence));
+            ShellWindow shell = new(new ShellViewModel(result, licence), _services);
             System.Windows.Application.Current.MainWindow = shell;
             shell.Show();
             Close();
