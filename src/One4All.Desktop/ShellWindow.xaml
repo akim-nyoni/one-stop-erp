@@ -47,7 +47,9 @@
         <Menu DockPanel.Dock="Top" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
             <MenuItem Header="_File"><MenuItem Header="Exit" Click="Exit_Click" /></MenuItem>
             <MenuItem Header="_View" />
-            <MenuItem Header="_Maintenance" />
+            <MenuItem Header="_Maintenance">
+                <MenuItem Header="Roles &amp; Permissions…" Click="OpenPermissionEditor_Click" />
+            </MenuItem>
             <MenuItem Header="_Transactions" />
             <MenuItem Header="_Enquiries" />
             <MenuItem Header="_Reports">
