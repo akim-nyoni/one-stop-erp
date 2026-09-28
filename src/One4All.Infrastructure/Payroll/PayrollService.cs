@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Payroll;
+using One4All.Application.Payroll;
 using One4All.Core.Common;
 using One4All.Core.Payroll;
 using One4All.Core.System;
@@ -49,6 +50,44 @@ public sealed class PayrollService : IPayrollService
 
         IReadOnlyList<PayLine> lines = slip.Value.Lines.Select(l => new PayLine(l.ElementCode, l.Amount)).ToList();
         return new PayCalculation(employee.Id, slip.Value.GrossEarnings, slip.Value.TotalDeductions, slip.Value.NetPay, lines);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RenderPayslipTextAsync(long companyId, long employeeId, string periodLabel, DateOnly payDate, int width = PayslipFormatter.DefaultWidth, CancellationToken ct = default)
+    {
+        Employee? employee = await _db.Set<Employee>().Include(e => e.PayElements)
+            .FirstOrDefaultAsync(e => e.Id == employeeId && e.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (employee is null)
+        {
+            return Error.NotFound("Payroll.EmployeeNotFound", $"Employee {employeeId} not found.");
+        }
+
+        Dictionary<long, PayElement> elements = await LoadElementsAsync(companyId, ct).ConfigureAwait(false);
+        Result<Payslip> slip = BuildPayslip(companyId, employee, elements, periodLabel, payDate);
+        if (slip.IsFailure)
+        {
+            return slip.Error;
+        }
+
+        string companyName = await _db.Set<Company>().Where(c => c.Id == companyId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? string.Empty;
+        Dictionary<string, string> names = elements.Values.GroupBy(e => e.Code).ToDictionary(g => g.Key, g => g.First().Name, StringComparer.OrdinalIgnoreCase);
+        string Label(string code) => names.TryGetValue(code, out string? name) ? name : code;
+
+        PayslipDocument document = new()
+        {
+            CompanyName = companyName,
+            EmployeeName = employee.FullName,
+            EmployeeNumber = employee.EmployeeNumber,
+            PeriodLabel = periodLabel,
+            PayDate = payDate,
+            Earnings = slip.Value.Lines.Where(l => l.Type == PayElementType.Earning).Select(l => new PayslipItem(Label(l.ElementCode), l.Amount)).ToList(),
+            Deductions = slip.Value.Lines.Where(l => l.Type == PayElementType.Deduction).Select(l => new PayslipItem(Label(l.ElementCode), l.Amount)).ToList(),
+            GrossEarnings = slip.Value.GrossEarnings,
+            TotalDeductions = slip.Value.TotalDeductions,
+            NetPay = slip.Value.NetPay,
+        };
+
+        return PayslipFormatter.ToPlainText(document, width);
     }
 
     /// <inheritdoc />

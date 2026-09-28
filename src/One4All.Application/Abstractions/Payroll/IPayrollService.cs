@@ -49,4 +49,14 @@ public interface IPayrollService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The run result.</returns>
     Task<Result<PayrollRunResult>> RunAsync(long companyId, string periodLabel, DateOnly payDate, string netPayAccountCode, string documentNumber, CancellationToken ct = default);
+
+    /// <summary>Renders an employee's payslip (earnings, deductions, gross/net) to fixed-width plain text.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="employeeId">The employee.</param>
+    /// <param name="periodLabel">The pay-period label shown on the payslip.</param>
+    /// <param name="payDate">The pay date shown on the payslip.</param>
+    /// <param name="width">The payslip character width.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The payslip text, or NotFound when the employee does not exist.</returns>
+    Task<Result<string>> RenderPayslipTextAsync(long companyId, long employeeId, string periodLabel, DateOnly payDate, int width = One4All.Application.Payroll.PayslipFormatter.DefaultWidth, CancellationToken ct = default);
 }
