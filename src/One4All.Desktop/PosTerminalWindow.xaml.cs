@@ -1,4 +1,6 @@
+using System.IO;
 using System.Windows;
+using Microsoft.Win32;
 using One4All.Desktop.ViewModels;
 
 namespace One4All.Desktop;
@@ -26,4 +28,23 @@ public partial class PosTerminalWindow : Window
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+    private async void PrintReceipt_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_viewModel.LastReceiptText))
+        {
+            MessageBox.Show(this, "No receipt yet — complete a sale first.", "Receipt", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        SaveFileDialog dialog = new()
+        {
+            FileName = "receipt.txt",
+            Filter = "Text file (*.txt)|*.txt",
+        };
+        if (dialog.ShowDialog(this) == true)
+        {
+            await File.WriteAllTextAsync(dialog.FileName, _viewModel.LastReceiptText).ConfigureAwait(false);
+        }
+    }
 }

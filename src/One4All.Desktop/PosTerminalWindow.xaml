@@ -248,6 +248,7 @@
                                 <Button Content="X-Read" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#34495E" Command="{Binding XReadCommand}" />
                                 <Button Content="Z / Close" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#C0392B" Command="{Binding CloseTillCommand}" />
                                 <Button Content="Sync Offline" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#16A085" Command="{Binding FlushOfflineCommand}" />
+                                <Button Content="Receipt" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#2C3E50" Click="PrintReceipt_Click" />
                             </UniformGrid>
                         </StackPanel>
                     </Grid>

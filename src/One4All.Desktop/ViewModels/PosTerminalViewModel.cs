@@ -149,6 +149,10 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [ObservableProperty]
     private int _pendingOfflineCount;
 
+    /// <summary>The plain-text receipt for the last posted sale (empty until a sale posts).</summary>
+    [ObservableProperty]
+    private string _lastReceiptText = string.Empty;
+
     /// <summary>The net subtotal.</summary>
     public string SubtotalText => _ticket.SubtotalNet.ToString("N2", CultureInfo.CurrentCulture);
 
@@ -518,6 +522,10 @@ public sealed partial class PosTerminalViewModel : ObservableObject
                 StatusMessage = $"Sale not posted: {result.Error.Message}";
                 return;
             }
+
+            IPosReceiptService receipts = scope.ServiceProvider.GetRequiredService<IPosReceiptService>();
+            Result<string> receipt = await receipts.RenderReceiptTextAsync(request.CompanyId, result.Value.SaleId).ConfigureAwait(true);
+            LastReceiptText = receipt.IsSuccess ? receipt.Value : string.Empty;
 
             _ticket.Clear();
             RebuildCart();
