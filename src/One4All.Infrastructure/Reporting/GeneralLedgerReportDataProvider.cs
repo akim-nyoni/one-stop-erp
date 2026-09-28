@@ -10,7 +10,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "TrialBalance", "IncomeStatement", "BalanceSheet", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts", "FinancialSnapshot", "VatReturn", "ControlReconciliation", "VatReturnByCode",
+        "TrialBalance", "IncomeStatement", "BalanceSheet", "CashFlow", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts", "FinancialSnapshot", "VatReturn", "ControlReconciliation", "VatReturnByCode",
     };
 
     private readonly IGeneralLedgerReports _reports;
@@ -30,6 +30,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             "TRIALBALANCE" => await TrialBalanceAsync(companyId, parameters, ct).ConfigureAwait(false),
             "INCOMESTATEMENT" => await IncomeStatementAsync(companyId, parameters, ct).ConfigureAwait(false),
             "BALANCESHEET" => await BalanceSheetAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "CASHFLOW" => await CashFlowAsync(companyId, parameters, ct).ConfigureAwait(false),
             "NOMINALACTIVITY" => await NominalActivityAsync(companyId, parameters, ct).ConfigureAwait(false),
             "JOURNALDAYBOOK" => await JournalDaybookAsync(companyId, parameters, ct).ConfigureAwait(false),
             "TRIALBALANCEMOVEMENT" => await TrialBalanceMovementAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -76,6 +77,24 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
         rows.AddRange(report.Liabilities.Select(l => Row(new() { ["Category"] = "Liability", ["AccountCode"] = l.AccountCode, ["AccountName"] = l.AccountName, ["Amount"] = l.Amount })));
         rows.AddRange(report.Equity.Select(l => Row(new() { ["Category"] = "Equity", ["AccountCode"] = l.AccountCode, ["AccountName"] = l.AccountName, ["Amount"] = l.Amount })));
         return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CashFlowAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly to = ReportParameters.Date(parameters, "ToDate");
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
+        CashFlowStatement cf = await _reports.CashFlowStatementAsync(companyId, from, to, ct).ConfigureAwait(false);
+
+        return
+        [
+            Row(new() { ["Activity"] = "Operating activities", ["Amount"] = cf.Operating }),
+            Row(new() { ["Activity"] = "Investing activities", ["Amount"] = cf.Investing }),
+            Row(new() { ["Activity"] = "Financing activities", ["Amount"] = cf.Financing }),
+            Row(new() { ["Activity"] = "Unclassified", ["Amount"] = cf.Unclassified }),
+            Row(new() { ["Activity"] = "Net change in cash", ["Amount"] = cf.NetChange }),
+            Row(new() { ["Activity"] = "Opening cash", ["Amount"] = cf.OpeningCash }),
+            Row(new() { ["Activity"] = "Closing cash", ["Amount"] = cf.ClosingCash }),
+        ];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> NominalActivityAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
