@@ -24,6 +24,28 @@ public sealed class OpportunityService : IOpportunityService
     }
 
     /// <inheritdoc />
+    public async Task<Result<PipelineForecast>> PipelineForecastAsync(long companyId, CancellationToken ct = default)
+    {
+        List<Opportunity> open = await _db.Set<Opportunity>()
+            .Where(o => o.CompanyId == companyId && o.Stage != OpportunityStage.Won && o.Stage != OpportunityStage.Lost)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        List<PipelineStageSummary> stages = open
+            .GroupBy(o => o.Stage)
+            .OrderBy(g => g.Key)
+            .Select(g => new PipelineStageSummary(
+                g.Key,
+                g.Count(),
+                g.Sum(o => o.EstimatedValue),
+                decimal.Round(g.Sum(o => o.WeightedValue), 2, MidpointRounding.ToEven)))
+            .ToList();
+
+        decimal totalEstimated = stages.Sum(s => s.EstimatedValue);
+        decimal totalWeighted = decimal.Round(stages.Sum(s => s.WeightedValue), 2, MidpointRounding.ToEven);
+        return new PipelineForecast(stages, totalEstimated, totalWeighted);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<long>> ConvertToSalesOrderAsync(long companyId, long opportunityId, string orderNumber, DateOnly orderDate, CurrencyCode currency, IReadOnlyList<SalesOrderLineRequest> lines, CancellationToken ct = default)
     {
         if (lines.Count == 0)
