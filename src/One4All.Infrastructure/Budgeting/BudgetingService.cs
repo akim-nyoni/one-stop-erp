@@ -101,8 +101,52 @@ public sealed class BudgetingService : IBudgetingService
         decimal budgetAmount = budget.Lines.Where(l => l.AccountCode == accountCode && l.Period <= asAtPeriod).Sum(l => l.Amount);
         Dictionary<string, decimal> actuals = await ActualsByAccountAsync(companyId, fiscalYearId, asAtPeriod, ct).ConfigureAwait(false);
         decimal actual = actuals.GetValueOrDefault(accountCode);
-        decimal available = budgetAmount - actual;
-        return new AvailabilityResult(accountCode, budgetAmount, actual, available, proposedAmount, proposedAmount <= available);
+
+        decimal committed = await _db.Set<BudgetCommitment>()
+            .Where(c => c.CompanyId == companyId && c.FiscalYearId == fiscalYearId && c.Type == type && c.Department == department
+                && c.AccountCode == accountCode && c.Period <= asAtPeriod && c.Status == CommitmentStatus.Open)
+            .SumAsync(c => (decimal?)c.Amount, ct).ConfigureAwait(false) ?? 0m;
+
+        decimal available = budgetAmount - actual - committed;
+        return new AvailabilityResult(accountCode, budgetAmount, actual, committed, available, proposedAmount, proposedAmount <= available);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> CommitAsync(long companyId, long fiscalYearId, BudgetType type, string? department, string accountCode, int period, decimal amount, string reference, CancellationToken ct = default)
+    {
+        if (amount <= 0m)
+        {
+            return Error.Validation("Budget.Commit.Amount", "A commitment amount must be positive.");
+        }
+
+        if (string.IsNullOrWhiteSpace(accountCode))
+        {
+            return Error.Validation("Budget.Commit.Account", "A commitment needs an account.");
+        }
+
+        BudgetCommitment commitment = new(companyId, fiscalYearId, type, department, accountCode.Trim(), period, amount, reference?.Trim() ?? string.Empty);
+        _db.Set<BudgetCommitment>().Add(commitment);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return commitment.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> ReleaseCommitmentAsync(long companyId, long commitmentId, CancellationToken ct = default)
+    {
+        BudgetCommitment? commitment = await _db.Set<BudgetCommitment>()
+            .FirstOrDefaultAsync(c => c.Id == commitmentId && c.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (commitment is null)
+        {
+            return Result.Failure(Error.NotFound("Budget.Commit.NotFound", $"No commitment {commitmentId}."));
+        }
+
+        if (!commitment.Release())
+        {
+            return Result.Failure(Error.Rule("Budget.Commit.AlreadyReleased", "The commitment is already released."));
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 
     private async Task<Dictionary<string, decimal>> ActualsByAccountAsync(long companyId, long fiscalYearId, int asAtPeriod, CancellationToken ct)

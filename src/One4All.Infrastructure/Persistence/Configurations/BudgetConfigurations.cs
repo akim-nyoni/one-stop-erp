@@ -34,3 +34,19 @@ internal sealed class BudgetLineConfiguration : IEntityTypeConfiguration<BudgetL
         b.HasIndex(x => new { x.BudgetId, x.AccountCode, x.Period });
     }
 }
+
+internal sealed class BudgetCommitmentConfiguration : IEntityTypeConfiguration<BudgetCommitment>
+{
+    public void Configure(EntityTypeBuilder<BudgetCommitment> b)
+    {
+        b.ToTable("commitment", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Type).HasConversion<int>();
+        b.Property(x => x.Department).HasMaxLength(30);
+        b.Property(x => x.AccountCode).HasMaxLength(8);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.FiscalYearId, x.Type, x.Department, x.AccountCode, x.Status });
+    }
+}

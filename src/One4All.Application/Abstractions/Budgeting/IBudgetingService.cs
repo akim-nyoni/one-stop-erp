@@ -39,10 +39,11 @@ public readonly record struct BudgetVsActualReport(long FiscalYearId, IReadOnlyL
 /// <param name="AccountCode">The account.</param>
 /// <param name="Budget">The budget for the account.</param>
 /// <param name="Actual">The actual to date.</param>
-/// <param name="Available">The available balance (budget − actual).</param>
+/// <param name="Committed">Open commitments (encumbrances) reserved against the account.</param>
+/// <param name="Available">The available balance (budget − actual − committed).</param>
 /// <param name="Proposed">The proposed spend tested.</param>
 /// <param name="Passes">Whether the proposed spend fits within the available balance.</param>
-public readonly record struct AvailabilityResult(string AccountCode, decimal Budget, decimal Actual, decimal Available, decimal Proposed, bool Passes);
+public readonly record struct AvailabilityResult(string AccountCode, decimal Budget, decimal Actual, decimal Committed, decimal Available, decimal Proposed, bool Passes);
 
 /// <summary>
 /// Budgeting, Planning &amp; Commitment Control (brief §4.18). Budgets live in their own schema and never
@@ -93,4 +94,28 @@ public interface IBudgetingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The availability result.</returns>
     Task<Result<AvailabilityResult>> CheckAvailabilityAsync(long companyId, long fiscalYearId, BudgetType type, string? department, string accountCode, decimal proposedAmount, int asAtPeriod, CancellationToken ct = default);
+
+    /// <summary>
+    /// Raises a budget commitment (encumbrance) reserving an amount against a budget line — the reservation
+    /// a purchase order makes so its funds cannot be committed twice. Open commitments reduce the available
+    /// balance in <see cref="CheckAvailabilityAsync"/>.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fiscalYearId">The fiscal year.</param>
+    /// <param name="type">The budget type/scenario.</param>
+    /// <param name="department">The department (null for company-wide).</param>
+    /// <param name="accountCode">The account committed against.</param>
+    /// <param name="period">The period (month 1–12).</param>
+    /// <param name="amount">The committed amount (positive).</param>
+    /// <param name="reference">The source reference (e.g. the purchase-order number).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created commitment id, or an error.</returns>
+    Task<Result<long>> CommitAsync(long companyId, long fiscalYearId, BudgetType type, string? department, string accountCode, int period, decimal amount, string reference, CancellationToken ct = default);
+
+    /// <summary>Releases an open commitment, freeing the reserved budget (e.g. when it is invoiced or cancelled).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="commitmentId">The commitment to release.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or NotFound/Rule when it is missing or already released.</returns>
+    Task<Result> ReleaseCommitmentAsync(long companyId, long commitmentId, CancellationToken ct = default);
 }
