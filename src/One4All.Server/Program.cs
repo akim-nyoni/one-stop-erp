@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using One4All.Application.Abstractions.Security;
+using One4All.Core.Common;
 using One4All.Infrastructure;
 using One4All.Infrastructure.Persistence;
 using One4All.Infrastructure.Persistence.Seeding;
@@ -113,7 +114,62 @@ app.MapGet("/api/reports", async (One4AllDbContext db, CancellationToken ct) =>
 .RequireAuthorization()
 .WithName("Reports");
 
+// --- Offline outbox (drain + dead-letter administration) --------------------------------------------------
+app.MapPost("/api/offline/sync", async (One4All.Application.Abstractions.Offline.IOfflineSyncService sync, CancellationToken ct) =>
+{
+    One4All.Application.Abstractions.Offline.OfflineSyncReport report = await sync.SyncPendingAsync(ct).ConfigureAwait(false);
+    return Results.Ok(new { report.Synced, report.DeadLettered, report.Retryable, report.Processed });
+})
+.RequireAuthorization()
+.WithName("OfflineSync");
+
+app.MapGet("/api/offline/failed", async (One4All.Application.Abstractions.Offline.IOfflineAdminService admin, CancellationToken ct) =>
+{
+    IReadOnlyList<One4All.Core.Offline.OfflineOperation> failed = await admin.ListFailedAsync(ct: ct).ConfigureAwait(false);
+    return Results.Ok(failed.Select(o => new
+    {
+        o.OperationId,
+        o.Kind,
+        o.CompanyId,
+        o.Attempts,
+        o.LastError,
+        o.CreatedUtc,
+    }));
+})
+.RequireAuthorization()
+.WithName("OfflineFailed");
+
+app.MapPost("/api/offline/{operationId:guid}/requeue", async (Guid operationId, One4All.Application.Abstractions.Offline.IOfflineAdminService admin, CancellationToken ct) =>
+{
+    Result result = await admin.RequeueAsync(operationId, ct).ConfigureAwait(false);
+    return OfflineActionResult(result);
+})
+.RequireAuthorization()
+.WithName("OfflineRequeue");
+
+app.MapPost("/api/offline/{operationId:guid}/discard", async (Guid operationId, One4All.Application.Abstractions.Offline.IOfflineAdminService admin, CancellationToken ct) =>
+{
+    Result result = await admin.DiscardAsync(operationId, ct).ConfigureAwait(false);
+    return OfflineActionResult(result);
+})
+.RequireAuthorization()
+.WithName("OfflineDiscard");
+
 app.Run();
+
+// Maps an offline admin Result to an HTTP response (404 not-found, 409 rule violation, 200 success).
+static IResult OfflineActionResult(Result result)
+{
+    if (result.IsSuccess)
+    {
+        return Results.Ok(new { ok = true });
+    }
+
+    int status = result.Error.Type == ErrorType.NotFound
+        ? StatusCodes.Status404NotFound
+        : StatusCodes.Status409Conflict;
+    return Results.Json(new { error = result.Error.Message }, statusCode: status);
+}
 
 /// <summary>The login request body.</summary>
 /// <param name="Username">The login name.</param>

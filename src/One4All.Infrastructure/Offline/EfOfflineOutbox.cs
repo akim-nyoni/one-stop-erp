@@ -40,5 +40,20 @@ public sealed class EfOfflineOutbox : IOfflineOutbox
             .ConfigureAwait(false);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<OfflineOperation>> GetByStatusAsync(OfflineOperationStatus status, int maxCount, CancellationToken ct = default) =>
+        await _db.OfflineOperations
+            .Where(o => o.Status == status)
+            .OrderBy(o => o.CreatedUtc).ThenBy(o => o.Id)
+            .Take(maxCount)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<OfflineOperation?> FindAsync(Guid operationId, CancellationToken ct = default) =>
+        await _db.OfflineOperations
+            .FirstOrDefaultAsync(o => o.OperationId == operationId, ct)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
     public Task SaveChangesAsync(CancellationToken ct = default) => _db.SaveChangesAsync(ct);
 }

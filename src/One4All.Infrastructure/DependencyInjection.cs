@@ -141,6 +141,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Offline.IOfflineOutbox, Offline.EfOfflineOutbox>();
         services.AddScoped<Application.Abstractions.Offline.IOfflineOperationHandler, Offline.PosSaleOfflineHandler>();
         services.AddScoped<Application.Abstractions.Offline.IOfflineSyncService, Application.Offline.OfflineSyncService>();
+        services.AddScoped<Application.Abstractions.Offline.IOfflineAdminService, Application.Offline.OfflineAdminService>();
 
         // Raw-SQL runner + seeders.
         services.AddSingleton<ISqlScriptRunner>(_ => new SqlScriptRunner(connectionString));

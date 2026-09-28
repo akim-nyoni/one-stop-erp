@@ -20,6 +20,19 @@ public interface IOfflineOutbox
     /// <returns>The pending operations.</returns>
     Task<IReadOnlyList<OfflineOperation>> GetPendingAsync(int maxCount, CancellationToken ct = default);
 
+    /// <summary>Returns operations in a given status, oldest first, up to a limit (for administration).</summary>
+    /// <param name="status">The status to filter by.</param>
+    /// <param name="maxCount">The maximum number to return.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The matching operations.</returns>
+    Task<IReadOnlyList<OfflineOperation>> GetByStatusAsync(OfflineOperationStatus status, int maxCount, CancellationToken ct = default);
+
+    /// <summary>Finds a single operation by its client operation id, or null.</summary>
+    /// <param name="operationId">The operation id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The operation, or null when not found.</returns>
+    Task<OfflineOperation?> FindAsync(Guid operationId, CancellationToken ct = default);
+
     /// <summary>Persists status changes made to operations returned by <see cref="GetPendingAsync"/>.</summary>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A task.</returns>

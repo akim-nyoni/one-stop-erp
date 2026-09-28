@@ -49,6 +49,19 @@ public sealed class OfflineSyncServiceTests
             return Task.FromResult(pending);
         }
 
+        public Task<IReadOnlyList<OfflineOperation>> GetByStatusAsync(OfflineOperationStatus status, int maxCount, CancellationToken ct = default)
+        {
+            IReadOnlyList<OfflineOperation> matching = _ops
+                .Where(o => o.Status == status)
+                .OrderBy(o => o.CreatedUtc)
+                .Take(maxCount)
+                .ToList();
+            return Task.FromResult(matching);
+        }
+
+        public Task<OfflineOperation?> FindAsync(Guid operationId, CancellationToken ct = default) =>
+            Task.FromResult(_ops.FirstOrDefault(o => o.OperationId == operationId));
+
         public Task SaveChangesAsync(CancellationToken ct = default)
         {
             SaveCount++;

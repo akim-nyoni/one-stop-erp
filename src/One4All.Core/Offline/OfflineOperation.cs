@@ -13,6 +13,9 @@ public enum OfflineOperationStatus
 
     /// <summary>Replay failed too many times; dead-lettered for an operator to inspect.</summary>
     Failed = 2,
+
+    /// <summary>Deliberately abandoned by an operator; kept for audit, never replayed.</summary>
+    Discarded = 3,
 }
 
 /// <summary>
@@ -107,5 +110,40 @@ public sealed class OfflineOperation : Entity, ICompanyScoped
         Attempts++;
         LastError = error;
         Status = OfflineOperationStatus.Failed;
+    }
+
+    /// <summary>
+    /// Returns a dead-lettered operation to the queue for another attempt (e.g. after the operator fixed
+    /// the underlying cause). Clears the attempt count and last error. Only a <see cref="OfflineOperationStatus.Failed"/>
+    /// operation can be requeued.
+    /// </summary>
+    /// <returns>True when requeued; false when the operation was not in a failed state.</returns>
+    public bool Requeue()
+    {
+        if (Status != OfflineOperationStatus.Failed)
+        {
+            return false;
+        }
+
+        Status = OfflineOperationStatus.Pending;
+        Attempts = 0;
+        LastError = null;
+        return true;
+    }
+
+    /// <summary>
+    /// Abandons a dead-lettered operation so it is never replayed (kept for audit). Only a
+    /// <see cref="OfflineOperationStatus.Failed"/> operation can be discarded.
+    /// </summary>
+    /// <returns>True when discarded; false when the operation was not in a failed state.</returns>
+    public bool Discard()
+    {
+        if (Status != OfflineOperationStatus.Failed)
+        {
+            return false;
+        }
+
+        Status = OfflineOperationStatus.Discarded;
+        return true;
     }
 }
