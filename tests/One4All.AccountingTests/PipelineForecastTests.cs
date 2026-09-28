@@ -53,6 +53,14 @@ public sealed class PipelineForecastTests
 
             forecast.TotalEstimated.Should().Be(3000m);
             forecast.TotalWeighted.Should().Be(1100m); // 100 + 1000
+
+            // Conversion: 1 won (5000) and 1 lost → 50% win rate.
+            var conversion = await opportunities.ConversionMetricsAsync(companyId);
+            conversion.IsSuccess.Should().BeTrue(conversion.IsFailure ? conversion.Error.ToString() : null);
+            conversion.Value.Won.Should().Be(1);
+            conversion.Value.Lost.Should().Be(1);
+            conversion.Value.WonValue.Should().Be(5000m);
+            conversion.Value.WinRatePercent.Should().Be(50.0m);
         }
     }
 }

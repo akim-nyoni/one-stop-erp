@@ -24,6 +24,20 @@ public sealed class OpportunityService : IOpportunityService
     }
 
     /// <inheritdoc />
+    public async Task<Result<OpportunityConversion>> ConversionMetricsAsync(long companyId, CancellationToken ct = default)
+    {
+        int won = await _db.Set<Opportunity>().CountAsync(o => o.CompanyId == companyId && o.Stage == OpportunityStage.Won, ct).ConfigureAwait(false);
+        int lost = await _db.Set<Opportunity>().CountAsync(o => o.CompanyId == companyId && o.Stage == OpportunityStage.Lost, ct).ConfigureAwait(false);
+        decimal wonValue = await _db.Set<Opportunity>()
+            .Where(o => o.CompanyId == companyId && o.Stage == OpportunityStage.Won)
+            .SumAsync(o => (decimal?)o.EstimatedValue, ct).ConfigureAwait(false) ?? 0m;
+
+        int decided = won + lost;
+        decimal winRate = decided == 0 ? 0m : decimal.Round(won * 100m / decided, 1, MidpointRounding.AwayFromZero);
+        return new OpportunityConversion(won, lost, wonValue, winRate);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<PipelineForecast>> PipelineForecastAsync(long companyId, CancellationToken ct = default)
     {
         List<Opportunity> open = await _db.Set<Opportunity>()

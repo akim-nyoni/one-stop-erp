@@ -18,9 +18,25 @@ public readonly record struct PipelineStageSummary(OpportunityStage Stage, int C
 /// <param name="TotalWeighted">The total probability-weighted forecast.</param>
 public sealed record PipelineForecast(IReadOnlyList<PipelineStageSummary> Stages, decimal TotalEstimated, decimal TotalWeighted);
 
+/// <summary>Opportunity conversion (win-rate) metrics.</summary>
+/// <param name="Won">The number of won opportunities.</param>
+/// <param name="Lost">The number of lost opportunities.</param>
+/// <param name="WonValue">The total estimated value of the won opportunities.</param>
+/// <param name="WinRatePercent">Won ÷ (won + lost) as a percent, or zero when none are decided.</param>
+public readonly record struct OpportunityConversion(int Won, int Lost, decimal WonValue, decimal WinRatePercent);
+
 /// <summary>Lightweight CRM opportunity operations that reach into other modules.</summary>
 public interface IOpportunityService
 {
+    /// <summary>
+    /// Produces the conversion (win-rate) metrics for the company's decided opportunities: how many were
+    /// won versus lost, the value won, and the win rate.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The conversion metrics.</returns>
+    Task<Result<OpportunityConversion>> ConversionMetricsAsync(long companyId, CancellationToken ct = default);
+
     /// <summary>
     /// Produces the weighted-pipeline forecast for the open opportunities: their estimated and
     /// probability-weighted value grouped by stage, plus the overall totals. Won and lost opportunities are
