@@ -117,6 +117,14 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [ObservableProperty]
     private string _taxAccountCode = string.Empty;
 
+    /// <summary>The cash-over/short account the Z cash-up variance posts to.</summary>
+    [ObservableProperty]
+    private string _overShortAccountCode = string.Empty;
+
+    /// <summary>The cash counted for the Z cash-up (blank closes without a cash-up).</summary>
+    [ObservableProperty]
+    private string _countedCash = string.Empty;
+
     /// <summary>The opening float entered when opening the till.</summary>
     [ObservableProperty]
     private string _openingFloat = "0.00";
@@ -272,6 +280,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         CashAccountCode = FindByName(accounts, "cash", "till", "bank") ?? CashAccountCode;
         CardAccountCode = FindByName(accounts, "card", "clearing") ?? CashAccountCode;
         TaxAccountCode = FindByName(accounts, "vat", "output tax", "tax") ?? TaxAccountCode;
+        OverShortAccountCode = FindByName(accounts, "over", "short", "variance") ?? OverShortAccountCode;
     }
 
     private static string? FindByName(IEnumerable<LedgerAccount> accounts, params string[] keywords) =>
@@ -616,18 +625,50 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         IPosService pos = scope.ServiceProvider.GetRequiredService<IPosService>();
-        Result<TillRead> result = await pos.CloseTillAsync(TillSessionId).ConfigureAwait(true);
-        if (result.IsFailure)
+
+        bool doCashUp = decimal.TryParse(CountedCash, NumberStyles.Number, CultureInfo.CurrentCulture, out decimal counted)
+            && !string.IsNullOrWhiteSpace(CashAccountCode)
+            && !string.IsNullOrWhiteSpace(OverShortAccountCode);
+
+        if (doCashUp)
         {
-            StatusMessage = result.Error.Message;
-            return;
+            Result<CashUpResult> cashUp = await pos.CashUpAndCloseAsync(new CashUpRequest
+            {
+                TillSessionId = TillSessionId,
+                CountedCash = counted,
+                Date = DateOnly.FromDateTime(DateTime.Today),
+                CashAccountCode = CashAccountCode.Trim(),
+                OverShortAccountCode = OverShortAccountCode.Trim(),
+            }).ConfigureAwait(true);
+            if (cashUp.IsFailure)
+            {
+                StatusMessage = cashUp.Error.Message;
+                return;
+            }
+
+            CashUpResult r = cashUp.Value;
+            string variance = r.Variance == 0m ? "balanced"
+                : r.Variance > 0m ? $"over {r.Variance:N2}"
+                : $"short {Math.Abs(r.Variance):N2}";
+            StatusMessage = $"Z-read #{r.ZReadNumber}: expected {r.ExpectedCash:N2}, counted {r.CountedCash:N2} ({variance}). Till closed.";
+        }
+        else
+        {
+            Result<TillRead> result = await pos.CloseTillAsync(TillSessionId).ConfigureAwait(true);
+            if (result.IsFailure)
+            {
+                StatusMessage = result.Error.Message;
+                return;
+            }
+
+            StatusMessage = $"Z-read #{result.Value.ZReadNumber}: {result.Value.SaleCount} sale(s), gross {result.Value.TotalGross:N2}. Till closed.";
         }
 
         _ticket.Clear();
         RebuildCart();
         IsSessionOpen = false;
         TillSessionId = 0;
-        StatusMessage = $"Z-read #{result.Value.ZReadNumber}: {result.Value.SaleCount} sale(s), gross {result.Value.TotalGross:N2}. Till closed.";
+        CountedCash = string.Empty;
     }
 
     private void RebuildCart()

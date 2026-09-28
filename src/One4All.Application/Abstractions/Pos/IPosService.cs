@@ -70,6 +70,42 @@ public readonly record struct CompleteSaleResult(long SaleId, string JournalNumb
 /// <param name="ZReadNumber">The Z number (only on a Z-read/close).</param>
 public sealed record TillRead(int SaleCount, decimal TotalGross, IReadOnlyDictionary<TenderType, decimal> TenderTotals, int? ZReadNumber);
 
+/// <summary>A request to close a till with a cash-up (declared cash count).</summary>
+public sealed class CashUpRequest
+{
+    /// <summary>The till session to close.</summary>
+    public long TillSessionId { get; init; }
+
+    /// <summary>The cash physically counted in the drawer.</summary>
+    public decimal CountedCash { get; init; }
+
+    /// <summary>The posting date for any variance journal.</summary>
+    public DateOnly Date { get; init; }
+
+    /// <summary>The till's cash GL account (the drawer).</summary>
+    public string CashAccountCode { get; init; } = string.Empty;
+
+    /// <summary>The cash over/short GL account the variance posts to.</summary>
+    public string OverShortAccountCode { get; init; } = string.Empty;
+}
+
+/// <summary>The result of a cash-up close.</summary>
+/// <param name="ZReadNumber">The Z-read number assigned on close.</param>
+/// <param name="OpeningFloat">The opening float.</param>
+/// <param name="ExpectedCash">The cash the drawer should hold (float + cash received − change).</param>
+/// <param name="CountedCash">The cash counted.</param>
+/// <param name="Variance">Counted − expected (positive over, negative short).</param>
+/// <param name="VarianceJournalNumber">The variance journal number, or null when it balanced.</param>
+/// <param name="Read">The underlying Z-read totals.</param>
+public sealed record CashUpResult(
+    int ZReadNumber,
+    decimal OpeningFloat,
+    decimal ExpectedCash,
+    decimal CountedCash,
+    decimal Variance,
+    string? VarianceJournalNumber,
+    TillRead Read);
+
 /// <summary>The Point of Sale service (brief §4.1): till sessions, sales with multi-currency tendering, and X/Z reads.</summary>
 public interface IPosService
 {
@@ -113,4 +149,14 @@ public interface IPosService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The Z-read.</returns>
     Task<Result<TillRead>> CloseTillAsync(long tillSessionId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Closes a session with a cash-up: reconciles the counted cash against the expected drawer (float +
+    /// cash received − change) and posts the over/short variance to the cash-over/short account before
+    /// taking the Z-read. A zero variance posts no journal.
+    /// </summary>
+    /// <param name="request">The cash-up request (counted cash and accounts).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The cash-up result (Z-read, expected/counted/variance, variance journal).</returns>
+    Task<Result<CashUpResult>> CashUpAndCloseAsync(CashUpRequest request, CancellationToken ct = default);
 }

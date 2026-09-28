@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Inventory;
 using One4All.Application.Abstractions.Pos;
+using One4All.Application.Pos;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.Inventory;
@@ -253,6 +254,87 @@ public sealed class PosService : IPosService
         }
 
         return new TillRead(sales.Count, gross, tenderTotals, zNumber);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<CashUpResult>> CashUpAndCloseAsync(CashUpRequest request, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.CashAccountCode) || string.IsNullOrWhiteSpace(request.OverShortAccountCode))
+        {
+            return Error.Validation("Pos.CashUp.Accounts", "A cash-up needs both the cash and the cash-over/short account.");
+        }
+
+        TillSession? session = await _db.Set<TillSession>().FirstOrDefaultAsync(s => s.Id == request.TillSessionId, ct).ConfigureAwait(false);
+        if (session is null)
+        {
+            return Error.NotFound("Pos.SessionNotFound", $"Till session {request.TillSessionId} not found.");
+        }
+
+        if (session.Status != TillSessionStatus.Open)
+        {
+            return Error.Rule("Pos.SessionClosed", "The till session is already closed.");
+        }
+
+        List<SaleTender> cashTenders = await _db.Set<Sale>()
+            .Where(s => s.TillSessionId == session.Id && s.Status == SaleStatus.Completed)
+            .SelectMany(s => s.Tenders)
+            .Where(t => t.TenderType == TenderType.Cash)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        decimal cashReceived = cashTenders.Where(t => !t.IsChange).Sum(t => t.BaseAmount);
+        decimal changeGiven = cashTenders.Where(t => t.IsChange).Sum(t => t.BaseAmount);
+        CashUpCalculation cashUp = new(session.OpeningFloat, cashReceived, changeGiven, request.CountedCash);
+
+        string? varianceJournal = null;
+        if (!cashUp.Balances)
+        {
+            Company company = await _db.Companies.FirstAsync(c => c.Id == session.CompanyId, ct).ConfigureAwait(false);
+            decimal amount = Math.Abs(cashUp.Variance);
+
+            // Overage: cash is really higher than the books → Dr cash, Cr over/short (a gain).
+            // Shortage: cash is really lower → Dr over/short (a loss), Cr cash.
+            JournalSide cashSide = cashUp.IsOver ? JournalSide.Debit : JournalSide.Credit;
+            JournalSide overShortSide = cashUp.IsOver ? JournalSide.Credit : JournalSide.Debit;
+
+            Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
+            {
+                CompanyId = session.CompanyId,
+                SourceModule = "POS",
+                PostingDate = request.Date,
+                TransactionCurrency = company.BaseCurrency,
+                EnforceManualJournalRules = false,
+                DocumentType = "PosCashUp",
+                DocumentNumber = $"CASHUP-{session.Id}",
+                Narrative = $"Cash-up variance for till session {session.Id} ({(cashUp.IsOver ? "over" : "short")} {amount:0.00})",
+                Lines =
+                [
+                    new JournalLineRequest { AccountCode = request.CashAccountCode, Side = cashSide, TransactionAmount = amount },
+                    new JournalLineRequest { AccountCode = request.OverShortAccountCode, Side = overShortSide, TransactionAmount = amount },
+                ],
+            }, ct).ConfigureAwait(false);
+
+            if (posting.IsFailure)
+            {
+                return posting.Error;
+            }
+
+            varianceJournal = posting.Value.JournalNumber;
+        }
+
+        Result<TillRead> read = await ReadAsync(session.Id, close: true, ct).ConfigureAwait(false);
+        if (read.IsFailure)
+        {
+            return read.Error;
+        }
+
+        return new CashUpResult(
+            read.Value.ZReadNumber ?? 0,
+            session.OpeningFloat,
+            cashUp.ExpectedCash,
+            cashUp.CountedCash,
+            cashUp.Variance,
+            varianceJournal,
+            read.Value);
     }
 
     private async Task<Result<decimal>> ResolveRateAsync(CurrencyCode baseCurrency, CurrencyCode tenderCurrency, decimal? explicitRate, DateOnly date, CancellationToken ct)

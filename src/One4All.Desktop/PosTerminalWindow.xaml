@@ -139,6 +139,16 @@
                                     <TextBox Text="{Binding TaxAccountCode}" />
                                 </StackPanel>
                             </UniformGrid>
+                            <UniformGrid Columns="2" Margin="0,4,0,0">
+                                <StackPanel Margin="2">
+                                    <TextBlock Text="Over/short a/c" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBox Text="{Binding OverShortAccountCode}" />
+                                </StackPanel>
+                                <StackPanel Margin="2">
+                                    <TextBlock Text="Counted cash (Z)" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBox Text="{Binding CountedCash}" />
+                                </StackPanel>
+                            </UniformGrid>
                             <DockPanel Margin="0,6,0,0">
                                 <TextBlock Text="Float" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="2,0,6,0" />
                                 <TextBox Width="90" Text="{Binding OpeningFloat}" DockPanel.Dock="Left" />
