@@ -88,6 +88,36 @@ public sealed class VoucherService : IVoucherService
     }
 
     /// <inheritdoc />
+    public async Task<Result<BreakageRunResult>> RecogniseExpiredBreakageAsync(long companyId, DateOnly asAtDate, string liabilityAccountCode, string breakageAccountCode, CancellationToken ct = default)
+    {
+        List<GiftCard> expired = await _db.Set<GiftCard>()
+            .Where(g => g.CompanyId == companyId && g.Status == GiftCardStatus.Active && g.Balance > 0m
+                && g.ExpiryDate != null && g.ExpiryDate <= asAtDate)
+            .OrderBy(g => g.CardNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        int count = 0;
+        decimal total = 0m;
+        foreach (GiftCard card in expired)
+        {
+            decimal balanceBefore = card.Balance;
+            Result<GiftCardResult> result = await RecogniseBreakageAsync(companyId, card.CardNumber, asAtDate, liabilityAccountCode, breakageAccountCode, ct).ConfigureAwait(false);
+            if (result.IsFailure)
+            {
+                return result.Error;
+            }
+
+            if (balanceBefore > 0m)
+            {
+                count++;
+                total += balanceBefore;
+            }
+        }
+
+        return new BreakageRunResult(count, total);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<GiftCardResult>> RecogniseBreakageAsync(long companyId, string cardNumber, DateOnly date, string liabilityAccountCode, string breakageAccountCode, CancellationToken ct = default)
     {
         Result<GiftCard> cardResult = await LoadAsync(companyId, cardNumber, ct).ConfigureAwait(false);

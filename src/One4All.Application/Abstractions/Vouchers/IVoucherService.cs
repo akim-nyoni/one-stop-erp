@@ -75,4 +75,21 @@ public interface IVoucherService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The result, or an error.</returns>
     Task<Result<GiftCardResult>> RecogniseBreakageAsync(long companyId, string cardNumber, DateOnly date, string liabilityAccountCode, string breakageAccountCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Recognises breakage for every active card whose expiry date has passed and that still has a residual
+    /// balance — the periodic run that releases stale gift-card liabilities to income.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAtDate">The recognition date; cards expiring on or before it are swept.</param>
+    /// <param name="liabilityAccountCode">The gift-card liability account (debited).</param>
+    /// <param name="breakageAccountCode">The breakage income account (credited).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of cards expired and the total breakage recognised, or an error.</returns>
+    Task<Result<BreakageRunResult>> RecogniseExpiredBreakageAsync(long companyId, DateOnly asAtDate, string liabilityAccountCode, string breakageAccountCode, CancellationToken ct = default);
 }
+
+/// <summary>The result of a bulk breakage run.</summary>
+/// <param name="CardsExpired">The number of cards whose balance was recognised as breakage.</param>
+/// <param name="TotalBreakage">The total breakage income recognised.</param>
+public readonly record struct BreakageRunResult(int CardsExpired, decimal TotalBreakage);
