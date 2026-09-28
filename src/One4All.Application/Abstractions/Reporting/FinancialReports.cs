@@ -314,6 +314,18 @@ public interface IGeneralLedgerReports
     /// <returns>The departmental income statement.</returns>
     Task<IncomeStatement> IncomeStatementByDepartmentAsync(long companyId, DateOnly fromDate, DateOnly toDate, string department, CancellationToken ct = default);
 
+    /// <summary>
+    /// Produces the income statement for a single cost centre over a date range — the same profit-and-loss,
+    /// restricted to journal lines tagged with the given cost-centre dimension.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromDate">Start of the range.</param>
+    /// <param name="toDate">End of the range.</param>
+    /// <param name="costCentre">The cost-centre dimension to filter by.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The cost-centre income statement.</returns>
+    Task<IncomeStatement> IncomeStatementByCostCentreAsync(long companyId, DateOnly fromDate, DateOnly toDate, string costCentre, CancellationToken ct = default);
+
     /// <summary>Produces the statement of financial position as at a date.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="asAtDate">The as-at date.</param>
