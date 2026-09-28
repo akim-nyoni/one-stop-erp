@@ -20,6 +20,28 @@ public enum AccountType
     Expense = 5,
 }
 
+/// <summary>
+/// The activity an account's movement represents on the Statement of Cash Flows (IAS 7). Cash and cash
+/// equivalents are tagged so the statement can reconcile the classified movements to the change in cash.
+/// </summary>
+public enum CashFlowCategory
+{
+    /// <summary>Not classified — its movement falls into the statement's unclassified bucket.</summary>
+    None = 0,
+
+    /// <summary>Operating activities (trading income/expense and working capital).</summary>
+    Operating = 1,
+
+    /// <summary>Investing activities (acquiring/disposing of long-term assets).</summary>
+    Investing = 2,
+
+    /// <summary>Financing activities (equity and borrowings).</summary>
+    Financing = 3,
+
+    /// <summary>Cash and cash equivalents (the accounts whose movement is the change in cash).</summary>
+    CashAndEquivalents = 4,
+}
+
 /// <summary>The side of the ledger on which an account normally carries its balance.</summary>
 public enum NormalBalance
 {

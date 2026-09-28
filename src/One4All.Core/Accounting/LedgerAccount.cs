@@ -50,6 +50,9 @@ public sealed class LedgerAccount : SoftDeletableEntity, ICompanyScoped
     /// <summary>The report category for financial-statement mapping.</summary>
     public string ReportCategory { get; set; }
 
+    /// <summary>The activity this account's movement represents on the Statement of Cash Flows.</summary>
+    public CashFlowCategory CashFlowCategory { get; private set; }
+
     /// <summary>Whether this is a control account.</summary>
     public bool IsControlAccount => ControlAccountType != ControlAccountType.None;
 
@@ -84,6 +87,10 @@ public sealed class LedgerAccount : SoftDeletableEntity, ICompanyScoped
             AllowManualJournal = false;
         }
     }
+
+    /// <summary>Sets the account's cash-flow classification for the Statement of Cash Flows.</summary>
+    /// <param name="category">The activity the account's movement represents.</param>
+    public void SetCashFlowCategory(CashFlowCategory category) => CashFlowCategory = category;
 
     /// <summary>Returns true when a posting in <paramref name="currency"/> is permitted on this account.</summary>
     /// <param name="currency">The transaction currency.</param>

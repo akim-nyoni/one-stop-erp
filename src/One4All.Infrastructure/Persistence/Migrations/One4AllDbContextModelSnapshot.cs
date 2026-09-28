@@ -493,6 +493,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("budget_enabled");
 
+                    b.Property<int>("CashFlowCategory")
+                        .HasColumnType("integer")
+                        .HasColumnName("cash_flow_category");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");

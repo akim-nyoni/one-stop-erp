@@ -192,6 +192,32 @@ public sealed record VatReturnByCodeReport(DateOnly FromDate, DateOnly ToDate, I
 public sealed record VatReturnReport(DateOnly FromDate, DateOnly ToDate, decimal OutputTax, decimal InputTax, decimal NetPayable);
 
 /// <summary>
+/// The Statement of Cash Flows (IAS 7) derived by the movement method: each account's net movement over the
+/// period is classified by its <c>CashFlowCategory</c> into operating, investing and financing activities;
+/// because every journal balances, the sum of those (sign-reversed non-cash) movements equals the change in
+/// cash and cash equivalents. Any movement on an untagged non-cash account falls into <paramref name="Unclassified"/>.
+/// </summary>
+/// <param name="FromDate">Start of the period.</param>
+/// <param name="ToDate">End of the period.</param>
+/// <param name="Operating">Net cash from operating activities.</param>
+/// <param name="Investing">Net cash from investing activities.</param>
+/// <param name="Financing">Net cash from financing activities.</param>
+/// <param name="Unclassified">Net cash effect of movements on untagged non-cash accounts (should be zero when fully tagged).</param>
+/// <param name="OpeningCash">Cash and cash equivalents at the start.</param>
+/// <param name="ClosingCash">Cash and cash equivalents at the end.</param>
+public sealed record CashFlowStatement(
+    DateOnly FromDate, DateOnly ToDate,
+    decimal Operating, decimal Investing, decimal Financing, decimal Unclassified,
+    decimal OpeningCash, decimal ClosingCash)
+{
+    /// <summary>The net change in cash and cash equivalents over the period.</summary>
+    public decimal NetChange => ClosingCash - OpeningCash;
+
+    /// <summary>The change explained by the classified activities (equals <see cref="NetChange"/> when the books balance).</summary>
+    public decimal ClassifiedChange => Operating + Investing + Financing + Unclassified;
+}
+
+/// <summary>
 /// Read-side services producing the core general-ledger financial reports from posted data (brief §16
 /// Phase 2). Every report is derived from <c>gl.period_balance</c> / <c>gl.journal_line</c>; the trial
 /// balance must always balance.
@@ -282,6 +308,14 @@ public interface IGeneralLedgerReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The balance sheet.</returns>
     Task<BalanceSheet> BalanceSheetAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
+
+    /// <summary>Produces the Statement of Cash Flows for a date range (movement method, classified by account tag).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromDate">Start of the period.</param>
+    /// <param name="toDate">End of the period.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The cash flow statement.</returns>
+    Task<CashFlowStatement> CashFlowStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
 
     /// <summary>Produces the nominal activity for one account over a date range.</summary>
     /// <param name="companyId">The company.</param>

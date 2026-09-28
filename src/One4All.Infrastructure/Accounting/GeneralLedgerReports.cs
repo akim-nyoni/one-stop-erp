@@ -19,13 +19,13 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
     /// <param name="db">The database context.</param>
     public GeneralLedgerReports(One4AllDbContext db) => _db = db;
 
-    private sealed record AccountMeta(string Name, AccountType Type, string ReportCategory);
+    private sealed record AccountMeta(string Name, AccountType Type, string ReportCategory, CashFlowCategory CashFlow);
 
     private async Task<Dictionary<string, AccountMeta>> LoadAccountsAsync(long companyId, CancellationToken ct)
     {
         return await _db.Accounts
             .Where(a => a.CompanyId == companyId)
-            .ToDictionaryAsync(a => a.AccountCode, a => new AccountMeta(a.Name, a.Type, a.ReportCategory), ct)
+            .ToDictionaryAsync(a => a.AccountCode, a => new AccountMeta(a.Name, a.Type, a.ReportCategory, a.CashFlowCategory), ct)
             .ConfigureAwait(false);
     }
 
@@ -65,7 +65,7 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
                 continue;
             }
 
-            AccountMeta meta = accounts.GetValueOrDefault(code, new AccountMeta(code, AccountType.Asset, "Unknown"));
+            AccountMeta meta = accounts.GetValueOrDefault(code, new AccountMeta(code, AccountType.Asset, "Unknown", CashFlowCategory.None));
             decimal rowDebit = net > 0m ? net : 0m;
             decimal rowCredit = net < 0m ? -net : 0m;
             rows.Add(new TrialBalanceRow(code, meta.Name, meta.Type, rowDebit, rowCredit));
@@ -260,6 +260,53 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         }
 
         return new TrialBalanceMovementReport(companyId, fromDate, toDate, rows);
+    }
+
+    /// <inheritdoc />
+    public async Task<CashFlowStatement> CashFlowStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    {
+        Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> opening = await SumByAccountAsync(companyId, null, fromDate.AddDays(-1), ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> movement = await SumByAccountAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
+
+        decimal openingCash = 0m;
+        decimal closingCash = 0m;
+        decimal operating = 0m, investing = 0m, financing = 0m, unclassified = 0m;
+
+        foreach (string code in opening.Keys.Union(movement.Keys))
+        {
+            CashFlowCategory category = accounts.TryGetValue(code, out AccountMeta? meta) ? meta.CashFlow : CashFlowCategory.None;
+            (decimal od, decimal oc) = opening.GetValueOrDefault(code, (0m, 0m));
+            (decimal md, decimal mc) = movement.GetValueOrDefault(code, (0m, 0m));
+            decimal openingNet = od - oc;   // debit-positive balance before the period
+            decimal movementNet = md - mc;  // debit-positive movement during the period
+
+            if (category == CashFlowCategory.CashAndEquivalents)
+            {
+                openingCash += openingNet;
+                closingCash += openingNet + movementNet;
+                continue;
+            }
+
+            // A non-cash debit movement consumes cash; a credit movement provides it — hence the sign flip.
+            decimal cashEffect = -movementNet;
+            switch (category)
+            {
+                case CashFlowCategory.Operating: operating += cashEffect; break;
+                case CashFlowCategory.Investing: investing += cashEffect; break;
+                case CashFlowCategory.Financing: financing += cashEffect; break;
+                default: unclassified += cashEffect; break;
+            }
+        }
+
+        return new CashFlowStatement(
+            fromDate, toDate,
+            decimal.Round(operating, 2, MidpointRounding.ToEven),
+            decimal.Round(investing, 2, MidpointRounding.ToEven),
+            decimal.Round(financing, 2, MidpointRounding.ToEven),
+            decimal.Round(unclassified, 2, MidpointRounding.ToEven),
+            decimal.Round(openingCash, 2, MidpointRounding.ToEven),
+            decimal.Round(closingCash, 2, MidpointRounding.ToEven));
     }
 
     /// <inheritdoc />
