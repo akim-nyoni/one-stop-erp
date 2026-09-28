@@ -1,14 +1,18 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using One4All.Application.Abstractions.Offline;
 using One4All.Application.Abstractions.Pos;
+using One4All.Application.Offline;
 using One4All.Application.Pos;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.Inventory;
+using One4All.Core.Offline;
 using One4All.Core.Pos;
 using One4All.Core.Restaurant;
 using One4All.Core.System;
@@ -133,6 +137,10 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [ObservableProperty]
     private string _statusMessage = "Loading…";
 
+    /// <summary>The number of sales captured locally while offline and awaiting sync.</summary>
+    [ObservableProperty]
+    private int _pendingOfflineCount;
+
     /// <summary>The net subtotal.</summary>
     public string SubtotalText => _ticket.SubtotalNet.ToString("N2", CultureInfo.CurrentCulture);
 
@@ -177,10 +185,16 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         await LoadProductsAsync(db, ct).ConfigureAwait(true);
         await PrefillAccountsAsync(db, ct).ConfigureAwait(true);
 
+        PendingOfflineCount = await LocalQueue.CountAsync(ct).ConfigureAwait(true);
+
         StatusMessage = _allProducts.Count == 0
             ? "No menu items found — add priced menu items to sell at the terminal."
-            : "Enter an opening float and press Open Till to start trading.";
+            : PendingOfflineCount > 0
+                ? $"{PendingOfflineCount} offline sale(s) queued. Open the till to sync and trade."
+                : "Enter an opening float and press Open Till to start trading.";
     }
+
+    private ILocalOfflineQueue LocalQueue => _services.GetRequiredService<ILocalOfflineQueue>();
 
     private async Task<long> ResolveTerminalAsync(One4AllDbContext db, CancellationToken ct)
     {
@@ -300,6 +314,12 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         TillSessionId = result.Value;
         IsSessionOpen = true;
         StatusMessage = $"Till open (session {TillSessionId}). Ready to trade.";
+
+        // The database is reachable (the till just opened) — flush anything captured offline earlier.
+        if (PendingOfflineCount > 0)
+        {
+            await FlushOfflineAsync().ConfigureAwait(true);
+        }
     }
 
     /// <summary>The open till session id (0 when closed).</summary>
@@ -475,20 +495,87 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             return;
         }
 
+        CompleteSaleRequest request = build.Value;
         decimal change = _ticket.ChangeDue;
 
-        await using AsyncServiceScope scope = _services.CreateAsyncScope();
-        IPosService pos = scope.ServiceProvider.GetRequiredService<IPosService>();
-        Result<CompleteSaleResult> result = await pos.CompleteSaleAsync(build.Value).ConfigureAwait(true);
-        if (result.IsFailure)
+        try
         {
-            StatusMessage = $"Sale not posted: {result.Error.Message}";
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            IPosService pos = scope.ServiceProvider.GetRequiredService<IPosService>();
+            Result<CompleteSaleResult> result = await pos.CompleteSaleAsync(request).ConfigureAwait(true);
+            if (result.IsFailure)
+            {
+                // A domain failure (e.g. closed period) would recur on replay, so it is surfaced, not queued.
+                StatusMessage = $"Sale not posted: {result.Error.Message}";
+                return;
+            }
+
+            _ticket.Clear();
+            RebuildCart();
+            StatusMessage = $"Sale {saleNumber} posted (journal {result.Value.JournalNumber}). Change {change:N2}.";
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            // The central database is unreachable — capture the sale locally and sync on reconnect.
+            await CaptureOfflineAsync(request).ConfigureAwait(true);
+            _ticket.Clear();
+            RebuildCart();
+            StatusMessage = $"Offline: sale {saleNumber} saved locally ({PendingOfflineCount} queued). It will sync when the connection returns.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Sale not posted: {ex.Message}";
+        }
+    }
+
+    private async Task CaptureOfflineAsync(CompleteSaleRequest request)
+    {
+        PosSaleEnvelope envelope = new(
+            request.CompanyId, request.TerminalId, request.TillSessionId, request.CashierUserId,
+            request.SaleNumber, request.SaleDate, request.WarehouseId, _currency.Value, request.TaxAccountCode,
+            request.Lines.Select(l => new PosSaleLineEnvelope(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode)).ToList(),
+            request.Tenders.Select(t => new PosTenderEnvelope(t.TenderType, t.Currency.Value, t.Amount, t.AccountCode, t.IsChange)).ToList());
+
+        LocalOfflineEntry entry = new(Guid.NewGuid(), request.CompanyId, PosSaleEnvelope.Kind, JsonSerializer.Serialize(envelope), DateTimeOffset.UtcNow);
+        await LocalQueue.EnqueueAsync(entry).ConfigureAwait(true);
+        PendingOfflineCount = await LocalQueue.CountAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>Hands locally-captured sales to the central outbox and drains it (used on reconnect).</summary>
+    [RelayCommand]
+    private async Task FlushOfflineAsync()
+    {
+        IReadOnlyList<LocalOfflineEntry> entries = await LocalQueue.ListAsync().ConfigureAwait(true);
+        if (entries.Count == 0)
+        {
+            PendingOfflineCount = 0;
             return;
         }
 
-        _ticket.Clear();
-        RebuildCart();
-        StatusMessage = $"Sale {saleNumber} posted (journal {result.Value.JournalNumber}). Change {change:N2}.";
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            IOfflineOutbox outbox = scope.ServiceProvider.GetRequiredService<IOfflineOutbox>();
+            foreach (LocalOfflineEntry entry in entries)
+            {
+                // Hand off to the durable central outbox, then drop the local copy (enqueue is idempotent).
+                await outbox.EnqueueAsync(new OfflineOperation(entry.CompanyId, entry.OperationId, entry.Kind, entry.PayloadJson, entry.CapturedUtc)).ConfigureAwait(true);
+                await LocalQueue.RemoveAsync(entry.OperationId).ConfigureAwait(true);
+            }
+
+            IOfflineSyncService sync = scope.ServiceProvider.GetRequiredService<IOfflineSyncService>();
+            OfflineSyncReport report = await sync.SyncPendingAsync().ConfigureAwait(true);
+            StatusMessage = $"Synced {report.Synced} offline sale(s)"
+                + (report.DeadLettered > 0 ? $", {report.DeadLettered} could not be posted" : string.Empty) + ".";
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            StatusMessage = $"Still offline — {PendingOfflineCount} sale(s) remain queued.";
+        }
+        finally
+        {
+            PendingOfflineCount = await LocalQueue.CountAsync().ConfigureAwait(true);
+        }
     }
 
     /// <summary>Abandons the current ticket.</summary>

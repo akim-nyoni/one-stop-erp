@@ -137,6 +137,7 @@ public static class DependencyInjection
 
         // Offline sync (outbox + replay engine + handlers).
         services.AddSingleton<Application.Offline.OfflineSyncOptions>();
+        services.AddSingleton<Application.Abstractions.Offline.ILocalOfflineQueue>(_ => Offline.FileLocalOfflineQueue.Default());
         services.AddScoped<Application.Abstractions.Offline.IOfflineOutbox, Offline.EfOfflineOutbox>();
         services.AddScoped<Application.Abstractions.Offline.IOfflineOperationHandler, Offline.PosSaleOfflineHandler>();
         services.AddScoped<Application.Abstractions.Offline.IOfflineSyncService, Application.Offline.OfflineSyncService>();
