@@ -1,0 +1,138 @@
+using One4All.Core.Common;
+
+namespace One4All.Core.Inventory;
+
+/// <summary>The state of a stocktake session.</summary>
+public enum StocktakeStatus
+{
+    /// <summary>Being counted — the on-hand snapshot is frozen and counts are being captured.</summary>
+    Draft = 0,
+
+    /// <summary>Posted — variances have been adjusted into stock and the session is closed.</summary>
+    Posted = 1,
+}
+
+/// <summary>
+/// A physical stocktake of one warehouse (brief §4.2): the on-hand quantity of each counted item is frozen
+/// when the count starts, the physical counts are captured against it, and on posting the variance of each
+/// counted line is adjusted into stock at moving-average cost. Freezing the system quantity up front means a
+/// later receipt or issue does not distort the variance.
+/// </summary>
+public sealed class StocktakeSession : AuditableEntity, ICompanyScoped
+{
+    private readonly List<StocktakeLine> _lines = [];
+
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private StocktakeSession() => Reference = string.Empty;
+
+    /// <summary>Starts a stocktake session.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="warehouseId">The warehouse counted.</param>
+    /// <param name="reference">The stocktake reference.</param>
+    /// <param name="stocktakeDate">The stocktake date.</param>
+    public StocktakeSession(long companyId, long warehouseId, string reference, DateOnly stocktakeDate)
+    {
+        CompanyId = companyId;
+        WarehouseId = warehouseId;
+        Reference = reference;
+        StocktakeDate = stocktakeDate;
+        Status = StocktakeStatus.Draft;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The warehouse counted.</summary>
+    public long WarehouseId { get; private set; }
+
+    /// <summary>The stocktake reference.</summary>
+    public string Reference { get; private set; }
+
+    /// <summary>The stocktake date.</summary>
+    public DateOnly StocktakeDate { get; private set; }
+
+    /// <summary>The status.</summary>
+    public StocktakeStatus Status { get; private set; }
+
+    /// <summary>The count lines.</summary>
+    public IReadOnlyList<StocktakeLine> Lines => _lines.AsReadOnly();
+
+    /// <summary>Adds a line with the frozen system quantity for an item.</summary>
+    /// <param name="itemId">The item.</param>
+    /// <param name="systemQuantity">The on-hand quantity at the start of the count.</param>
+    /// <param name="averageCost">The moving-average unit cost (for the indicative variance value).</param>
+    /// <returns>The created line.</returns>
+    public StocktakeLine AddLine(long itemId, decimal systemQuantity, decimal averageCost)
+    {
+        StocktakeLine line = new(itemId, systemQuantity, averageCost);
+        _lines.Add(line);
+        return line;
+    }
+
+    /// <summary>Records the physical count for an item.</summary>
+    /// <param name="itemId">The item.</param>
+    /// <param name="countedQuantity">The counted quantity.</param>
+    /// <returns>True when a line for the item existed and was updated.</returns>
+    public bool RecordCount(long itemId, decimal countedQuantity)
+    {
+        StocktakeLine? line = _lines.FirstOrDefault(l => l.ItemId == itemId);
+        if (line is null)
+        {
+            return false;
+        }
+
+        line.SetCount(countedQuantity);
+        return true;
+    }
+
+    /// <summary>Marks the session posted.</summary>
+    public void MarkPosted() => Status = StocktakeStatus.Posted;
+}
+
+/// <summary>One counted item on a <see cref="StocktakeSession"/>.</summary>
+public sealed class StocktakeLine : Entity
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private StocktakeLine()
+    {
+    }
+
+    /// <summary>Creates a line.</summary>
+    /// <param name="itemId">The item.</param>
+    /// <param name="systemQuantity">The frozen on-hand quantity.</param>
+    /// <param name="averageCost">The moving-average unit cost.</param>
+    public StocktakeLine(long itemId, decimal systemQuantity, decimal averageCost)
+    {
+        ItemId = itemId;
+        SystemQuantity = systemQuantity;
+        AverageCost = averageCost;
+    }
+
+    /// <summary>The owning stocktake id.</summary>
+    public long StocktakeSessionId { get; private set; }
+
+    /// <summary>The item.</summary>
+    public long ItemId { get; private set; }
+
+    /// <summary>The frozen on-hand quantity when the count started.</summary>
+    public decimal SystemQuantity { get; private set; }
+
+    /// <summary>The moving-average unit cost captured at the start.</summary>
+    public decimal AverageCost { get; private set; }
+
+    /// <summary>The physical count, or null until captured.</summary>
+    public decimal? CountedQuantity { get; private set; }
+
+    /// <summary>Whether a count has been captured for this line.</summary>
+    public bool IsCounted => CountedQuantity.HasValue;
+
+    /// <summary>The variance quantity (counted − system); zero until counted.</summary>
+    public decimal VarianceQuantity => CountedQuantity is { } counted ? counted - SystemQuantity : 0m;
+
+    /// <summary>The indicative variance value at the captured average cost.</summary>
+    public decimal VarianceValue => decimal.Round(VarianceQuantity * AverageCost, 2, MidpointRounding.ToEven);
+
+    /// <summary>Sets the physical count.</summary>
+    /// <param name="countedQuantity">The counted quantity.</param>
+    public void SetCount(decimal countedQuantity) => CountedQuantity = countedQuantity;
+}

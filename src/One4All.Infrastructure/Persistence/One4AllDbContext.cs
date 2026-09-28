@@ -68,6 +68,9 @@ public class One4AllDbContext : DbContext
     /// <summary>The offline sync outbox (operations captured while a terminal was offline).</summary>
     public DbSet<Core.Offline.OfflineOperation> OfflineOperations => Set<Core.Offline.OfflineOperation>();
 
+    /// <summary>Physical stocktake sessions.</summary>
+    public DbSet<Core.Inventory.StocktakeSession> Stocktakes => Set<Core.Inventory.StocktakeSession>();
+
     /// <summary>Chart of accounts.</summary>
     public DbSet<LedgerAccount> Accounts => Set<LedgerAccount>();
 

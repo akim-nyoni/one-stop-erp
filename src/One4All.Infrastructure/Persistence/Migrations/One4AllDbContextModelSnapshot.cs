@@ -2426,6 +2426,115 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("stock_movement", "inv");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.StocktakeLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("AverageCost")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("average_cost");
+
+                    b.Property<decimal?>("CountedQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("counted_quantity");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("StocktakeSessionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stocktake_session_id");
+
+                    b.Property<decimal>("SystemQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("system_quantity");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stocktake_line");
+
+                    b.HasIndex("StocktakeSessionId")
+                        .HasDatabaseName("ix_stocktake_line_stocktake_session_id");
+
+                    b.ToTable("stocktake_line", "inv");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.StocktakeSession", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<DateOnly>("StocktakeDate")
+                        .HasColumnType("date")
+                        .HasColumnName("stocktake_date");
+
+                    b.Property<long>("WarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stocktake");
+
+                    b.HasIndex("CompanyId", "WarehouseId")
+                        .HasDatabaseName("ix_stocktake_company_id_warehouse_id");
+
+                    b.ToTable("stocktake", "inv");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.Warehouse", b =>
                 {
                     b.Property<long>("Id")
@@ -10251,6 +10360,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_ownership_record_housing_stands_housing_stand_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.StocktakeLine", b =>
+                {
+                    b.HasOne("One4All.Core.Inventory.StocktakeSession", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("StocktakeSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_stocktake_line_stocktakes_stocktake_session_id");
+                });
+
             modelBuilder.Entity("One4All.Core.JobCosting.JobCostEntry", b =>
                 {
                     b.HasOne("One4All.Core.JobCosting.JobContract", null)
@@ -10639,6 +10758,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Housing.HousingStand", b =>
                 {
                     b.Navigation("Ownership");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.StocktakeSession", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("One4All.Core.JobCosting.JobContract", b =>
