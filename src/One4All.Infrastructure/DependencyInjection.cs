@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<IRecurringJournalService, Accounting.RecurringJournalService>();
         services.AddScoped<IAccrualService, Accounting.AccrualService>();
         services.AddScoped<IPeriodService, PeriodService>();
+        services.AddScoped<IVatReturnService, Accounting.VatReturnService>();
         services.AddScoped<IYearEndService, YearEndService>();
         services.AddScoped<ITaxCalculator, TaxCalculator>();
         services.AddScoped<IFxRevaluationService, FxRevaluationService>();
