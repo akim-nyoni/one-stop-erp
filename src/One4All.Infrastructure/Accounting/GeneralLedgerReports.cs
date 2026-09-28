@@ -46,6 +46,60 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         return totals.ToDictionary(t => t.Code, t => (t.Debit, t.Credit));
     }
 
+    private async Task<Dictionary<string, (decimal debit, decimal credit)>> SumByAccountForDepartmentAsync(
+        long companyId, DateOnly from, DateOnly to, string department, CancellationToken ct)
+    {
+        var totals = await _db.Set<JournalLine>()
+            .Where(l => l.Department == department && _db.Journals.Any(j =>
+                j.Id == l.JournalEntryId && j.CompanyId == companyId && j.Status == JournalStatus.Posted &&
+                j.PostingDate >= from && j.PostingDate <= to))
+            .GroupBy(l => l.AccountCode)
+            .Select(g => new { Code = g.Key, Debit = g.Sum(x => x.BaseDebit), Credit = g.Sum(x => x.BaseCredit) })
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+
+        return totals.ToDictionary(t => t.Code, t => (t.Debit, t.Credit));
+    }
+
+    /// <inheritdoc />
+    public async Task<IncomeStatement> IncomeStatementByDepartmentAsync(long companyId, DateOnly fromDate, DateOnly toDate, string department, CancellationToken ct = default)
+    {
+        Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> sums = await SumByAccountForDepartmentAsync(companyId, fromDate, toDate, department ?? string.Empty, ct).ConfigureAwait(false);
+        string currency = await BaseCurrencyAsync(companyId, ct).ConfigureAwait(false);
+
+        List<StatementLine> income = [];
+        List<StatementLine> expenses = [];
+        foreach ((string code, (decimal debit, decimal credit)) in sums)
+        {
+            if (!accounts.TryGetValue(code, out AccountMeta? meta))
+            {
+                continue;
+            }
+
+            if (meta.Type == AccountType.Income)
+            {
+                decimal amount = credit - debit;
+                if (amount != 0m)
+                {
+                    income.Add(new StatementLine(meta.ReportCategory, code, meta.Name, amount));
+                }
+            }
+            else if (meta.Type == AccountType.Expense)
+            {
+                decimal amount = debit - credit;
+                if (amount != 0m)
+                {
+                    expenses.Add(new StatementLine(meta.ReportCategory, code, meta.Name, amount));
+                }
+            }
+        }
+
+        return new IncomeStatement(companyId, fromDate, toDate, currency,
+            income.OrderBy(l => l.AccountCode, StringComparer.Ordinal).ToList(),
+            expenses.OrderBy(l => l.AccountCode, StringComparer.Ordinal).ToList());
+    }
+
     /// <inheritdoc />
     public async Task<TrialBalanceReport> TrialBalanceAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
     {
