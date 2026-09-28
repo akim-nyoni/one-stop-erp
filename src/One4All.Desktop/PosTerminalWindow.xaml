@@ -1,0 +1,246 @@
+<Window x:Class="One4All.Desktop.PosTerminalWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:One4All.Desktop.ViewModels"
+        Title="One4All POS" Height="820" Width="1280"
+        WindowStartupLocation="CenterScreen" WindowState="Maximized"
+        Background="#1E272E" FontFamily="Segoe UI">
+    <Window.Resources>
+        <!-- Touch-sized action button -->
+        <Style x:Key="PadButton" TargetType="Button">
+            <Setter Property="Height" Value="56" />
+            <Setter Property="Margin" Value="4" />
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Background" Value="#34495E" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="B" Background="{TemplateBinding Background}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="B" Property="Opacity" Value="0.85" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="B" Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ProductButton" TargetType="Button" BasedOn="{StaticResource PadButton}">
+            <Setter Property="Height" Value="88" />
+            <Setter Property="Width" Value="150" />
+            <Setter Property="Background" Value="#2C3E50" />
+            <Setter Property="FontSize" Value="15" />
+        </Style>
+
+        <SolidColorBrush x:Key="Panel" Color="#26313A" />
+        <SolidColorBrush x:Key="Muted" Color="#9AA7B0" />
+    </Window.Resources>
+
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <DockPanel Grid.Row="0" Margin="4,0,4,10">
+            <TextBlock Text="One4All &#8226; Point of Sale" FontSize="22" FontWeight="Bold" Foreground="White" DockPanel.Dock="Left" VerticalAlignment="Center" />
+            <Button Content="Close" Style="{StaticResource PadButton}" Width="110" Background="#7F8C8D" Click="Close_Click" DockPanel.Dock="Right" />
+            <TextBlock Text="{Binding CashierName, StringFormat='Cashier: {0}'}" Foreground="{StaticResource Muted}" FontSize="14"
+                       DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,16,0" />
+        </DockPanel>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="440" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left: categories + products -->
+            <Border Grid.Column="0" Background="{StaticResource Panel}" CornerRadius="8" Padding="10" Margin="0,0,10,0">
+                <DockPanel>
+                    <ListBox DockPanel.Dock="Top" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}"
+                             Background="Transparent" BorderThickness="0" Margin="0,0,0,8">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="14,6" Margin="3" CornerRadius="14" Background="#34495E">
+                                    <TextBlock Text="{Binding}" Foreground="White" FontSize="14" />
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Products}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:PosProductVm}">
+                                    <Button Style="{StaticResource ProductButton}"
+                                            Command="{Binding DataContext.AddProductCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                            CommandParameter="{Binding}">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" />
+                                            <TextBlock Text="{Binding PriceText}" Foreground="#7FE0A0" FontSize="14" HorizontalAlignment="Center" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <!-- Right: setup + cart + totals + tender -->
+            <Border Grid.Column="1" Background="{StaticResource Panel}" CornerRadius="8" Padding="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Session / account setup -->
+                    <Border Grid.Row="0" Background="#1F2A33" CornerRadius="6" Padding="8" Margin="0,0,0,8">
+                        <StackPanel>
+                            <UniformGrid Columns="3">
+                                <StackPanel Margin="2">
+                                    <TextBlock Text="Cash a/c" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBox Text="{Binding CashAccountCode}" />
+                                </StackPanel>
+                                <StackPanel Margin="2">
+                                    <TextBlock Text="Card a/c" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBox Text="{Binding CardAccountCode}" />
+                                </StackPanel>
+                                <StackPanel Margin="2">
+                                    <TextBlock Text="Tax a/c" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBox Text="{Binding TaxAccountCode}" />
+                                </StackPanel>
+                            </UniformGrid>
+                            <DockPanel Margin="0,6,0,0">
+                                <TextBlock Text="Float" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="2,0,6,0" />
+                                <TextBox Width="90" Text="{Binding OpeningFloat}" DockPanel.Dock="Left" />
+                                <Button Content="Open Till" Style="{StaticResource PadButton}" Height="36" Width="120" Background="#27AE60"
+                                        Command="{Binding OpenTillCommand}" DockPanel.Dock="Right" />
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Cart -->
+                    <Border Grid.Row="1" Background="#1F2A33" CornerRadius="6" Padding="4">
+                        <ItemsControl ItemsSource="{Binding Cart}">
+                            <ItemsControl.Template>
+                                <ControlTemplate>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </ControlTemplate>
+                            </ItemsControl.Template>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:PosCartLineVm}">
+                                    <Grid Margin="2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Description}" Foreground="White" FontSize="15" />
+                                            <TextBlock Text="{Binding Quantity, StringFormat='× {0}'}" Foreground="{StaticResource Muted}" FontSize="12" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="{Binding LineGrossText}" Foreground="White" FontSize="15"
+                                                   VerticalAlignment="Center" Margin="6,0" MinWidth="64" TextAlignment="Right" />
+                                        <Button Grid.Column="2" Content="&#8722;" Style="{StaticResource PadButton}" Width="40" Height="40" FontSize="22"
+                                                Command="{Binding DataContext.DecrementLineCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
+                                        <Button Grid.Column="3" Content="+" Style="{StaticResource PadButton}" Width="40" Height="40" FontSize="22"
+                                                Command="{Binding DataContext.IncrementLineCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
+                                        <Button Grid.Column="4" Content="&#215;" Style="{StaticResource PadButton}" Width="40" Height="40" FontSize="20" Background="#C0392B"
+                                                Command="{Binding DataContext.VoidLineCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+
+                    <!-- Totals -->
+                    <Border Grid.Row="2" Background="#1F2A33" CornerRadius="6" Padding="10" Margin="0,8,0,8">
+                        <StackPanel>
+                            <DockPanel><TextBlock Text="Subtotal" Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding SubtotalText}" Foreground="White" DockPanel.Dock="Right" /></DockPanel>
+                            <DockPanel Margin="0,2"><TextBlock Text="Tax" Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding TaxText}" Foreground="White" DockPanel.Dock="Right" /></DockPanel>
+                            <DockPanel Margin="0,2"><TextBlock Text="TOTAL" Foreground="White" FontWeight="Bold" FontSize="22" /><TextBlock Text="{Binding GrossText}" Foreground="#7FE0A0" FontWeight="Bold" FontSize="22" DockPanel.Dock="Right" /></DockPanel>
+                            <Separator Margin="0,4" />
+                            <DockPanel><TextBlock Text="Tendered" Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding TenderedText}" Foreground="White" DockPanel.Dock="Right" /></DockPanel>
+                            <DockPanel Margin="0,2"><TextBlock Text="Balance" Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding BalanceText}" Foreground="#E67E22" FontWeight="SemiBold" DockPanel.Dock="Right" /></DockPanel>
+                            <DockPanel Margin="0,2"><TextBlock Text="Change" Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding ChangeText}" Foreground="#7FE0A0" FontWeight="SemiBold" DockPanel.Dock="Right" /></DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Tender pad -->
+                    <Grid Grid.Row="3">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="1.1*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Numeric entry -->
+                        <StackPanel Grid.Column="0">
+                            <Border Background="#0F1519" CornerRadius="6" Padding="8" Margin="4">
+                                <TextBlock Text="{Binding TenderEntry}" Foreground="White" FontSize="22" TextAlignment="Right" MinHeight="26" />
+                            </Border>
+                            <UniformGrid Columns="3">
+                                <Button Content="7" Style="{StaticResource PadButton}" Command="{Binding AppendDigitCommand}" CommandParameter="7" />
+                                <Button Content="8" Style="{StaticResource PadButton}" Command="{Binding AppendDigitCommand}" CommandParameter="8" />
+                                <Button Content="9" Style="{StaticResource PadButton}" Command="{Binding AppendDigitCommand}" CommandParameter="9" />
+                                <Button Content="4" Style="{StaticResource PadButton}" Command="{Binding AppendDigitCommand}" CommandParameter="4" />
+                                <Button Content="5" Style="{StaticResource PadButton}" Command="{Binding AppendDigitCommand}" CommandParameter="5" />
+                                <Button Content="6" Style="{StaticResource PadButton}" Command="{Binding AppendDigitCommand}" CommandParameter="6" />
+                                <Button Content="1" Style="{StaticResource PadButton}" Command="{Binding AppendDigitCommand}" CommandParameter="1" />
+                                <Button Content="2" Style="{StaticResource PadButton}" Command="{Binding AppendDigitCommand}" CommandParameter="2" />
+                                <Button Content="3" Style="{StaticResource PadButton}" Command="{Binding AppendDigitCommand}" CommandParameter="3" />
+                                <Button Content="." Style="{StaticResource PadButton}" Command="{Binding AppendDigitCommand}" CommandParameter="." />
+                                <Button Content="0" Style="{StaticResource PadButton}" Command="{Binding AppendDigitCommand}" CommandParameter="0" />
+                                <Button Content="C" Style="{StaticResource PadButton}" Background="#7F8C8D" Command="{Binding ClearEntryCommand}" />
+                            </UniformGrid>
+                        </StackPanel>
+
+                        <!-- Tender / complete -->
+                        <StackPanel Grid.Column="1">
+                            <Button Content="CASH" Style="{StaticResource PadButton}" Height="64" Background="#2980B9" Command="{Binding TenderCashCommand}" />
+                            <Button Content="CARD" Style="{StaticResource PadButton}" Height="64" Background="#8E44AD" Command="{Binding TenderCardCommand}" />
+                            <Button Content="PAY / COMPLETE" Style="{StaticResource PadButton}" Height="72" FontSize="22" Background="#27AE60" Command="{Binding PayCommand}" />
+                            <UniformGrid Columns="2">
+                                <Button Content="Clear Tenders" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#7F8C8D" Command="{Binding ClearTendersCommand}" />
+                                <Button Content="New Sale" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#7F8C8D" Command="{Binding NewSaleCommand}" />
+                                <Button Content="X-Read" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#34495E" Command="{Binding XReadCommand}" />
+                                <Button Content="Z / Close" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#C0392B" Command="{Binding CloseTillCommand}" />
+                            </UniformGrid>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Status bar -->
+        <Border Grid.Row="2" Background="#0F1519" CornerRadius="6" Padding="10,6" Margin="0,10,0,0">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#DCEFDD" FontSize="14" />
+        </Border>
+    </Grid>
+</Window>

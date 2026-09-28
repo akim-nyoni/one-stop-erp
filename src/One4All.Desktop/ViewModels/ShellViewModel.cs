@@ -41,6 +41,7 @@ public sealed partial class ShellViewModel : ObservableObject
     public ShellViewModel(AuthenticationResult auth, ILicenceService licence)
     {
         _permissions = auth.Permissions;
+        UserId = auth.UserId;
         UserDisplayName = auth.DisplayName;
 
         LicenseValidationResult status = licence.Current;
@@ -72,6 +73,9 @@ public sealed partial class ShellViewModel : ObservableObject
             ? "No modules are available for your account."
             : $"{Modules.Count} module(s) available. Select a module to begin.";
     }
+
+    /// <summary>The signed-in user's id (the cashier at the POS terminal).</summary>
+    public long UserId { get; }
 
     /// <summary>The signed-in user's display name.</summary>
     public string UserDisplayName { get; }

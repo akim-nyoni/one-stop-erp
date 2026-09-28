@@ -37,4 +37,11 @@ public partial class ShellWindow : Window
         PermissionEditorWindow editor = new(_services) { Owner = this };
         editor.Show();
     }
+
+    private void OpenPosTerminal_Click(object sender, RoutedEventArgs e)
+    {
+        ShellViewModel vm = (ShellViewModel)DataContext;
+        PosTerminalWindow terminal = new(_services, vm.UserId, vm.UserDisplayName) { Owner = this };
+        terminal.Show();
+    }
 }
