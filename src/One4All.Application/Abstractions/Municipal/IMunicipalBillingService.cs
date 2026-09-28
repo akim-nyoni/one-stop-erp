@@ -39,4 +39,22 @@ public interface IMunicipalBillingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The billing result, or an error.</returns>
     Task<Result<BillingResult>> BillServiceAsync(long companyId, long propertyId, ServiceType serviceType, decimal consumption, string invoiceNumber, DateOnly date, decimal taxAmount = 0m, string? taxAccountCode = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Runs a fixed-charge billing cycle for a non-metered service (e.g. rates or refuse): bills every
+    /// property that has an active link to the service at its tariff's fixed charge (zero consumption),
+    /// raising each on the ratepayer's account.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="serviceType">The service to bill across all linked properties.</param>
+    /// <param name="date">The billing date.</param>
+    /// <param name="invoicePrefix">A prefix for the generated bill numbers.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of properties billed and the total charged, or an error.</returns>
+    Task<Result<MunicipalBillingRunResult>> RunFixedChargeBillingAsync(long companyId, ServiceType serviceType, DateOnly date, string invoicePrefix, CancellationToken ct = default);
 }
+
+/// <summary>The result of a fixed-charge municipal billing run.</summary>
+/// <param name="PropertiesBilled">The number of properties billed.</param>
+/// <param name="TotalBilled">The total charge raised across all properties.</param>
+public readonly record struct MunicipalBillingRunResult(int PropertiesBilled, decimal TotalBilled);

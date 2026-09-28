@@ -50,6 +50,33 @@ public sealed class MunicipalBillingService : IMunicipalBillingService
     }
 
     /// <inheritdoc />
+    public async Task<Result<MunicipalBillingRunResult>> RunFixedChargeBillingAsync(long companyId, ServiceType serviceType, DateOnly date, string invoicePrefix, CancellationToken ct = default)
+    {
+        List<long> propertyIds = await _db.Set<Property>()
+            .Where(p => p.CompanyId == companyId && p.Services.Any(s => s.ServiceType == serviceType && s.IsActive))
+            .OrderBy(p => p.Id)
+            .Select(p => p.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        int billed = 0;
+        decimal total = 0m;
+        foreach (long propertyId in propertyIds)
+        {
+            string invoiceNumber = $"{invoicePrefix}-{propertyId}-{date:yyyyMMdd}";
+            Result<BillingResult> result = await BillServiceAsync(companyId, propertyId, serviceType, consumption: 0m, invoiceNumber, date, ct: ct).ConfigureAwait(false);
+            if (result.IsFailure)
+            {
+                return result.Error;
+            }
+
+            billed++;
+            total += result.Value.Charge;
+        }
+
+        return new MunicipalBillingRunResult(billed, decimal.Round(total, 2, MidpointRounding.AwayFromZero));
+    }
+
+    /// <inheritdoc />
     public async Task<Result<BillingResult>> BillServiceAsync(long companyId, long propertyId, ServiceType serviceType, decimal consumption, string invoiceNumber, DateOnly date, decimal taxAmount = 0m, string? taxAccountCode = null, CancellationToken ct = default)
     {
         Property? property = await _db.Set<Property>().Include(p => p.Services)
