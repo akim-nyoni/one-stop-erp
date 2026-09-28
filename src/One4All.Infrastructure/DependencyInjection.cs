@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<IAccrualService, Accounting.AccrualService>();
         services.AddScoped<IPeriodService, PeriodService>();
         services.AddScoped<IVatReturnService, Accounting.VatReturnService>();
+        services.AddScoped<IPettyCashService, Accounting.PettyCashService>();
         services.AddScoped<IYearEndService, YearEndService>();
         services.AddScoped<ITaxCalculator, TaxCalculator>();
         services.AddScoped<IFxRevaluationService, FxRevaluationService>();
