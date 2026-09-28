@@ -65,6 +65,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Installed licence tokens (active + history).</summary>
     public DbSet<InstalledLicence> InstalledLicences => Set<InstalledLicence>();
 
+    /// <summary>The offline sync outbox (operations captured while a terminal was offline).</summary>
+    public DbSet<Core.Offline.OfflineOperation> OfflineOperations => Set<Core.Offline.OfflineOperation>();
+
     /// <summary>Chart of accounts.</summary>
     public DbSet<LedgerAccount> Accounts => Set<LedgerAccount>();
 

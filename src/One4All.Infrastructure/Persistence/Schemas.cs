@@ -89,4 +89,7 @@ public static class Schemas
 
     /// <summary>Licensing status and history.</summary>
     public const string Licensing = "lic";
+
+    /// <summary>Offline sync: the outbox of operations captured while a terminal was offline.</summary>
+    public const string Sync = "sync";
 }

@@ -135,6 +135,12 @@ public static class DependencyInjection
         services.AddSingleton<IMachineIdProvider, WmiMachineIdProvider>();
         services.AddSingleton<ILicenceService, LicenceService>();
 
+        // Offline sync (outbox + replay engine + handlers).
+        services.AddSingleton<Application.Offline.OfflineSyncOptions>();
+        services.AddScoped<Application.Abstractions.Offline.IOfflineOutbox, Offline.EfOfflineOutbox>();
+        services.AddScoped<Application.Abstractions.Offline.IOfflineOperationHandler, Offline.PosSaleOfflineHandler>();
+        services.AddScoped<Application.Abstractions.Offline.IOfflineSyncService, Application.Offline.OfflineSyncService>();
+
         // Raw-SQL runner + seeders.
         services.AddSingleton<ISqlScriptRunner>(_ => new SqlScriptRunner(connectionString));
         services.AddScoped<PermissionSeeder>();
