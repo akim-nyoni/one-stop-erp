@@ -60,6 +60,7 @@ public static class DependencyInjection
         services.AddSingleton<IFiscalDeviceProvider, NullFiscalDeviceProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IGeneralLedgerReports, GeneralLedgerReports>();
         services.AddScoped<Application.Abstractions.Reporting.IConsolidationService, Accounting.ConsolidationService>();
+        services.AddScoped<Application.Abstractions.Reporting.IWorkingCapitalService, Accounting.WorkingCapitalService>();
         services.AddScoped<Application.Abstractions.Reporting.IFinancialReportRenderer, Reporting.FinancialReportRenderer>();
         services.AddScoped<Persistence.Seeding.ReportCatalogueSeeder>();
 
