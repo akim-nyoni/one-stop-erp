@@ -31,22 +31,34 @@ public sealed class WorkingCapitalService : IWorkingCapitalService
 
         HashSet<string> arAccounts = accounts.Where(a => a.ControlAccountType == ControlAccountType.AccountsReceivable).Select(a => a.AccountCode).ToHashSet(StringComparer.Ordinal);
         HashSet<string> apAccounts = accounts.Where(a => a.ControlAccountType == ControlAccountType.AccountsPayable).Select(a => a.AccountCode).ToHashSet(StringComparer.Ordinal);
+        HashSet<string> stockAccounts = accounts.Where(a => a.ControlAccountType == ControlAccountType.Stock).Select(a => a.AccountCode).ToHashSet(StringComparer.Ordinal);
         HashSet<string> incomeAccounts = accounts.Where(a => a.Type == AccountType.Income).Select(a => a.AccountCode).ToHashSet(StringComparer.Ordinal);
         HashSet<string> expenseAccounts = accounts.Where(a => a.Type == AccountType.Expense).Select(a => a.AccountCode).ToHashSet(StringComparer.Ordinal);
+
+        // Cost-of-sales accounts are those the items post their issues to.
+        HashSet<string> cogsAccounts = (await _db.Set<Core.Inventory.Item>()
+            .Where(i => i.CompanyId == companyId && i.CostOfSalesAccountCode != null)
+            .Select(i => i.CostOfSalesAccountCode!)
+            .Distinct()
+            .ToListAsync(ct).ConfigureAwait(false)).ToHashSet(StringComparer.Ordinal);
 
         Dictionary<string, (decimal debit, decimal credit)> asAt = await SumByAccountAsync(companyId, null, toDate, ct).ConfigureAwait(false);
         Dictionary<string, (decimal debit, decimal credit)> period = await SumByAccountAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
 
         decimal receivables = arAccounts.Sum(code => Net(asAt, code));          // AR is a debit balance
         decimal payables = apAccounts.Sum(code => -Net(asAt, code));            // AP is a credit balance
+        decimal inventory = stockAccounts.Sum(code => Net(asAt, code));         // stock is a debit balance
         decimal creditSales = incomeAccounts.Sum(code => -Net(period, code));   // income is a credit movement
-        decimal creditPurchases = expenseAccounts.Sum(code => Net(period, code)); // expense is a debit movement
+        // Purchases are operating expenses excluding cost of sales, which is measured separately by DIO.
+        decimal creditPurchases = expenseAccounts.Where(code => !cogsAccounts.Contains(code)).Sum(code => Net(period, code));
+        decimal costOfSales = cogsAccounts.Sum(code => Net(period, code));      // COGS is a debit movement
 
         int days = toDate.DayNumber - fromDate.DayNumber + 1;
         decimal dso = WorkingCapital.DaysOutstanding(receivables, creditSales, days);
         decimal dpo = WorkingCapital.DaysOutstanding(payables, creditPurchases, days);
+        decimal dio = WorkingCapital.DaysOutstanding(inventory, costOfSales, days);
 
-        return new WorkingCapitalMetrics(fromDate, toDate, receivables, creditSales, dso, payables, creditPurchases, dpo);
+        return new WorkingCapitalMetrics(fromDate, toDate, receivables, creditSales, dso, payables, creditPurchases, dpo, inventory, costOfSales, dio);
     }
 
     private static decimal Net(Dictionary<string, (decimal debit, decimal credit)> sums, string code)
