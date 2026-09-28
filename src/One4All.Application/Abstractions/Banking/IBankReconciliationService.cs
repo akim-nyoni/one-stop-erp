@@ -49,6 +49,26 @@ public interface IBankReconciliationService
     /// <returns>The number of lines matched, or an error.</returns>
     Task<Result<int>> AutoMatchAsync(long companyId, long bankAccountId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Manually matches an unreconciled statement line to a specific GL cash-book posting on the bank
+    /// account (operator judgement, where auto-match by amount could not). Refuses a line that is already
+    /// reconciled, a journal line that is not a posting on the bank's GL account, or one already matched.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="bankAccountId">The bank account.</param>
+    /// <param name="statementLineId">The statement line to match.</param>
+    /// <param name="journalLineId">The GL cash-book journal line to match it to.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or NotFound/Rule.</returns>
+    Task<Result> MatchLineAsync(long companyId, long bankAccountId, long statementLineId, long journalLineId, CancellationToken ct = default);
+
+    /// <summary>Un-matches a previously reconciled statement line, returning it to the unreconciled pool.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="statementLineId">The statement line to un-match.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or NotFound/Rule when the line is missing or not reconciled.</returns>
+    Task<Result> UnmatchLineAsync(long companyId, long statementLineId, CancellationToken ct = default);
+
     /// <summary>Produces the bank reconciliation statement as at a date.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="bankAccountId">The bank account.</param>

@@ -57,6 +57,65 @@ public sealed class BankReconciliationService : IBankReconciliationService
     }
 
     /// <inheritdoc />
+    public async Task<Result> MatchLineAsync(long companyId, long bankAccountId, long statementLineId, long journalLineId, CancellationToken ct = default)
+    {
+        Result<BankAccount> accountResult = await LoadAccountAsync(companyId, bankAccountId, ct).ConfigureAwait(false);
+        if (accountResult.IsFailure)
+        {
+            return Result.Failure(accountResult.Error);
+        }
+
+        BankStatementLine? line = await _db.Set<BankStatementLine>()
+            .FirstOrDefaultAsync(s => s.Id == statementLineId && s.CompanyId == companyId && s.BankAccountId == bankAccountId, ct).ConfigureAwait(false);
+        if (line is null)
+        {
+            return Result.Failure(Error.NotFound("Bank.StatementLineNotFound", $"Statement line {statementLineId} not found."));
+        }
+
+        if (line.IsReconciled)
+        {
+            return Result.Failure(Error.Rule("Bank.AlreadyReconciled", "The statement line is already reconciled."));
+        }
+
+        List<GlLine> glLines = await GlLinesAsync(companyId, accountResult.Value.GlAccountCode, null, ct).ConfigureAwait(false);
+        if (glLines.All(g => g.Id != journalLineId))
+        {
+            return Result.Failure(Error.Rule("Bank.NotACashBookLine", "The journal line is not a posting on the bank's cash-book account."));
+        }
+
+        bool alreadyTaken = await _db.Set<BankStatementLine>()
+            .AnyAsync(s => s.CompanyId == companyId && s.BankAccountId == bankAccountId && s.MatchedJournalLineId == journalLineId, ct).ConfigureAwait(false);
+        if (alreadyTaken)
+        {
+            return Result.Failure(Error.Rule("Bank.JournalLineMatched", "That cash-book posting is already matched to another statement line."));
+        }
+
+        line.MatchTo(journalLineId);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> UnmatchLineAsync(long companyId, long statementLineId, CancellationToken ct = default)
+    {
+        BankStatementLine? line = await _db.Set<BankStatementLine>()
+            .FirstOrDefaultAsync(s => s.Id == statementLineId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (line is null)
+        {
+            return Result.Failure(Error.NotFound("Bank.StatementLineNotFound", $"Statement line {statementLineId} not found."));
+        }
+
+        if (!line.IsReconciled)
+        {
+            return Result.Failure(Error.Rule("Bank.NotReconciled", "The statement line is not reconciled."));
+        }
+
+        line.Unmatch();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result<int>> AutoMatchAsync(long companyId, long bankAccountId, CancellationToken ct = default)
     {
         Result<BankAccount> accountResult = await LoadAccountAsync(companyId, bankAccountId, ct).ConfigureAwait(false);
