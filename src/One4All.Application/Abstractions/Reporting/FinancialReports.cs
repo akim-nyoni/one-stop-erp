@@ -25,6 +25,24 @@ public sealed record TrialBalanceReport(
     public bool IsBalanced => TotalDebit == TotalCredit;
 }
 
+/// <summary>One account-type total on the summarised trial balance.</summary>
+/// <param name="Type">The account type.</param>
+/// <param name="Debit">The net debit total across accounts of this type.</param>
+/// <param name="Credit">The net credit total across accounts of this type.</param>
+public sealed record TrialBalanceTypeRow(AccountType Type, decimal Debit, decimal Credit);
+
+/// <summary>The trial balance summarised by account type.</summary>
+/// <param name="CompanyId">The company.</param>
+/// <param name="AsAtDate">The as-at date.</param>
+/// <param name="Rows">One row per account type present.</param>
+/// <param name="TotalDebit">Total debits.</param>
+/// <param name="TotalCredit">Total credits.</param>
+public sealed record TrialBalanceByTypeReport(long CompanyId, DateOnly AsAtDate, IReadOnlyList<TrialBalanceTypeRow> Rows, decimal TotalDebit, decimal TotalCredit)
+{
+    /// <summary>True when total debits equal total credits.</summary>
+    public bool IsBalanced => TotalDebit == TotalCredit;
+}
+
 /// <summary>A line in a financial statement (P&amp;L or balance sheet), grouped by report category.</summary>
 /// <param name="Category">The report category.</param>
 /// <param name="AccountCode">The account code.</param>
@@ -293,6 +311,17 @@ public interface IGeneralLedgerReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The trial balance.</returns>
     Task<TrialBalanceReport> TrialBalanceAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
+
+    /// <summary>
+    /// Produces a summarised trial balance grouped by account type (Asset/Liability/Equity/Income/Expense) —
+    /// each type's net debit and credit totals as at a date. Balances overall because the detailed trial
+    /// balance does.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAtDate">The as-at date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The by-type summary.</returns>
+    Task<TrialBalanceByTypeReport> TrialBalanceByTypeAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
 
     /// <summary>Produces the statement of profit or loss for a date range.</summary>
     /// <param name="companyId">The company.</param>

@@ -114,6 +114,31 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
     }
 
     /// <inheritdoc />
+    public async Task<TrialBalanceByTypeReport> TrialBalanceByTypeAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+    {
+        Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> sums = await SumByAccountAsync(companyId, null, asAtDate, ct).ConfigureAwait(false);
+
+        // Net each account, then net all accounts of a type together so the type shows on one side.
+        Dictionary<AccountType, decimal> netByType = [];
+        foreach ((string code, (decimal debit, decimal credit)) in sums)
+        {
+            if (accounts.TryGetValue(code, out AccountMeta? meta))
+            {
+                netByType[meta.Type] = netByType.GetValueOrDefault(meta.Type) + (debit - credit);
+            }
+        }
+
+        List<TrialBalanceTypeRow> rows = netByType
+            .Where(kv => kv.Value != 0m)
+            .OrderBy(kv => kv.Key)
+            .Select(kv => new TrialBalanceTypeRow(kv.Key, kv.Value > 0m ? kv.Value : 0m, kv.Value < 0m ? -kv.Value : 0m))
+            .ToList();
+
+        return new TrialBalanceByTypeReport(companyId, asAtDate, rows, rows.Sum(r => r.Debit), rows.Sum(r => r.Credit));
+    }
+
+    /// <inheritdoc />
     public async Task<IncomeStatement> IncomeStatementByDepartmentAsync(long companyId, DateOnly fromDate, DateOnly toDate, string department, CancellationToken ct = default)
     {
         Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);
