@@ -71,6 +71,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Physical stocktake sessions.</summary>
     public DbSet<Core.Inventory.StocktakeSession> Stocktakes => Set<Core.Inventory.StocktakeSession>();
 
+    /// <summary>Selling price lists (quantity breaks, customer-linked).</summary>
+    public DbSet<Core.Inventory.PriceList> PriceLists => Set<Core.Inventory.PriceList>();
+
     /// <summary>Budget commitments (encumbrances).</summary>
     public DbSet<Core.Budgeting.BudgetCommitment> BudgetCommitments => Set<Core.Budgeting.BudgetCommitment>();
 
