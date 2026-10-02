@@ -46,6 +46,57 @@ public sealed class WorkflowService : IWorkflowService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<PendingApproval>> PendingForUserAsync(long companyId, long userId, CancellationToken ct = default)
+    {
+        List<WorkflowInstance> inProgress = await _db.WorkflowInstances
+            .Include(i => i.Approvals)
+            .Where(i => i.CompanyId == companyId && i.Status == WorkflowStatus.InProgress)
+            .OrderBy(i => i.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        if (inProgress.Count == 0)
+        {
+            return [];
+        }
+
+        List<long> definitionIds = inProgress.Select(i => i.WorkflowDefinitionId).Distinct().ToList();
+        Dictionary<long, WorkflowDefinition> definitions = await _db.WorkflowDefinitions
+            .Include(d => d.Stages)
+            .Where(d => definitionIds.Contains(d.Id))
+            .ToDictionaryAsync(d => d.Id, ct).ConfigureAwait(false);
+
+        List<PendingApproval> pending = [];
+        foreach (WorkflowInstance instance in inProgress)
+        {
+            if (!definitions.TryGetValue(instance.WorkflowDefinitionId, out WorkflowDefinition? definition))
+            {
+                continue;
+            }
+
+            WorkflowStage? stage = definition.Stages
+                .Where(s => s.AppliesTo(instance.Value))
+                .FirstOrDefault(s => s.Sequence == instance.CurrentStageSequence);
+            if (stage is null)
+            {
+                continue;
+            }
+
+            // Eligible when the stage names this user, or names nobody (anyone may act).
+            bool eligible = stage.EligibleUserIds.Count == 0 || stage.EligibleUserIds.Contains(userId);
+            bool alreadyApproved = instance.Approvals.Any(a => a.StageSequence == stage.Sequence && a.UserId == userId && a.Action == WorkflowActionType.Approve);
+            if (!eligible || alreadyApproved)
+            {
+                continue;
+            }
+
+            int approvalsSoFar = instance.Approvals.Count(a => a.StageSequence == stage.Sequence && a.Action == WorkflowActionType.Approve);
+            pending.Add(new PendingApproval(instance.Id, instance.DocumentType, instance.DocumentReference, instance.Value, instance.InitiatedByUserId, stage.Sequence, stage.Name, approvalsSoFar, stage.Quorum));
+        }
+
+        return pending;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<WorkflowStatus>> ActAsync(long instanceId, long userId, WorkflowActionType action, string? comment, CancellationToken ct = default)
     {
         WorkflowInstance? instance = await _db.WorkflowInstances
