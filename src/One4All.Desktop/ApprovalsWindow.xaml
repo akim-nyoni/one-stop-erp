@@ -1,0 +1,61 @@
+<Window x:Class="One4All.Desktop.ApprovalsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:One4All.Desktop.ViewModels"
+        Title="My Approvals" Height="560" Width="900"
+        WindowStartupLocation="CenterOwner" Background="#F4F6F4" FontFamily="Segoe UI">
+    <Window.Resources>
+        <Style x:Key="ActionButton" TargetType="Button">
+            <Setter Property="Padding" Value="16,7" />
+            <Setter Property="Margin" Value="6,0,0,0" />
+            <Setter Property="MinWidth" Value="100" />
+        </Style>
+    </Window.Resources>
+
+    <DockPanel Margin="10">
+        <!-- Header -->
+        <DockPanel DockPanel.Dock="Top" Margin="6,0,6,6">
+            <Button Content="Refresh" Padding="14,6" DockPanel.Dock="Right" Command="{Binding LoadCommand}" />
+            <StackPanel>
+                <TextBlock Text="My Approvals" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
+                <TextBlock Text="Documents waiting on you. Select one, add an optional comment, then approve, reject or return it."
+                           Foreground="#667" FontSize="12" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom" Background="#E8EEE8" Padding="10,5" Margin="6,6,6,0" CornerRadius="4">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#334" FontSize="12" />
+        </Border>
+
+        <!-- Comment + actions -->
+        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="6,6,6,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="Return" Style="{StaticResource ActionButton}" Command="{Binding ReturnCommand}" />
+                    <Button Content="Reject" Style="{StaticResource ActionButton}" Command="{Binding RejectCommand}" Foreground="#8B1E1E" />
+                    <Button Content="Approve" Style="{StaticResource ActionButton}" Command="{Binding ApproveCommand}" FontWeight="SemiBold" Background="#DDEFE0" />
+                </StackPanel>
+                <StackPanel Margin="0,0,12,0">
+                    <TextBlock Text="Comment (optional)" Foreground="#667" FontSize="12" />
+                    <TextBox Text="{Binding Comment, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" Padding="6,4" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Inbox -->
+        <Border Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="6" Margin="6,0">
+            <ListView ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}" BorderThickness="0">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Document" Width="260" DisplayMemberBinding="{Binding Document}" />
+                        <GridViewColumn Header="Value" Width="120" DisplayMemberBinding="{Binding Value}" />
+                        <GridViewColumn Header="Stage" Width="180" DisplayMemberBinding="{Binding Stage}" />
+                        <GridViewColumn Header="Approvals" Width="90" DisplayMemberBinding="{Binding Progress}" />
+                        <GridViewColumn Header="Raised by" Width="120" DisplayMemberBinding="{Binding RaisedBy}" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+    </DockPanel>
+</Window>

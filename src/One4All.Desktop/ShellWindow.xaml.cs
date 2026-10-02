@@ -50,4 +50,11 @@ public partial class ShellWindow : Window
         AnalyticsWindow analytics = new(_services) { Owner = this };
         analytics.Show();
     }
+
+    private void OpenApprovals_Click(object sender, RoutedEventArgs e)
+    {
+        ShellViewModel vm = (ShellViewModel)DataContext;
+        ApprovalsWindow approvals = new(_services, vm.UserId) { Owner = this };
+        approvals.Show();
+    }
 }

@@ -176,6 +176,17 @@ app.MapGet("/api/crm/conversion", async (long companyId, One4All.Application.Abs
 .RequireAuthorization()
 .WithName("CrmConversion");
 
+// --- Workflow approvals (the approver's inbox, and acting on an item) ---------------------------------------
+app.MapGet("/api/workflow/inbox", async (long companyId, long userId, One4All.Application.Abstractions.Workflow.IWorkflowService workflow, CancellationToken ct) =>
+    Results.Ok(await workflow.PendingForUserAsync(companyId, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("WorkflowInbox");
+
+app.MapPost("/api/workflow/{instanceId:long}/act", async (long instanceId, long userId, One4All.Core.Workflow.WorkflowActionType action, string? comment, One4All.Application.Abstractions.Workflow.IWorkflowService workflow, CancellationToken ct) =>
+    ValueResponse(await workflow.ActAsync(instanceId, userId, action, comment, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("WorkflowAct");
+
 app.Run();
 
 // Maps a value-bearing Result to an HTTP response: 200 with the value, 404 for not-found, else 400.
