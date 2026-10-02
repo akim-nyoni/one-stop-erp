@@ -17,6 +17,17 @@ public readonly record struct PostingReceipt(long JournalId, string JournalNumbe
 /// the posting module; valid, active, permitted accounts; control-account manual-journal rules; gapless
 /// numbering; the audit trail; and the period-balance update. There is no other way to write to the ledger.
 /// </summary>
+/// <summary>A deferred journal that could not be released.</summary>
+/// <param name="JournalId">The journal.</param>
+/// <param name="JournalNumber">Its number.</param>
+/// <param name="Reason">Why it stayed deferred.</param>
+public sealed record DeferredReleaseFailure(long JournalId, string JournalNumber, string Reason);
+
+/// <summary>The outcome of a batch release of deferred journals.</summary>
+/// <param name="Released">The journal numbers released, oldest first.</param>
+/// <param name="Failed">The journals that could not be released.</param>
+public sealed record DeferredReleaseResult(IReadOnlyList<string> Released, IReadOnlyList<DeferredReleaseFailure> Failed);
+
 public interface IPostingEngine
 {
     /// <summary>Posts (or defers) one balanced journal.</summary>
@@ -37,4 +48,25 @@ public interface IPostingEngine
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The reversal journal's receipt, or an error.</returns>
     Task<Result<PostingReceipt>> ReverseAsync(long companyId, long journalId, DateOnly date, string reason, CancellationToken ct = default);
+
+    /// <summary>
+    /// Releases one deferred journal to the ledger: re-checks that its period is still open for its module,
+    /// marks it posted (keeping its already-allocated number) and updates the period balances. Refuses a
+    /// journal that is not deferred.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="journalId">The deferred journal.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The posting receipt, or an error.</returns>
+    Task<Result<PostingReceipt>> ReleaseDeferredAsync(long companyId, long journalId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Releases every deferred journal dated on or before a date, oldest first, continuing past any that
+    /// cannot be released (e.g. a closed period) and reporting them.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="upToDate">Journals with a posting date on or before this are released.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What was released and what was not.</returns>
+    Task<DeferredReleaseResult> ReleaseAllDeferredAsync(long companyId, DateOnly upToDate, CancellationToken ct = default);
 }

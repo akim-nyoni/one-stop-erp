@@ -119,6 +119,68 @@ public sealed class PostingEngine : IPostingEngine
     }
 
     /// <inheritdoc />
+    public async Task<Result<PostingReceipt>> ReleaseDeferredAsync(long companyId, long journalId, CancellationToken ct = default)
+    {
+        JournalEntry? journal = await _db.Journals.Include(j => j.Lines)
+            .FirstOrDefaultAsync(j => j.Id == journalId && j.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (journal is null)
+        {
+            return Error.NotFound("Gl.JournalNotFound", $"Journal {journalId} not found.");
+        }
+
+        if (journal.Status != JournalStatus.Deferred)
+        {
+            return Error.Rule("Posting.NotDeferred", $"Journal {journal.JournalNumber} is {journal.Status}, not deferred.");
+        }
+
+        Company company = await _db.Companies.FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+
+        // The period must still be open for the module now that the journal is really being posted.
+        Result<(FiscalYear, FiscalPeriod)> periodResult =
+            await ResolvePeriodAsync(companyId, journal.SourceModule, journal.PostingDate, company.AllowFuturePeriodPosting, ct).ConfigureAwait(false);
+        if (periodResult.IsFailure)
+        {
+            return periodResult.Error;
+        }
+
+        (FiscalYear fiscalYear, FiscalPeriod fiscalPeriod) = periodResult.Value;
+
+        journal.MarkPosted(journal.JournalNumber, fiscalYear.Id, fiscalPeriod.Id, DateTimeOffset.UtcNow);
+        await UpdatePeriodBalancesAsync(companyId, fiscalYear.Id, fiscalPeriod.Id, journal, ct).ConfigureAwait(false);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return new PostingReceipt(journal.Id, journal.JournalNumber, journal.PostingDate, journal.Lines.Sum(l => l.BaseDebit), false);
+    }
+
+    /// <inheritdoc />
+    public async Task<DeferredReleaseResult> ReleaseAllDeferredAsync(long companyId, DateOnly upToDate, CancellationToken ct = default)
+    {
+        List<long> ids = await _db.Journals
+            .Where(j => j.CompanyId == companyId && j.Status == JournalStatus.Deferred && j.PostingDate <= upToDate)
+            .OrderBy(j => j.PostingDate).ThenBy(j => j.Id)
+            .Select(j => j.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        List<string> released = [];
+        List<DeferredReleaseFailure> failed = [];
+        foreach (long id in ids)
+        {
+            Result<PostingReceipt> result = await ReleaseDeferredAsync(companyId, id, ct).ConfigureAwait(false);
+            if (result.IsSuccess)
+            {
+                released.Add(result.Value.JournalNumber);
+            }
+            else
+            {
+                string number = await _db.Journals.Where(j => j.Id == id).Select(j => j.JournalNumber).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                failed.Add(new DeferredReleaseFailure(id, number, result.Error.Message));
+            }
+        }
+
+        return new DeferredReleaseResult(released, failed);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<PostingReceipt>> ReverseAsync(long companyId, long journalId, DateOnly date, string reason, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(reason))
