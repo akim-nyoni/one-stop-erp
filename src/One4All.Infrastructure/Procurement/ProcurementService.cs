@@ -17,22 +17,41 @@ public sealed class ProcurementService : IProcurementService
     private readonly One4AllDbContext _db;
     private readonly IInventoryService _inventory;
     private readonly IPostingEngine _postingEngine;
+    private readonly One4All.Application.Abstractions.Numbering.INumberSequenceService _numbers;
+
+    /// <summary>The document-type key of the purchase-order number sequence.</summary>
+    public const string OrderNumberSequence = "PO";
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="inventory">The inventory service (for stock receipts).</param>
     /// <param name="postingEngine">The posting engine.</param>
-    public ProcurementService(One4AllDbContext db, IInventoryService inventory, IPostingEngine postingEngine)
+    /// <param name="numbers">The number-sequence service (allocates order numbers left blank).</param>
+    public ProcurementService(One4AllDbContext db, IInventoryService inventory, IPostingEngine postingEngine, One4All.Application.Abstractions.Numbering.INumberSequenceService numbers)
     {
         _db = db;
         _inventory = inventory;
         _postingEngine = postingEngine;
+        _numbers = numbers;
     }
 
     /// <inheritdoc />
     public async Task<Result<PurchaseOrderResult>> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken ct = default)
     {
-        PurchaseOrder order = new(request.CompanyId, request.SupplierId, request.OrderNumber, request.OrderDate, request.Currency);
+        // A blank order number means "allocate the next one" from the PO sequence.
+        string orderNumber = request.OrderNumber.Trim();
+        if (orderNumber.Length == 0)
+        {
+            Result<string> allocated = await _numbers.AllocateAsync(request.CompanyId, OrderNumberSequence, request.OrderDate, ct: ct).ConfigureAwait(false);
+            if (allocated.IsFailure)
+            {
+                return allocated.Error;
+            }
+
+            orderNumber = allocated.Value;
+        }
+
+        PurchaseOrder order = new(request.CompanyId, request.SupplierId, orderNumber, request.OrderDate, request.Currency);
         foreach (PurchaseOrderLineRequest line in request.Lines)
         {
             order.AddLine(line.ItemId, line.Description, line.Quantity, line.UnitPrice);

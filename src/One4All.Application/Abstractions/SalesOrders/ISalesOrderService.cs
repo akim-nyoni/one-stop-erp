@@ -21,7 +21,7 @@ public sealed class CreateSalesOrderRequest
     /// <summary>The customer.</summary>
     public long CustomerId { get; init; }
 
-    /// <summary>The order number.</summary>
+    /// <summary>The order number; blank allocates the next number from the company's <c>SO</c> sequence.</summary>
     public string OrderNumber { get; init; } = string.Empty;
 
     /// <summary>The order date.</summary>

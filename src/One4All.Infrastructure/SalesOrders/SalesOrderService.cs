@@ -17,18 +17,24 @@ public sealed class SalesOrderService : ISalesOrderService
     private readonly IInventoryService _inventory;
     private readonly ISalesLedgerService _salesLedger;
     private readonly IPricingService _pricing;
+    private readonly One4All.Application.Abstractions.Numbering.INumberSequenceService _numbers;
+
+    /// <summary>The document-type key of the sales-order number sequence.</summary>
+    public const string OrderNumberSequence = "SO";
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="inventory">The inventory service (for despatch stock issues).</param>
     /// <param name="salesLedger">The AR service (for invoicing).</param>
     /// <param name="pricing">The pricing service (resolves unpriced order lines from the price lists).</param>
-    public SalesOrderService(One4AllDbContext db, IInventoryService inventory, ISalesLedgerService salesLedger, IPricingService pricing)
+    /// <param name="numbers">The number-sequence service (allocates order numbers left blank).</param>
+    public SalesOrderService(One4AllDbContext db, IInventoryService inventory, ISalesLedgerService salesLedger, IPricingService pricing, One4All.Application.Abstractions.Numbering.INumberSequenceService numbers)
     {
         _db = db;
         _inventory = inventory;
         _salesLedger = salesLedger;
         _pricing = pricing;
+        _numbers = numbers;
     }
 
     /// <inheritdoc />
@@ -48,7 +54,20 @@ public sealed class SalesOrderService : ISalesOrderService
             return Error.Rule("Sop.CustomerOnHold", $"Customer {customer.Code} is on hold; no new sales orders can be taken.");
         }
 
-        SalesOrder order = new(request.CompanyId, request.CustomerId, request.OrderNumber, request.OrderDate, request.Currency);
+        // A blank order number means "allocate the next one" from the SO sequence.
+        string orderNumber = request.OrderNumber.Trim();
+        if (orderNumber.Length == 0)
+        {
+            Result<string> allocated = await _numbers.AllocateAsync(request.CompanyId, OrderNumberSequence, request.OrderDate, ct: ct).ConfigureAwait(false);
+            if (allocated.IsFailure)
+            {
+                return allocated.Error;
+            }
+
+            orderNumber = allocated.Value;
+        }
+
+        SalesOrder order = new(request.CompanyId, request.CustomerId, orderNumber, request.OrderDate, request.Currency);
         foreach (SalesOrderLineRequest line in request.Lines)
         {
             decimal unitPrice;

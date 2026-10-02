@@ -18,7 +18,7 @@ public sealed class CreatePurchaseOrderRequest
     /// <summary>The supplier.</summary>
     public long SupplierId { get; init; }
 
-    /// <summary>The order number.</summary>
+    /// <summary>The order number; blank allocates the next number from the company's <c>PO</c> sequence.</summary>
     public string OrderNumber { get; init; } = string.Empty;
 
     /// <summary>The order date.</summary>
