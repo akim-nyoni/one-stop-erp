@@ -285,6 +285,11 @@ app.MapPost("/api/banking/{bankAccountId:long}/statement-csv", async (HttpReques
 .Accepts<string>("text/csv", "text/plain")
 .WithName("ImportStatementCsv");
 
+app.MapGet("/api/accounting/period-close", async (long companyId, DateOnly periodEnd, One4All.Application.Abstractions.Accounting.IPeriodCloseService close, CancellationToken ct) =>
+    Results.Ok(await close.ChecklistAsync(companyId, periodEnd, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PeriodCloseChecklist");
+
 // --- Intercompany and job-costing period-end runs ----------------------------------------------------------
 app.MapPost("/api/interco/post", async (One4All.Application.Abstractions.Accounting.IntercompanyJournalRequest request, One4All.Application.Abstractions.Accounting.IIntercompanyService interco, CancellationToken ct) =>
     ValueResponse(await interco.PostAsync(request, ct).ConfigureAwait(false)))

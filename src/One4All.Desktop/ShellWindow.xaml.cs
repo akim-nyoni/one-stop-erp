@@ -57,6 +57,12 @@ public partial class ShellWindow : Window
         credit.Show();
     }
 
+    private void OpenPeriodClose_Click(object sender, RoutedEventArgs e)
+    {
+        PeriodCloseWindow close = new(_services) { Owner = this };
+        close.Show();
+    }
+
     private void OpenCustomerDocuments_Click(object sender, RoutedEventArgs e)
     {
         CustomerDocumentsWindow documents = new(_services) { Owner = this };
