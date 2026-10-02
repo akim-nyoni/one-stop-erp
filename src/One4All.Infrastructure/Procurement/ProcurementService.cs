@@ -44,6 +44,31 @@ public sealed class ProcurementService : IProcurementService
     }
 
     /// <inheritdoc />
+    public async Task<Result> CancelPurchaseOrderAsync(long companyId, long purchaseOrderId, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Result.Failure(Error.Validation("Pop.ReasonRequired", "A reason is required to cancel a purchase order."));
+        }
+
+        PurchaseOrder? order = await _db.Set<PurchaseOrder>().Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.Id == purchaseOrderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Result.Failure(Error.NotFound("Pop.OrderNotFound", $"Purchase order {purchaseOrderId} not found."));
+        }
+
+        Result cancelled = order.Cancel();
+        if (cancelled.IsFailure)
+        {
+            return cancelled;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result<GrnResult>> ReceiveGoodsAsync(ReceiveGoodsRequest request, CancellationToken ct = default)
     {
         PurchaseOrder? order = await _db.Set<PurchaseOrder>().Include(o => o.Lines)

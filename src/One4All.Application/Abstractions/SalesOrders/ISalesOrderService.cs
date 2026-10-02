@@ -136,6 +136,17 @@ public interface ISalesOrderService
     /// <returns>The value returned to stock.</returns>
     Task<Result<decimal>> ReturnDespatchAsync(long companyId, long salesOrderId, long salesOrderLineId, long warehouseId, DateOnly date, decimal quantity, string reason, CancellationToken ct = default);
 
+    /// <summary>
+    /// Cancels a sales order, releasing its stock commitment. Refused once anything has been despatched
+    /// (<c>Sop.Despatched</c>) or when already cancelled; requires a reason.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="salesOrderId">The sales order.</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> CancelOrderAsync(long companyId, long salesOrderId, string reason, CancellationToken ct = default);
+
     /// <summary>Invoices the despatched-but-uninvoiced quantity, raising the AR invoice.</summary>
     /// <param name="request">The request.</param>
     /// <param name="ct">Cancellation token.</param>

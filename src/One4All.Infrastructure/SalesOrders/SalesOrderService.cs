@@ -82,6 +82,31 @@ public sealed class SalesOrderService : ISalesOrderService
     }
 
     /// <inheritdoc />
+    public async Task<Result> CancelOrderAsync(long companyId, long salesOrderId, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Result.Failure(Error.Validation("Sop.ReasonRequired", "A reason is required to cancel a sales order."));
+        }
+
+        SalesOrder? order = await _db.Set<SalesOrder>().Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.Id == salesOrderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Result.Failure(Error.NotFound("Sop.OrderNotFound", $"Sales order {salesOrderId} not found."));
+        }
+
+        Result cancelled = order.Cancel();
+        if (cancelled.IsFailure)
+        {
+            return cancelled;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result<DespatchResult>> DespatchAsync(DespatchRequest request, CancellationToken ct = default)
     {
         SalesOrder? order = await _db.Set<SalesOrder>().Include(o => o.Lines)

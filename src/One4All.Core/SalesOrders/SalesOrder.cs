@@ -86,9 +86,35 @@ public sealed class SalesOrder : AuditableEntity, ICompanyScoped
         return line;
     }
 
+    /// <summary>
+    /// Cancels the order. Refused once anything has been despatched (the goods have moved; return them
+    /// first) or the order is already cancelled.
+    /// </summary>
+    /// <returns>Success or the rule violated.</returns>
+    public Result Cancel()
+    {
+        if (Status == SalesOrderStatus.Cancelled)
+        {
+            return Result.Failure(Error.Rule("Sop.AlreadyCancelled", $"Sales order {OrderNumber} is already cancelled."));
+        }
+
+        if (_lines.Any(l => l.DespatchedQuantity > 0m))
+        {
+            return Result.Failure(Error.Rule("Sop.Despatched", $"Sales order {OrderNumber} has despatched lines and cannot be cancelled."));
+        }
+
+        Status = SalesOrderStatus.Cancelled;
+        return Result.Success();
+    }
+
     /// <summary>Recomputes the order status from its lines.</summary>
     public void RecomputeStatus()
     {
+        if (Status == SalesOrderStatus.Cancelled)
+        {
+            return;
+        }
+
         if (_lines.All(l => l.InvoicedQuantity >= l.OrderedQuantity))
         {
             Status = SalesOrderStatus.Invoiced;

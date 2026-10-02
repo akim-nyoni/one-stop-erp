@@ -123,6 +123,17 @@ public interface IProcurementService
     /// <returns>The order result.</returns>
     Task<Result<PurchaseOrderResult>> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// Cancels a purchase order, releasing its inbound (on-order) quantity. Refused once anything has been
+    /// received (<c>Pop.Received</c>) or when already cancelled; requires a reason.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="purchaseOrderId">The purchase order.</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> CancelPurchaseOrderAsync(long companyId, long purchaseOrderId, string reason, CancellationToken ct = default);
+
     /// <summary>Receives goods against a purchase order, accruing GRNI and updating stock.</summary>
     /// <param name="request">The request.</param>
     /// <param name="ct">Cancellation token.</param>

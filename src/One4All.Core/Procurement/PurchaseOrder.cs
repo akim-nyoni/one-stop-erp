@@ -90,9 +90,35 @@ public sealed class PurchaseOrder : AuditableEntity, ICompanyScoped
         return line;
     }
 
+    /// <summary>
+    /// Cancels the order. Refused once anything has been received (the goods are in stock; return them to
+    /// the supplier first) or the order is already cancelled.
+    /// </summary>
+    /// <returns>Success or the rule violated.</returns>
+    public Result Cancel()
+    {
+        if (Status == PurchaseOrderStatus.Cancelled)
+        {
+            return Result.Failure(Error.Rule("Pop.AlreadyCancelled", $"Purchase order {OrderNumber} is already cancelled."));
+        }
+
+        if (_lines.Any(l => l.ReceivedQuantity > 0m))
+        {
+            return Result.Failure(Error.Rule("Pop.Received", $"Purchase order {OrderNumber} has received lines and cannot be cancelled."));
+        }
+
+        Status = PurchaseOrderStatus.Cancelled;
+        return Result.Success();
+    }
+
     /// <summary>Recomputes the order status from its lines' received/invoiced quantities.</summary>
     public void RecomputeStatus()
     {
+        if (Status == PurchaseOrderStatus.Cancelled)
+        {
+            return;
+        }
+
         if (_lines.All(l => l.InvoicedQuantity >= l.OrderedQuantity))
         {
             Status = PurchaseOrderStatus.Closed;
