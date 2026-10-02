@@ -57,6 +57,12 @@ public partial class ShellWindow : Window
         credit.Show();
     }
 
+    private void OpenReplenishment_Click(object sender, RoutedEventArgs e)
+    {
+        ReplenishmentWindow replenishment = new(_services) { Owner = this };
+        replenishment.Show();
+    }
+
     private void OpenApprovals_Click(object sender, RoutedEventArgs e)
     {
         ShellViewModel vm = (ShellViewModel)DataContext;

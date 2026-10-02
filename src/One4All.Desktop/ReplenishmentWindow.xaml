@@ -1,0 +1,54 @@
+<Window x:Class="One4All.Desktop.ReplenishmentWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:One4All.Desktop.ViewModels"
+        Title="Stock Replenishment" Height="620" Width="1000"
+        WindowStartupLocation="CenterOwner" Background="#F4F6F4" FontFamily="Segoe UI">
+    <DockPanel Margin="10">
+        <!-- Header -->
+        <DockPanel DockPanel.Dock="Top" Margin="6,0,6,6">
+            <Button Content="Refresh" Padding="14,6" DockPanel.Dock="Right" Command="{Binding LoadCommand}" />
+            <StackPanel>
+                <TextBlock Text="Stock Replenishment" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
+                <TextBlock Text="Items at or below their reorder level, net of stock already on order. Adjust quantities, untick what you don't want, choose a supplier and raise the order."
+                           Foreground="#667" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom" Background="#E8EEE8" Padding="10,5" Margin="6,6,6,0" CornerRadius="4">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#334" FontSize="12" TextWrapping="Wrap" />
+        </Border>
+
+        <!-- Order controls -->
+        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="12,10" Margin="6,6,6,0">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Raise order" Padding="18,7" MinWidth="120" FontWeight="SemiBold" Background="#DDEFE0" Command="{Binding RaiseOrderCommand}" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Supplier" Foreground="#667" FontSize="12" VerticalAlignment="Center" />
+                    <ComboBox ItemsSource="{Binding Suppliers}" SelectedItem="{Binding SelectedSupplier}" DisplayMemberPath="Label" Width="320" Margin="8,0,18,0" />
+                    <TextBlock Text="Order date" Foreground="#667" FontSize="12" VerticalAlignment="Center" />
+                    <DatePicker SelectedDate="{Binding OrderDate}" Margin="8,0,0,0" />
+                    <TextBlock Text="Order number is allocated automatically." Foreground="#889" FontSize="11" VerticalAlignment="Center" Margin="18,0,0,0" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Suggestions -->
+        <Border Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="6" Margin="6,0">
+            <DataGrid ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal" BorderThickness="0" RowHeight="26">
+                <DataGrid.Columns>
+                    <DataGridCheckBoxColumn Header="Order" Binding="{Binding Include, UpdateSourceTrigger=PropertyChanged}" Width="60" />
+                    <DataGridTextColumn Header="Item" Binding="{Binding ItemCode}" Width="110" IsReadOnly="True" />
+                    <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*" IsReadOnly="True" />
+                    <DataGridTextColumn Header="On hand" Binding="{Binding OnHand, StringFormat=N2}" Width="90" IsReadOnly="True" />
+                    <DataGridTextColumn Header="On order" Binding="{Binding OnOrder, StringFormat=N2}" Width="90" IsReadOnly="True" />
+                    <DataGridTextColumn Header="Reorder level" Binding="{Binding ReorderLevel, StringFormat=N2}" Width="100" IsReadOnly="True" />
+                    <DataGridTextColumn Header="Order qty" Binding="{Binding OrderQuantity, StringFormat=N2, UpdateSourceTrigger=PropertyChanged}" Width="100" />
+                    <DataGridTextColumn Header="Last price" Binding="{Binding LastUnitPrice, StringFormat=N2}" Width="90" IsReadOnly="True" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+    </DockPanel>
+</Window>
