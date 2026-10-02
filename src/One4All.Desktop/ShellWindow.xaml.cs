@@ -57,6 +57,12 @@ public partial class ShellWindow : Window
         credit.Show();
     }
 
+    private void OpenCustomerDocuments_Click(object sender, RoutedEventArgs e)
+    {
+        CustomerDocumentsWindow documents = new(_services) { Owner = this };
+        documents.Show();
+    }
+
     private void OpenReplenishment_Click(object sender, RoutedEventArgs e)
     {
         ReplenishmentWindow replenishment = new(_services) { Owner = this };

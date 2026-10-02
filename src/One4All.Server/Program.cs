@@ -235,6 +235,11 @@ app.MapGet("/api/trading/suppliers/{supplierId:long}/statement", async (long com
 .RequireAuthorization()
 .WithName("SupplierStatement");
 
+app.MapGet("/api/trading/items/{openItemId:long}/document", async (long companyId, long openItemId, int? width, One4All.Application.Abstractions.Trading.IInvoiceDocumentService documents, CancellationToken ct) =>
+    TextResponse(await documents.RenderTextAsync(companyId, openItemId, width ?? 64, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("InvoiceDocument");
+
 app.MapGet("/api/sop/{salesOrderId:long}/pick-list", async (long companyId, long salesOrderId, long warehouseId, int? width, One4All.Application.Abstractions.SalesOrders.IPickListService picks, CancellationToken ct) =>
     TextResponse(await picks.RenderTextAsync(companyId, salesOrderId, warehouseId, width ?? 64, ct).ConfigureAwait(false)))
 .RequireAuthorization()
