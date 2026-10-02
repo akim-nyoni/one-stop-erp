@@ -266,6 +266,84 @@ public sealed class JobCostingService : IJobCostingService
         return new RevenueRecognitionResult(poc.PercentComplete, poc.EarnedRevenue, poc.CertifiedToDate, target, poc.Movement, posting.Value.JournalNumber);
     }
 
+    /// <inheritdoc />
+    public async Task<Result> ReviseBudgetAsync(long companyId, long contractId, decimal newBudgetCost, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Result.Failure(Error.Validation("Job.ReasonRequired", "A reason is required to revise a contract budget."));
+        }
+
+        JobContract? contract = await _db.Set<JobContract>().Include(c => c.Costs)
+            .FirstOrDefaultAsync(c => c.Id == contractId && c.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (contract is null)
+        {
+            return Result.Failure(Error.NotFound("Job.ContractNotFound", $"Contract {contractId} not found."));
+        }
+
+        Result revised = contract.ReviseBudget(newBudgetCost);
+        if (revised.IsFailure)
+        {
+            return revised;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<ExpectedLossResult>> ProvideForExpectedLossAsync(long companyId, long contractId, DateOnly date, string lossExpenseAccountCode, string provisionAccountCode, string documentNumber, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(lossExpenseAccountCode) || string.IsNullOrWhiteSpace(provisionAccountCode))
+        {
+            return Error.Validation("Job.LossAccounts", "Both the expected-loss expense and provision accounts are required.");
+        }
+
+        JobContract? contract = await _db.Set<JobContract>()
+            .FirstOrDefaultAsync(c => c.Id == contractId && c.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (contract is null)
+        {
+            return Error.NotFound("Job.ContractNotFound", $"Contract {contractId} not found.");
+        }
+
+        ExpectedLossCalculation loss = ExpectedLoss.Compute(contract.ContractValue, contract.BudgetCost, contract.LossProvisionToDate);
+        if (loss.Movement == 0m)
+        {
+            return new ExpectedLossResult(loss.ExpectedLoss, loss.PriorProvision, 0m, null);
+        }
+
+        Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+
+        // Top-up: Dr loss expense / Cr provision. Release: the reverse.
+        decimal amount = Math.Abs(loss.Movement);
+        bool topUp = loss.Movement > 0m;
+        Result<PostingReceipt> posting = await _posting.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId,
+            SourceModule = "GL",
+            PostingDate = date,
+            TransactionCurrency = company.BaseCurrency,
+            DocumentType = "ONEROUS",
+            DocumentNumber = documentNumber,
+            Reference = contract.ContractNumber,
+            Narrative = (topUp ? "Expected loss provision" : "Expected loss provision release") + $" — {contract.ContractNumber}",
+            Lines =
+            [
+                Line(topUp ? lossExpenseAccountCode : provisionAccountCode, JournalSide.Debit, amount),
+                Line(topUp ? provisionAccountCode : lossExpenseAccountCode, JournalSide.Credit, amount),
+            ],
+        }, ct).ConfigureAwait(false);
+        if (posting.IsFailure)
+        {
+            return posting.Error;
+        }
+
+        contract.SetLossProvision(loss.ExpectedLoss);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return new ExpectedLossResult(loss.ExpectedLoss, loss.PriorProvision, loss.Movement, posting.Value.JournalNumber);
+    }
+
     private static JournalLineRequest Line(string account, JournalSide side, decimal amount) =>
         new() { AccountCode = account, Side = side, TransactionAmount = amount };
 }

@@ -111,7 +111,42 @@ public interface IJobCostingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The recognition result.</returns>
     Task<Result<RevenueRecognitionResult>> RecogniseRevenueAsync(long companyId, long contractId, DateOnly date, string contractAssetAccountCode, string contractLiabilityAccountCode, string documentNumber, CancellationToken ct = default);
+
+    /// <summary>
+    /// Revises the contract's forecast total cost (the budget the cost-to-cost percentage and the expected
+    /// loss are measured against). Refuses a negative budget or one below the cost already incurred; requires
+    /// a reason.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="contractId">The contract.</param>
+    /// <param name="newBudgetCost">The revised forecast total cost.</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or an error.</returns>
+    Task<Result> ReviseBudgetAsync(long companyId, long contractId, decimal newBudgetCost, string reason, CancellationToken ct = default);
+
+    /// <summary>
+    /// Onerous-contract provisioning (IAS 37): when the forecast cost exceeds the contract value, provides the
+    /// whole expected loss at once (Dr expected-loss expense / Cr provision) and releases it when the forecast
+    /// improves (the reverse). Posts only the movement since the last run; no movement posts nothing.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="contractId">The contract.</param>
+    /// <param name="date">The provision date.</param>
+    /// <param name="lossExpenseAccountCode">The expected-loss (contract loss) expense account.</param>
+    /// <param name="provisionAccountCode">The provision for onerous contracts (liability) account.</param>
+    /// <param name="documentNumber">The journal document number.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The provision result.</returns>
+    Task<Result<ExpectedLossResult>> ProvideForExpectedLossAsync(long companyId, long contractId, DateOnly date, string lossExpenseAccountCode, string provisionAccountCode, string documentNumber, CancellationToken ct = default);
 }
+
+/// <summary>The result of an onerous-contract provision run.</summary>
+/// <param name="ExpectedLoss">The expected loss now provided (0 when the contract is profitable).</param>
+/// <param name="PriorProvision">The provision carried before this run.</param>
+/// <param name="Movement">The amount posted this run (positive top-up, negative release).</param>
+/// <param name="JournalNumber">The journal posted, or null when there was no movement.</param>
+public readonly record struct ExpectedLossResult(decimal ExpectedLoss, decimal PriorProvision, decimal Movement, string? JournalNumber);
 
 /// <summary>The result of a percentage-of-completion revenue recognition run.</summary>
 /// <param name="PercentComplete">The cost-to-cost percentage complete.</param>

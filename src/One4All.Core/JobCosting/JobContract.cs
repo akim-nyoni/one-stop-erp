@@ -115,6 +115,12 @@ public sealed class JobContract : SoftDeletableEntity, ICompanyScoped
     /// </summary>
     public decimal RevenueAdjustmentToDate { get; private set; }
 
+    /// <summary>The cumulative onerous-contract (expected loss) provision carried to date (IAS 37).</summary>
+    public decimal LossProvisionToDate { get; private set; }
+
+    /// <summary>The expected loss on the contract: budget cost over contract value, 0 when profitable.</summary>
+    public decimal ExpectedLoss => Math.Max(0m, BudgetCost - ContractValue);
+
     /// <summary>The captured cost entries.</summary>
     public IReadOnlyList<JobCostEntry> Costs => _costs.AsReadOnly();
 
@@ -154,6 +160,29 @@ public sealed class JobContract : SoftDeletableEntity, ICompanyScoped
     /// <summary>Records the cumulative revenue adjustment after a percentage-of-completion run.</summary>
     /// <param name="cumulativeAdjustment">The new cumulative adjustment (earned − certified).</param>
     public void SetRevenueAdjustment(decimal cumulativeAdjustment) => RevenueAdjustmentToDate = cumulativeAdjustment;
+
+    /// <summary>Revises the forecast total cost (budget) of the contract. Refuses a negative budget or one below cost already incurred.</summary>
+    /// <param name="newBudgetCost">The revised forecast cost to complete the whole contract.</param>
+    /// <returns>Success or the rule violated.</returns>
+    public Result ReviseBudget(decimal newBudgetCost)
+    {
+        if (newBudgetCost < 0m)
+        {
+            return Result.Failure(Error.Validation("Job.BudgetNegative", "A contract budget cannot be negative."));
+        }
+
+        if (newBudgetCost < ActualCost)
+        {
+            return Result.Failure(Error.Rule("Job.BudgetBelowActual", $"The revised budget {newBudgetCost:0.00} is below the cost already incurred {ActualCost:0.00}."));
+        }
+
+        BudgetCost = newBudgetCost;
+        return Result.Success();
+    }
+
+    /// <summary>Records the cumulative expected-loss provision after a provision run.</summary>
+    /// <param name="cumulativeProvision">The provision now carried (≥ 0).</param>
+    public void SetLossProvision(decimal cumulativeProvision) => LossProvisionToDate = cumulativeProvision;
 }
 
 /// <summary>A captured actual cost against a job (<c>job.cost_entry</c>).</summary>
