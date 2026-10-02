@@ -14,6 +14,7 @@ internal sealed class JobContractConfiguration : IEntityTypeConfiguration<JobCon
         b.Property(x => x.Name).HasMaxLength(200);
         b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
         b.Property(x => x.RetentionPercent).HasPrecision(9, 4);
+        b.Property(x => x.RevenueAdjustmentToDate).HasPrecision(19, 4);
         b.Property(x => x.Status).HasConversion<int>();
         b.Ignore(x => x.ActualCost);
         b.Ignore(x => x.PercentComplete);

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.JobCosting;
 using One4All.Application.Abstractions.Trading;
+using One4All.Application.JobCosting;
 using One4All.Core.Common;
 using One4All.Core.JobCosting;
 using One4All.Core.System;
@@ -192,4 +193,79 @@ public sealed class JobCostingService : IJobCostingService
 
         return new RetentionReleaseResult(ar.Value.OpenItemId, ar.Value.JournalNumber, amount);
     }
+
+    /// <inheritdoc />
+    public async Task<Result<RevenueRecognitionResult>> RecogniseRevenueAsync(long companyId, long contractId, DateOnly date, string contractAssetAccountCode, string contractLiabilityAccountCode, string documentNumber, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(contractAssetAccountCode) || string.IsNullOrWhiteSpace(contractLiabilityAccountCode))
+        {
+            return Error.Validation("Job.PocAccounts", "Both the contract asset and contract liability accounts are required.");
+        }
+
+        JobContract? contract = await _db.Set<JobContract>().Include(c => c.Costs)
+            .FirstOrDefaultAsync(c => c.Id == contractId && c.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (contract is null)
+        {
+            return Error.NotFound("Job.ContractNotFound", $"Contract {contractId} not found.");
+        }
+
+        PocCalculation poc = PercentageOfCompletion.Compute(contract.ContractValue, contract.BudgetCost, contract.ActualCost, contract.CertifiedToDate, contract.RevenueAdjustmentToDate);
+        if (poc.Movement == 0m)
+        {
+            return new RevenueRecognitionResult(poc.PercentComplete, poc.EarnedRevenue, poc.CertifiedToDate, poc.CumulativeAdjustment, 0m, null);
+        }
+
+        Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+
+        // Unwind the prior position, then book the new one; revenue takes the net movement.
+        List<JournalLineRequest> lines = [];
+        decimal prior = poc.PriorAdjustment;
+        if (prior > 0m)
+        {
+            lines.Add(Line(contract.RevenueAccountCode, JournalSide.Debit, prior));
+            lines.Add(Line(contractAssetAccountCode, JournalSide.Credit, prior));
+        }
+        else if (prior < 0m)
+        {
+            lines.Add(Line(contractLiabilityAccountCode, JournalSide.Debit, -prior));
+            lines.Add(Line(contract.RevenueAccountCode, JournalSide.Credit, -prior));
+        }
+
+        decimal target = poc.CumulativeAdjustment;
+        if (target > 0m)
+        {
+            lines.Add(Line(contractAssetAccountCode, JournalSide.Debit, target));
+            lines.Add(Line(contract.RevenueAccountCode, JournalSide.Credit, target));
+        }
+        else if (target < 0m)
+        {
+            lines.Add(Line(contract.RevenueAccountCode, JournalSide.Debit, -target));
+            lines.Add(Line(contractLiabilityAccountCode, JournalSide.Credit, -target));
+        }
+
+        Result<PostingReceipt> posting = await _posting.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId,
+            SourceModule = "GL",
+            PostingDate = date,
+            TransactionCurrency = company.BaseCurrency,
+            DocumentType = "POC",
+            DocumentNumber = documentNumber,
+            Reference = contract.ContractNumber,
+            Narrative = $"Revenue recognition {poc.PercentComplete:0.00}% complete — {contract.ContractNumber}",
+            Lines = lines,
+        }, ct).ConfigureAwait(false);
+        if (posting.IsFailure)
+        {
+            return posting.Error;
+        }
+
+        contract.SetRevenueAdjustment(target);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        return new RevenueRecognitionResult(poc.PercentComplete, poc.EarnedRevenue, poc.CertifiedToDate, target, poc.Movement, posting.Value.JournalNumber);
+    }
+
+    private static JournalLineRequest Line(string account, JournalSide side, decimal amount) =>
+        new() { AccountCode = account, Side = side, TransactionAmount = amount };
 }

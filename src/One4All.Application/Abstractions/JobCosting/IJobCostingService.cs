@@ -93,7 +93,34 @@ public interface IJobCostingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The release result.</returns>
     Task<Result<RetentionReleaseResult>> ReleaseRetentionAsync(long companyId, long contractId, decimal amount, DateOnly date, string retentionReceivableAccountCode, string documentNumber, CancellationToken ct = default);
+
+    /// <summary>
+    /// Period-end percentage-of-completion revenue recognition (cost-to-cost): brings cumulative revenue to
+    /// contract value × % complete by posting the movement since the last run — an under-billed contract
+    /// carries the excess of earned over certified as a contract asset (Dr asset / Cr revenue), an over-billed
+    /// one carries the shortfall as a contract liability (Dr revenue / Cr liability). The prior position is
+    /// unwound and the new one booked in one journal, so re-running after new costs or certificates only
+    /// posts the difference; a run with no movement posts nothing.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="contractId">The contract.</param>
+    /// <param name="date">The recognition date.</param>
+    /// <param name="contractAssetAccountCode">The contract asset (unbilled revenue) account.</param>
+    /// <param name="contractLiabilityAccountCode">The contract liability (over-billing) account.</param>
+    /// <param name="documentNumber">The journal document number.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The recognition result.</returns>
+    Task<Result<RevenueRecognitionResult>> RecogniseRevenueAsync(long companyId, long contractId, DateOnly date, string contractAssetAccountCode, string contractLiabilityAccountCode, string documentNumber, CancellationToken ct = default);
 }
+
+/// <summary>The result of a percentage-of-completion revenue recognition run.</summary>
+/// <param name="PercentComplete">The cost-to-cost percentage complete.</param>
+/// <param name="EarnedToDate">Revenue earned to date (contract value × % complete).</param>
+/// <param name="CertifiedToDate">Gross certified to date.</param>
+/// <param name="CumulativeAdjustment">Earned − certified now carried (positive asset, negative liability).</param>
+/// <param name="Movement">The adjustment posted this run.</param>
+/// <param name="JournalNumber">The journal posted, or null when there was no movement.</param>
+public readonly record struct RevenueRecognitionResult(decimal PercentComplete, decimal EarnedToDate, decimal CertifiedToDate, decimal CumulativeAdjustment, decimal Movement, string? JournalNumber);
 
 /// <summary>The result of releasing retention.</summary>
 /// <param name="OpenItemId">The AR open item raised for the released retention.</param>

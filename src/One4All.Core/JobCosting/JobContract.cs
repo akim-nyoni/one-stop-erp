@@ -109,6 +109,12 @@ public sealed class JobContract : SoftDeletableEntity, ICompanyScoped
     /// <summary>The cumulative retention held to date.</summary>
     public decimal RetentionHeld { get; private set; }
 
+    /// <summary>
+    /// The cumulative percentage-of-completion revenue adjustment posted to date: earned revenue less gross
+    /// certified. Positive = a contract asset (under-billed), negative = a contract liability (over-billed).
+    /// </summary>
+    public decimal RevenueAdjustmentToDate { get; private set; }
+
     /// <summary>The captured cost entries.</summary>
     public IReadOnlyList<JobCostEntry> Costs => _costs.AsReadOnly();
 
@@ -144,6 +150,10 @@ public sealed class JobContract : SoftDeletableEntity, ICompanyScoped
     /// <summary>Reduces the retention held when it is released.</summary>
     /// <param name="amount">The amount released.</param>
     public void ReleaseRetention(decimal amount) => RetentionHeld -= amount;
+
+    /// <summary>Records the cumulative revenue adjustment after a percentage-of-completion run.</summary>
+    /// <param name="cumulativeAdjustment">The new cumulative adjustment (earned − certified).</param>
+    public void SetRevenueAdjustment(decimal cumulativeAdjustment) => RevenueAdjustmentToDate = cumulativeAdjustment;
 }
 
 /// <summary>A captured actual cost against a job (<c>job.cost_entry</c>).</summary>
