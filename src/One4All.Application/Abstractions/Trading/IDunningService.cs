@@ -26,4 +26,18 @@ public interface IDunningService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The dunning notices, ordered by level then customer.</returns>
     Task<Result<IReadOnlyList<DunningNotice>>> AssessAsync(long companyId, DateOnly asAtDate, DunningStages stages, CancellationToken ct = default);
+
+    /// <summary>
+    /// Renders a payment-reminder letter for one customer at the dunning level their oldest overdue item
+    /// warrants, listing every overdue invoice and the total. Refuses a customer with nothing overdue, or
+    /// one whose oldest item is still inside the first reminder threshold.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="customerId">The customer.</param>
+    /// <param name="asAtDate">The letter date.</param>
+    /// <param name="stages">The stage day thresholds.</param>
+    /// <param name="width">The letter character width.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The letter text, or NotFound/Rule.</returns>
+    Task<Result<string>> RenderReminderTextAsync(long companyId, long customerId, DateOnly asAtDate, DunningStages stages, int width = DunningLetterFormatter.DefaultWidth, CancellationToken ct = default);
 }

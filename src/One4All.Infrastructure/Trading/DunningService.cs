@@ -60,4 +60,56 @@ public sealed class DunningService : IDunningService
             .ToList();
         return Result.Success(ordered);
     }
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RenderReminderTextAsync(long companyId, long customerId, DateOnly asAtDate, DunningStages stages, int width = DunningLetterFormatter.DefaultWidth, CancellationToken ct = default)
+    {
+        string? customerName = await _db.Customers
+            .Where(c => c.CompanyId == companyId && c.Id == customerId)
+            .Select(c => c.Name)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (customerName is null)
+        {
+            return Error.NotFound("Dunning.CustomerNotFound", $"Customer {customerId} not found.");
+        }
+
+        List<OpenItem> overdue = await _db.Set<OpenItem>()
+            .Where(o => o.CompanyId == companyId
+                && o.Ledger == TradingLedger.AccountsReceivable
+                && o.Sign == LedgerSign.Debit
+                && o.TraderId == customerId
+                && o.OutstandingBase > 0m
+                && o.DueDate < asAtDate)
+            .OrderBy(o => o.DueDate)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        if (overdue.Count == 0)
+        {
+            return Error.Rule("Dunning.NothingOverdue", $"{customerName} has nothing overdue as at {asAtDate:yyyy-MM-dd}.");
+        }
+
+        int oldestDays = overdue.Max(o => asAtDate.DayNumber - o.DueDate.DayNumber);
+        int level = Dunning.LevelFor(oldestDays, stages);
+        if (level < 1)
+        {
+            return Error.Rule("Dunning.NotDue", $"{customerName}'s oldest item is {oldestDays} day(s) overdue, inside the first reminder threshold.");
+        }
+
+        string companyName = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? string.Empty;
+
+        DunningReminder reminder = new()
+        {
+            CompanyName = companyName,
+            CustomerName = customerName,
+            AsAtDate = asAtDate,
+            Level = level,
+            LevelLabel = Dunning.LabelFor(level),
+            Items = overdue
+                .Select(o => new DunningReminderItem(o.DocumentNumber, o.DueDate, asAtDate.DayNumber - o.DueDate.DayNumber, o.OutstandingBase))
+                .ToList(),
+            TotalOverdue = overdue.Sum(o => o.OutstandingBase),
+        };
+
+        return DunningLetterFormatter.ToPlainText(reminder, width);
+    }
 }
