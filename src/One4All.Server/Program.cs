@@ -224,7 +224,50 @@ app.MapGet("/api/pricing/price", async (long companyId, long? customerId, long i
 .RequireAuthorization()
 .WithName("Price");
 
+// --- Documents (plain text) and order cancellation ---------------------------------------------------------
+app.MapGet("/api/trading/customers/{customerId:long}/statement", async (long companyId, long customerId, DateOnly asAt, int? width, One4All.Application.Abstractions.Trading.IStatementService statements, CancellationToken ct) =>
+    TextResponse(await statements.RenderCustomerStatementTextAsync(companyId, customerId, asAt, width ?? 64, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CustomerStatement");
+
+app.MapGet("/api/trading/suppliers/{supplierId:long}/statement", async (long companyId, long supplierId, DateOnly asAt, int? width, One4All.Application.Abstractions.Trading.IStatementService statements, CancellationToken ct) =>
+    TextResponse(await statements.RenderSupplierStatementTextAsync(companyId, supplierId, asAt, width ?? 64, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SupplierStatement");
+
+app.MapGet("/api/sop/{salesOrderId:long}/pick-list", async (long companyId, long salesOrderId, long warehouseId, int? width, One4All.Application.Abstractions.SalesOrders.IPickListService picks, CancellationToken ct) =>
+    TextResponse(await picks.RenderTextAsync(companyId, salesOrderId, warehouseId, width ?? 64, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PickList");
+
+app.MapPost("/api/sop/{salesOrderId:long}/cancel", async (long companyId, long salesOrderId, string reason, One4All.Application.Abstractions.SalesOrders.ISalesOrderService sop, CancellationToken ct) =>
+    ActionResponse(await sop.CancelOrderAsync(companyId, salesOrderId, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CancelSalesOrder");
+
+app.MapPost("/api/pop/{purchaseOrderId:long}/cancel", async (long companyId, long purchaseOrderId, string reason, One4All.Application.Abstractions.Procurement.IProcurementService pop, CancellationToken ct) =>
+    ActionResponse(await pop.CancelPurchaseOrderAsync(companyId, purchaseOrderId, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CancelPurchaseOrder");
+
 app.Run();
+
+// Maps a text-bearing Result to a plain-text response (200), or 404 / 409 / 400 by error type.
+static IResult TextResponse(Result<string> result)
+{
+    if (result.IsSuccess)
+    {
+        return Results.Text(result.Value, "text/plain", Encoding.UTF8);
+    }
+
+    int status = result.Error.Type switch
+    {
+        ErrorType.NotFound => StatusCodes.Status404NotFound,
+        ErrorType.Rule => StatusCodes.Status409Conflict,
+        _ => StatusCodes.Status400BadRequest,
+    };
+    return Results.Json(new { error = result.Error.Message }, statusCode: status);
+}
 
 // Maps a non-value Result to an HTTP response: 200 ok, 404 not-found, 409 rule violation, else 400.
 static IResult ActionResponse(Result result)
