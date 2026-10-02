@@ -187,7 +187,61 @@ app.MapPost("/api/workflow/{instanceId:long}/act", async (long instanceId, long 
 .RequireAuthorization()
 .WithName("WorkflowAct");
 
+// --- Credit control -----------------------------------------------------------------------------------------
+app.MapPost("/api/credit/review", async (long companyId, DateOnly asAt, int overdueToleranceDays, One4All.Application.Abstractions.Trading.ICreditControlService credit, CancellationToken ct) =>
+    ValueResponse(await credit.ReviewAsync(companyId, asAt, overdueToleranceDays, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CreditReview");
+
+app.MapPost("/api/credit/{customerId:long}/hold", async (long companyId, long customerId, string reason, One4All.Application.Abstractions.Trading.ICreditControlService credit, CancellationToken ct) =>
+    ActionResponse(await credit.HoldAsync(companyId, customerId, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CreditHold");
+
+app.MapPost("/api/credit/{customerId:long}/release", async (long companyId, long customerId, string reason, One4All.Application.Abstractions.Trading.ICreditControlService credit, CancellationToken ct) =>
+    ActionResponse(await credit.ReleaseAsync(companyId, customerId, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CreditRelease");
+
+// --- Stock: replenishment, availability, pricing ----------------------------------------------------------
+app.MapGet("/api/stock/replenishment", async (long companyId, long? warehouseId, One4All.Application.Abstractions.Inventory.IReplenishmentService replenish, CancellationToken ct) =>
+    Results.Ok(await replenish.SuggestAsync(companyId, warehouseId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("Replenishment");
+
+app.MapGet("/api/stock/{itemId:long}/availability", async (long companyId, long itemId, long? warehouseId, One4All.Application.Abstractions.Inventory.IStockAvailabilityService availability, CancellationToken ct) =>
+    ValueResponse(await availability.AvailabilityAsync(companyId, itemId, warehouseId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("StockAvailability");
+
+app.MapGet("/api/stock/back-orders", async (long companyId, One4All.Application.Abstractions.Inventory.IStockAvailabilityService availability, CancellationToken ct) =>
+    Results.Ok(await availability.BackOrdersAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("BackOrders");
+
+app.MapGet("/api/pricing/price", async (long companyId, long? customerId, long itemId, decimal quantity, One4All.Application.Abstractions.Inventory.IPricingService pricing, CancellationToken ct) =>
+    ValueResponse(await pricing.PriceAsync(companyId, customerId, itemId, quantity, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("Price");
+
 app.Run();
+
+// Maps a non-value Result to an HTTP response: 200 ok, 404 not-found, 409 rule violation, else 400.
+static IResult ActionResponse(Result result)
+{
+    if (result.IsSuccess)
+    {
+        return Results.Ok(new { ok = true });
+    }
+
+    int status = result.Error.Type switch
+    {
+        ErrorType.NotFound => StatusCodes.Status404NotFound,
+        ErrorType.Rule => StatusCodes.Status409Conflict,
+        _ => StatusCodes.Status400BadRequest,
+    };
+    return Results.Json(new { error = result.Error.Message }, statusCode: status);
+}
 
 // Maps a value-bearing Result to an HTTP response: 200 with the value, 404 for not-found, else 400.
 static IResult ValueResponse<T>(Result<T> result)

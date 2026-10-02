@@ -121,6 +121,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.StockValuationCode => SystemReports.StockValuation(),
         SystemReports.StockMovementsCode => SystemReports.StockMovements(),
         SystemReports.ReorderCode => SystemReports.Reorder(),
+        SystemReports.BackOrdersCode => SystemReports.BackOrders(),
         SystemReports.SlowStockCode => SystemReports.SlowStock(),
         SystemReports.StockAgeingCode => SystemReports.StockAgeing(),
         SystemReports.AbcAnalysisCode => SystemReports.AbcAnalysis(),

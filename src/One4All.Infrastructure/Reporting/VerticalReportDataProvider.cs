@@ -21,25 +21,28 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "StockValuation", "StockMovements", "Reorder", "SlowStock", "StockAgeing", "AbcAnalysis", "ItemMaster", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "AssetDisposals", "PayrollSummary", "PayrollDeductions", "EmployeeRegister", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "RecurringJournals", "PeriodStatus", "Pipeline", "ExpenseClaims",
+        "StockValuation", "StockMovements", "Reorder", "BackOrders", "SlowStock", "StockAgeing", "AbcAnalysis", "ItemMaster", "AssetRegister", "DepreciationForecast", "AssetMaintenance", "AssetDisposals", "PayrollSummary", "PayrollDeductions", "EmployeeRegister", "EmployeeLoans", "LeaveBalances", "PropertyRegister", "BudgetVsActual", "BudgetList", "RecurringJournals", "PeriodStatus", "Pipeline", "ExpenseClaims",
     };
 
     private readonly One4AllDbContext _db;
     private readonly IInventoryService _inventory;
     private readonly IBudgetingService _budgeting;
     private readonly One4All.Application.Abstractions.FixedAssets.IFixedAssetService _fixedAssets;
+    private readonly IStockAvailabilityService _availability;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="inventory">The inventory service (stock valuation).</param>
     /// <param name="budgeting">The budgeting service (budget vs actual).</param>
     /// <param name="fixedAssets">The fixed-asset service (depreciation forecast).</param>
-    public VerticalReportDataProvider(One4AllDbContext db, IInventoryService inventory, IBudgetingService budgeting, One4All.Application.Abstractions.FixedAssets.IFixedAssetService fixedAssets)
+    /// <param name="availability">The stock-availability service (back-order book).</param>
+    public VerticalReportDataProvider(One4AllDbContext db, IInventoryService inventory, IBudgetingService budgeting, One4All.Application.Abstractions.FixedAssets.IFixedAssetService fixedAssets, IStockAvailabilityService availability)
     {
         _db = db;
         _inventory = inventory;
         _budgeting = budgeting;
         _fixedAssets = fixedAssets;
+        _availability = availability;
     }
 
     /// <inheritdoc />
@@ -53,6 +56,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             "STOCKVALUATION" => await StockValuationAsync(companyId, ct).ConfigureAwait(false),
             "STOCKMOVEMENTS" => await StockMovementsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "REORDER" => await ReorderAsync(companyId, ct).ConfigureAwait(false),
+            "BACKORDERS" => await BackOrdersAsync(companyId, ct).ConfigureAwait(false),
             "SLOWSTOCK" => await SlowStockAsync(companyId, parameters, ct).ConfigureAwait(false),
             "STOCKAGEING" => await StockAgeingAsync(companyId, parameters, ct).ConfigureAwait(false),
             "ABCANALYSIS" => await AbcAnalysisAsync(companyId, ct).ConfigureAwait(false),
@@ -204,6 +208,32 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
         }
 
         return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BackOrdersAsync(long companyId, CancellationToken ct)
+    {
+        IReadOnlyList<BackOrderLine> book = await _availability.BackOrdersAsync(companyId, ct).ConfigureAwait(false);
+        if (book.Count == 0)
+        {
+            return [];
+        }
+
+        List<long> customerIds = book.Select(b => b.CustomerId).Distinct().ToList();
+        Dictionary<long, string> customers = await _db.Customers
+            .Where(c => c.CompanyId == companyId && customerIds.Contains(c.Id))
+            .ToDictionaryAsync(c => c.Id, c => c.Code, ct).ConfigureAwait(false);
+
+        return book.Select(b => Row(new()
+        {
+            ["OrderNumber"] = b.OrderNumber,
+            ["OrderDate"] = b.OrderDate,
+            ["Customer"] = customers.GetValueOrDefault(b.CustomerId, string.Empty),
+            ["ItemCode"] = b.ItemCode,
+            ["Outstanding"] = b.Outstanding,
+            ["OnHand"] = b.OnHand,
+            ["CanFulfil"] = b.CanFulfil ? "Yes" : "No",
+            ["Shortfall"] = b.Shortfall,
+        })).ToList();
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReorderAsync(long companyId, CancellationToken ct)

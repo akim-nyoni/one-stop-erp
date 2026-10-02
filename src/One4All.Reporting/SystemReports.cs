@@ -340,6 +340,9 @@ public static class SystemReports
     /// <summary>The Reorder report code.</summary>
     public const string ReorderCode = "INV-REORDER";
 
+    /// <summary>The Back-order Book report code.</summary>
+    public const string BackOrdersCode = "INV-BACKORDER";
+
     /// <summary>The Slow-moving Stock report code.</summary>
     public const string SlowStockCode = "INV-SLOW";
 
@@ -454,6 +457,13 @@ public static class SystemReports
     public static ReportDefinition Reorder() => Listing(ReorderCode, "Reorder Report", "Inventory",
         "Items at or below their reorder level, with the suggested reorder quantity — a purchasing aid.", "Reorder",
         [new Column("ItemCode", "Item", 100), new Column("Description", "Description", 190), new Column("OnHand", "On hand", 80, true), new Column("ReorderLevel", "Reorder level", 90, true), new Column("Suggested", "Suggested order", 100, true)],
+        []);
+
+    /// <summary>Builds the Back-order Book definition (undespatched sales-order lines against stock on hand).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition BackOrders() => Listing(BackOrdersCode, "Back-order Book", "Inventory",
+        "Every undespatched sales-order line, oldest order first, with stock on hand allocated to earlier orders so each line shows whether it can be fulfilled and any shortfall.", "BackOrders",
+        [new Column("OrderNumber", "Order", 90), new Column("OrderDate", "Date", 80), new Column("Customer", "Customer", 90), new Column("ItemCode", "Item", 100), new Column("Outstanding", "Outstanding", 90, true), new Column("OnHand", "On hand", 80, true), new Column("CanFulfil", "Fulfil?", 60), new Column("Shortfall", "Shortfall", 80, true)],
         []);
 
     /// <summary>Builds the Slow-moving Stock definition (dead-stock analysis).</summary>
