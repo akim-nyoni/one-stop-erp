@@ -250,6 +250,52 @@ app.MapPost("/api/pop/{purchaseOrderId:long}/cancel", async (long companyId, lon
 .RequireAuthorization()
 .WithName("CancelPurchaseOrder");
 
+// --- Banking: statement CSV import (body is the raw CSV; the layout comes from the query) --------------------
+app.MapPost("/api/banking/{bankAccountId:long}/statement-csv", async (HttpRequest http, long companyId, long bankAccountId,
+    int dateColumn, int descriptionColumn, int? amountColumn, int? debitColumn, int? creditColumn, int? referenceColumn, string? dateFormat, string? delimiter, bool? hasHeader,
+    One4All.Application.Abstractions.Banking.IBankReconciliationService banking, CancellationToken ct) =>
+{
+    using StreamReader reader = new(http.Body, Encoding.UTF8);
+    string csv = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+    One4All.Application.Banking.BankCsvLayout layout = new()
+    {
+        DateColumn = dateColumn,
+        DescriptionColumn = descriptionColumn,
+        AmountColumn = amountColumn,
+        DebitColumn = debitColumn,
+        CreditColumn = creditColumn,
+        ReferenceColumn = referenceColumn,
+        DateFormat = string.IsNullOrWhiteSpace(dateFormat) ? "yyyy-MM-dd" : dateFormat,
+        Delimiter = string.IsNullOrEmpty(delimiter) ? ',' : delimiter[0],
+        HasHeader = hasHeader ?? true,
+    };
+    return ValueResponse(await banking.ImportStatementCsvAsync(companyId, bankAccountId, csv, layout, ct).ConfigureAwait(false));
+})
+.RequireAuthorization()
+.Accepts<string>("text/csv", "text/plain")
+.WithName("ImportStatementCsv");
+
+// --- Intercompany and job-costing period-end runs ----------------------------------------------------------
+app.MapPost("/api/interco/post", async (One4All.Application.Abstractions.Accounting.IntercompanyJournalRequest request, One4All.Application.Abstractions.Accounting.IIntercompanyService interco, CancellationToken ct) =>
+    ValueResponse(await interco.PostAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("IntercompanyPost");
+
+app.MapPost("/api/jobs/{contractId:long}/recognise-revenue", async (long companyId, long contractId, DateOnly date, string contractAssetAccount, string contractLiabilityAccount, string documentNumber, One4All.Application.Abstractions.JobCosting.IJobCostingService jobs, CancellationToken ct) =>
+    ValueResponse(await jobs.RecogniseRevenueAsync(companyId, contractId, date, contractAssetAccount, contractLiabilityAccount, documentNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("JobRecogniseRevenue");
+
+app.MapPost("/api/jobs/{contractId:long}/expected-loss", async (long companyId, long contractId, DateOnly date, string lossExpenseAccount, string provisionAccount, string documentNumber, One4All.Application.Abstractions.JobCosting.IJobCostingService jobs, CancellationToken ct) =>
+    ValueResponse(await jobs.ProvideForExpectedLossAsync(companyId, contractId, date, lossExpenseAccount, provisionAccount, documentNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("JobExpectedLoss");
+
+app.MapPost("/api/jobs/{contractId:long}/revise-budget", async (long companyId, long contractId, decimal newBudgetCost, string reason, One4All.Application.Abstractions.JobCosting.IJobCostingService jobs, CancellationToken ct) =>
+    ActionResponse(await jobs.ReviseBudgetAsync(companyId, contractId, newBudgetCost, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("JobReviseBudget");
+
 app.Run();
 
 // Maps a text-bearing Result to a plain-text response (200), or 404 / 409 / 400 by error type.
