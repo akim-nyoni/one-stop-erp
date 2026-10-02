@@ -20,7 +20,11 @@ public sealed class ConsolidationService : IConsolidationService
     public ConsolidationService(One4AllDbContext db) => _db = db;
 
     /// <inheritdoc />
-    public async Task<Result<ConsolidatedTrialBalance>> ConsolidatedTrialBalanceAsync(IReadOnlyList<long> companyIds, DateOnly asAtDate, CancellationToken ct = default)
+    public Task<Result<ConsolidatedTrialBalance>> ConsolidatedTrialBalanceAsync(IReadOnlyList<long> companyIds, DateOnly asAtDate, CancellationToken ct = default) =>
+        ConsolidatedTrialBalanceAsync(companyIds, asAtDate, [], ct);
+
+    /// <inheritdoc />
+    public async Task<Result<ConsolidatedTrialBalance>> ConsolidatedTrialBalanceAsync(IReadOnlyList<long> companyIds, DateOnly asAtDate, IReadOnlyCollection<string> intercompanyAccountCodes, CancellationToken ct = default)
     {
         if (companyIds is null || companyIds.Count == 0)
         {
@@ -57,6 +61,22 @@ public sealed class ConsolidationService : IConsolidationService
             .Select(g => new { Code = g.Key, Name = g.Min(a => a.Name)! })
             .ToDictionaryAsync(x => x.Code, x => x.Name, ct).ConfigureAwait(false);
 
+        // Intercompany elimination: the due-from / due-to accounts should net to zero across the group. When
+        // they do, their rows are dropped; when they don't, the residual is reported and the rows are kept.
+        HashSet<string> interco = new(intercompanyAccountCodes ?? [], StringComparer.Ordinal);
+        decimal eliminated = 0m;
+        decimal unmatched = 0m;
+        if (interco.Count > 0)
+        {
+            var intercoTotals = totals.Where(t => interco.Contains(t.Code)).ToList();
+            unmatched = intercoTotals.Sum(t => t.Debit - t.Credit);
+            if (unmatched == 0m)
+            {
+                eliminated = intercoTotals.Sum(t => Math.Max(0m, t.Debit - t.Credit));
+                totals = totals.Where(t => !interco.Contains(t.Code)).ToList();
+            }
+        }
+
         List<ConsolidatedTrialBalanceRow> rows = [];
         foreach (var t in totals.OrderBy(t => t.Code, StringComparer.Ordinal))
         {
@@ -73,6 +93,6 @@ public sealed class ConsolidationService : IConsolidationService
                 net < 0m ? -net : 0m));
         }
 
-        return new ConsolidatedTrialBalance(asAtDate, ids, rows);
+        return new ConsolidatedTrialBalance(asAtDate, ids, rows, eliminated, unmatched);
     }
 }

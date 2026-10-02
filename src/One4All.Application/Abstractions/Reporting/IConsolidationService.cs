@@ -12,8 +12,10 @@ public sealed record ConsolidatedTrialBalanceRow(string AccountCode, string Acco
 /// <summary>The consolidated trial balance for a set of companies as at a date.</summary>
 /// <param name="AsAtDate">The as-at date.</param>
 /// <param name="CompanyIds">The consolidated companies.</param>
-/// <param name="Rows">The account rows.</param>
-public sealed record ConsolidatedTrialBalance(DateOnly AsAtDate, IReadOnlyList<long> CompanyIds, IReadOnlyList<ConsolidatedTrialBalanceRow> Rows)
+/// <param name="Rows">The account rows (after any intercompany elimination).</param>
+/// <param name="IntercompanyEliminated">The gross intercompany debit balance removed by elimination (0 when none requested).</param>
+/// <param name="IntercompanyUnmatched">The net intercompany balance that did not eliminate (debit positive); its rows are kept so the imbalance is visible.</param>
+public sealed record ConsolidatedTrialBalance(DateOnly AsAtDate, IReadOnlyList<long> CompanyIds, IReadOnlyList<ConsolidatedTrialBalanceRow> Rows, decimal IntercompanyEliminated = 0m, decimal IntercompanyUnmatched = 0m)
 {
     /// <summary>The total debit.</summary>
     public decimal TotalDebit => Rows.Sum(r => r.Debit);
@@ -39,4 +41,16 @@ public interface IConsolidationService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The consolidated trial balance, or an error.</returns>
     Task<Result<ConsolidatedTrialBalance>> ConsolidatedTrialBalanceAsync(IReadOnlyList<long> companyIds, DateOnly asAtDate, CancellationToken ct = default);
+
+    /// <summary>
+    /// Produces the consolidated trial balance with intercompany elimination: the named intercompany
+    /// accounts (due-from / due-to) are summed across the group and, when they net to zero, dropped from the
+    /// rows; any residual is reported as <c>IntercompanyUnmatched</c> and its rows kept.
+    /// </summary>
+    /// <param name="companyIds">The companies to consolidate (all sharing a base currency).</param>
+    /// <param name="asAtDate">The as-at date.</param>
+    /// <param name="intercompanyAccountCodes">The intercompany account codes to eliminate.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The consolidated trial balance, or an error.</returns>
+    Task<Result<ConsolidatedTrialBalance>> ConsolidatedTrialBalanceAsync(IReadOnlyList<long> companyIds, DateOnly asAtDate, IReadOnlyCollection<string> intercompanyAccountCodes, CancellationToken ct = default);
 }
