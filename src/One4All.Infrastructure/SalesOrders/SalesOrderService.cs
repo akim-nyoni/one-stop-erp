@@ -5,6 +5,7 @@ using One4All.Application.Abstractions.Trading;
 using One4All.Core.Common;
 using One4All.Core.Inventory;
 using One4All.Core.SalesOrders;
+using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
 
 namespace One4All.Infrastructure.SalesOrders;
@@ -30,6 +31,20 @@ public sealed class SalesOrderService : ISalesOrderService
     /// <inheritdoc />
     public async Task<Result<SalesOrderResult>> CreateOrderAsync(CreateSalesOrderRequest request, CancellationToken ct = default)
     {
+        // Credit control: a customer on stop may not place new orders (invoicing applies the same rule).
+        Customer? customer = await _db.Customers
+            .FirstOrDefaultAsync(c => c.Id == request.CustomerId && c.CompanyId == request.CompanyId, ct)
+            .ConfigureAwait(false);
+        if (customer is null)
+        {
+            return Error.NotFound("Sop.CustomerNotFound", $"Customer {request.CustomerId} not found.");
+        }
+
+        if (customer.OnHold)
+        {
+            return Error.Rule("Sop.CustomerOnHold", $"Customer {customer.Code} is on hold; no new sales orders can be taken.");
+        }
+
         SalesOrder order = new(request.CompanyId, request.CustomerId, request.OrderNumber, request.OrderDate, request.Currency);
         foreach (SalesOrderLineRequest line in request.Lines)
         {
