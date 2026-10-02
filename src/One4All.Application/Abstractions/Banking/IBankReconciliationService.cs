@@ -31,9 +31,34 @@ public sealed record BankReconciliationReport(
         StatementBalance - GlBalance + UnpresentedGlItems.Sum(i => i.Amount) - UnmatchedStatementItems.Sum(i => i.Amount);
 }
 
+/// <summary>One bank account on the cash-position report.</summary>
+/// <param name="Code">The bank account code.</param>
+/// <param name="Name">The bank account name.</param>
+/// <param name="Currency">The account currency.</param>
+/// <param name="GlAccountCode">The GL cash-book account.</param>
+/// <param name="Balance">The GL cash-book balance (debit positive) as at the date.</param>
+/// <param name="UnreconciledLines">Imported statement lines not yet reconciled.</param>
+public sealed record CashPositionRow(string Code, string Name, string Currency, string GlAccountCode, decimal Balance, int UnreconciledLines);
+
+/// <summary>The cash position: every active bank account's cash-book balance as at a date.</summary>
+/// <param name="AsAtDate">The as-at date.</param>
+/// <param name="Rows">One row per active bank account.</param>
+/// <param name="TotalBalance">The total across all accounts (base currency).</param>
+public sealed record CashPositionReport(DateOnly AsAtDate, IReadOnlyList<CashPositionRow> Rows, decimal TotalBalance);
+
 /// <summary>Imports bank statements and reconciles them to the GL cash book (brief §4.7).</summary>
 public interface IBankReconciliationService
 {
+    /// <summary>
+    /// Produces the cash position as at a date: each active bank account's GL cash-book balance (and how
+    /// many imported statement lines are still unreconciled), with the total — the daily treasury view.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAtDate">The as-at date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The cash position.</returns>
+    Task<Result<CashPositionReport>> CashPositionAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
+
     /// <summary>Imports statement lines for a bank account.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="bankAccountId">The bank account.</param>

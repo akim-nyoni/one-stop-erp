@@ -57,6 +57,29 @@ public sealed class BankReconciliationService : IBankReconciliationService
     }
 
     /// <inheritdoc />
+    public async Task<Result<CashPositionReport>> CashPositionAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+    {
+        List<BankAccount> accounts = await _db.Set<BankAccount>()
+            .Where(b => b.CompanyId == companyId && b.IsActive)
+            .OrderBy(b => b.Code)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        List<CashPositionRow> rows = [];
+        foreach (BankAccount account in accounts)
+        {
+            List<GlLine> glLines = await GlLinesAsync(companyId, account.GlAccountCode, asAtDate, ct).ConfigureAwait(false);
+            decimal balance = glLines.Sum(g => g.Signed);
+            int unreconciled = await _db.Set<BankStatementLine>()
+                .CountAsync(s => s.CompanyId == companyId && s.BankAccountId == account.Id && !s.IsReconciled && s.StatementDate <= asAtDate, ct)
+                .ConfigureAwait(false);
+
+            rows.Add(new CashPositionRow(account.Code, account.Name, account.Currency.Value, account.GlAccountCode, balance, unreconciled));
+        }
+
+        return new CashPositionReport(asAtDate, rows, rows.Sum(r => r.Balance));
+    }
+
+    /// <inheritdoc />
     public async Task<Result> MatchLineAsync(long companyId, long bankAccountId, long statementLineId, long journalLineId, CancellationToken ct = default)
     {
         Result<BankAccount> accountResult = await LoadAccountAsync(companyId, bankAccountId, ct).ConfigureAwait(false);
