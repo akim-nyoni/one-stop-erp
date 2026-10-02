@@ -10,7 +10,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "TrialBalance", "IncomeStatement", "BalanceSheet", "CashFlow", "DepartmentalIncomeStatement", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts", "FinancialSnapshot", "VatReturn", "ControlReconciliation", "VatReturnByCode",
+        "TrialBalance", "TrialBalanceByType", "IncomeStatement", "BalanceSheet", "CashFlow", "DepartmentalIncomeStatement", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts", "FinancialSnapshot", "VatReturn", "ControlReconciliation", "VatReturnByCode",
     };
 
     private readonly IGeneralLedgerReports _reports;
@@ -28,6 +28,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
         return command.ToUpperInvariant() switch
         {
             "TRIALBALANCE" => await TrialBalanceAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "TRIALBALANCEBYTYPE" => await TrialBalanceByTypeAsync(companyId, parameters, ct).ConfigureAwait(false),
             "INCOMESTATEMENT" => await IncomeStatementAsync(companyId, parameters, ct).ConfigureAwait(false),
             "BALANCESHEET" => await BalanceSheetAsync(companyId, parameters, ct).ConfigureAwait(false),
             "CASHFLOW" => await CashFlowAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -51,6 +52,17 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
         {
             ["AccountCode"] = r.AccountCode,
             ["AccountName"] = r.AccountName,
+            ["Debit"] = r.Debit,
+            ["Credit"] = r.Credit,
+        })).ToList();
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TrialBalanceByTypeAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        TrialBalanceByTypeReport report = await _reports.TrialBalanceByTypeAsync(companyId, ReportParameters.Date(parameters, "AsAtDate"), ct).ConfigureAwait(false);
+        return report.Rows.Select(r => Row(new()
+        {
+            ["Type"] = r.Type.ToString(),
             ["Debit"] = r.Debit,
             ["Credit"] = r.Credit,
         })).ToList();

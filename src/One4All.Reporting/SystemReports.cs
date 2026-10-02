@@ -160,6 +160,9 @@ public static class SystemReports
     /// <summary>The Departmental Income Statement report code.</summary>
     public const string DepartmentalIncomeStatementCode = "GL-DEPT-IS";
 
+    /// <summary>The Trial Balance by Type report code.</summary>
+    public const string TrialBalanceByTypeCode = "GL-TBTYPE";
+
     /// <summary>The Journal Daybook report code.</summary>
     public const string JournalDaybookCode = "GL-DAYBOOK";
 
@@ -285,6 +288,13 @@ public static class SystemReports
         "Income and expenses for a period restricted to one department; the difference is the department's net profit.", "DepartmentalIncomeStatement",
         [new Column("Category", "Section", 120), new Column("AccountName", "Account", 250), new Column("Amount", "Amount", 100, true)],
         [("Department", ParameterType.String), ("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+
+    /// <summary>Builds the Trial Balance by Type definition (summary trial balance grouped by account type).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition TrialBalanceByType() => Listing(TrialBalanceByTypeCode, "Trial Balance by Type", "GeneralLedger",
+        "The trial balance summarised to one line per account type, with debit and credit totals that balance.", "TrialBalanceByType",
+        [new Column("Type", "Account type", 200), new Column("Debit", "Debit", 120, true), new Column("Credit", "Credit", 120, true)],
+        [("AsAtDate", ParameterType.Date)]);
 
     /// <summary>Builds the Customer Register definition (AR master listing).</summary>
     /// <returns>The definition.</returns>

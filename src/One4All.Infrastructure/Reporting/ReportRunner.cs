@@ -103,6 +103,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.BalanceSheetCode => SystemReports.BalanceSheet(),
         SystemReports.CashFlowCode => SystemReports.CashFlow(),
         SystemReports.DepartmentalIncomeStatementCode => SystemReports.DepartmentalIncomeStatement(),
+        SystemReports.TrialBalanceByTypeCode => SystemReports.TrialBalanceByType(),
         SystemReports.JournalDaybookCode => SystemReports.JournalDaybook(),
         SystemReports.TrialBalanceMovementCode => SystemReports.TrialBalanceMovement(),
         SystemReports.ChartOfAccountsCode => SystemReports.ChartOfAccounts(),
