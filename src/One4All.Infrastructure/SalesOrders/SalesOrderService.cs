@@ -16,16 +16,19 @@ public sealed class SalesOrderService : ISalesOrderService
     private readonly One4AllDbContext _db;
     private readonly IInventoryService _inventory;
     private readonly ISalesLedgerService _salesLedger;
+    private readonly IPricingService _pricing;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="inventory">The inventory service (for despatch stock issues).</param>
     /// <param name="salesLedger">The AR service (for invoicing).</param>
-    public SalesOrderService(One4AllDbContext db, IInventoryService inventory, ISalesLedgerService salesLedger)
+    /// <param name="pricing">The pricing service (resolves unpriced order lines from the price lists).</param>
+    public SalesOrderService(One4AllDbContext db, IInventoryService inventory, ISalesLedgerService salesLedger, IPricingService pricing)
     {
         _db = db;
         _inventory = inventory;
         _salesLedger = salesLedger;
+        _pricing = pricing;
     }
 
     /// <inheritdoc />
@@ -48,7 +51,29 @@ public sealed class SalesOrderService : ISalesOrderService
         SalesOrder order = new(request.CompanyId, request.CustomerId, request.OrderNumber, request.OrderDate, request.Currency);
         foreach (SalesOrderLineRequest line in request.Lines)
         {
-            order.AddLine(line.ItemId, line.Description, line.Quantity, line.UnitPrice, line.TaxCode, line.RevenueAccountCode);
+            decimal unitPrice;
+            if (line.UnitPrice is { } given)
+            {
+                unitPrice = given;
+            }
+            else
+            {
+                // No price keyed: take it from the customer's price list (then the default list) for this quantity.
+                Result<ResolvedPrice> price = await _pricing.PriceAsync(request.CompanyId, request.CustomerId, line.ItemId, line.Quantity, ct).ConfigureAwait(false);
+                if (price.IsFailure)
+                {
+                    return price.Error;
+                }
+
+                if (price.Value.Currency != request.Currency)
+                {
+                    return Error.Rule("Sop.PriceCurrency", $"Price list {price.Value.PriceListCode} is in {price.Value.Currency} but the order is in {request.Currency}.");
+                }
+
+                unitPrice = price.Value.UnitPrice;
+            }
+
+            order.AddLine(line.ItemId, line.Description, line.Quantity, unitPrice, line.TaxCode, line.RevenueAccountCode);
         }
 
         _db.Set<SalesOrder>().Add(order);

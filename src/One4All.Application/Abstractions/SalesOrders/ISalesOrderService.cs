@@ -7,10 +7,10 @@ namespace One4All.Application.Abstractions.SalesOrders;
 /// <param name="ItemId">The item.</param>
 /// <param name="Description">The description.</param>
 /// <param name="Quantity">The quantity.</param>
-/// <param name="UnitPrice">The unit price.</param>
+/// <param name="UnitPrice">The unit price; null resolves it from the customer's price list (then the default list) for the quantity.</param>
 /// <param name="TaxCode">The tax code.</param>
 /// <param name="RevenueAccountCode">The revenue account.</param>
-public readonly record struct SalesOrderLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice, string? TaxCode, string RevenueAccountCode);
+public readonly record struct SalesOrderLineRequest(long ItemId, string Description, decimal Quantity, decimal? UnitPrice, string? TaxCode, string RevenueAccountCode);
 
 /// <summary>A request to create a sales order.</summary>
 public sealed class CreateSalesOrderRequest
