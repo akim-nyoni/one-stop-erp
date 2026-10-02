@@ -57,6 +57,30 @@ public sealed class BankReconciliationService : IBankReconciliationService
     }
 
     /// <inheritdoc />
+    public async Task<Result<int>> ImportStatementCsvAsync(long companyId, long bankAccountId, string csv, One4All.Application.Banking.BankCsvLayout layout, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(csv))
+        {
+            return Error.Validation("Cb.EmptyStatement", "The statement file is empty.");
+        }
+
+        One4All.Application.Banking.BankCsvParseResult parsed = One4All.Application.Banking.BankStatementCsvParser.Parse(csv, layout);
+        if (!parsed.IsClean)
+        {
+            string detail = string.Join("; ", parsed.Errors.Take(5).Select(e => $"line {e.LineNumber}: {e.Reason}"));
+            string more = parsed.Errors.Count > 5 ? $" (+{parsed.Errors.Count - 5} more)" : string.Empty;
+            return Error.Validation("Cb.StatementParse", $"{parsed.Errors.Count} line(s) could not be read — {detail}{more}.");
+        }
+
+        if (parsed.Lines.Count == 0)
+        {
+            return Error.Validation("Cb.NoStatementLines", "The statement file has no data lines.");
+        }
+
+        return await ImportStatementLinesAsync(companyId, bankAccountId, parsed.Lines, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<CashPositionReport>> CashPositionAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
     {
         List<BankAccount> accounts = await _db.Set<BankAccount>()
