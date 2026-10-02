@@ -44,4 +44,10 @@ public partial class ShellWindow : Window
         PosTerminalWindow terminal = new(_services, vm.UserId, vm.UserDisplayName) { Owner = this };
         terminal.Show();
     }
+
+    private void OpenAnalytics_Click(object sender, RoutedEventArgs e)
+    {
+        AnalyticsWindow analytics = new(_services) { Owner = this };
+        analytics.Show();
+    }
 }

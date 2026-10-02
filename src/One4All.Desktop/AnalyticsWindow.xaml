@@ -1,0 +1,158 @@
+<Window x:Class="One4All.Desktop.AnalyticsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:One4All.Desktop.ViewModels"
+        Title="Analytics Dashboard" Height="720" Width="1100"
+        WindowStartupLocation="CenterOwner" Background="#F4F6F4" FontFamily="Segoe UI">
+    <Window.Resources>
+        <!-- KPI tile -->
+        <Style x:Key="Tile" TargetType="Border">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="BorderBrush" Value="#D9E0D9" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="Margin" Value="6" />
+        </Style>
+        <Style x:Key="TileLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#667" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style x:Key="TileValue" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#1E3A2E" />
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+        <Style x:Key="PanelTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#1E3A2E" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+    </Window.Resources>
+
+    <DockPanel Margin="10">
+        <!-- Header -->
+        <DockPanel DockPanel.Dock="Top" Margin="6,0,6,6">
+            <Button Content="Refresh" Padding="14,6" DockPanel.Dock="Right" Command="{Binding LoadCommand}" />
+            <StackPanel>
+                <TextBlock Text="Analytics Dashboard" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
+                <TextBlock Text="{Binding PeriodLabel}" Foreground="#667" FontSize="12" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom" Background="#E8EEE8" Padding="10,5" Margin="6,6,6,0" CornerRadius="4">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#334" FontSize="12" />
+        </Border>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Working-capital ratios -->
+            <UniformGrid Grid.Row="0" Columns="4">
+                <Border Style="{StaticResource Tile}">
+                    <StackPanel>
+                        <TextBlock Text="Days sales outstanding (DSO)" Style="{StaticResource TileLabel}" />
+                        <TextBlock Text="{Binding Dso}" Style="{StaticResource TileValue}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Tile}">
+                    <StackPanel>
+                        <TextBlock Text="Days payable outstanding (DPO)" Style="{StaticResource TileLabel}" />
+                        <TextBlock Text="{Binding Dpo}" Style="{StaticResource TileValue}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Tile}">
+                    <StackPanel>
+                        <TextBlock Text="Days inventory outstanding (DIO)" Style="{StaticResource TileLabel}" />
+                        <TextBlock Text="{Binding Dio}" Style="{StaticResource TileValue}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Tile}" Background="#EAF4EC">
+                    <StackPanel>
+                        <TextBlock Text="Cash conversion cycle" Style="{StaticResource TileLabel}" />
+                        <TextBlock Text="{Binding Ccc}" Style="{StaticResource TileValue}" />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- Balances -->
+            <UniformGrid Grid.Row="1" Columns="4">
+                <Border Style="{StaticResource Tile}">
+                    <StackPanel>
+                        <TextBlock Text="Receivables" Style="{StaticResource TileLabel}" />
+                        <TextBlock Text="{Binding Receivables}" Style="{StaticResource TileValue}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Tile}">
+                    <StackPanel>
+                        <TextBlock Text="Payables" Style="{StaticResource TileLabel}" />
+                        <TextBlock Text="{Binding Payables}" Style="{StaticResource TileValue}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Tile}">
+                    <StackPanel>
+                        <TextBlock Text="Inventory" Style="{StaticResource TileLabel}" />
+                        <TextBlock Text="{Binding Inventory}" Style="{StaticResource TileValue}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Tile}" Background="#EAF4EC">
+                    <StackPanel>
+                        <TextBlock Text="Total cash" Style="{StaticResource TileLabel}" />
+                        <TextBlock Text="{Binding TotalCash}" Style="{StaticResource TileValue}" />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- Cash position + pipeline -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource Tile}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Cash position (today)" Style="{StaticResource PanelTitle}" />
+                        <ListView ItemsSource="{Binding CashRows}" BorderThickness="0">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Account" Width="260" DisplayMemberBinding="{Binding Account}" />
+                                    <GridViewColumn Header="Balance" Width="120" DisplayMemberBinding="{Binding Balance}" />
+                                    <GridViewColumn Header="Unreconciled" Width="100" DisplayMemberBinding="{Binding Unreconciled}" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </DockPanel>
+                </Border>
+
+                <Border Grid.Column="1" Style="{StaticResource Tile}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Sales pipeline (open)" Style="{StaticResource PanelTitle}" />
+                        <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                            <TextBlock Text="{Binding PipelineEstimated, StringFormat='Estimated: {0}'}" Foreground="#334" />
+                            <TextBlock Text="{Binding PipelineWeighted, StringFormat='Weighted forecast: {0}'}" Foreground="#1E3A2E" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding Conversion}" Foreground="#667" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <ListView ItemsSource="{Binding PipelineRows}" BorderThickness="0">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Stage" Width="130" DisplayMemberBinding="{Binding Stage}" />
+                                    <GridViewColumn Header="Count" Width="60" DisplayMemberBinding="{Binding Count}" />
+                                    <GridViewColumn Header="Estimated" Width="120" DisplayMemberBinding="{Binding Estimated}" />
+                                    <GridViewColumn Header="Weighted" Width="120" DisplayMemberBinding="{Binding Weighted}" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </DockPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</Window>

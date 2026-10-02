@@ -53,7 +53,9 @@
             <MenuItem Header="_Transactions">
                 <MenuItem Header="Point of Sale — Touch Terminal…" Click="OpenPosTerminal_Click" />
             </MenuItem>
-            <MenuItem Header="_Enquiries" />
+            <MenuItem Header="_Enquiries">
+                <MenuItem Header="Analytics Dashboard…" Click="OpenAnalytics_Click" />
+            </MenuItem>
             <MenuItem Header="_Reports">
                 <MenuItem Header="Report Viewer…" Click="OpenReportViewer_Click" />
                 <MenuItem Header="Report Designer…" Click="OpenReportDesigner_Click" />
