@@ -16,7 +16,7 @@ public sealed class BankReconciliationService : IBankReconciliationService
     /// <param name="db">The database context.</param>
     public BankReconciliationService(One4AllDbContext db) => _db = db;
 
-    private sealed record GlLine(long Id, DateOnly PostingDate, string JournalNumber, decimal Signed);
+    private sealed record GlLine(long Id, DateOnly PostingDate, string JournalNumber, decimal Signed, string? DocumentNumber, string? Reference);
 
     private async Task<List<GlLine>> GlLinesAsync(long companyId, string glCode, DateOnly? asAtDate, CancellationToken ct)
     {
@@ -25,10 +25,10 @@ public sealed class BankReconciliationService : IBankReconciliationService
             join j in _db.Journals on l.JournalEntryId equals j.Id
             where j.CompanyId == companyId && j.Status == JournalStatus.Posted && l.AccountCode == glCode &&
                   (asAtDate == null || j.PostingDate <= asAtDate)
-            select new { l.Id, j.PostingDate, j.JournalNumber, l.TransactionDebit, l.TransactionCredit })
+            select new { l.Id, j.PostingDate, j.JournalNumber, l.TransactionDebit, l.TransactionCredit, j.DocumentNumber, j.Reference })
             .ToListAsync(ct).ConfigureAwait(false);
 
-        return raw.Select(x => new GlLine(x.Id, x.PostingDate, x.JournalNumber, x.TransactionDebit - x.TransactionCredit)).ToList();
+        return raw.Select(x => new GlLine(x.Id, x.PostingDate, x.JournalNumber, x.TransactionDebit - x.TransactionCredit, x.DocumentNumber, x.Reference)).ToList();
     }
 
     private async Task<Result<BankAccount>> LoadAccountAsync(long companyId, long bankAccountId, CancellationToken ct)
@@ -163,7 +163,7 @@ public sealed class BankReconciliationService : IBankReconciliationService
     }
 
     /// <inheritdoc />
-    public async Task<Result<int>> AutoMatchAsync(long companyId, long bankAccountId, CancellationToken ct = default)
+    public async Task<Result<int>> AutoMatchAsync(long companyId, long bankAccountId, int dateToleranceDays = One4All.Application.Banking.BankAutoMatcher.DefaultDateToleranceDays, CancellationToken ct = default)
     {
         Result<BankAccount> accountResult = await LoadAccountAsync(companyId, bankAccountId, ct).ConfigureAwait(false);
         if (accountResult.IsFailure)
@@ -177,29 +177,28 @@ public sealed class BankReconciliationService : IBankReconciliationService
 
         List<GlLine> glLines = await GlLinesAsync(companyId, accountResult.Value.GlAccountCode, null, ct).ConfigureAwait(false);
 
-        List<long> matchedIds = await _db.Set<BankStatementLine>()
+        HashSet<long> alreadyMatched = (await _db.Set<BankStatementLine>()
             .Where(s => s.CompanyId == companyId && s.BankAccountId == bankAccountId && s.MatchedJournalLineId != null)
-            .Select(s => s.MatchedJournalLineId!.Value).ToListAsync(ct).ConfigureAwait(false);
-        HashSet<long> alreadyMatched = matchedIds.ToHashSet();
+            .Select(s => s.MatchedJournalLineId!.Value).ToListAsync(ct).ConfigureAwait(false)).ToHashSet();
 
-        int matched = 0;
-        foreach (BankStatementLine line in statementLines)
+        // The matching rule itself is pure: same amount, within the date window, reference then closest date.
+        IReadOnlyList<One4All.Application.Banking.BankMatch> matches = One4All.Application.Banking.BankAutoMatcher.Match(
+            statementLines.Select(s => new One4All.Application.Banking.MatchableStatementLine(s.Id, s.StatementDate, s.Amount, s.Reference)).ToList(),
+            glLines.Where(g => !alreadyMatched.Contains(g.Id)).Select(g => new One4All.Application.Banking.MatchableGlLine(g.Id, g.PostingDate, g.Signed, g.DocumentNumber, g.Reference)).ToList(),
+            dateToleranceDays);
+
+        Dictionary<long, BankStatementLine> byId = statementLines.ToDictionary(s => s.Id);
+        foreach (One4All.Application.Banking.BankMatch match in matches)
         {
-            GlLine? candidate = glLines.FirstOrDefault(g => !alreadyMatched.Contains(g.Id) && g.Signed == line.Amount);
-            if (candidate is not null)
-            {
-                line.MatchTo(candidate.Id);
-                alreadyMatched.Add(candidate.Id);
-                matched++;
-            }
+            byId[match.StatementLineId].MatchTo(match.GlLineId);
         }
 
-        if (matched > 0)
+        if (matches.Count > 0)
         {
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
-        return matched;
+        return matches.Count;
     }
 
     /// <inheritdoc />

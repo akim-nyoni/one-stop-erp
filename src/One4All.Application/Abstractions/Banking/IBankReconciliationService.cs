@@ -84,7 +84,7 @@ public interface IBankReconciliationService
     /// <param name="bankAccountId">The bank account.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The number of lines matched, or an error.</returns>
-    Task<Result<int>> AutoMatchAsync(long companyId, long bankAccountId, CancellationToken ct = default);
+    Task<Result<int>> AutoMatchAsync(long companyId, long bankAccountId, int dateToleranceDays = One4All.Application.Banking.BankAutoMatcher.DefaultDateToleranceDays, CancellationToken ct = default);
 
     /// <summary>
     /// Manually matches an unreconciled statement line to a specific GL cash-book posting on the bank
