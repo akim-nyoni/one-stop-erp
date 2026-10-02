@@ -290,6 +290,11 @@ app.MapGet("/api/accounting/period-close", async (long companyId, DateOnly perio
 .RequireAuthorization()
 .WithName("PeriodCloseChecklist");
 
+app.MapPost("/api/accounting/release-deferred", async (long companyId, DateOnly upToDate, One4All.Application.Abstractions.Accounting.IPostingEngine engine, CancellationToken ct) =>
+    Results.Ok(await engine.ReleaseAllDeferredAsync(companyId, upToDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReleaseDeferredJournals");
+
 // --- Intercompany and job-costing period-end runs ----------------------------------------------------------
 app.MapPost("/api/interco/post", async (One4All.Application.Abstractions.Accounting.IntercompanyJournalRequest request, One4All.Application.Abstractions.Accounting.IIntercompanyService interco, CancellationToken ct) =>
     ValueResponse(await interco.PostAsync(request, ct).ConfigureAwait(false)))

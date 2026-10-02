@@ -38,6 +38,8 @@
                 <TextBlock Text="Period end" Foreground="#667" FontSize="12" VerticalAlignment="Center" />
                 <DatePicker SelectedDate="{Binding PeriodEnd}" Margin="8,0,8,0" />
                 <Button Content="Run checks" Padding="14,6" FontWeight="SemiBold" Background="#DDEFE0" Command="{Binding RunCommand}" />
+                <Button Content="Release deferred journals" Padding="14,6" Margin="8,0,0,0" Command="{Binding ReleaseDeferredCommand}"
+                        ToolTip="Posts every deferred journal dated on or before the period end (enabled when the Unposted journals check is outstanding)." />
             </StackPanel>
             <StackPanel>
                 <TextBlock Text="Period Close Checklist" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />

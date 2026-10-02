@@ -52,12 +52,47 @@ public sealed partial class PeriodCloseViewModel : ObservableObject
     [ObservableProperty]
     private string _statusMessage = "Choose a period end and run the checks.";
 
+    /// <summary>True when the last run found deferred journals to release.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ReleaseDeferredCommand))]
+    private bool _hasUnpostedJournals;
+
     /// <summary>True while running.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RunCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunCommand), nameof(ReleaseDeferredCommand))]
     private bool _isBusy;
 
     private bool CanRun => !IsBusy;
+
+    private bool CanRelease => HasUnpostedJournals && !IsBusy;
+
+    /// <summary>Releases every deferred journal dated on or before the period end, then re-runs the checks.</summary>
+    [RelayCommand(CanExecute = nameof(CanRelease))]
+    public async Task ReleaseDeferredAsync()
+    {
+        IsBusy = true;
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            DeferredReleaseResult result = await scope.ServiceProvider.GetRequiredService<IPostingEngine>()
+                .ReleaseAllDeferredAsync(_companyId, DateOnly.FromDateTime(PeriodEnd)).ConfigureAwait(true);
+
+            StatusMessage = result.Failed.Count == 0
+                ? $"Released {result.Released.Count} deferred journal(s)."
+                : $"Released {result.Released.Count}; {result.Failed.Count} could not be released — {string.Join("; ", result.Failed.Take(3).Select(f => $"{f.JournalNumber}: {f.Reason}"))}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Release failed: {ex.Message}";
+            return;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+
+        await RunAsync().ConfigureAwait(true);
+    }
 
     /// <summary>Runs the checklist as at the period end.</summary>
     [RelayCommand(CanExecute = nameof(CanRun))]
@@ -96,11 +131,15 @@ public sealed partial class PeriodCloseViewModel : ObservableObject
                     check.Passes));
             }
 
+            HasUnpostedJournals = list.Checks.Any(c => c.Code == "UnpostedJournals" && !c.Passes);
             IsReady = list.IsReadyToClose;
             Verdict = list.IsReadyToClose
                 ? (list.Outstanding == 0 ? $"Ready to close {asAt:yyyy-MM-dd}: every check passes." : $"Ready to close {asAt:yyyy-MM-dd}: {list.Outstanding} warning(s) to review, nothing blocking.")
                 : $"NOT ready to close {asAt:yyyy-MM-dd}: {list.Checks.Count(c => !c.Passes && c.IsBlocking)} blocking check(s) outstanding.";
-            StatusMessage = $"Checked {DateTime.Now:HH:mm:ss}.";
+            if (!StatusMessage.StartsWith("Released", StringComparison.Ordinal))
+            {
+                StatusMessage = $"Checked {DateTime.Now:HH:mm:ss}.";
+            }
         }
         catch (Exception ex)
         {
