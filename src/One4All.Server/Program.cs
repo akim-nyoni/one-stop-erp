@@ -155,7 +155,40 @@ app.MapPost("/api/offline/{operationId:guid}/discard", async (Guid operationId, 
 .RequireAuthorization()
 .WithName("OfflineDiscard");
 
+// --- Analytics / treasury / CRM read models (dashboards and mobile clients) --------------------------------
+app.MapGet("/api/analytics/working-capital", async (long companyId, DateOnly from, DateOnly to, One4All.Application.Abstractions.Reporting.IWorkingCapitalService wc, CancellationToken ct) =>
+    ValueResponse(await wc.ComputeAsync(companyId, from, to, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("WorkingCapital");
+
+app.MapGet("/api/treasury/cash-position", async (long companyId, DateOnly asAt, One4All.Application.Abstractions.Banking.IBankReconciliationService banking, CancellationToken ct) =>
+    ValueResponse(await banking.CashPositionAsync(companyId, asAt, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CashPosition");
+
+app.MapGet("/api/crm/pipeline-forecast", async (long companyId, One4All.Application.Abstractions.Crm.IOpportunityService crm, CancellationToken ct) =>
+    ValueResponse(await crm.PipelineForecastAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PipelineForecast");
+
+app.MapGet("/api/crm/conversion", async (long companyId, One4All.Application.Abstractions.Crm.IOpportunityService crm, CancellationToken ct) =>
+    ValueResponse(await crm.ConversionMetricsAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CrmConversion");
+
 app.Run();
+
+// Maps a value-bearing Result to an HTTP response: 200 with the value, 404 for not-found, else 400.
+static IResult ValueResponse<T>(Result<T> result)
+{
+    if (result.IsSuccess)
+    {
+        return Results.Ok(result.Value);
+    }
+
+    int status = result.Error.Type == ErrorType.NotFound ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest;
+    return Results.Json(new { error = result.Error.Message }, statusCode: status);
+}
 
 // Maps an offline admin Result to an HTTP response (404 not-found, 409 rule violation, 200 success).
 static IResult OfflineActionResult(Result result)
