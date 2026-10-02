@@ -51,6 +51,12 @@ public partial class ShellWindow : Window
         analytics.Show();
     }
 
+    private void OpenCreditControl_Click(object sender, RoutedEventArgs e)
+    {
+        CreditControlWindow credit = new(_services) { Owner = this };
+        credit.Show();
+    }
+
     private void OpenApprovals_Click(object sender, RoutedEventArgs e)
     {
         ShellViewModel vm = (ShellViewModel)DataContext;
