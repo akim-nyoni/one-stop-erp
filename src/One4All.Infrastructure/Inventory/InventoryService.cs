@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Inventory;
 using One4All.Core.Accounting;
@@ -26,7 +25,11 @@ public sealed class InventoryService : IInventoryService
     }
 
     /// <inheritdoc />
-    public async Task<Result<StockMovementResult>> ReceiveAsync(ReceiveStockRequest request, CancellationToken ct = default)
+    public Task<Result<StockMovementResult>> ReceiveAsync(ReceiveStockRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReceiveCoreAsync(request, ct), ct);
+
+    // One unit of work, retried if another posting changes the same stock balance at the same moment.
+    private async Task<Result<StockMovementResult>> ReceiveCoreAsync(ReceiveStockRequest request, CancellationToken ct)
     {
         Result<(Item item, string stockCode, CurrencyCode currency)> setup = await SetupAsync(request.CompanyId, request.ItemId, ct).ConfigureAwait(false);
         if (setup.IsFailure)
@@ -37,7 +40,6 @@ public sealed class InventoryService : IInventoryService
         (Item item, string stockCode, CurrencyCode currency) = setup.Value;
         decimal value = decimal.Round(request.Quantity * request.UnitCost, 4, MidpointRounding.ToEven);
 
-        await using IDbContextTransaction? transaction = await BeginIfNoneAsync(ct).ConfigureAwait(false);
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
             CompanyId = request.CompanyId,
@@ -69,13 +71,16 @@ public sealed class InventoryService : IInventoryService
         };
         _db.Set<StockMovement>().Add(movement);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        await CommitAsync(transaction, ct).ConfigureAwait(false);
 
         return new StockMovementResult(movement.Id, posting.Value.JournalNumber, value, balance.AverageCost);
     }
 
     /// <inheritdoc />
-    public async Task<Result<StockMovementResult>> IssueAsync(IssueStockRequest request, CancellationToken ct = default)
+    public Task<Result<StockMovementResult>> IssueAsync(IssueStockRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => IssueCoreAsync(request, ct), ct);
+
+    // One unit of work, retried if another posting changes the same stock balance at the same moment.
+    private async Task<Result<StockMovementResult>> IssueCoreAsync(IssueStockRequest request, CancellationToken ct)
     {
         Result<(Item item, string stockCode, CurrencyCode currency)> setup = await SetupAsync(request.CompanyId, request.ItemId, ct).ConfigureAwait(false);
         if (setup.IsFailure)
@@ -100,7 +105,6 @@ public sealed class InventoryService : IInventoryService
         decimal averageCost = balance.AverageCost;
         decimal cost = balance.CostOfIssue(request.Quantity);
 
-        await using IDbContextTransaction? transaction = await BeginIfNoneAsync(ct).ConfigureAwait(false);
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
             CompanyId = request.CompanyId,
@@ -130,13 +134,16 @@ public sealed class InventoryService : IInventoryService
         };
         _db.Set<StockMovement>().Add(movement);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        await CommitAsync(transaction, ct).ConfigureAwait(false);
 
         return new StockMovementResult(movement.Id, posting.Value.JournalNumber, cost, balance.AverageCost);
     }
 
     /// <inheritdoc />
-    public async Task<Result<StockMovementResult>> ReverseIssueAsync(long companyId, long movementId, DateOnly date, string? reference = null, CancellationToken ct = default)
+    public Task<Result<StockMovementResult>> ReverseIssueAsync(long companyId, long movementId, DateOnly date, string? reference = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReverseIssueCoreAsync(companyId, movementId, date, reference, ct), ct);
+
+    // One unit of work, retried if another posting changes the same stock balance at the same moment.
+    private async Task<Result<StockMovementResult>> ReverseIssueCoreAsync(long companyId, long movementId, DateOnly date, string? reference, CancellationToken ct)
     {
         StockMovement? original = await _db.Set<StockMovement>().FirstOrDefaultAsync(m => m.Id == movementId && m.CompanyId == companyId, ct).ConfigureAwait(false);
         if (original is null)
@@ -171,7 +178,6 @@ public sealed class InventoryService : IInventoryService
         decimal unitCost = original.UnitCost;      // the average cost applied at issue time
 
         // Inverse of the issue: Dr stock control, Cr cost of sales.
-        await using IDbContextTransaction? transaction = await BeginIfNoneAsync(ct).ConfigureAwait(false);
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
             CompanyId = companyId,
@@ -204,7 +210,6 @@ public sealed class InventoryService : IInventoryService
         _db.Set<StockMovement>().Add(reversal);
         original.MarkReversed();
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        await CommitAsync(transaction, ct).ConfigureAwait(false);
 
         return new StockMovementResult(reversal.Id, posting.Value.JournalNumber, returnValue, balance.AverageCost);
     }
@@ -249,7 +254,11 @@ public sealed class InventoryService : IInventoryService
     }
 
     /// <inheritdoc />
-    public async Task<Result<decimal>> AdjustAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, string adjustmentAccountCode, string? reference = null, CancellationToken ct = default)
+    public Task<Result<decimal>> AdjustAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, string adjustmentAccountCode, string? reference = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => AdjustCoreAsync(companyId, itemId, warehouseId, date, countedQuantity, adjustmentAccountCode, reference, ct), ct);
+
+    // One unit of work, retried if another posting changes the same stock balance at the same moment.
+    private async Task<Result<decimal>> AdjustCoreAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, string adjustmentAccountCode, string? reference, CancellationToken ct)
     {
         if (countedQuantity < 0m)
         {
@@ -304,7 +313,6 @@ public sealed class InventoryService : IInventoryService
         }
 
         // The balance changes only once the journal has posted (see IssueAsync).
-        await using IDbContextTransaction? transaction = await BeginIfNoneAsync(ct).ConfigureAwait(false);
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
             CompanyId = companyId,
@@ -329,7 +337,6 @@ public sealed class InventoryService : IInventoryService
             JournalEntryId = posting.Value.JournalId,
         });
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        await CommitAsync(transaction, ct).ConfigureAwait(false);
 
         return variance > 0m ? value : -value;
     }
@@ -392,18 +399,6 @@ public sealed class InventoryService : IInventoryService
         else
         {
             balance.Issue(-variance);
-        }
-    }
-
-    // Starts a transaction unless the caller already has one open (a stocktake, a despatch), which the work then joins.
-    private async Task<IDbContextTransaction?> BeginIfNoneAsync(CancellationToken ct)
-        => _db.Database.CurrentTransaction is null ? await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false) : null;
-
-    private static async Task CommitAsync(IDbContextTransaction? transaction, CancellationToken ct)
-    {
-        if (transaction is not null)
-        {
-            await transaction.CommitAsync(ct).ConfigureAwait(false);
         }
     }
 }

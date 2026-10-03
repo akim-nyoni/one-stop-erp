@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Trading;
 using One4All.Core.Accounting;
@@ -649,7 +648,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result<AllocationResult>> AllocateAsync(long companyId, TradingLedger ledger, long debitItemId, long creditItemId, decimal transactionAmount, DateOnly allocationDate, CancellationToken ct = default)
+    public Task<Result<AllocationResult>> AllocateAsync(long companyId, TradingLedger ledger, long debitItemId, long creditItemId, decimal transactionAmount, DateOnly allocationDate, CancellationToken ct = default)
+        => _db.AtomicAsync(() => AllocateCoreAsync(companyId, ledger, debitItemId, creditItemId, transactionAmount, allocationDate, ct), ct);
+
+    // One unit of work, retried if another user allocates against the same items at the same moment.
+    private async Task<Result<AllocationResult>> AllocateCoreAsync(long companyId, TradingLedger ledger, long debitItemId, long creditItemId, decimal transactionAmount, DateOnly allocationDate, CancellationToken ct)
     {
         OpenItem? debit = await _db.OpenItems.FirstOrDefaultAsync(i => i.Id == debitItemId && i.CompanyId == companyId, ct).ConfigureAwait(false);
         OpenItem? credit = await _db.OpenItems.FirstOrDefaultAsync(i => i.Id == creditItemId && i.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -678,10 +681,8 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         decimal creditBase = BaseDrawn(credit, amount);
         decimal realisedFx = decimal.Round(creditBase - debitBase, Scale, MidpointRounding.ToEven);
 
-        // Post the realised FX before touching the items: if it is refused (e.g. a closed period) nothing has changed,
-        // so a later save in the same scope cannot persist a reduced outstanding without its allocation. The FX journal
-        // and the allocation are committed together.
-        await using IDbContextTransaction? transaction = await BeginIfNoneAsync(ct).ConfigureAwait(false);
+        // Post the realised FX before touching the items; the FX journal and the allocation commit together (the
+        // public method runs this as one unit of work, retried if another user changed either item meanwhile).
         string? fxJournalNumber = null;
         if (realisedFx != 0m)
         {
@@ -699,17 +700,9 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         Allocation allocation = new(companyId, ledger, debit.TraderId, allocationDate, debit.Id, credit.Id, amount, debitBase, creditBase, realisedFx);
         _db.Allocations.Add(allocation);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        if (transaction is not null)
-        {
-            await transaction.CommitAsync(ct).ConfigureAwait(false);
-        }
 
         return new AllocationResult(allocation.Id, amount, realisedFx, fxJournalNumber);
     }
-
-    // Starts a transaction unless the caller (e.g. a payment run) already has one open, in which case the work joins it.
-    private async Task<IDbContextTransaction?> BeginIfNoneAsync(CancellationToken ct)
-        => _db.Database.CurrentTransaction is null ? await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false) : null;
 
     private async Task<Result<string>> PostRealisedFxAsync(long companyId, TradingLedger ledger, decimal realisedFx, DateOnly date, CancellationToken ct, bool reverse = false)
     {
@@ -759,7 +752,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result<UnallocationResult>> UnallocateAsync(long companyId, long allocationId, DateOnly reversalDate, CancellationToken ct = default)
+    public Task<Result<UnallocationResult>> UnallocateAsync(long companyId, long allocationId, DateOnly reversalDate, CancellationToken ct = default)
+        => _db.AtomicAsync(() => UnallocateCoreAsync(companyId, allocationId, reversalDate, ct), ct);
+
+    // One unit of work, retried if another user allocates against the same items at the same moment.
+    private async Task<Result<UnallocationResult>> UnallocateCoreAsync(long companyId, long allocationId, DateOnly reversalDate, CancellationToken ct)
     {
         Allocation? allocation = await _db.Allocations.FirstOrDefaultAsync(a => a.Id == allocationId && a.CompanyId == companyId, ct).ConfigureAwait(false);
         if (allocation is null)
@@ -781,7 +778,6 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
         // Reverse any realised FX the allocation posted (netting the original gain/loss to nil) before touching the
         // items, and commit the reversal journal with the restored items.
-        await using IDbContextTransaction? transaction = await BeginIfNoneAsync(ct).ConfigureAwait(false);
         string? fxReversalJournal = null;
         if (allocation.RealisedFxBase != 0m)
         {
@@ -799,10 +795,6 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         credit.RestoreOutstanding(allocation.TransactionAmount, allocation.CreditBase);
         allocation.Reverse(reversalDate);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        if (transaction is not null)
-        {
-            await transaction.CommitAsync(ct).ConfigureAwait(false);
-        }
 
         return new UnallocationResult(allocation.Id, allocation.TransactionAmount, -allocation.RealisedFxBase, fxReversalJournal);
     }

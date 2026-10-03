@@ -86,6 +86,7 @@ internal static class AtomicWork
         "ix_period_balance_company_id_fiscal_period_id_account_code_cos", // both created the same period balance
         "ix_number_sequence_company_id_branch_id_document_type",         // both created the company's sequence
         "pk_number_sequence_year",                                       // both opened the same year's counter
+        "ix_stock_balance_company_id_item_id_warehouse_id",              // both created the same stock balance
     };
 
     /// <summary>
