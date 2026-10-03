@@ -666,6 +666,16 @@ app.MapGet("/api/municipal/reading-exceptions", async (long companyId, DateOnly 
 .RequireAuthorization()
 .WithName("MeterReadingExceptions");
 
+app.MapPost("/api/municipal/prepaid/vend", async (One4All.Application.Abstractions.Municipal.PrepaidVendRequest request, One4All.Application.Abstractions.Municipal.IPrepaidVendingService prepaid, CancellationToken ct) =>
+    ValueResponse(await prepaid.VendAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("VendPrepaid");
+
+app.MapGet("/api/municipal/prepaid/sales", async (long companyId, DateOnly start, DateOnly end, One4All.Application.Abstractions.Municipal.IPrepaidVendingService prepaid, CancellationToken ct) =>
+    Results.Ok(await prepaid.SalesAsync(companyId, start, end, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PrepaidSales");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

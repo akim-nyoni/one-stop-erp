@@ -78,6 +78,12 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Municipal.ICouncilLicensingService, Municipal.CouncilLicensingService>();
         services.AddScoped<Application.Abstractions.Municipal.IValuationRollService, Municipal.ValuationRollService>();
         services.AddScoped<Application.Abstractions.Municipal.IMeterReadingService, Municipal.MeterReadingService>();
+        services.AddScoped<Application.Abstractions.Municipal.IPrepaidVendingService, Municipal.PrepaidVendingService>();
+        if (!services.Any(d => d.ServiceType == typeof(Application.Municipal.IPrepaidTokenGenerator)))
+        {
+            // A live installation registers its token vendor's generator before this; the placeholder is for testing.
+            services.AddSingleton<Application.Municipal.IPrepaidTokenGenerator, Municipal.PlaceholderPrepaidTokenGenerator>();
+        }
         services.AddScoped<Application.Abstractions.Trading.IDebtCollectionService, Trading.DebtCollectionService>();
         services.AddScoped<Application.Abstractions.Budgeting.IVarianceCommentaryService, Budgeting.VarianceCommentaryService>();
         services.AddScoped<Application.Abstractions.Trading.ISupplierBankDetailsService, Trading.SupplierBankDetailsService>();

@@ -23,6 +23,9 @@ public enum ServiceType
     /// <summary>Licences / permits.</summary>
     Licence = 6,
 
+    /// <summary>Electricity (conventional or prepaid).</summary>
+    Electricity = 7,
+
     /// <summary>Other configurable service.</summary>
     Other = 99,
 }

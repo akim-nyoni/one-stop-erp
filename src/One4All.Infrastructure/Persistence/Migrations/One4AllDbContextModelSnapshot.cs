@@ -4548,6 +4548,106 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("meter_reading", "mun");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.PrepaidSale", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("channel");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("MeterSerial")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("meter_serial");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("PropertyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("property_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("SaleNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("sale_number");
+
+                    b.Property<int>("ServiceType")
+                        .HasColumnType("integer")
+                        .HasColumnName("service_type");
+
+                    b.Property<DateOnly>("SoldOn")
+                        .HasColumnType("date")
+                        .HasColumnName("sold_on");
+
+                    b.Property<decimal>("ToArrears")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("to_arrears");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("token");
+
+                    b.Property<decimal>("Units")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("units");
+
+                    b.HasKey("Id")
+                        .HasName("pk_prepaid_sale");
+
+                    b.HasIndex("CompanyId", "SaleNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_prepaid_sale_company_id_sale_number");
+
+                    b.HasIndex("CompanyId", "SoldOn")
+                        .HasDatabaseName("ix_prepaid_sale_company_id_sold_on");
+
+                    b.ToTable("prepaid_sale", "mun", t =>
+                        {
+                            t.HasCheckConstraint("ck_prepaid_sale_amounts", "amount > 0 AND to_arrears >= 0 AND to_arrears <= amount AND units >= 0");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.Property", b =>
                 {
                     b.Property<long>("Id")

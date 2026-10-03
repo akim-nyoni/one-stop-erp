@@ -99,6 +99,25 @@ internal sealed class ValuationObjectionConfiguration : IEntityTypeConfiguration
     }
 }
 
+internal sealed class PrepaidSaleConfiguration : IEntityTypeConfiguration<PrepaidSale>
+{
+    public void Configure(EntityTypeBuilder<PrepaidSale> b)
+    {
+        b.ToTable("prepaid_sale", Schemas.Municipal, t => t.HasCheckConstraint("ck_prepaid_sale_amounts", "amount > 0 AND to_arrears >= 0 AND to_arrears <= amount AND units >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.SaleNumber).HasMaxLength(30);
+        b.Property(x => x.ServiceType).HasConversion<int>();
+        b.Property(x => x.MeterSerial).HasMaxLength(60);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.ToArrears).HasPrecision(19, 4);
+        b.Property(x => x.Units).HasPrecision(19, 4);
+        b.Property(x => x.Token).HasMaxLength(60);
+        b.Property(x => x.Channel).HasMaxLength(40);
+        b.HasIndex(x => new { x.CompanyId, x.SaleNumber }).IsUnique();
+        b.HasIndex(x => new { x.CompanyId, x.SoldOn });
+    }
+}
+
 internal sealed class IndigentRegistrationConfiguration : IEntityTypeConfiguration<IndigentRegistration>
 {
     public void Configure(EntityTypeBuilder<IndigentRegistration> b)
