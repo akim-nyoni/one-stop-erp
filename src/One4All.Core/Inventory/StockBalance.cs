@@ -65,6 +65,16 @@ public sealed class StockBalance : Entity, ICompanyScoped
         return valueIn;
     }
 
+    /// <summary>
+    /// Adds value without quantity — landed charges capitalised onto stock on hand — and re-derives the average cost.
+    /// </summary>
+    /// <param name="amount">The value added.</param>
+    public void AddValue(decimal amount)
+    {
+        TotalValue = decimal.Round(TotalValue + amount, ValueScale, MidpointRounding.ToEven);
+        AverageCost = QuantityOnHand == 0m ? 0m : decimal.Round(TotalValue / QuantityOnHand, CostScale, MidpointRounding.ToEven);
+    }
+
     /// <summary>The cost an issue of <paramref name="quantity"/> would carry at the current average, without issuing it.</summary>
     /// <param name="quantity">The quantity to issue (positive).</param>
     /// <returns>The cost <see cref="Issue"/> would return.</returns>
