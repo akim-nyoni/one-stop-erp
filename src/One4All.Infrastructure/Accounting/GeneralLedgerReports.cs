@@ -491,20 +491,14 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
 
         Dictionary<string, (decimal debit, decimal credit)> movement = await SumByAccountAsync(companyId, null, asAtDate, ct).ConfigureAwait(false);
 
-        // Sub-ledger totals.
-        List<Core.Trading.OpenItem> arItems = await _db.OpenItems
-            .Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsReceivable && i.OutstandingBase != 0m && i.DocumentDate <= asAtDate)
-            .ToListAsync(ct).ConfigureAwait(false);
-        decimal arSub = arItems.Sum(i => i.Sign == Core.Trading.LedgerSign.Debit ? i.OutstandingBase : -i.OutstandingBase);
+        // Sub-ledger totals as they stood at the date — not as they stand today. Later allocations, and stock
+        // movements after the date, must not leak into a past reconciliation.
+        decimal arSub = await SubLedgerAsAtAsync(companyId, Core.Trading.TradingLedger.AccountsReceivable, asAtDate, ct).ConfigureAwait(false);
+        decimal apSub = await SubLedgerAsAtAsync(companyId, Core.Trading.TradingLedger.AccountsPayable, asAtDate, ct).ConfigureAwait(false);
 
-        List<Core.Trading.OpenItem> apItems = await _db.OpenItems
-            .Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsPayable && i.OutstandingBase != 0m && i.DocumentDate <= asAtDate)
-            .ToListAsync(ct).ConfigureAwait(false);
-        decimal apSub = apItems.Sum(i => i.Sign == Core.Trading.LedgerSign.Credit ? i.OutstandingBase : -i.OutstandingBase);
-
-        decimal stockSub = await _db.Set<Core.Inventory.StockBalance>()
-            .Where(b => b.CompanyId == companyId)
-            .SumAsync(b => (decimal?)b.TotalValue, ct).ConfigureAwait(false) ?? 0m;
+        decimal stockSub = await _db.Set<Core.Inventory.StockMovement>()
+            .Where(m => m.CompanyId == companyId && m.Date <= asAtDate)
+            .SumAsync(m => (decimal?)m.Value, ct).ConfigureAwait(false) ?? 0m;
 
         List<ControlReconciliationRow> rows = [];
         foreach (var c in controls.OrderBy(c => c.AccountCode, StringComparer.Ordinal))
@@ -520,6 +514,37 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         }
 
         return new ControlReconciliationReport(asAtDate, rows);
+    }
+
+    // A trading sub-ledger's balance in base currency as at a date, in the control account's natural sign
+    // (AR debit, AP credit): every item dated by then at its original base amount, less the base drawn by the
+    // allocations made by then that had not been reversed by then.
+    private async Task<decimal> SubLedgerAsAtAsync(long companyId, Core.Trading.TradingLedger ledger, DateOnly asAtDate, CancellationToken ct)
+    {
+        var items = await _db.OpenItems
+            .Where(i => i.CompanyId == companyId && i.Ledger == ledger && i.DocumentDate <= asAtDate)
+            .Select(i => new { i.Id, i.Sign, i.OriginalBase })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        var allocations = await _db.Allocations
+            .Where(a => a.CompanyId == companyId && a.Ledger == ledger && a.AllocationDate <= asAtDate
+                && !(a.IsReversed && a.ReversedOn != null && a.ReversedOn <= asAtDate))
+            .Select(a => new { a.DebitItemId, a.CreditItemId, a.DebitBase, a.CreditBase })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<long, decimal> drawn = [];
+        foreach (var a in allocations)
+        {
+            drawn[a.DebitItemId] = drawn.GetValueOrDefault(a.DebitItemId) + a.DebitBase;
+            drawn[a.CreditItemId] = drawn.GetValueOrDefault(a.CreditItemId) + a.CreditBase;
+        }
+
+        Core.Trading.LedgerSign natural = ledger == Core.Trading.TradingLedger.AccountsReceivable ? Core.Trading.LedgerSign.Debit : Core.Trading.LedgerSign.Credit;
+        return items.Sum(i =>
+        {
+            decimal outstanding = i.OriginalBase - drawn.GetValueOrDefault(i.Id);
+            return i.Sign == natural ? outstanding : -outstanding;
+        });
     }
 
     /// <inheritdoc />
