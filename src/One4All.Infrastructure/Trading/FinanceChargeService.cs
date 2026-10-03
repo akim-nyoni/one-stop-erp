@@ -30,7 +30,11 @@ public sealed class FinanceChargeService : IFinanceChargeService
     }
 
     /// <inheritdoc />
-    public async Task<Result<FinanceChargeRunResult>> RaiseChargesAsync(FinanceChargeRunRequest request, CancellationToken ct = default)
+    public Task<Result<FinanceChargeRunResult>> RaiseChargesAsync(FinanceChargeRunRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RaiseChargesCoreAsync(request, ct), ct);
+
+    // One unit of work: every customer's charge and the marks on the items it covers commit together or not at all.
+    private async Task<Result<FinanceChargeRunResult>> RaiseChargesCoreAsync(FinanceChargeRunRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.InterestIncomeAccountCode))
         {

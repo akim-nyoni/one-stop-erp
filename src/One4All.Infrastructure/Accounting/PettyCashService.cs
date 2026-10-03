@@ -26,7 +26,11 @@ public sealed class PettyCashService : IPettyCashService
     }
 
     /// <inheritdoc />
-    public async Task<Result<string>> DisburseAsync(long companyId, decimal amount, DateOnly date, string expenseAccountCode, string pettyCashAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result<string>> DisburseAsync(long companyId, decimal amount, DateOnly date, string expenseAccountCode, string pettyCashAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => DisburseCoreAsync(companyId, amount, date, expenseAccountCode, pettyCashAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<string>> DisburseCoreAsync(long companyId, decimal amount, DateOnly date, string expenseAccountCode, string pettyCashAccountCode, string documentNumber, CancellationToken ct)
     {
         if (amount <= 0m)
         {
@@ -41,7 +45,11 @@ public sealed class PettyCashService : IPettyCashService
     }
 
     /// <inheritdoc />
-    public async Task<Result<ImprestResult>> ReimburseToFloatAsync(long companyId, DateOnly date, string pettyCashAccountCode, string bankAccountCode, decimal floatAmount, string documentNumber, CancellationToken ct = default)
+    public Task<Result<ImprestResult>> ReimburseToFloatAsync(long companyId, DateOnly date, string pettyCashAccountCode, string bankAccountCode, decimal floatAmount, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReimburseToFloatCoreAsync(companyId, date, pettyCashAccountCode, bankAccountCode, floatAmount, documentNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<ImprestResult>> ReimburseToFloatCoreAsync(long companyId, DateOnly date, string pettyCashAccountCode, string bankAccountCode, decimal floatAmount, string documentNumber, CancellationToken ct)
     {
         if (floatAmount <= 0m)
         {

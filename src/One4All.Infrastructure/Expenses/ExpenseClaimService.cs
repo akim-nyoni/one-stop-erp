@@ -64,7 +64,11 @@ public sealed class ExpenseClaimService : IExpenseClaimService
     }
 
     /// <inheritdoc />
-    public async Task<Result> ApproveAsync(long companyId, long claimId, long approvedByUserId, CancellationToken ct = default)
+    public Task<Result> ApproveAsync(long companyId, long claimId, long approvedByUserId, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ApproveCoreAsync(companyId, claimId, approvedByUserId, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result> ApproveCoreAsync(long companyId, long claimId, long approvedByUserId, CancellationToken ct)
     {
         Result<ExpenseClaim> loaded = await LoadAsync(companyId, claimId, ct).ConfigureAwait(false);
         if (loaded.IsFailure)
@@ -104,7 +108,11 @@ public sealed class ExpenseClaimService : IExpenseClaimService
     }
 
     /// <inheritdoc />
-    public async Task<Result<string>> ReimburseAsync(long companyId, long claimId, DateOnly date, string fundingAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result<string>> ReimburseAsync(long companyId, long claimId, DateOnly date, string fundingAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReimburseCoreAsync(companyId, claimId, date, fundingAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<string>> ReimburseCoreAsync(long companyId, long claimId, DateOnly date, string fundingAccountCode, string documentNumber, CancellationToken ct)
     {
         Result<ExpenseClaim> loaded = await LoadAsync(companyId, claimId, ct).ConfigureAwait(false);
         if (loaded.IsFailure)

@@ -51,7 +51,11 @@ public sealed class AgentService : IAgentService
     }
 
     /// <inheritdoc />
-    public async Task<Result<AgentCollectionResult>> RecordCollectionAsync(long companyId, long agentId, long customerId, decimal amount, DateOnly date, string agentControlAccountCode, CancellationToken ct = default)
+    public Task<Result<AgentCollectionResult>> RecordCollectionAsync(long companyId, long agentId, long customerId, decimal amount, DateOnly date, string agentControlAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RecordCollectionCoreAsync(companyId, agentId, customerId, amount, date, agentControlAccountCode, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<AgentCollectionResult>> RecordCollectionCoreAsync(long companyId, long agentId, long customerId, decimal amount, DateOnly date, string agentControlAccountCode, CancellationToken ct)
     {
         if (amount <= 0m)
         {
@@ -96,7 +100,11 @@ public sealed class AgentService : IAgentService
     }
 
     /// <inheritdoc />
-    public async Task<Result<AgentRemittanceResult>> RemitAsync(long companyId, long agentId, decimal grossAmount, DateOnly date, string agentControlAccountCode, string bankAccountCode, string commissionAccountCode, CancellationToken ct = default)
+    public Task<Result<AgentRemittanceResult>> RemitAsync(long companyId, long agentId, decimal grossAmount, DateOnly date, string agentControlAccountCode, string bankAccountCode, string commissionAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RemitCoreAsync(companyId, agentId, grossAmount, date, agentControlAccountCode, bankAccountCode, commissionAccountCode, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<AgentRemittanceResult>> RemitCoreAsync(long companyId, long agentId, decimal grossAmount, DateOnly date, string agentControlAccountCode, string bankAccountCode, string commissionAccountCode, CancellationToken ct)
     {
         if (grossAmount <= 0m)
         {

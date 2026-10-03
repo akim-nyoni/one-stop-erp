@@ -24,7 +24,11 @@ public sealed class EmployeeLoanService : IEmployeeLoanService
     }
 
     /// <inheritdoc />
-    public async Task<Result<long>> GrantAsync(long companyId, long employeeId, string reference, decimal principal, decimal installment, DateOnly date, string loanReceivableAccountCode, string fundingAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result<long>> GrantAsync(long companyId, long employeeId, string reference, decimal principal, decimal installment, DateOnly date, string loanReceivableAccountCode, string fundingAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => GrantCoreAsync(companyId, employeeId, reference, principal, installment, date, loanReceivableAccountCode, fundingAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<long>> GrantCoreAsync(long companyId, long employeeId, string reference, decimal principal, decimal installment, DateOnly date, string loanReceivableAccountCode, string fundingAccountCode, string documentNumber, CancellationToken ct)
     {
         if (principal <= 0m)
         {
@@ -66,7 +70,11 @@ public sealed class EmployeeLoanService : IEmployeeLoanService
     }
 
     /// <inheritdoc />
-    public async Task<Result<decimal>> RecordRepaymentAsync(long companyId, long loanId, decimal amount, DateOnly date, string fundingAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result<decimal>> RecordRepaymentAsync(long companyId, long loanId, decimal amount, DateOnly date, string fundingAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RecordRepaymentCoreAsync(companyId, loanId, amount, date, fundingAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<decimal>> RecordRepaymentCoreAsync(long companyId, long loanId, decimal amount, DateOnly date, string fundingAccountCode, string documentNumber, CancellationToken ct)
     {
         if (amount <= 0m)
         {

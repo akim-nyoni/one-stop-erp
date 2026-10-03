@@ -64,7 +64,11 @@ public sealed class RecurringJournalService : IRecurringJournalService
     }
 
     /// <inheritdoc />
-    public async Task<Result<string>> PostAsync(long companyId, long recurringJournalId, DateOnly date, string? documentNumber = null, CancellationToken ct = default)
+    public Task<Result<string>> PostAsync(long companyId, long recurringJournalId, DateOnly date, string? documentNumber = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PostCoreAsync(companyId, recurringJournalId, date, documentNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<string>> PostCoreAsync(long companyId, long recurringJournalId, DateOnly date, string? documentNumber, CancellationToken ct)
     {
         RecurringJournal? template = await _db.Set<RecurringJournal>().Include(r => r.Lines)
             .FirstOrDefaultAsync(r => r.Id == recurringJournalId && r.CompanyId == companyId, ct).ConfigureAwait(false);

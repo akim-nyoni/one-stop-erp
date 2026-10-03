@@ -25,7 +25,11 @@ public sealed class LeaveService : ILeaveService
     }
 
     /// <inheritdoc />
-    public async Task<Result<decimal>> AccrueAsync(long companyId, long employeeId, string leaveType, decimal days, CancellationToken ct = default)
+    public Task<Result<decimal>> AccrueAsync(long companyId, long employeeId, string leaveType, decimal days, CancellationToken ct = default)
+        => _db.AtomicAsync(() => AccrueCoreAsync(companyId, employeeId, leaveType, days, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<decimal>> AccrueCoreAsync(long companyId, long employeeId, string leaveType, decimal days, CancellationToken ct)
     {
         if (days <= 0m)
         {
@@ -44,7 +48,11 @@ public sealed class LeaveService : ILeaveService
     }
 
     /// <inheritdoc />
-    public async Task<Result<decimal>> TakeAsync(long companyId, long employeeId, string leaveType, decimal days, CancellationToken ct = default)
+    public Task<Result<decimal>> TakeAsync(long companyId, long employeeId, string leaveType, decimal days, CancellationToken ct = default)
+        => _db.AtomicAsync(() => TakeCoreAsync(companyId, employeeId, leaveType, days, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<decimal>> TakeCoreAsync(long companyId, long employeeId, string leaveType, decimal days, CancellationToken ct)
     {
         if (days <= 0m)
         {
@@ -68,7 +76,11 @@ public sealed class LeaveService : ILeaveService
     }
 
     /// <inheritdoc />
-    public async Task<Result<decimal>> RaiseLeaveProvisionAsync(long companyId, DateOnly date, decimal dailyRate, string leaveExpenseAccountCode, string leaveProvisionAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result<decimal>> RaiseLeaveProvisionAsync(long companyId, DateOnly date, decimal dailyRate, string leaveExpenseAccountCode, string leaveProvisionAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RaiseLeaveProvisionCoreAsync(companyId, date, dailyRate, leaveExpenseAccountCode, leaveProvisionAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<decimal>> RaiseLeaveProvisionCoreAsync(long companyId, DateOnly date, decimal dailyRate, string leaveExpenseAccountCode, string leaveProvisionAccountCode, string documentNumber, CancellationToken ct)
     {
         if (dailyRate < 0m)
         {
