@@ -454,6 +454,26 @@ app.MapPost("/api/accounting/release-deferred", async (long companyId, DateOnly 
 .RequireAuthorization()
 .WithName("ReleaseDeferredJournals");
 
+app.MapPost("/api/gl/journals/submit", async (long userId, One4All.Application.Abstractions.Accounting.JournalRequest request, One4All.Application.Abstractions.Accounting.IJournalApprovalService approvals, CancellationToken ct) =>
+    ValueResponse(await approvals.SubmitAsync(request, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SubmitManualJournal");
+
+app.MapGet("/api/gl/journals/awaiting-approval", async (long companyId, One4All.Application.Abstractions.Accounting.IJournalApprovalService approvals, CancellationToken ct) =>
+    Results.Ok(await approvals.AwaitingApprovalAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("JournalsAwaitingApproval");
+
+app.MapPost("/api/gl/journals/{journalId:long}/approve", async (long journalId, long companyId, long userId, One4All.Application.Abstractions.Accounting.IJournalApprovalService approvals, CancellationToken ct) =>
+    ValueResponse(await approvals.ApproveAsync(companyId, journalId, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveJournal");
+
+app.MapPost("/api/gl/journals/{journalId:long}/reject", async (long journalId, long companyId, string reason, One4All.Application.Abstractions.Accounting.IJournalApprovalService approvals, CancellationToken ct) =>
+    ActionResponse(await approvals.RejectAsync(companyId, journalId, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RejectJournal");
+
 app.MapGet("/api/consolidation/trial-balance", async (long[] companyIds, DateOnly asAtDate, string? presentationCurrency, string[]? intercompanyAccounts, One4All.Application.Abstractions.Reporting.IConsolidationService consolidation, CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(presentationCurrency))

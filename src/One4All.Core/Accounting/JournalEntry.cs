@@ -16,6 +16,9 @@ public enum JournalStatus
 
     /// <summary>Reversed by a later journal.</summary>
     Reversed = 3,
+
+    /// <summary>Rejected while awaiting approval: never posted, its number kept so the sequence has no gap.</summary>
+    Cancelled = 4,
 }
 
 /// <summary>
@@ -85,6 +88,18 @@ public sealed class JournalEntry : AuditableEntity, ICompanyScoped
     /// <summary>The accounting date.</summary>
     public DateOnly PostingDate { get; private set; }
 
+    /// <summary>Who prepared the journal, when it was submitted for a second user's approval (maker-checker).</summary>
+    public long? PreparedByUserId { get; private set; }
+
+    /// <summary>Who approved the journal for posting; never the preparer.</summary>
+    public long? ApprovedByUserId { get; private set; }
+
+    /// <summary>Whether the journal is held, numbered but unposted, until a second user approves it.</summary>
+    public bool AwaitingApproval { get; private set; }
+
+    /// <summary>Why the approver rejected the journal.</summary>
+    public string? RejectionReason { get; private set; }
+
     /// <summary>The company base currency at posting time.</summary>
     public CurrencyCode BaseCurrency { get; private set; }
 
@@ -150,6 +165,38 @@ public sealed class JournalEntry : AuditableEntity, ICompanyScoped
         FiscalPeriodId = fiscalPeriodId;
         CreatedOnUtc = entryDateUtc;
         Status = JournalStatus.Deferred;
+    }
+
+    /// <summary>Holds this deferred journal for a second user's approval. Called only by the posting engine.</summary>
+    /// <param name="preparedByUserId">The preparer.</param>
+    public void HoldForApproval(long preparedByUserId)
+    {
+        PreparedByUserId = preparedByUserId;
+        AwaitingApproval = true;
+    }
+
+    /// <summary>Records the approval, freeing the journal to be released. Refuses self-approval.</summary>
+    /// <param name="approverUserId">The approver.</param>
+    /// <returns>Whether the approval was recorded.</returns>
+    public bool Approve(long approverUserId)
+    {
+        if (!AwaitingApproval || approverUserId == PreparedByUserId)
+        {
+            return false;
+        }
+
+        ApprovedByUserId = approverUserId;
+        AwaitingApproval = false;
+        return true;
+    }
+
+    /// <summary>Rejects the journal awaiting approval; it is cancelled and never posts.</summary>
+    /// <param name="reason">Why.</param>
+    public void Reject(string reason)
+    {
+        AwaitingApproval = false;
+        RejectionReason = reason;
+        Status = JournalStatus.Cancelled;
     }
 
     /// <summary>Marks this journal as a reversal of another.</summary>

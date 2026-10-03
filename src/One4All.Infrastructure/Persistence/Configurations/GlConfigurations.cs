@@ -55,9 +55,15 @@ internal sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journ
 {
     public void Configure(EntityTypeBuilder<JournalEntry> b)
     {
-        b.ToTable("journal", Schemas.GeneralLedger);
+        b.ToTable("journal", Schemas.GeneralLedger, t =>
+        {
+            // Maker-checker: a held journal cannot post unapproved, and nobody approves their own journal.
+            t.HasCheckConstraint("ck_journal_approved_before_posting", "prepared_by_user_id IS NULL OR status NOT IN (2, 3) OR approved_by_user_id IS NOT NULL");
+            t.HasCheckConstraint("ck_journal_approver_not_preparer", "approved_by_user_id IS NULL OR approved_by_user_id <> prepared_by_user_id");
+        });
         b.HasKey(x => x.Id);
         b.Property(x => x.JournalNumber).HasMaxLength(30);
+        b.Property(x => x.RejectionReason).HasMaxLength(256);
         b.Property(x => x.BatchNumber).HasMaxLength(30);
         b.Property(x => x.SourceModule).HasMaxLength(40);
         b.Property(x => x.DocumentType).HasMaxLength(40);

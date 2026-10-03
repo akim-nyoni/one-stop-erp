@@ -338,6 +338,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<bool>("AwaitingApproval")
+                        .HasColumnType("boolean")
+                        .HasColumnName("awaiting_approval");
+
                     b.Property<string>("BaseCurrency")
                         .IsRequired()
                         .HasMaxLength(3)
@@ -410,10 +418,19 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("posting_date");
 
+                    b.Property<long?>("PreparedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("prepared_by_user_id");
+
                     b.Property<string>("Reference")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)")
                         .HasColumnName("reference");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("rejection_reason");
 
                     b.Property<long?>("ReversalOfJournalId")
                         .HasColumnType("bigint")
@@ -455,7 +472,12 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.HasIndex("CompanyId", "PostingDate")
                         .HasDatabaseName("ix_journal_company_id_posting_date");
 
-                    b.ToTable("journal", "gl");
+                    b.ToTable("journal", "gl", t =>
+                        {
+                            t.HasCheckConstraint("ck_journal_approved_before_posting", "prepared_by_user_id IS NULL OR status NOT IN (2, 3) OR approved_by_user_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_journal_approver_not_preparer", "approved_by_user_id IS NULL OR approved_by_user_id <> prepared_by_user_id");
+                        });
                 });
 
             modelBuilder.Entity("One4All.Core.Accounting.JournalLine", b =>
@@ -9252,6 +9274,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<decimal?>("ManualJournalApprovalThreshold")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("manual_journal_approval_threshold");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")

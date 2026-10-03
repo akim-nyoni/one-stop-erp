@@ -53,6 +53,12 @@ public sealed class JournalRequest
     /// <summary>When true, the journal is queued as deferred rather than posted live.</summary>
     public bool Deferred { get; init; }
 
+    /// <summary>
+    /// When set, the journal is submitted for approval by this user (the preparer): it is numbered and held, unposted,
+    /// until a different user approves it.
+    /// </summary>
+    public long? SubmittedByUserId { get; init; }
+
     /// <summary>An idempotency key so a retried post (e.g. POS sync) does not double-post.</summary>
     public string? IdempotencyKey { get; init; }
 

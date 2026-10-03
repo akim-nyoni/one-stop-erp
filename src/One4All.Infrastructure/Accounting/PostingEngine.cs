@@ -105,13 +105,26 @@ public sealed class PostingEngine : IPostingEngine
             }
         }
 
+        // Maker-checker: a manual journal above the company's threshold must go through approval.
+        if (request.EnforceManualJournalRules && request.SubmittedByUserId is null
+            && company.ManualJournalApprovalThreshold is decimal threshold && totalBaseDebit > threshold)
+        {
+            return Error.Rule("Posting.ApprovalRequired",
+                $"Manual journals over {threshold:0.00} {baseCurrency} need a second user's approval: submit the journal for approval.");
+        }
+
         // Allocate the gapless journal number (increment persists in this transaction).
         string journalNumber = await AllocateJournalNumberAsync(request.CompanyId, request.PostingDate.Year, ct).ConfigureAwait(false);
 
         DateTimeOffset entryDate = DateTimeOffset.UtcNow;
-        if (request.Deferred)
+        bool held = request.Deferred || request.SubmittedByUserId is not null;
+        if (held)
         {
             journal.MarkDeferred(journalNumber, fiscalYear.Id, fiscalPeriod.Id, entryDate);
+            if (request.SubmittedByUserId is long preparer)
+            {
+                journal.HoldForApproval(preparer);
+            }
         }
         else
         {
@@ -122,7 +135,7 @@ public sealed class PostingEngine : IPostingEngine
         _db.Journals.Add(journal);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        return new PostingReceipt(journal.Id, journalNumber, request.PostingDate, totalBaseDebit, request.Deferred);
+        return new PostingReceipt(journal.Id, journalNumber, request.PostingDate, totalBaseDebit, held);
     }
 
     /// <inheritdoc />
@@ -142,6 +155,11 @@ public sealed class PostingEngine : IPostingEngine
         if (journal.Status != JournalStatus.Deferred)
         {
             return Error.Rule("Posting.NotDeferred", $"Journal {journal.JournalNumber} is {journal.Status}, not deferred.");
+        }
+
+        if (journal.AwaitingApproval)
+        {
+            return Error.Rule("Posting.AwaitingApproval", $"Journal {journal.JournalNumber} is awaiting approval.");
         }
 
         Company company = await _db.Companies.FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
@@ -167,7 +185,7 @@ public sealed class PostingEngine : IPostingEngine
     public async Task<DeferredReleaseResult> ReleaseAllDeferredAsync(long companyId, DateOnly upToDate, CancellationToken ct = default)
     {
         List<long> ids = await _db.Journals
-            .Where(j => j.CompanyId == companyId && j.Status == JournalStatus.Deferred && j.PostingDate <= upToDate)
+            .Where(j => j.CompanyId == companyId && j.Status == JournalStatus.Deferred && !j.AwaitingApproval && j.PostingDate <= upToDate)
             .OrderBy(j => j.PostingDate).ThenBy(j => j.Id)
             .Select(j => j.Id)
             .ToListAsync(ct).ConfigureAwait(false);
@@ -208,6 +226,11 @@ public sealed class PostingEngine : IPostingEngine
         if (original is null)
         {
             return Error.NotFound("Gl.JournalNotFound", $"Journal {journalId} not found.");
+        }
+
+        if (original.Status != JournalStatus.Posted)
+        {
+            return Error.Rule("Gl.NotPosted", $"Journal {original.JournalNumber} is {original.Status}; only a posted journal can be reversed.");
         }
 
         if (original.IsReversal)

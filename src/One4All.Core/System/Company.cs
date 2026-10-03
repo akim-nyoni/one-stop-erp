@@ -55,6 +55,13 @@ public sealed class Company : SoftDeletableEntity
     /// <summary>Whether posting to future periods is permitted (per the posting engine's period check).</summary>
     public bool AllowFuturePeriodPosting { get; set; }
 
+    /// <summary>
+    /// The value above which a manual journal needs a second user's approval before it posts (maker-checker): the posting
+    /// engine refuses a manual journal worth more than this in base currency unless it was submitted for approval. Zero
+    /// puts every manual journal through approval; null turns approval off.
+    /// </summary>
+    public decimal? ManualJournalApprovalThreshold { get; set; }
+
     /// <summary>Sets or clears the second reporting currency.</summary>
     /// <param name="reportingCurrency">The reporting currency, or null to disable dual-currency reporting.</param>
     public void SetReportingCurrency(CurrencyCode? reportingCurrency) => ReportingCurrency = reportingCurrency;
