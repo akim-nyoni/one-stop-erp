@@ -24,9 +24,8 @@ public sealed class TradingReports : ITradingReports
 
     private async Task<AgeingReport> AgeAsync(long companyId, TradingLedger ledger, DateOnly asAtDate, CancellationToken ct)
     {
-        List<OpenItem> items = await _db.OpenItems
-            .Where(i => i.CompanyId == companyId && i.Ledger == ledger && i.OutstandingBase != 0m && i.DocumentDate <= asAtDate)
-            .ToListAsync(ct).ConfigureAwait(false);
+        // As the items stood at the date: allocations made afterwards must not age a past report.
+        List<OpenItemAsAt> items = await OpenItemsAsAt.LoadAsync(_db, companyId, ledger, asAtDate, ct).ConfigureAwait(false);
 
         Dictionary<long, (string Code, string Name)> traders = await LoadTradersAsync(companyId, ledger, ct).ConfigureAwait(false);
 
@@ -34,14 +33,14 @@ public sealed class TradingReports : ITradingReports
         LedgerSign positiveSign = ledger == TradingLedger.AccountsReceivable ? LedgerSign.Debit : LedgerSign.Credit;
 
         List<AgeingRow> rows = items
-            .GroupBy(i => i.TraderId)
+            .GroupBy(i => i.Item.TraderId)
             .Select(g =>
             {
                 decimal current = 0m, d30 = 0m, d60 = 0m, d90 = 0m, d90plus = 0m;
-                foreach (OpenItem item in g)
+                foreach (OpenItemAsAt entry in g)
                 {
-                    decimal signed = item.Sign == positiveSign ? item.OutstandingBase : -item.OutstandingBase;
-                    int age = asAtDate.DayNumber - item.DueDate.DayNumber;
+                    decimal signed = entry.Signed(positiveSign);
+                    int age = asAtDate.DayNumber - entry.Item.DueDate.DayNumber;
                     if (age <= 0) { current += signed; }
                     else if (age <= 30) { d30 += signed; }
                     else if (age <= 60) { d60 += signed; }
@@ -144,12 +143,10 @@ public sealed class TradingReports : ITradingReports
             .Where(c => c.CompanyId == companyId)
             .ToListAsync(ct).ConfigureAwait(false);
 
-        // Current receivable balance per customer: debit items positive, credit items negative.
-        Dictionary<long, decimal> balances = (await _db.OpenItems
-            .Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.OutstandingBase != 0m && i.DocumentDate <= asAtDate)
-            .ToListAsync(ct).ConfigureAwait(false))
-            .GroupBy(i => i.TraderId)
-            .ToDictionary(g => g.Key, g => g.Sum(i => i.Sign == LedgerSign.Debit ? i.OutstandingBase : -i.OutstandingBase));
+        // Receivable balance per customer as at the date: debit items positive, credit items negative.
+        Dictionary<long, decimal> balances = (await OpenItemsAsAt.LoadAsync(_db, companyId, TradingLedger.AccountsReceivable, asAtDate, ct).ConfigureAwait(false))
+            .GroupBy(i => i.Item.TraderId)
+            .ToDictionary(g => g.Key, g => g.Sum(i => i.Signed(LedgerSign.Debit)));
 
         List<CreditExposureRow> rows = customers
             .Select(c =>

@@ -517,34 +517,11 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
     }
 
     // A trading sub-ledger's balance in base currency as at a date, in the control account's natural sign
-    // (AR debit, AP credit): every item dated by then at its original base amount, less the base drawn by the
-    // allocations made by then that had not been reversed by then.
+    // (AR debit, AP credit), rebuilt from the items and allocations as they stood then.
     private async Task<decimal> SubLedgerAsAtAsync(long companyId, Core.Trading.TradingLedger ledger, DateOnly asAtDate, CancellationToken ct)
     {
-        var items = await _db.OpenItems
-            .Where(i => i.CompanyId == companyId && i.Ledger == ledger && i.DocumentDate <= asAtDate)
-            .Select(i => new { i.Id, i.Sign, i.OriginalBase })
-            .ToListAsync(ct).ConfigureAwait(false);
-
-        var allocations = await _db.Allocations
-            .Where(a => a.CompanyId == companyId && a.Ledger == ledger && a.AllocationDate <= asAtDate
-                && !(a.IsReversed && a.ReversedOn != null && a.ReversedOn <= asAtDate))
-            .Select(a => new { a.DebitItemId, a.CreditItemId, a.DebitBase, a.CreditBase })
-            .ToListAsync(ct).ConfigureAwait(false);
-
-        Dictionary<long, decimal> drawn = [];
-        foreach (var a in allocations)
-        {
-            drawn[a.DebitItemId] = drawn.GetValueOrDefault(a.DebitItemId) + a.DebitBase;
-            drawn[a.CreditItemId] = drawn.GetValueOrDefault(a.CreditItemId) + a.CreditBase;
-        }
-
         Core.Trading.LedgerSign natural = ledger == Core.Trading.TradingLedger.AccountsReceivable ? Core.Trading.LedgerSign.Debit : Core.Trading.LedgerSign.Credit;
-        return items.Sum(i =>
-        {
-            decimal outstanding = i.OriginalBase - drawn.GetValueOrDefault(i.Id);
-            return i.Sign == natural ? outstanding : -outstanding;
-        });
+        return (await Trading.OpenItemsAsAt.LoadAsync(_db, companyId, ledger, asAtDate, ct).ConfigureAwait(false)).Sum(i => i.Signed(natural));
     }
 
     /// <inheritdoc />
