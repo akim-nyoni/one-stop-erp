@@ -40,6 +40,8 @@
                 <Button Content="Run checks" Padding="14,6" FontWeight="SemiBold" Background="#DDEFE0" Command="{Binding RunCommand}" />
                 <Button Content="Release deferred journals" Padding="14,6" Margin="8,0,0,0" Command="{Binding ReleaseDeferredCommand}"
                         ToolTip="Posts every deferred journal dated on or before the period end (enabled when the Unposted journals check is outstanding)." />
+                <Button Content="Revalue foreign balances" Padding="14,6" Margin="8,0,0,0" Command="{Binding RevalueForeignCommand}"
+                        ToolTip="Retranslates foreign-currency debtors and creditors at the closing rate as at the period end, reversed the next day (enabled when the Foreign balances check is outstanding)." />
             </StackPanel>
             <StackPanel>
                 <TextBlock Text="Period Close Checklist" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />

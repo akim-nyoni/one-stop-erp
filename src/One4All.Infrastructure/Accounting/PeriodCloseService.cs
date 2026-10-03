@@ -1,10 +1,13 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
+using One4All.Application.Abstractions.Trading;
 using One4All.Core.Accounting;
 using One4All.Core.Banking;
+using One4All.Core.Common;
 using One4All.Core.Inventory;
 using One4All.Core.Offline;
 using One4All.Core.Procurement;
+using One4All.Core.Trading;
 using One4All.Core.Workflow;
 using One4All.Infrastructure.Persistence;
 
@@ -13,15 +16,22 @@ namespace One4All.Infrastructure.Accounting;
 /// <summary>
 /// The period-close checklist: counts, as at a period end, everything a controller should clear before
 /// closing — unposted journals, unsynced offline operations, unreconciled statement lines, open
-/// stocktakes, goods received not invoiced and approvals in progress. Reads only.
+/// stocktakes, goods received not invoiced, approvals in progress and foreign-currency balances not yet revalued.
+/// Reads only.
 /// </summary>
 public sealed class PeriodCloseService : IPeriodCloseService
 {
     private readonly One4AllDbContext _db;
+    private readonly ITradingRevaluationService _revaluation;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
-    public PeriodCloseService(One4AllDbContext db) => _db = db;
+    /// <param name="revaluation">The trading revaluation service (previewed, never posted, by the checklist).</param>
+    public PeriodCloseService(One4AllDbContext db, ITradingRevaluationService revaluation)
+    {
+        _db = db;
+        _revaluation = revaluation;
+    }
 
     /// <inheritdoc />
     public async Task<PeriodCloseChecklist> ChecklistAsync(long companyId, DateOnly periodEnd, CancellationToken ct = default)
@@ -66,6 +76,39 @@ public sealed class PeriodCloseService : IPeriodCloseService
             .ConfigureAwait(false);
         checks.Add(new PeriodCloseCheck("ApprovalsInProgress", "Approvals in progress", approvals, 0m, false,
             "Workflow instances still awaiting approval."));
+
+        // Foreign-currency debtors and creditors should carry the period-end revaluation. A preview says what a run
+        // would post; anything unbooked (or no closing rate to value at) is a warning.
+        int unrevalued = 0;
+        decimal unbooked = 0m;
+        List<string> notes = [];
+        foreach (TradingLedger ledger in new[] { TradingLedger.AccountsReceivable, TradingLedger.AccountsPayable })
+        {
+            Result<TradingRevaluationResult> preview = await _revaluation.PreviewAsync(companyId, ledger, periodEnd, ct).ConfigureAwait(false);
+            string name = ledger == TradingLedger.AccountsReceivable ? "AR" : "AP";
+            if (preview.IsFailure)
+            {
+                if (preview.Error.Code != "Reval.AccountsMissing")
+                {
+                    unrevalued++;
+                    notes.Add($"{name}: {preview.Error.Message}");
+                }
+
+                continue;
+            }
+
+            if (preview.Value.Posted != 0m)
+            {
+                unrevalued += preview.Value.Items.Count;
+                unbooked += Math.Abs(preview.Value.Posted);
+                notes.Add($"{name}: {preview.Value.Posted:N2} unbooked");
+            }
+        }
+
+        checks.Add(new PeriodCloseCheck("ForeignRevaluation", "Foreign balances not revalued", unrevalued, unbooked, false,
+            notes.Count == 0
+                ? "Foreign-currency debtors and creditors carry the period-end revaluation at the closing rate."
+                : $"Run the foreign-currency revaluation at the period end ({string.Join("; ", notes)})."));
 
         return new PeriodCloseChecklist(periodEnd, checks);
     }

@@ -61,6 +61,14 @@ public sealed class TradingRevaluationTests
             // No closing rate is in force at the end of March.
             (await reval.RevalueAsync(companyId, TradingLedger.AccountsReceivable, new DateOnly(2026, 3, 31))).Error.Code.Should().Be("Reval.NoClosingRate");
 
+            // Before the run, the period-close checklist warns (one AR item, one AP item, 60 + 50 unbooked) and a
+            // preview shows what would be posted without posting it.
+            PeriodCloseCheck before = (await scope.ServiceProvider.GetRequiredService<IPeriodCloseService>().ChecklistAsync(companyId, june30)).Checks.Single(c => c.Code == "ForeignRevaluation");
+            before.Should().BeEquivalentTo(new { Count = 2, Value = 110m, IsBlocking = false });
+            TradingRevaluationResult preview = (await reval.PreviewAsync(companyId, TradingLedger.AccountsReceivable, june30)).Value;
+            preview.Posted.Should().Be(60m);
+            preview.JournalNumber.Should().BeNull();
+
             // AR: EUR 600 outstanding, booked at 660, worth 720 → unrealised gain 60.
             Result<TradingRevaluationResult> arRun = await reval.RevalueAsync(companyId, TradingLedger.AccountsReceivable, june30);
             arRun.IsSuccess.Should().BeTrue(arRun.IsFailure ? arRun.Error.ToString() : null);
@@ -82,6 +90,9 @@ public sealed class TradingRevaluationTests
             again.AlreadyBooked.Should().Be(60m);
             again.Posted.Should().Be(0m);
             again.JournalNumber.Should().BeNull();
+
+            // Once both ledgers are revalued the checklist passes.
+            (await scope.ServiceProvider.GetRequiredService<IPeriodCloseService>().ChecklistAsync(companyId, june30)).Checks.Single(c => c.Code == "ForeignRevaluation").Passes.Should().BeTrue();
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())

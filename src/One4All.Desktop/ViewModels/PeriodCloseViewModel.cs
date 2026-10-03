@@ -5,6 +5,9 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Accounting;
+using One4All.Application.Abstractions.Trading;
+using One4All.Core.Common;
+using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
 
 namespace One4All.Desktop.ViewModels;
@@ -57,14 +60,59 @@ public sealed partial class PeriodCloseViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(ReleaseDeferredCommand))]
     private bool _hasUnpostedJournals;
 
+    /// <summary>True when the last run found foreign-currency balances not yet revalued.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RevalueForeignCommand))]
+    private bool _needsRevaluation;
+
     /// <summary>True while running.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RunCommand), nameof(ReleaseDeferredCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunCommand), nameof(ReleaseDeferredCommand), nameof(RevalueForeignCommand))]
     private bool _isBusy;
 
     private bool CanRun => !IsBusy;
 
     private bool CanRelease => HasUnpostedJournals && !IsBusy;
+
+    private bool CanRevalue => NeedsRevaluation && !IsBusy;
+
+    /// <summary>
+    /// Revalues foreign-currency debtors and creditors at the closing rate as at the period end (reversed the next
+    /// day), then re-runs the checks.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanRevalue))]
+    public async Task RevalueForeignAsync()
+    {
+        IsBusy = true;
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            ITradingRevaluationService reval = scope.ServiceProvider.GetRequiredService<ITradingRevaluationService>();
+            DateOnly asAt = DateOnly.FromDateTime(PeriodEnd);
+            List<string> parts = [];
+            foreach (TradingLedger ledger in new[] { TradingLedger.AccountsReceivable, TradingLedger.AccountsPayable })
+            {
+                Result<TradingRevaluationResult> run = await reval.RevalueAsync(_companyId, ledger, asAt).ConfigureAwait(true);
+                string name = ledger == TradingLedger.AccountsReceivable ? "AR" : "AP";
+                parts.Add(run.IsFailure
+                    ? $"{name}: {run.Error.Message}"
+                    : run.Value.JournalNumber is null ? $"{name}: nothing to post" : $"{name}: {run.Value.Posted:N2} posted ({run.Value.JournalNumber})");
+            }
+
+            StatusMessage = $"Revalued — {string.Join("; ", parts)}.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Revaluation failed: {ex.Message}";
+            return;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+
+        await RunAsync().ConfigureAwait(true);
+    }
 
     /// <summary>Releases every deferred journal dated on or before the period end, then re-runs the checks.</summary>
     [RelayCommand(CanExecute = nameof(CanRelease))]
@@ -132,11 +180,12 @@ public sealed partial class PeriodCloseViewModel : ObservableObject
             }
 
             HasUnpostedJournals = list.Checks.Any(c => c.Code == "UnpostedJournals" && !c.Passes);
+            NeedsRevaluation = list.Checks.Any(c => c.Code == "ForeignRevaluation" && !c.Passes);
             IsReady = list.IsReadyToClose;
             Verdict = list.IsReadyToClose
                 ? (list.Outstanding == 0 ? $"Ready to close {asAt:yyyy-MM-dd}: every check passes." : $"Ready to close {asAt:yyyy-MM-dd}: {list.Outstanding} warning(s) to review, nothing blocking.")
                 : $"NOT ready to close {asAt:yyyy-MM-dd}: {list.Checks.Count(c => !c.Passes && c.IsBlocking)} blocking check(s) outstanding.";
-            if (!StatusMessage.StartsWith("Released", StringComparison.Ordinal))
+            if (!StatusMessage.StartsWith("Released", StringComparison.Ordinal) && !StatusMessage.StartsWith("Revalued", StringComparison.Ordinal))
             {
                 StatusMessage = $"Checked {DateTime.Now:HH:mm:ss}.";
             }

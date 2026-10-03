@@ -31,7 +31,74 @@ public sealed class TradingRevaluationService : ITradingRevaluationService
     }
 
     /// <inheritdoc />
+    public async Task<Result<TradingRevaluationResult>> PreviewAsync(long companyId, TradingLedger ledger, DateOnly asAtDate, CancellationToken ct = default)
+    {
+        Result<Computation> computed = await ComputeAsync(companyId, ledger, asAtDate, ct).ConfigureAwait(false);
+        if (computed.IsFailure)
+        {
+            return computed.Error;
+        }
+
+        return new TradingRevaluationResult(asAtDate, ledger, computed.Value.Items, computed.Value.Target, computed.Value.Booked, null, null);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<TradingRevaluationResult>> RevalueAsync(long companyId, TradingLedger ledger, DateOnly asAtDate, bool autoReverse = true, CancellationToken ct = default)
+    {
+        Result<Computation> computed = await ComputeAsync(companyId, ledger, asAtDate, ct).ConfigureAwait(false);
+        if (computed.IsFailure)
+        {
+            return computed.Error;
+        }
+
+        (Company company, string controlCode, string gainCode, string lossCode, LedgerSign natural, List<OpenItemRevaluation> items, decimal target, decimal booked) = computed.Value;
+        decimal delta = target - booked;
+        if (delta == 0m)
+        {
+            return new TradingRevaluationResult(asAtDate, ledger, items, target, booked, null, null);
+        }
+
+        // In the control's natural sign, a positive delta raises the balance: an asset (AR) going up is a gain, a
+        // liability (AP) going up is a loss.
+        bool controlUp = delta > 0m;
+        bool gain = ledger == TradingLedger.AccountsReceivable ? controlUp : !controlUp;
+        JournalSide naturalSide = natural == LedgerSign.Debit ? JournalSide.Debit : JournalSide.Credit;
+        JournalSide otherSide = naturalSide == JournalSide.Debit ? JournalSide.Credit : JournalSide.Debit;
+        JournalSide controlSide = controlUp ? naturalSide : otherSide;
+        JournalSide fxSide = controlSide == JournalSide.Debit ? JournalSide.Credit : JournalSide.Debit;
+        string fxCode = gain ? gainCode : lossCode;
+        decimal magnitude = Math.Abs(delta);
+        string module = ledger == TradingLedger.AccountsReceivable ? "AR" : "AP";
+
+        // The revaluation and its reversal stand or fall together.
+        await using IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+        Result<PostingReceipt> posted = await _posting.PostAsync(Journal(companyId, company.BaseCurrency, module, asAtDate,
+            ITradingRevaluationService.RevaluationDocumentType, $"Unrealised FX revaluation of {module} as at {asAtDate:yyyy-MM-dd}",
+            controlCode, controlSide, fxCode, fxSide, magnitude), ct).ConfigureAwait(false);
+        if (posted.IsFailure)
+        {
+            return posted.Error;
+        }
+
+        string? reversalNumber = null;
+        if (autoReverse)
+        {
+            Result<PostingReceipt> reversal = await _posting.PostAsync(Journal(companyId, company.BaseCurrency, module, asAtDate.AddDays(1),
+                ITradingRevaluationService.ReversalDocumentType, $"Reversal of {module} FX revaluation of {asAtDate:yyyy-MM-dd}",
+                controlCode, fxSide, fxCode, controlSide, magnitude), ct).ConfigureAwait(false);
+            if (reversal.IsFailure)
+            {
+                return reversal.Error;
+            }
+
+            reversalNumber = reversal.Value.JournalNumber;
+        }
+
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        return new TradingRevaluationResult(asAtDate, ledger, items, target, booked, posted.Value.JournalNumber, reversalNumber);
+    }
+
+    private async Task<Result<Computation>> ComputeAsync(long companyId, TradingLedger ledger, DateOnly asAtDate, CancellationToken ct)
     {
         Company? company = await _db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         if (company is null)
@@ -78,51 +145,11 @@ public sealed class TradingRevaluationService : ITradingRevaluationService
 
         decimal target = items.Sum(i => i.Difference);
         decimal booked = await BookedAsync(_db, companyId, ledger, controlCode, asAtDate, ct).ConfigureAwait(false);
-        decimal delta = target - booked;
-        if (delta == 0m)
-        {
-            return new TradingRevaluationResult(asAtDate, ledger, items, target, booked, null, null);
-        }
-
-        // In the control's natural sign, a positive delta raises the balance: an asset (AR) going up is a gain, a
-        // liability (AP) going up is a loss.
-        bool controlUp = delta > 0m;
-        bool gain = ledger == TradingLedger.AccountsReceivable ? controlUp : !controlUp;
-        JournalSide naturalSide = natural == LedgerSign.Debit ? JournalSide.Debit : JournalSide.Credit;
-        JournalSide otherSide = naturalSide == JournalSide.Debit ? JournalSide.Credit : JournalSide.Debit;
-        JournalSide controlSide = controlUp ? naturalSide : otherSide;
-        JournalSide fxSide = controlSide == JournalSide.Debit ? JournalSide.Credit : JournalSide.Debit;
-        string fxCode = gain ? gainCode : lossCode;
-        decimal magnitude = Math.Abs(delta);
-        string module = ledger == TradingLedger.AccountsReceivable ? "AR" : "AP";
-
-        // The revaluation and its reversal stand or fall together.
-        await using IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
-        Result<PostingReceipt> posted = await _posting.PostAsync(Journal(companyId, company.BaseCurrency, module, asAtDate,
-            ITradingRevaluationService.RevaluationDocumentType, $"Unrealised FX revaluation of {module} as at {asAtDate:yyyy-MM-dd}",
-            controlCode, controlSide, fxCode, fxSide, magnitude), ct).ConfigureAwait(false);
-        if (posted.IsFailure)
-        {
-            return posted.Error;
-        }
-
-        string? reversalNumber = null;
-        if (autoReverse)
-        {
-            Result<PostingReceipt> reversal = await _posting.PostAsync(Journal(companyId, company.BaseCurrency, module, asAtDate.AddDays(1),
-                ITradingRevaluationService.ReversalDocumentType, $"Reversal of {module} FX revaluation of {asAtDate:yyyy-MM-dd}",
-                controlCode, fxSide, fxCode, controlSide, magnitude), ct).ConfigureAwait(false);
-            if (reversal.IsFailure)
-            {
-                return reversal.Error;
-            }
-
-            reversalNumber = reversal.Value.JournalNumber;
-        }
-
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
-        return new TradingRevaluationResult(asAtDate, ledger, items, target, booked, posted.Value.JournalNumber, reversalNumber);
+        return new Computation(company, controlCode, gainCode, lossCode, natural, items, target, booked);
     }
+
+    /// <summary>The revaluation worked out but not yet posted.</summary>
+    private sealed record Computation(Company Company, string ControlCode, string GainCode, string LossCode, LedgerSign Natural, List<OpenItemRevaluation> Items, decimal Target, decimal Booked);
 
     /// <summary>
     /// The unrealised revaluation carried on a trading control account at a date, in its natural sign: the net of the

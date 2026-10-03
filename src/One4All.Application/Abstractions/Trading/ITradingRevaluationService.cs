@@ -44,6 +44,17 @@ public interface ITradingRevaluationService
     /// <summary>The document type of their reversals.</summary>
     public const string ReversalDocumentType = "TradingRevaluationReversal";
 
+    /// <summary>
+    /// Works out the revaluation without posting anything: the per-item differences, the target and what is already
+    /// booked. <see cref="TradingRevaluationResult.Posted"/> is then what a run would post.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="ledger">Receivables or payables.</param>
+    /// <param name="asAtDate">The revaluation date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The revaluation that a run would make.</returns>
+    Task<Result<TradingRevaluationResult>> PreviewAsync(long companyId, TradingLedger ledger, DateOnly asAtDate, CancellationToken ct = default);
+
     /// <summary>Revalues a ledger's foreign-currency open items as at a date.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="ledger">Receivables or payables.</param>
