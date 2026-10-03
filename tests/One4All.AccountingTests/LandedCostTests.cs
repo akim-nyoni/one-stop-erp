@@ -40,7 +40,7 @@ public sealed class LandedCostAccountingTests
         db.Accounts.Add(new LedgerAccount(companyId, "2485", "Landed Cost Clearing", AccountType.Liability));
         Supplier supplier = new(companyId, "LC-SUP", "Overseas Supplier", Scenario.Usd);
         Item bolt = new(companyId, "LC-BOLT", "Bolt") { CostOfSalesAccountCode = "5000", UnitWeightKg = 0.5m };
-        Item nut = new(companyId, "LC-NUT", "Nut") { CostOfSalesAccountCode = "5000", UnitWeightKg = 0.1m };
+        Item nut = new(companyId, "LC-NUT", "Nut", ItemType.Stock, CostingMethod.Fifo) { CostOfSalesAccountCode = "5000", UnitWeightKg = 0.1m };
         Warehouse wh = new(companyId, "LCWH", "Main");
         db.AddRange(supplier, bolt, nut, wh);
         await db.SaveChangesAsync();

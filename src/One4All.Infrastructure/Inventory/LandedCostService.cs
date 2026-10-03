@@ -97,7 +97,7 @@ public sealed class LandedCostService : ILandedCostService
             .ToListAsync(ct).ConfigureAwait(false);
 
         List<LandedCostLineResult> results = [];
-        List<(StockBalance Balance, long ItemId, long WarehouseId, decimal Amount)> capitalise = [];
+        List<(StockBalance Balance, long ItemId, long WarehouseId, decimal Amount, List<StockCostLayer> Layers)> capitalise = [];
         Dictionary<string, decimal> toCostOfSales = new(StringComparer.Ordinal);
         for (int i = 0; i < receiptLines.Count; i++)
         {
@@ -107,8 +107,13 @@ public sealed class LandedCostService : ILandedCostService
             StockBalance? balance = warehouseId is null ? null : await _db.StockBalances
                 .FirstOrDefaultAsync(b => b.CompanyId == request.CompanyId && b.ItemId == line.ItemId && b.WarehouseId == warehouseId, ct).ConfigureAwait(false);
 
-            // Only the share of what is still on hand can be capitalised; the rest belongs to cost of sales.
-            decimal onHandShare = balance is null || line.Quantity <= 0m ? 0m : Math.Min(1m, Math.Max(0m, balance.QuantityOnHand) / line.Quantity);
+            // Only the share of what is still on hand can be capitalised; the rest belongs to cost of sales. For a FIFO
+            // item that is what remains of this receipt's own layers.
+            List<StockCostLayer> layers = balance is null || !StockCosting.IsFifo(item) ? [] : await _db.Set<StockCostLayer>()
+                .Where(l => l.CompanyId == request.CompanyId && l.ItemId == line.ItemId && l.WarehouseId == warehouseId && l.Reference == grn.GrnNumber && l.RemainingQuantity > 0m)
+                .OrderBy(l => l.Id).ToListAsync(ct).ConfigureAwait(false);
+            decimal onHand = StockCosting.IsFifo(item) ? layers.Sum(l => l.RemainingQuantity) : Math.Max(0m, balance?.QuantityOnHand ?? 0m);
+            decimal onHandShare = balance is null || line.Quantity <= 0m ? 0m : Math.Min(1m, onHand / line.Quantity);
             decimal capitalised = decimal.Round(shares[i] * onHandShare, 2, MidpointRounding.AwayFromZero);
             decimal expensed = shares[i] - capitalised;
             if (expensed != 0m)
@@ -123,7 +128,7 @@ public sealed class LandedCostService : ILandedCostService
 
             if (capitalised != 0m)
             {
-                capitalise.Add((balance!, line.ItemId, warehouseId!.Value, capitalised));
+                capitalise.Add((balance!, line.ItemId, warehouseId!.Value, capitalised, layers));
             }
 
             results.Add(new LandedCostLineResult(item.Code, shares[i], capitalised, expensed));
@@ -158,9 +163,20 @@ public sealed class LandedCostService : ILandedCostService
             return posted.Error;
         }
 
-        foreach ((StockBalance balance, long itemId, long warehouseId, decimal amount) in capitalise)
+        foreach ((StockBalance balance, long itemId, long warehouseId, decimal amount, List<StockCostLayer> layers) in capitalise)
         {
             balance.AddValue(amount);
+
+            // Spread over the receipt's remaining FIFO layers by quantity; the last takes the rounding.
+            decimal left = amount;
+            decimal remaining = layers.Sum(l => l.RemainingQuantity);
+            for (int i = 0; i < layers.Count; i++)
+            {
+                decimal part = i == layers.Count - 1 ? left : decimal.Round(amount * layers[i].RemainingQuantity / remaining, 4, MidpointRounding.ToEven);
+                layers[i].AddValue(part);
+                left -= part;
+            }
+
             _db.StockMovements.Add(new StockMovement(request.CompanyId, itemId, warehouseId, request.Date, StockMovementType.LandedCost, 0m, 0m, amount, reference)
             {
                 JournalEntryId = posted.Value.JournalId,

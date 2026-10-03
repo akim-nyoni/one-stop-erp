@@ -305,12 +305,12 @@ public sealed class ProcurementService : IProcurementService
         }
 
         Company company = await _db.Companies.FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
-        decimal averageCost = balance.AverageCost;
-        decimal stockValue = balance.Issue(quantity);                                  // removes stock at moving-average cost
+        Inventory.StockIssue issue = await Inventory.StockCosting.PlanIssueAsync(_db, item, balance, quantity, ct).ConfigureAwait(false);
+        decimal stockValue = issue.Cost;                                               // the stock's cost: average or oldest FIFO layers
         decimal creditValue = decimal.Round(quantity * returnUnitPrice, 4, MidpointRounding.ToEven);
         decimal variance = creditValue - stockValue;                                   // + gain, − loss
 
-        // Dr AP control (credit note), Cr stock control at average cost, PPV takes the difference.
+        // Dr AP control (credit note), Cr stock control at its cost, PPV takes the difference.
         List<JournalLineRequest> lines =
         [
             new JournalLineRequest { AccountCode = apCode, Side = JournalSide.Debit, TransactionAmount = creditValue },
@@ -343,7 +343,8 @@ public sealed class ProcurementService : IProcurementService
             return posting.Error;
         }
 
-        _db.Set<Core.Inventory.StockMovement>().Add(new Core.Inventory.StockMovement(companyId, itemId, warehouseId, date, Core.Inventory.StockMovementType.SupplierReturn, -quantity, averageCost, -stockValue, documentNumber)
+        issue.Apply();
+        _db.Set<Core.Inventory.StockMovement>().Add(new Core.Inventory.StockMovement(companyId, itemId, warehouseId, date, Core.Inventory.StockMovementType.SupplierReturn, -quantity, issue.UnitCost, -stockValue, documentNumber)
         {
             JournalEntryId = posting.Value.JournalId,
         });

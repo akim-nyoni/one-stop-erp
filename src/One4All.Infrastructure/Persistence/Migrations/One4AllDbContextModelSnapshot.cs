@@ -2896,6 +2896,64 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("stock_balance", "inv");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.StockCostLayer", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<DateOnly>("LayerDate")
+                        .HasColumnType("date")
+                        .HasColumnName("layer_date");
+
+                    b.Property<decimal>("ReceivedQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("received_quantity");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<decimal>("RemainingQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("remaining_quantity");
+
+                    b.Property<decimal>("RemainingValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("remaining_value");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("WarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stock_cost_layer");
+
+                    b.HasIndex("CompanyId", "ItemId", "WarehouseId", "LayerDate")
+                        .HasDatabaseName("ix_stock_cost_layer_company_id_item_id_warehouse_id_layer_date");
+
+                    b.ToTable("stock_cost_layer", "inv");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.StockMovement", b =>
                 {
                     b.Property<long>("Id")

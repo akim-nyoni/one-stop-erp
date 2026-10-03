@@ -9,7 +9,10 @@ using One4All.Infrastructure.Persistence;
 
 namespace One4All.Infrastructure.Inventory;
 
-/// <summary>Inventory service with moving weighted-average costing, posting through the central engine (brief §4.2/§3.6).</summary>
+/// <summary>
+/// Inventory service costing each item by its method, moving weighted average or FIFO (see <see cref="StockCosting"/>),
+/// posting through the central engine (brief §4.2/§3.6).
+/// </summary>
 public sealed class InventoryService : IInventoryService
 {
     private readonly One4AllDbContext _db;
@@ -63,7 +66,7 @@ public sealed class InventoryService : IInventoryService
         }
 
         StockBalance balance = await LoadOrCreateBalanceAsync(request.CompanyId, request.ItemId, request.WarehouseId, ct).ConfigureAwait(false);
-        balance.Receive(request.Quantity, request.UnitCost);
+        StockCosting.Receive(_db, item, balance, request.Date, request.Reference, request.Quantity, value);
 
         StockMovement movement = new(request.CompanyId, request.ItemId, request.WarehouseId, request.Date, StockMovementType.Receipt, request.Quantity, request.UnitCost, value, request.Reference)
         {
@@ -102,8 +105,8 @@ public sealed class InventoryService : IInventoryService
 
         // Work out the cost without touching the balance: it changes only once the journal has posted, so a refused
         // posting (a closed period, say) leaves nothing behind for a later save to persist.
-        decimal averageCost = balance.AverageCost;
-        decimal cost = balance.CostOfIssue(request.Quantity);
+        StockIssue issue = await StockCosting.PlanIssueAsync(_db, item, balance, request.Quantity, ct).ConfigureAwait(false);
+        decimal cost = issue.Cost;
 
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
@@ -127,8 +130,8 @@ public sealed class InventoryService : IInventoryService
             return posting.Error;
         }
 
-        balance.Issue(request.Quantity);
-        StockMovement movement = new(request.CompanyId, request.ItemId, request.WarehouseId, request.Date, StockMovementType.Issue, -request.Quantity, averageCost, -cost, request.Reference)
+        issue.Apply();
+        StockMovement movement = new(request.CompanyId, request.ItemId, request.WarehouseId, request.Date, StockMovementType.Issue, -request.Quantity, issue.UnitCost, -cost, request.Reference)
         {
             JournalEntryId = posting.Value.JournalId,
         };
@@ -175,7 +178,7 @@ public sealed class InventoryService : IInventoryService
 
         decimal returnQty = -original.Quantity;   // the issue stored a negative quantity
         decimal returnValue = -original.Value;     // and a negative value
-        decimal unitCost = original.UnitCost;      // the average cost applied at issue time
+        decimal unitCost = original.UnitCost;      // the unit cost applied at issue time
 
         // Inverse of the issue: Dr stock control, Cr cost of sales.
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
@@ -201,7 +204,7 @@ public sealed class InventoryService : IInventoryService
         }
 
         StockBalance balance = await LoadOrCreateBalanceAsync(companyId, original.ItemId, original.WarehouseId, ct).ConfigureAwait(false);
-        balance.Receive(returnQty, unitCost);
+        StockCosting.Receive(_db, item, balance, date, reference ?? $"REV:{movementId}", returnQty, returnValue);
 
         StockMovement reversal = new(companyId, original.ItemId, original.WarehouseId, date, StockMovementType.Reversal, returnQty, unitCost, returnValue, reference ?? $"REV:{movementId}")
         {
@@ -239,11 +242,25 @@ public sealed class InventoryService : IInventoryService
             return Error.Rule("Inv.InsufficientStock", $"Warehouse holds {source.QuantityOnHand}, less than the {quantity} to transfer.");
         }
 
-        decimal unitCost = source.AverageCost;
-        decimal cost = source.Issue(quantity);
+        Item item = setup.Value.Item1;
+        StockIssue issue = await StockCosting.PlanIssueAsync(_db, item, source, quantity, ct).ConfigureAwait(false);
+        decimal unitCost = issue.UnitCost;
+        decimal cost = issue.Cost;
+        issue.Apply();
 
+        // FIFO layers move with their original dates and costs, so the destination issues them in the same order.
         StockBalance destination = await LoadOrCreateBalanceAsync(companyId, itemId, toWarehouseId, ct).ConfigureAwait(false);
-        destination.Receive(quantity, unitCost);
+        if (issue.Fifo is null)
+        {
+            StockCosting.Receive(_db, item, destination, date, reference, quantity, cost);
+        }
+        else
+        {
+            foreach (FifoTake take in issue.Fifo.Takes)
+            {
+                StockCosting.Receive(_db, item, destination, take.Layer.LayerDate, take.Layer.Reference, take.Quantity, take.Cost);
+            }
+        }
 
         // GL-neutral: both warehouses share one stock-control account, so no journal is posted.
         _db.Set<StockMovement>().Add(new StockMovement(companyId, itemId, fromWarehouseId, date, StockMovementType.Transfer, -quantity, unitCost, -cost, reference));
@@ -285,6 +302,7 @@ public sealed class InventoryService : IInventoryService
         }
 
         decimal unitCost = balance.AverageCost;
+        StockIssue? shortage = variance < 0m ? await StockCosting.PlanIssueAsync(_db, item, balance, -variance, ct).ConfigureAwait(false) : null;
         decimal value;
         JournalLineRequest debit;
         JournalLineRequest credit;
@@ -297,8 +315,8 @@ public sealed class InventoryService : IInventoryService
         }
         else
         {
-            // Shortage: reduce stock at the average cost, loss to the adjustment account.
-            value = balance.CostOfIssue(-variance);
+            // Shortage: reduce stock at its cost (average, or the oldest FIFO layers), loss to the adjustment account.
+            value = shortage!.Cost;
             debit = new JournalLineRequest { AccountCode = adjustmentAccountCode, Side = JournalSide.Debit, TransactionAmount = value };
             credit = new JournalLineRequest { AccountCode = stockCode, Side = JournalSide.Credit, TransactionAmount = value };
         }
@@ -306,7 +324,7 @@ public sealed class InventoryService : IInventoryService
         if (value == 0m)
         {
             // No cost basis (average cost is zero): move the quantity only, no journal.
-            ApplyVariance(balance, variance, unitCost);
+            ApplyVariance(item, balance, shortage, date, reference, variance, 0m);
             _db.Set<StockMovement>().Add(new StockMovement(companyId, itemId, warehouseId, date, StockMovementType.Adjustment, variance, unitCost, 0m, reference));
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             return 0m;
@@ -331,8 +349,8 @@ public sealed class InventoryService : IInventoryService
             return posting.Error;
         }
 
-        ApplyVariance(balance, variance, unitCost);
-        _db.Set<StockMovement>().Add(new StockMovement(companyId, itemId, warehouseId, date, StockMovementType.Adjustment, variance, unitCost, variance > 0m ? value : -value, reference)
+        ApplyVariance(item, balance, shortage, date, reference, variance, value);
+        _db.Set<StockMovement>().Add(new StockMovement(companyId, itemId, warehouseId, date, StockMovementType.Adjustment, variance, shortage?.UnitCost ?? unitCost, variance > 0m ? value : -value, reference)
         {
             JournalEntryId = posting.Value.JournalId,
         });
@@ -390,15 +408,15 @@ public sealed class InventoryService : IInventoryService
         return balance;
     }
 
-    private static void ApplyVariance(StockBalance balance, decimal variance, decimal unitCost)
+    private void ApplyVariance(Item item, StockBalance balance, StockIssue? shortage, DateOnly date, string? reference, decimal variance, decimal value)
     {
-        if (variance > 0m)
+        if (shortage is null)
         {
-            balance.Receive(variance, unitCost);
+            StockCosting.Receive(_db, item, balance, date, reference, variance, value);
         }
         else
         {
-            balance.Issue(-variance);
+            shortage.Apply();
         }
     }
 }

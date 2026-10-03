@@ -75,6 +75,27 @@ public sealed class StockBalance : Entity, ICompanyScoped
         AverageCost = QuantityOnHand == 0m ? 0m : decimal.Round(TotalValue / QuantityOnHand, CostScale, MidpointRounding.ToEven);
     }
 
+    /// <summary>Receives stock at an exact value (a FIFO layer's, say), recomputing the average.</summary>
+    /// <param name="quantity">The quantity received.</param>
+    /// <param name="value">The value received.</param>
+    public void ReceiveAtValue(decimal quantity, decimal value)
+    {
+        decimal newValue = TotalValue + value;
+        QuantityOnHand += quantity;
+        TotalValue = decimal.Round(newValue, ValueScale, MidpointRounding.ToEven);
+        AverageCost = QuantityOnHand == 0m ? 0m : decimal.Round(newValue / QuantityOnHand, CostScale, MidpointRounding.ToEven);
+    }
+
+    /// <summary>Issues stock at a cost worked out elsewhere (from FIFO layers), recomputing the average of what is left.</summary>
+    /// <param name="quantity">The quantity issued.</param>
+    /// <param name="cost">The cost of the issue.</param>
+    public void IssueAtCost(decimal quantity, decimal cost)
+    {
+        QuantityOnHand -= quantity;
+        TotalValue = decimal.Round(TotalValue - cost, ValueScale, MidpointRounding.ToEven);
+        AverageCost = QuantityOnHand == 0m ? 0m : decimal.Round(TotalValue / QuantityOnHand, CostScale, MidpointRounding.ToEven);
+    }
+
     /// <summary>The cost an issue of <paramref name="quantity"/> would carry at the current average, without issuing it.</summary>
     /// <param name="quantity">The quantity to issue (positive).</param>
     /// <returns>The cost <see cref="Issue"/> would return.</returns>

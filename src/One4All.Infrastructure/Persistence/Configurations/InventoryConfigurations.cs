@@ -4,6 +4,20 @@ using One4All.Core.Inventory;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
+internal sealed class StockCostLayerConfiguration : IEntityTypeConfiguration<StockCostLayer>
+{
+    public void Configure(EntityTypeBuilder<StockCostLayer> b)
+    {
+        b.ToTable("stock_cost_layer", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.Property(x => x.ReceivedQuantity).HasPrecision(19, 4);
+        b.Property(x => x.RemainingQuantity).HasPrecision(19, 4);
+        b.Property(x => x.RemainingValue).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.ItemId, x.WarehouseId, x.LayerDate });
+    }
+}
+
 internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
 {
     public void Configure(EntityTypeBuilder<Item> b)

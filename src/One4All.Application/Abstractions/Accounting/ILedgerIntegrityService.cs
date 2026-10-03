@@ -22,6 +22,9 @@ public enum IntegrityCheck
 
     /// <summary>An open item whose outstanding amount differs from its original amount less its allocations.</summary>
     OpenItemOutstanding = 6,
+
+    /// <summary>A FIFO item whose cost layers do not add up to its stock balance.</summary>
+    CostLayers = 7,
 }
 
 /// <summary>How serious an integrity finding is.</summary>

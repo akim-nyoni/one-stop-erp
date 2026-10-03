@@ -4,6 +4,7 @@ using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Accounting;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
+using One4All.Core.Inventory;
 using One4All.Infrastructure.Persistence;
 
 namespace One4All.Infrastructure.Accounting;
@@ -174,7 +175,7 @@ public sealed class LedgerIntegrityService : ILedgerIntegrityService
             join i in _db.Items.IgnoreQueryFilters() on b.ItemId equals i.Id
             join w in _db.Warehouses.IgnoreQueryFilters() on b.WarehouseId equals w.Id
             where b.CompanyId == companyId
-            select new { b.ItemId, b.WarehouseId, ItemCode = i.Code, WarehouseCode = w.Code, b.QuantityOnHand, b.TotalValue })
+            select new { b.ItemId, b.WarehouseId, ItemCode = i.Code, WarehouseCode = w.Code, b.QuantityOnHand, b.TotalValue, i.CostingMethod })
             .ToListAsync(ct).ConfigureAwait(false);
 
         var movements = await _db.StockMovements
@@ -203,6 +204,25 @@ public sealed class LedgerIntegrityService : ILedgerIntegrityService
             {
                 issues.Add(new IntegrityIssue(IntegrityCheck.StockValue, IntegritySeverity.Warning, subject,
                     $"Stock value {Money(b.TotalValue)} differs from the movements' {Money(value)} by more than rounding ({Money(tolerance)}).", value, b.TotalValue));
+            }
+        }
+
+        // A FIFO item's open layers must hold exactly what is on hand (nothing when stock has gone below zero).
+        var layers = await _db.Set<StockCostLayer>()
+            .Where(l => l.CompanyId == companyId && l.RemainingQuantity > 0m)
+            .GroupBy(l => new { l.ItemId, l.WarehouseId })
+            .Select(g => new { g.Key.ItemId, g.Key.WarehouseId, Quantity = g.Sum(l => l.RemainingQuantity), Value = g.Sum(l => l.RemainingValue) })
+            .ToListAsync(ct).ConfigureAwait(false);
+        var layersByKey = layers.ToDictionary(l => (l.ItemId, l.WarehouseId));
+        foreach (var b in balances.Where(b => b.CostingMethod == CostingMethod.Fifo))
+        {
+            var l = layersByKey.GetValueOrDefault((b.ItemId, b.WarehouseId));
+            decimal expectedQuantity = Math.Max(0m, b.QuantityOnHand);
+            decimal expectedValue = b.QuantityOnHand > 0m ? b.TotalValue : 0m;
+            if ((l?.Quantity ?? 0m) != expectedQuantity || Math.Abs((l?.Value ?? 0m) - expectedValue) > RoundingPerMovement)
+            {
+                issues.Add(new IntegrityIssue(IntegrityCheck.CostLayers, IntegritySeverity.Error, $"{b.ItemCode} @ {b.WarehouseCode}",
+                    $"FIFO layers hold {Qty(l?.Quantity ?? 0m)} worth {Money(l?.Value ?? 0m)}, not the {Qty(expectedQuantity)} worth {Money(expectedValue)} on hand.", expectedValue, l?.Value ?? 0m));
             }
         }
 
