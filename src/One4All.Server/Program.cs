@@ -411,6 +411,17 @@ app.MapPost("/api/banking/{bankAccountId:long}/statement-csv", async (HttpReques
 .Accepts<string>("text/csv", "text/plain")
 .WithName("ImportStatementCsv");
 
+app.MapPost("/api/banking/{bankAccountId:long}/statement/file", async (long companyId, long bankAccountId, One4All.Application.Banking.StatementFileFormat format, HttpRequest http,
+    One4All.Application.Abstractions.Banking.IBankReconciliationService banking, CancellationToken ct) =>
+{
+    using StreamReader reader = new(http.Body, Encoding.UTF8);
+    string content = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+    return ValueResponse(await banking.ImportStatementFileAsync(companyId, bankAccountId, content, format, null, ct).ConfigureAwait(false));
+})
+.RequireAuthorization()
+.Accepts<string>("text/plain", "application/xml")
+.WithName("ImportStatementFile");
+
 app.MapGet("/api/gl/accounts/{accountCode}/activity", async (long companyId, string accountCode, DateOnly from, DateOnly to, One4All.Application.Abstractions.Reporting.IGeneralLedgerReports gl, CancellationToken ct) =>
     Results.Ok(await gl.NominalActivityAsync(companyId, accountCode, from, to, ct).ConfigureAwait(false)))
 .RequireAuthorization()

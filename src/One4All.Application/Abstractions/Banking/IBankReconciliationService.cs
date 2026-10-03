@@ -112,6 +112,19 @@ public interface IBankReconciliationService
     /// <returns>The number of lines imported.</returns>
     Task<Result<int>> ImportStatementCsvAsync(long companyId, long bankAccountId, string csv, One4All.Application.Banking.BankCsvLayout layout, CancellationToken ct = default);
 
+    /// <summary>
+    /// Imports a statement file in any supported format (brief §4.7: CSV, MT940, camt.053). As for CSV, the whole file is
+    /// refused when any entry cannot be read.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="bankAccountId">The bank account.</param>
+    /// <param name="content">The file content.</param>
+    /// <param name="format">The file format.</param>
+    /// <param name="csvLayout">The column layout, for CSV files (the simple layout when omitted).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of lines imported.</returns>
+    Task<Result<int>> ImportStatementFileAsync(long companyId, long bankAccountId, string content, One4All.Application.Banking.StatementFileFormat format, One4All.Application.Banking.BankCsvLayout? csvLayout = null, CancellationToken ct = default);
+
     /// <summary>Auto-matches unreconciled statement lines to unmatched GL cash-book postings by equal amount.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="bankAccountId">The bank account.</param>

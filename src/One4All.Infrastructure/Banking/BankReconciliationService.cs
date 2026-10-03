@@ -57,14 +57,23 @@ public sealed class BankReconciliationService : IBankReconciliationService
     }
 
     /// <inheritdoc />
-    public async Task<Result<int>> ImportStatementCsvAsync(long companyId, long bankAccountId, string csv, One4All.Application.Banking.BankCsvLayout layout, CancellationToken ct = default)
+    public Task<Result<int>> ImportStatementCsvAsync(long companyId, long bankAccountId, string csv, One4All.Application.Banking.BankCsvLayout layout, CancellationToken ct = default)
+        => ImportStatementFileAsync(companyId, bankAccountId, csv, One4All.Application.Banking.StatementFileFormat.Csv, layout, ct);
+
+    /// <inheritdoc />
+    public async Task<Result<int>> ImportStatementFileAsync(long companyId, long bankAccountId, string content, One4All.Application.Banking.StatementFileFormat format, One4All.Application.Banking.BankCsvLayout? csvLayout = null, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(csv))
+        if (string.IsNullOrWhiteSpace(content))
         {
             return Error.Validation("Cb.EmptyStatement", "The statement file is empty.");
         }
 
-        One4All.Application.Banking.BankCsvParseResult parsed = One4All.Application.Banking.BankStatementCsvParser.Parse(csv, layout);
+        One4All.Application.Banking.BankCsvParseResult parsed = format switch
+        {
+            One4All.Application.Banking.StatementFileFormat.Mt940 => One4All.Application.Banking.Mt940Parser.Parse(content),
+            One4All.Application.Banking.StatementFileFormat.Camt053 => One4All.Application.Banking.Camt053Parser.Parse(content),
+            _ => One4All.Application.Banking.BankStatementCsvParser.Parse(content, csvLayout ?? One4All.Application.Banking.BankCsvLayout.Simple),
+        };
         if (!parsed.IsClean)
         {
             string detail = string.Join("; ", parsed.Errors.Take(5).Select(e => $"line {e.LineNumber}: {e.Reason}"));
