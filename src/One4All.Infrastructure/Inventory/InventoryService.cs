@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Inventory;
 using One4All.Core.Accounting;
@@ -36,6 +37,7 @@ public sealed class InventoryService : IInventoryService
         (Item item, string stockCode, CurrencyCode currency) = setup.Value;
         decimal value = decimal.Round(request.Quantity * request.UnitCost, 4, MidpointRounding.ToEven);
 
+        await using IDbContextTransaction? transaction = await BeginIfNoneAsync(ct).ConfigureAwait(false);
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
             CompanyId = request.CompanyId,
@@ -67,6 +69,7 @@ public sealed class InventoryService : IInventoryService
         };
         _db.Set<StockMovement>().Add(movement);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await CommitAsync(transaction, ct).ConfigureAwait(false);
 
         return new StockMovementResult(movement.Id, posting.Value.JournalNumber, value, balance.AverageCost);
     }
@@ -92,9 +95,12 @@ public sealed class InventoryService : IInventoryService
             return Error.Rule("Inv.InsufficientStock", $"Item '{item.Code}' has {balance.QuantityOnHand} on hand, less than the {request.Quantity} to issue.");
         }
 
+        // Work out the cost without touching the balance: it changes only once the journal has posted, so a refused
+        // posting (a closed period, say) leaves nothing behind for a later save to persist.
         decimal averageCost = balance.AverageCost;
-        decimal cost = balance.Issue(request.Quantity);
+        decimal cost = balance.CostOfIssue(request.Quantity);
 
+        await using IDbContextTransaction? transaction = await BeginIfNoneAsync(ct).ConfigureAwait(false);
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
             CompanyId = request.CompanyId,
@@ -117,12 +123,14 @@ public sealed class InventoryService : IInventoryService
             return posting.Error;
         }
 
+        balance.Issue(request.Quantity);
         StockMovement movement = new(request.CompanyId, request.ItemId, request.WarehouseId, request.Date, StockMovementType.Issue, -request.Quantity, averageCost, -cost, request.Reference)
         {
             JournalEntryId = posting.Value.JournalId,
         };
         _db.Set<StockMovement>().Add(movement);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await CommitAsync(transaction, ct).ConfigureAwait(false);
 
         return new StockMovementResult(movement.Id, posting.Value.JournalNumber, cost, balance.AverageCost);
     }
@@ -163,6 +171,7 @@ public sealed class InventoryService : IInventoryService
         decimal unitCost = original.UnitCost;      // the average cost applied at issue time
 
         // Inverse of the issue: Dr stock control, Cr cost of sales.
+        await using IDbContextTransaction? transaction = await BeginIfNoneAsync(ct).ConfigureAwait(false);
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
             CompanyId = companyId,
@@ -195,6 +204,7 @@ public sealed class InventoryService : IInventoryService
         _db.Set<StockMovement>().Add(reversal);
         original.MarkReversed();
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await CommitAsync(transaction, ct).ConfigureAwait(false);
 
         return new StockMovementResult(reversal.Id, posting.Value.JournalNumber, returnValue, balance.AverageCost);
     }
@@ -272,7 +282,6 @@ public sealed class InventoryService : IInventoryService
         if (variance > 0m)
         {
             // Surplus: increase stock at the current average cost, gain to the adjustment account.
-            balance.Receive(variance, unitCost);
             value = decimal.Round(variance * unitCost, 4, MidpointRounding.ToEven);
             debit = new JournalLineRequest { AccountCode = stockCode, Side = JournalSide.Debit, TransactionAmount = value };
             credit = new JournalLineRequest { AccountCode = adjustmentAccountCode, Side = JournalSide.Credit, TransactionAmount = value };
@@ -280,7 +289,7 @@ public sealed class InventoryService : IInventoryService
         else
         {
             // Shortage: reduce stock at the average cost, loss to the adjustment account.
-            value = balance.Issue(-variance);
+            value = balance.CostOfIssue(-variance);
             debit = new JournalLineRequest { AccountCode = adjustmentAccountCode, Side = JournalSide.Debit, TransactionAmount = value };
             credit = new JournalLineRequest { AccountCode = stockCode, Side = JournalSide.Credit, TransactionAmount = value };
         }
@@ -288,11 +297,14 @@ public sealed class InventoryService : IInventoryService
         if (value == 0m)
         {
             // No cost basis (average cost is zero): move the quantity only, no journal.
+            ApplyVariance(balance, variance, unitCost);
             _db.Set<StockMovement>().Add(new StockMovement(companyId, itemId, warehouseId, date, StockMovementType.Adjustment, variance, unitCost, 0m, reference));
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             return 0m;
         }
 
+        // The balance changes only once the journal has posted (see IssueAsync).
+        await using IDbContextTransaction? transaction = await BeginIfNoneAsync(ct).ConfigureAwait(false);
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
             CompanyId = companyId,
@@ -311,11 +323,13 @@ public sealed class InventoryService : IInventoryService
             return posting.Error;
         }
 
+        ApplyVariance(balance, variance, unitCost);
         _db.Set<StockMovement>().Add(new StockMovement(companyId, itemId, warehouseId, date, StockMovementType.Adjustment, variance, unitCost, variance > 0m ? value : -value, reference)
         {
             JournalEntryId = posting.Value.JournalId,
         });
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await CommitAsync(transaction, ct).ConfigureAwait(false);
 
         return variance > 0m ? value : -value;
     }
@@ -367,5 +381,29 @@ public sealed class InventoryService : IInventoryService
         }
 
         return balance;
+    }
+
+    private static void ApplyVariance(StockBalance balance, decimal variance, decimal unitCost)
+    {
+        if (variance > 0m)
+        {
+            balance.Receive(variance, unitCost);
+        }
+        else
+        {
+            balance.Issue(-variance);
+        }
+    }
+
+    // Starts a transaction unless the caller already has one open (a stocktake, a despatch), which the work then joins.
+    private async Task<IDbContextTransaction?> BeginIfNoneAsync(CancellationToken ct)
+        => _db.Database.CurrentTransaction is null ? await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false) : null;
+
+    private static async Task CommitAsync(IDbContextTransaction? transaction, CancellationToken ct)
+    {
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(ct).ConfigureAwait(false);
+        }
     }
 }

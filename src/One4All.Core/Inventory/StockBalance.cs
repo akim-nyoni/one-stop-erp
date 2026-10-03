@@ -65,6 +65,11 @@ public sealed class StockBalance : Entity, ICompanyScoped
         return valueIn;
     }
 
+    /// <summary>The cost an issue of <paramref name="quantity"/> would carry at the current average, without issuing it.</summary>
+    /// <param name="quantity">The quantity to issue (positive).</param>
+    /// <returns>The cost <see cref="Issue"/> would return.</returns>
+    public decimal CostOfIssue(decimal quantity) => decimal.Round(quantity * AverageCost, ValueScale, MidpointRounding.ToEven);
+
     /// <summary>
     /// Issues stock at the current average cost, returning the cost of the issue.
     /// </summary>
@@ -72,7 +77,7 @@ public sealed class StockBalance : Entity, ICompanyScoped
     /// <returns>The cost of the issue (value removed).</returns>
     public decimal Issue(decimal quantity)
     {
-        decimal cost = decimal.Round(quantity * AverageCost, ValueScale, MidpointRounding.ToEven);
+        decimal cost = CostOfIssue(quantity);
         QuantityOnHand -= quantity;
         TotalValue = decimal.Round(QuantityOnHand * AverageCost, ValueScale, MidpointRounding.ToEven);
         return cost;
