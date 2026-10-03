@@ -39,8 +39,8 @@ public sealed class LandedCostAccountingTests
         long companyId = await Scenario.SeedAsync(db);
         db.Accounts.Add(new LedgerAccount(companyId, "2485", "Landed Cost Clearing", AccountType.Liability));
         Supplier supplier = new(companyId, "LC-SUP", "Overseas Supplier", Scenario.Usd);
-        Item bolt = new(companyId, "LC-BOLT", "Bolt") { CostOfSalesAccountCode = "5000" };
-        Item nut = new(companyId, "LC-NUT", "Nut") { CostOfSalesAccountCode = "5000" };
+        Item bolt = new(companyId, "LC-BOLT", "Bolt") { CostOfSalesAccountCode = "5000", UnitWeightKg = 0.5m };
+        Item nut = new(companyId, "LC-NUT", "Nut") { CostOfSalesAccountCode = "5000", UnitWeightKg = 0.1m };
         Warehouse wh = new(companyId, "LCWH", "Main");
         db.AddRange(supplier, bolt, nut, wh);
         await db.SaveChangesAsync();
@@ -80,11 +80,21 @@ public sealed class LandedCostAccountingTests
         StockBalance nuts = await db.StockBalances.AsNoTracking().SingleAsync(b => b.ItemId == nut.Id);
         nuts.Should().BeEquivalentTo(new { QuantityOnHand = 30m, TotalValue = 72m, AverageCost = 2.4m });
 
+        // Duty of 16 by weight: the bolts' 5 kg take 10 (half on hand, half issued), the nuts' 3 kg take 6. No volumes are recorded.
+        (await landed.ApplyAsync(freight with { Reference = "VOL-1", Basis = LandedCostBasis.Volume })).Error.Code.Should().Be("Landed.NoMeasurement");
+        (await landed.ApplyAsync(freight with { Reference = "DUTY-1", Amount = 16m, Basis = LandedCostBasis.Weight })).Value.Lines.Should().BeEquivalentTo(
+        [
+            new { ItemCode = "LC-BOLT", Apportioned = 10m, Capitalised = 5m, ToCostOfSales = 5m },
+            new { ItemCode = "LC-NUT", Apportioned = 6m, Capitalised = 6m, ToCostOfSales = 0m },
+        ]);
+        (await db.StockBalances.AsNoTracking().SingleAsync(b => b.ItemId == bolt.Id)).TotalValue.Should().Be(65m);
+        (await db.StockBalances.AsNoTracking().SingleAsync(b => b.ItemId == nut.Id)).TotalValue.Should().Be(78m);
+
         ConsolidatedTrialBalance tb = (await scope.ServiceProvider.GetRequiredService<IConsolidationService>().ConsolidatedTrialBalanceAsync([companyId], new DateOnly(2026, 3, 31))).Value;
         tb.IsBalanced.Should().BeTrue();
-        tb.Rows.Single(r => r.AccountCode == "1400").Debit.Should().Be(132m); // 160 received − 50 issued + 22 capitalised
-        tb.Rows.Single(r => r.AccountCode == "5000").Debit.Should().Be(60m);  // 50 issued + 10 freight on issued bolts
-        tb.Rows.Single(r => r.AccountCode == "2485").Credit.Should().Be(32m);
+        tb.Rows.Single(r => r.AccountCode == "1400").Debit.Should().Be(143m); // 160 received − 50 issued + 22 + 11 capitalised
+        tb.Rows.Single(r => r.AccountCode == "5000").Debit.Should().Be(65m);  // 50 issued + 10 freight and 5 duty on issued bolts
+        tb.Rows.Single(r => r.AccountCode == "2485").Credit.Should().Be(48m);
         (await scope.ServiceProvider.GetRequiredService<ILedgerIntegrityService>().CheckAsync(companyId)).Value.Issues.Should().BeEmpty();
     }
 }

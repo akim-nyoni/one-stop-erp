@@ -66,10 +66,24 @@ public sealed class LandedCostService : ILandedCostService
         }
 
         List<GrnLine> receiptLines = [.. grn.Lines.OrderBy(l => l.Id)];
+        List<long> itemIds = [.. receiptLines.Select(l => l.ItemId).Distinct()];
+        Dictionary<long, Item> items = await _db.Items.Where(i => itemIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id, ct).ConfigureAwait(false);
+
+        // Weight and volume bases need every item's measurements: a missing one would silently take no share.
+        Item? unmeasured = receiptLines.Select(l => items[l.ItemId]).FirstOrDefault(i =>
+            (request.Basis == LandedCostBasis.Weight && i.UnitWeightKg is null) || (request.Basis == LandedCostBasis.Volume && i.UnitVolumeM3 is null));
+        if (unmeasured is not null)
+        {
+            string measure = request.Basis == LandedCostBasis.Weight ? "weight" : "volume";
+            return Error.Rule("Landed.NoMeasurement", $"Item '{unmeasured.Code}' has no unit {measure} to share the charges by.");
+        }
+
         decimal[] shares;
         try
         {
-            shares = LandedCost.Apportion([.. receiptLines.Select(l => new LandedCostLine(l.Quantity, l.Quantity * l.UnitPrice))], request.Amount, request.Basis);
+            shares = LandedCost.Apportion(
+                [.. receiptLines.Select(l => new LandedCostLine(l.Quantity, l.Quantity * l.UnitPrice, l.Quantity * (items[l.ItemId].UnitWeightKg ?? 0m), l.Quantity * (items[l.ItemId].UnitVolumeM3 ?? 0m)))],
+                request.Amount, request.Basis);
         }
         catch (ArgumentException ex)
         {
@@ -81,9 +95,6 @@ public sealed class LandedCostService : ILandedCostService
             .Where(m => m.CompanyId == request.CompanyId && m.Reference == grn.GrnNumber && m.Type == StockMovementType.Receipt)
             .Select(m => new { m.ItemId, m.WarehouseId })
             .ToListAsync(ct).ConfigureAwait(false);
-
-        List<long> itemIds = [.. receiptLines.Select(l => l.ItemId).Distinct()];
-        Dictionary<long, Item> items = await _db.Items.Where(i => itemIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id, ct).ConfigureAwait(false);
 
         List<LandedCostLineResult> results = [];
         List<(StockBalance Balance, long ItemId, long WarehouseId, decimal Amount)> capitalise = [];

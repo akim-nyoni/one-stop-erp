@@ -8,12 +8,20 @@ public enum LandedCostBasis
 
     /// <summary>In proportion to each line's quantity.</summary>
     Quantity = 2,
+
+    /// <summary>In proportion to each line's weight (quantity times the item's unit weight), as freight is often charged.</summary>
+    Weight = 3,
+
+    /// <summary>In proportion to each line's volume (quantity times the item's unit volume), as sea freight is often charged.</summary>
+    Volume = 4,
 }
 
 /// <summary>A goods-receipt line to share landed charges over.</summary>
 /// <param name="Quantity">The quantity received.</param>
 /// <param name="Value">Its purchase value.</param>
-public readonly record struct LandedCostLine(decimal Quantity, decimal Value);
+/// <param name="Weight">Its total weight.</param>
+/// <param name="Volume">Its total volume.</param>
+public readonly record struct LandedCostLine(decimal Quantity, decimal Value, decimal Weight = 0m, decimal Volume = 0m);
 
 /// <summary>
 /// Apportions landed charges (freight, duty, clearing, insurance) across a goods receipt (brief §3.6). The shares are
@@ -30,7 +38,13 @@ public static class LandedCost
     public static decimal[] Apportion(IReadOnlyList<LandedCostLine> lines, decimal charge, LandedCostBasis basis)
     {
         ArgumentNullException.ThrowIfNull(lines);
-        decimal[] weights = [.. lines.Select(l => basis == LandedCostBasis.Quantity ? l.Quantity : l.Value)];
+        decimal[] weights = [.. lines.Select(l => basis switch
+        {
+            LandedCostBasis.Quantity => l.Quantity,
+            LandedCostBasis.Weight => l.Weight,
+            LandedCostBasis.Volume => l.Volume,
+            _ => l.Value,
+        })];
         decimal total = weights.Sum();
         if (lines.Count == 0 || total <= 0m)
         {

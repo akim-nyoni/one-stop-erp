@@ -4,7 +4,7 @@ using One4All.Core.Common;
 namespace One4All.Application.Abstractions.Inventory;
 
 /// <summary>A request to add landed charges to a goods receipt.</summary>
-public sealed class LandedCostRequest
+public sealed record LandedCostRequest
 {
     /// <summary>The company.</summary>
     public long CompanyId { get; init; }

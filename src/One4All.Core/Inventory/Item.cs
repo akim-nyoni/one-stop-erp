@@ -76,6 +76,12 @@ public sealed class Item : SoftDeletableEntity, ICompanyScoped
     /// <summary>Reorder quantity.</summary>
     public decimal ReorderQuantity { get; set; }
 
+    /// <summary>The weight of one unit in kilograms, used to share landed costs by weight.</summary>
+    public decimal? UnitWeightKg { get; set; }
+
+    /// <summary>The volume of one unit in cubic metres, used to share landed costs by volume.</summary>
+    public decimal? UnitVolumeM3 { get; set; }
+
     /// <summary>Whether the item is active.</summary>
     public bool IsActive { get; set; }
 

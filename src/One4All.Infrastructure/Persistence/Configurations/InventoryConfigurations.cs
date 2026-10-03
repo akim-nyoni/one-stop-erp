@@ -15,6 +15,8 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
         b.Property(x => x.ShortDescription).HasMaxLength(80);
         b.Property(x => x.ItemType).HasConversion<int>();
         b.Property(x => x.CostingMethod).HasConversion<int>();
+        b.Property(x => x.UnitWeightKg).HasPrecision(19, 6);
+        b.Property(x => x.UnitVolumeM3).HasPrecision(19, 6);
         b.Property(x => x.UnitOfMeasure).HasMaxLength(10);
         b.Property(x => x.TaxCode).HasMaxLength(20);
         b.Property(x => x.Category).HasMaxLength(60);

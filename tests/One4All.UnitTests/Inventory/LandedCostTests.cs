@@ -4,10 +4,10 @@ using Xunit;
 
 namespace One4All.UnitTests.Inventory;
 
-/// <summary>Covers <see cref="LandedCost.Apportion"/>: by value or quantity, cent-exact, refusing an empty basis.</summary>
+/// <summary>Covers <see cref="LandedCost.Apportion"/>: by value, quantity, weight or volume, cent-exact, refusing an empty basis.</summary>
 public sealed class LandedCostTests
 {
-    private static readonly LandedCostLine[] Lines = [new(10m, 100m), new(30m, 60m)];
+    private static readonly LandedCostLine[] Lines = [new(10m, 100m, 5m, 0.2m), new(30m, 60m, 3m, 0.6m)];
 
     [Fact]
     public void Charges_follow_value()
@@ -19,6 +19,18 @@ public sealed class LandedCostTests
     public void Charges_follow_quantity()
     {
         LandedCost.Apportion(Lines, 32m, LandedCostBasis.Quantity).Should().Equal(8m, 24m);
+    }
+
+    [Fact]
+    public void Charges_follow_weight()
+    {
+        LandedCost.Apportion(Lines, 16m, LandedCostBasis.Weight).Should().Equal(10m, 6m);
+    }
+
+    [Fact]
+    public void Charges_follow_volume()
+    {
+        LandedCost.Apportion(Lines, 16m, LandedCostBasis.Volume).Should().Equal(4m, 12m);
     }
 
     [Fact]

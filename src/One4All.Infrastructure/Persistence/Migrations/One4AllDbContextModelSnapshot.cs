@@ -2696,6 +2696,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(10)")
                         .HasColumnName("unit_of_measure");
 
+                    b.Property<decimal?>("UnitVolumeM3")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("unit_volume_m3");
+
+                    b.Property<decimal?>("UnitWeightKg")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("unit_weight_kg");
+
                     b.HasKey("Id")
                         .HasName("pk_item");
 
