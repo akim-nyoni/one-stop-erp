@@ -93,6 +93,12 @@ public sealed class PrepaidVendingService : IPrepaidVendingService
         }
 
         Tariff? tariff = await _db.Tariffs.AsNoTracking().FirstOrDefaultAsync(t => t.Id == link.TariffId, ct).ConfigureAwait(false);
+        if (tariff is not null)
+        {
+            // Sell at the unit price of the version in force on the sale date.
+            tariff = TariffVersions.InForce(await TariffVersions.LoadAsync(_db, tariff, ct).ConfigureAwait(false), tariff, request.Date);
+        }
+
         if (tariff is null || tariff.PerUnitRate <= 0m)
         {
             return Error.Rule("Mun.NotPrepaid", $"The {request.ServiceType} tariff on stand {property.StandNumber} has no unit price to vend at.");

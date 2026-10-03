@@ -31,6 +31,28 @@ internal static class ValuationHistory
             .Select(v => new DatedValue(v.EffectiveFrom, v.Value)).ToList();
 }
 
+/// <summary>Resolves the version of a tariff code in force on a date, shared by billing, back-billing and vending.</summary>
+internal static class TariffVersions
+{
+    /// <summary>The active versions of the linked tariff's code, oldest first, with their blocks.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="linked">The tariff a service is linked to.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The versions.</returns>
+    public static Task<List<Tariff>> LoadAsync(One4AllDbContext db, Tariff linked, CancellationToken ct)
+        => db.Set<Tariff>().Include(t => t.Blocks).AsNoTracking()
+            .Where(t => t.CompanyId == linked.CompanyId && t.Code == linked.Code && t.IsActive)
+            .OrderBy(t => t.EffectiveFrom).ToListAsync(ct);
+
+    /// <summary>The version in force on a date: the latest effective by then, or the linked one before any is.</summary>
+    /// <param name="versions">The versions, oldest first.</param>
+    /// <param name="linked">The linked tariff.</param>
+    /// <param name="date">The date.</param>
+    /// <returns>The version.</returns>
+    public static Tariff InForce(IReadOnlyList<Tariff> versions, Tariff linked, DateOnly date)
+        => versions.LastOrDefault(t => t.EffectiveFrom <= date) ?? linked;
+}
+
 /// <summary>The valuation roll, supplementary valuations and objections, with rates back-billing through AR.</summary>
 public sealed class ValuationRollService : IValuationRollService
 {
@@ -271,12 +293,15 @@ public sealed class ValuationRollService : IValuationRollService
             return new ValuationAdjustment(0, 0m, null);
         }
 
-        string billNarrative = ValuationHistory.BillNarrative(tariff.Name, property.StandNumber);
+        // Bills were raised on whichever version of the tariff was in force, under that version's name.
+        List<Tariff> versions = await TariffVersions.LoadAsync(_db, tariff, ct).ConfigureAwait(false);
+        List<string> billNarratives = [.. versions.Append(tariff).Select(t => ValuationHistory.BillNarrative(t.Name, property.StandNumber)).Distinct()];
         List<DateOnly> billDates = await _db.OpenItems.AsNoTracking()
             .Where(i => i.CompanyId == property.CompanyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == property.RatepayerCustomerId
-                && i.ItemType == OpenItemType.Invoice && i.Narrative == billNarrative && i.DocumentDate >= record.EffectiveFrom && i.DocumentDate <= adjustmentDate)
+                && i.ItemType == OpenItemType.Invoice && billNarratives.Contains(i.Narrative!) && i.DocumentDate >= record.EffectiveFrom && i.DocumentDate <= adjustmentDate)
             .Select(i => i.DocumentDate).ToListAsync(ct).ConfigureAwait(false);
-        decimal amount = ValuationRoll.BackBilling(billDates, before, after, property.Valuation, v => tariff.CalculateCharge(0m, v));
+        decimal amount = ValuationRoll.BackBilling(billDates, before, after, property.Valuation, (d, v) => TariffVersions.InForce(versions, tariff, d).CalculateCharge(0m, v));
+        string revenueAccount = TariffVersions.InForce(versions, tariff, adjustmentDate).RevenueAccountCode;
         if (amount == 0m)
         {
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -289,12 +314,12 @@ public sealed class ValuationRollService : IValuationRollService
             ? await _ar.PostInvoiceAsync(new SalesInvoiceRequest
             {
                 CompanyId = property.CompanyId, CustomerId = property.RatepayerCustomerId, DocumentNumber = document, DocumentDate = adjustmentDate,
-                Currency = company.BaseCurrency, NetAmount = amount, SalesAccountCode = tariff.RevenueAccountCode, Narrative = $"{narrative}, stand {property.StandNumber}",
+                Currency = company.BaseCurrency, NetAmount = amount, SalesAccountCode = revenueAccount, Narrative = $"{narrative}, stand {property.StandNumber}",
             }, ct).ConfigureAwait(false)
             : await _ar.PostCreditNoteAsync(new SalesCreditNoteRequest
             {
                 CompanyId = property.CompanyId, CustomerId = property.RatepayerCustomerId, DocumentNumber = document, DocumentDate = adjustmentDate,
-                Currency = company.BaseCurrency, NetAmount = -amount, SalesAccountCode = tariff.RevenueAccountCode, Narrative = $"{narrative}, stand {property.StandNumber}",
+                Currency = company.BaseCurrency, NetAmount = -amount, SalesAccountCode = revenueAccount, Narrative = $"{narrative}, stand {property.StandNumber}",
             }, ct).ConfigureAwait(false);
         if (posted.IsFailure)
         {

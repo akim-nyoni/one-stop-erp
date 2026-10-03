@@ -12,7 +12,7 @@ namespace One4All.AccountingTests;
 /// <summary>
 /// Covers effective-dated tariff versions: a stand linked to the January version of a refuse tariff (10 a month) bills 10
 /// in June and 12 in July once the July version takes effect, without relinking; a version that is switched off is
-/// passed over.
+/// passed over; prepaid units sell at the version in force (200 then 100 units for 50).
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class TariffVersionTests
@@ -49,5 +49,20 @@ public sealed class TariffVersionTests
         }
 
         (await db.OpenItems.AsNoTracking().CountAsync(i => i.CompanyId == companyId && i.DocumentNumber.StartsWith("TV-"))).Should().Be(3);
+
+        // Prepaid units sell at the unit price of the version in force on the sale date.
+        Tariff power = new(companyId, "ELEC", "Prepaid Electricity", ServiceType.Electricity, TariffType.PerUnit, new DateOnly(2026, 1, 1), "4000") { PerUnitRate = 0.25m };
+        db.Tariffs.AddRange(power, new Tariff(companyId, "ELEC", "Prepaid Electricity", ServiceType.Electricity, TariffType.PerUnit, new DateOnly(2026, 7, 1), "4000") { PerUnitRate = 0.5m });
+        await db.SaveChangesAsync();
+        stand.AddService(ServiceType.Electricity, power.Id, new DateOnly(2026, 1, 1));
+        await db.SaveChangesAsync();
+        IPrepaidVendingService prepaid = scope.ServiceProvider.GetRequiredService<IPrepaidVendingService>();
+        foreach ((int month, decimal units) in new[] { (6, 200m), (7, 100m) })
+        {
+            (await prepaid.VendAsync(new PrepaidVendRequest
+            {
+                CompanyId = companyId, PropertyId = stand.Id, ServiceType = ServiceType.Electricity, Amount = 50m, Date = new DateOnly(2026, month, 20), BankAccountCode = "1100",
+            })).Value.Units.Should().Be(units);
+        }
     }
 }

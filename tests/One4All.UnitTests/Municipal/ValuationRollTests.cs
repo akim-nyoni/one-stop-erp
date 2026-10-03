@@ -49,6 +49,16 @@ public class ValuationRollTests
     }
 
     [Fact]
+    public void Back_billing_can_use_the_tariff_in_force_on_each_bill_date()
+    {
+        DatedValue[] before = [Opening];
+        DatedValue[] after = [Opening, new(new DateOnly(2026, 1, 1), 200_000m)];
+        DateOnly[] bills = [new(2026, 6, 15), new(2026, 7, 15)];
+        decimal Rate(DateOnly d) => d >= new DateOnly(2026, 7, 1) ? 0.002m : 0.001m;
+        ValuationRoll.BackBilling(bills, before, after, 0m, (d, v) => v * Rate(d)).Should().Be(300m);
+    }
+
+    [Fact]
     public void Back_billing_respects_the_charge_floor()
     {
         DatedValue[] before = [new(DateOnly.MinValue, 10_000m)];

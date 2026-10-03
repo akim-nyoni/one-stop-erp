@@ -43,9 +43,22 @@ public static class ValuationRoll
     /// <returns>The amount to invoice (positive) or credit (negative).</returns>
     public static decimal BackBilling(IEnumerable<DateOnly> billDates, IReadOnlyList<DatedValue> before, IReadOnlyList<DatedValue> after, decimal fallback, Func<decimal, decimal> charge)
     {
+        ArgumentNullException.ThrowIfNull(charge);
+        return BackBilling(billDates, before, after, fallback, (_, value) => charge(value));
+    }
+
+    /// <summary>The total change to bills already raised, with a charge that depends on the bill date (tariff versions).</summary>
+    /// <param name="billDates">The dates of the bills affected.</param>
+    /// <param name="before">The history the bills were raised on.</param>
+    /// <param name="after">The history with the new record.</param>
+    /// <param name="fallback">The value when no record applies.</param>
+    /// <param name="charge">The charge a bill on a date makes on a value.</param>
+    /// <returns>The amount to invoice (positive) or credit (negative).</returns>
+    public static decimal BackBilling(IEnumerable<DateOnly> billDates, IReadOnlyList<DatedValue> before, IReadOnlyList<DatedValue> after, decimal fallback, Func<DateOnly, decimal, decimal> charge)
+    {
         ArgumentNullException.ThrowIfNull(billDates);
         ArgumentNullException.ThrowIfNull(charge);
-        decimal total = billDates.Sum(d => charge(ValueAt(after, d, fallback)) - charge(ValueAt(before, d, fallback)));
+        decimal total = billDates.Sum(d => charge(d, ValueAt(after, d, fallback)) - charge(d, ValueAt(before, d, fallback)));
         return decimal.Round(total, 2, MidpointRounding.AwayFromZero);
     }
 }

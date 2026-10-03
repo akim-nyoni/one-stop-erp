@@ -143,10 +143,7 @@ public sealed class MunicipalBillingService : IMunicipalBillingService
         }
 
         // The version of the linked tariff's code in force on the bill date (the linked version itself before any is).
-        Tariff tariff = await _db.Set<Tariff>().Include(t => t.Blocks)
-            .Where(t => t.CompanyId == companyId && t.Code == linked.Code && t.IsActive && t.EffectiveFrom <= date)
-            .OrderByDescending(t => t.EffectiveFrom)
-            .FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? linked;
+        Tariff tariff = TariffVersions.InForce(await TariffVersions.LoadAsync(_db, linked, ct).ConfigureAwait(false), linked, date);
 
         // The value in force on the bill date, from the valuation roll (the register value when there is no history).
         decimal valuation = ValuationRoll.ValueAt(await ValuationHistory.LoadAsync(_db, property.Id, ct).ConfigureAwait(false), date, property.Valuation);
