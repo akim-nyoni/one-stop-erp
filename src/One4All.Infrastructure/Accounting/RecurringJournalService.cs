@@ -83,6 +83,15 @@ public sealed class RecurringJournalService : IRecurringJournalService
             return Error.Rule("Gl.RecurringUnbalanced", "The template does not balance.");
         }
 
+        if (template.IsPostedFor(date))
+        {
+            return Error.Rule("Gl.RecurringAlreadyPosted",
+                $"Recurring journal {template.Code} has already been posted for {template.LastPostedPeriod / 100}-{template.LastPostedPeriod % 100:00}; it cannot be posted again for {date:yyyy-MM} or an earlier month.");
+        }
+
+        // Recorded before posting so the engine's single SaveChanges persists the journal and the mark together.
+        template.RecordPosted(date);
+
         Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
         {
@@ -103,7 +112,14 @@ public sealed class RecurringJournalService : IRecurringJournalService
             }).ToList(),
         }, ct).ConfigureAwait(false);
 
-        return posted.IsFailure ? posted.Error : posted.Value.JournalNumber;
+        if (posted.IsFailure)
+        {
+            // Nothing was saved; discard the mark so the template is not left looking posted.
+            await _db.Entry(template).ReloadAsync(ct).ConfigureAwait(false);
+            return posted.Error;
+        }
+
+        return posted.Value.JournalNumber;
     }
 
     /// <inheritdoc />
@@ -117,6 +133,12 @@ public sealed class RecurringJournalService : IRecurringJournalService
         List<RecurringRunLine> results = [];
         foreach (RecurringJournal template in templates)
         {
+            if (template.IsPostedFor(date))
+            {
+                results.Add(new RecurringRunLine(template.Code, string.Empty, AlreadyPosted: true));
+                continue;
+            }
+
             Result<string> posted = await PostAsync(companyId, template.Id, date, ct: ct).ConfigureAwait(false);
             if (posted.IsFailure)
             {

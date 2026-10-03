@@ -74,6 +74,26 @@ public sealed class RecurringJournal : AuditableEntity, ICompanyScoped
     /// <summary>Whether the template is balanced (debits equal credits) and has lines.</summary>
     public bool IsBalanced => _lines.Count > 0 && TotalDebit == TotalCredit;
 
+    /// <summary>
+    /// The latest month (<c>yyyyMM</c>) this template has been posted for, or null if never. Posting is forward-only:
+    /// a month at or before this one is refused, so re-running a month's batch cannot post the charge twice.
+    /// </summary>
+    public int? LastPostedPeriod { get; private set; }
+
+    /// <summary>The <c>yyyyMM</c> period key of a date.</summary>
+    /// <param name="date">The date.</param>
+    /// <returns>The period key.</returns>
+    public static int PeriodOf(DateOnly date) => (date.Year * 100) + date.Month;
+
+    /// <summary>Whether the template has already been posted for the month of <paramref name="date"/> (or a later one).</summary>
+    /// <param name="date">Any date in the month.</param>
+    /// <returns>True when a post for that month would be a repeat.</returns>
+    public bool IsPostedFor(DateOnly date) => LastPostedPeriod is { } last && last >= PeriodOf(date);
+
+    /// <summary>Records that the template was posted for the month of <paramref name="date"/>.</summary>
+    /// <param name="date">The posting date.</param>
+    public void RecordPosted(DateOnly date) => LastPostedPeriod = PeriodOf(date);
+
     /// <summary>Activates or deactivates the template.</summary>
     /// <param name="isActive">Whether the template is active.</param>
     public void SetActive(bool isActive) => IsActive = isActive;

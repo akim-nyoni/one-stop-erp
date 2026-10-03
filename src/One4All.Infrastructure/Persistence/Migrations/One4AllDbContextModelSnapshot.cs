@@ -612,6 +612,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<int?>("LastPostedPeriod")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_posted_period");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");

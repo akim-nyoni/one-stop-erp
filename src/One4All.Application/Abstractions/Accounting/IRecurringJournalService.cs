@@ -12,8 +12,9 @@ public readonly record struct RecurringJournalLineInput(string AccountCode, bool
 
 /// <summary>The result of posting one template in a recurring-journal run.</summary>
 /// <param name="Code">The template code.</param>
-/// <param name="JournalNumber">The generated journal number.</param>
-public readonly record struct RecurringRunLine(string Code, string JournalNumber);
+/// <param name="JournalNumber">The generated journal number (empty when the template was skipped).</param>
+/// <param name="AlreadyPosted">True when the template had already been posted for the run's month and was skipped.</param>
+public readonly record struct RecurringRunLine(string Code, string JournalNumber, bool AlreadyPosted = false);
 
 /// <summary>
 /// Manages recurring-journal templates: balanced sets of lines saved once and posted repeatedly (rent,
@@ -34,7 +35,8 @@ public interface IRecurringJournalService
 
     /// <summary>
     /// Posts a recurring-journal template as a real journal on the given date, returning the journal number.
-    /// Refuses an inactive or unbalanced template.
+    /// Refuses an inactive or unbalanced template, and one already posted for that month or a later one
+    /// (<c>Gl.RecurringAlreadyPosted</c>) — posting is forward-only, one journal per template per month.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="recurringJournalId">The template.</param>
@@ -46,12 +48,14 @@ public interface IRecurringJournalService
 
     /// <summary>
     /// Posts every active, balanced recurring template for the company on the given date (a month-end run).
-    /// Stops and returns the error if any template fails to post; templates posted before the failure stand.
+    /// Templates already posted for the month are skipped (reported with <see cref="RecurringRunLine.AlreadyPosted"/>),
+    /// so the run can be repeated safely. Stops and returns the error if any template fails to post; templates posted
+    /// before the failure stand, and a re-run after fixing the cause posts only the remainder.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="date">The posting date.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>One result line per template posted.</returns>
+    /// <returns>One result line per active template, posted or skipped.</returns>
     Task<Result<IReadOnlyList<RecurringRunLine>>> PostAllActiveAsync(long companyId, DateOnly date, CancellationToken ct = default);
 
     /// <summary>Activates or deactivates a template.</summary>
