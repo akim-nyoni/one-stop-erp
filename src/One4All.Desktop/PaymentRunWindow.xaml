@@ -1,0 +1,73 @@
+<Window x:Class="One4All.Desktop.PaymentRunWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Supplier Payment Run" Height="580" Width="1040"
+        WindowStartupLocation="CenterOwner" Background="#F4F6F4" FontFamily="Segoe UI">
+    <Window.Resources>
+        <Style x:Key="StatusCell" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#1E6B3A" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding OnHold}" Value="True">
+                    <Setter Property="Foreground" Value="#8B1E1E" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <DockPanel Margin="10">
+        <!-- Header -->
+        <StackPanel DockPanel.Dock="Top" Margin="6,0,6,6">
+            <TextBlock Text="Supplier Payment Run" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
+            <TextBlock Text="Propose first (nothing is posted): each supplier's credit notes and payments on account are netted, suppliers on hold are skipped. Then run and save the EFT file."
+                       Foreground="#667" FontSize="12" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!-- Parameters -->
+        <WrapPanel DockPanel.Dock="Top" Margin="6,0,6,6">
+            <TextBlock Text="Pay from" Foreground="#667" FontSize="12" VerticalAlignment="Center" />
+            <ComboBox ItemsSource="{Binding Banks}" SelectedItem="{Binding SelectedBank}" DisplayMemberPath="Label" Width="260" Margin="8,0,16,0" />
+            <TextBlock Text="Payment date" Foreground="#667" FontSize="12" VerticalAlignment="Center" />
+            <DatePicker SelectedDate="{Binding PaymentDate}" Margin="8,0,16,0" />
+            <TextBlock Text="Due on or before" Foreground="#667" FontSize="12" VerticalAlignment="Center" />
+            <DatePicker SelectedDate="{Binding DueOnOrBefore}" Margin="8,0,16,0" />
+            <Button Content="Propose" Padding="14,6" FontWeight="SemiBold" Background="#DDEFE0" Command="{Binding ProposeCommand}" />
+            <Button Content="Run payments" Padding="14,6" Margin="8,0,0,0" Command="{Binding RunCommand}"
+                    ToolTip="Posts and allocates the proposed payments in one transaction (enabled when the proposal has something to pay)." />
+            <Button Content="Save EFT file…" Padding="14,6" Margin="8,0,0,0" Click="SaveEft_Click" IsEnabled="{Binding HasEftFile}" />
+        </WrapPanel>
+
+        <!-- Summary -->
+        <Border DockPanel.Dock="Top" Background="#EEF3EE" BorderBrush="#C9D6C9" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="6,0,6,6">
+            <TextBlock Text="{Binding Summary}" FontSize="14" FontWeight="SemiBold" Foreground="#1E3A2E" TextWrapping="Wrap" />
+        </Border>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom" Background="#E8EEE8" Padding="10,5" Margin="6,6,6,0" CornerRadius="4">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#334" FontSize="12" />
+        </Border>
+
+        <!-- Proposal -->
+        <Border Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="6" Margin="6,0">
+            <ListView ItemsSource="{Binding Rows}" BorderThickness="0">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="Supplier" Width="280" DisplayMemberBinding="{Binding Supplier}" />
+                        <GridViewColumn Header="Currency" Width="70" DisplayMemberBinding="{Binding Currency}" />
+                        <GridViewColumn Header="Invoices" Width="70" DisplayMemberBinding="{Binding Invoices}" />
+                        <GridViewColumn Header="Due" Width="110" DisplayMemberBinding="{Binding Due}" />
+                        <GridViewColumn Header="Credits applied" Width="170" DisplayMemberBinding="{Binding Credits}" />
+                        <GridViewColumn Header="To pay" Width="110" DisplayMemberBinding="{Binding ToPay}" />
+                        <GridViewColumn Header="Status" Width="150">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Status}" Style="{StaticResource StatusCell}" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+    </DockPanel>
+</Window>

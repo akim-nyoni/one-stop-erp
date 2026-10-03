@@ -31,29 +31,7 @@ public sealed class PaymentRunService : IPaymentRunService
     /// <inheritdoc />
     public async Task<Result<PaymentRunResult>> RunAsync(PaymentRunRequest request, CancellationToken ct = default)
     {
-        List<OpenItem> dueInvoices = await _db.OpenItems
-            .Where(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsPayable &&
-                        i.Sign == LedgerSign.Credit && i.OutstandingTransaction > 0m && i.DueDate <= request.DueOnOrBefore)
-            .OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)
-            .ToListAsync(ct).ConfigureAwait(false);
-
-        if (request.SupplierIds.Count > 0)
-        {
-            HashSet<long> filter = request.SupplierIds.ToHashSet();
-            dueInvoices = dueInvoices.Where(i => filter.Contains(i.TraderId)).ToList();
-        }
-
-        // Credit notes, debit notes and payments on account the supplier has not yet used: they reduce what is paid.
-        HashSet<long> supplierIds = [.. dueInvoices.Select(i => i.TraderId)];
-        List<OpenItem> credits = await _db.OpenItems
-            .Where(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsPayable && i.Sign == LedgerSign.Debit
-                        && i.OutstandingTransaction > 0m && i.DocumentDate <= request.PaymentDate && supplierIds.Contains(i.TraderId))
-            .OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)
-            .ToListAsync(ct).ConfigureAwait(false);
-
-        Dictionary<long, Supplier> suppliers = await _db.Suppliers
-            .Where(s => s.CompanyId == request.CompanyId)
-            .ToDictionaryAsync(s => s.Id, ct).ConfigureAwait(false);
+        (List<OpenItem> dueInvoices, List<OpenItem> credits, Dictionary<long, Supplier> suppliers) = await SelectAsync(request, ct).ConfigureAwait(false);
 
         // Continue the day's numbering if an earlier run already used it.
         string prefix = $"PMT-{request.PaymentDate:yyyyMMdd}-";
@@ -156,6 +134,60 @@ public sealed class PaymentRunService : IPaymentRunService
 
         byte[] eft = BuildEftFile(request, [.. lines.Where(l => l.Amount > 0m)], suppliers);
         return new PaymentRunResult(lines, totalBase, eft);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<PaymentRunProposal>> ProposeAsync(PaymentRunRequest request, CancellationToken ct = default)
+    {
+        (List<OpenItem> dueInvoices, List<OpenItem> credits, Dictionary<long, Supplier> suppliers) = await SelectAsync(request, ct).ConfigureAwait(false);
+
+        List<PaymentProposalLine> lines = [];
+        foreach (IGrouping<(long SupplierId, string Currency), OpenItem> group in dueInvoices.GroupBy(i => (i.TraderId, i.Currency.Value)))
+        {
+            if (!suppliers.TryGetValue(group.Key.SupplierId, out Supplier? supplier))
+            {
+                continue;
+            }
+
+            decimal due = group.Sum(i => i.OutstandingTransaction);
+            decimal available = credits.Where(c => c.TraderId == supplier.Id && c.Currency.Value == group.Key.Currency).Sum(c => c.OutstandingTransaction);
+
+            // Exactly what the run does: credits are set against the invoices up to what is due; the rest is paid.
+            decimal apply = supplier.OnHold ? 0m : Math.Min(available, due);
+            decimal toPay = supplier.OnHold ? 0m : due - apply;
+            lines.Add(new PaymentProposalLine(supplier.Id, supplier.Code, supplier.Name, group.Key.Currency, group.Count(), due, available, apply, toPay, supplier.OnHold));
+        }
+
+        return new PaymentRunProposal(request.PaymentDate, [.. lines.OrderBy(l => l.SupplierCode, StringComparer.Ordinal).ThenBy(l => l.Currency, StringComparer.Ordinal)]);
+    }
+
+    private async Task<(List<OpenItem> DueInvoices, List<OpenItem> Credits, Dictionary<long, Supplier> Suppliers)> SelectAsync(PaymentRunRequest request, CancellationToken ct)
+    {
+        List<OpenItem> dueInvoices = await _db.OpenItems
+            .Where(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsPayable &&
+                        i.Sign == LedgerSign.Credit && i.OutstandingTransaction > 0m && i.DueDate <= request.DueOnOrBefore)
+            .OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        if (request.SupplierIds.Count > 0)
+        {
+            HashSet<long> filter = request.SupplierIds.ToHashSet();
+            dueInvoices = dueInvoices.Where(i => filter.Contains(i.TraderId)).ToList();
+        }
+
+        // Credit notes, debit notes and payments on account the supplier has not yet used: they reduce what is paid.
+        HashSet<long> supplierIds = [.. dueInvoices.Select(i => i.TraderId)];
+        List<OpenItem> credits = await _db.OpenItems
+            .Where(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsPayable && i.Sign == LedgerSign.Debit
+                        && i.OutstandingTransaction > 0m && i.DocumentDate <= request.PaymentDate && supplierIds.Contains(i.TraderId))
+            .OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<long, Supplier> suppliers = await _db.Suppliers
+            .Where(s => s.CompanyId == request.CompanyId)
+            .ToDictionaryAsync(s => s.Id, ct).ConfigureAwait(false);
+
+        return (dueInvoices, credits, suppliers);
     }
 
     private static byte[] BuildEftFile(PaymentRunRequest request, List<PaymentRunLine> lines, IReadOnlyDictionary<long, Supplier> suppliers)

@@ -247,6 +247,16 @@ app.MapPost("/api/trading/auto-allocate", async (long companyId, One4All.Core.Tr
 .RequireAuthorization()
 .WithName("AutoAllocate");
 
+app.MapPost("/api/trading/payment-run/propose", async (One4All.Application.Abstractions.Trading.PaymentRunRequest request, One4All.Application.Abstractions.Trading.IPaymentRunService run, CancellationToken ct) =>
+    ValueResponse(await run.ProposeAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ProposePaymentRun");
+
+app.MapPost("/api/trading/payment-run", async (One4All.Application.Abstractions.Trading.PaymentRunRequest request, One4All.Application.Abstractions.Trading.IPaymentRunService run, CancellationToken ct) =>
+    ValueResponse(await run.RunAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PaymentRun");
+
 app.MapPost("/api/trading/revalue", async (long companyId, One4All.Core.Trading.TradingLedger ledger, DateOnly asAtDate, bool? autoReverse, One4All.Application.Abstractions.Trading.ITradingRevaluationService reval, CancellationToken ct) =>
     ValueResponse(await reval.RevalueAsync(companyId, ledger, asAtDate, autoReverse ?? true, ct).ConfigureAwait(false)))
 .RequireAuthorization()

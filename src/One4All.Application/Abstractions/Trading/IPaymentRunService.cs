@@ -38,6 +38,34 @@ public readonly record struct PaymentRunLine(long SupplierId, string SupplierCod
 /// <param name="EftFile">A generated bank EFT file (template format).</param>
 public sealed record PaymentRunResult(IReadOnlyList<PaymentRunLine> Lines, decimal Total, byte[] EftFile);
 
+/// <summary>One supplier's line in a payment run proposal (nothing posted).</summary>
+/// <param name="SupplierId">The supplier.</param>
+/// <param name="SupplierCode">The supplier code.</param>
+/// <param name="SupplierName">The supplier name.</param>
+/// <param name="Currency">The invoices' currency.</param>
+/// <param name="InvoicesDue">How many invoices are due.</param>
+/// <param name="AmountDue">Their outstanding total.</param>
+/// <param name="CreditsAvailable">The supplier's unused credit notes / payments on account in that currency.</param>
+/// <param name="CreditsToApply">How much of those credits the run would set against the invoices.</param>
+/// <param name="ToPay">What the run would pay (0 for a supplier on hold).</param>
+/// <param name="OnHold">True when the supplier is on hold and would be skipped.</param>
+public readonly record struct PaymentProposalLine(long SupplierId, string SupplierCode, string SupplierName, string Currency, int InvoicesDue, decimal AmountDue, decimal CreditsAvailable, decimal CreditsToApply, decimal ToPay, bool OnHold);
+
+/// <summary>A payment run proposal: what <see cref="IPaymentRunService.RunAsync"/> would do with the same request.</summary>
+/// <param name="PaymentDate">The payment date.</param>
+/// <param name="Lines">One line per supplier and currency with invoices due, including suppliers on hold.</param>
+public sealed record PaymentRunProposal(DateOnly PaymentDate, IReadOnlyList<PaymentProposalLine> Lines)
+{
+    /// <summary>The number of payments the run would make.</summary>
+    public int PaymentCount => Lines.Count(l => l.ToPay > 0m);
+
+    /// <summary>The amounts to pay, per currency.</summary>
+    public IReadOnlyDictionary<string, decimal> ToPayByCurrency => Lines
+        .Where(l => l.ToPay > 0m)
+        .GroupBy(l => l.Currency, StringComparer.Ordinal)
+        .ToDictionary(g => g.Key, g => g.Sum(l => l.ToPay), StringComparer.Ordinal);
+}
+
 /// <summary>
 /// Runs a supplier payment run (brief §4.6): selects unpaid, due AP invoices, first sets each supplier's unused
 /// credit notes and payments on account against them, then posts one payment per supplier and currency for the
@@ -51,4 +79,13 @@ public interface IPaymentRunService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The run result, or an error.</returns>
     Task<Result<PaymentRunResult>> RunAsync(PaymentRunRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Proposes the run without posting anything: per supplier and currency, the invoices due, the credits that would
+    /// be applied and the amount that would be paid; suppliers on hold are listed with nothing to pay.
+    /// </summary>
+    /// <param name="request">The run request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The proposal.</returns>
+    Task<Result<PaymentRunProposal>> ProposeAsync(PaymentRunRequest request, CancellationToken ct = default);
 }

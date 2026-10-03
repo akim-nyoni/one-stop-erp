@@ -105,6 +105,12 @@ public partial class ShellWindow : Window
         recon.Show();
     }
 
+    private void OpenPaymentRun_Click(object sender, RoutedEventArgs e)
+    {
+        PaymentRunWindow run = new(_services) { Owner = this };
+        run.Show();
+    }
+
     private void OpenReplenishment_Click(object sender, RoutedEventArgs e)
     {
         ReplenishmentWindow replenishment = new(_services) { Owner = this };
