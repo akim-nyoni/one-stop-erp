@@ -25,22 +25,24 @@ public sealed class PaymentRunRequest
 /// <param name="SupplierId">The supplier.</param>
 /// <param name="SupplierCode">The supplier code.</param>
 /// <param name="SupplierName">The supplier name.</param>
-/// <param name="Currency">The payment currency.</param>
-/// <param name="Amount">The amount paid.</param>
-/// <param name="PaymentNumber">The allocated payment number.</param>
+/// <param name="Currency">The payment currency (the invoices' currency).</param>
+/// <param name="Amount">The amount paid (0 when the supplier's credits covered everything due).</param>
+/// <param name="PaymentNumber">The allocated payment number (empty when nothing was paid).</param>
 /// <param name="InvoicesPaid">How many invoices were settled/part-paid.</param>
-public readonly record struct PaymentRunLine(long SupplierId, string SupplierCode, string SupplierName, string Currency, decimal Amount, string PaymentNumber, int InvoicesPaid);
+/// <param name="CreditsApplied">Unused credit notes / payments on account set against the invoices before paying.</param>
+public readonly record struct PaymentRunLine(long SupplierId, string SupplierCode, string SupplierName, string Currency, decimal Amount, string PaymentNumber, int InvoicesPaid, decimal CreditsApplied = 0m);
 
 /// <summary>The result of a payment run.</summary>
 /// <param name="Lines">The per-supplier payment lines.</param>
-/// <param name="Total">The total base value paid.</param>
+/// <param name="Total">The total paid, in base currency.</param>
 /// <param name="EftFile">A generated bank EFT file (template format).</param>
 public sealed record PaymentRunResult(IReadOnlyList<PaymentRunLine> Lines, decimal Total, byte[] EftFile);
 
 /// <summary>
-/// Runs a supplier payment run (brief §4.6): selects unpaid, due AP invoices, posts a payment per supplier
-/// through the posting engine, allocates it against the invoices (realising FX), and produces a bank EFT
-/// file. A production run adds a proposed/approval step; this posts directly.
+/// Runs a supplier payment run (brief §4.6): selects unpaid, due AP invoices, first sets each supplier's unused
+/// credit notes and payments on account against them, then posts one payment per supplier and currency for the
+/// remainder through the posting engine, allocates it (realising FX), and produces a bank EFT file. The whole run
+/// is one database transaction. A production run adds a proposed/approval step; this posts directly.
 /// </summary>
 public interface IPaymentRunService
 {

@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using One4All.Core.Accounting;
 using One4All.Application.Abstractions.Trading;
 using One4All.Core.Common;
 using One4All.Core.Trading;
@@ -41,12 +43,30 @@ public sealed class PaymentRunService : IPaymentRunService
             dueInvoices = dueInvoices.Where(i => filter.Contains(i.TraderId)).ToList();
         }
 
+        // Credit notes, debit notes and payments on account the supplier has not yet used: they reduce what is paid.
+        HashSet<long> supplierIds = [.. dueInvoices.Select(i => i.TraderId)];
+        List<OpenItem> credits = await _db.OpenItems
+            .Where(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsPayable && i.Sign == LedgerSign.Debit
+                        && i.OutstandingTransaction > 0m && i.DocumentDate <= request.PaymentDate && supplierIds.Contains(i.TraderId))
+            .OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+
         Dictionary<long, Supplier> suppliers = await _db.Suppliers
             .Where(s => s.CompanyId == request.CompanyId)
             .ToDictionaryAsync(s => s.Id, ct).ConfigureAwait(false);
 
+        // Continue the day's numbering if an earlier run already used it.
+        string prefix = $"PMT-{request.PaymentDate:yyyyMMdd}-";
+        int index = await _db.OpenItems
+            .CountAsync(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsPayable && i.DocumentNumber.StartsWith(prefix), ct)
+            .ConfigureAwait(false);
+
+        // The whole run stands or falls together: a failure part-way must not leave a payment posted but unallocated,
+        // which a re-run would pay again.
+        await using IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+
         List<PaymentRunLine> lines = [];
-        int index = 0;
+        decimal totalBase = 0m;
         foreach (IGrouping<(long SupplierId, string Currency), OpenItem> group in dueInvoices
             .GroupBy(i => (i.TraderId, i.Currency.Value)))
         {
@@ -55,14 +75,48 @@ public sealed class PaymentRunService : IPaymentRunService
                 continue;
             }
 
-            decimal amount = group.Sum(i => i.OutstandingTransaction);
-            if (amount <= 0m)
+            List<OpenItem> invoices = [.. group.OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)];
+            CurrencyCode currency = invoices[0].Currency;
+
+            // Apply the supplier's unused credits first, oldest invoice first.
+            decimal creditsApplied = 0m;
+            HashSet<long> touched = [];
+            foreach (OpenItem credit in credits.Where(c => c.TraderId == supplier.Id && c.Currency == currency))
             {
+                foreach (OpenItem invoice in invoices.Where(i => i.OutstandingTransaction > 0m))
+                {
+                    if (credit.OutstandingTransaction <= 0m)
+                    {
+                        break;
+                    }
+
+                    decimal amount = Math.Min(credit.OutstandingTransaction, invoice.OutstandingTransaction);
+                    Result<AllocationResult> applied = await _allocationService.AllocateAsync(
+                        request.CompanyId, TradingLedger.AccountsPayable, credit.Id, invoice.Id, amount, request.PaymentDate, ct).ConfigureAwait(false);
+                    if (applied.IsFailure)
+                    {
+                        return applied.Error;
+                    }
+
+                    creditsApplied += applied.Value.TransactionAmount;
+                    touched.Add(invoice.Id);
+                }
+            }
+
+            decimal toPay = invoices.Sum(i => i.OutstandingTransaction);
+            if (toPay <= 0m)
+            {
+                // Settled entirely by credits: nothing to pay.
+                if (creditsApplied > 0m)
+                {
+                    lines.Add(new PaymentRunLine(supplier.Id, supplier.Code, supplier.Name, currency.Value, 0m, string.Empty, touched.Count, creditsApplied));
+                }
+
                 continue;
             }
 
             index++;
-            string paymentNumber = $"PMT-{request.PaymentDate:yyyyMMdd}-{index:D4}";
+            string paymentNumber = $"{prefix}{index:D4}";
 
             Result<TradingPostingResult> payment = await _purchaseLedger.PostPaymentAsync(new PaymentRequest
             {
@@ -70,8 +124,8 @@ public sealed class PaymentRunService : IPaymentRunService
                 SupplierId = supplier.Id,
                 DocumentNumber = paymentNumber,
                 PaymentDate = request.PaymentDate,
-                Currency = supplier.Currency,
-                Amount = amount,
+                Currency = currency,
+                Amount = toPay,
                 BankAccountCode = request.BankAccountCode,
                 Narrative = "Payment run",
             }, ct).ConfigureAwait(false);
@@ -81,8 +135,7 @@ public sealed class PaymentRunService : IPaymentRunService
                 return payment.Error;
             }
 
-            int invoicesPaid = 0;
-            foreach (OpenItem invoice in group.OrderBy(i => i.DocumentDate))
+            foreach (OpenItem invoice in invoices.Where(i => i.OutstandingTransaction > 0m))
             {
                 Result<AllocationResult> alloc = await _allocationService.AllocateAsync(
                     request.CompanyId, TradingLedger.AccountsPayable, payment.Value.OpenItemId, invoice.Id, invoice.OutstandingTransaction, request.PaymentDate, ct)
@@ -92,18 +145,20 @@ public sealed class PaymentRunService : IPaymentRunService
                     return alloc.Error;
                 }
 
-                invoicesPaid++;
+                touched.Add(invoice.Id);
             }
 
-            lines.Add(new PaymentRunLine(supplier.Id, supplier.Code, supplier.Name, supplier.Currency.Value, amount, paymentNumber, invoicesPaid));
+            totalBase += payment.Value.BaseAmount;
+            lines.Add(new PaymentRunLine(supplier.Id, supplier.Code, supplier.Name, currency.Value, toPay, paymentNumber, touched.Count, creditsApplied));
         }
 
-        byte[] eft = BuildEftFile(request, lines, suppliers);
-        decimal total = lines.Sum(l => l.Amount);
-        return new PaymentRunResult(lines, total, eft);
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+
+        byte[] eft = BuildEftFile(request, [.. lines.Where(l => l.Amount > 0m)], suppliers);
+        return new PaymentRunResult(lines, totalBase, eft);
     }
 
-    private static byte[] BuildEftFile(PaymentRunRequest request, IReadOnlyList<PaymentRunLine> lines, IReadOnlyDictionary<long, Supplier> suppliers)
+    private static byte[] BuildEftFile(PaymentRunRequest request, List<PaymentRunLine> lines, IReadOnlyDictionary<long, Supplier> suppliers)
     {
         // A generic pipe-delimited EFT template. Real banks define their own layout (brief §4.15.7 / §4.6);
         // the layout is configuration, not code, in production.
