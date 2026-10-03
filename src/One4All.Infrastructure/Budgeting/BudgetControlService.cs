@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Budgeting;
+using One4All.Application.Budgeting;
 using One4All.Core.Accounting;
 using One4All.Core.Budgeting;
 using One4All.Core.Common;
@@ -212,6 +213,24 @@ public sealed class BudgetControlService : IBudgetControlService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         YearEndCommitment Row((BudgetCommitment Original, BudgetCommitment? Carried) d) => new(d.Original.Id, d.Original.AccountCode, d.Original.Reference, d.Original.Amount, d.Carried?.Id);
         return new CommitmentYearEnd([.. decided.Where(d => d.Carried is null).Select(Row)], [.. decided.Where(d => d.Carried is not null).Select(Row)]);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<UtilisationAlert>> UtilisationAlertsAsync(long companyId, long fiscalYearId, int asAtPeriod, IReadOnlyList<decimal> thresholdPercents, CancellationToken ct = default)
+    {
+        IReadOnlyList<VoteBookRow> votes = await VoteBookAsync(companyId, fiscalYearId, asAtPeriod, ct).ConfigureAwait(false);
+        List<UtilisationAlert> alerts = [];
+        foreach (VoteBookRow vote in votes)
+        {
+            decimal used = vote.Expenditure + vote.Commitments;
+            decimal percent = BudgetUtilisation.PercentUsed(vote.Appropriation, used);
+            if (BudgetUtilisation.HighestCrossed(percent, thresholdPercents) is decimal crossed)
+            {
+                alerts.Add(new UtilisationAlert(vote.AccountCode, vote.Name, vote.Appropriation, used, percent, crossed));
+            }
+        }
+
+        return [.. alerts.OrderByDescending(a => a.PercentUsed).ThenBy(a => a.AccountCode, StringComparer.Ordinal)];
     }
 
     /// <inheritdoc />

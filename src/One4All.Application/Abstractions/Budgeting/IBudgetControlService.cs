@@ -21,6 +21,15 @@ public sealed record VirementRegisterRow(string AccountCode, decimal Original, d
     public decimal Current => Original + VirementsIn - VirementsOut;
 }
 
+/// <summary>A budget line that has crossed an alert threshold.</summary>
+/// <param name="AccountCode">The vote (account).</param>
+/// <param name="Name">Its name.</param>
+/// <param name="Appropriation">The year's appropriation.</param>
+/// <param name="Used">Expenditure plus open commitments to the as-at period.</param>
+/// <param name="PercentUsed">The percentage of the appropriation used.</param>
+/// <param name="ThresholdCrossed">The highest alert threshold reached.</param>
+public sealed record UtilisationAlert(string AccountCode, string Name, decimal Appropriation, decimal Used, decimal PercentUsed, decimal ThresholdCrossed);
+
 /// <summary>A commitment as decided at year end.</summary>
 /// <param name="CommitmentId">The year's commitment.</param>
 /// <param name="AccountCode">Its account.</param>
@@ -114,6 +123,18 @@ public interface IBudgetControlService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>What lapsed and what was carried, or why it was refused.</returns>
     Task<Result<CommitmentYearEnd>> CloseYearCommitmentsAsync(long companyId, long fiscalYearId, long nextFiscalYearId, IReadOnlyCollection<long> carryForwardIds, long approvedByUserId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The budget-holder alerts (brief §4.18.5): each vote whose expenditure and commitments have reached one of the
+    /// utilisation thresholds of its appropriation, with the highest reached, most used first.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fiscalYearId">The fiscal year.</param>
+    /// <param name="asAtPeriod">The last period included.</param>
+    /// <param name="thresholdPercents">The alert thresholds, such as 75, 90 and 100.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The alerts.</returns>
+    Task<IReadOnlyList<UtilisationAlert>> UtilisationAlertsAsync(long companyId, long fiscalYearId, int asAtPeriod, IReadOnlyList<decimal> thresholdPercents, CancellationToken ct = default);
 
     /// <summary>Checks an approved budget's lines against its seal.</summary>
     /// <param name="companyId">The company.</param>

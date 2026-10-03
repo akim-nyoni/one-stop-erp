@@ -574,6 +574,12 @@ app.MapPost("/api/budgets/commitments/year-end", async (long companyId, long fis
 .RequireAuthorization()
 .WithName("CloseYearCommitments");
 
+app.MapGet("/api/budgets/utilisation-alerts", async (long companyId, long fiscalYearId, int asAtPeriod, decimal[]? thresholds, One4All.Application.Abstractions.Budgeting.IBudgetControlService control, CancellationToken ct) =>
+    Results.Ok(await control.UtilisationAlertsAsync(companyId, fiscalYearId, asAtPeriod,
+        thresholds is { Length: > 0 } ? thresholds : One4All.Application.Budgeting.BudgetUtilisation.DefaultThresholds, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("BudgetUtilisationAlerts");
+
 app.MapGet("/api/budgets/material-variances", async (long companyId, long fiscalYearId, One4All.Core.Budgeting.BudgetType type, string? department, int asAtPeriod, decimal? thresholdValue, decimal? thresholdPercent, One4All.Application.Abstractions.Budgeting.IVarianceCommentaryService commentary, CancellationToken ct) =>
 {
     One4All.Application.Budgeting.VarianceThreshold threshold = new(
