@@ -43,7 +43,9 @@ public interface IMunicipalBillingService
     /// <summary>
     /// Runs a fixed-charge billing cycle for a non-metered service (e.g. rates or refuse): bills every
     /// property that has an active link to the service at its tariff's fixed charge (zero consumption),
-    /// raising each on the ratepayer's account.
+    /// raising each on the ratepayer's account. Billing is monthly: each bill is numbered
+    /// <c>{prefix}-{propertyId}-{yyyyMM}</c>, and a property already billed under that number is skipped, so
+    /// re-running the month (on any day) never bills twice.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="serviceType">The service to bill across all linked properties.</param>
@@ -57,4 +59,5 @@ public interface IMunicipalBillingService
 /// <summary>The result of a fixed-charge municipal billing run.</summary>
 /// <param name="PropertiesBilled">The number of properties billed.</param>
 /// <param name="TotalBilled">The total charge raised across all properties.</param>
-public readonly record struct MunicipalBillingRunResult(int PropertiesBilled, decimal TotalBilled);
+/// <param name="AlreadyBilled">Properties skipped because this service had already been billed for them in the billing month.</param>
+public readonly record struct MunicipalBillingRunResult(int PropertiesBilled, decimal TotalBilled, int AlreadyBilled = 0);

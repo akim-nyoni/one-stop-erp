@@ -63,6 +63,15 @@ public sealed class MunicipalBillingRunTests
             run.IsSuccess.Should().BeTrue(run.IsFailure ? run.Error.ToString() : null);
             run.Value.PropertiesBilled.Should().Be(2);   // only the two linked properties
             run.Value.TotalBilled.Should().Be(30m);       // 2 × 15
+            run.Value.AlreadyBilled.Should().Be(0);
+
+            // Re-running March — same day or another day in the month — bills nobody again.
+            var again = await billing.RunFixedChargeBillingAsync(companyId, ServiceType.Refuse, new DateOnly(2026, 3, 15), "REF");
+            again.Value.PropertiesBilled.Should().Be(0);
+            again.Value.TotalBilled.Should().Be(0m);
+            again.Value.AlreadyBilled.Should().Be(2);
+
+            (await billing.RunFixedChargeBillingAsync(companyId, ServiceType.Refuse, new DateOnly(2026, 3, 31), " ")).Error.Code.Should().Be("Mun.PrefixRequired");
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
