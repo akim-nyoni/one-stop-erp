@@ -600,6 +600,11 @@ app.MapPost("/api/ar/laybys/default-overdue", async (long companyId, DateOnly as
 .RequireAuthorization()
 .WithName("DefaultOverdueLaybys");
 
+app.MapGet("/api/pop/supplier-scorecard", async (long companyId, DateOnly from, DateOnly to, One4All.Application.Abstractions.Procurement.ISupplierScorecardService scorecard, CancellationToken ct) =>
+    Results.Ok(await scorecard.ScorecardAsync(companyId, from, to, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SupplierScorecard");
+
 app.MapPost("/api/ar/items/{openItemId:long}/write-off-with-vat-relief", async (long openItemId, long companyId, DateOnly date, string badDebtAccountCode, string reason, int minimumDaysOverdue, One4All.Application.Abstractions.Trading.ISalesLedgerService ar, CancellationToken ct) =>
     ValueResponse(await ar.WriteOffWithVatReliefAsync(companyId, openItemId, date, badDebtAccountCode, reason, minimumDaysOverdue, ct).ConfigureAwait(false)))
 .RequireAuthorization()

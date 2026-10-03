@@ -51,7 +51,7 @@ public sealed class ProcurementService : IProcurementService
             orderNumber = allocated.Value;
         }
 
-        PurchaseOrder order = new(request.CompanyId, request.SupplierId, orderNumber, request.OrderDate, request.Currency);
+        PurchaseOrder order = new(request.CompanyId, request.SupplierId, orderNumber, request.OrderDate, request.Currency) { RequiredBy = request.RequiredBy };
         foreach (PurchaseOrderLineRequest line in request.Lines)
         {
             order.AddLine(line.ItemId, line.Description, line.Quantity, line.UnitPrice);

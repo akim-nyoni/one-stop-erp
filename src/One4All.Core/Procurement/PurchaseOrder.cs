@@ -65,6 +65,9 @@ public sealed class PurchaseOrder : AuditableEntity, ICompanyScoped
     /// <summary>The order date.</summary>
     public DateOnly OrderDate { get; private set; }
 
+    /// <summary>When the goods are required; deliveries after it count as late on the supplier scorecard.</summary>
+    public DateOnly? RequiredBy { get; set; }
+
     /// <summary>The currency.</summary>
     public CurrencyCode Currency { get; private set; }
 

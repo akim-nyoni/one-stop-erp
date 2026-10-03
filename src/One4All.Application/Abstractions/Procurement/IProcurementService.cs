@@ -24,6 +24,9 @@ public sealed class CreatePurchaseOrderRequest
     /// <summary>The order date.</summary>
     public DateOnly OrderDate { get; init; }
 
+    /// <summary>When the goods are required, if a date is set; used to judge on-time delivery.</summary>
+    public DateOnly? RequiredBy { get; init; }
+
     /// <summary>The currency.</summary>
     public Core.Accounting.CurrencyCode Currency { get; init; }
 

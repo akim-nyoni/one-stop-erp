@@ -5457,6 +5457,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("order_number");
 
+                    b.Property<DateOnly?>("RequiredBy")
+                        .HasColumnType("date")
+                        .HasColumnName("required_by");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
