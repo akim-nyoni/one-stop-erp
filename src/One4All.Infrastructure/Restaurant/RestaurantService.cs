@@ -246,7 +246,11 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<decimal>> RecordWastageAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal quantity, string wastageAccountCode, string reason, CancellationToken ct = default)
+    public Task<Result<decimal>> RecordWastageAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal quantity, string wastageAccountCode, string reason, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RecordWastageCoreAsync(companyId, itemId, warehouseId, date, quantity, wastageAccountCode, reason, ct), ct);
+
+    // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
+    private async Task<Result<decimal>> RecordWastageCoreAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal quantity, string wastageAccountCode, string reason, CancellationToken ct)
     {
         if (quantity <= 0m)
         {
@@ -359,7 +363,11 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
+    public Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => BillOrderCoreAsync(companyId, orderId, warehouseId, date, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct), ct);
+
+    // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
+    private async Task<Result<BillResult>> BillOrderCoreAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, CancellationToken ct)
     {
         Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
         if (loaded.IsFailure)
@@ -382,7 +390,11 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<BillResult>> BillWithTendersAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<TenderLine> tenders, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
+    public Task<Result<BillResult>> BillWithTendersAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<TenderLine> tenders, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => BillWithTendersCoreAsync(companyId, orderId, warehouseId, date, tenders, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct), ct);
+
+    // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
+    private async Task<Result<BillResult>> BillWithTendersCoreAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<TenderLine> tenders, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, CancellationToken ct)
     {
         if (tenders.Count == 0)
         {
@@ -415,7 +427,11 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
+    public Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => BillPartialCoreAsync(companyId, orderId, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct), ct);
+
+    // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
+    private async Task<Result<BillResult>> BillPartialCoreAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, CancellationToken ct)
     {
         if (portions.Count == 0)
         {
@@ -485,7 +501,11 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<BillResult>> BillSeatAsync(long companyId, long orderId, int seatNumber, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
+    public Task<Result<BillResult>> BillSeatAsync(long companyId, long orderId, int seatNumber, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => BillSeatCoreAsync(companyId, orderId, seatNumber, warehouseId, date, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct), ct);
+
+    // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
+    private async Task<Result<BillResult>> BillSeatCoreAsync(long companyId, long orderId, int seatNumber, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, CancellationToken ct)
     {
         Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
         if (loaded.IsFailure)
@@ -507,7 +527,11 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<BillResult>> BillToVoucherAsync(long companyId, long orderId, string cardNumber, long warehouseId, DateOnly date, string giftCardLiabilityAccountCode, string? taxAccountCode = null, CancellationToken ct = default)
+    public Task<Result<BillResult>> BillToVoucherAsync(long companyId, long orderId, string cardNumber, long warehouseId, DateOnly date, string giftCardLiabilityAccountCode, string? taxAccountCode = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => BillToVoucherCoreAsync(companyId, orderId, cardNumber, warehouseId, date, giftCardLiabilityAccountCode, taxAccountCode, ct), ct);
+
+    // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
+    private async Task<Result<BillResult>> BillToVoucherCoreAsync(long companyId, long orderId, string cardNumber, long warehouseId, DateOnly date, string giftCardLiabilityAccountCode, string? taxAccountCode, CancellationToken ct)
     {
         Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
         if (loaded.IsFailure)
@@ -572,7 +596,11 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<string>> ReverseBillAsync(long companyId, long billId, DateOnly date, string reason, CancellationToken ct = default)
+    public Task<Result<string>> ReverseBillAsync(long companyId, long billId, DateOnly date, string reason, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReverseBillCoreAsync(companyId, billId, date, reason, ct), ct);
+
+    // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
+    private async Task<Result<string>> ReverseBillCoreAsync(long companyId, long billId, DateOnly date, string reason, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
@@ -641,7 +669,11 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<BillResult>> BillToHouseAccountAsync(long companyId, long orderId, long customerId, long warehouseId, DateOnly date, string salesAccountCode, string? taxAccountCode = null, CancellationToken ct = default)
+    public Task<Result<BillResult>> BillToHouseAccountAsync(long companyId, long orderId, long customerId, long warehouseId, DateOnly date, string salesAccountCode, string? taxAccountCode = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => BillToHouseAccountCoreAsync(companyId, orderId, customerId, warehouseId, date, salesAccountCode, taxAccountCode, ct), ct);
+
+    // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
+    private async Task<Result<BillResult>> BillToHouseAccountCoreAsync(long companyId, long orderId, long customerId, long warehouseId, DateOnly date, string salesAccountCode, string? taxAccountCode, CancellationToken ct)
     {
         Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
         if (loaded.IsFailure)
@@ -718,7 +750,11 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<string>> PayTipsAsync(long companyId, decimal amount, DateOnly date, string tipsPayableAccountCode, string fundingAccountCode, CancellationToken ct = default)
+    public Task<Result<string>> PayTipsAsync(long companyId, decimal amount, DateOnly date, string tipsPayableAccountCode, string fundingAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PayTipsCoreAsync(companyId, amount, date, tipsPayableAccountCode, fundingAccountCode, ct), ct);
+
+    // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
+    private async Task<Result<string>> PayTipsCoreAsync(long companyId, decimal amount, DateOnly date, string tipsPayableAccountCode, string fundingAccountCode, CancellationToken ct)
     {
         if (amount <= 0m)
         {
@@ -1187,7 +1223,11 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<int>> DistributeTipsAsync(long companyId, DateOnly date, decimal totalAmount, string tipsPayableAccountCode, IReadOnlyList<TipShare> shares, CancellationToken ct = default)
+    public Task<Result<int>> DistributeTipsAsync(long companyId, DateOnly date, decimal totalAmount, string tipsPayableAccountCode, IReadOnlyList<TipShare> shares, CancellationToken ct = default)
+        => _db.AtomicAsync(() => DistributeTipsCoreAsync(companyId, date, totalAmount, tipsPayableAccountCode, shares, ct), ct);
+
+    // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
+    private async Task<Result<int>> DistributeTipsCoreAsync(long companyId, DateOnly date, decimal totalAmount, string tipsPayableAccountCode, IReadOnlyList<TipShare> shares, CancellationToken ct)
     {
         if (totalAmount <= 0m)
         {
@@ -1220,7 +1260,11 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result<string>> PayTipAllocationAsync(long companyId, long allocationId, DateOnly date, string fundingAccountCode, CancellationToken ct = default)
+    public Task<Result<string>> PayTipAllocationAsync(long companyId, long allocationId, DateOnly date, string fundingAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PayTipAllocationCoreAsync(companyId, allocationId, date, fundingAccountCode, ct), ct);
+
+    // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
+    private async Task<Result<string>> PayTipAllocationCoreAsync(long companyId, long allocationId, DateOnly date, string fundingAccountCode, CancellationToken ct)
     {
         TipAllocation? allocation = await _db.Set<TipAllocation>().FirstOrDefaultAsync(a => a.Id == allocationId && a.CompanyId == companyId, ct).ConfigureAwait(false);
         if (allocation is null)
