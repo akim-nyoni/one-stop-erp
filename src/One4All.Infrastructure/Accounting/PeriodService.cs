@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
+using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.System;
 using One4All.Infrastructure.Persistence;
@@ -28,6 +29,21 @@ public sealed class PeriodService : IPeriodService
         if (period is null)
         {
             return Result.Failure(Error.NotFound("Period.NotFound", $"Period {periodNumber} not found in fiscal year {fiscalYearId}."));
+        }
+
+        // A permanently closed period can never take another posting, so a draft or deferred journal of that module
+        // dated in it would be stranded: it must be posted or deleted first. (A plain close can be reopened.)
+        if (status == PeriodStatus.PermanentlyClosed)
+        {
+            string module = moduleCode.Trim().ToUpperInvariant();
+            int unposted = await _db.Journals.CountAsync(j => j.CompanyId == companyId && j.SourceModule == module
+                && j.PostingDate >= period.StartDate && j.PostingDate <= period.EndDate
+                && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred), ct).ConfigureAwait(false);
+            if (unposted > 0)
+            {
+                return Result.Failure(Error.Rule("Period.UnpostedJournals",
+                    $"{unposted} draft or deferred {module} journal(s) are dated in period {periodNumber}; post or delete them before closing it permanently."));
+            }
         }
 
         Result result = period.SetStatus(moduleCode, status);
