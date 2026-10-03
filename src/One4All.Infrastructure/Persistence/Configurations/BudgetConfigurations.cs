@@ -54,6 +54,18 @@ internal sealed class BudgetVirementConfiguration : IEntityTypeConfiguration<Bud
     }
 }
 
+internal sealed class VarianceCommentConfiguration : IEntityTypeConfiguration<VarianceComment>
+{
+    public void Configure(EntityTypeBuilder<VarianceComment> b)
+    {
+        b.ToTable("variance_comment", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AccountCode).HasMaxLength(8);
+        b.Property(x => x.Comment).HasMaxLength(2000);
+        b.HasIndex(x => new { x.CompanyId, x.FiscalYearId, x.AsAtPeriod, x.AccountCode }).IsUnique();
+    }
+}
+
 internal sealed class BudgetCommitmentConfiguration : IEntityTypeConfiguration<BudgetCommitment>
 {
     public void Configure(EntityTypeBuilder<BudgetCommitment> b)

@@ -574,6 +574,20 @@ app.MapPost("/api/budgets/commitments/year-end", async (long companyId, long fis
 .RequireAuthorization()
 .WithName("CloseYearCommitments");
 
+app.MapGet("/api/budgets/material-variances", async (long companyId, long fiscalYearId, One4All.Core.Budgeting.BudgetType type, string? department, int asAtPeriod, decimal? thresholdValue, decimal? thresholdPercent, One4All.Application.Abstractions.Budgeting.IVarianceCommentaryService commentary, CancellationToken ct) =>
+{
+    One4All.Application.Budgeting.VarianceThreshold threshold = new(
+        thresholdValue ?? One4All.Application.Budgeting.VarianceThreshold.Default.Value, thresholdPercent ?? One4All.Application.Budgeting.VarianceThreshold.Default.Percent);
+    return ValueResponse(await commentary.MaterialVariancesAsync(companyId, fiscalYearId, type, department, asAtPeriod, threshold, ct).ConfigureAwait(false));
+})
+.RequireAuthorization()
+.WithName("MaterialVariances");
+
+app.MapPut("/api/budgets/variance-comments", async (long companyId, long fiscalYearId, int asAtPeriod, string accountCode, long userId, string comment, One4All.Application.Abstractions.Budgeting.IVarianceCommentaryService commentary, CancellationToken ct) =>
+    ActionResponse(await commentary.CommentAsync(companyId, fiscalYearId, asAtPeriod, accountCode, comment, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CommentVariance");
+
 app.MapPost("/api/ar/customers/{customerId:long}/promises", async (long customerId, long companyId, long userId, DateOnly madeOn, DateOnly payBy, decimal amount, string? note, One4All.Application.Abstractions.Trading.IPromiseToPayService promises, CancellationToken ct) =>
     ValueResponse(await promises.RecordAsync(companyId, customerId, madeOn, payBy, amount, note, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
