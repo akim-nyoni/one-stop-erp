@@ -4,6 +4,7 @@ using One4All.Core.Common;
 using One4All.Core.Inventory;
 using One4All.Core.Procurement;
 using One4All.Core.SalesOrders;
+using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
 
 namespace One4All.Infrastructure.Inventory;
@@ -43,6 +44,14 @@ public sealed class StockAvailabilityService : IStockAvailabilityService
             where so.CompanyId == companyId && so.Status != SalesOrderStatus.Cancelled
                 && line.ItemId == itemId && line.OrderedQuantity > line.DespatchedQuantity
             select line.OrderedQuantity - line.DespatchedQuantity)
+            .SumAsync(q => (decimal?)q, ct).ConfigureAwait(false) ?? 0m;
+
+        // Goods set aside on open lay-byes are as good as sold.
+        allocated += await (
+            from plan in _db.Set<LaybyPlan>()
+            from line in plan.Lines
+            where plan.CompanyId == companyId && plan.Status == LaybyStatus.Open && line.ItemId == itemId && (warehouseId == null || plan.WarehouseId == warehouseId)
+            select line.Quantity)
             .SumAsync(q => (decimal?)q, ct).ConfigureAwait(false) ?? 0m;
 
         decimal onOrder = await (

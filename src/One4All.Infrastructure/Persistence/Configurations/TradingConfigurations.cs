@@ -45,6 +45,41 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
     }
 }
 
+internal sealed class LaybyPlanConfiguration : IEntityTypeConfiguration<LaybyPlan>
+{
+    public void Configure(EntityTypeBuilder<LaybyPlan> b)
+    {
+        b.ToTable("layby_plan", Schemas.AccountsReceivable);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PlanNumber).HasMaxLength(40);
+        b.Property(x => x.ForfeitPercent).HasPrecision(9, 4);
+        b.Property(x => x.DepositAccountCode).HasMaxLength(8);
+        b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
+        b.Property(x => x.ForfeitureAccountCode).HasMaxLength(8);
+        b.Property(x => x.Paid).HasPrecision(19, 4);
+        b.Property(x => x.Forfeited).HasPrecision(19, 4);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Ignore(x => x.Total);
+        b.Ignore(x => x.Balance);
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.LaybyPlanId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.PlanNumber }).IsUnique();
+        b.HasIndex(x => new { x.CompanyId, x.Status, x.FinalDate });
+    }
+}
+
+internal sealed class LaybyLineConfiguration : IEntityTypeConfiguration<LaybyLine>
+{
+    public void Configure(EntityTypeBuilder<LaybyLine> b)
+    {
+        b.ToTable("layby_line", Schemas.AccountsReceivable);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.Property(x => x.UnitPrice).HasPrecision(19, 4);
+        b.HasIndex(x => x.ItemId);
+    }
+}
+
 internal sealed class PaymentPromiseConfiguration : IEntityTypeConfiguration<PaymentPromise>
 {
     public void Configure(EntityTypeBuilder<PaymentPromise> b)

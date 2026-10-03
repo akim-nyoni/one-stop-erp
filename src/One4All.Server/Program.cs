@@ -580,6 +580,26 @@ app.MapGet("/api/budgets/utilisation-alerts", async (long companyId, long fiscal
 .RequireAuthorization()
 .WithName("BudgetUtilisationAlerts");
 
+app.MapPost("/api/ar/laybys", async (One4All.Application.Abstractions.Trading.LaybyRequest request, One4All.Application.Abstractions.Trading.ILaybyService laybys, CancellationToken ct) =>
+    ValueResponse(await laybys.OpenAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("OpenLayby");
+
+app.MapPost("/api/ar/laybys/{planId:long}/pay", async (long planId, long companyId, DateOnly date, decimal amount, string bankAccountCode, One4All.Application.Abstractions.Trading.ILaybyService laybys, CancellationToken ct) =>
+    ValueResponse(await laybys.PayAsync(companyId, planId, date, amount, bankAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PayLayby");
+
+app.MapPost("/api/ar/laybys/{planId:long}/cancel", async (long planId, long companyId, DateOnly date, string refundAccountCode, One4All.Application.Abstractions.Trading.ILaybyService laybys, CancellationToken ct) =>
+    ValueResponse(await laybys.CancelAsync(companyId, planId, date, refundAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CancelLayby");
+
+app.MapPost("/api/ar/laybys/default-overdue", async (long companyId, DateOnly asAtDate, string refundAccountCode, One4All.Application.Abstractions.Trading.ILaybyService laybys, CancellationToken ct) =>
+    ValueResponse(await laybys.DefaultOverdueAsync(companyId, asAtDate, refundAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DefaultOverdueLaybys");
+
 app.MapPost("/api/ar/items/{openItemId:long}/write-off-with-vat-relief", async (long openItemId, long companyId, DateOnly date, string badDebtAccountCode, string reason, int minimumDaysOverdue, One4All.Application.Abstractions.Trading.ISalesLedgerService ar, CancellationToken ct) =>
     ValueResponse(await ar.WriteOffWithVatReliefAsync(companyId, openItemId, date, badDebtAccountCode, reason, minimumDaysOverdue, ct).ConfigureAwait(false)))
 .RequireAuthorization()

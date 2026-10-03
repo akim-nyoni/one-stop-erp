@@ -10413,6 +10413,158 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("customer", "ar");
                 });
 
+            modelBuilder.Entity("One4All.Core.Trading.LaybyLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<long>("LaybyPlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("layby_plan_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id")
+                        .HasName("pk_layby_line");
+
+                    b.HasIndex("ItemId")
+                        .HasDatabaseName("ix_layby_line_item_id");
+
+                    b.HasIndex("LaybyPlanId")
+                        .HasDatabaseName("ix_layby_line_layby_plan_id");
+
+                    b.ToTable("layby_line", "ar");
+                });
+
+            modelBuilder.Entity("One4All.Core.Trading.LaybyPlan", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly?>("ClosedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("closed_on");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("DepositAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("deposit_account_code");
+
+                    b.Property<DateOnly>("FinalDate")
+                        .HasColumnType("date")
+                        .HasColumnName("final_date");
+
+                    b.Property<decimal>("ForfeitPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("forfeit_percent");
+
+                    b.Property<decimal>("Forfeited")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("forfeited");
+
+                    b.Property<string>("ForfeitureAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("forfeiture_account_code");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("OpenedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("opened_on");
+
+                    b.Property<decimal>("Paid")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("paid");
+
+                    b.Property<string>("PlanNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("plan_number");
+
+                    b.Property<string>("RevenueAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("revenue_account_code");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("WarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_layby_plan");
+
+                    b.HasIndex("CompanyId", "PlanNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_layby_plan_company_id_plan_number");
+
+                    b.HasIndex("CompanyId", "Status", "FinalDate")
+                        .HasDatabaseName("ix_layby_plan_company_id_status_final_date");
+
+                    b.ToTable("layby_plan", "ar");
+                });
+
             modelBuilder.Entity("One4All.Core.Trading.OpenItem", b =>
                 {
                     b.Property<long>("Id")
@@ -11909,6 +12061,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_period_module_status_fiscal_period_fiscal_period_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Trading.LaybyLine", b =>
+                {
+                    b.HasOne("One4All.Core.Trading.LaybyPlan", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("LaybyPlanId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_layby_line_layby_plan_layby_plan_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Workflow.WorkflowApproval", b =>
                 {
                     b.HasOne("One4All.Core.Workflow.WorkflowInstance", null)
@@ -12124,6 +12286,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.System.FiscalYear", b =>
                 {
                     b.Navigation("Periods");
+                });
+
+            modelBuilder.Entity("One4All.Core.Trading.LaybyPlan", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("One4All.Core.Workflow.WorkflowDefinition", b =>
