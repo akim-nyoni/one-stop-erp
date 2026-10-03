@@ -47,6 +47,11 @@ public sealed class BankReconciliationService : IBankReconciliationService
             return account.Error;
         }
 
+        if (account.Value.ReconciledTo is DateOnly locked && lines.Any(l => l.StatementDate <= locked))
+        {
+            return Error.Rule("Cb.ReconciledLocked", $"The account is reconciled to {locked:yyyy-MM-dd}; statement lines on or before it cannot be added.");
+        }
+
         foreach (StatementLineImport line in lines)
         {
             _db.Set<BankStatementLine>().Add(new BankStatementLine(companyId, bankAccountId, line.StatementDate, line.Description, line.Amount, line.Reference));
@@ -167,9 +172,46 @@ public sealed class BankReconciliationService : IBankReconciliationService
             return Result.Failure(Error.Rule("Bank.NotReconciled", "The statement line is not reconciled."));
         }
 
+        DateOnly? locked = await _db.Set<BankAccount>().Where(b => b.Id == line.BankAccountId).Select(b => b.ReconciledTo).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (locked is DateOnly lockedTo && line.StatementDate <= lockedTo)
+        {
+            return Result.Failure(Error.Rule("Cb.ReconciledLocked", $"The account is reconciled to {lockedTo:yyyy-MM-dd}; matches on or before it cannot be undone."));
+        }
+
         line.Unmatch();
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<BankReconciliationReport>> SignOffAsync(long companyId, long bankAccountId, DateOnly asAtDate, long userId, CancellationToken ct = default)
+    {
+        Result<BankAccount> account = await LoadAccountAsync(companyId, bankAccountId, ct).ConfigureAwait(false);
+        if (account.IsFailure)
+        {
+            return account.Error;
+        }
+
+        if (account.Value.ReconciledTo is DateOnly previous && asAtDate <= previous)
+        {
+            return Error.Rule("Cb.AlreadyReconciled", $"The account is already reconciled to {previous:yyyy-MM-dd}.");
+        }
+
+        Result<BankReconciliationReport> report = await GetReconciliationAsync(companyId, bankAccountId, asAtDate, ct).ConfigureAwait(false);
+        if (report.IsFailure)
+        {
+            return report.Error;
+        }
+
+        if (report.Value.UnmatchedStatementItems.Count > 0 || report.Value.Difference != 0m)
+        {
+            return Error.Rule("Cb.NotReconciled",
+                $"The reconciliation does not agree: {report.Value.UnmatchedStatementItems.Count} statement line(s) are not in the ledger and the difference is {report.Value.Difference:0.00}.");
+        }
+
+        account.Value.SignOff(asAtDate, userId);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return report.Value;
     }
 
     /// <inheritdoc />

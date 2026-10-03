@@ -1326,6 +1326,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<long?>("ReconciledByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reconciled_by_user_id");
+
+                    b.Property<DateOnly?>("ReconciledTo")
+                        .HasColumnType("date")
+                        .HasColumnName("reconciled_to");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()

@@ -113,6 +113,16 @@ public sealed class PostingEngine : IPostingEngine
                 $"Manual journals over {threshold:0.00} {baseCurrency} need a second user's approval: submit the journal for approval.");
         }
 
+        // A bank account reconciled and signed off to a date takes no more entries on or before it.
+        List<string> lineAccounts = [.. journal.Lines.Select(l => l.AccountCode).Distinct()];
+        string? lockedBank = await _db.Set<Core.Banking.BankAccount>()
+            .Where(b => b.CompanyId == request.CompanyId && lineAccounts.Contains(b.GlAccountCode) && b.ReconciledTo != null && b.ReconciledTo >= request.PostingDate)
+            .Select(b => b.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (lockedBank is not null)
+        {
+            return Error.Rule("Posting.BankReconciled", $"Bank account {lockedBank} is reconciled past {request.PostingDate:yyyy-MM-dd}; post the entry in an open period.");
+        }
+
         // Fund control: no expenditure against a vote without an appropriation.
         if (company.FundControlEnabled && await CheckAppropriationAsync(request.CompanyId, fiscalYear.Id, journal, ct).ConfigureAwait(false) is { } unappropriated)
         {

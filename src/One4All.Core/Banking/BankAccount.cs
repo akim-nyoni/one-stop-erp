@@ -57,6 +57,24 @@ public sealed class BankAccount : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Whether the account is active.</summary>
     public bool IsActive { get; set; }
+
+    /// <summary>
+    /// The date the account is reconciled and signed off to (brief §4.7): nothing can be posted to its ledger account,
+    /// imported onto its statement, or unmatched, on or before it.
+    /// </summary>
+    public DateOnly? ReconciledTo { get; private set; }
+
+    /// <summary>Who signed off the latest reconciliation.</summary>
+    public long? ReconciledByUserId { get; private set; }
+
+    /// <summary>Signs off the reconciliation to a date, locking the period up to it.</summary>
+    /// <param name="asAt">The date reconciled to.</param>
+    /// <param name="userId">Who signed it off.</param>
+    public void SignOff(DateOnly asAt, long userId)
+    {
+        ReconciledTo = asAt;
+        ReconciledByUserId = userId;
+    }
 }
 
 /// <summary>

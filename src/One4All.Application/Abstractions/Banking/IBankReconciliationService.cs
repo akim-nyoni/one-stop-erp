@@ -159,4 +159,17 @@ public interface IBankReconciliationService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The reconciliation, or an error.</returns>
     Task<Result<BankReconciliationReport>> GetReconciliationAsync(long companyId, long bankAccountId, DateOnly asAtDate, CancellationToken ct = default);
+
+    /// <summary>
+    /// Signs off the reconciliation to a date and locks the period (brief §4.7): the reconciliation must agree to the
+    /// cent with every statement line to that date in the ledger. Afterwards nothing can be posted to the bank's ledger
+    /// account, imported onto its statement, or unmatched, on or before the date.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="bankAccountId">The bank account.</param>
+    /// <param name="asAtDate">The date reconciled to; after any earlier sign-off.</param>
+    /// <param name="userId">Who signs it off.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The reconciliation signed off, or why it cannot be.</returns>
+    Task<Result<BankReconciliationReport>> SignOffAsync(long companyId, long bankAccountId, DateOnly asAtDate, long userId, CancellationToken ct = default);
 }
