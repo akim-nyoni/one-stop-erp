@@ -600,6 +600,31 @@ app.MapPost("/api/ar/laybys/default-overdue", async (long companyId, DateOnly as
 .RequireAuthorization()
 .WithName("DefaultOverdueLaybys");
 
+app.MapPost("/api/ar/customers/{customerId:long}/credit-limit/lower", async (long customerId, long companyId, decimal limit, One4All.Application.Abstractions.Trading.ICreditLimitService limits, CancellationToken ct) =>
+    ActionResponse(await limits.LowerAsync(companyId, customerId, limit, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LowerCreditLimit");
+
+app.MapPost("/api/ar/customers/{customerId:long}/credit-limit/request", async (long customerId, long companyId, decimal limit, string reason, long userId, One4All.Application.Abstractions.Trading.ICreditLimitService limits, CancellationToken ct) =>
+    ValueResponse(await limits.RequestIncreaseAsync(companyId, customerId, limit, reason, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RequestCreditLimitIncrease");
+
+app.MapGet("/api/ar/credit-limit-requests", async (long companyId, One4All.Application.Abstractions.Trading.ICreditLimitService limits, CancellationToken ct) =>
+    Results.Ok(await limits.PendingAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PendingCreditLimitRequests");
+
+app.MapPost("/api/ar/credit-limit-requests/{requestId:long}/approve", async (long requestId, long companyId, long userId, One4All.Application.Abstractions.Trading.ICreditLimitService limits, CancellationToken ct) =>
+    ActionResponse(await limits.ApproveAsync(companyId, requestId, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveCreditLimitRequest");
+
+app.MapPost("/api/ar/credit-limit-requests/{requestId:long}/reject", async (long requestId, long companyId, long userId, string reason, One4All.Application.Abstractions.Trading.ICreditLimitService limits, CancellationToken ct) =>
+    ActionResponse(await limits.RejectAsync(companyId, requestId, userId, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RejectCreditLimitRequest");
+
 app.MapGet("/api/pop/supplier-scorecard", async (long companyId, DateOnly from, DateOnly to, One4All.Application.Abstractions.Procurement.ISupplierScorecardService scorecard, CancellationToken ct) =>
     Results.Ok(await scorecard.ScorecardAsync(companyId, from, to, ct).ConfigureAwait(false)))
 .RequireAuthorization()

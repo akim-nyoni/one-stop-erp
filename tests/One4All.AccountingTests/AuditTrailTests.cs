@@ -32,12 +32,12 @@ public sealed class AuditTrailTests
         {
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             companyId = await Scenario.SeedAsync(db);
-            Customer customer = new(companyId, "AUD-C", "Audited Buyer", Scenario.Usd) { CreditLimit = 1_000m };
+            Customer customer = new(companyId, "AUD-C", "Audited Buyer", Scenario.Usd) { CreditLimit = 2_500m };
             db.Customers.Add(customer);
             await db.SaveChangesAsync();
             customerId = customer.Id;
 
-            customer.CreditLimit = 2_500m;
+            customer.LowerCreditLimit(1_000m);
             await db.SaveChangesAsync();
         }
 
@@ -49,8 +49,8 @@ public sealed class AuditTrailTests
             customerTrail.Should().HaveCount(2);
             customerTrail[0].Action.Should().Be(AuditAction.Update); // newest first
             customerTrail[0].ChangedFields.Should().Contain("CreditLimit");
-            customerTrail[0].OldValues.Should().Contain("1000");
-            customerTrail[0].NewValues.Should().Contain("2500");
+            customerTrail[0].OldValues.Should().Contain("2500");
+            customerTrail[0].NewValues.Should().Contain("1000");
             customerTrail[1].Action.Should().Be(AuditAction.Insert);
 
             (await audit.QueryAsync(new AuditQuery { CompanyId = companyId, EntityType = "Customer", Action = AuditAction.Update })).Should().ContainSingle();
@@ -72,18 +72,18 @@ public sealed class AuditTrailTests
 
             // The log is append-only in the database: an ordinary UPDATE or DELETE is refused outright.
             Func<Task> update = () => db.Database.ExecuteSqlInterpolatedAsync(
-                $"UPDATE audit.change_log SET new_values = REPLACE(new_values, '2500', '25000') WHERE id = {tamperedId}");
+                $"UPDATE audit.change_log SET new_values = REPLACE(new_values, '1000', '10000') WHERE id = {tamperedId}");
             (await update.Should().ThrowAsync<Npgsql.PostgresException>()).Which.MessageText.Should().Contain("append-only");
             Func<Task> delete = () => db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM audit.change_log WHERE id = {tamperedId}");
             await delete.Should().ThrowAsync<Npgsql.PostgresException>();
 
             // Someone able to switch the trigger off (the table owner) quietly rewrites history: the credit-limit
-            // change now says 25,000. The hash chain must still catch it.
+            // change now says 10,000. The hash chain must still catch it.
             await db.Database.ExecuteSqlRawAsync("ALTER TABLE audit.change_log DISABLE TRIGGER trg_change_log_no_update_delete");
             try
             {
                 int rows = await db.Database.ExecuteSqlInterpolatedAsync(
-                    $"UPDATE audit.change_log SET new_values = REPLACE(new_values, '2500', '25000') WHERE id = {tamperedId}");
+                    $"UPDATE audit.change_log SET new_values = REPLACE(new_values, '1000', '10000') WHERE id = {tamperedId}");
                 rows.Should().Be(1);
             }
             finally

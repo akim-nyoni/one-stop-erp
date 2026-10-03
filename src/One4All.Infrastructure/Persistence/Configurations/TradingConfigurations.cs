@@ -45,6 +45,22 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
     }
 }
 
+internal sealed class CreditLimitRequestConfiguration : IEntityTypeConfiguration<CreditLimitRequest>
+{
+    public void Configure(EntityTypeBuilder<CreditLimitRequest> b)
+    {
+        b.ToTable("credit_limit_request", Schemas.AccountsReceivable, t =>
+            t.HasCheckConstraint("ck_credit_limit_request_reviewer_not_requester", "status <> 1 OR reviewed_by_user_id <> requested_by_user_id"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.CurrentLimit).HasPrecision(19, 4);
+        b.Property(x => x.RequestedLimit).HasPrecision(19, 4);
+        b.Property(x => x.Reason).HasMaxLength(500);
+        b.Property(x => x.RejectionReason).HasMaxLength(256);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => x.CustomerId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_credit_limit_request_one_pending");
+    }
+}
+
 internal sealed class LaybyPlanConfiguration : IEntityTypeConfiguration<LaybyPlan>
 {
     public void Configure(EntityTypeBuilder<LaybyPlan> b)

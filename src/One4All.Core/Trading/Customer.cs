@@ -10,6 +10,8 @@ namespace One4All.Core.Trading;
 /// </summary>
 public sealed class Customer : SoftDeletableEntity, ICompanyScoped
 {
+    private decimal _creditLimit;
+
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private Customer()
     {
@@ -45,8 +47,38 @@ public sealed class Customer : SoftDeletableEntity, ICompanyScoped
     /// <summary>The trading currency.</summary>
     public CurrencyCode Currency { get; private set; }
 
-    /// <summary>The credit limit in the trading currency (0 = no credit).</summary>
-    public decimal CreditLimit { get; set; }
+    /// <summary>
+    /// The credit limit in the trading currency (0 = no limit). Set when the customer is created; afterwards it can be
+    /// lowered directly but raised only through an approved <see cref="CreditLimitRequest"/>.
+    /// </summary>
+    public decimal CreditLimit { get => _creditLimit; init => _creditLimit = value; }
+
+    /// <summary>Lowers the credit limit, which only reduces risk and so needs no approval.</summary>
+    /// <param name="limit">The new, lower limit; positive.</param>
+    /// <exception cref="InvalidOperationException">Thrown when the new limit would allow more credit.</exception>
+    public void LowerCreditLimit(decimal limit)
+    {
+        if (limit <= 0m || CreditLimitRequest.IsIncrease(_creditLimit, limit) || limit == _creditLimit)
+        {
+            throw new InvalidOperationException("A credit limit can be lowered directly; raising it needs an approved request.");
+        }
+
+        _creditLimit = limit;
+    }
+
+    /// <summary>Applies an approved request to raise the credit limit.</summary>
+    /// <param name="request">The request; it must be this customer's and approved.</param>
+    /// <exception cref="InvalidOperationException">Thrown for a request that is not this customer's or not approved.</exception>
+    public void RaiseCreditLimit(CreditLimitRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.CustomerId != Id || request.Status != CreditLimitRequestStatus.Approved)
+        {
+            throw new InvalidOperationException("A credit limit is raised only by an approved request.");
+        }
+
+        _creditLimit = request.RequestedLimit;
+    }
 
     /// <summary>Payment terms in days from the ageing-basis date.</summary>
     public int PaymentTermsDays { get; set; } = 30;

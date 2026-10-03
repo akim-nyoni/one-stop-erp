@@ -54,7 +54,7 @@ public sealed class CreditControlTests
             // (as a credit controller would), leaving the balance above the limit for the review to catch.
             (await ar.PostInvoiceAsync(Invoice(companyId, overLimitId, "CC-L1", new DateOnly(2026, 5, 1), 400m))).IsSuccess.Should().BeTrue();
             (await ar.PostInvoiceAsync(Invoice(companyId, overLimitId, "CC-L2", new DateOnly(2026, 5, 2), 500m))).IsSuccess.Should().BeTrue();
-            overLimit.CreditLimit = 500m;
+            overLimit.LowerCreditLimit(500m);
 
             // Overdue: due 2026-03-03, well past tolerance at the review date.
             (await ar.PostInvoiceAsync(Invoice(companyId, overdueId, "CC-D1", new DateOnly(2026, 2, 1), 250m))).IsSuccess.Should().BeTrue();
