@@ -35,6 +35,9 @@ internal static class AtomicWork
     public static Task<Result> AtomicAsync(this One4AllDbContext db, Func<Task<Result>> work, CancellationToken ct)
         => RunAsync(db, work, r => r.IsSuccess, ct);
 
+    /// <summary>How many times a unit of work that lost a concurrency race is attempted in all.</summary>
+    internal const int MaxAttempts = 3;
+
     private static async Task<TResult> RunAsync<TResult>(One4AllDbContext db, Func<Task<TResult>> work, Func<TResult, bool> succeeded, CancellationToken ct)
     {
         if (db.Database.CurrentTransaction is not null)
@@ -42,28 +45,57 @@ internal static class AtomicWork
             return await work().ConfigureAwait(false);
         }
 
-        List<TrackedState> before = Snapshot(db);
-        await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
-        try
+        for (int attempt = 1; ; attempt++)
         {
-            TResult result = await work().ConfigureAwait(false);
-            if (succeeded(result))
+            List<TrackedState> before = Snapshot(db);
+            await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+            try
             {
-                await transaction.CommitAsync(ct).ConfigureAwait(false);
+                TResult result = await work().ConfigureAwait(false);
+                if (succeeded(result))
+                {
+                    await transaction.CommitAsync(ct).ConfigureAwait(false);
+                    return result;
+                }
+
+                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                RestoreTracker(db, before);
                 return result;
             }
-
-            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            RestoreTracker(db, before);
-            return result;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            RestoreTracker(db, before);
-            throw;
+            catch (DbUpdateException ex) when (attempt < MaxAttempts && LostRace(ex))
+            {
+                // Another user changed a row this work updates (typically the journal number sequence or a period
+                // balance, when two postings race). Everything is rolled back and put back; the work runs again and
+                // re-reads those rows.
+                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                RestoreTracker(db, before);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                RestoreTracker(db, before);
+                throw;
+            }
         }
     }
+
+    /// <summary>Constraints two concurrent postings can both try to satisfy with the same new row.</summary>
+    private static readonly HashSet<string> RaceConstraints = new(StringComparer.Ordinal)
+    {
+        "ix_journal_company_id_journal_number",                          // both took the same next journal number
+        "ix_period_balance_company_id_fiscal_period_id_account_code_cos", // both created the same period balance
+        "ix_number_sequence_company_id_branch_id_document_type",         // both created the company's sequence
+        "pk_number_sequence_year",                                       // both opened the same year's counter
+    };
+
+    /// <summary>
+    /// Whether a failed save lost a race with another posting rather than broke a rule: an optimistic-concurrency
+    /// conflict (the row's <c>xmin</c> moved on), or a unique violation on one of the counter / balance constraints that
+    /// concurrent postings both try to satisfy.
+    /// </summary>
+    private static bool LostRace(DbUpdateException ex)
+        => ex is DbUpdateConcurrencyException
+           || (ex.InnerException is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.UniqueViolation } pg && pg.ConstraintName is { } name && RaceConstraints.Contains(name));
 
     private static List<TrackedState> Snapshot(One4AllDbContext db)
     {

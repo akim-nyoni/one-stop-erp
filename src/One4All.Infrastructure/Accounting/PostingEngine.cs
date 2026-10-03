@@ -25,7 +25,11 @@ public sealed class PostingEngine : IPostingEngine
     public PostingEngine(One4AllDbContext db) => _db = db;
 
     /// <inheritdoc />
-    public async Task<Result<PostingReceipt>> PostAsync(JournalRequest request, CancellationToken ct = default)
+    public Task<Result<PostingReceipt>> PostAsync(JournalRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PostCoreAsync(request, ct), ct);
+
+    // One unit of work, retried if it loses a race with another posting for the sequence or a period balance.
+    private async Task<Result<PostingReceipt>> PostCoreAsync(JournalRequest request, CancellationToken ct)
     {
         if (request.Lines.Count == 0)
         {
@@ -119,7 +123,11 @@ public sealed class PostingEngine : IPostingEngine
     }
 
     /// <inheritdoc />
-    public async Task<Result<PostingReceipt>> ReleaseDeferredAsync(long companyId, long journalId, CancellationToken ct = default)
+    public Task<Result<PostingReceipt>> ReleaseDeferredAsync(long companyId, long journalId, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReleaseDeferredCoreAsync(companyId, journalId, ct), ct);
+
+    // One unit of work, retried if it loses a race with another posting for the sequence or a period balance.
+    private async Task<Result<PostingReceipt>> ReleaseDeferredCoreAsync(long companyId, long journalId, CancellationToken ct)
     {
         JournalEntry? journal = await _db.Journals.Include(j => j.Lines)
             .FirstOrDefaultAsync(j => j.Id == journalId && j.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -181,7 +189,11 @@ public sealed class PostingEngine : IPostingEngine
     }
 
     /// <inheritdoc />
-    public async Task<Result<PostingReceipt>> ReverseAsync(long companyId, long journalId, DateOnly date, string reason, CancellationToken ct = default)
+    public Task<Result<PostingReceipt>> ReverseAsync(long companyId, long journalId, DateOnly date, string reason, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReverseCoreAsync(companyId, journalId, date, reason, ct), ct);
+
+    // One unit of work, retried if it loses a race with another posting for the sequence or a period balance.
+    private async Task<Result<PostingReceipt>> ReverseCoreAsync(long companyId, long journalId, DateOnly date, string reason, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
