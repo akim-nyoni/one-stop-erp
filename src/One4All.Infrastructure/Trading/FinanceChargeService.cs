@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Trading;
 using One4All.Application.Trading;
 using One4All.Core.Common;
+using One4All.Core.Municipal;
 using One4All.Core.System;
 using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
@@ -48,12 +49,12 @@ public sealed class FinanceChargeService : IFinanceChargeService
 
         Company company = await _db.Companies.FirstAsync(c => c.Id == request.CompanyId, ct).ConfigureAwait(false);
 
-        // Finance charges themselves never earn interest (no interest on interest).
+        // Finance charges earn interest only under the compounding rule (by default no interest on interest).
         List<OpenItem> arDebits = await _db.Set<OpenItem>()
             .Where(o => o.CompanyId == request.CompanyId
                 && o.Ledger == TradingLedger.AccountsReceivable
                 && o.Sign == LedgerSign.Debit
-                && o.ItemType != OpenItemType.Interest
+                && (request.Compound || o.ItemType != OpenItemType.Interest)
                 && o.OutstandingBase > 0m)
             .ToListAsync(ct).ConfigureAwait(false);
 
@@ -61,6 +62,21 @@ public sealed class FinanceChargeService : IFinanceChargeService
         List<OpenItem> overdue = arDebits
             .Where(o => o.Currency == company.BaseCurrency && o.DueDate.AddDays(request.GraceDays) < request.AsAtDate)
             .ToList();
+
+        // Exempt accounts: flagged customers, and indigent ratepayers when the run exempts them.
+        HashSet<long> overdueCustomers = [.. overdue.Select(o => o.TraderId)];
+        HashSet<long> exempt = [.. await _db.Customers.Where(c => c.CompanyId == request.CompanyId && c.InterestExempt && overdueCustomers.Contains(c.Id))
+            .Select(c => c.Id).ToListAsync(ct).ConfigureAwait(false)];
+        if (request.ExemptIndigent)
+        {
+            exempt.UnionWith(await (
+                from r in _db.Set<IndigentRegistration>()
+                join p in _db.Properties on r.PropertyId equals p.Id
+                where r.CompanyId == request.CompanyId && r.Status == IndigentStatus.Active && overdueCustomers.Contains(p.RatepayerCustomerId)
+                select p.RatepayerCustomerId).ToListAsync(ct).ConfigureAwait(false));
+        }
+
+        overdue = [.. overdue.Where(o => !exempt.Contains(o.TraderId))];
 
         // Unallocated receipts and credit notes stop interest on what they cover from their date.
         HashSet<long> chargeable = [.. overdue.Select(o => o.TraderId)];
@@ -138,6 +154,6 @@ public sealed class FinanceChargeService : IFinanceChargeService
             charges.Add(new CustomerFinanceCharge(byCustomer.Key, overdueAmount, maxDays, interest, documentNumber));
         }
 
-        return new FinanceChargeRunResult(charges, charges.Sum(c => c.Interest));
+        return new FinanceChargeRunResult(charges, charges.Sum(c => c.Interest), exempt.Count);
     }
 }

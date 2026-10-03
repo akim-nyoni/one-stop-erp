@@ -95,6 +95,9 @@ public sealed class Customer : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the account is on hold (blocks new sales on credit).</summary>
     public bool OnHold { get; set; }
 
+    /// <summary>Whether the account is exempt from interest on arrears (government, charities, by council resolution).</summary>
+    public bool InterestExempt { get; set; }
+
     /// <summary>Optional tax registration / VAT number.</summary>
     public string? TaxRegistration { get; set; }
 

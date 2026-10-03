@@ -12062,6 +12062,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
 
+                    b.Property<bool>("InterestExempt")
+                        .HasColumnType("boolean")
+                        .HasColumnName("interest_exempt");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");

@@ -25,6 +25,15 @@ public sealed class FinanceChargeRunRequest
 
     /// <summary>A prefix for the finance-charge document numbers.</summary>
     public string DocumentPrefix { get; init; } = "FC";
+
+    /// <summary>
+    /// The compounding rule: when true, unpaid finance charges earn interest too; when false (the default) interest is
+    /// charged on the original debt only.
+    /// </summary>
+    public bool Compound { get; init; }
+
+    /// <summary>Whether ratepayers of properties on the active indigent register are exempt (customers flagged exempt always are).</summary>
+    public bool ExemptIndigent { get; init; }
 }
 
 /// <summary>The finance charge raised for one customer.</summary>
@@ -38,7 +47,8 @@ public readonly record struct CustomerFinanceCharge(long CustomerId, decimal Ove
 /// <summary>The result of a finance-charge run.</summary>
 /// <param name="Charges">The charges raised, one per customer charged.</param>
 /// <param name="TotalInterest">The total interest raised.</param>
-public sealed record FinanceChargeRunResult(IReadOnlyList<CustomerFinanceCharge> Charges, decimal TotalInterest);
+/// <param name="CustomersExempted">Customers with overdue items left uncharged because they are exempt.</param>
+public sealed record FinanceChargeRunResult(IReadOnlyList<CustomerFinanceCharge> Charges, decimal TotalInterest, int CustomersExempted = 0);
 
 /// <summary>
 /// Raises interest (finance charges) on overdue customer balances (brief §4.5). Scans the AR ledger for
