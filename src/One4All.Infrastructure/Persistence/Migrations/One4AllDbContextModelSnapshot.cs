@@ -22,6 +22,132 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("One4All.Core.Accounting.AllocationRule", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Basis")
+                        .HasColumnType("integer")
+                        .HasColumnName("basis");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.Property<string>("SourceAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("source_account_code");
+
+                    b.Property<string>("SourceCostCentre")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("source_cost_centre");
+
+                    b.Property<string>("TargetAccountCode")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("target_account_code");
+
+                    b.HasKey("Id")
+                        .HasName("pk_allocation_rule");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_allocation_rule_company_id_code");
+
+                    b.ToTable("allocation_rule", "gl");
+                });
+
+            modelBuilder.Entity("One4All.Core.Accounting.AllocationRuleTarget", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AllocationRuleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("allocation_rule_id");
+
+                    b.Property<string>("CostCentre")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("cost_centre");
+
+                    b.Property<string>("Department")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("department");
+
+                    b.Property<decimal>("Driver")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("driver");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_allocation_rule_target");
+
+                    b.HasIndex("AllocationRuleId")
+                        .HasDatabaseName("ix_allocation_rule_target_allocation_rule_id");
+
+                    b.ToTable("allocation_rule_target", "gl");
+                });
+
             modelBuilder.Entity("One4All.Core.Accounting.CostCentre", b =>
                 {
                     b.Property<long>("Id")
@@ -10855,6 +10981,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("stage", "wf");
                 });
 
+            modelBuilder.Entity("One4All.Core.Accounting.AllocationRuleTarget", b =>
+                {
+                    b.HasOne("One4All.Core.Accounting.AllocationRule", null)
+                        .WithMany("Targets")
+                        .HasForeignKey("AllocationRuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_allocation_rule_target_allocation_rule_allocation_rule_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Accounting.JournalLine", b =>
                 {
                     b.HasOne("One4All.Core.Accounting.JournalEntry", null)
@@ -11322,6 +11458,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_stage_definition_workflow_definition_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Accounting.AllocationRule", b =>
+                {
+                    b.Navigation("Targets");
                 });
 
             modelBuilder.Entity("One4All.Core.Accounting.JournalEntry", b =>

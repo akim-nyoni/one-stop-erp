@@ -474,6 +474,26 @@ app.MapPost("/api/gl/journals/{journalId:long}/reject", async (long journalId, l
 .RequireAuthorization()
 .WithName("RejectJournal");
 
+app.MapPost("/api/gl/allocation-rules", async (One4All.Application.Abstractions.Accounting.AllocationRuleRequest request, One4All.Application.Abstractions.Accounting.IOverheadAllocationService allocation, CancellationToken ct) =>
+    ValueResponse(await allocation.CreateRuleAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CreateAllocationRule");
+
+app.MapPut("/api/gl/allocation-rules/{ruleId:long}/drivers", async (long ruleId, long companyId, One4All.Application.Abstractions.Accounting.AllocationTargetRequest[] targets, One4All.Application.Abstractions.Accounting.IOverheadAllocationService allocation, CancellationToken ct) =>
+    ActionResponse(await allocation.SetDriversAsync(companyId, ruleId, targets, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SetAllocationDrivers");
+
+app.MapGet("/api/gl/allocations/preview", async (long companyId, DateOnly periodDate, One4All.Application.Abstractions.Accounting.IOverheadAllocationService allocation, CancellationToken ct) =>
+    ValueResponse(await allocation.PreviewAsync(companyId, periodDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PreviewAllocations");
+
+app.MapPost("/api/gl/allocations/run", async (long companyId, DateOnly periodDate, One4All.Application.Abstractions.Accounting.IOverheadAllocationService allocation, CancellationToken ct) =>
+    ValueResponse(await allocation.RunAsync(companyId, periodDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RunAllocations");
+
 app.MapGet("/api/consolidation/trial-balance", async (long[] companyIds, DateOnly asAtDate, string? presentationCurrency, string[]? intercompanyAccounts, One4All.Application.Abstractions.Reporting.IConsolidationService consolidation, CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(presentationCurrency))

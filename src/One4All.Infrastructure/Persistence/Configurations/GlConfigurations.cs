@@ -86,6 +86,37 @@ internal sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journ
     }
 }
 
+internal sealed class AllocationRuleConfiguration : IEntityTypeConfiguration<AllocationRule>
+{
+    public void Configure(EntityTypeBuilder<AllocationRule> b)
+    {
+        b.ToTable("allocation_rule", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.Basis).HasConversion<int>();
+        b.Property(x => x.SourceAccountCode).HasMaxLength(8);
+        b.Property(x => x.SourceCostCentre).HasMaxLength(3);
+        b.Property(x => x.TargetAccountCode).HasMaxLength(8);
+        b.Ignore(x => x.ChargeAccountCode);
+        b.HasMany(x => x.Targets).WithOne().HasForeignKey(x => x.AllocationRuleId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Targets).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class AllocationRuleTargetConfiguration : IEntityTypeConfiguration<AllocationRuleTarget>
+{
+    public void Configure(EntityTypeBuilder<AllocationRuleTarget> b)
+    {
+        b.ToTable("allocation_rule_target", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.CostCentre).HasMaxLength(3);
+        b.Property(x => x.Department).HasMaxLength(3);
+        b.Property(x => x.Driver).HasPrecision(19, 4);
+    }
+}
+
 internal sealed class JournalLineConfiguration : IEntityTypeConfiguration<JournalLine>
 {
     public void Configure(EntityTypeBuilder<JournalLine> b)
