@@ -115,9 +115,10 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
     /// <param name="amount">The budgeted amount.</param>
     /// <param name="costCentre">The cost centre, if any.</param>
     /// <returns>The created line.</returns>
-    public BudgetLine AddLine(string accountCode, int period, decimal amount, string? costCentre = null)
+    /// <param name="virementId">The approved virement adding the line, if any.</param>
+    public BudgetLine AddLine(string accountCode, int period, decimal amount, string? costCentre = null, long? virementId = null)
     {
-        BudgetLine line = new(accountCode, period, amount, costCentre);
+        BudgetLine line = new(accountCode, period, amount, costCentre, virementId);
         _lines.Add(line);
         return line;
     }
@@ -151,12 +152,14 @@ public sealed class BudgetLine : Entity
     /// <param name="period">The period (month 1–12).</param>
     /// <param name="amount">The budgeted amount.</param>
     /// <param name="costCentre">The cost centre, if any.</param>
-    public BudgetLine(string accountCode, int period, decimal amount, string? costCentre)
+    /// <param name="virementId">The approved virement that added the line, if any.</param>
+    public BudgetLine(string accountCode, int period, decimal amount, string? costCentre, long? virementId = null)
     {
         AccountCode = accountCode;
         Period = period;
         Amount = amount;
         CostCentre = costCentre;
+        VirementId = virementId;
     }
 
     /// <summary>The owning budget id.</summary>
@@ -173,4 +176,7 @@ public sealed class BudgetLine : Entity
 
     /// <summary>The budgeted amount.</summary>
     public decimal Amount { get; private set; }
+
+    /// <summary>The approved virement that added the line; null for the budget as approved.</summary>
+    public long? VirementId { get; private set; }
 }

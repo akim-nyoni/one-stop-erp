@@ -539,6 +539,31 @@ app.MapPost("/api/ap/bank-changes/{changeId:long}/reject", async (long changeId,
 .RequireAuthorization()
 .WithName("RejectSupplierBankChange");
 
+app.MapPost("/api/budgets/{budgetId:long}/virements", async (long budgetId, long companyId, long userId, One4All.Application.Abstractions.Budgeting.VirementRequest request, One4All.Application.Abstractions.Budgeting.IBudgetControlService control, CancellationToken ct) =>
+    ValueResponse(await control.RequestVirementAsync(companyId, budgetId, request, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RequestVirement");
+
+app.MapPost("/api/budgets/virements/{virementId:long}/approve", async (long virementId, long companyId, long userId, One4All.Application.Abstractions.Budgeting.IBudgetControlService control, CancellationToken ct) =>
+    ActionResponse(await control.ApproveVirementAsync(companyId, virementId, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveVirement");
+
+app.MapPost("/api/budgets/virements/{virementId:long}/reject", async (long virementId, long companyId, long userId, string reason, One4All.Application.Abstractions.Budgeting.IBudgetControlService control, CancellationToken ct) =>
+    ActionResponse(await control.RejectVirementAsync(companyId, virementId, userId, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RejectVirement");
+
+app.MapGet("/api/budgets/{budgetId:long}/virement-register", async (long budgetId, long companyId, One4All.Application.Abstractions.Budgeting.IBudgetControlService control, CancellationToken ct) =>
+    ValueResponse(await control.VirementRegisterAsync(companyId, budgetId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("VirementRegister");
+
+app.MapGet("/api/budgets/vote-book", async (long companyId, long fiscalYearId, int asAtPeriod, One4All.Application.Abstractions.Budgeting.IBudgetControlService control, CancellationToken ct) =>
+    Results.Ok(await control.VoteBookAsync(companyId, fiscalYearId, asAtPeriod, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("VoteBook");
+
 app.MapGet("/api/consolidation/trial-balance", async (long[] companyIds, DateOnly asAtDate, string? presentationCurrency, string[]? intercompanyAccounts, One4All.Application.Abstractions.Reporting.IConsolidationService consolidation, CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(presentationCurrency))

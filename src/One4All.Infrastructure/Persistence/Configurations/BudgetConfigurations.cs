@@ -35,6 +35,23 @@ internal sealed class BudgetLineConfiguration : IEntityTypeConfiguration<BudgetL
     }
 }
 
+internal sealed class BudgetVirementConfiguration : IEntityTypeConfiguration<BudgetVirement>
+{
+    public void Configure(EntityTypeBuilder<BudgetVirement> b)
+    {
+        b.ToTable("budget_virement", Schemas.Budget, t =>
+            t.HasCheckConstraint("ck_budget_virement_reviewer_not_requester", "status <> 1 OR reviewed_by_user_id <> requested_by_user_id"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.FromAccountCode).HasMaxLength(8);
+        b.Property(x => x.ToAccountCode).HasMaxLength(8);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Justification).HasMaxLength(500);
+        b.Property(x => x.RejectionReason).HasMaxLength(256);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.BudgetId, x.Status });
+    }
+}
+
 internal sealed class BudgetCommitmentConfiguration : IEntityTypeConfiguration<BudgetCommitment>
 {
     public void Configure(EntityTypeBuilder<BudgetCommitment> b)
