@@ -2,14 +2,16 @@ using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Reporting;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
+using One4All.Core.System;
 using One4All.Infrastructure.Persistence;
 
 namespace One4All.Infrastructure.Accounting;
 
 /// <summary>
 /// Consolidates several companies' ledgers into one trial balance by summing each account code across the
-/// group from the posted journals. Requires the companies to share a base currency (no FX translation) and
-/// produces a balanced result because each company's own postings balance.
+/// group from the posted journals. The plain consolidation requires a shared base currency; the translated one
+/// translates each company into a presentation currency first (IAS 21 current-rate method) and carries the
+/// difference as a translation reserve. Either way the result balances because each company's own postings do.
 /// </summary>
 public sealed class ConsolidationService : IConsolidationService
 {
@@ -94,5 +96,162 @@ public sealed class ConsolidationService : IConsolidationService
         }
 
         return new ConsolidatedTrialBalance(asAtDate, ids, rows, eliminated, unmatched);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<TranslatedTrialBalance>> TranslatedTrialBalanceAsync(IReadOnlyList<long> companyIds, CurrencyCode presentationCurrency, DateOnly asAtDate, IReadOnlyCollection<string>? intercompanyAccountCodes = null, CancellationToken ct = default)
+    {
+        if (companyIds is null || companyIds.Count == 0)
+        {
+            return Error.Validation("Consolidation.Companies", "At least one company is required.");
+        }
+
+        long[] ids = companyIds.Distinct().ToArray();
+        var companies = await _db.Companies
+            .Where(c => ids.Contains(c.Id))
+            .OrderBy(c => c.Code)
+            .Select(c => new { c.Id, c.Code, c.BaseCurrency })
+            .ToListAsync(ct).ConfigureAwait(false);
+        if (companies.Count == 0)
+        {
+            return Error.NotFound("Consolidation.NoCompanies", "None of the given companies exist.");
+        }
+
+        var accounts = await _db.Accounts
+            .Where(a => ids.Contains(a.CompanyId))
+            .Select(a => new { a.CompanyId, a.AccountCode, a.Name, a.Type })
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<(long, string), AccountType> types = accounts.ToDictionary(a => (a.CompanyId, a.AccountCode), a => a.Type);
+        Dictionary<string, string> names = accounts
+            .GroupBy(a => a.AccountCode, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Min(a => a.Name)!, StringComparer.Ordinal);
+
+        // Movements by company, account and posting date: balance-sheet accounts use only the total, the others are
+        // translated date by date.
+        var movements = await (
+            from l in _db.Set<JournalLine>()
+            join j in _db.Journals on l.JournalEntryId equals j.Id
+            where ids.Contains(j.CompanyId) && j.Status == JournalStatus.Posted && j.PostingDate <= asAtDate
+            group l by new { j.CompanyId, l.AccountCode, j.PostingDate } into g
+            select new { g.Key.CompanyId, g.Key.AccountCode, g.Key.PostingDate, Net = g.Sum(x => x.BaseDebit) - g.Sum(x => x.BaseCredit) })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<string, decimal> translated = new(StringComparer.Ordinal);
+        List<CompanyTranslation> translations = [];
+        foreach (var company in companies)
+        {
+            bool same = company.BaseCurrency == presentationCurrency;
+            decimal closing = 1m;
+            if (!same)
+            {
+                Result<decimal> closingRate = await RateAsync(company.BaseCurrency, presentationCurrency, ExchangeRateType.ClosingRate, asAtDate, ct).ConfigureAwait(false);
+                if (closingRate.IsFailure)
+                {
+                    return closingRate.Error;
+                }
+
+                closing = closingRate.Value;
+            }
+
+            Dictionary<DateOnly, decimal> dailyRates = [];
+            decimal companyNet = 0m;
+            foreach (var account in movements.Where(m => m.CompanyId == company.Id).GroupBy(m => m.AccountCode, StringComparer.Ordinal))
+            {
+                AccountType type = types.GetValueOrDefault((company.Id, account.Key), AccountType.Asset);
+                decimal amount;
+                if (same)
+                {
+                    amount = account.Sum(m => m.Net);
+                }
+                else if (type is AccountType.Asset or AccountType.Liability)
+                {
+                    amount = decimal.Round(account.Sum(m => m.Net) * closing, 2, MidpointRounding.ToEven);
+                }
+                else
+                {
+                    decimal sum = 0m;
+                    foreach (var movement in account)
+                    {
+                        if (!dailyRates.TryGetValue(movement.PostingDate, out decimal rate))
+                        {
+                            Result<decimal> daily = await RateAsync(company.BaseCurrency, presentationCurrency, ExchangeRateType.Daily, movement.PostingDate, ct).ConfigureAwait(false);
+                            if (daily.IsFailure)
+                            {
+                                return daily.Error;
+                            }
+
+                            dailyRates[movement.PostingDate] = rate = daily.Value;
+                        }
+
+                        sum += movement.Net * rate;
+                    }
+
+                    amount = decimal.Round(sum, 2, MidpointRounding.ToEven);
+                }
+
+                translated[account.Key] = translated.GetValueOrDefault(account.Key) + amount;
+                companyNet += amount;
+            }
+
+            // The company balanced in its own currency; whatever it no longer balances by is its translation difference.
+            translations.Add(new CompanyTranslation(company.Id, company.Code, company.BaseCurrency.Value, closing, companyNet));
+        }
+
+        HashSet<string> interco = new(intercompanyAccountCodes ?? [], StringComparer.Ordinal);
+        decimal eliminated = 0m;
+        decimal unmatched = 0m;
+        if (interco.Count > 0)
+        {
+            List<KeyValuePair<string, decimal>> intercoTotals = [.. translated.Where(t => interco.Contains(t.Key))];
+            unmatched = intercoTotals.Sum(t => t.Value);
+            if (unmatched == 0m)
+            {
+                eliminated = intercoTotals.Sum(t => Math.Max(0m, t.Value));
+                foreach (KeyValuePair<string, decimal> t in intercoTotals)
+                {
+                    translated.Remove(t.Key);
+                }
+            }
+        }
+
+        List<ConsolidatedTrialBalanceRow> rows = [];
+        foreach (KeyValuePair<string, decimal> t in translated.Where(t => t.Value != 0m).OrderBy(t => t.Key, StringComparer.Ordinal))
+        {
+            rows.Add(new ConsolidatedTrialBalanceRow(t.Key, names.GetValueOrDefault(t.Key, t.Key), t.Value > 0m ? t.Value : 0m, t.Value < 0m ? -t.Value : 0m));
+        }
+
+        decimal reserve = translations.Sum(c => c.TranslationDifference);
+        if (reserve != 0m)
+        {
+            rows.Add(new ConsolidatedTrialBalanceRow(TranslatedTrialBalance.TranslationReserveCode, "Foreign currency translation reserve",
+                reserve < 0m ? -reserve : 0m, reserve > 0m ? reserve : 0m));
+        }
+
+        return new TranslatedTrialBalance(asAtDate, presentationCurrency.Value, rows, translations, reserve, eliminated, unmatched);
+    }
+
+    // The rate converting one unit of `from` into `to` in force on a date: the latest rate of the type quoted either
+    // way round (an inverse quotation is inverted).
+    private async Task<Result<decimal>> RateAsync(CurrencyCode from, CurrencyCode to, ExchangeRateType type, DateOnly date, CancellationToken ct)
+    {
+        ExchangeRate? direct = await _db.ExchangeRates
+            .Where(r => r.FromCurrency == from && r.ToCurrency == to && r.RateType == type && r.EffectiveFrom <= date)
+            .OrderByDescending(r => r.EffectiveFrom)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (direct is not null)
+        {
+            return direct.Quotation == QuotationType.Direct ? direct.Rate : 1m / direct.Rate;
+        }
+
+        ExchangeRate? inverse = await _db.ExchangeRates
+            .Where(r => r.FromCurrency == to && r.ToCurrency == from && r.RateType == type && r.EffectiveFrom <= date)
+            .OrderByDescending(r => r.EffectiveFrom)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (inverse is not null)
+        {
+            return inverse.Quotation == QuotationType.Direct ? 1m / inverse.Rate : inverse.Rate;
+        }
+
+        return Error.Rule("Consolidation.NoRate", $"No {type} rate between {from} and {to} on or before {date:yyyy-MM-dd}.");
     }
 }

@@ -17,8 +17,9 @@ public static class Scenario
     /// <summary>Seeds the scenario and returns the created company id.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="openPeriods">Whether to open all periods for the GL/AR/POS modules.</param>
+    /// <param name="baseCurrency">The company's base currency (USD when omitted).</param>
     /// <returns>The company id.</returns>
-    public static async Task<long> SeedAsync(One4AllDbContext db, bool openPeriods = true)
+    public static async Task<long> SeedAsync(One4AllDbContext db, bool openPeriods = true, CurrencyCode? baseCurrency = null)
     {
         // Currencies and the FX rate are global reference data shared by the collection's single
         // database — seed them only once.
@@ -46,7 +47,7 @@ public static class Scenario
 
         // Each test gets its own company (unique code) so tests on the shared database don't collide.
         string code = "TC" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
-        Company company = new(code, "Test Trading Co", Usd, "UTC");
+        Company company = new(code, "Test Trading Co", baseCurrency ?? Usd, "UTC");
         db.Companies.Add(company);
         await db.SaveChangesAsync();
 

@@ -390,6 +390,23 @@ app.MapPost("/api/accounting/release-deferred", async (long companyId, DateOnly 
 .RequireAuthorization()
 .WithName("ReleaseDeferredJournals");
 
+app.MapGet("/api/consolidation/trial-balance", async (long[] companyIds, DateOnly asAtDate, string? presentationCurrency, string[]? intercompanyAccounts, One4All.Application.Abstractions.Reporting.IConsolidationService consolidation, CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(presentationCurrency))
+    {
+        return ValueResponse(await consolidation.ConsolidatedTrialBalanceAsync(companyIds, asAtDate, intercompanyAccounts ?? [], ct).ConfigureAwait(false));
+    }
+
+    if (!One4All.Core.Accounting.CurrencyCode.TryParse(presentationCurrency, out One4All.Core.Accounting.CurrencyCode currency))
+    {
+        return Results.BadRequest(new { error = $"'{presentationCurrency}' is not a currency code." });
+    }
+
+    return ValueResponse(await consolidation.TranslatedTrialBalanceAsync(companyIds, currency, asAtDate, intercompanyAccounts, ct).ConfigureAwait(false));
+})
+.RequireAuthorization()
+.WithName("ConsolidatedTrialBalance");
+
 app.MapGet("/api/accounting/check-data", async (long companyId, One4All.Application.Abstractions.Accounting.ILedgerIntegrityService integrity, CancellationToken ct) =>
     ValueResponse(await integrity.CheckAsync(companyId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
