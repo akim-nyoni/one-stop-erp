@@ -108,6 +108,7 @@ public sealed class PaymentRunService : IPaymentRunService
                 Amount = toPay,
                 BankAccountCode = request.BankAccountCode,
                 Narrative = "Payment run",
+                WithholdingTaxCode = request.WithholdingTaxCode,
             }, ct).ConfigureAwait(false);
 
             if (payment.IsFailure)
@@ -129,7 +130,8 @@ public sealed class PaymentRunService : IPaymentRunService
             }
 
             totalBase += payment.Value.BaseAmount;
-            lines.Add(new PaymentRunLine(supplier.Id, supplier.Code, supplier.Name, currency.Value, toPay, paymentNumber, touched.Count, creditsApplied));
+            decimal withheld = payment.Value.WithheldBase == 0m ? 0m : await WithholdingOnAsync(request, supplier, toPay, ct).ConfigureAwait(false);
+            lines.Add(new PaymentRunLine(supplier.Id, supplier.Code, supplier.Name, currency.Value, toPay, paymentNumber, touched.Count, creditsApplied, withheld));
         }
 
         byte[] eft = BuildEftFile(request, [.. lines.Where(l => l.Amount > 0m)], suppliers);
@@ -155,7 +157,8 @@ public sealed class PaymentRunService : IPaymentRunService
             // Exactly what the run does: credits are set against the invoices up to what is due; the rest is paid.
             decimal apply = supplier.OnHold ? 0m : Math.Min(available, due);
             decimal toPay = supplier.OnHold ? 0m : due - apply;
-            lines.Add(new PaymentProposalLine(supplier.Id, supplier.Code, supplier.Name, group.Key.Currency, group.Count(), due, available, apply, toPay, supplier.OnHold));
+            decimal withholding = toPay > 0m ? await WithholdingOnAsync(request, supplier, toPay, ct).ConfigureAwait(false) : 0m;
+            lines.Add(new PaymentProposalLine(supplier.Id, supplier.Code, supplier.Name, group.Key.Currency, group.Count(), due, available, apply, toPay, supplier.OnHold, withholding));
         }
 
         return new PaymentRunProposal(request.PaymentDate, [.. lines.OrderBy(l => l.SupplierCode, StringComparer.Ordinal).ThenBy(l => l.Currency, StringComparer.Ordinal)]);
@@ -190,12 +193,27 @@ public sealed class PaymentRunService : IPaymentRunService
         return (dueInvoices, credits, suppliers);
     }
 
+    // The withholding the payment run deducts from a payment (payment currency): the code's rate when the supplier has no
+    // valid tax clearance on the payment date, otherwise none — the same rule the purchase ledger applies.
+    private async Task<decimal> WithholdingOnAsync(PaymentRunRequest request, Supplier supplier, decimal amount, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.WithholdingTaxCode) || (supplier.TaxClearanceExpiry is { } expiry && expiry >= request.PaymentDate))
+        {
+            return 0m;
+        }
+
+        string code = request.WithholdingTaxCode.Trim().ToUpperInvariant();
+        Core.Accounting.TaxCode? tax = await _db.TaxCodes.Include(t => t.Rates)
+            .FirstOrDefaultAsync(t => t.CompanyId == request.CompanyId && t.Code == code && t.IsActive, ct).ConfigureAwait(false);
+        return tax is null ? 0m : decimal.Round(amount * tax.RateOn(request.PaymentDate) / 100m, 4, MidpointRounding.ToEven);
+    }
+
     private static byte[] BuildEftFile(PaymentRunRequest request, List<PaymentRunLine> lines, IReadOnlyDictionary<long, Supplier> suppliers)
     {
         // A generic pipe-delimited EFT template. Real banks define their own layout (brief §4.15.7 / §4.6);
         // the layout is configuration, not code, in production.
         StringBuilder sb = new();
-        sb.AppendLine($"HDR|{request.PaymentDate:yyyyMMdd}|{request.BankAccountCode}|{lines.Count}|{lines.Sum(l => l.Amount).ToString("0.00", CultureInfo.InvariantCulture)}");
+        sb.AppendLine($"HDR|{request.PaymentDate:yyyyMMdd}|{request.BankAccountCode}|{lines.Count}|{lines.Sum(l => l.NetPaid).ToString("0.00", CultureInfo.InvariantCulture)}");
         foreach (PaymentRunLine line in lines)
         {
             Supplier supplier = suppliers[line.SupplierId];
@@ -207,7 +225,7 @@ public sealed class PaymentRunService : IPaymentRunService
                 supplier.BankName ?? string.Empty,
                 supplier.BankAccountNumber ?? string.Empty,
                 line.Currency,
-                line.Amount.ToString("0.00", CultureInfo.InvariantCulture)));
+                line.NetPaid.ToString("0.00", CultureInfo.InvariantCulture)));
         }
 
         return Encoding.UTF8.GetBytes(sb.ToString());

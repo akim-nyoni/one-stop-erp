@@ -19,6 +19,12 @@ public sealed class PaymentRunRequest
 
     /// <summary>Optional restriction to specific suppliers; empty = all eligible.</summary>
     public IReadOnlyList<long> SupplierIds { get; init; } = [];
+
+    /// <summary>
+    /// A withholding tax code applied to payments to suppliers without a valid tax clearance (see
+    /// <see cref="PaymentRequest.WithholdingTaxCode"/>); the bank file then carries the net amount.
+    /// </summary>
+    public string? WithholdingTaxCode { get; init; }
 }
 
 /// <summary>One supplier's line in a payment run.</summary>
@@ -30,7 +36,12 @@ public sealed class PaymentRunRequest
 /// <param name="PaymentNumber">The allocated payment number (empty when nothing was paid).</param>
 /// <param name="InvoicesPaid">How many invoices were settled/part-paid.</param>
 /// <param name="CreditsApplied">Unused credit notes / payments on account set against the invoices before paying.</param>
-public readonly record struct PaymentRunLine(long SupplierId, string SupplierCode, string SupplierName, string Currency, decimal Amount, string PaymentNumber, int InvoicesPaid, decimal CreditsApplied = 0m);
+/// <param name="Withheld">Withholding tax deducted from the payment (payment currency); the bank pays <c>Amount − Withheld</c>.</param>
+public readonly record struct PaymentRunLine(long SupplierId, string SupplierCode, string SupplierName, string Currency, decimal Amount, string PaymentNumber, int InvoicesPaid, decimal CreditsApplied = 0m, decimal Withheld = 0m)
+{
+    /// <summary>What the bank actually pays.</summary>
+    public decimal NetPaid => Amount - Withheld;
+}
 
 /// <summary>The result of a payment run.</summary>
 /// <param name="Lines">The per-supplier payment lines.</param>
@@ -49,7 +60,8 @@ public sealed record PaymentRunResult(IReadOnlyList<PaymentRunLine> Lines, decim
 /// <param name="CreditsToApply">How much of those credits the run would set against the invoices.</param>
 /// <param name="ToPay">What the run would pay (0 for a supplier on hold).</param>
 /// <param name="OnHold">True when the supplier is on hold and would be skipped.</param>
-public readonly record struct PaymentProposalLine(long SupplierId, string SupplierCode, string SupplierName, string Currency, int InvoicesDue, decimal AmountDue, decimal CreditsAvailable, decimal CreditsToApply, decimal ToPay, bool OnHold);
+/// <param name="Withholding">Withholding tax that would be deducted (the supplier has no valid tax clearance).</param>
+public readonly record struct PaymentProposalLine(long SupplierId, string SupplierCode, string SupplierName, string Currency, int InvoicesDue, decimal AmountDue, decimal CreditsAvailable, decimal CreditsToApply, decimal ToPay, bool OnHold, decimal Withholding = 0m);
 
 /// <summary>A payment run proposal: what <see cref="IPaymentRunService.RunAsync"/> would do with the same request.</summary>
 /// <param name="PaymentDate">The payment date.</param>
