@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Trading;
 using One4All.Core.Accounting;
@@ -658,9 +659,10 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         decimal creditBase = BaseDrawn(credit, amount);
         decimal realisedFx = decimal.Round(creditBase - debitBase, Scale, MidpointRounding.ToEven);
 
-        debit.ReduceOutstanding(amount, debitBase);
-        credit.ReduceOutstanding(amount, creditBase);
-
+        // Post the realised FX before touching the items: if it is refused (e.g. a closed period) nothing has changed,
+        // so a later save in the same scope cannot persist a reduced outstanding without its allocation. The FX journal
+        // and the allocation are committed together.
+        await using IDbContextTransaction? transaction = await BeginIfNoneAsync(ct).ConfigureAwait(false);
         string? fxJournalNumber = null;
         if (realisedFx != 0m)
         {
@@ -673,12 +675,22 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             fxJournalNumber = fxResult.Value;
         }
 
+        debit.ReduceOutstanding(amount, debitBase);
+        credit.ReduceOutstanding(amount, creditBase);
         Allocation allocation = new(companyId, ledger, debit.TraderId, allocationDate, debit.Id, credit.Id, amount, debitBase, creditBase, realisedFx);
         _db.Allocations.Add(allocation);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(ct).ConfigureAwait(false);
+        }
 
         return new AllocationResult(allocation.Id, amount, realisedFx, fxJournalNumber);
     }
+
+    // Starts a transaction unless the caller (e.g. a payment run) already has one open, in which case the work joins it.
+    private async Task<IDbContextTransaction?> BeginIfNoneAsync(CancellationToken ct)
+        => _db.Database.CurrentTransaction is null ? await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false) : null;
 
     private async Task<Result<string>> PostRealisedFxAsync(long companyId, TradingLedger ledger, decimal realisedFx, DateOnly date, CancellationToken ct, bool reverse = false)
     {
@@ -748,11 +760,9 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return Error.NotFound("Alloc.ItemNotFound", "One or both open items were not found.");
         }
 
-        // Restore both items to their pre-allocation state using the exact base amounts drawn.
-        debit.RestoreOutstanding(allocation.TransactionAmount, allocation.DebitBase);
-        credit.RestoreOutstanding(allocation.TransactionAmount, allocation.CreditBase);
-
-        // Reverse any realised FX the allocation posted, netting the original gain/loss to nil.
+        // Reverse any realised FX the allocation posted (netting the original gain/loss to nil) before touching the
+        // items, and commit the reversal journal with the restored items.
+        await using IDbContextTransaction? transaction = await BeginIfNoneAsync(ct).ConfigureAwait(false);
         string? fxReversalJournal = null;
         if (allocation.RealisedFxBase != 0m)
         {
@@ -765,8 +775,15 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             fxReversalJournal = fxResult.Value;
         }
 
+        // Restore both items to their pre-allocation state using the exact base amounts drawn.
+        debit.RestoreOutstanding(allocation.TransactionAmount, allocation.DebitBase);
+        credit.RestoreOutstanding(allocation.TransactionAmount, allocation.CreditBase);
         allocation.Reverse(reversalDate);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(ct).ConfigureAwait(false);
+        }
 
         return new UnallocationResult(allocation.Id, allocation.TransactionAmount, -allocation.RealisedFxBase, fxReversalJournal);
     }
