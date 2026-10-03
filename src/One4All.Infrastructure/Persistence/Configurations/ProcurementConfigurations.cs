@@ -4,6 +4,57 @@ using One4All.Core.Procurement;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
+internal sealed class RfqConfiguration : IEntityTypeConfiguration<Rfq>
+{
+    public void Configure(EntityTypeBuilder<Rfq> b)
+    {
+        b.ToTable("rfq", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.RfqNumber).HasMaxLength(40);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.AwardReason).HasMaxLength(500);
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.RfqId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasMany(x => x.Quotes).WithOne().HasForeignKey(x => x.RfqId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Quotes).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.RfqNumber }).IsUnique();
+    }
+}
+
+internal sealed class RfqLineConfiguration : IEntityTypeConfiguration<RfqLine>
+{
+    public void Configure(EntityTypeBuilder<RfqLine> b)
+    {
+        b.ToTable("rfq_line", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+    }
+}
+
+internal sealed class RfqQuoteConfiguration : IEntityTypeConfiguration<RfqQuote>
+{
+    public void Configure(EntityTypeBuilder<RfqQuote> b)
+    {
+        b.ToTable("rfq_quote", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Terms).HasMaxLength(300);
+        b.HasMany(x => x.Prices).WithOne().HasForeignKey(x => x.RfqQuoteId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Prices).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.RfqId, x.SupplierId }).IsUnique();
+    }
+}
+
+internal sealed class RfqQuoteLineConfiguration : IEntityTypeConfiguration<RfqQuoteLine>
+{
+    public void Configure(EntityTypeBuilder<RfqQuoteLine> b)
+    {
+        b.ToTable("rfq_quote_line", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.UnitPrice).HasPrecision(19, 4);
+    }
+}
+
 internal sealed class PurchaseOrderConfiguration : IEntityTypeConfiguration<PurchaseOrder>
 {
     public void Configure(EntityTypeBuilder<PurchaseOrder> b)

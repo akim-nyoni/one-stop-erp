@@ -605,6 +605,26 @@ app.MapGet("/api/pop/supplier-scorecard", async (long companyId, DateOnly from, 
 .RequireAuthorization()
 .WithName("SupplierScorecard");
 
+app.MapPost("/api/pop/rfqs", async (long companyId, One4All.Application.Abstractions.Procurement.RfqRequest request, One4All.Application.Abstractions.Procurement.IRfqService rfqs, CancellationToken ct) =>
+    ValueResponse(await rfqs.IssueAsync(companyId, request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("IssueRfq");
+
+app.MapPost("/api/pop/rfqs/{rfqId:long}/quotes", async (long rfqId, long companyId, One4All.Application.Abstractions.Procurement.QuoteRequest quote, One4All.Application.Abstractions.Procurement.IRfqService rfqs, CancellationToken ct) =>
+    ActionResponse(await rfqs.RecordQuoteAsync(companyId, rfqId, quote, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordRfqQuote");
+
+app.MapGet("/api/pop/rfqs/{rfqId:long}/comparison", async (long rfqId, long companyId, decimal? priceWeight, One4All.Application.Abstractions.Procurement.IRfqService rfqs, CancellationToken ct) =>
+    ValueResponse(await rfqs.CompareAsync(companyId, rfqId, priceWeight ?? One4All.Application.Procurement.TenderEvaluation.DefaultPriceWeight, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CompareRfqQuotes");
+
+app.MapPost("/api/pop/rfqs/{rfqId:long}/award", async (long rfqId, long companyId, long supplierId, DateOnly orderDate, long userId, string? reason, One4All.Application.Abstractions.Procurement.IRfqService rfqs, CancellationToken ct) =>
+    ValueResponse(await rfqs.AwardAsync(companyId, rfqId, supplierId, orderDate, userId, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AwardRfq");
+
 app.MapPost("/api/ar/items/{openItemId:long}/write-off-with-vat-relief", async (long openItemId, long companyId, DateOnly date, string badDebtAccountCode, string reason, int minimumDaysOverdue, One4All.Application.Abstractions.Trading.ISalesLedgerService ar, CancellationToken ct) =>
     ValueResponse(await ar.WriteOffWithVatReliefAsync(companyId, openItemId, date, badDebtAccountCode, reason, minimumDaysOverdue, ct).ConfigureAwait(false)))
 .RequireAuthorization()
