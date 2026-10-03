@@ -1,0 +1,101 @@
+<Window x:Class="One4All.Desktop.AuditTrailWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:One4All.Desktop.ViewModels"
+        Title="Audit Trail" Height="720" Width="1200"
+        WindowStartupLocation="CenterOwner" Background="#F4F6F4" FontFamily="Segoe UI">
+    <Window.Resources>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#667" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="10,0,6,0" />
+        </Style>
+        <Style x:Key="ChainBanner" TargetType="Border">
+            <Setter Property="Background" Value="#EEF0EE" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Margin" Value="6,0,6,6" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ChainIntact}" Value="True">
+                    <Setter Property="Background" Value="#DDEFE0" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding ChainIntact}" Value="False">
+                    <Setter Property="Background" Value="#F6E3E3" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <DockPanel Margin="10">
+        <!-- Header -->
+        <StackPanel DockPanel.Dock="Top" Margin="6,0,6,6">
+            <TextBlock Text="Audit Trail" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
+            <TextBlock Text="Every insert, update and delete, who made it and what changed. The log is append-only and hash-chained, so tampering is refused or detected."
+                       Foreground="#667" FontSize="12" />
+        </StackPanel>
+
+        <!-- Chain verification -->
+        <Border DockPanel.Dock="Top" Style="{StaticResource ChainBanner}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Verify chain" Padding="12,4" Command="{Binding VerifyCommand}" />
+                <TextBlock Text="{Binding ChainStatus}" FontWeight="SemiBold" Foreground="#1E3A2E" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </DockPanel>
+        </Border>
+
+        <!-- Filters -->
+        <Border DockPanel.Dock="Top" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="8" Margin="6,0,6,6">
+            <WrapPanel>
+                <TextBlock Text="From" Style="{StaticResource Label}" Margin="0,0,6,0" />
+                <DatePicker SelectedDate="{Binding FromDate}" />
+                <TextBlock Text="To" Style="{StaticResource Label}" />
+                <DatePicker SelectedDate="{Binding ToDate}" />
+                <TextBlock Text="Record type" Style="{StaticResource Label}" />
+                <TextBox Text="{Binding EntityType, UpdateSourceTrigger=PropertyChanged}" Width="110" Padding="4,2" ToolTip="e.g. Customer, JournalEntry, OpenItem" />
+                <TextBlock Text="Id" Style="{StaticResource Label}" />
+                <TextBox Text="{Binding EntityId, UpdateSourceTrigger=PropertyChanged}" Width="70" Padding="4,2" />
+                <TextBlock Text="User" Style="{StaticResource Label}" />
+                <TextBox Text="{Binding UserName, UpdateSourceTrigger=PropertyChanged}" Width="100" Padding="4,2" />
+                <TextBlock Text="Action" Style="{StaticResource Label}" />
+                <ComboBox ItemsSource="{Binding Actions}" SelectedItem="{Binding Action}" Width="120" />
+                <Button Content="Search" Padding="14,4" Margin="12,0,0,0" FontWeight="SemiBold" Background="#DDEFE0" Command="{Binding SearchCommand}" />
+            </WrapPanel>
+        </Border>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom" Background="#E8EEE8" Padding="10,5" Margin="6,6,6,0" CornerRadius="4">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#334" FontSize="12" />
+        </Border>
+
+        <!-- Detail -->
+        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="8" Margin="6,6,6,0" Height="200">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="Before / after for the selected entry" FontWeight="SemiBold" Foreground="#1E3A2E" Margin="0,0,0,4" />
+                <ListView ItemsSource="{Binding Fields}" BorderThickness="0">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Field" Width="200" DisplayMemberBinding="{Binding Field}" />
+                            <GridViewColumn Header="Before" Width="400" DisplayMemberBinding="{Binding Before}" />
+                            <GridViewColumn Header="After" Width="400" DisplayMemberBinding="{Binding After}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </DockPanel>
+        </Border>
+
+        <!-- Entries -->
+        <Border Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="6" Margin="6,0">
+            <ListView ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}" BorderThickness="0">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Header="When" Width="150" DisplayMemberBinding="{Binding When}" />
+                        <GridViewColumn Header="User" Width="110" DisplayMemberBinding="{Binding User}" />
+                        <GridViewColumn Header="Action" Width="90" DisplayMemberBinding="{Binding Action}" />
+                        <GridViewColumn Header="Record" Width="220" DisplayMemberBinding="{Binding Record}" />
+                        <GridViewColumn Header="Changed fields" Width="500" DisplayMemberBinding="{Binding Fields}" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+        </Border>
+    </DockPanel>
+</Window>

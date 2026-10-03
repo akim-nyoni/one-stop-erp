@@ -63,6 +63,12 @@ public partial class ShellWindow : Window
         credit.Show();
     }
 
+    private void OpenAuditTrail_Click(object sender, RoutedEventArgs e)
+    {
+        AuditTrailWindow audit = new(_services) { Owner = this };
+        audit.Show();
+    }
+
     private void OpenBankRules_Click(object sender, RoutedEventArgs e)
     {
         BankRulesWindow rules = new(_services) { Owner = this };
