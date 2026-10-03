@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Reporting;
 using One4All.Core.Accounting;
@@ -56,6 +57,24 @@ public sealed class YearEndService : IYearEndService
         {
             return Error.Rule("YearEnd.NoRetainedEarnings", $"Retained earnings account '{retained}' (equity) was not found.");
         }
+
+        // Draft or deferred journals dated in the year would be left out of the closing profit and could never be posted
+        // once the year's periods are permanently closed: they must be posted (or deleted) first.
+        List<string> unposted = await _db.Journals
+            .Where(j => j.CompanyId == companyId && j.PostingDate >= year.StartDate && j.PostingDate <= year.EndDate
+                && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred))
+            .OrderBy(j => j.PostingDate)
+            .Select(j => j.JournalNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+        if (unposted.Count > 0)
+        {
+            string sample = string.Join(", ", unposted.Where(n => n.Length > 0).Take(5));
+            return Error.Rule("YearEnd.UnpostedJournals",
+                $"{unposted.Count} draft or deferred journal(s) are dated in {year.Code}{(sample.Length > 0 ? $" ({sample})" : string.Empty)}; post or delete them before closing the year.");
+        }
+
+        // The closing journal, the next year and the closed periods stand or fall together.
+        await using IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
 
         // Compute the year's profit or loss and build the closing journal that zeroes income/expense.
         IncomeStatement pl = await _reports.IncomeStatementAsync(companyId, year.StartDate, year.EndDate, ct).ConfigureAwait(false);
@@ -121,6 +140,7 @@ public sealed class YearEndService : IYearEndService
 
         year.Close();
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
 
         return new YearEndResult(closingJournalNumber, netProfit, nextYearId);
     }

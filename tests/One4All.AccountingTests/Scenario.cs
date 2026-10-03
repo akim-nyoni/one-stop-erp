@@ -46,7 +46,7 @@ public static class Scenario
         await db.SaveChangesAsync();
 
         // Each test gets its own company (unique code) so tests on the shared database don't collide.
-        string code = "TC" + Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
+        string code = "TC" + Guid.NewGuid().ToString("N")[..10].ToUpperInvariant(); // wide enough that hundreds of companies per run never collide
         Company company = new(code, "Test Trading Co", baseCurrency ?? Usd, "UTC");
         db.Companies.Add(company);
         await db.SaveChangesAsync();
