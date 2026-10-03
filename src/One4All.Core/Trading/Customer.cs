@@ -107,6 +107,9 @@ public sealed class Customer : SoftDeletableEntity, ICompanyScoped
     /// <summary>The selling price list this customer buys from (null = the company's default list).</summary>
     public long? PriceListId { get; set; }
 
+    /// <summary>The sales rep who earns commission on this customer, if any.</summary>
+    public long? SalesRepId { get; set; }
+
     /// <summary>Whether the customer is active.</summary>
     public bool IsActive { get; set; }
 

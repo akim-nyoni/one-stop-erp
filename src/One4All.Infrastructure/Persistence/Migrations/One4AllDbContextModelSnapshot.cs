@@ -10821,6 +10821,46 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("allocation", "trd");
                 });
 
+            modelBuilder.Entity("One4All.Core.Trading.CommissionAccrual", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Accrued")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("accrued");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("Month")
+                        .HasColumnType("date")
+                        .HasColumnName("month");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SalesRepId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sales_rep_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_commission_accrual");
+
+                    b.HasIndex("CompanyId", "SalesRepId", "Month")
+                        .IsUnique()
+                        .HasDatabaseName("ix_commission_accrual_company_id_sales_rep_id_month");
+
+                    b.ToTable("commission_accrual", "ar");
+                });
+
             modelBuilder.Entity("One4All.Core.Trading.CreditLimitRequest", b =>
                 {
                     b.Property<long>("Id")
@@ -11004,6 +11044,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("sales_agent");
+
+                    b.Property<long?>("SalesRepId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sales_rep_id");
 
                     b.Property<decimal>("SettlementDiscountPercent")
                         .HasPrecision(9, 4)
@@ -11578,6 +11622,74 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_recurring_invoice_company_id_is_active_next_run_date1");
 
                     b.ToTable("recurring_invoice", "ar");
+                });
+
+            modelBuilder.Entity("One4All.Core.Trading.SalesRep", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Basis")
+                        .HasColumnType("integer")
+                        .HasColumnName("basis");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<decimal>("RatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("rate_percent");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sales_rep");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sales_rep_company_id_code");
+
+                    b.ToTable("sales_rep", "ar");
                 });
 
             modelBuilder.Entity("One4All.Core.Trading.Supplier", b =>

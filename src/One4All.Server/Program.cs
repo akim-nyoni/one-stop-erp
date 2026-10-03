@@ -625,6 +625,16 @@ app.MapPost("/api/ar/credit-limit-requests/{requestId:long}/reject", async (long
 .RequireAuthorization()
 .WithName("RejectCreditLimitRequest");
 
+app.MapGet("/api/ar/sales-reps/{salesRepId:long}/commission-statement", async (long salesRepId, long companyId, DateOnly from, DateOnly to, One4All.Application.Abstractions.Trading.ICommissionService commission, CancellationToken ct) =>
+    ValueResponse(await commission.StatementAsync(companyId, salesRepId, from, to, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CommissionStatement");
+
+app.MapPost("/api/ar/commission/accrue", async (long companyId, DateOnly monthEnd, string expenseAccountCode, string payableAccountCode, One4All.Application.Abstractions.Trading.ICommissionService commission, CancellationToken ct) =>
+    ValueResponse(await commission.AccrueAsync(companyId, monthEnd, expenseAccountCode, payableAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AccrueCommission");
+
 app.MapGet("/api/pop/supplier-scorecard", async (long companyId, DateOnly from, DateOnly to, One4All.Application.Abstractions.Procurement.ISupplierScorecardService scorecard, CancellationToken ct) =>
     Results.Ok(await scorecard.ScorecardAsync(companyId, from, to, ct).ConfigureAwait(false)))
 .RequireAuthorization()

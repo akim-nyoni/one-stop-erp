@@ -45,6 +45,31 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
     }
 }
 
+internal sealed class SalesRepConfiguration : IEntityTypeConfiguration<SalesRep>
+{
+    public void Configure(EntityTypeBuilder<SalesRep> b)
+    {
+        b.ToTable("sales_rep", Schemas.AccountsReceivable);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.Basis).HasConversion<int>();
+        b.Property(x => x.RatePercent).HasPrecision(9, 4);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class CommissionAccrualConfiguration : IEntityTypeConfiguration<CommissionAccrual>
+{
+    public void Configure(EntityTypeBuilder<CommissionAccrual> b)
+    {
+        b.ToTable("commission_accrual", Schemas.AccountsReceivable);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Accrued).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.SalesRepId, x.Month }).IsUnique();
+    }
+}
+
 internal sealed class CreditLimitRequestConfiguration : IEntityTypeConfiguration<CreditLimitRequest>
 {
     public void Configure(EntityTypeBuilder<CreditLimitRequest> b)
