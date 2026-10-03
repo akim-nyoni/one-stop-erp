@@ -54,6 +54,7 @@
                 <MenuItem Header="Point of Sale — Touch Terminal…" Click="OpenPosTerminal_Click" />
                 <Separator />
                 <MenuItem Header="My Approvals…" Click="OpenApprovals_Click" />
+                <MenuItem Header="Journals Awaiting Approval…" Click="OpenJournalApprovals_Click" />
                 <MenuItem Header="Stock Replenishment…" Click="OpenReplenishment_Click" />
                 <MenuItem Header="Supplier Payment Run…" Click="OpenPaymentRun_Click" />
                 <MenuItem Header="Bank Reconciliation…" Click="OpenBankReconciliation_Click" />

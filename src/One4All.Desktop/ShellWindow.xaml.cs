@@ -129,4 +129,11 @@ public partial class ShellWindow : Window
         ApprovalsWindow approvals = new(_services, vm.UserId) { Owner = this };
         approvals.Show();
     }
+
+    private void OpenJournalApprovals_Click(object sender, RoutedEventArgs e)
+    {
+        ShellViewModel vm = (ShellViewModel)DataContext;
+        JournalApprovalsWindow journals = new(_services, vm.UserId) { Owner = this };
+        journals.Show();
+    }
 }
