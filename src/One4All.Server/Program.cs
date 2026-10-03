@@ -492,6 +492,26 @@ app.MapGet("/api/vouchers/gift-cards/{cardNumber}/history", async (string cardNu
 .RequireAuthorization()
 .WithName("GiftCardHistory");
 
+app.MapPost("/api/vouchers/accounting", async (long companyId, One4All.Application.Abstractions.Vouchers.VoucherRequest request, One4All.Application.Abstractions.Vouchers.IAccountingVoucherService vouchers, CancellationToken ct) =>
+    ValueResponse(await vouchers.PrepareAsync(companyId, request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PrepareAccountingVoucher");
+
+app.MapPost("/api/vouchers/accounting/{voucherId:long}/approve", async (long voucherId, long companyId, long userId, One4All.Application.Abstractions.Vouchers.IAccountingVoucherService vouchers, CancellationToken ct) =>
+    ValueResponse(await vouchers.ApproveAsync(companyId, voucherId, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveAccountingVoucher");
+
+app.MapPost("/api/vouchers/accounting/{voucherId:long}/cancel", async (long voucherId, long companyId, One4All.Application.Abstractions.Vouchers.IAccountingVoucherService vouchers, CancellationToken ct) =>
+    ActionResponse(await vouchers.CancelAsync(companyId, voucherId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CancelAccountingVoucher");
+
+app.MapGet("/api/vouchers/accounting/{voucherId:long}/print", async (long voucherId, long companyId, One4All.Application.Abstractions.Vouchers.IAccountingVoucherService vouchers, CancellationToken ct) =>
+    TextResponse(await vouchers.RenderAsync(companyId, voucherId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PrintAccountingVoucher");
+
 app.MapGet("/api/gl/accounts/{accountCode}/activity", async (long companyId, string accountCode, DateOnly from, DateOnly to, One4All.Application.Abstractions.Reporting.IGeneralLedgerReports gl, CancellationToken ct) =>
     Results.Ok(await gl.NominalActivityAsync(companyId, accountCode, from, to, ct).ConfigureAwait(false)))
 .RequireAuthorization()

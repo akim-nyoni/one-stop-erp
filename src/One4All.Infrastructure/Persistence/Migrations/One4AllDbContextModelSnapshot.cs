@@ -12111,6 +12111,146 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("withholding_certificate", "trd");
                 });
 
+            modelBuilder.Entity("One4All.Core.Vouchers.AccountingVoucher", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<string>("CashAccountCode")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("cash_account_code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("JournalNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Narrative")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("narrative");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("number");
+
+                    b.Property<string>("Party")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("party");
+
+                    b.Property<long>("PreparedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("prepared_by_user_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_accounting_voucher");
+
+                    b.HasIndex("CompanyId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_accounting_voucher_company_id_number");
+
+                    b.ToTable("accounting_voucher", "vou", t =>
+                        {
+                            t.HasCheckConstraint("ck_accounting_voucher_approver_not_preparer", "approved_by_user_id IS NULL OR approved_by_user_id <> prepared_by_user_id");
+                        });
+                });
+
+            modelBuilder.Entity("One4All.Core.Vouchers.AccountingVoucherLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("account_code");
+
+                    b.Property<long>("AccountingVoucherId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("accounting_voucher_id");
+
+                    b.Property<decimal>("Credit")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("credit");
+
+                    b.Property<decimal>("Debit")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("debit");
+
+                    b.Property<string>("Narrative")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("narrative");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_accounting_voucher_line");
+
+                    b.HasIndex("AccountingVoucherId")
+                        .HasDatabaseName("ix_accounting_voucher_line_accounting_voucher_id");
+
+                    b.ToTable("accounting_voucher_line", "vou");
+                });
+
             modelBuilder.Entity("One4All.Core.Vouchers.AllowanceVoucher", b =>
                 {
                     b.Property<long>("Id")
@@ -13311,6 +13451,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_layby_line_layby_plan_layby_plan_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Vouchers.AccountingVoucherLine", b =>
+                {
+                    b.HasOne("One4All.Core.Vouchers.AccountingVoucher", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("AccountingVoucherId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_accounting_voucher_line_accounting_voucher_accounting_vouch");
+                });
+
             modelBuilder.Entity("One4All.Core.Vouchers.PromoCode", b =>
                 {
                     b.HasOne("One4All.Core.Vouchers.PromoCampaign", null)
@@ -13566,6 +13716,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("One4All.Core.Trading.LaybyPlan", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Vouchers.AccountingVoucher", b =>
                 {
                     b.Navigation("Lines");
                 });

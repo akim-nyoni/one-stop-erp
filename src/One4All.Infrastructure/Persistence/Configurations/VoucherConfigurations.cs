@@ -4,6 +4,40 @@ using One4All.Core.Vouchers;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
+internal sealed class AccountingVoucherConfiguration : IEntityTypeConfiguration<AccountingVoucher>
+{
+    public void Configure(EntityTypeBuilder<AccountingVoucher> b)
+    {
+        b.ToTable("accounting_voucher", Schemas.Vouchers, t =>
+            t.HasCheckConstraint("ck_accounting_voucher_approver_not_preparer", "approved_by_user_id IS NULL OR approved_by_user_id <> prepared_by_user_id"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Type).HasConversion<int>();
+        b.Property(x => x.Number).HasMaxLength(30);
+        b.Property(x => x.Party).HasMaxLength(200);
+        b.Property(x => x.CashAccountCode).HasMaxLength(8);
+        b.Property(x => x.Narrative).HasMaxLength(500);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.JournalNumber).HasMaxLength(30);
+        b.Ignore(x => x.Total);
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.AccountingVoucherId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Number }).IsUnique();
+    }
+}
+
+internal sealed class AccountingVoucherLineConfiguration : IEntityTypeConfiguration<AccountingVoucherLine>
+{
+    public void Configure(EntityTypeBuilder<AccountingVoucherLine> b)
+    {
+        b.ToTable("accounting_voucher_line", Schemas.Vouchers);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AccountCode).HasMaxLength(8);
+        b.Property(x => x.Debit).HasPrecision(19, 4);
+        b.Property(x => x.Credit).HasPrecision(19, 4);
+        b.Property(x => x.Narrative).HasMaxLength(200);
+    }
+}
+
 internal sealed class GiftCardTransactionConfiguration : IEntityTypeConfiguration<GiftCardTransaction>
 {
     public void Configure(EntityTypeBuilder<GiftCardTransaction> b)
