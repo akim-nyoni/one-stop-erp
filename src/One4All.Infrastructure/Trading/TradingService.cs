@@ -30,7 +30,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result<TradingPostingResult>> PostInvoiceAsync(SalesInvoiceRequest request, CancellationToken ct = default)
+    public Task<Result<TradingPostingResult>> PostInvoiceAsync(SalesInvoiceRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PostInvoiceCoreAsync(request, ct), ct);
+
+    // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
+    private async Task<Result<TradingPostingResult>> PostInvoiceCoreAsync(SalesInvoiceRequest request, CancellationToken ct)
     {
         Customer? customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
         if (customer is null)
@@ -109,7 +113,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result> ContraAsync(long companyId, long customerId, long customerInvoiceItemId, long supplierId, long supplierInvoiceItemId, decimal amount, DateOnly date, string contraClearingAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result> ContraAsync(long companyId, long customerId, long customerInvoiceItemId, long supplierId, long supplierInvoiceItemId, decimal amount, DateOnly date, string contraClearingAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ContraCoreAsync(companyId, customerId, customerInvoiceItemId, supplierId, supplierInvoiceItemId, amount, date, contraClearingAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
+    private async Task<Result> ContraCoreAsync(long companyId, long customerId, long customerInvoiceItemId, long supplierId, long supplierInvoiceItemId, decimal amount, DateOnly date, string contraClearingAccountCode, string documentNumber, CancellationToken ct)
     {
         if (amount <= 0m)
         {
@@ -166,7 +174,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result<TradingPostingResult>> WriteOffAsync(long companyId, long openItemId, DateOnly date, string badDebtAccountCode, string reason, CancellationToken ct = default)
+    public Task<Result<TradingPostingResult>> WriteOffAsync(long companyId, long openItemId, DateOnly date, string badDebtAccountCode, string reason, CancellationToken ct = default)
+        => _db.AtomicAsync(() => WriteOffCoreAsync(companyId, openItemId, date, badDebtAccountCode, reason, ct), ct);
+
+    // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
+    private async Task<Result<TradingPostingResult>> WriteOffCoreAsync(long companyId, long openItemId, DateOnly date, string badDebtAccountCode, string reason, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
@@ -219,7 +231,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result<TradingPostingResult>> WriteBackAsync(long companyId, long openItemId, DateOnly date, string writeBackAccountCode, string reason, CancellationToken ct = default)
+    public Task<Result<TradingPostingResult>> WriteBackAsync(long companyId, long openItemId, DateOnly date, string writeBackAccountCode, string reason, CancellationToken ct = default)
+        => _db.AtomicAsync(() => WriteBackCoreAsync(companyId, openItemId, date, writeBackAccountCode, reason, ct), ct);
+
+    // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
+    private async Task<Result<TradingPostingResult>> WriteBackCoreAsync(long companyId, long openItemId, DateOnly date, string writeBackAccountCode, string reason, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
@@ -272,7 +288,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result<TradingPostingResult>> SettleWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result<TradingPostingResult>> SettleWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => SettleWithDiscountCoreAsync(companyId, invoiceOpenItemId, date, cashAmount, discountAmount, bankAccountCode, discountAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
+    private async Task<Result<TradingPostingResult>> SettleWithDiscountCoreAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountAccountCode, string documentNumber, CancellationToken ct)
     {
         if (cashAmount <= 0m || discountAmount <= 0m)
         {
@@ -335,7 +355,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result<TradingPostingResult>> PostReceiptAsync(ReceiptRequest request, CancellationToken ct = default)
+    public Task<Result<TradingPostingResult>> PostReceiptAsync(ReceiptRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PostReceiptCoreAsync(request, ct), ct);
+
+    // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
+    private async Task<Result<TradingPostingResult>> PostReceiptCoreAsync(ReceiptRequest request, CancellationToken ct)
     {
         Customer? customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
         if (customer is null)
@@ -370,7 +394,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result<TradingPostingResult>> PostCreditNoteAsync(SalesCreditNoteRequest request, CancellationToken ct = default)
+    public Task<Result<TradingPostingResult>> PostCreditNoteAsync(SalesCreditNoteRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PostCreditNoteCoreAsync(request, ct), ct);
+
+    // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
+    private async Task<Result<TradingPostingResult>> PostCreditNoteCoreAsync(SalesCreditNoteRequest request, CancellationToken ct)
     {
         Customer? customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
         if (customer is null)
@@ -413,7 +441,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result<TradingPostingResult>> PostCreditNoteAsync(PurchaseCreditNoteRequest request, CancellationToken ct = default)
+    public Task<Result<TradingPostingResult>> PostCreditNoteAsync(PurchaseCreditNoteRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PostCreditNoteCoreAsync(request, ct), ct);
+
+    // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
+    private async Task<Result<TradingPostingResult>> PostCreditNoteCoreAsync(PurchaseCreditNoteRequest request, CancellationToken ct)
     {
         Supplier? supplier = await _db.Suppliers.FirstOrDefaultAsync(s => s.Id == request.SupplierId && s.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
         if (supplier is null)
@@ -456,7 +488,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result<TradingPostingResult>> PostInvoiceAsync(PurchaseInvoiceRequest request, CancellationToken ct = default)
+    public Task<Result<TradingPostingResult>> PostInvoiceAsync(PurchaseInvoiceRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PostInvoiceCoreAsync(request, ct), ct);
+
+    // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
+    private async Task<Result<TradingPostingResult>> PostInvoiceCoreAsync(PurchaseInvoiceRequest request, CancellationToken ct)
     {
         Supplier? supplier = await _db.Suppliers.FirstOrDefaultAsync(s => s.Id == request.SupplierId && s.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
         if (supplier is null)
@@ -515,7 +551,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result<TradingPostingResult>> PostPaymentAsync(PaymentRequest request, CancellationToken ct = default)
+    public Task<Result<TradingPostingResult>> PostPaymentAsync(PaymentRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PostPaymentCoreAsync(request, ct), ct);
+
+    // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
+    private async Task<Result<TradingPostingResult>> PostPaymentCoreAsync(PaymentRequest request, CancellationToken ct)
     {
         Supplier? supplier = await _db.Suppliers.FirstOrDefaultAsync(s => s.Id == request.SupplierId && s.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
         if (supplier is null)
@@ -550,7 +590,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result<TradingPostingResult>> PayWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result<TradingPostingResult>> PayWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PayWithDiscountCoreAsync(companyId, invoiceOpenItemId, date, cashAmount, discountAmount, bankAccountCode, discountReceivedAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
+    private async Task<Result<TradingPostingResult>> PayWithDiscountCoreAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode, string documentNumber, CancellationToken ct)
     {
         if (cashAmount <= 0m || discountAmount <= 0m)
         {
@@ -613,7 +657,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public async Task<Result<TradingPostingResult>> PostReceiptReversalAsync(long companyId, long customerId, string documentNumber, DateOnly date, CurrencyCode currency, decimal amount, string bankAccountCode, decimal? exchangeRate = null, CancellationToken ct = default)
+    public Task<Result<TradingPostingResult>> PostReceiptReversalAsync(long companyId, long customerId, string documentNumber, DateOnly date, CurrencyCode currency, decimal amount, string bankAccountCode, decimal? exchangeRate = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PostReceiptReversalCoreAsync(companyId, customerId, documentNumber, date, currency, amount, bankAccountCode, exchangeRate, ct), ct);
+
+    // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
+    private async Task<Result<TradingPostingResult>> PostReceiptReversalCoreAsync(long companyId, long customerId, string documentNumber, DateOnly date, CurrencyCode currency, decimal amount, string bankAccountCode, decimal? exchangeRate, CancellationToken ct)
     {
         Customer? customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == customerId && c.CompanyId == companyId, ct).ConfigureAwait(false);
         if (customer is null)
