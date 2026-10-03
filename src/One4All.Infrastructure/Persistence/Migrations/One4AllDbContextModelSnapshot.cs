@@ -1792,6 +1792,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<int?>("LastDepreciatedPeriod")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_depreciated_period");
+
                     b.Property<string>("Location")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)")

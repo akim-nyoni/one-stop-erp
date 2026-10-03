@@ -12,6 +12,19 @@ public enum DepreciationMethod
     ReducingBalance = 2,
 }
 
+/// <summary>Why a depreciation run passed over an asset.</summary>
+public enum DepreciationSkip
+{
+    /// <summary>Disposed or already fully depreciated.</summary>
+    NotActive = 1,
+
+    /// <summary>Acquired after the run month.</summary>
+    NotYetAcquired = 2,
+
+    /// <summary>The run month (or a later one) has already been charged.</summary>
+    AlreadyDepreciated = 3,
+}
+
 /// <summary>The lifecycle of a fixed asset (brief §4.14).</summary>
 public enum FixedAssetStatus
 {
@@ -116,6 +129,12 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
     /// <summary>The status.</summary>
     public FixedAssetStatus Status { get; private set; }
 
+    /// <summary>
+    /// The last month depreciation was charged for, as <c>yyyyMM</c> (null before the first run). Guards a month
+    /// against being charged twice.
+    /// </summary>
+    public int? LastDepreciatedPeriod { get; private set; }
+
     /// <summary>The asset-cost account.</summary>
     public string CostAccountCode { get; private set; }
 
@@ -158,11 +177,45 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
         return charge > remaining ? remaining : charge;
     }
 
-    /// <summary>Applies a depreciation charge, updating accumulated depreciation and status.</summary>
+    /// <summary>The <c>yyyyMM</c> period key of a date.</summary>
+    /// <param name="date">The date.</param>
+    /// <returns>The period key.</returns>
+    public static int PeriodOf(DateOnly date) => (date.Year * 100) + date.Month;
+
+    /// <summary>
+    /// Why the asset would not be charged for the month containing <paramref name="runDate"/>, or null when it is
+    /// due. Full-month convention: an asset is depreciated from the month it was acquired in.
+    /// </summary>
+    /// <param name="runDate">Any date in the run month.</param>
+    /// <returns>The reason it is skipped, or null.</returns>
+    public DepreciationSkip? SkipReasonFor(DateOnly runDate)
+    {
+        int period = PeriodOf(runDate);
+        if (Status != FixedAssetStatus.Active)
+        {
+            return DepreciationSkip.NotActive;
+        }
+
+        if (PeriodOf(AcquisitionDate) > period)
+        {
+            return DepreciationSkip.NotYetAcquired;
+        }
+
+        if (LastDepreciatedPeriod is { } last && last >= period)
+        {
+            return DepreciationSkip.AlreadyDepreciated;
+        }
+
+        return null;
+    }
+
+    /// <summary>Applies a depreciation charge for a month, updating accumulated depreciation, status and the last period.</summary>
     /// <param name="charge">The charge to apply.</param>
-    public void ApplyDepreciation(decimal charge)
+    /// <param name="runDate">Any date in the month charged.</param>
+    public void ApplyDepreciation(decimal charge, DateOnly runDate)
     {
         AccumulatedDepreciation += charge;
+        LastDepreciatedPeriod = PeriodOf(runDate);
         if (NetBookValue <= ResidualValue)
         {
             Status = FixedAssetStatus.FullyDepreciated;

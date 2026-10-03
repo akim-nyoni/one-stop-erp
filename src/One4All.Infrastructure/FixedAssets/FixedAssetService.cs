@@ -79,8 +79,23 @@ public sealed class FixedAssetService : IFixedAssetService
         List<JournalLineRequest> lines = [];
         decimal total = 0m;
         int count = 0;
+        int notYetAcquired = 0;
+        int alreadyDepreciated = 0;
         foreach (FixedAsset asset in assets)
         {
+            // Never charge before acquisition, and never charge the same month twice.
+            switch (asset.SkipReasonFor(date))
+            {
+                case DepreciationSkip.NotYetAcquired:
+                    notYetAcquired++;
+                    continue;
+                case DepreciationSkip.AlreadyDepreciated:
+                    alreadyDepreciated++;
+                    continue;
+                case DepreciationSkip.NotActive:
+                    continue;
+            }
+
             decimal charge = asset.MonthlyDepreciation();
             if (charge <= 0m)
             {
@@ -89,14 +104,14 @@ public sealed class FixedAssetService : IFixedAssetService
 
             lines.Add(new JournalLineRequest { AccountCode = asset.DepreciationExpenseAccountCode, Side = JournalSide.Debit, TransactionAmount = charge, Narrative = asset.AssetNumber });
             lines.Add(new JournalLineRequest { AccountCode = asset.AccumulatedDepreciationAccountCode, Side = JournalSide.Credit, TransactionAmount = charge, Narrative = asset.AssetNumber });
-            asset.ApplyDepreciation(charge);
+            asset.ApplyDepreciation(charge, date);
             total += charge;
             count++;
         }
 
         if (count == 0)
         {
-            return new DepreciationRunResult(0, 0m, null);
+            return new DepreciationRunResult(0, 0m, null, notYetAcquired, alreadyDepreciated);
         }
 
         Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
@@ -117,7 +132,7 @@ public sealed class FixedAssetService : IFixedAssetService
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new DepreciationRunResult(count, total, posted.Value.JournalNumber);
+        return new DepreciationRunResult(count, total, posted.Value.JournalNumber, notYetAcquired, alreadyDepreciated);
     }
 
     /// <inheritdoc />

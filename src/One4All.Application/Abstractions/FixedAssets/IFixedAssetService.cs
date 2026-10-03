@@ -56,7 +56,9 @@ public sealed class RegisterAssetRequest
 /// <param name="AssetsDepreciated">The number of assets depreciated.</param>
 /// <param name="TotalDepreciation">The total charge posted.</param>
 /// <param name="JournalNumber">The GL journal number, or null when nothing depreciated.</param>
-public readonly record struct DepreciationRunResult(int AssetsDepreciated, decimal TotalDepreciation, string? JournalNumber);
+/// <param name="SkippedNotYetAcquired">Active assets passed over because they were acquired after the run month.</param>
+/// <param name="SkippedAlreadyDepreciated">Active assets passed over because the run month had already been charged.</param>
+public readonly record struct DepreciationRunResult(int AssetsDepreciated, decimal TotalDepreciation, string? JournalNumber, int SkippedNotYetAcquired = 0, int SkippedAlreadyDepreciated = 0);
 
 /// <summary>The result of disposing an asset.</summary>
 /// <param name="Proceeds">The disposal proceeds.</param>
@@ -85,7 +87,9 @@ public interface IFixedAssetService
 
     /// <summary>
     /// Runs one month's depreciation for every active asset, posting Dr depreciation expense, Cr
-    /// accumulated depreciation for the period total.
+    /// accumulated depreciation for the period total. Full-month convention: an asset is charged from the
+    /// month it was acquired in; assets acquired after the run month are skipped, and a month already charged
+    /// for an asset is never charged again (so a re-run of the same month posts nothing).
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="date">The run (posting) date.</param>
