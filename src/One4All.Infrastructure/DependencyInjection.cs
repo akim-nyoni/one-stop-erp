@@ -52,6 +52,7 @@ public static class DependencyInjection
         // Accounting.
         services.AddScoped<IPostingEngine, PostingEngine>();
         services.AddScoped<IRecurringJournalService, Accounting.RecurringJournalService>();
+        services.AddScoped<ILedgerIntegrityService, Accounting.LedgerIntegrityService>();
         services.AddScoped<IAccrualService, Accounting.AccrualService>();
         services.AddScoped<IPeriodService, PeriodService>();
         services.AddScoped<Application.Abstractions.Numbering.INumberSequenceService, Infrastructure.Numbering.NumberSequenceService>();

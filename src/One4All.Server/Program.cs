@@ -385,6 +385,16 @@ app.MapPost("/api/accounting/release-deferred", async (long companyId, DateOnly 
 .RequireAuthorization()
 .WithName("ReleaseDeferredJournals");
 
+app.MapGet("/api/accounting/check-data", async (long companyId, One4All.Application.Abstractions.Accounting.ILedgerIntegrityService integrity, CancellationToken ct) =>
+    ValueResponse(await integrity.CheckAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CheckData");
+
+app.MapPost("/api/accounting/check-data/rebuild-period-balances", async (long companyId, One4All.Application.Abstractions.Accounting.ILedgerIntegrityService integrity, CancellationToken ct) =>
+    ValueResponse(await integrity.RebuildPeriodBalancesAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RebuildPeriodBalances");
+
 // --- Intercompany and job-costing period-end runs ----------------------------------------------------------
 app.MapPost("/api/interco/post", async (One4All.Application.Abstractions.Accounting.IntercompanyJournalRequest request, One4All.Application.Abstractions.Accounting.IIntercompanyService interco, CancellationToken ct) =>
     ValueResponse(await interco.PostAsync(request, ct).ConfigureAwait(false)))

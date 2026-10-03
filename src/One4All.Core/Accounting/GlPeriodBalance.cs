@@ -81,4 +81,20 @@ public sealed class GlPeriodBalance : Entity, ICompanyScoped
         ReportingDebit += reportingDebit;
         ReportingCredit += reportingCredit;
     }
+
+    /// <summary>
+    /// Restates the balance to totals recomputed from the posted journal lines (check-data rebuild). The cached
+    /// balance is derived data; the journal lines are the record.
+    /// </summary>
+    /// <param name="baseDebit">Base-currency debit total.</param>
+    /// <param name="baseCredit">Base-currency credit total.</param>
+    /// <param name="reportingDebit">Reporting-currency debit total.</param>
+    /// <param name="reportingCredit">Reporting-currency credit total.</param>
+    public void Restate(decimal baseDebit, decimal baseCredit, decimal reportingDebit, decimal reportingCredit)
+    {
+        BaseDebit = baseDebit;
+        BaseCredit = baseCredit;
+        ReportingDebit = reportingDebit;
+        ReportingCredit = reportingCredit;
+    }
 }

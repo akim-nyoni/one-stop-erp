@@ -69,6 +69,12 @@ public partial class ShellWindow : Window
         audit.Show();
     }
 
+    private void OpenCheckData_Click(object sender, RoutedEventArgs e)
+    {
+        CheckDataWindow check = new(_services) { Owner = this };
+        check.Show();
+    }
+
     private void OpenBankRules_Click(object sender, RoutedEventArgs e)
     {
         BankRulesWindow rules = new(_services) { Owner = this };
