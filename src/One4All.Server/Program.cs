@@ -569,6 +569,11 @@ app.MapGet("/api/budgets/{budgetId:long}/verify-seal", async (long budgetId, lon
 .RequireAuthorization()
 .WithName("VerifyBudgetSeal");
 
+app.MapPost("/api/budgets/commitments/year-end", async (long companyId, long fiscalYearId, long nextFiscalYearId, long userId, long[] carryForwardIds, One4All.Application.Abstractions.Budgeting.IBudgetControlService control, CancellationToken ct) =>
+    ValueResponse(await control.CloseYearCommitmentsAsync(companyId, fiscalYearId, nextFiscalYearId, carryForwardIds, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CloseYearCommitments");
+
 app.MapPost("/api/ar/customers/{customerId:long}/promises", async (long customerId, long companyId, long userId, DateOnly madeOn, DateOnly payBy, decimal amount, string? note, One4All.Application.Abstractions.Trading.IPromiseToPayService promises, CancellationToken ct) =>
     ValueResponse(await promises.RecordAsync(companyId, customerId, madeOn, payBy, amount, note, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

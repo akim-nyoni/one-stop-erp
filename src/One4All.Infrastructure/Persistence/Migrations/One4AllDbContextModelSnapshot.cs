@@ -1627,6 +1627,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("amount");
 
+                    b.Property<long?>("CarriedFromId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("carried_from_id");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -1679,6 +1683,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("Type")
                         .HasColumnType("integer")
                         .HasColumnName("type");
+
+                    b.Property<long?>("YearEndApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("year_end_approved_by_user_id");
 
                     b.HasKey("Id")
                         .HasName("pk_commitment");

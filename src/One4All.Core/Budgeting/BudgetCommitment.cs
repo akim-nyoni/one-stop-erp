@@ -10,6 +10,12 @@ public enum CommitmentStatus
 
     /// <summary>Released — the reservation has been freed (e.g. the order was invoiced or cancelled).</summary>
     Released = 1,
+
+    /// <summary>Lapsed at year end: the reservation ends with the year that made it.</summary>
+    Lapsed = 2,
+
+    /// <summary>Carried forward at year end into a commitment against the next year's budget.</summary>
+    CarriedForward = 3,
 }
 
 /// <summary>
@@ -77,16 +83,55 @@ public sealed class BudgetCommitment : AuditableEntity, ICompanyScoped
     /// <summary>The status.</summary>
     public CommitmentStatus Status { get; private set; }
 
+    /// <summary>The prior year's commitment this one was carried forward from, if any.</summary>
+    public long? CarriedFromId { get; private set; }
+
+    /// <summary>Who approved the year-end decision (lapse or carry forward), once made.</summary>
+    public long? YearEndApprovedByUserId { get; private set; }
+
     /// <summary>Releases the commitment, freeing the reserved budget.</summary>
-    /// <returns>True when it was open and is now released; false when it was already released.</returns>
+    /// <returns>True when it was open and is now released; false when it was not open.</returns>
     public bool Release()
     {
-        if (Status == CommitmentStatus.Released)
+        if (Status != CommitmentStatus.Open)
         {
             return false;
         }
 
         Status = CommitmentStatus.Released;
+        return true;
+    }
+
+    /// <summary>Lets an open commitment lapse at year end.</summary>
+    /// <param name="approvedByUserId">Who approved the year-end decision.</param>
+    /// <returns>Whether it was open.</returns>
+    public bool Lapse(long approvedByUserId) => CloseForYearEnd(CommitmentStatus.Lapsed, approvedByUserId);
+
+    /// <summary>
+    /// Carries an open commitment forward: it closes here and reopens against the next year's budget, in its first period.
+    /// </summary>
+    /// <param name="nextFiscalYearId">The next fiscal year.</param>
+    /// <param name="approvedByUserId">Who approved the carry-forward.</param>
+    /// <returns>The new commitment, or null when this one was not open.</returns>
+    public BudgetCommitment? CarryForward(long nextFiscalYearId, long approvedByUserId)
+    {
+        if (!CloseForYearEnd(CommitmentStatus.CarriedForward, approvedByUserId))
+        {
+            return null;
+        }
+
+        return new BudgetCommitment(CompanyId, nextFiscalYearId, Type, Department, AccountCode, 1, Amount, Reference) { CarriedFromId = Id };
+    }
+
+    private bool CloseForYearEnd(CommitmentStatus status, long approvedByUserId)
+    {
+        if (Status != CommitmentStatus.Open)
+        {
+            return false;
+        }
+
+        Status = status;
+        YearEndApprovedByUserId = approvedByUserId;
         return true;
     }
 }

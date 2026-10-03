@@ -168,6 +168,53 @@ public sealed class BudgetControlService : IBudgetControlService
     }
 
     /// <inheritdoc />
+    public Task<Result<CommitmentYearEnd>> CloseYearCommitmentsAsync(long companyId, long fiscalYearId, long nextFiscalYearId, IReadOnlyCollection<long> carryForwardIds, long approvedByUserId, CancellationToken ct = default)
+        => _db.AtomicAsync(() => CloseYearCommitmentsCoreAsync(companyId, fiscalYearId, nextFiscalYearId, carryForwardIds, approvedByUserId, ct), ct);
+
+    // One unit: every commitment of the year is decided, or none is.
+    private async Task<Result<CommitmentYearEnd>> CloseYearCommitmentsCoreAsync(long companyId, long fiscalYearId, long nextFiscalYearId, IReadOnlyCollection<long> carryForwardIds, long approvedByUserId, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(carryForwardIds);
+        List<FiscalYear> years = await _db.FiscalYears.AsNoTracking()
+            .Where(y => y.CompanyId == companyId && (y.Id == fiscalYearId || y.Id == nextFiscalYearId)).ToListAsync(ct).ConfigureAwait(false);
+        FiscalYear? ending = years.FirstOrDefault(y => y.Id == fiscalYearId);
+        FiscalYear? next = years.FirstOrDefault(y => y.Id == nextFiscalYearId);
+        if (ending is null || next is null || next.StartDate <= ending.EndDate)
+        {
+            return Error.Rule("Budget.YearEnd.Years", "Commitments carry forward from a year into a later one of the same company.");
+        }
+
+        List<BudgetCommitment> open = await _db.Set<BudgetCommitment>()
+            .Where(c => c.CompanyId == companyId && c.FiscalYearId == fiscalYearId && c.Status == CommitmentStatus.Open)
+            .OrderBy(c => c.Id).ToListAsync(ct).ConfigureAwait(false);
+        long? stray = carryForwardIds.Cast<long?>().FirstOrDefault(id => open.All(c => c.Id != id));
+        if (stray is not null)
+        {
+            return Error.Rule("Budget.YearEnd.NotOpen", $"Commitment {stray} is not open in the year ending.");
+        }
+
+        List<(BudgetCommitment Original, BudgetCommitment? Carried)> decided = [];
+        foreach (BudgetCommitment commitment in open)
+        {
+            if (carryForwardIds.Contains(commitment.Id))
+            {
+                BudgetCommitment carried = commitment.CarryForward(nextFiscalYearId, approvedByUserId)!;
+                _db.Set<BudgetCommitment>().Add(carried);
+                decided.Add((commitment, carried));
+            }
+            else
+            {
+                commitment.Lapse(approvedByUserId);
+                decided.Add((commitment, null));
+            }
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        YearEndCommitment Row((BudgetCommitment Original, BudgetCommitment? Carried) d) => new(d.Original.Id, d.Original.AccountCode, d.Original.Reference, d.Original.Amount, d.Carried?.Id);
+        return new CommitmentYearEnd([.. decided.Where(d => d.Carried is null).Select(Row)], [.. decided.Where(d => d.Carried is not null).Select(Row)]);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<bool>> VerifySealAsync(long companyId, long budgetId, CancellationToken ct = default)
     {
         Budget? budget = await _db.Budgets.AsNoTracking().Include(b => b.Lines).FirstOrDefaultAsync(b => b.Id == budgetId && b.CompanyId == companyId, ct).ConfigureAwait(false);

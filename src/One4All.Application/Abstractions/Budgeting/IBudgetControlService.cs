@@ -21,6 +21,19 @@ public sealed record VirementRegisterRow(string AccountCode, decimal Original, d
     public decimal Current => Original + VirementsIn - VirementsOut;
 }
 
+/// <summary>A commitment as decided at year end.</summary>
+/// <param name="CommitmentId">The year's commitment.</param>
+/// <param name="AccountCode">Its account.</param>
+/// <param name="Reference">Its source reference.</param>
+/// <param name="Amount">Its amount.</param>
+/// <param name="CarriedToId">The next year's commitment it became, when carried forward.</param>
+public sealed record YearEndCommitment(long CommitmentId, string AccountCode, string Reference, decimal Amount, long? CarriedToId);
+
+/// <summary>The year-end decision on a year's open commitments.</summary>
+/// <param name="Lapsed">Commitments that lapsed with the year.</param>
+/// <param name="CarriedForward">Commitments carried into the next year.</param>
+public sealed record CommitmentYearEnd(IReadOnlyList<YearEndCommitment> Lapsed, IReadOnlyList<YearEndCommitment> CarriedForward);
+
 /// <summary>One vote in the vote book: the year's appropriation against expenditure and commitments to the as-at period.</summary>
 /// <param name="AccountCode">The vote (account).</param>
 /// <param name="Name">Its name.</param>
@@ -88,6 +101,19 @@ public interface IBudgetControlService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>One row per vote, by account.</returns>
     Task<IReadOnlyList<VoteBookRow>> VoteBookAsync(long companyId, long fiscalYearId, int asAtPeriod, CancellationToken ct = default);
+
+    /// <summary>
+    /// Settles a year's open commitments at year end (brief §4.18.5): those chosen are carried forward into commitments
+    /// against the next year's budget, linked to their originals; the rest lapse. The decision records who approved it.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fiscalYearId">The year ending.</param>
+    /// <param name="nextFiscalYearId">The following year.</param>
+    /// <param name="carryForwardIds">The commitments to carry forward; each must be open in the year ending.</param>
+    /// <param name="approvedByUserId">Who approved the decision.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What lapsed and what was carried, or why it was refused.</returns>
+    Task<Result<CommitmentYearEnd>> CloseYearCommitmentsAsync(long companyId, long fiscalYearId, long nextFiscalYearId, IReadOnlyCollection<long> carryForwardIds, long approvedByUserId, CancellationToken ct = default);
 
     /// <summary>Checks an approved budget's lines against its seal.</summary>
     /// <param name="companyId">The company.</param>
