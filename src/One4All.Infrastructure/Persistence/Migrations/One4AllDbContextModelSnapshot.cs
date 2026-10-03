@@ -11822,6 +11822,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("bank_name");
 
+                    b.Property<string>("BlacklistReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("blacklist_reason");
+
                     b.Property<string>("Category")
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)")
@@ -11862,6 +11867,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
+
+                    b.Property<bool>("IsBlacklisted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_blacklisted");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")

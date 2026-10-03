@@ -40,10 +40,10 @@ public sealed class RfqService : IRfqService
         }
 
         List<long> invited = [.. request.SupplierIds.Distinct()];
-        int known = await _db.Suppliers.CountAsync(s => s.CompanyId == companyId && invited.Contains(s.Id) && !s.OnHold, ct).ConfigureAwait(false);
+        int known = await _db.Suppliers.CountAsync(s => s.CompanyId == companyId && invited.Contains(s.Id) && !s.OnHold && !s.IsBlacklisted, ct).ConfigureAwait(false);
         if (known != invited.Count)
         {
-            return Error.Rule("Rfq.Supplier", "Every invited supplier must exist and not be on hold.");
+            return Error.Rule("Rfq.Supplier", "Every invited supplier must exist, not be on hold and not be blacklisted.");
         }
 
         Rfq rfq = new(companyId, number, request.IssuedOn, request.ClosesOn, invited);

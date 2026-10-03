@@ -40,6 +40,11 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
         }
 
         bool supplierExists = await _db.Suppliers.AnyAsync(s => s.Id == supplierId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (await _db.Suppliers.AnyAsync(s => s.Id == supplierId && s.CompanyId == companyId && s.IsBlacklisted, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Pop.SupplierBlacklisted", "The supplier is blacklisted; requisitions cannot name it.");
+        }
+
         if (!supplierExists)
         {
             return Error.NotFound("Pop.SupplierNotFound", $"Supplier {supplierId} not found.");

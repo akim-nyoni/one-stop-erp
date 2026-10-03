@@ -38,6 +38,18 @@ public sealed class ProcurementService : IProcurementService
     /// <inheritdoc />
     public async Task<Result<PurchaseOrderResult>> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken ct = default)
     {
+        var supplier = await _db.Suppliers.Where(s => s.Id == request.SupplierId && s.CompanyId == request.CompanyId)
+            .Select(s => new { s.Code, s.IsBlacklisted }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (supplier is null)
+        {
+            return Error.NotFound("Pop.SupplierNotFound", $"Supplier {request.SupplierId} not found.");
+        }
+
+        if (supplier.IsBlacklisted)
+        {
+            return Error.Rule("Pop.SupplierBlacklisted", $"Supplier {supplier.Code} is blacklisted; no new orders can be placed.");
+        }
+
         // A blank order number means "allocate the next one" from the PO sequence.
         string orderNumber = request.OrderNumber.Trim();
         if (orderNumber.Length == 0)

@@ -95,6 +95,30 @@ public sealed class Supplier : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the supplier is active.</summary>
     public bool IsActive { get; set; }
 
+    /// <summary>
+    /// Whether the supplier is blacklisted (brief §4.3): no new orders, requisitions or invitations to quote. What is
+    /// already owed can still be settled.
+    /// </summary>
+    public bool IsBlacklisted { get; private set; }
+
+    /// <summary>Why the supplier was blacklisted.</summary>
+    public string? BlacklistReason { get; private set; }
+
+    /// <summary>Blacklists the supplier.</summary>
+    /// <param name="reason">Why; recorded for the audit trail.</param>
+    public void Blacklist(string reason)
+    {
+        IsBlacklisted = true;
+        BlacklistReason = reason;
+    }
+
+    /// <summary>Takes the supplier off the blacklist.</summary>
+    public void Reinstate()
+    {
+        IsBlacklisted = false;
+        BlacklistReason = null;
+    }
+
     /// <summary>Computes the due date for a document from its date, using the payment terms.</summary>
     /// <param name="documentDate">The document date.</param>
     /// <returns>The due date.</returns>

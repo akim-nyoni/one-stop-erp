@@ -40,6 +40,7 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         b.Property(x => x.BankAccountName).HasMaxLength(120);
         b.Property(x => x.BankAccountNumber).HasMaxLength(40);
         b.Property(x => x.BankName).HasMaxLength(120);
+        b.Property(x => x.BlacklistReason).HasMaxLength(300);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);
     }
