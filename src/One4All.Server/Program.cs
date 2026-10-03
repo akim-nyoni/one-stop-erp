@@ -479,6 +479,16 @@ app.MapPost("/api/gl/journals/{journalId:long}/reject", async (long journalId, l
 .RequireAuthorization()
 .WithName("RejectJournal");
 
+app.MapPost("/api/gl/journals/import", async (long companyId, long userId, HttpRequest http, One4All.Application.Abstractions.Accounting.IJournalImportService import, CancellationToken ct) =>
+{
+    using StreamReader reader = new(http.Body, Encoding.UTF8);
+    string csv = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+    return ValueResponse(await import.ImportAsync(companyId, csv, userId, ct).ConfigureAwait(false));
+})
+.RequireAuthorization()
+.Accepts<string>("text/csv", "text/plain")
+.WithName("ImportJournals");
+
 app.MapPost("/api/gl/allocation-rules", async (One4All.Application.Abstractions.Accounting.AllocationRuleRequest request, One4All.Application.Abstractions.Accounting.IOverheadAllocationService allocation, CancellationToken ct) =>
     ValueResponse(await allocation.CreateRuleAsync(request, ct).ConfigureAwait(false)))
 .RequireAuthorization()

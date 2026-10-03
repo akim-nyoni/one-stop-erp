@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<IJournalApprovalService, Accounting.JournalApprovalService>();
         services.AddScoped<IOverheadAllocationService, Accounting.OverheadAllocationService>();
         services.AddScoped<IHyperinflationService, Accounting.HyperinflationService>();
+        services.AddScoped<IJournalImportService, Accounting.JournalImportService>();
         services.AddScoped<Application.Abstractions.Trading.ISupplierBankDetailsService, Trading.SupplierBankDetailsService>();
         services.AddScoped<IRecurringJournalService, Accounting.RecurringJournalService>();
         services.AddScoped<IDeferredIncomeService, Accounting.DeferredIncomeService>();

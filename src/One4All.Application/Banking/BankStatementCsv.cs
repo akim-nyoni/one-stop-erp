@@ -200,8 +200,11 @@ public static class BankStatementCsvParser
         return true;
     }
 
-    // RFC-4180-style split: quoted fields may contain the delimiter and doubled quotes.
-    private static List<string> SplitFields(string row, char delimiter)
+    /// <summary>Splits a delimited row RFC-4180 style: quoted fields may contain the delimiter and doubled quotes.</summary>
+    /// <param name="row">The row.</param>
+    /// <param name="delimiter">The delimiter.</param>
+    /// <returns>The fields.</returns>
+    internal static List<string> SplitFields(string row, char delimiter)
     {
         List<string> fields = [];
         System.Text.StringBuilder current = new();
