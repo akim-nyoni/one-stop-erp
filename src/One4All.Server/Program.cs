@@ -581,6 +581,31 @@ app.MapPost("/api/municipal/clearance", async (long companyId, long propertyId, 
 .RequireAuthorization()
 .WithName("IssueRatesClearance");
 
+app.MapPost("/api/municipal/licences", async (One4All.Application.Abstractions.Municipal.IssueLicenceRequest request, One4All.Application.Abstractions.Municipal.ICouncilLicensingService licensing, CancellationToken ct) =>
+    ValueResponse(await licensing.IssueAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("IssueCouncilLicence");
+
+app.MapPost("/api/municipal/licences/{licenceNumber}/inspections", async (string licenceNumber, long companyId, DateOnly date, string inspector, bool passed, string? notes, One4All.Application.Abstractions.Municipal.ICouncilLicensingService licensing, CancellationToken ct) =>
+    ValueResponse(await licensing.RecordInspectionAsync(companyId, licenceNumber, date, inspector, passed, notes, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordLicenceInspection");
+
+app.MapPost("/api/municipal/licences/{licenceNumber}/renew", async (string licenceNumber, long companyId, DateOnly date, decimal penaltyPercent, string? penaltyAccountCode, One4All.Application.Abstractions.Municipal.ICouncilLicensingService licensing, CancellationToken ct) =>
+    ValueResponse(await licensing.RenewAsync(companyId, licenceNumber, date, penaltyPercent, penaltyAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RenewCouncilLicence");
+
+app.MapPost("/api/municipal/licences/{licenceNumber}/revoke", async (string licenceNumber, long companyId, string reason, One4All.Application.Abstractions.Municipal.ICouncilLicensingService licensing, CancellationToken ct) =>
+    ActionResponse(await licensing.RevokeAsync(companyId, licenceNumber, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RevokeCouncilLicence");
+
+app.MapGet("/api/municipal/licences/renewals-due", async (long companyId, DateOnly asAtDate, int withinDays, One4All.Application.Abstractions.Municipal.ICouncilLicensingService licensing, CancellationToken ct) =>
+    Results.Ok(await licensing.RenewalsDueAsync(companyId, asAtDate, withinDays, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LicenceRenewalsDue");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

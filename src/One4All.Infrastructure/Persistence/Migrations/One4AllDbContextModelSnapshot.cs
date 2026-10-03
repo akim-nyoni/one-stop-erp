@@ -4100,6 +4100,183 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("clearance_certificate", "mun");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.CouncilInspection", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("InspectedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("inspected_on");
+
+                    b.Property<string>("Inspector")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("inspector");
+
+                    b.Property<long>("LicenceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("licence_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<bool>("Passed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("passed");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_council_inspection");
+
+                    b.HasIndex("LicenceId")
+                        .HasDatabaseName("ix_council_inspection_licence_id");
+
+                    b.ToTable("council_inspection", "mun");
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.CouncilLicence", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<int>("CycleMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("cycle_months");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<DateOnly>("ExpiresOn")
+                        .HasColumnType("date")
+                        .HasColumnName("expires_on");
+
+                    b.Property<decimal>("Fee")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("fee");
+
+                    b.Property<long>("HolderCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("holder_customer_id");
+
+                    b.Property<DateOnly>("IssuedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("issued_on");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("LicenceNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("licence_number");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long?>("PropertyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("property_id");
+
+                    b.Property<int>("Renewals")
+                        .HasColumnType("integer")
+                        .HasColumnName("renewals");
+
+                    b.Property<string>("RevenueAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("revenue_account_code");
+
+                    b.Property<string>("RevokedReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("revoked_reason");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_council_licence");
+
+                    b.HasIndex("HolderCustomerId")
+                        .HasDatabaseName("ix_council_licence_holder_customer_id");
+
+                    b.HasIndex("CompanyId", "ExpiresOn")
+                        .HasDatabaseName("ix_council_licence_company_id_expires_on");
+
+                    b.HasIndex("CompanyId", "LicenceNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_council_licence_company_id_licence_number");
+
+                    b.ToTable("council_licence", "mun", t =>
+                        {
+                            t.HasCheckConstraint("ck_council_licence_cycle", "cycle_months >= 1 AND fee >= 0");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.IndigentRegistration", b =>
                 {
                     b.Property<long>("Id")
@@ -13503,6 +13680,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_cost_entry_contract_job_contract_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.CouncilInspection", b =>
+                {
+                    b.HasOne("One4All.Core.Municipal.CouncilLicence", null)
+                        .WithMany()
+                        .HasForeignKey("LicenceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_council_inspection_council_licence_licence_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Municipal.PropertyServiceLink", b =>

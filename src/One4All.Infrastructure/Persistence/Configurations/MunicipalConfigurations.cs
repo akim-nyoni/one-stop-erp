@@ -34,6 +34,37 @@ internal sealed class ClearanceCertificateConfiguration : IEntityTypeConfigurati
     }
 }
 
+internal sealed class CouncilLicenceConfiguration : IEntityTypeConfiguration<CouncilLicence>
+{
+    public void Configure(EntityTypeBuilder<CouncilLicence> b)
+    {
+        b.ToTable("council_licence", Schemas.Municipal, t => t.HasCheckConstraint("ck_council_licence_cycle", "cycle_months >= 1 AND fee >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.LicenceNumber).HasMaxLength(30);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.Property(x => x.Fee).HasPrecision(19, 4);
+        b.Property(x => x.RevenueAccountCode).HasMaxLength(20);
+        b.Property(x => x.RevokedReason).HasMaxLength(500);
+        b.HasIndex(x => new { x.CompanyId, x.LicenceNumber }).IsUnique();
+        b.HasIndex(x => new { x.CompanyId, x.ExpiresOn });
+        b.HasIndex(x => x.HolderCustomerId);
+    }
+}
+
+internal sealed class CouncilInspectionConfiguration : IEntityTypeConfiguration<CouncilInspection>
+{
+    public void Configure(EntityTypeBuilder<CouncilInspection> b)
+    {
+        b.ToTable("council_inspection", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Inspector).HasMaxLength(120);
+        b.Property(x => x.Notes).HasMaxLength(1000);
+        b.HasOne<CouncilLicence>().WithMany().HasForeignKey(x => x.LicenceId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class IndigentRegistrationConfiguration : IEntityTypeConfiguration<IndigentRegistration>
 {
     public void Configure(EntityTypeBuilder<IndigentRegistration> b)
