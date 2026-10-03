@@ -367,6 +367,9 @@ public sealed class PostingEngine : IPostingEngine
 
             if (!touched.TryGetValue(mapKey, out GlPeriodBalance? balance))
             {
+                ForgetIfUnchanged(_db.PeriodBalances.Local.FirstOrDefault(
+                    b => b.CompanyId == companyId && b.FiscalPeriodId == fiscalPeriodId &&
+                         b.AccountCode == key.AccountCode && b.CostCentre == key.CostCentre && b.Department == key.Department));
                 balance = await _db.PeriodBalances.FirstOrDefaultAsync(
                     b => b.CompanyId == companyId && b.FiscalPeriodId == fiscalPeriodId &&
                          b.AccountCode == key.AccountCode && b.CostCentre == key.CostCentre && b.Department == key.Department,
@@ -387,6 +390,7 @@ public sealed class PostingEngine : IPostingEngine
 
     private async Task<string> AllocateJournalNumberAsync(long companyId, int year, CancellationToken ct)
     {
+        ForgetIfUnchanged(_db.NumberSequences.Local.FirstOrDefault(s => s.CompanyId == companyId && s.BranchId == null && s.DocumentType == JournalDocumentType));
         NumberSequence? sequence = await _db.NumberSequences
             .FirstOrDefaultAsync(s => s.CompanyId == companyId && s.BranchId == null && s.DocumentType == JournalDocumentType, ct)
             .ConfigureAwait(false);
@@ -398,5 +402,30 @@ public sealed class PostingEngine : IPostingEngine
         }
 
         return sequence.Allocate(year);
+    }
+
+    /// <summary>
+    /// Stops tracking an unchanged copy of a counter row so the next query reads it from the database. A query returns
+    /// an already-tracked instance as it is in memory; after a caller rolls back a transaction that included an earlier
+    /// posting, the sequence counter (with its per-year counters) and the period balances would still hold the
+    /// rolled-back values and concurrency token, so the next posting would skip numbers, double-count movements or fail.
+    /// Rows with pending changes of this unit of work are left alone.
+    /// </summary>
+    private void ForgetIfUnchanged(object? entity)
+    {
+        if (entity is null || _db.Entry(entity).State != EntityState.Unchanged)
+        {
+            return;
+        }
+
+        if (entity is NumberSequence sequence)
+        {
+            foreach (NumberSequenceYear year in sequence.Years)
+            {
+                _db.Entry(year).State = EntityState.Detached;
+            }
+        }
+
+        _db.Entry(entity).State = EntityState.Detached;
     }
 }
