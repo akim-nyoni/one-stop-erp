@@ -106,7 +106,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
         return await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.Invoice,
             LedgerSign.Debit, request.DocumentNumber, request.DocumentDate, customer.DueDateFor(request.DocumentDate),
-            request.Currency, rate, gross, baseGross, request.Narrative, lines, request.SalesAccountCode, ct).ConfigureAwait(false);
+            request.Currency, rate, gross, baseGross, request.Narrative, lines, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -367,7 +367,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
         return await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.Receipt,
             LedgerSign.Credit, request.DocumentNumber, request.ReceiptDate, request.ReceiptDate, request.Currency, rate,
-            request.Amount, baseAmount, request.Narrative, lines, request.BankAccountCode, ct).ConfigureAwait(false);
+            request.Amount, baseAmount, request.Narrative, lines, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -410,7 +410,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
         return await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.CreditNote,
             LedgerSign.Credit, request.DocumentNumber, request.DocumentDate, request.DocumentDate, request.Currency, rate,
-            gross, baseGross, request.Narrative, lines, request.SalesAccountCode, ct).ConfigureAwait(false);
+            gross, baseGross, request.Narrative, lines, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -453,7 +453,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
         return await PostAndOpenAsync(request.CompanyId, "AP", TradingLedger.AccountsPayable, supplier.Id, OpenItemType.CreditNote,
             LedgerSign.Debit, request.DocumentNumber, request.DocumentDate, request.DocumentDate, request.Currency, rate,
-            gross, baseGross, request.Narrative, lines, request.ExpenseAccountCode, ct).ConfigureAwait(false);
+            gross, baseGross, request.Narrative, lines, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -512,7 +512,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
         return await PostAndOpenAsync(request.CompanyId, "AP", TradingLedger.AccountsPayable, supplier.Id, OpenItemType.Invoice,
             LedgerSign.Credit, request.DocumentNumber, request.DocumentDate, supplier.DueDateFor(request.DocumentDate),
-            request.Currency, rate, gross, baseGross, request.Narrative, lines, request.ExpenseAccountCode, ct).ConfigureAwait(false);
+            request.Currency, rate, gross, baseGross, request.Narrative, lines, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -547,7 +547,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
         return await PostAndOpenAsync(request.CompanyId, "AP", TradingLedger.AccountsPayable, supplier.Id, OpenItemType.Payment,
             LedgerSign.Debit, request.DocumentNumber, request.PaymentDate, request.PaymentDate, request.Currency, rate,
-            request.Amount, baseAmount, request.Narrative, lines, request.BankAccountCode, ct).ConfigureAwait(false);
+            request.Amount, baseAmount, request.Narrative, lines, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -645,7 +645,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         ];
 
         return await PostAndOpenAsync(companyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.Journal,
-            LedgerSign.Debit, documentNumber, date, date, currency, rate, amount, baseAmount, "Receipt reversal", lines, bankAccountCode, ct).ConfigureAwait(false);
+            LedgerSign.Debit, documentNumber, date, date, currency, rate, amount, baseAmount, "Receipt reversal", lines, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -810,7 +810,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     private async Task<Result<TradingPostingResult>> PostAndOpenAsync(
         long companyId, string module, TradingLedger ledger, long traderId, OpenItemType itemType, LedgerSign sign,
         string documentNumber, DateOnly documentDate, DateOnly dueDate, CurrencyCode currency, decimal rate,
-        decimal amountTxn, decimal amountBase, string? narrative, List<JournalLineRequest> lines, string documentType, CancellationToken ct)
+        decimal amountTxn, decimal amountBase, string? narrative, List<JournalLineRequest> lines, CancellationToken ct)
     {
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
@@ -819,7 +819,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             PostingDate = documentDate,
             TransactionCurrency = currency,
             EnforceManualJournalRules = false,
-            DocumentType = documentType,
+            DocumentType = DocumentTypeFor(ledger, itemType),
             DocumentNumber = documentNumber,
             Narrative = narrative,
             Lines = lines,
@@ -840,6 +840,25 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
         return new TradingPostingResult(item.Id, posting.Value.JournalNumber, amountBase);
     }
+
+    /// <summary>
+    /// The journal document type of a trading document — what the account enquiry, the audit trail and journal
+    /// listings show for it. (These journals used to carry an account code here.)
+    /// </summary>
+    /// <param name="ledger">The sub-ledger.</param>
+    /// <param name="itemType">The open-item type the document raises.</param>
+    /// <returns>The document type.</returns>
+    internal static string DocumentTypeFor(TradingLedger ledger, OpenItemType itemType) => (ledger, itemType) switch
+    {
+        (TradingLedger.AccountsReceivable, OpenItemType.Invoice) => "SalesInvoice",
+        (TradingLedger.AccountsReceivable, OpenItemType.CreditNote) => "SalesCreditNote",
+        (TradingLedger.AccountsReceivable, OpenItemType.Receipt) => "CustomerReceipt",
+        (TradingLedger.AccountsReceivable, OpenItemType.Journal) => "ReceiptReversal",
+        (TradingLedger.AccountsPayable, OpenItemType.Invoice) => "PurchaseInvoice",
+        (TradingLedger.AccountsPayable, OpenItemType.CreditNote) => "PurchaseCreditNote",
+        (TradingLedger.AccountsPayable, OpenItemType.Payment) => "SupplierPayment",
+        _ => $"{(ledger == TradingLedger.AccountsReceivable ? "AR" : "AP")}{itemType}",
+    };
 
     private static decimal BaseDrawn(OpenItem item, decimal transactionAmount) =>
         transactionAmount >= item.OutstandingTransaction
