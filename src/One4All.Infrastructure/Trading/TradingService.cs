@@ -931,18 +931,13 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return r;
         }
 
-        ExchangeRate? rate = await _db.ExchangeRates
-            .Where(x => x.FromCurrency == currency && x.ToCurrency == company.BaseCurrency && x.RateType == ExchangeRateType.Daily && x.EffectiveFrom <= date)
-            .OrderByDescending(x => x.EffectiveFrom)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-
+        decimal? rate = await Accounting.ExchangeRateResolver.FindAsync(_db, currency, company.BaseCurrency, ExchangeRateType.Daily, date, ct).ConfigureAwait(false);
         if (rate is null)
         {
             return Error.Rule("Trading.NoRate", $"No daily rate from {currency} to {company.BaseCurrency} on or before {date:yyyy-MM-dd}.");
         }
 
-        return rate.Quotation == QuotationType.Direct ? rate.Rate : 1m / rate.Rate;
+        return rate.Value;
     }
 
     private static JournalLineRequest Line(string account, JournalSide side, decimal txn, decimal rate, decimal baseAmount, string? taxCode = null) =>

@@ -205,16 +205,12 @@ public sealed class TradingRevaluationService : ITradingRevaluationService
 
     private async Task<Result<decimal>> ClosingRateAsync(CurrencyCode from, CurrencyCode to, DateOnly date, CancellationToken ct)
     {
-        ExchangeRate? rate = await _db.ExchangeRates
-            .Where(r => r.FromCurrency == from && r.ToCurrency == to && r.RateType == ExchangeRateType.ClosingRate && r.EffectiveFrom <= date)
-            .OrderByDescending(r => r.EffectiveFrom)
-            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-
+        decimal? rate = await Accounting.ExchangeRateResolver.FindAsync(_db, from, to, ExchangeRateType.ClosingRate, date, ct).ConfigureAwait(false);
         if (rate is null)
         {
             return Error.Rule("Reval.NoClosingRate", $"No closing rate from {from} to {to} on or before {date:yyyy-MM-dd}.");
         }
 
-        return rate.Quotation == QuotationType.Direct ? rate.Rate : 1m / rate.Rate;
+        return rate.Value;
     }
 }

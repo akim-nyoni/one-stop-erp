@@ -234,24 +234,9 @@ public sealed class ConsolidationService : IConsolidationService
     // way round (an inverse quotation is inverted).
     private async Task<Result<decimal>> RateAsync(CurrencyCode from, CurrencyCode to, ExchangeRateType type, DateOnly date, CancellationToken ct)
     {
-        ExchangeRate? direct = await _db.ExchangeRates
-            .Where(r => r.FromCurrency == from && r.ToCurrency == to && r.RateType == type && r.EffectiveFrom <= date)
-            .OrderByDescending(r => r.EffectiveFrom)
-            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        if (direct is not null)
-        {
-            return direct.Quotation == QuotationType.Direct ? direct.Rate : 1m / direct.Rate;
-        }
-
-        ExchangeRate? inverse = await _db.ExchangeRates
-            .Where(r => r.FromCurrency == to && r.ToCurrency == from && r.RateType == type && r.EffectiveFrom <= date)
-            .OrderByDescending(r => r.EffectiveFrom)
-            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        if (inverse is not null)
-        {
-            return inverse.Quotation == QuotationType.Direct ? 1m / inverse.Rate : inverse.Rate;
-        }
-
-        return Error.Rule("Consolidation.NoRate", $"No {type} rate between {from} and {to} on or before {date:yyyy-MM-dd}.");
+        decimal? rate = await ExchangeRateResolver.FindAsync(_db, from, to, type, date, ct).ConfigureAwait(false);
+        return rate is { } value
+            ? value
+            : Error.Rule("Consolidation.NoRate", $"No {type} rate between {from} and {to} on or before {date:yyyy-MM-dd}.");
     }
 }

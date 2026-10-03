@@ -352,18 +352,13 @@ public sealed class PostingEngine : IPostingEngine
 
     private async Task<Result<decimal>> LookupRateAsync(CurrencyCode from, CurrencyCode to, DateOnly date, CancellationToken ct)
     {
-        ExchangeRate? rate = await _db.ExchangeRates
-            .Where(r => r.FromCurrency == from && r.ToCurrency == to && r.RateType == ExchangeRateType.Daily && r.EffectiveFrom <= date)
-            .OrderByDescending(r => r.EffectiveFrom)
-            .FirstOrDefaultAsync(ct)
-            .ConfigureAwait(false);
-
+        decimal? rate = await ExchangeRateResolver.FindAsync(_db, from, to, ExchangeRateType.Daily, date, ct).ConfigureAwait(false);
         if (rate is null)
         {
-            return Error.Rule("Posting.NoExchangeRate", $"No daily exchange rate from {from} to {to} on or before {date:yyyy-MM-dd}.");
+            return Error.Rule("Posting.NoExchangeRate", $"No daily exchange rate from {from} to {to} (direct, inverse or through another currency) on or before {date:yyyy-MM-dd}.");
         }
 
-        return rate.Quotation == QuotationType.Direct ? rate.Rate : 1m / rate.Rate;
+        return rate.Value;
     }
 
     private async Task UpdatePeriodBalancesAsync(long companyId, long fiscalYearId, long fiscalPeriodId, JournalEntry journal, CancellationToken ct)

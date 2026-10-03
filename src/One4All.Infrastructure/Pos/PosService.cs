@@ -361,16 +361,12 @@ public sealed class PosService : IPosService
             return r;
         }
 
-        ExchangeRate? rate = await _db.ExchangeRates
-            .Where(x => x.FromCurrency == tenderCurrency && x.ToCurrency == baseCurrency && x.RateType == ExchangeRateType.Daily && x.EffectiveFrom <= date)
-            .OrderByDescending(x => x.EffectiveFrom)
-            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-
+        decimal? rate = await Accounting.ExchangeRateResolver.FindAsync(_db, tenderCurrency, baseCurrency, ExchangeRateType.Daily, date, ct).ConfigureAwait(false);
         if (rate is null)
         {
             return Error.Rule("Pos.NoRate", $"No daily rate from {tenderCurrency} to {baseCurrency} on or before {date:yyyy-MM-dd}.");
         }
 
-        return rate.Quotation == QuotationType.Direct ? rate.Rate : 1m / rate.Rate;
+        return rate.Value;
     }
 }
