@@ -4,6 +4,35 @@ using One4All.Core.Inventory;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
+internal sealed class StoreRequisitionConfiguration : IEntityTypeConfiguration<StoreRequisition>
+{
+    public void Configure(EntityTypeBuilder<StoreRequisition> b)
+    {
+        b.ToTable("store_requisition", Schemas.Inventory, t =>
+            t.HasCheckConstraint("ck_store_requisition_approver_not_requester", "approved_by_user_id IS NULL OR approved_by_user_id <> requested_by_user_id"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Number).HasMaxLength(30);
+        b.Property(x => x.ChargeAccountCode).HasMaxLength(8);
+        b.Property(x => x.CostCentre).HasMaxLength(3);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.StoreRequisitionId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Number }).IsUnique();
+    }
+}
+
+internal sealed class StoreRequisitionLineConfiguration : IEntityTypeConfiguration<StoreRequisitionLine>
+{
+    public void Configure(EntityTypeBuilder<StoreRequisitionLine> b)
+    {
+        b.ToTable("store_requisition_line", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Requested).HasPrecision(19, 4);
+        b.Property(x => x.Issued).HasPrecision(19, 4);
+        b.Ignore(x => x.Outstanding);
+    }
+}
+
 internal sealed class StockCostLayerConfiguration : IEntityTypeConfiguration<StockCostLayer>
 {
     public void Configure(EntityTypeBuilder<StockCostLayer> b)

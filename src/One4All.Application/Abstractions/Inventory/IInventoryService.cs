@@ -53,6 +53,15 @@ public sealed class IssueStockRequest
 
     /// <summary>When true, allows the issue to take the balance negative (backorder); otherwise an over-issue is refused.</summary>
     public bool AllowNegative { get; init; }
+
+    /// <summary>
+    /// The account the issue is charged to, for internal consumption (a department's supplies expense, say); null to
+    /// charge the item's cost of sales.
+    /// </summary>
+    public string? ChargeAccountCode { get; init; }
+
+    /// <summary>The cost centre the charge is analysed to, if any.</summary>
+    public string? CostCentre { get; init; }
 }
 
 /// <summary>The result of a stock movement.</summary>

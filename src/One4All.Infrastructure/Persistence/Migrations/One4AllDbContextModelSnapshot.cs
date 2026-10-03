@@ -3393,6 +3393,129 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("stocktake", "inv");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.StoreRequisition", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<string>("ChargeAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("charge_account_code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("CostCentre")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("cost_centre");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("number");
+
+                    b.Property<long>("RequestedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("WarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_store_requisition");
+
+                    b.HasIndex("CompanyId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_store_requisition_company_id_number");
+
+                    b.ToTable("store_requisition", "inv", t =>
+                        {
+                            t.HasCheckConstraint("ck_store_requisition_approver_not_requester", "approved_by_user_id IS NULL OR approved_by_user_id <> requested_by_user_id");
+                        });
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.StoreRequisitionLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Issued")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("issued");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<decimal>("Requested")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("requested");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("StoreRequisitionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("store_requisition_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_store_requisition_line");
+
+                    b.HasIndex("StoreRequisitionId")
+                        .HasDatabaseName("ix_store_requisition_line_store_requisition_id");
+
+                    b.ToTable("store_requisition_line", "inv");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.Warehouse", b =>
                 {
                     b.Property<long>("Id")
@@ -13012,6 +13135,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stocktake_line_stocktakes_stocktake_session_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.StoreRequisitionLine", b =>
+                {
+                    b.HasOne("One4All.Core.Inventory.StoreRequisition", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("StoreRequisitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_store_requisition_line_store_requisition_store_requisition_");
+                });
+
             modelBuilder.Entity("One4All.Core.JobCosting.JobCostEntry", b =>
                 {
                     b.HasOne("One4All.Core.JobCosting.JobContract", null)
@@ -13532,6 +13665,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("One4All.Core.Inventory.StocktakeSession", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.StoreRequisition", b =>
                 {
                     b.Navigation("Lines");
                 });

@@ -111,7 +111,8 @@ public sealed class InventoryService : IInventoryService
         }
 
         (Item item, string stockCode, CurrencyCode currency) = setup.Value;
-        if (string.IsNullOrEmpty(item.CostOfSalesAccountCode))
+        string? chargeAccount = string.IsNullOrWhiteSpace(request.ChargeAccountCode) ? item.CostOfSalesAccountCode : request.ChargeAccountCode.Trim();
+        if (string.IsNullOrEmpty(chargeAccount))
         {
             return Error.Rule("Inv.NoCogsAccount", $"Item '{item.Code}' has no cost-of-sales account.");
         }
@@ -139,7 +140,7 @@ public sealed class InventoryService : IInventoryService
             Narrative = $"Stock issue {item.Code}",
             Lines =
             [
-                new JournalLineRequest { AccountCode = item.CostOfSalesAccountCode!, Side = JournalSide.Debit, TransactionAmount = cost },
+                new JournalLineRequest { AccountCode = chargeAccount, CostCentre = request.CostCentre, Side = JournalSide.Debit, TransactionAmount = cost },
                 new JournalLineRequest { AccountCode = stockCode, Side = JournalSide.Credit, TransactionAmount = cost },
             ],
         }, ct).ConfigureAwait(false);
@@ -190,7 +191,15 @@ public sealed class InventoryService : IInventoryService
         }
 
         (Item item, string stockCode, CurrencyCode currency) = setup.Value;
-        if (string.IsNullOrEmpty(item.CostOfSalesAccountCode))
+
+        // Credit back whatever the issue charged: cost of sales, or the account and cost centre of an internal issue.
+        var charged = await _db.Set<JournalLine>()
+            .Where(l => l.JournalEntryId == original.JournalEntryId && l.BaseDebit > 0m)
+            .Select(l => new { l.AccountCode, l.CostCentre })
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        string? chargeAccount = charged?.AccountCode ?? item.CostOfSalesAccountCode;
+        string? chargeCentre = string.IsNullOrEmpty(charged?.CostCentre) ? null : charged.CostCentre;
+        if (string.IsNullOrEmpty(chargeAccount))
         {
             return Error.Rule("Inv.NoCogsAccount", $"Item '{item.Code}' has no cost-of-sales account.");
         }
@@ -213,7 +222,7 @@ public sealed class InventoryService : IInventoryService
             Lines =
             [
                 new JournalLineRequest { AccountCode = stockCode, Side = JournalSide.Debit, TransactionAmount = returnValue },
-                new JournalLineRequest { AccountCode = item.CostOfSalesAccountCode!, Side = JournalSide.Credit, TransactionAmount = returnValue },
+                new JournalLineRequest { AccountCode = chargeAccount, CostCentre = chargeCentre, Side = JournalSide.Credit, TransactionAmount = returnValue },
             ],
         }, ct).ConfigureAwait(false);
 

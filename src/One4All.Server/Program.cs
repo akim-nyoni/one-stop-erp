@@ -512,6 +512,24 @@ app.MapGet("/api/vouchers/accounting/{voucherId:long}/print", async (long vouche
 .RequireAuthorization()
 .WithName("PrintAccountingVoucher");
 
+app.MapPost("/api/stock/requisitions", async (long companyId, One4All.Application.Abstractions.Inventory.StoreRequisitionRequest request, One4All.Application.Abstractions.Inventory.IStoreRequisitionService store, CancellationToken ct) =>
+{
+    var raised = await store.RaiseAsync(companyId, request, ct).ConfigureAwait(false);
+    return raised.IsSuccess ? Results.Ok(new { raised.Value.Id, raised.Value.Number }) : Results.BadRequest(new { error = raised.Error.Message, code = raised.Error.Code });
+})
+.RequireAuthorization()
+.WithName("RaiseStoreRequisition");
+
+app.MapPost("/api/stock/requisitions/{requisitionId:long}/approve", async (long requisitionId, long companyId, long userId, One4All.Application.Abstractions.Inventory.IStoreRequisitionService store, CancellationToken ct) =>
+    ActionResponse(await store.ApproveAsync(companyId, requisitionId, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveStoreRequisition");
+
+app.MapPost("/api/stock/requisitions/{requisitionId:long}/issue", async (long requisitionId, long companyId, DateOnly date, One4All.Application.Abstractions.Inventory.StoreRequisitionLineRequest[] lines, One4All.Application.Abstractions.Inventory.IStoreRequisitionService store, CancellationToken ct) =>
+    ValueResponse(await store.IssueAsync(companyId, requisitionId, date, lines, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("IssueStoreRequisition");
+
 app.MapGet("/api/gl/accounts/{accountCode}/activity", async (long companyId, string accountCode, DateOnly from, DateOnly to, One4All.Application.Abstractions.Reporting.IGeneralLedgerReports gl, CancellationToken ct) =>
     Results.Ok(await gl.NominalActivityAsync(companyId, accountCode, from, to, ct).ConfigureAwait(false)))
 .RequireAuthorization()
