@@ -650,6 +650,21 @@ app.MapPost("/api/pop/invoice-disputes/{disputeId:long}/reject", async (long dis
 .RequireAuthorization()
 .WithName("RejectInvoiceDispute");
 
+app.MapPost("/api/pop/{purchaseOrderId:long}/amend", async (long purchaseOrderId, long companyId, One4All.Application.Abstractions.Procurement.AmendmentRequest request, One4All.Application.Abstractions.Procurement.IPurchaseOrderAmendmentService amendments, CancellationToken ct) =>
+    ValueResponse(await amendments.AmendAsync(companyId, purchaseOrderId, request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AmendPurchaseOrder");
+
+app.MapPost("/api/pop/{purchaseOrderId:long}/reapprove", async (long purchaseOrderId, long companyId, long userId, One4All.Application.Abstractions.Procurement.IPurchaseOrderAmendmentService amendments, CancellationToken ct) =>
+    ActionResponse(await amendments.ReapproveAsync(companyId, purchaseOrderId, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReapprovePurchaseOrder");
+
+app.MapGet("/api/pop/{purchaseOrderId:long}/history", async (long purchaseOrderId, long companyId, One4All.Application.Abstractions.Procurement.IPurchaseOrderAmendmentService amendments, CancellationToken ct) =>
+    Results.Ok(await amendments.HistoryAsync(companyId, purchaseOrderId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PurchaseOrderHistory");
+
 app.MapPost("/api/ar/items/{openItemId:long}/write-off-with-vat-relief", async (long openItemId, long companyId, DateOnly date, string badDebtAccountCode, string reason, int minimumDaysOverdue, One4All.Application.Abstractions.Trading.ISalesLedgerService ar, CancellationToken ct) =>
     ValueResponse(await ar.WriteOffWithVatReliefAsync(companyId, openItemId, date, badDebtAccountCode, reason, minimumDaysOverdue, ct).ConfigureAwait(false)))
 .RequireAuthorization()

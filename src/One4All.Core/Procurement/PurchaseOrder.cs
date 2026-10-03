@@ -68,6 +68,15 @@ public sealed class PurchaseOrder : AuditableEntity, ICompanyScoped
     /// <summary>When the goods are required; deliveries after it count as late on the supplier scorecard.</summary>
     public DateOnly? RequiredBy { get; set; }
 
+    /// <summary>The version: 1 as raised, one more for each amendment.</summary>
+    public int Version { get; private set; } = 1;
+
+    /// <summary>Whether an amendment is waiting for re-approval; nothing can be received against it meanwhile.</summary>
+    public bool AwaitingReapproval { get; private set; }
+
+    /// <summary>Who made the latest amendment.</summary>
+    public long? LastAmendedByUserId { get; private set; }
+
     /// <summary>The currency.</summary>
     public CurrencyCode Currency { get; private set; }
 
@@ -111,6 +120,66 @@ public sealed class PurchaseOrder : AuditableEntity, ICompanyScoped
         }
 
         Status = PurchaseOrderStatus.Cancelled;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Amends a line's quantity and price. The quantity cannot fall below what has been received, and the price cannot
+    /// change once anything on the line has been invoiced.
+    /// </summary>
+    /// <param name="lineId">The line.</param>
+    /// <param name="quantity">The new ordered quantity.</param>
+    /// <param name="unitPrice">The new unit price.</param>
+    /// <returns>Success or the rule broken.</returns>
+    public Result AmendLine(long lineId, decimal quantity, decimal unitPrice)
+    {
+        PurchaseOrderLine? line = _lines.FirstOrDefault(l => l.Id == lineId);
+        if (line is null)
+        {
+            return Result.Failure(Error.NotFound("Pop.LineNotFound", $"PO line {lineId} not found."));
+        }
+
+        if (quantity < line.ReceivedQuantity || quantity <= 0m || unitPrice < 0m)
+        {
+            return Result.Failure(Error.Rule("Pop.AmendQuantity", $"PO line {lineId} cannot be ordered below the {line.ReceivedQuantity} already received."));
+        }
+
+        if (unitPrice != line.UnitPrice && line.InvoicedQuantity > 0m)
+        {
+            return Result.Failure(Error.Rule("Pop.AmendPrice", $"PO line {lineId} has been invoiced, so its price cannot change."));
+        }
+
+        line.Amend(quantity, unitPrice);
+        return Result.Success();
+    }
+
+    /// <summary>Records an amendment: a new version, held for re-approval when it needs one.</summary>
+    /// <param name="userId">Who amended it.</param>
+    /// <param name="needsReapproval">Whether the change needs re-approval before more goods are received.</param>
+    public void MarkAmended(long userId, bool needsReapproval)
+    {
+        Version++;
+        LastAmendedByUserId = userId;
+        AwaitingReapproval = AwaitingReapproval || needsReapproval;
+        RecomputeStatus();
+    }
+
+    /// <summary>Re-approves the amended order; never by the person who amended it.</summary>
+    /// <param name="userId">The approver.</param>
+    /// <returns>Success or the rule broken.</returns>
+    public Result Reapprove(long userId)
+    {
+        if (!AwaitingReapproval)
+        {
+            return Result.Failure(Error.Rule("Pop.NotAwaitingReapproval", $"Purchase order {OrderNumber} is not awaiting re-approval."));
+        }
+
+        if (userId == LastAmendedByUserId)
+        {
+            return Result.Failure(Error.Rule("Pop.SelfApproval", "A different user must re-approve an amendment than the one who made it."));
+        }
+
+        AwaitingReapproval = false;
         return Result.Success();
     }
 
@@ -188,4 +257,13 @@ public sealed class PurchaseOrderLine : Entity
     /// <summary>Records an invoiced quantity.</summary>
     /// <param name="quantity">The quantity invoiced.</param>
     public void Invoice(decimal quantity) => InvoicedQuantity += quantity;
+
+    /// <summary>Changes the ordered quantity and price (through <see cref="PurchaseOrder.AmendLine"/>).</summary>
+    /// <param name="quantity">The new quantity.</param>
+    /// <param name="unitPrice">The new price.</param>
+    internal void Amend(decimal quantity, decimal unitPrice)
+    {
+        OrderedQuantity = quantity;
+        UnitPrice = unitPrice;
+    }
 }

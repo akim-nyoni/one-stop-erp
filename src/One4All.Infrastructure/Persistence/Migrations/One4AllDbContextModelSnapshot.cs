@@ -5659,6 +5659,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<bool>("AwaitingReapproval")
+                        .HasColumnType("boolean")
+                        .HasColumnName("awaiting_reapproval");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -5676,6 +5680,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
                         .HasColumnName("currency");
+
+                    b.Property<long?>("LastAmendedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_amended_by_user_id");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
@@ -5712,6 +5720,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("SupplierId")
                         .HasColumnType("bigint")
                         .HasColumnName("supplier_id");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
 
                     b.HasKey("Id")
                         .HasName("pk_purchase_order");
@@ -5779,6 +5791,82 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_purchase_order_line_purchase_order_id");
 
                     b.ToTable("purchase_order_line", "pop");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrderRevision", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AmendedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amended_by_user_id");
+
+                    b.Property<DateOnly>("AmendedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("amended_on");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("LinesSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("lines_snapshot");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("PurchaseOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("purchase_order_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal>("TotalNet")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("total_net");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_purchase_order_revision");
+
+                    b.HasIndex("PurchaseOrderId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_purchase_order_revision_purchase_order_id_version");
+
+                    b.ToTable("purchase_order_revision", "pop");
                 });
 
             modelBuilder.Entity("One4All.Core.Procurement.PurchaseRequisition", b =>

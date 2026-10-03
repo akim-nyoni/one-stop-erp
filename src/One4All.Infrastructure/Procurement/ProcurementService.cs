@@ -101,6 +101,11 @@ public sealed class ProcurementService : IProcurementService
             return Error.NotFound("Pop.OrderNotFound", $"Purchase order {request.PurchaseOrderId} not found.");
         }
 
+        if (order.AwaitingReapproval)
+        {
+            return Error.Rule("Pop.AwaitingReapproval", $"Purchase order {order.OrderNumber} has an amendment awaiting re-approval.");
+        }
+
         string? grniCode = await ControlCodeAsync(request.CompanyId, ControlAccountType.GoodsReceivedNotInvoiced, ct).ConfigureAwait(false);
         if (grniCode is null)
         {

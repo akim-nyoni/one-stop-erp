@@ -4,6 +4,19 @@ using One4All.Core.Procurement;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
+internal sealed class PurchaseOrderRevisionConfiguration : IEntityTypeConfiguration<PurchaseOrderRevision>
+{
+    public void Configure(EntityTypeBuilder<PurchaseOrderRevision> b)
+    {
+        b.ToTable("purchase_order_revision", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.TotalNet).HasPrecision(19, 4);
+        b.Property(x => x.LinesSnapshot).HasColumnType("jsonb");
+        b.Property(x => x.Reason).HasMaxLength(500);
+        b.HasIndex(x => new { x.PurchaseOrderId, x.Version }).IsUnique();
+    }
+}
+
 internal sealed class InvoiceDisputeConfiguration : IEntityTypeConfiguration<InvoiceDispute>
 {
     public void Configure(EntityTypeBuilder<InvoiceDispute> b)
