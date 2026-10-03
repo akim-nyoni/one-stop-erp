@@ -606,6 +606,36 @@ app.MapGet("/api/municipal/licences/renewals-due", async (long companyId, DateOn
 .RequireAuthorization()
 .WithName("LicenceRenewalsDue");
 
+app.MapPost("/api/municipal/valuation-rolls", async (long companyId, string rollName, DateOnly effectiveFrom, IReadOnlyList<One4All.Application.Abstractions.Municipal.RollEntry> entries, One4All.Application.Abstractions.Municipal.IValuationRollService roll, CancellationToken ct) =>
+    ValueResponse(await roll.ImportRollAsync(companyId, rollName, effectiveFrom, entries, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ImportValuationRoll");
+
+app.MapPost("/api/municipal/properties/{propertyId:long}/supplementary-valuations", async (long propertyId, long companyId, DateOnly effectiveFrom, decimal value, string reason, DateOnly adjustmentDate, One4All.Application.Abstractions.Municipal.IValuationRollService roll, CancellationToken ct) =>
+    ValueResponse(await roll.RecordSupplementaryAsync(companyId, propertyId, effectiveFrom, value, reason, adjustmentDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordSupplementaryValuation");
+
+app.MapGet("/api/municipal/properties/{propertyId:long}/valuations", async (long propertyId, long companyId, One4All.Application.Abstractions.Municipal.IValuationRollService roll, CancellationToken ct) =>
+    Results.Ok(await roll.HistoryAsync(companyId, propertyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ValuationHistory");
+
+app.MapPost("/api/municipal/objections", async (long companyId, long propertyId, DateOnly lodgedOn, decimal claimedValue, string grounds, One4All.Application.Abstractions.Municipal.IValuationRollService roll, CancellationToken ct) =>
+    ValueResponse(await roll.LodgeObjectionAsync(companyId, propertyId, lodgedOn, claimedValue, grounds, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LodgeValuationObjection");
+
+app.MapPost("/api/municipal/objections/{objectionNumber}/decide", async (string objectionNumber, long companyId, DateOnly decidedOn, decimal? revisedValue, string notes, One4All.Application.Abstractions.Municipal.IValuationRollService roll, CancellationToken ct) =>
+    ValueResponse(await roll.DecideObjectionAsync(companyId, objectionNumber, decidedOn, revisedValue, notes, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DecideValuationObjection");
+
+app.MapGet("/api/municipal/objections", async (long companyId, One4All.Core.Municipal.ObjectionStatus? status, One4All.Application.Abstractions.Municipal.IValuationRollService roll, CancellationToken ct) =>
+    Results.Ok(await roll.ObjectionsAsync(companyId, status, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ValuationObjectionsRegister");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

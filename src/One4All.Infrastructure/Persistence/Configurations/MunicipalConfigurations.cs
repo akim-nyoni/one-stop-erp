@@ -65,6 +65,40 @@ internal sealed class CouncilInspectionConfiguration : IEntityTypeConfiguration<
     }
 }
 
+internal sealed class PropertyValuationConfiguration : IEntityTypeConfiguration<PropertyValuation>
+{
+    public void Configure(EntityTypeBuilder<PropertyValuation> b)
+    {
+        b.ToTable("property_valuation", Schemas.Municipal, t => t.HasCheckConstraint("ck_property_valuation_value", "value >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Value).HasPrecision(19, 4);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Reference).HasMaxLength(40);
+        b.Property(x => x.Reason).HasMaxLength(500);
+        b.HasOne<Property>().WithMany().HasForeignKey(x => x.PropertyId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.PropertyId, x.EffectiveFrom });
+    }
+}
+
+internal sealed class ValuationObjectionConfiguration : IEntityTypeConfiguration<ValuationObjection>
+{
+    public void Configure(EntityTypeBuilder<ValuationObjection> b)
+    {
+        b.ToTable("valuation_objection", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ObjectionNumber).HasMaxLength(30);
+        b.Property(x => x.ValueObjectedTo).HasPrecision(19, 4);
+        b.Property(x => x.ClaimedValue).HasPrecision(19, 4);
+        b.Property(x => x.DecidedValue).HasPrecision(19, 4);
+        b.Property(x => x.Grounds).HasMaxLength(1000);
+        b.Property(x => x.DecisionNotes).HasMaxLength(1000);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasOne<PropertyValuation>().WithMany().HasForeignKey(x => x.ObjectedValuationId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.ObjectionNumber }).IsUnique();
+        b.HasIndex(x => x.PropertyId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_valuation_objection_one_open");
+    }
+}
+
 internal sealed class IndigentRegistrationConfiguration : IEntityTypeConfiguration<IndigentRegistration>
 {
     public void Configure(EntityTypeBuilder<IndigentRegistration> b)

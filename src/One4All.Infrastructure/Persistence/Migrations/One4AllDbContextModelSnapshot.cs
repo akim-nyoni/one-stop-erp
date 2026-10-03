@@ -4647,6 +4647,79 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("property_service", "mun");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.PropertyValuation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("PropertyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("property_id");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_property_valuation");
+
+                    b.HasIndex("PropertyId", "EffectiveFrom")
+                        .HasDatabaseName("ix_property_valuation_property_id_effective_from");
+
+                    b.ToTable("property_valuation", "mun", t =>
+                        {
+                            t.HasCheckConstraint("ck_property_valuation_value", "value >= 0");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.ServiceOrder", b =>
                 {
                     b.Property<long>("Id")
@@ -4888,6 +4961,109 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_tariff_block_tariff_id");
 
                     b.ToTable("tariff_block", "mun");
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.ValuationObjection", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("ClaimedValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("claimed_value");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly?>("DecidedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("decided_on");
+
+                    b.Property<decimal?>("DecidedValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("decided_value");
+
+                    b.Property<string>("DecisionNotes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("decision_notes");
+
+                    b.Property<string>("Grounds")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("grounds");
+
+                    b.Property<DateOnly>("LodgedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("lodged_on");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("ObjectedValuationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("objected_valuation_id");
+
+                    b.Property<string>("ObjectionNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("objection_number");
+
+                    b.Property<long>("PropertyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("property_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<decimal>("ValueObjectedTo")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("value_objected_to");
+
+                    b.HasKey("Id")
+                        .HasName("pk_valuation_objection");
+
+                    b.HasIndex("ObjectedValuationId")
+                        .HasDatabaseName("ix_valuation_objection_objected_valuation_id");
+
+                    b.HasIndex("PropertyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_valuation_objection_one_open")
+                        .HasFilter("status = 0");
+
+                    b.HasIndex("CompanyId", "ObjectionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_valuation_objection_company_id_objection_number");
+
+                    b.ToTable("valuation_objection", "mun");
                 });
 
             modelBuilder.Entity("One4All.Core.Offline.OfflineOperation", b =>
@@ -13702,6 +13878,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_property_service_property_property_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.PropertyValuation", b =>
+                {
+                    b.HasOne("One4All.Core.Municipal.Property", null)
+                        .WithMany()
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_property_valuation_property_property_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.TariffBlock", b =>
                 {
                     b.HasOne("One4All.Core.Municipal.Tariff", null)
@@ -13710,6 +13896,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tariff_block_tariffs_tariff_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.ValuationObjection", b =>
+                {
+                    b.HasOne("One4All.Core.Municipal.PropertyValuation", null)
+                        .WithMany()
+                        .HasForeignKey("ObjectedValuationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_valuation_objection_property_valuation_objected_valuation_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Payroll.EmployeePayElement", b =>

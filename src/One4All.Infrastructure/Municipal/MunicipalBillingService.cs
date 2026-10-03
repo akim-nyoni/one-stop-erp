@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Municipal;
 using One4All.Application.Abstractions.Trading;
+using One4All.Application.Municipal;
 using One4All.Core.Common;
 using One4All.Core.Municipal;
 using One4All.Core.System;
@@ -126,7 +127,9 @@ public sealed class MunicipalBillingService : IMunicipalBillingService
             return Error.NotFound("Mun.TariffNotFound", $"Tariff {link.TariffId} not found.");
         }
 
-        decimal charge = tariff.CalculateCharge(consumption, property.Valuation);
+        // The value in force on the bill date, from the valuation roll (the register value when there is no history).
+        decimal valuation = ValuationRoll.ValueAt(await ValuationHistory.LoadAsync(_db, property.Id, ct).ConfigureAwait(false), date, property.Valuation);
+        decimal charge = tariff.CalculateCharge(consumption, valuation);
         if (charge <= 0m)
         {
             return Error.Rule("Mun.NothingToBill", $"Computed charge for {serviceType} on {property.StandNumber} is zero.");
@@ -150,7 +153,7 @@ public sealed class MunicipalBillingService : IMunicipalBillingService
             TaxAmount = taxAmount,
             SalesAccountCode = tariff.RevenueAccountCode,
             TaxAccountCode = taxAccountCode,
-            Narrative = $"{tariff.Name} — stand {property.StandNumber}",
+            Narrative = ValuationHistory.BillNarrative(tariff.Name, property.StandNumber),
         }, ct).ConfigureAwait(false);
 
         if (posted.IsFailure)
