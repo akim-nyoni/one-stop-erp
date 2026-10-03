@@ -162,7 +162,8 @@ internal sealed class TariffConfiguration : IEntityTypeConfiguration<Tariff>
         b.Property(x => x.RatePerValuationCents).HasPrecision(19, 6);
         b.HasMany(x => x.Blocks).WithOne().HasForeignKey(x => x.TariffId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Blocks).UsePropertyAccessMode(PropertyAccessMode.Field);
-        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
+        // A tariff code has effective-dated versions: one per code and effective date.
+        b.HasIndex(x => new { x.CompanyId, x.Code, x.EffectiveFrom }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);
     }
 }

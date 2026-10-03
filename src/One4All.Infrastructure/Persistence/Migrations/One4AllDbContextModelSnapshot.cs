@@ -5153,9 +5153,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_tariff");
 
-                    b.HasIndex("CompanyId", "Code")
+                    b.HasIndex("CompanyId", "Code", "EffectiveFrom")
                         .IsUnique()
-                        .HasDatabaseName("ix_tariff_company_id_code")
+                        .HasDatabaseName("ix_tariff_company_id_code_effective_from")
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("tariff", "mun");
