@@ -260,6 +260,17 @@ app.MapPost("/api/pop/{purchaseOrderId:long}/cancel", async (long companyId, lon
 .RequireAuthorization()
 .WithName("CancelPurchaseOrder");
 
+// --- Banking: reconciliation work list and auto-match ------------------------------------------------------
+app.MapGet("/api/banking/{bankAccountId:long}/work-list", async (long companyId, long bankAccountId, DateOnly asAt, One4All.Application.Abstractions.Banking.IBankReconciliationService banking, CancellationToken ct) =>
+    ValueResponse(await banking.WorkListAsync(companyId, bankAccountId, asAt, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("BankWorkList");
+
+app.MapPost("/api/banking/{bankAccountId:long}/auto-match", async (long companyId, long bankAccountId, int? dateToleranceDays, One4All.Application.Abstractions.Banking.IBankReconciliationService banking, CancellationToken ct) =>
+    ValueResponse(await banking.AutoMatchAsync(companyId, bankAccountId, dateToleranceDays ?? One4All.Application.Banking.BankAutoMatcher.DefaultDateToleranceDays, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("BankAutoMatch");
+
 // --- Banking: statement CSV import (body is the raw CSV; the layout comes from the query) --------------------
 app.MapPost("/api/banking/{bankAccountId:long}/statement-csv", async (HttpRequest http, long companyId, long bankAccountId,
     int dateColumn, int descriptionColumn, int? amountColumn, int? debitColumn, int? creditColumn, int? referenceColumn, string? dateFormat, string? delimiter, bool? hasHeader,

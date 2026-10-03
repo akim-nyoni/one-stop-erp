@@ -46,9 +46,42 @@ public sealed record CashPositionRow(string Code, string Name, string Currency, 
 /// <param name="TotalBalance">The total across all accounts (base currency).</param>
 public sealed record CashPositionReport(DateOnly AsAtDate, IReadOnlyList<CashPositionRow> Rows, decimal TotalBalance);
 
+/// <summary>A statement line on the reconciliation work list.</summary>
+/// <param name="Id">The statement line id.</param>
+/// <param name="Date">The statement date.</param>
+/// <param name="Description">The bank's description.</param>
+/// <param name="Reference">The bank's reference, if any.</param>
+/// <param name="Amount">The signed amount (+ in, − out).</param>
+/// <param name="MatchedJournalLineId">The GL line it is matched to, or null while unreconciled.</param>
+public sealed record StatementWorkItem(long Id, DateOnly Date, string Description, string? Reference, decimal Amount, long? MatchedJournalLineId);
+
+/// <summary>A GL cash-book posting on the reconciliation work list.</summary>
+/// <param name="Id">The journal line id.</param>
+/// <param name="Date">The posting date.</param>
+/// <param name="JournalNumber">The journal number.</param>
+/// <param name="DocumentNumber">The journal's document number, if any.</param>
+/// <param name="Amount">The signed amount on the bank account (debit positive).</param>
+public sealed record GlWorkItem(long Id, DateOnly Date, string JournalNumber, string? DocumentNumber, decimal Amount);
+
+/// <summary>The reconciliation work list for a bank account as at a date.</summary>
+/// <param name="StatementLines">Every statement line dated on or before the date (matched ones carry their GL line id).</param>
+/// <param name="UnpresentedGlLines">GL postings on the bank account not matched to any statement line.</param>
+public sealed record BankWorkList(IReadOnlyList<StatementWorkItem> StatementLines, IReadOnlyList<GlWorkItem> UnpresentedGlLines);
+
 /// <summary>Imports bank statements and reconciles them to the GL cash book (brief §4.7).</summary>
 public interface IBankReconciliationService
 {
+    /// <summary>
+    /// The reconciliation work list: statement lines (with their match, if any) and the unpresented GL
+    /// postings, both with ids so a screen can match and unmatch them. Derived the same way as the report.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="bankAccountId">The bank account.</param>
+    /// <param name="asAtDate">The as-at date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The work list, or not-found.</returns>
+    Task<Result<BankWorkList>> WorkListAsync(long companyId, long bankAccountId, DateOnly asAtDate, CancellationToken ct = default);
+
     /// <summary>
     /// Produces the cash position as at a date: each active bank account's GL cash-book balance (and how
     /// many imported statement lines are still unreconciled), with the total — the daily treasury view.

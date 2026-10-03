@@ -1,0 +1,139 @@
+<Window x:Class="One4All.Desktop.BankReconciliationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:One4All.Desktop.ViewModels"
+        Title="Bank Reconciliation" Height="700" Width="1200"
+        WindowStartupLocation="CenterOwner" Background="#F4F6F4" FontFamily="Segoe UI">
+    <Window.Resources>
+        <Style x:Key="Tile" TargetType="Border">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="BorderBrush" Value="#D9E0D9" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="Margin" Value="6" />
+        </Style>
+        <Style x:Key="TileLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#667" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style x:Key="TileValue" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#1E3A2E" />
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="DifferenceTile" TargetType="Border" BasedOn="{StaticResource Tile}">
+            <Setter Property="Background" Value="#F6E3E3" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsReconciled}" Value="True">
+                    <Setter Property="Background" Value="#DDEFE0" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="ActionButton" TargetType="Button">
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="Margin" Value="6,0,0,0" />
+            <Setter Property="MinWidth" Value="100" />
+        </Style>
+    </Window.Resources>
+
+    <DockPanel Margin="10">
+        <!-- Header -->
+        <DockPanel DockPanel.Dock="Top" Margin="6,0,6,6">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Bank account" Style="{StaticResource TileLabel}" VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{Binding Banks}" SelectedItem="{Binding SelectedBank}" DisplayMemberPath="Label" Width="260" Margin="8,0,16,0" />
+                <TextBlock Text="As at" Style="{StaticResource TileLabel}" VerticalAlignment="Center" />
+                <DatePicker SelectedDate="{Binding AsAt}" Margin="8,0,8,0" />
+                <Button Content="Refresh" Style="{StaticResource ActionButton}" Command="{Binding LoadCommand}" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Bank Reconciliation" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
+                <TextBlock Text="Auto-match within a date window, then match or unmatch by hand until the difference is zero." Foreground="#667" FontSize="12" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Balances -->
+        <UniformGrid DockPanel.Dock="Top" Columns="3">
+            <Border Style="{StaticResource Tile}">
+                <StackPanel>
+                    <TextBlock Text="Cash book (GL) balance" Style="{StaticResource TileLabel}" />
+                    <TextBlock Text="{Binding GlBalance}" Style="{StaticResource TileValue}" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource Tile}">
+                <StackPanel>
+                    <TextBlock Text="Statement balance" Style="{StaticResource TileLabel}" />
+                    <TextBlock Text="{Binding StatementBalance}" Style="{StaticResource TileValue}" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource DifferenceTile}">
+                <StackPanel>
+                    <TextBlock Text="Difference after unreconciled items" Style="{StaticResource TileLabel}" />
+                    <TextBlock Text="{Binding Difference}" Style="{StaticResource TileValue}" />
+                </StackPanel>
+            </Border>
+        </UniformGrid>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom" Background="#E8EEE8" Padding="10,5" Margin="6,6,6,0" CornerRadius="4">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#334" FontSize="12" TextWrapping="Wrap" />
+        </Border>
+
+        <!-- Actions -->
+        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="6,6,6,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="Unmatch" Style="{StaticResource ActionButton}" Command="{Binding UnmatchCommand}" />
+                    <Button Content="Match selected" Style="{StaticResource ActionButton}" FontWeight="SemiBold" Background="#DDEFE0" Command="{Binding MatchCommand}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Auto-match tolerance (days)" Style="{StaticResource TileLabel}" VerticalAlignment="Center" />
+                    <TextBox Text="{Binding DateToleranceDays, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="8,0,0,0" Padding="6,4" TextAlignment="Right" />
+                    <Button Content="Auto-match" Style="{StaticResource ActionButton}" Command="{Binding AutoMatchCommand}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- Work lists -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource Tile}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Statement lines" FontSize="14" FontWeight="SemiBold" Foreground="#1E3A2E" Margin="0,0,0,6" />
+                    <ListView ItemsSource="{Binding StatementLines}" SelectedItem="{Binding SelectedStatementLine}" BorderThickness="0">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Date" Width="90" DisplayMemberBinding="{Binding Date}" />
+                                <GridViewColumn Header="Description" Width="200" DisplayMemberBinding="{Binding Description}" />
+                                <GridViewColumn Header="Reference" Width="90" DisplayMemberBinding="{Binding Reference}" />
+                                <GridViewColumn Header="Amount" Width="100" DisplayMemberBinding="{Binding Amount}" />
+                                <GridViewColumn Header="Status" Width="70" DisplayMemberBinding="{Binding Status}" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </DockPanel>
+            </Border>
+
+            <Border Grid.Column="1" Style="{StaticResource Tile}">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Unpresented cash-book postings" FontSize="14" FontWeight="SemiBold" Foreground="#1E3A2E" Margin="0,0,0,6" />
+                    <ListView ItemsSource="{Binding UnpresentedGlLines}" SelectedItem="{Binding SelectedGlLine}" BorderThickness="0">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Date" Width="90" DisplayMemberBinding="{Binding Date}" />
+                                <GridViewColumn Header="Journal" Width="120" DisplayMemberBinding="{Binding Journal}" />
+                                <GridViewColumn Header="Document" Width="120" DisplayMemberBinding="{Binding Document}" />
+                                <GridViewColumn Header="Amount" Width="100" DisplayMemberBinding="{Binding Amount}" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

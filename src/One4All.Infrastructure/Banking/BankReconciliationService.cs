@@ -202,6 +202,29 @@ public sealed class BankReconciliationService : IBankReconciliationService
     }
 
     /// <inheritdoc />
+    public async Task<Result<BankWorkList>> WorkListAsync(long companyId, long bankAccountId, DateOnly asAtDate, CancellationToken ct = default)
+    {
+        Result<BankAccount> accountResult = await LoadAccountAsync(companyId, bankAccountId, ct).ConfigureAwait(false);
+        if (accountResult.IsFailure)
+        {
+            return accountResult.Error;
+        }
+
+        List<GlLine> glLines = await GlLinesAsync(companyId, accountResult.Value.GlAccountCode, asAtDate, ct).ConfigureAwait(false);
+        List<BankStatementLine> statementLines = await _db.Set<BankStatementLine>()
+            .Where(s => s.CompanyId == companyId && s.BankAccountId == bankAccountId && s.StatementDate <= asAtDate)
+            .OrderBy(s => s.StatementDate).ThenBy(s => s.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        HashSet<long> matchedGlIds = statementLines.Where(s => s.MatchedJournalLineId is not null).Select(s => s.MatchedJournalLineId!.Value).ToHashSet();
+
+        return new BankWorkList(
+            statementLines.Select(s => new StatementWorkItem(s.Id, s.StatementDate, s.Description, s.Reference, s.Amount, s.MatchedJournalLineId)).ToList(),
+            glLines.Where(g => !matchedGlIds.Contains(g.Id)).OrderBy(g => g.PostingDate).ThenBy(g => g.Id)
+                .Select(g => new GlWorkItem(g.Id, g.PostingDate, g.JournalNumber, g.DocumentNumber, g.Signed)).ToList());
+    }
+
+    /// <inheritdoc />
     public async Task<Result<BankReconciliationReport>> GetReconciliationAsync(long companyId, long bankAccountId, DateOnly asAtDate, CancellationToken ct = default)
     {
         Result<BankAccount> accountResult = await LoadAccountAsync(companyId, bankAccountId, ct).ConfigureAwait(false);
