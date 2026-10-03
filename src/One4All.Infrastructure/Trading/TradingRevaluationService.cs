@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Trading;
 using One4All.Core.Accounting;
@@ -43,7 +42,11 @@ public sealed class TradingRevaluationService : ITradingRevaluationService
     }
 
     /// <inheritdoc />
-    public async Task<Result<TradingRevaluationResult>> RevalueAsync(long companyId, TradingLedger ledger, DateOnly asAtDate, bool autoReverse = true, CancellationToken ct = default)
+    public Task<Result<TradingRevaluationResult>> RevalueAsync(long companyId, TradingLedger ledger, DateOnly asAtDate, bool autoReverse = true, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RevalueCoreAsync(companyId, ledger, asAtDate, autoReverse, ct), ct);
+
+    // One unit of work: every posting it makes commits together or not at all (joining a caller's transaction).
+    private async Task<Result<TradingRevaluationResult>> RevalueCoreAsync(long companyId, TradingLedger ledger, DateOnly asAtDate, bool autoReverse, CancellationToken ct)
     {
         Result<Computation> computed = await ComputeAsync(companyId, ledger, asAtDate, ct).ConfigureAwait(false);
         if (computed.IsFailure)
@@ -71,7 +74,6 @@ public sealed class TradingRevaluationService : ITradingRevaluationService
         string module = ledger == TradingLedger.AccountsReceivable ? "AR" : "AP";
 
         // The revaluation and its reversal stand or fall together.
-        await using IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
         Result<PostingReceipt> posted = await _posting.PostAsync(Journal(companyId, company.BaseCurrency, module, asAtDate,
             ITradingRevaluationService.RevaluationDocumentType, $"Unrealised FX revaluation of {module} as at {asAtDate:yyyy-MM-dd}",
             controlCode, controlSide, fxCode, fxSide, magnitude), ct).ConfigureAwait(false);
@@ -93,8 +95,6 @@ public sealed class TradingRevaluationService : ITradingRevaluationService
 
             reversalNumber = reversal.Value.JournalNumber;
         }
-
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
         return new TradingRevaluationResult(asAtDate, ledger, items, target, booked, posted.Value.JournalNumber, reversalNumber);
     }
 

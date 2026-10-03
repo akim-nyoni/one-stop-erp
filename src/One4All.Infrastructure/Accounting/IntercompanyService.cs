@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
@@ -27,7 +26,11 @@ public sealed class IntercompanyService : IIntercompanyService
     }
 
     /// <inheritdoc />
-    public async Task<Result<IntercompanyPostingResult>> PostAsync(IntercompanyJournalRequest request, CancellationToken ct = default)
+    public Task<Result<IntercompanyPostingResult>> PostAsync(IntercompanyJournalRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PostCoreAsync(request, ct), ct);
+
+    // One unit of work: every posting it makes commits together or not at all (joining a caller's transaction).
+    private async Task<Result<IntercompanyPostingResult>> PostCoreAsync(IntercompanyJournalRequest request, CancellationToken ct)
     {
         if (request.FromCompanyId == request.ToCompanyId)
         {
@@ -60,7 +63,6 @@ public sealed class IntercompanyService : IIntercompanyService
         string narrative = request.Narrative ?? $"Intercompany {from.Code} → {to.Code} {request.DocumentNumber}";
 
         // Both journals or neither: the engine only calls SaveChanges, so one transaction on the context covers both.
-        await using IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
 
         Result<PostingReceipt> fromPosting = await _postingEngine.PostAsync(Journal(from, request.Date, request.DocumentNumber, narrative,
             (request.FromIntercompanyAccountCode, JournalSide.Debit),
@@ -68,7 +70,6 @@ public sealed class IntercompanyService : IIntercompanyService
             request.Amount), ct).ConfigureAwait(false);
         if (fromPosting.IsFailure)
         {
-            await transaction.RollbackAsync(ct).ConfigureAwait(false);
             return fromPosting.Error;
         }
 
@@ -78,11 +79,8 @@ public sealed class IntercompanyService : IIntercompanyService
             request.Amount), ct).ConfigureAwait(false);
         if (toPosting.IsFailure)
         {
-            await transaction.RollbackAsync(ct).ConfigureAwait(false);
             return toPosting.Error;
         }
-
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
         return new IntercompanyPostingResult(fromPosting.Value.JournalNumber, toPosting.Value.JournalNumber);
     }
 

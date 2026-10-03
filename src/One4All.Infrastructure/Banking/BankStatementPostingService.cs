@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Banking;
 using One4All.Application.Abstractions.Trading;
@@ -159,32 +158,31 @@ public sealed class BankStatementPostingService : IBankStatementPostingService
             return Error.Rule("Bank.NotMoneyOut", "Only a money-out statement line can be posted as a supplier payment.");
         }
 
-        await using IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
-
-        Result<(string JournalNumber, long? OpenItemId)> posted = await post(bank, line).ConfigureAwait(false);
-        if (posted.IsFailure)
+        // The posting and the match stand or fall together (joining a caller's transaction when there is one).
+        return await _db.AtomicAsync<StatementLinePosting>(async () =>
         {
-            await transaction.RollbackAsync(ct).ConfigureAwait(false);
-            return posted.Error;
-        }
+            Result<(string JournalNumber, long? OpenItemId)> posted = await post(bank, line).ConfigureAwait(false);
+            if (posted.IsFailure)
+            {
+                return posted.Error;
+            }
 
-        // The bank leg of the journal just posted is what the statement line matches.
-        long? bankLegId = await (
-            from l in _db.Set<JournalLine>()
-            join j in _db.Journals on l.JournalEntryId equals j.Id
-            where j.CompanyId == companyId && j.JournalNumber == posted.Value.JournalNumber && l.AccountCode == bank.GlAccountCode
-            select (long?)l.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        if (bankLegId is null)
-        {
-            await transaction.RollbackAsync(ct).ConfigureAwait(false);
-            return Error.Failure("Bank.NoBankLeg", $"Journal {posted.Value.JournalNumber} has no line on the bank account {bank.GlAccountCode}.");
-        }
+            // The bank leg of the journal just posted is what the statement line matches.
+            long? bankLegId = await (
+                from l in _db.Set<JournalLine>()
+                join j in _db.Journals on l.JournalEntryId equals j.Id
+                where j.CompanyId == companyId && j.JournalNumber == posted.Value.JournalNumber && l.AccountCode == bank.GlAccountCode
+                select (long?)l.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (bankLegId is null)
+            {
+                return Error.Failure("Bank.NoBankLeg", $"Journal {posted.Value.JournalNumber} has no line on the bank account {bank.GlAccountCode}.");
+            }
 
-        line.MatchTo(bankLegId.Value);
-        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
+            line.MatchTo(bankLegId.Value);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        return new StatementLinePosting(posted.Value.JournalNumber, bankLegId.Value, posted.Value.OpenItemId);
+            return new StatementLinePosting(posted.Value.JournalNumber, bankLegId.Value, posted.Value.OpenItemId);
+        }, ct).ConfigureAwait(false);
     }
 
     // The document number: as given, else the bank's reference, else a stable BNK-{line id}.

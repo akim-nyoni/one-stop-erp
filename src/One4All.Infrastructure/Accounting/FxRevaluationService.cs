@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
@@ -30,7 +29,11 @@ public sealed class FxRevaluationService : IFxRevaluationService
     }
 
     /// <inheritdoc />
-    public async Task<Result<FxRevaluationResult>> RevalueAsync(long companyId, DateOnly asAtDate, bool autoReverse = true, CancellationToken ct = default)
+    public Task<Result<FxRevaluationResult>> RevalueAsync(long companyId, DateOnly asAtDate, bool autoReverse = true, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RevalueCoreAsync(companyId, asAtDate, autoReverse, ct), ct);
+
+    // One unit of work: every posting it makes commits together or not at all (joining a caller's transaction).
+    private async Task<Result<FxRevaluationResult>> RevalueCoreAsync(long companyId, DateOnly asAtDate, bool autoReverse, CancellationToken ct)
     {
         Company? company = await _db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         if (company is null)
@@ -111,7 +114,6 @@ public sealed class FxRevaluationService : IFxRevaluationService
 
         List<string> journalNumbers = [];
         List<string> reversalNumbers = [];
-        await using IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
         foreach ((CurrencyCode currency, List<JournalLineRequest> lines, List<JournalLineRequest> reversalLines) in byCurrency.Values)
         {
             Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
@@ -156,8 +158,6 @@ public sealed class FxRevaluationService : IFxRevaluationService
 
             reversalNumbers.Add(reversal.Value.JournalNumber);
         }
-
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
         return new FxRevaluationResult(asAtDate, revaluations, journalNumbers, reversalNumbers);
     }
 

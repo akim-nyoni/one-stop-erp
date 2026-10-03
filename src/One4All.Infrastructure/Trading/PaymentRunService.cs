@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using One4All.Core.Accounting;
 using One4All.Application.Abstractions.Trading;
 using One4All.Core.Common;
@@ -29,7 +28,11 @@ public sealed class PaymentRunService : IPaymentRunService
     }
 
     /// <inheritdoc />
-    public async Task<Result<PaymentRunResult>> RunAsync(PaymentRunRequest request, CancellationToken ct = default)
+    public Task<Result<PaymentRunResult>> RunAsync(PaymentRunRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RunCoreAsync(request, ct), ct);
+
+    // One unit of work: every posting it makes commits together or not at all (joining a caller's transaction).
+    private async Task<Result<PaymentRunResult>> RunCoreAsync(PaymentRunRequest request, CancellationToken ct)
     {
         (List<OpenItem> dueInvoices, List<OpenItem> credits, Dictionary<long, Supplier> suppliers) = await SelectAsync(request, ct).ConfigureAwait(false);
 
@@ -41,7 +44,6 @@ public sealed class PaymentRunService : IPaymentRunService
 
         // The whole run stands or falls together: a failure part-way must not leave a payment posted but unallocated,
         // which a re-run would pay again.
-        await using IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
 
         List<PaymentRunLine> lines = [];
         decimal totalBase = 0m;
@@ -129,8 +131,6 @@ public sealed class PaymentRunService : IPaymentRunService
             totalBase += payment.Value.BaseAmount;
             lines.Add(new PaymentRunLine(supplier.Id, supplier.Code, supplier.Name, currency.Value, toPay, paymentNumber, touched.Count, creditsApplied));
         }
-
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
 
         byte[] eft = BuildEftFile(request, [.. lines.Where(l => l.Amount > 0m)], suppliers);
         return new PaymentRunResult(lines, totalBase, eft);

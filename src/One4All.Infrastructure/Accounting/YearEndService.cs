@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Reporting;
 using One4All.Core.Accounting;
@@ -32,7 +31,11 @@ public sealed class YearEndService : IYearEndService
     }
 
     /// <inheritdoc />
-    public async Task<Result<YearEndResult>> RunAsync(long companyId, long fiscalYearId, string retainedEarningsAccountCode, CancellationToken ct = default)
+    public Task<Result<YearEndResult>> RunAsync(long companyId, long fiscalYearId, string retainedEarningsAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RunCoreAsync(companyId, fiscalYearId, retainedEarningsAccountCode, ct), ct);
+
+    // One unit of work: every posting it makes commits together or not at all (joining a caller's transaction).
+    private async Task<Result<YearEndResult>> RunCoreAsync(long companyId, long fiscalYearId, string retainedEarningsAccountCode, CancellationToken ct)
     {
         FiscalYear? year = await _db.FiscalYears
             .Include(y => y.Periods).ThenInclude(p => p.ModuleStatuses)
@@ -74,7 +77,6 @@ public sealed class YearEndService : IYearEndService
         }
 
         // The closing journal, the next year and the closed periods stand or fall together.
-        await using IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
 
         // Compute the year's profit or loss and build the closing journal that zeroes income/expense.
         IncomeStatement pl = await _reports.IncomeStatementAsync(companyId, year.StartDate, year.EndDate, ct).ConfigureAwait(false);
@@ -140,7 +142,6 @@ public sealed class YearEndService : IYearEndService
 
         year.Close();
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        await transaction.CommitAsync(ct).ConfigureAwait(false);
 
         return new YearEndResult(closingJournalNumber, netProfit, nextYearId);
     }
