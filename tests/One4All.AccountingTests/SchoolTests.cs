@@ -59,6 +59,15 @@ public sealed class SchoolTests
             run.Value.Count.Should().Be(2);
             // Compulsory total 1000; full fee 1000 + (1000 − 250) = 1750.
             run.Value.TotalNetBilled.Should().Be(1750m);
+
+            // Repeating the term's run bills nobody again; a blank prefix is refused; a single re-bill is refused.
+            var again = await school.BillTermAsync(companyId, structureId, "FEE-", new DateOnly(2026, 1, 15));
+            again.Value.Count.Should().Be(0);
+            again.Value.AlreadyBilled.Should().Be(2);
+            again.Value.TotalNetBilled.Should().Be(0m);
+            (await school.BillTermAsync(companyId, structureId, "  ", new DateOnly(2026, 1, 15))).Error.Code.Should().Be("School.PrefixRequired");
+            long studentId = run.Value.Bills[0].StudentId;
+            (await school.BillStudentAsync(companyId, studentId, structureId, "FEE-ADM-001", new DateOnly(2026, 1, 20))).Error.Code.Should().Be("School.AlreadyBilled");
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())

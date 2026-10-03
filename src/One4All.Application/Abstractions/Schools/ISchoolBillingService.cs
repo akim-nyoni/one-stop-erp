@@ -14,7 +14,8 @@ public readonly record struct StudentBillResult(long StudentId, decimal GrossFee
 /// <summary>The result of a term billing run.</summary>
 /// <param name="Bills">The per-student results.</param>
 /// <param name="TotalNetBilled">The total net billed across all students.</param>
-public readonly record struct TermBillResult(IReadOnlyList<StudentBillResult> Bills, decimal TotalNetBilled)
+/// <param name="AlreadyBilled">Students skipped because their invoice number for this run is already on the receivables ledger.</param>
+public readonly record struct TermBillResult(IReadOnlyList<StudentBillResult> Bills, decimal TotalNetBilled, int AlreadyBilled = 0)
 {
     /// <summary>The number of students billed.</summary>
     public int Count => Bills.Count;
@@ -26,7 +27,10 @@ public readonly record struct TermBillResult(IReadOnlyList<StudentBillResult> Bi
 /// </summary>
 public interface ISchoolBillingService
 {
-    /// <summary>Bills one student for a term against a fee structure.</summary>
+    /// <summary>
+    /// Bills one student for a term against a fee structure. Refuses an invoice number already on the receivables
+    /// ledger (<c>School.AlreadyBilled</c>), so the same bill cannot be raised twice.
+    /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="studentId">The student.</param>
     /// <param name="feeStructureId">The fee structure to apply.</param>
@@ -38,7 +42,10 @@ public interface ISchoolBillingService
 
     /// <summary>
     /// Runs a term billing for every enrolled student in the fee structure's grade, raising one invoice
-    /// per student (invoice numbers are the prefix plus the admission number).
+    /// per student (invoice numbers are the prefix plus the admission number). The prefix identifies the term's
+    /// run (e.g. <c>T1-2026-</c>) and is required: a student whose number is already on the receivables ledger is
+    /// skipped and counted in <see cref="TermBillResult.AlreadyBilled"/>, so a repeated or resumed run never bills
+    /// anyone twice.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="feeStructureId">The fee structure to apply.</param>
