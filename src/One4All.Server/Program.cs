@@ -272,6 +272,16 @@ app.MapPost("/api/trading/payment-run", async (One4All.Application.Abstractions.
 .RequireAuthorization()
 .WithName("PaymentRun");
 
+app.MapGet("/api/ar/expected-credit-loss", async (long companyId, DateOnly asAtDate, string allowanceAccount, One4All.Application.Abstractions.Trading.IExpectedCreditLossService ecl, CancellationToken ct) =>
+    ValueResponse(await ecl.AssessAsync(companyId, asAtDate, One4All.Application.Trading.EclMatrix.Default, allowanceAccount, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ExpectedCreditLoss");
+
+app.MapPost("/api/ar/expected-credit-loss", async (long companyId, DateOnly asAtDate, string allowanceAccount, string expenseAccount, One4All.Application.Abstractions.Trading.IExpectedCreditLossService ecl, CancellationToken ct) =>
+    ValueResponse(await ecl.PostAsync(companyId, asAtDate, One4All.Application.Trading.EclMatrix.Default, allowanceAccount, expenseAccount, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PostExpectedCreditLoss");
+
 app.MapGet("/api/ap/withholding/return", async (long companyId, DateOnly fromDate, DateOnly toDate, One4All.Application.Abstractions.Trading.IWithholdingTaxService wht, CancellationToken ct) =>
     ValueResponse(await wht.ReturnAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)))
 .RequireAuthorization()
