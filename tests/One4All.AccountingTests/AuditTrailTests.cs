@@ -65,14 +65,31 @@ public sealed class AuditTrailTests
         long tamperedId;
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
-            // Someone with database access quietly rewrites history: the credit-limit change now says 25,000.
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             tamperedId = await db.ChangeLog
                 .Where(c => c.CompanyId == companyId && c.EntityType == "Customer" && c.Action == AuditAction.Update)
                 .Select(c => c.Id).SingleAsync();
-            int rows = await db.Database.ExecuteSqlInterpolatedAsync(
+
+            // The log is append-only in the database: an ordinary UPDATE or DELETE is refused outright.
+            Func<Task> update = () => db.Database.ExecuteSqlInterpolatedAsync(
                 $"UPDATE audit.change_log SET new_values = REPLACE(new_values, '2500', '25000') WHERE id = {tamperedId}");
-            rows.Should().Be(1);
+            (await update.Should().ThrowAsync<Npgsql.PostgresException>()).Which.MessageText.Should().Contain("append-only");
+            Func<Task> delete = () => db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM audit.change_log WHERE id = {tamperedId}");
+            await delete.Should().ThrowAsync<Npgsql.PostgresException>();
+
+            // Someone able to switch the trigger off (the table owner) quietly rewrites history: the credit-limit
+            // change now says 25,000. The hash chain must still catch it.
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE audit.change_log DISABLE TRIGGER trg_change_log_no_update_delete");
+            try
+            {
+                int rows = await db.Database.ExecuteSqlInterpolatedAsync(
+                    $"UPDATE audit.change_log SET new_values = REPLACE(new_values, '2500', '25000') WHERE id = {tamperedId}");
+                rows.Should().Be(1);
+            }
+            finally
+            {
+                await db.Database.ExecuteSqlRawAsync("ALTER TABLE audit.change_log ENABLE TRIGGER trg_change_log_no_update_delete");
+            }
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
