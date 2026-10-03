@@ -129,6 +129,12 @@ public sealed class Warehouse : SoftDeletableEntity, ICompanyScoped
     /// <summary>The warehouse name.</summary>
     public string Name { get; set; }
 
+    /// <summary>
+    /// Whether this is a quarantine (inspection hold) location: goods here await quality inspection and are not
+    /// available to sell.
+    /// </summary>
+    public bool IsQuarantine { get; set; }
+
     /// <summary>Whether the warehouse is active.</summary>
     public bool IsActive { get; set; }
 }

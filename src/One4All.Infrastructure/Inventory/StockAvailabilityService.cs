@@ -35,6 +35,11 @@ public sealed class StockAvailabilityService : IStockAvailabilityService
         {
             balances = balances.Where(b => b.WarehouseId == wh);
         }
+        else
+        {
+            // Goods held for quality inspection are not available until released.
+            balances = balances.Where(b => !_db.Set<Warehouse>().Any(w => w.Id == b.WarehouseId && w.IsQuarantine));
+        }
 
         decimal onHand = await balances.SumAsync(b => (decimal?)b.QuantityOnHand, ct).ConfigureAwait(false) ?? 0m;
 

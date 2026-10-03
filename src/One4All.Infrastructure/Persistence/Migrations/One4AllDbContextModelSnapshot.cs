@@ -3428,6 +3428,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<bool>("IsQuarantine")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_quarantine");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -5365,6 +5369,109 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_grn_company_id_grn_number");
 
                     b.ToTable("grn", "pop");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.GrnInspection", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("GoodsReceivedNoteId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("goods_received_note_id");
+
+                    b.Property<DateOnly>("InspectedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("inspected_on");
+
+                    b.Property<long>("InspectorUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("inspector_user_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("ReleaseWarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("release_warehouse_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_grn_inspection");
+
+                    b.HasIndex("GoodsReceivedNoteId")
+                        .HasDatabaseName("ix_grn_inspection_goods_received_note_id");
+
+                    b.ToTable("grn_inspection", "pop");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.GrnInspectionLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("GrnInspectionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("grn_inspection_id");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<decimal>("Passed")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("passed");
+
+                    b.Property<decimal>("Rejected")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("rejected");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_grn_inspection_line");
+
+                    b.HasIndex("GrnInspectionId")
+                        .HasDatabaseName("ix_grn_inspection_line_grn_inspection_id");
+
+                    b.ToTable("grn_inspection_line", "pop");
                 });
 
             modelBuilder.Entity("One4All.Core.Procurement.GrnLine", b =>
@@ -11970,6 +12077,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_sale_tender_sales_sale_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Procurement.GrnInspectionLine", b =>
+                {
+                    b.HasOne("One4All.Core.Procurement.GrnInspection", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("GrnInspectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_grn_inspection_line_grn_inspection_grn_inspection_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Procurement.GrnLine", b =>
                 {
                     b.HasOne("One4All.Core.Procurement.GoodsReceivedNote", null)
@@ -12407,6 +12524,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("One4All.Core.Procurement.GoodsReceivedNote", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.GrnInspection", b =>
                 {
                     b.Navigation("Lines");
                 });

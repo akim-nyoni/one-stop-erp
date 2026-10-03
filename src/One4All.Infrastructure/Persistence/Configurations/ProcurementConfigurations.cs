@@ -4,6 +4,30 @@ using One4All.Core.Procurement;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
+internal sealed class GrnInspectionConfiguration : IEntityTypeConfiguration<GrnInspection>
+{
+    public void Configure(EntityTypeBuilder<GrnInspection> b)
+    {
+        b.ToTable("grn_inspection", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.GrnInspectionId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => x.GoodsReceivedNoteId);
+    }
+}
+
+internal sealed class GrnInspectionLineConfiguration : IEntityTypeConfiguration<GrnInspectionLine>
+{
+    public void Configure(EntityTypeBuilder<GrnInspectionLine> b)
+    {
+        b.ToTable("grn_inspection_line", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Passed).HasPrecision(19, 4);
+        b.Property(x => x.Rejected).HasPrecision(19, 4);
+        b.Property(x => x.RejectionReason).HasMaxLength(300);
+    }
+}
+
 internal sealed class RfqConfiguration : IEntityTypeConfiguration<Rfq>
 {
     public void Configure(EntityTypeBuilder<Rfq> b)

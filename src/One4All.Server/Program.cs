@@ -625,6 +625,11 @@ app.MapPost("/api/pop/rfqs/{rfqId:long}/award", async (long rfqId, long companyI
 .RequireAuthorization()
 .WithName("AwardRfq");
 
+app.MapPost("/api/pop/grns/{grnId:long}/inspection", async (long grnId, long companyId, One4All.Application.Abstractions.Procurement.InspectionRequest request, One4All.Application.Abstractions.Procurement.IQualityInspectionService qc, CancellationToken ct) =>
+    ValueResponse(await qc.InspectAsync(companyId, grnId, request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("InspectGoodsReceived");
+
 app.MapPost("/api/ar/items/{openItemId:long}/write-off-with-vat-relief", async (long openItemId, long companyId, DateOnly date, string badDebtAccountCode, string reason, int minimumDaysOverdue, One4All.Application.Abstractions.Trading.ISalesLedgerService ar, CancellationToken ct) =>
     ValueResponse(await ar.WriteOffWithVatReliefAsync(companyId, openItemId, date, badDebtAccountCode, reason, minimumDaysOverdue, ct).ConfigureAwait(false)))
 .RequireAuthorization()
