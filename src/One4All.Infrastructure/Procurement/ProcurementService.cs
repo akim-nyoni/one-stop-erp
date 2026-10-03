@@ -88,7 +88,11 @@ public sealed class ProcurementService : IProcurementService
     }
 
     /// <inheritdoc />
-    public async Task<Result<GrnResult>> ReceiveGoodsAsync(ReceiveGoodsRequest request, CancellationToken ct = default)
+    public Task<Result<GrnResult>> ReceiveGoodsAsync(ReceiveGoodsRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReceiveGoodsCoreAsync(request, ct), ct);
+
+    // One unit of work: every line's stock receipt, the PO lines and the GRN commit together or not at all.
+    private async Task<Result<GrnResult>> ReceiveGoodsCoreAsync(ReceiveGoodsRequest request, CancellationToken ct)
     {
         PurchaseOrder? order = await _db.Set<PurchaseOrder>().Include(o => o.Lines)
             .FirstOrDefaultAsync(o => o.Id == request.PurchaseOrderId && o.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
@@ -145,7 +149,11 @@ public sealed class ProcurementService : IProcurementService
     }
 
     /// <inheritdoc />
-    public async Task<Result<MatchInvoiceResult>> MatchInvoiceAsync(MatchInvoiceRequest request, CancellationToken ct = default)
+    public Task<Result<MatchInvoiceResult>> MatchInvoiceAsync(MatchInvoiceRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => MatchInvoiceCoreAsync(request, ct), ct);
+
+    // One unit of work: a refused match (a price or quantity check on a later line, a duplicate invoice, a closed period) leaves no PO line marked invoiced.
+    private async Task<Result<MatchInvoiceResult>> MatchInvoiceCoreAsync(MatchInvoiceRequest request, CancellationToken ct)
     {
         PurchaseOrder? order = await _db.Set<PurchaseOrder>().Include(o => o.Lines)
             .FirstOrDefaultAsync(o => o.Id == request.PurchaseOrderId && o.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
@@ -254,7 +262,11 @@ public sealed class ProcurementService : IProcurementService
     }
 
     /// <inheritdoc />
-    public async Task<Result<SupplierReturnResult>> ReturnToSupplierAsync(long companyId, long supplierId, long itemId, long warehouseId, decimal quantity, decimal returnUnitPrice, DateOnly date, string documentNumber, string priceVarianceAccountCode, CancellationToken ct = default)
+    public Task<Result<SupplierReturnResult>> ReturnToSupplierAsync(long companyId, long supplierId, long itemId, long warehouseId, decimal quantity, decimal returnUnitPrice, DateOnly date, string documentNumber, string priceVarianceAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReturnToSupplierCoreAsync(companyId, supplierId, itemId, warehouseId, quantity, returnUnitPrice, date, documentNumber, priceVarianceAccountCode, ct), ct);
+
+    // One unit of work: the stock reduction, its journal and the supplier credit commit together or not at all.
+    private async Task<Result<SupplierReturnResult>> ReturnToSupplierCoreAsync(long companyId, long supplierId, long itemId, long warehouseId, decimal quantity, decimal returnUnitPrice, DateOnly date, string documentNumber, string priceVarianceAccountCode, CancellationToken ct)
     {
         if (quantity <= 0m)
         {
