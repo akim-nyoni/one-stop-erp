@@ -4,6 +4,31 @@ using One4All.Core.Procurement;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
+internal sealed class RebateAgreementConfiguration : IEntityTypeConfiguration<RebateAgreement>
+{
+    public void Configure(EntityTypeBuilder<RebateAgreement> b)
+    {
+        b.ToTable("rebate_agreement", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Accrued).HasPrecision(19, 4);
+        b.HasMany(x => x.Tiers).WithOne().HasForeignKey(x => x.RebateAgreementId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Tiers).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class RebateAgreementTierConfiguration : IEntityTypeConfiguration<RebateAgreementTier>
+{
+    public void Configure(EntityTypeBuilder<RebateAgreementTier> b)
+    {
+        b.ToTable("rebate_agreement_tier", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Threshold).HasPrecision(19, 4);
+        b.Property(x => x.RatePercent).HasPrecision(9, 4);
+    }
+}
+
 internal sealed class PurchaseOrderRevisionConfiguration : IEntityTypeConfiguration<PurchaseOrderRevision>
 {
     public void Configure(EntityTypeBuilder<PurchaseOrderRevision> b)

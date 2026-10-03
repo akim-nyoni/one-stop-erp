@@ -5994,6 +5994,108 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("requisition_line", "pop");
                 });
 
+            modelBuilder.Entity("One4All.Core.Procurement.RebateAgreement", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Accrued")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("accrued");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date")
+                        .HasColumnName("from_date");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date")
+                        .HasColumnName("to_date");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rebate_agreement");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_rebate_agreement_company_id_code");
+
+                    b.ToTable("rebate_agreement", "pop");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.RebateAgreementTier", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("RatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("rate_percent");
+
+                    b.Property<long>("RebateAgreementId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rebate_agreement_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal>("Threshold")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("threshold");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rebate_agreement_tier");
+
+                    b.HasIndex("RebateAgreementId")
+                        .HasDatabaseName("ix_rebate_agreement_tier_rebate_agreement_id");
+
+                    b.ToTable("rebate_agreement_tier", "pop");
+                });
+
             modelBuilder.Entity("One4All.Core.Procurement.Rfq", b =>
                 {
                     b.Property<long>("Id")
@@ -12541,6 +12643,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_requisition_line_requisition_purchase_requisition_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Procurement.RebateAgreementTier", b =>
+                {
+                    b.HasOne("One4All.Core.Procurement.RebateAgreement", null)
+                        .WithMany("Tiers")
+                        .HasForeignKey("RebateAgreementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_rebate_agreement_tier_rebate_agreement_rebate_agreement_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Procurement.RfqLine", b =>
                 {
                     b.HasOne("One4All.Core.Procurement.Rfq", null)
@@ -12970,6 +13082,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Procurement.PurchaseRequisition", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.RebateAgreement", b =>
+                {
+                    b.Navigation("Tiers");
                 });
 
             modelBuilder.Entity("One4All.Core.Procurement.Rfq", b =>

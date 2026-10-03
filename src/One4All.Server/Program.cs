@@ -700,6 +700,16 @@ app.MapGet("/api/pop/{purchaseOrderId:long}/history", async (long purchaseOrderI
 .RequireAuthorization()
 .WithName("PurchaseOrderHistory");
 
+app.MapPost("/api/pop/rebate-agreements", async (long companyId, One4All.Application.Abstractions.Procurement.RebateAgreementRequest request, One4All.Application.Abstractions.Procurement.IRebateService rebates, CancellationToken ct) =>
+    ValueResponse(await rebates.CreateAsync(companyId, request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CreateRebateAgreement");
+
+app.MapPost("/api/pop/rebates/accrue", async (long companyId, DateOnly asAtDate, string receivableAccountCode, string incomeAccountCode, One4All.Application.Abstractions.Procurement.IRebateService rebates, CancellationToken ct) =>
+    ValueResponse(await rebates.AccrueAsync(companyId, asAtDate, receivableAccountCode, incomeAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AccrueRebates");
+
 app.MapPost("/api/ar/items/{openItemId:long}/write-off-with-vat-relief", async (long openItemId, long companyId, DateOnly date, string badDebtAccountCode, string reason, int minimumDaysOverdue, One4All.Application.Abstractions.Trading.ISalesLedgerService ar, CancellationToken ct) =>
     ValueResponse(await ar.WriteOffWithVatReliefAsync(companyId, openItemId, date, badDebtAccountCode, reason, minimumDaysOverdue, ct).ConfigureAwait(false)))
 .RequireAuthorization()
