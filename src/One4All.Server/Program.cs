@@ -666,6 +666,16 @@ app.MapGet("/api/municipal/reading-exceptions", async (long companyId, DateOnly 
 .RequireAuthorization()
 .WithName("MeterReadingExceptions");
 
+app.MapGet("/api/receipting/arrangements/{arrangementId:long}/schedule", async (long arrangementId, long companyId, One4All.Application.Abstractions.Receipting.IArrangementMonitor monitor, CancellationToken ct) =>
+    ValueResponse(await monitor.ScheduleAsync(companyId, arrangementId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ArrangementSchedule");
+
+app.MapPost("/api/receipting/arrangements/review", async (long companyId, DateOnly asAtDate, int graceDays, int missedToDefault, One4All.Application.Abstractions.Receipting.IArrangementMonitor monitor, CancellationToken ct) =>
+    Results.Ok(await monitor.ReviewAsync(companyId, asAtDate, graceDays, missedToDefault, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReviewArrangements");
+
 app.MapPost("/api/municipal/prepaid/vend", async (One4All.Application.Abstractions.Municipal.PrepaidVendRequest request, One4All.Application.Abstractions.Municipal.IPrepaidVendingService prepaid, CancellationToken ct) =>
     ValueResponse(await prepaid.VendAsync(request, ct).ConfigureAwait(false)))
 .RequireAuthorization()

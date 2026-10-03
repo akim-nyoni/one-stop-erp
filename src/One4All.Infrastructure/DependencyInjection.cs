@@ -193,6 +193,7 @@ public static class DependencyInjection
         // Cashiering & Receipting.
         services.AddScoped<Application.Abstractions.Receipting.IPayerAccountProvider, Receipting.ArPayerAccountProvider>();
         services.AddScoped<Application.Abstractions.Receipting.IReceiptingService, Receipting.ReceiptingService>();
+        services.AddScoped<Application.Abstractions.Receipting.IArrangementMonitor, Receipting.ArrangementMonitor>();
         services.AddScoped<Application.Abstractions.Receipting.IBankingService, Receipting.BankingService>();
         services.AddScoped<Application.Abstractions.Receipting.IReceiptImportService, Receipting.ReceiptImportService>();
         services.AddScoped<Application.Abstractions.Receipting.IAgentService, Receipting.AgentService>();
