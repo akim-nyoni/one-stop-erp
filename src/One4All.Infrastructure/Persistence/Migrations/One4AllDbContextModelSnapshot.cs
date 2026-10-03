@@ -12111,6 +12111,95 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("withholding_certificate", "trd");
                 });
 
+            modelBuilder.Entity("One4All.Core.Vouchers.AllowanceVoucher", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("ExpiresOn")
+                        .HasColumnType("date")
+                        .HasColumnName("expires_on");
+
+                    b.Property<decimal>("FaceValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("face_value");
+
+                    b.Property<DateOnly>("IssuedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("issued_on");
+
+                    b.Property<string>("IssuedTo")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("issued_to");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long?>("RedeemedAtSupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("redeemed_at_supplier_id");
+
+                    b.Property<DateOnly?>("RedeemedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("redeemed_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("Serial")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("serial");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("SupplierInvoiceNumber")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("supplier_invoice_number");
+
+                    b.HasKey("Id")
+                        .HasName("pk_allowance_voucher");
+
+                    b.HasIndex("CompanyId", "Serial")
+                        .IsUnique()
+                        .HasDatabaseName("ix_allowance_voucher_company_id_serial");
+
+                    b.ToTable("allowance_voucher", "vou");
+                });
+
             modelBuilder.Entity("One4All.Core.Vouchers.GiftCard", b =>
                 {
                     b.Property<long>("Id")

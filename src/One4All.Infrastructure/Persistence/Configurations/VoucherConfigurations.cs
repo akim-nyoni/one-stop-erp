@@ -4,6 +4,22 @@ using One4All.Core.Vouchers;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
+internal sealed class AllowanceVoucherConfiguration : IEntityTypeConfiguration<AllowanceVoucher>
+{
+    public void Configure(EntityTypeBuilder<AllowanceVoucher> b)
+    {
+        b.ToTable("allowance_voucher", Schemas.Vouchers);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Serial).HasMaxLength(30);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.FaceValue).HasPrecision(19, 4);
+        b.Property(x => x.IssuedTo).HasMaxLength(120);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.SupplierInvoiceNumber).HasMaxLength(60);
+        b.HasIndex(x => new { x.CompanyId, x.Serial }).IsUnique();
+    }
+}
+
 internal sealed class PromoCampaignConfiguration : IEntityTypeConfiguration<PromoCampaign>
 {
     public void Configure(EntityTypeBuilder<PromoCampaign> b)

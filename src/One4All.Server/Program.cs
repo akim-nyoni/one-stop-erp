@@ -457,6 +457,21 @@ app.MapGet("/api/vouchers/promo-campaigns/{campaignId:long}/analysis", async (lo
 .RequireAuthorization()
 .WithName("PromoCampaignAnalysis");
 
+app.MapPost("/api/vouchers/allowances/issue", async (long companyId, One4All.Application.Abstractions.Vouchers.AllowanceIssueRequest request, One4All.Application.Abstractions.Vouchers.IAllowanceVoucherService vouchers, CancellationToken ct) =>
+    ValueResponse(await vouchers.IssueAsync(companyId, request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("IssueAllowanceVouchers");
+
+app.MapPost("/api/vouchers/allowances/reconcile", async (long companyId, long supplierId, string invoiceNumber, decimal invoicedAmount, One4All.Application.Abstractions.Vouchers.BilledVoucher[] vouchers, One4All.Application.Abstractions.Vouchers.IAllowanceVoucherService service, CancellationToken ct) =>
+    ValueResponse(await service.ReconcileInvoiceAsync(companyId, supplierId, invoiceNumber, invoicedAmount, vouchers, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReconcileAllowanceVouchers");
+
+app.MapGet("/api/vouchers/allowances/outstanding", async (long companyId, DateOnly asAtDate, One4All.Application.Abstractions.Vouchers.IAllowanceVoucherService vouchers, CancellationToken ct) =>
+    Results.Ok(await vouchers.OutstandingAsync(companyId, asAtDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("OutstandingAllowanceVouchers");
+
 app.MapGet("/api/gl/accounts/{accountCode}/activity", async (long companyId, string accountCode, DateOnly from, DateOnly to, One4All.Application.Abstractions.Reporting.IGeneralLedgerReports gl, CancellationToken ct) =>
     Results.Ok(await gl.NominalActivityAsync(companyId, accountCode, from, to, ct).ConfigureAwait(false)))
 .RequireAuthorization()
