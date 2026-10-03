@@ -58,32 +58,45 @@ public sealed class FinanceChargeService : IFinanceChargeService
             .Where(o => o.Currency == company.BaseCurrency && o.DueDate.AddDays(request.GraceDays) < request.AsAtDate)
             .ToList();
 
+        // Unallocated receipts and credit notes stop interest on what they cover from their date.
+        HashSet<long> chargeable = [.. overdue.Select(o => o.TraderId)];
+        var creditRows = await _db.Set<OpenItem>()
+            .Where(o => o.CompanyId == request.CompanyId
+                && o.Ledger == TradingLedger.AccountsReceivable
+                && o.Sign == LedgerSign.Credit
+                && o.OutstandingBase > 0m
+                && o.DocumentDate <= request.AsAtDate
+                && chargeable.Contains(o.TraderId))
+            .Select(o => new { o.TraderId, o.Currency, o.DocumentDate, o.OutstandingBase })
+            .ToListAsync(ct).ConfigureAwait(false);
+        ILookup<long, UnallocatedCredit> credits = creditRows
+            .Where(c => c.Currency == company.BaseCurrency)
+            .ToLookup(c => c.TraderId, c => new UnallocatedCredit(c.DocumentDate, c.OutstandingBase));
+
         List<CustomerFinanceCharge> charges = [];
         foreach (IGrouping<long, OpenItem> byCustomer in overdue.GroupBy(o => o.TraderId).OrderBy(g => g.Key))
         {
-            decimal interest = 0m;
-            decimal overdueAmount = 0m;
             int maxDays = 0;
             List<OpenItem> charged = [];
+            List<ChargeableItem> items = [];
             foreach (OpenItem item in byCustomer)
             {
-                int daysOverdue = request.AsAtDate.DayNumber - item.DueDate.DayNumber;
-                overdueAmount += item.OutstandingBase;
-                maxDays = Math.Max(maxDays, daysOverdue);
+                maxDays = Math.Max(maxDays, request.AsAtDate.DayNumber - item.DueDate.DayNumber);
 
                 // Charge only the days not already charged: from the later of the due date and the last run.
                 DateOnly from = item.InterestChargedTo is { } last && last > item.DueDate ? last : item.DueDate;
-                int daysToCharge = request.AsAtDate.DayNumber - from.DayNumber;
-                if (daysToCharge <= 0)
+                if (request.AsAtDate.DayNumber - from.DayNumber <= 0)
                 {
                     continue;
                 }
 
-                interest += FinanceCharge.Interest(item.OutstandingBase, daysToCharge, request.AnnualRatePercent);
+                items.Add(new ChargeableItem(item.DueDate, from, item.OutstandingBase));
                 charged.Add(item);
             }
 
-            interest = decimal.Round(interest, 2, MidpointRounding.AwayFromZero);
+            CreditAdjustedInterest adjusted = FinanceCharge.InterestAfterCredits(items, credits[byCustomer.Key], request.AsAtDate, request.AnnualRatePercent);
+            decimal overdueAmount = byCustomer.Sum(o => o.OutstandingBase) - (items.Sum(i => i.Outstanding) - adjusted.OverdueAfterCredits);
+            decimal interest = decimal.Round(adjusted.Interest, 2, MidpointRounding.AwayFromZero);
             if (interest <= 0m || interest < request.MinimumCharge)
             {
                 // Below the minimum: the days stay uncharged and roll into a later run.
