@@ -21,6 +21,19 @@ internal sealed class ServiceOrderConfiguration : IEntityTypeConfiguration<Servi
     }
 }
 
+internal sealed class ClearanceCertificateConfiguration : IEntityTypeConfiguration<ClearanceCertificate>
+{
+    public void Configure(EntityTypeBuilder<ClearanceCertificate> b)
+    {
+        b.ToTable("clearance_certificate", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.CertificateNumber).HasMaxLength(30);
+        b.Property(x => x.AdvanceHeld).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.CertificateNumber }).IsUnique();
+        b.HasIndex(x => x.PropertyId);
+    }
+}
+
 internal sealed class IndigentRegistrationConfiguration : IEntityTypeConfiguration<IndigentRegistration>
 {
     public void Configure(EntityTypeBuilder<IndigentRegistration> b)

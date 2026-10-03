@@ -571,6 +571,16 @@ app.MapPost("/api/municipal/service-orders/{orderNumber}/cancel", async (string 
 .RequireAuthorization()
 .WithName("CancelServiceOrder");
 
+app.MapGet("/api/municipal/clearance/quote", async (long companyId, long propertyId, DateOnly date, int monthsInAdvance, One4All.Application.Abstractions.Municipal.IClearanceService clearance, CancellationToken ct) =>
+    ValueResponse(await clearance.QuoteAsync(companyId, propertyId, date, monthsInAdvance, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("QuoteRatesClearance");
+
+app.MapPost("/api/municipal/clearance", async (long companyId, long propertyId, DateOnly date, int monthsInAdvance, int validDays, long userId, One4All.Application.Abstractions.Municipal.IClearanceService clearance, CancellationToken ct) =>
+    ValueResponse(await clearance.IssueAsync(companyId, propertyId, date, monthsInAdvance, validDays, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("IssueRatesClearance");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()
