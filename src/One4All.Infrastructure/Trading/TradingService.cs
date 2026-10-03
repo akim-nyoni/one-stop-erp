@@ -234,6 +234,90 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
+    public Task<Result<VatReliefWriteOff>> WriteOffWithVatReliefAsync(long companyId, long openItemId, DateOnly date, string badDebtAccountCode, string reason, int minimumDaysOverdue, CancellationToken ct = default)
+        => _db.AtomicAsync(() => WriteOffWithVatReliefCoreAsync(companyId, openItemId, date, badDebtAccountCode, reason, minimumDaysOverdue, ct), ct);
+
+    // One unit: the net write-off, the VAT relief and both allocations commit together.
+    private async Task<Result<VatReliefWriteOff>> WriteOffWithVatReliefCoreAsync(long companyId, long openItemId, DateOnly date, string badDebtAccountCode, string reason, int minimumDaysOverdue, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(reason) || string.IsNullOrWhiteSpace(badDebtAccountCode))
+        {
+            return Error.Validation("Ar.ReasonRequired", "A bad-debt write-off requires a reason and a bad-debt account.");
+        }
+
+        OpenItem? item = await _db.OpenItems.FirstOrDefaultAsync(i => i.Id == openItemId && i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable, ct).ConfigureAwait(false);
+        if (item is null)
+        {
+            return Error.NotFound("Ar.OpenItemNotFound", $"AR open item {openItemId} not found.");
+        }
+
+        if (item.Sign != LedgerSign.Debit || item.OutstandingTransaction <= 0m)
+        {
+            return Error.Rule("Ar.NothingToWriteOff", "Only an outstanding debtor item (invoice) can be written off.");
+        }
+
+        if (date.DayNumber - item.DueDate.DayNumber < minimumDaysOverdue)
+        {
+            return Error.Rule("Ar.VatReliefTooEarly", $"{item.DocumentNumber} has not been overdue for {minimumDaysOverdue} days, so it does not yet qualify for VAT relief.");
+        }
+
+        // The invoice's own tax lines (tax-coded, or to the output VAT account) give the VAT share of what is still owed.
+        List<string> vatOutput = await _db.Accounts.Where(a => a.CompanyId == companyId && a.ControlAccountType == ControlAccountType.VatOutput)
+            .Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false);
+        List<(string Account, decimal Base)> taxLines = item.JournalEntryId is not long journalId ? [] : [.. (await _db.Set<JournalLine>()
+                .Where(l => l.JournalEntryId == journalId && (l.TaxCode != null || vatOutput.Contains(l.AccountCode)) && l.BaseCredit > 0m)
+                .Select(l => new { l.AccountCode, l.BaseCredit })
+                .ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(l => l.AccountCode).Select(g => (g.Key, g.Sum(l => l.BaseCredit)))];
+        decimal outstanding = item.OutstandingTransaction;
+        decimal vat = item.OriginalBase == 0m ? 0m : decimal.Round(outstanding * taxLines.Sum(t => t.Base) / item.OriginalBase, 2, MidpointRounding.AwayFromZero);
+
+        Result<TradingPostingResult> net = await PostReceiptAsync(new ReceiptRequest
+        {
+            CompanyId = companyId, CustomerId = item.TraderId, DocumentNumber = $"WO{openItemId}", ReceiptDate = date, Currency = item.Currency,
+            Amount = outstanding - vat, BankAccountCode = badDebtAccountCode, ExchangeRate = item.ExchangeRate,
+            Narrative = $"Bad-debt write-off of {item.DocumentNumber} (net of VAT): {reason}",
+        }, ct).ConfigureAwait(false);
+        if (net.IsFailure)
+        {
+            return net.Error;
+        }
+
+        Result<AllocationResult> netAllocation = await AllocateAsync(companyId, TradingLedger.AccountsReceivable, openItemId, net.Value.OpenItemId, outstanding - vat, date, ct).ConfigureAwait(false);
+        if (netAllocation.IsFailure)
+        {
+            return netAllocation.Error;
+        }
+
+        long? reliefItemId = null;
+        if (vat > 0m)
+        {
+            // Reclaimed against the output VAT account the invoice credited (the largest, if it used several).
+            string vatAccount = taxLines.OrderByDescending(t => t.Base).First().Account;
+            Result<TradingPostingResult> relief = await PostReceiptAsync(new ReceiptRequest
+            {
+                CompanyId = companyId, CustomerId = item.TraderId, DocumentNumber = $"WOV{openItemId}", ReceiptDate = date, Currency = item.Currency,
+                Amount = vat, BankAccountCode = vatAccount, ExchangeRate = item.ExchangeRate,
+                Narrative = $"Bad-debt VAT relief on {item.DocumentNumber}",
+            }, ct).ConfigureAwait(false);
+            if (relief.IsFailure)
+            {
+                return relief.Error;
+            }
+
+            Result<AllocationResult> reliefAllocation = await AllocateAsync(companyId, TradingLedger.AccountsReceivable, openItemId, relief.Value.OpenItemId, vat, date, ct).ConfigureAwait(false);
+            if (reliefAllocation.IsFailure)
+            {
+                return reliefAllocation.Error;
+            }
+
+            reliefItemId = relief.Value.OpenItemId;
+        }
+
+        return new VatReliefWriteOff(outstanding - vat, vat, net.Value.OpenItemId, reliefItemId);
+    }
+
+    /// <inheritdoc />
     public Task<Result<TradingPostingResult>> WriteBackAsync(long companyId, long openItemId, DateOnly date, string writeBackAccountCode, string reason, CancellationToken ct = default)
         => _db.AtomicAsync(() => WriteBackCoreAsync(companyId, openItemId, date, writeBackAccountCode, reason, ct), ct);
 

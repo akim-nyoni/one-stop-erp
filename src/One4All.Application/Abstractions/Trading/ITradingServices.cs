@@ -18,6 +18,13 @@ public readonly record struct AllocationResult(long AllocationId, decimal Transa
 /// <param name="FxReversalJournalNumber">The FX reversal journal number, when the original allocation realised FX.</param>
 public readonly record struct UnallocationResult(long AllocationId, decimal RestoredTransaction, decimal ReversedFxBase, string? FxReversalJournalNumber);
 
+/// <summary>A bad-debt write-off that reclaimed the output VAT on the debt.</summary>
+/// <param name="WrittenOffToBadDebt">The net amount charged to bad debt (transaction currency).</param>
+/// <param name="VatRelief">The output VAT reclaimed (transaction currency).</param>
+/// <param name="BadDebtOpenItemId">The write-off open item allocated to the invoice.</param>
+/// <param name="VatReliefOpenItemId">The VAT relief open item allocated to the invoice, or null when there was none.</param>
+public sealed record VatReliefWriteOff(decimal WrittenOffToBadDebt, decimal VatRelief, long BadDebtOpenItemId, long? VatReliefOpenItemId);
+
 /// <summary>The Sales Ledger (AR) posting service (brief §4.5). All postings go through the central engine.</summary>
 public interface ISalesLedgerService
 {
@@ -69,6 +76,22 @@ public interface ISalesLedgerService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The posting result (the write-off credit open item).</returns>
     Task<Result<TradingPostingResult>> WriteOffAsync(long companyId, long openItemId, DateOnly date, string badDebtAccountCode, string reason, CancellationToken ct = default);
+
+    /// <summary>
+    /// Writes off a bad debt with VAT relief (brief §4.5): the output VAT included in what is still owed is reclaimed
+    /// (Dr the output VAT account the invoice credited) and only the net goes to bad debt, so the next VAT return pays
+    /// back the tax never collected. The share of VAT follows the invoice's own tax lines. Relief is refused before the
+    /// debt has been overdue for the qualifying number of days.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="openItemId">The AR invoice to write off.</param>
+    /// <param name="date">The write-off date.</param>
+    /// <param name="badDebtAccountCode">The bad-debt-expense account debited with the net.</param>
+    /// <param name="reason">The mandatory reason.</param>
+    /// <param name="minimumDaysOverdue">How long the debt must have been overdue to qualify for relief.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The split between bad debt and VAT relief, or why it was refused.</returns>
+    Task<Result<VatReliefWriteOff>> WriteOffWithVatReliefAsync(long companyId, long openItemId, DateOnly date, string badDebtAccountCode, string reason, int minimumDaysOverdue, CancellationToken ct = default);
 
     /// <summary>
     /// Settles a customer invoice where the customer pays early and takes a settlement (early-payment) discount:

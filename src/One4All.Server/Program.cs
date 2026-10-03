@@ -580,6 +580,11 @@ app.MapGet("/api/budgets/utilisation-alerts", async (long companyId, long fiscal
 .RequireAuthorization()
 .WithName("BudgetUtilisationAlerts");
 
+app.MapPost("/api/ar/items/{openItemId:long}/write-off-with-vat-relief", async (long openItemId, long companyId, DateOnly date, string badDebtAccountCode, string reason, int minimumDaysOverdue, One4All.Application.Abstractions.Trading.ISalesLedgerService ar, CancellationToken ct) =>
+    ValueResponse(await ar.WriteOffWithVatReliefAsync(companyId, openItemId, date, badDebtAccountCode, reason, minimumDaysOverdue, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("WriteOffWithVatRelief");
+
 app.MapGet("/api/budgets/material-variances", async (long companyId, long fiscalYearId, One4All.Core.Budgeting.BudgetType type, string? department, int asAtPeriod, decimal? thresholdValue, decimal? thresholdPercent, One4All.Application.Abstractions.Budgeting.IVarianceCommentaryService commentary, CancellationToken ct) =>
 {
     One4All.Application.Budgeting.VarianceThreshold threshold = new(
