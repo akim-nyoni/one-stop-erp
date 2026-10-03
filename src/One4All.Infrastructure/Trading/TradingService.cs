@@ -74,6 +74,9 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         // Credit-limit control: refuse when this invoice would take the customer's outstanding balance over the limit.
         if (customer.CreditLimit > 0m)
         {
+            // Lock the customer for the rest of the transaction so concurrent invoices queue here: each then sees the
+            // others' committed items, and two cannot both squeeze under the limit.
+            await _db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM ar.customer WHERE id = {customer.Id} FOR UPDATE", ct).ConfigureAwait(false);
             IQueryable<OpenItem> ar = _db.OpenItems.Where(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == customer.Id);
             decimal debits = await ar.Where(i => i.Sign == LedgerSign.Debit).SumAsync(i => (decimal?)i.OutstandingBase, ct).ConfigureAwait(false) ?? 0m;
             decimal credits = await ar.Where(i => i.Sign == LedgerSign.Credit).SumAsync(i => (decimal?)i.OutstandingBase, ct).ConfigureAwait(false) ?? 0m;
