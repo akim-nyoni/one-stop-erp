@@ -550,6 +550,27 @@ app.MapGet("/api/municipal/indigent/reviews-due", async (long companyId, DateOnl
 .RequireAuthorization()
 .WithName("IndigentReviewsDue");
 
+app.MapGet("/api/municipal/disconnections/candidates", async (long companyId, One4All.Core.Municipal.ServiceType serviceType, DateOnly asAtDate, decimal threshold, One4All.Application.Abstractions.Municipal.IServiceOrderService orders, CancellationToken ct) =>
+    Results.Ok(await orders.CandidatesAsync(companyId, serviceType, asAtDate, threshold, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DisconnectionCandidates");
+
+app.MapPost("/api/municipal/service-orders", async (long companyId, long propertyId, One4All.Core.Municipal.ServiceType serviceType, One4All.Core.Municipal.ServiceOrderKind kind, DateOnly date, decimal threshold, One4All.Application.Abstractions.Municipal.IServiceOrderService orders, CancellationToken ct) =>
+    ValueResponse(await orders.RaiseAsync(companyId, propertyId, serviceType, kind, date, threshold, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RaiseServiceOrder");
+
+app.MapPost("/api/municipal/service-orders/{orderNumber}/execute", async (string orderNumber, long companyId, DateOnly date, decimal? feeAmount, string? feeRevenueAccountCode, One4All.Application.Abstractions.Municipal.IServiceOrderService orders, CancellationToken ct) =>
+    ActionResponse(await orders.ExecuteAsync(companyId, orderNumber, date,
+        feeAmount is decimal amount && !string.IsNullOrWhiteSpace(feeRevenueAccountCode) ? new One4All.Application.Abstractions.Municipal.ReconnectionFee(amount, feeRevenueAccountCode) : null, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ExecuteServiceOrder");
+
+app.MapPost("/api/municipal/service-orders/{orderNumber}/cancel", async (string orderNumber, long companyId, One4All.Application.Abstractions.Municipal.IServiceOrderService orders, CancellationToken ct) =>
+    ActionResponse(await orders.CancelAsync(companyId, orderNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CancelServiceOrder");
+
 app.MapGet("/api/gl/accounts/{accountCode}/activity", async (long companyId, string accountCode, DateOnly from, DateOnly to, One4All.Application.Abstractions.Reporting.IGeneralLedgerReports gl, CancellationToken ct) =>
     Results.Ok(await gl.NominalActivityAsync(companyId, accountCode, from, to, ct).ConfigureAwait(false)))
 .RequireAuthorization()

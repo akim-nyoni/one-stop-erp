@@ -73,6 +73,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Vouchers.IAccountingVoucherService, Vouchers.AccountingVoucherService>();
         services.AddScoped<Application.Abstractions.Inventory.IStoreRequisitionService, Inventory.StoreRequisitionService>();
         services.AddScoped<Application.Abstractions.Municipal.IIndigentRegisterService, Municipal.IndigentRegisterService>();
+        services.AddScoped<Application.Abstractions.Municipal.IServiceOrderService, Municipal.ServiceOrderService>();
         services.AddScoped<Application.Abstractions.Budgeting.IVarianceCommentaryService, Budgeting.VarianceCommentaryService>();
         services.AddScoped<Application.Abstractions.Trading.ISupplierBankDetailsService, Trading.SupplierBankDetailsService>();
         services.AddScoped<IRecurringJournalService, Accounting.RecurringJournalService>();

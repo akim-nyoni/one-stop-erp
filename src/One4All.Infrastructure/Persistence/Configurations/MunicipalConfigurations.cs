@@ -4,6 +4,23 @@ using One4All.Core.Municipal;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
+internal sealed class ServiceOrderConfiguration : IEntityTypeConfiguration<ServiceOrder>
+{
+    public void Configure(EntityTypeBuilder<ServiceOrder> b)
+    {
+        b.ToTable("service_order", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.OrderNumber).HasMaxLength(30);
+        b.Property(x => x.ServiceType).HasConversion<int>();
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Arrears).HasPrecision(19, 4);
+        b.Property(x => x.FeeInvoiceNumber).HasMaxLength(40);
+        b.HasIndex(x => new { x.CompanyId, x.OrderNumber }).IsUnique();
+        b.HasIndex(x => new { x.PropertyId, x.ServiceType }).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_service_order_one_open");
+    }
+}
+
 internal sealed class IndigentRegistrationConfiguration : IEntityTypeConfiguration<IndigentRegistration>
 {
     public void Configure(EntityTypeBuilder<IndigentRegistration> b)
