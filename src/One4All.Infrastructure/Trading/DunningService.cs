@@ -35,12 +35,16 @@ public sealed class DunningService : IDunningService
             .Where(c => c.CompanyId == companyId)
             .ToDictionaryAsync(c => c.Id, c => c.Name, ct).ConfigureAwait(false);
 
+        HashSet<long> chased = [.. overdue.Select(o => o.TraderId)];
+        Dictionary<long, decimal> credits = await UnallocatedCreditsAsync(companyId, chased, asAtDate, ct).ConfigureAwait(false);
+
         List<DunningNotice> notices = [];
         foreach (IGrouping<long, OpenItem> byCustomer in overdue.GroupBy(o => o.TraderId))
         {
-            int oldestDays = byCustomer.Max(o => asAtDate.DayNumber - o.DueDate.DayNumber);
-            int level = Dunning.LevelFor(oldestDays, stages);
-            if (level < 1)
+            // Payments and credit notes not yet allocated count against the oldest invoices first.
+            NetOverdue net = Dunning.ApplyCredits(byCustomer.Select(o => new OverdueItem(o.DueDate, o.OutstandingBase)), credits.GetValueOrDefault(byCustomer.Key), asAtDate);
+            int level = Dunning.LevelFor(net.OldestDaysOverdue, stages);
+            if (level < 1 || net.Amount <= 0m)
             {
                 continue;
             }
@@ -50,8 +54,8 @@ public sealed class DunningService : IDunningService
                 customerNames.GetValueOrDefault(byCustomer.Key, $"Customer {byCustomer.Key}"),
                 level,
                 Dunning.LabelFor(level),
-                byCustomer.Sum(o => o.OutstandingBase),
-                oldestDays));
+                net.Amount,
+                net.OldestDaysOverdue));
         }
 
         IReadOnlyList<DunningNotice> ordered = notices
@@ -88,11 +92,18 @@ public sealed class DunningService : IDunningService
             return Error.Rule("Dunning.NothingOverdue", $"{customerName} has nothing overdue as at {asAtDate:yyyy-MM-dd}.");
         }
 
-        int oldestDays = overdue.Max(o => asAtDate.DayNumber - o.DueDate.DayNumber);
+        decimal credits = (await UnallocatedCreditsAsync(companyId, [customerId], asAtDate, ct).ConfigureAwait(false)).GetValueOrDefault(customerId);
+        NetOverdue net = Dunning.ApplyCredits(overdue.Select(o => new OverdueItem(o.DueDate, o.OutstandingBase)), credits, asAtDate);
+        if (net.Amount <= 0m)
+        {
+            return Error.Rule("Dunning.CoveredByCredits", $"{customerName}'s unallocated payments and credits cover everything overdue as at {asAtDate:yyyy-MM-dd}.");
+        }
+
+        int oldestDays = net.OldestDaysOverdue;
         int level = Dunning.LevelFor(oldestDays, stages);
         if (level < 1)
         {
-            return Error.Rule("Dunning.NotDue", $"{customerName}'s oldest item is {oldestDays} day(s) overdue, inside the first reminder threshold.");
+            return Error.Rule("Dunning.NotDue", $"{customerName}'s oldest unpaid item is {oldestDays} day(s) overdue, inside the first reminder threshold.");
         }
 
         string companyName = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? string.Empty;
@@ -107,9 +118,23 @@ public sealed class DunningService : IDunningService
             Items = overdue
                 .Select(o => new DunningReminderItem(o.DocumentNumber, o.DueDate, asAtDate.DayNumber - o.DueDate.DayNumber, o.OutstandingBase))
                 .ToList(),
-            TotalOverdue = overdue.Sum(o => o.OutstandingBase),
+            UnallocatedCredits = net.CreditsApplied,
+            TotalOverdue = net.Amount,
         };
 
         return DunningLetterFormatter.ToPlainText(reminder, width);
     }
+
+    // Each customer's unallocated receipts and credit notes (AR credit items still outstanding), in base currency.
+    private async Task<Dictionary<long, decimal>> UnallocatedCreditsAsync(long companyId, HashSet<long> customerIds, DateOnly asAtDate, CancellationToken ct)
+        => await _db.Set<OpenItem>()
+            .Where(o => o.CompanyId == companyId
+                && o.Ledger == TradingLedger.AccountsReceivable
+                && o.Sign == LedgerSign.Credit
+                && o.OutstandingBase > 0m
+                && o.DocumentDate <= asAtDate
+                && customerIds.Contains(o.TraderId))
+            .GroupBy(o => o.TraderId)
+            .Select(g => new { CustomerId = g.Key, Total = g.Sum(o => o.OutstandingBase) })
+            .ToDictionaryAsync(x => x.CustomerId, x => x.Total, ct).ConfigureAwait(false);
 }

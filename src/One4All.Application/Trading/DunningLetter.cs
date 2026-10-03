@@ -34,7 +34,10 @@ public sealed class DunningReminder
     /// <summary>The overdue invoices.</summary>
     public IReadOnlyList<DunningReminderItem> Items { get; init; } = [];
 
-    /// <summary>The total overdue.</summary>
+    /// <summary>The unallocated payments and credits set against the overdue invoices (shown as a deduction when non-zero).</summary>
+    public decimal UnallocatedCredits { get; init; }
+
+    /// <summary>The total overdue, after any unallocated credits.</summary>
     public decimal TotalOverdue { get; init; }
 }
 
@@ -75,6 +78,11 @@ public static class DunningLetterFormatter
         {
             string left = $"{Fit(item.DocumentNumber, 18)} {item.DueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}  {item.DaysOverdue,4}";
             sb.AppendLine(TwoColumn(left, Money(item.Outstanding), width));
+        }
+
+        if (reminder.UnallocatedCredits > 0m)
+        {
+            sb.AppendLine(TwoColumn("Less payments / credits not yet allocated", $"({Money(reminder.UnallocatedCredits)})", width));
         }
 
         sb.AppendLine(rule);
