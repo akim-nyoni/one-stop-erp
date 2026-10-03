@@ -437,6 +437,26 @@ app.MapPost("/api/banking/transfers", async (One4All.Application.Abstractions.Ba
 .RequireAuthorization()
 .WithName("TransferBetweenBankAccounts");
 
+app.MapPost("/api/vouchers/promo-campaigns", async (long companyId, One4All.Application.Abstractions.Vouchers.PromoCampaignRequest request, One4All.Application.Abstractions.Vouchers.IPromoService promos, CancellationToken ct) =>
+    ValueResponse(await promos.CreateCampaignAsync(companyId, request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CreatePromoCampaign");
+
+app.MapGet("/api/vouchers/promo-codes/{code}/quote", async (string code, long companyId, DateOnly date, decimal spend, One4All.Application.Abstractions.Vouchers.IPromoService promos, CancellationToken ct) =>
+    ValueResponse(await promos.QuoteAsync(companyId, code, date, spend, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("QuotePromoCode");
+
+app.MapPost("/api/vouchers/promo-codes/{code}/redeem", async (string code, long companyId, DateOnly date, decimal spend, string reference, One4All.Application.Abstractions.Vouchers.IPromoService promos, CancellationToken ct) =>
+    ValueResponse(await promos.RedeemAsync(companyId, code, date, spend, reference, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RedeemPromoCode");
+
+app.MapGet("/api/vouchers/promo-campaigns/{campaignId:long}/analysis", async (long campaignId, long companyId, One4All.Application.Abstractions.Vouchers.IPromoService promos, CancellationToken ct) =>
+    ValueResponse(await promos.AnalysisAsync(companyId, campaignId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PromoCampaignAnalysis");
+
 app.MapGet("/api/gl/accounts/{accountCode}/activity", async (long companyId, string accountCode, DateOnly from, DateOnly to, One4All.Application.Abstractions.Reporting.IGeneralLedgerReports gl, CancellationToken ct) =>
     Results.Ok(await gl.NominalActivityAsync(companyId, accountCode, from, to, ct).ConfigureAwait(false)))
 .RequireAuthorization()

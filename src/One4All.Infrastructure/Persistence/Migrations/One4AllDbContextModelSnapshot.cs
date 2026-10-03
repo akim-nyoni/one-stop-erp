@@ -12190,6 +12190,192 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("gift_card", "vou");
                 });
 
+            modelBuilder.Entity("One4All.Core.Vouchers.PromoCampaign", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<int>("DiscountType")
+                        .HasColumnType("integer")
+                        .HasColumnName("discount_type");
+
+                    b.Property<decimal>("DiscountValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("discount_value");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<int?>("MaxRedemptions")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_redemptions");
+
+                    b.Property<decimal>("MinimumSpend")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("minimum_spend");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Redemptions")
+                        .HasColumnType("integer")
+                        .HasColumnName("redemptions");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("UsesPerCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("uses_per_code");
+
+                    b.Property<DateOnly>("ValidFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("valid_from");
+
+                    b.Property<DateOnly>("ValidTo")
+                        .HasColumnType("date")
+                        .HasColumnName("valid_to");
+
+                    b.HasKey("Id")
+                        .HasName("pk_promo_campaign");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_promo_campaign_company_id_code");
+
+                    b.ToTable("promo_campaign", "vou");
+                });
+
+            modelBuilder.Entity("One4All.Core.Vouchers.PromoCode", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("PromoCampaignId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("promo_campaign_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("TimesUsed")
+                        .HasColumnType("integer")
+                        .HasColumnName("times_used");
+
+                    b.HasKey("Id")
+                        .HasName("pk_promo_code");
+
+                    b.HasIndex("Code")
+                        .HasDatabaseName("ix_promo_code_code");
+
+                    b.HasIndex("PromoCampaignId")
+                        .HasDatabaseName("ix_promo_code_promo_campaign_id");
+
+                    b.ToTable("promo_code", "vou");
+                });
+
+            modelBuilder.Entity("One4All.Core.Vouchers.PromoRedemption", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<decimal>("Discount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("discount");
+
+                    b.Property<long>("PromoCampaignId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("promo_campaign_id");
+
+                    b.Property<long>("PromoCodeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("promo_code_id");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal>("Spend")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("spend");
+
+                    b.HasKey("Id")
+                        .HasName("pk_promo_redemption");
+
+                    b.HasIndex("PromoCampaignId", "Date")
+                        .HasDatabaseName("ix_promo_redemption_promo_campaign_id_date");
+
+                    b.ToTable("promo_redemption", "vou");
+                });
+
             modelBuilder.Entity("One4All.Core.Workflow.WorkflowApproval", b =>
                 {
                     b.Property<long>("Id")
@@ -12979,6 +13165,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_layby_line_layby_plan_layby_plan_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Vouchers.PromoCode", b =>
+                {
+                    b.HasOne("One4All.Core.Vouchers.PromoCampaign", null)
+                        .WithMany("Codes")
+                        .HasForeignKey("PromoCampaignId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_promo_code_promo_campaign_promo_campaign_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Workflow.WorkflowApproval", b =>
                 {
                     b.HasOne("One4All.Core.Workflow.WorkflowInstance", null)
@@ -13226,6 +13422,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Trading.LaybyPlan", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Vouchers.PromoCampaign", b =>
+                {
+                    b.Navigation("Codes");
                 });
 
             modelBuilder.Entity("One4All.Core.Workflow.WorkflowDefinition", b =>

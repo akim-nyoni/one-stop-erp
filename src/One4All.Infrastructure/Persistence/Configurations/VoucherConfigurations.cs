@@ -4,6 +4,47 @@ using One4All.Core.Vouchers;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
+internal sealed class PromoCampaignConfiguration : IEntityTypeConfiguration<PromoCampaign>
+{
+    public void Configure(EntityTypeBuilder<PromoCampaign> b)
+    {
+        b.ToTable("promo_campaign", Schemas.Vouchers);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.DiscountType).HasConversion<int>();
+        b.Property(x => x.DiscountValue).HasPrecision(19, 4);
+        b.Property(x => x.MinimumSpend).HasPrecision(19, 4);
+        b.HasMany(x => x.Codes).WithOne().HasForeignKey(x => x.PromoCampaignId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Codes).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class PromoCodeConfiguration : IEntityTypeConfiguration<PromoCode>
+{
+    public void Configure(EntityTypeBuilder<PromoCode> b)
+    {
+        b.ToTable("promo_code", Schemas.Vouchers);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(40);
+        b.HasIndex(x => x.Code);
+    }
+}
+
+internal sealed class PromoRedemptionConfiguration : IEntityTypeConfiguration<PromoRedemption>
+{
+    public void Configure(EntityTypeBuilder<PromoRedemption> b)
+    {
+        b.ToTable("promo_redemption", Schemas.Vouchers);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Spend).HasPrecision(19, 4);
+        b.Property(x => x.Discount).HasPrecision(19, 4);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.HasIndex(x => new { x.PromoCampaignId, x.Date });
+    }
+}
+
 internal sealed class GiftCardConfiguration : IEntityTypeConfiguration<GiftCard>
 {
     public void Configure(EntityTypeBuilder<GiftCard> b)
