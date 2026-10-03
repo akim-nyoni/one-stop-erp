@@ -44,6 +44,12 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return Error.Rule("Ar.CustomerOnHold", $"Customer {customer.Code} is on hold; no new invoices can be posted.");
         }
 
+        if (request.RevenueLines.Count > 0
+            && (request.RevenueLines.Sum(r => r.NetAmount) != request.NetAmount || request.RevenueLines.Any(r => string.IsNullOrWhiteSpace(r.AccountCode))))
+        {
+            return Error.Validation("Ar.RevenueLinesMismatch", "The revenue lines must each name an account and add up to the net amount.");
+        }
+
         Result<string> controlResult = await ControlCodeAsync(request.CompanyId, ControlAccountType.AccountsReceivable, ct).ConfigureAwait(false);
         if (controlResult.IsFailure)
         {
@@ -75,11 +81,24 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             }
         }
 
-        List<JournalLineRequest> lines =
-        [
-            Line(controlResult.Value, JournalSide.Debit, gross, rate, baseGross),
-            Line(request.SalesAccountCode, JournalSide.Credit, request.NetAmount, rate, baseNet),
-        ];
+        List<JournalLineRequest> lines = [Line(controlResult.Value, JournalSide.Debit, gross, rate, baseGross)];
+        if (request.RevenueLines.Count == 0)
+        {
+            lines.Add(Line(request.SalesAccountCode, JournalSide.Credit, request.NetAmount, rate, baseNet));
+        }
+        else
+        {
+            // Each revenue account gets its share; the last absorbs base rounding so the credits equal the base net.
+            decimal baseLeft = baseNet;
+            for (int i = 0; i < request.RevenueLines.Count; i++)
+            {
+                RevenueLine revenue = request.RevenueLines[i];
+                decimal baseShare = i == request.RevenueLines.Count - 1 ? baseLeft : Round(revenue.NetAmount * rate);
+                baseLeft -= baseShare;
+                lines.Add(Line(revenue.AccountCode, JournalSide.Credit, revenue.NetAmount, rate, baseShare));
+            }
+        }
+
         if (request.TaxAmount != 0m && request.TaxAccountCode is not null)
         {
             lines.Add(Line(request.TaxAccountCode, JournalSide.Credit, request.TaxAmount, rate, baseTax, request.TaxCode));

@@ -126,7 +126,12 @@ public sealed class SalesOrderService : ISalesOrderService
     }
 
     /// <inheritdoc />
-    public async Task<Result<DespatchResult>> DespatchAsync(DespatchRequest request, CancellationToken ct = default)
+    public Task<Result<DespatchResult>> DespatchAsync(DespatchRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => DespatchCoreAsync(request, ct), ct);
+
+    // Every line is checked before any stock moves; the stock issues and the order update then stand or fall together,
+    // so a failure on a later line cannot leave earlier lines issued (a retry would issue them twice).
+    private async Task<Result<DespatchResult>> DespatchCoreAsync(DespatchRequest request, CancellationToken ct)
     {
         SalesOrder? order = await _db.Set<SalesOrder>().Include(o => o.Lines)
             .FirstOrDefaultAsync(o => o.Id == request.SalesOrderId && o.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
@@ -135,15 +140,38 @@ public sealed class SalesOrderService : ISalesOrderService
             return Error.NotFound("Sop.OrderNotFound", $"Sales order {request.SalesOrderId} not found.");
         }
 
-        decimal costOfSales = 0m;
-        foreach (DespatchLine despatch in request.Lines)
+        if (order.Status == SalesOrderStatus.Cancelled)
         {
-            SalesOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == despatch.SalesOrderLineId);
+            return Error.Rule("Sop.OrderCancelled", $"Sales order {order.OrderNumber} is cancelled.");
+        }
+
+        List<(SalesOrderLine Line, decimal Quantity)> despatches = [];
+        foreach (IGrouping<long, DespatchLine> byLine in request.Lines.GroupBy(d => d.SalesOrderLineId))
+        {
+            SalesOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == byLine.Key);
             if (line is null)
             {
-                return Error.NotFound("Sop.LineNotFound", $"Order line {despatch.SalesOrderLineId} not found.");
+                return Error.NotFound("Sop.LineNotFound", $"Order line {byLine.Key} not found.");
             }
 
+            decimal quantity = byLine.Sum(d => d.Quantity);
+            if (quantity <= 0m)
+            {
+                return Error.Rule("Sop.InvalidQuantity", $"Order line {line.Id}: the despatch quantity must be positive.");
+            }
+
+            decimal remaining = line.OrderedQuantity - line.DespatchedQuantity;
+            if (quantity > remaining + 0.0001m)
+            {
+                return Error.Rule("Sop.OverDespatch", $"Order line {line.Id}: cannot despatch {quantity}; only {remaining} left to despatch.");
+            }
+
+            despatches.Add((line, quantity));
+        }
+
+        decimal costOfSales = 0m;
+        foreach ((SalesOrderLine line, decimal quantity) in despatches)
+        {
             Item? item = await _db.Set<Item>().FirstOrDefaultAsync(i => i.Id == line.ItemId, ct).ConfigureAwait(false);
             if (item is { IsStockTracked: true } && !string.IsNullOrEmpty(item.CostOfSalesAccountCode))
             {
@@ -153,7 +181,7 @@ public sealed class SalesOrderService : ISalesOrderService
                     ItemId = line.ItemId,
                     WarehouseId = request.WarehouseId,
                     Date = request.Date,
-                    Quantity = despatch.Quantity,
+                    Quantity = quantity,
                     Reference = request.Reference,
                 }, ct).ConfigureAwait(false);
 
@@ -165,7 +193,7 @@ public sealed class SalesOrderService : ISalesOrderService
                 costOfSales += issue.Value.Value;
             }
 
-            line.Despatch(despatch.Quantity);
+            line.Despatch(quantity);
         }
 
         order.RecomputeStatus();
@@ -241,7 +269,12 @@ public sealed class SalesOrderService : ISalesOrderService
     }
 
     /// <inheritdoc />
-    public async Task<Result<InvoiceOrderResult>> InvoiceAsync(InvoiceOrderRequest request, CancellationToken ct = default)
+    public Task<Result<InvoiceOrderResult>> InvoiceAsync(InvoiceOrderRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => InvoiceCoreAsync(request, ct), ct);
+
+    // Every line is checked first; the lines are marked invoiced only once the AR invoice has posted, and both are
+    // committed together — a refused invoice (customer on hold, over the credit limit) leaves the order untouched.
+    private async Task<Result<InvoiceOrderResult>> InvoiceCoreAsync(InvoiceOrderRequest request, CancellationToken ct)
     {
         SalesOrder? order = await _db.Set<SalesOrder>().Include(o => o.Lines)
             .FirstOrDefaultAsync(o => o.Id == request.SalesOrderId && o.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
@@ -250,29 +283,37 @@ public sealed class SalesOrderService : ISalesOrderService
             return Error.NotFound("Sop.OrderNotFound", $"Sales order {request.SalesOrderId} not found.");
         }
 
-        decimal net = 0m;
         decimal tax = 0m;
-        string revenueAccount = string.Empty;
-
-        foreach (InvoiceOrderLine invLine in request.Lines)
+        List<(SalesOrderLine Line, decimal Quantity, decimal Net)> invoiced = [];
+        foreach (IGrouping<long, InvoiceOrderLine> byLine in request.Lines.GroupBy(l => l.SalesOrderLineId))
         {
-            SalesOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == invLine.SalesOrderLineId);
+            SalesOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == byLine.Key);
             if (line is null)
             {
-                return Error.NotFound("Sop.LineNotFound", $"Order line {invLine.SalesOrderLineId} not found.");
+                return Error.NotFound("Sop.LineNotFound", $"Order line {byLine.Key} not found.");
             }
 
+            decimal quantity = byLine.Sum(l => l.Quantity);
             decimal available = line.DespatchedQuantity - line.InvoicedQuantity;
-            if (invLine.Quantity > available + 0.0001m)
+            if (quantity <= 0m || quantity > available + 0.0001m)
             {
-                return Error.Rule("Sop.NotDespatched", $"Order line {line.Id}: cannot invoice {invLine.Quantity}; only {available} despatched and uninvoiced.");
+                return Error.Rule("Sop.NotDespatched", $"Order line {line.Id}: cannot invoice {quantity}; only {available} despatched and uninvoiced.");
             }
 
-            net += decimal.Round(invLine.Quantity * line.UnitPrice, 4, MidpointRounding.ToEven);
-            tax += invLine.TaxAmount;
-            revenueAccount = line.RevenueAccountCode;
-            line.Invoice(invLine.Quantity);
+            invoiced.Add((line, quantity, decimal.Round(quantity * line.UnitPrice, 4, MidpointRounding.ToEven)));
+            tax += byLine.Sum(l => l.TaxAmount);
         }
+
+        if (invoiced.Count == 0)
+        {
+            return Error.Validation("Sop.NothingToInvoice", "An invoice needs at least one order line.");
+        }
+
+        // Revenue goes to each line's own revenue account.
+        List<RevenueLine> revenue = [.. invoiced
+            .GroupBy(i => i.Line.RevenueAccountCode, StringComparer.Ordinal)
+            .Select(g => new RevenueLine(g.Key, g.Sum(i => i.Net)))];
+        decimal net = revenue.Sum(r => r.NetAmount);
 
         Result<TradingPostingResult> invoice = await _salesLedger.PostInvoiceAsync(new SalesInvoiceRequest
         {
@@ -283,7 +324,8 @@ public sealed class SalesOrderService : ISalesOrderService
             Currency = order.Currency,
             NetAmount = net,
             TaxAmount = tax,
-            SalesAccountCode = revenueAccount,
+            SalesAccountCode = revenue[0].AccountCode,
+            RevenueLines = revenue,
             TaxAccountCode = request.TaxAccountCode,
             Narrative = $"Invoice for order {order.OrderNumber}",
         }, ct).ConfigureAwait(false);
@@ -291,6 +333,11 @@ public sealed class SalesOrderService : ISalesOrderService
         if (invoice.IsFailure)
         {
             return invoice.Error;
+        }
+
+        foreach ((SalesOrderLine line, decimal quantity, _) in invoiced)
+        {
+            line.Invoice(quantity);
         }
 
         order.RecomputeStatus();

@@ -32,8 +32,14 @@ public sealed class SalesInvoiceRequest
     /// <summary>The tax amount.</summary>
     public decimal TaxAmount { get; init; }
 
-    /// <summary>The revenue account code (credited).</summary>
+    /// <summary>The revenue account code (credited) — used when <see cref="RevenueLines"/> is empty.</summary>
     public string SalesAccountCode { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Optional split of the net amount across revenue accounts (e.g. an order whose items post to different revenue
+    /// accounts). When given, the amounts must add up to <see cref="NetAmount"/>, and each account is credited its share.
+    /// </summary>
+    public IReadOnlyList<RevenueLine> RevenueLines { get; init; } = [];
 
     /// <summary>The output-tax account code (credited), when there is tax.</summary>
     public string? TaxAccountCode { get; init; }
@@ -47,6 +53,11 @@ public sealed class SalesInvoiceRequest
     /// <summary>Optional narrative.</summary>
     public string? Narrative { get; init; }
 }
+
+/// <summary>One revenue account's share of a sales invoice's net amount.</summary>
+/// <param name="AccountCode">The revenue account (credited).</param>
+/// <param name="NetAmount">Its net amount.</param>
+public readonly record struct RevenueLine(string AccountCode, decimal NetAmount);
 
 /// <summary>A request to post a receipt against a customer (AR).</summary>
 public sealed class ReceiptRequest
