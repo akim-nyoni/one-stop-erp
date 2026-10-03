@@ -77,6 +77,7 @@ public sealed class FixedAssetService : IFixedAssetService
             .ToListAsync(ct).ConfigureAwait(false);
 
         List<JournalLineRequest> lines = [];
+        List<(FixedAsset Asset, decimal Charge)> charges = [];
         decimal total = 0m;
         int count = 0;
         int notYetAcquired = 0;
@@ -104,7 +105,7 @@ public sealed class FixedAssetService : IFixedAssetService
 
             lines.Add(new JournalLineRequest { AccountCode = asset.DepreciationExpenseAccountCode, Side = JournalSide.Debit, TransactionAmount = charge, Narrative = asset.AssetNumber });
             lines.Add(new JournalLineRequest { AccountCode = asset.AccumulatedDepreciationAccountCode, Side = JournalSide.Credit, TransactionAmount = charge, Narrative = asset.AssetNumber });
-            asset.ApplyDepreciation(charge, date);
+            charges.Add((asset, charge));
             total += charge;
             count++;
         }
@@ -128,7 +129,14 @@ public sealed class FixedAssetService : IFixedAssetService
 
         if (posted.IsFailure)
         {
+            // Nothing applied yet: a refused posting (e.g. a closed period) must not leave the assets marked as
+            // depreciated for the month, or the next run would skip a month that was never charged.
             return posted.Error;
+        }
+
+        foreach ((FixedAsset asset, decimal charge) in charges)
+        {
+            asset.ApplyDepreciation(charge, date);
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
