@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Trading;
+using One4All.Application.Trading;
 using One4All.Core.Common;
 using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
@@ -50,10 +51,14 @@ public sealed class CreditControlService : ICreditControlService
             var mine = items.Where(i => i.TraderId == customer.Id).ToList();
             decimal balance = mine.Sum(i => i.Sign == LedgerSign.Debit ? i.OutstandingBase : -i.OutstandingBase);
 
-            // Overdue: debit items whose due date is earlier than the cutoff (strictly beyond the tolerance).
+            // Overdue: debit items whose due date is earlier than the cutoff (strictly beyond the tolerance), less the
+            // customer's unallocated receipts and credit notes applied oldest first — money already received does not
+            // put an account on stop.
             var overdue = mine.Where(i => i.Sign == LedgerSign.Debit && i.DueDate < overdueCutoff).ToList();
-            decimal overdueAmount = overdue.Sum(i => i.OutstandingBase);
-            int oldestDays = overdue.Count == 0 ? 0 : overdue.Max(i => asAt.DayNumber - i.DueDate.DayNumber);
+            decimal credits = mine.Where(i => i.Sign == LedgerSign.Credit).Sum(i => i.OutstandingBase);
+            NetOverdue net = Dunning.ApplyCredits(overdue.Select(i => new OverdueItem(i.DueDate, i.OutstandingBase)), credits, asAt);
+            decimal overdueAmount = net.Amount;
+            int oldestDays = net.OldestDaysOverdue;
 
             bool overLimit = customer.CreditLimit > 0m && balance > customer.CreditLimit;
             bool isOverdue = overdueAmount > 0m;
