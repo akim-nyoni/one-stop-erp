@@ -72,6 +72,7 @@ public sealed class BankReconciliationService : IBankReconciliationService
         {
             One4All.Application.Banking.StatementFileFormat.Mt940 => One4All.Application.Banking.Mt940Parser.Parse(content),
             One4All.Application.Banking.StatementFileFormat.Camt053 => One4All.Application.Banking.Camt053Parser.Parse(content),
+            One4All.Application.Banking.StatementFileFormat.Ofx => One4All.Application.Banking.OfxParser.Parse(content),
             _ => One4All.Application.Banking.BankStatementCsvParser.Parse(content, csvLayout ?? One4All.Application.Banking.BankCsvLayout.Simple),
         };
         if (!parsed.IsClean)

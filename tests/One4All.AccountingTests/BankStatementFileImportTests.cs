@@ -10,7 +10,7 @@ using Xunit;
 namespace One4All.AccountingTests;
 
 /// <summary>
-/// Covers importing bank statements as MT940 and camt.053 files (brief §4.7): both land as statement lines ready to
+/// Covers importing bank statements as MT940, camt.053 and OFX files (brief §4.7): all land as statement lines ready to
 /// reconcile, with signs and references kept; an MT940 file with an unreadable line is refused whole.
 /// </summary>
 [Collection(AccountingCollection.Name)]
@@ -44,12 +44,16 @@ public sealed class BankStatementFileImportTests
             """;
         (await banking.ImportStatementFileAsync(companyId, account.Id, camt, StatementFileFormat.Camt053)).Value.Should().Be(1);
 
+        const string ofx = "<OFX><STMTTRN><DTPOSTED>20260311<TRNAMT>60.00<FITID>9001<REFNUM>OFX-1<NAME>Transfer in</STMTTRN></OFX>";
+        (await banking.ImportStatementFileAsync(companyId, account.Id, ofx, StatementFileFormat.Ofx)).Value.Should().Be(1);
+
         (await banking.ImportStatementFileAsync(companyId, account.Id, ":61:garbage\n", StatementFileFormat.Mt940)).Error.Code.Should().Be("Cb.StatementParse");
 
         List<BankStatementLine> lines = await db.Set<BankStatementLine>().AsNoTracking().Where(l => l.BankAccountId == account.Id).OrderBy(l => l.StatementDate).ToListAsync();
         lines.Select(l => (l.StatementDate, l.Amount, l.Reference)).Should().Equal(
             (new DateOnly(2026, 3, 5), 250m, "INV-1001"),
             (new DateOnly(2026, 3, 6), -80.5m, (string?)null),
-            (new DateOnly(2026, 3, 9), -40m, "DD-77"));
+            (new DateOnly(2026, 3, 9), -40m, "DD-77"),
+            (new DateOnly(2026, 3, 11), 60m, "OFX-1"));
     }
 }

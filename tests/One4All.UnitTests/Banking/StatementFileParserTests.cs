@@ -81,6 +81,52 @@ public sealed class StatementFileParserTests
             new StatementLineImport(new DateOnly(2026, 3, 6), "Monthly service fee", -80.5m, "CHG-0306"));
     }
 
+    private const string OfxSgml = """
+        OFXHEADER:100
+        DATA:OFXSGML
+
+        <OFX>
+        <BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST>
+        <STMTTRN>
+        <TRNTYPE>CREDIT
+        <DTPOSTED>20260305120000[+2:CAT]
+        <TRNAMT>250.00
+        <FITID>F-1
+        <REFNUM>INV-1001
+        <NAME>Acme Ltd
+        </STMTTRN>
+        <STMTTRN>
+        <TRNTYPE>DEBIT
+        <DTPOSTED>20260306
+        <TRNAMT>-80.50
+        <FITID>F-2
+        <NAME>Bank charges
+        <MEMO>March &amp; fees
+        </STMTTRN>
+        </BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1>
+        </OFX>
+        """;
+
+    [Fact]
+    public void Ofx_sgml_and_xml_transactions_are_read()
+    {
+        BankCsvParseResult sgml = OfxParser.Parse(OfxSgml);
+        sgml.Errors.Should().BeEmpty();
+        sgml.Lines.Should().Equal(
+            new StatementLineImport(new DateOnly(2026, 3, 5), "Acme Ltd", 250m, "INV-1001"),
+            new StatementLineImport(new DateOnly(2026, 3, 6), "Bank charges March & fees", -80.5m, "F-2"));
+
+        BankCsvParseResult xml = OfxParser.Parse("<?xml version=\"1.0\"?><OFX><STMTTRN><DTPOSTED>20260307</DTPOSTED><TRNAMT>-15</TRNAMT><CHECKNUM>1042</CHECKNUM><NAME>Cheque</NAME></STMTTRN></OFX>");
+        xml.Lines.Should().Equal(new StatementLineImport(new DateOnly(2026, 3, 7), "Cheque", -15m, "1042"));
+    }
+
+    [Fact]
+    public void An_unreadable_ofx_transaction_or_file_is_reported()
+    {
+        OfxParser.Parse("<OFX><STMTTRN><DTPOSTED>bad<TRNAMT>1</STMTTRN></OFX>").Errors.Should().ContainSingle();
+        OfxParser.Parse("not a statement").Errors.Should().ContainSingle();
+    }
+
     [Fact]
     public void Invalid_xml_is_reported()
     {

@@ -16,6 +16,9 @@ public enum StatementFileFormat
 
     /// <summary>ISO 20022 camt.053 bank-to-customer statement (XML).</summary>
     Camt053 = 3,
+
+    /// <summary>Open Financial Exchange statement, SGML (OFX 1.x) or XML (OFX 2.x).</summary>
+    Ofx = 4,
 }
 
 /// <summary>
@@ -88,6 +91,60 @@ public static partial class Mt940Parser
 
     [GeneratedRegex(@"^(?<date>\d{6})(?<entry>\d{4})?(?<mark>RC|RD|C|D)(?<funds>[A-Z])?(?<amount>\d+,\d{0,2})(?<type>[NFS][A-Z0-9]{3})(?<ref>[^/]*)(//(?<bank>.*))?$")]
     private static partial Regex StatementLine();
+}
+
+/// <summary>
+/// Reads OFX statements, both the SGML of OFX 1.x (leaf elements without closing tags) and the XML of OFX 2.x: each
+/// <c>STMTTRN</c> with its posting date, signed amount, cheque or reference number (else the bank's transaction id) and
+/// name / memo. Pure and unit-tested.
+/// </summary>
+public static partial class OfxParser
+{
+    /// <summary>Parses an OFX statement.</summary>
+    /// <param name="text">The file content.</param>
+    /// <returns>The lines read and any errors, as for CSV.</returns>
+    public static BankCsvParseResult Parse(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        List<StatementLineImport> lines = [];
+        List<BankCsvError> errors = [];
+        foreach (Match transaction in Transaction().Matches(text))
+        {
+            int lineNumber = text[..transaction.Index].Count(c => c == '\n') + 1;
+            Dictionary<string, string> fields = new(StringComparer.OrdinalIgnoreCase);
+            foreach (Match field in Field().Matches(transaction.Groups["body"].Value))
+            {
+                fields.TryAdd(field.Groups["tag"].Value, System.Net.WebUtility.HtmlDecode(field.Groups["value"].Value.Trim()));
+            }
+
+            string? posted = fields.GetValueOrDefault("DTPOSTED");
+            if (posted is null || posted.Length < 8
+                || !DateOnly.TryParseExact(posted[..8], "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly date)
+                || !decimal.TryParse(fields.GetValueOrDefault("TRNAMT"), NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out decimal amount))
+            {
+                errors.Add(new BankCsvError(lineNumber, "The transaction's posting date or amount cannot be read."));
+                continue;
+            }
+
+            string? reference = new[] { "CHECKNUM", "REFNUM", "FITID" }.Select(fields.GetValueOrDefault).FirstOrDefault(v => !string.IsNullOrEmpty(v));
+            string description = string.Join(" ", new[] { "NAME", "MEMO" }.Select(fields.GetValueOrDefault).Where(v => !string.IsNullOrEmpty(v)));
+            lines.Add(new StatementLineImport(date, description.Length == 0 ? reference ?? string.Empty : description, amount, reference));
+        }
+
+        if (lines.Count == 0 && errors.Count == 0 && !text.Contains("<OFX", StringComparison.OrdinalIgnoreCase))
+        {
+            errors.Add(new BankCsvError(1, "The file is not an OFX statement."));
+        }
+
+        return new BankCsvParseResult(lines, errors);
+    }
+
+    [GeneratedRegex(@"<STMTTRN>(?<body>.*?)</STMTTRN>", RegexOptions.Singleline | RegexOptions.IgnoreCase)]
+    private static partial Regex Transaction();
+
+    // A leaf element: its value runs to the next tag or line end, whether or not it is closed (SGML or XML).
+    [GeneratedRegex(@"<(?<tag>[A-Z0-9.]+)>(?<value>[^<\r\n]*)", RegexOptions.IgnoreCase)]
+    private static partial Regex Field();
 }
 
 /// <summary>
