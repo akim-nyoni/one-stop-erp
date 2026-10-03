@@ -105,6 +105,19 @@
             <Border Grid.Column="0" Style="{StaticResource Tile}">
                 <DockPanel>
                     <TextBlock DockPanel.Dock="Top" Text="Statement lines" FontSize="14" FontWeight="SemiBold" Foreground="#1E3A2E" Margin="0,0,0,6" />
+                    <!-- Post the selected open line straight into the books -->
+                    <Border DockPanel.Dock="Bottom" Background="#F4F6F4" CornerRadius="4" Padding="8" Margin="0,8,0,0">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Not in the books yet? Post the selected line as…" Style="{StaticResource TileLabel}" Margin="0,0,0,4" />
+                            <Button DockPanel.Dock="Right" Content="Post &amp; match" Padding="12,5" Margin="6,0,0,0" FontWeight="SemiBold" Background="#DDEFE0" Command="{Binding PostLineCommand}" />
+                            <StackPanel Orientation="Horizontal">
+                                <ComboBox ItemsSource="{Binding PostKinds}" SelectedItem="{Binding PostKind}" Width="140" />
+                                <ComboBox ItemsSource="{Binding PostTargets}" SelectedItem="{Binding PostTarget}" DisplayMemberPath="Label" Width="210" Margin="6,0,0,0" IsTextSearchEnabled="True" />
+                                <TextBox Text="{Binding PostReference, UpdateSourceTrigger=PropertyChanged}" Width="110" Margin="6,0,0,0" Padding="4,2"
+                                         ToolTip="Document number (receipts / payments) or narrative (account postings); blank uses the bank reference." />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
                     <ListView ItemsSource="{Binding StatementLines}" SelectedItem="{Binding SelectedStatementLine}" BorderThickness="0">
                         <ListView.View>
                             <GridView>

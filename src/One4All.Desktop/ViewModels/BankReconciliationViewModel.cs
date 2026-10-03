@@ -24,7 +24,13 @@ public sealed record BankChoiceVm(long Id, string Label);
 /// <param name="Amount">The signed amount.</param>
 /// <param name="Status">"Matched" or "Open".</param>
 /// <param name="IsMatched">Whether the line is reconciled.</param>
-public sealed record StatementRowVm(long Id, string Date, string Description, string Reference, string Amount, string Status, bool IsMatched);
+/// <param name="AmountValue">The signed amount as a number (direction decides what the line can be posted as).</param>
+public sealed record StatementRowVm(long Id, string Date, string Description, string Reference, string Amount, string Status, bool IsMatched, decimal AmountValue);
+
+/// <summary>A counterparty for posting a statement line: a customer, supplier or nominal account.</summary>
+/// <param name="Key">The customer / supplier id, or the account code.</param>
+/// <param name="Label">What the picker shows.</param>
+public sealed record PostTargetVm(string Key, string Label);
 
 /// <summary>An unpresented GL posting row (pre-formatted for display).</summary>
 /// <param name="Id">The journal line.</param>
@@ -72,8 +78,96 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
 
     /// <summary>The selected statement line.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(MatchCommand), nameof(UnmatchCommand))]
+    [NotifyCanExecuteChangedFor(nameof(MatchCommand), nameof(UnmatchCommand), nameof(PostLineCommand))]
     private StatementRowVm? _selectedStatementLine;
+
+    /// <summary>What an open statement line can be posted as.</summary>
+    public IReadOnlyList<string> PostKinds { get; } = [CustomerReceipt, SupplierPayment, ToAccount];
+
+    /// <summary>The counterparties for the chosen kind.</summary>
+    public ObservableCollection<PostTargetVm> PostTargets { get; } = [];
+
+    /// <summary>How to post the selected line.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(PostLineCommand))]
+    private string _postKind = CustomerReceipt;
+
+    /// <summary>The chosen customer / supplier / account.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(PostLineCommand))]
+    private PostTargetVm? _postTarget;
+
+    /// <summary>An optional document number or narrative for the posting.</summary>
+    [ObservableProperty]
+    private string _postReference = string.Empty;
+
+    private const string CustomerReceipt = "Customer receipt";
+    private const string SupplierPayment = "Supplier payment";
+    private const string ToAccount = "Post to account";
+
+    private readonly List<PostTargetVm> _customers = [];
+    private readonly List<PostTargetVm> _suppliers = [];
+    private readonly List<PostTargetVm> _accounts = [];
+
+    private bool CanPostLine => SelectedStatementLine is { IsMatched: false } && PostTarget is not null && !IsBusy;
+
+    partial void OnPostKindChanged(string value) => RefillTargets();
+
+    partial void OnSelectedStatementLineChanged(StatementRowVm? value)
+    {
+        // Default the kind from the line's direction; a fee or interest line can still be switched to an account.
+        if (value is { IsMatched: false })
+        {
+            string kind = value.AmountValue > 0m ? CustomerReceipt : SupplierPayment;
+            if (PostKind != ToAccount && PostKind != kind)
+            {
+                PostKind = kind;
+            }
+        }
+    }
+
+    private void RefillTargets()
+    {
+        PostTargets.Clear();
+        foreach (PostTargetVm target in PostKind switch { CustomerReceipt => _customers, SupplierPayment => _suppliers, _ => _accounts })
+        {
+            PostTargets.Add(target);
+        }
+
+        PostTarget = null;
+    }
+
+    /// <summary>Posts the selected open statement line as the chosen kind against the chosen counterparty, matching it.</summary>
+    [RelayCommand(CanExecute = nameof(CanPostLine))]
+    public Task PostLineAsync()
+    {
+        StatementRowVm? line = SelectedStatementLine;
+        PostTargetVm? target = PostTarget;
+        if (line is null || target is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        string? reference = string.IsNullOrWhiteSpace(PostReference) ? null : PostReference.Trim();
+        string kind = PostKind;
+        return ActAsync(async (_, bank) =>
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            IBankStatementPostingService posting = scope.ServiceProvider.GetRequiredService<IBankStatementPostingService>();
+            Result<StatementLinePosting> posted = kind switch
+            {
+                CustomerReceipt => await posting.PostCustomerReceiptAsync(_companyId, bank.Id, line.Id, long.Parse(target.Key, CultureInfo.InvariantCulture), reference).ConfigureAwait(true),
+                SupplierPayment => await posting.PostSupplierPaymentAsync(_companyId, bank.Id, line.Id, long.Parse(target.Key, CultureInfo.InvariantCulture), reference).ConfigureAwait(true),
+                _ => await posting.PostToAccountAsync(_companyId, bank.Id, line.Id, target.Key, reference).ConfigureAwait(true),
+            };
+            if (posted.IsSuccess)
+            {
+                PostReference = string.Empty;
+            }
+
+            return posted.IsSuccess ? Result.Success() : Result.Failure(posted.Error);
+        }, $"Posted {line.Date} {line.Amount} as {kind.ToLowerInvariant()} to {target.Label} and matched it.");
+    }
 
     /// <summary>The selected unpresented GL posting.</summary>
     [ObservableProperty]
@@ -102,7 +196,7 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
 
     /// <summary>True while working.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(LoadCommand), nameof(AutoMatchCommand), nameof(MatchCommand), nameof(UnmatchCommand))]
+    [NotifyCanExecuteChangedFor(nameof(LoadCommand), nameof(AutoMatchCommand), nameof(MatchCommand), nameof(UnmatchCommand), nameof(PostLineCommand))]
     private bool _isBusy;
 
     private bool CanLoad => SelectedBank is not null && !IsBusy;
@@ -132,6 +226,17 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
             {
                 Banks.Add(new BankChoiceVm(b.Id, $"{b.Code} — {b.Name}"));
             }
+
+            var customers = await db.Customers.Where(c => c.CompanyId == _companyId).OrderBy(c => c.Code).Select(c => new { c.Id, c.Code, c.Name }).ToListAsync(ct).ConfigureAwait(true);
+            var suppliers = await db.Suppliers.Where(s => s.CompanyId == _companyId).OrderBy(s => s.Code).Select(s => new { s.Id, s.Code, s.Name }).ToListAsync(ct).ConfigureAwait(true);
+            var accounts = await db.Accounts.Where(a => a.CompanyId == _companyId).OrderBy(a => a.AccountCode).Select(a => new { a.AccountCode, a.Name }).ToListAsync(ct).ConfigureAwait(true);
+            _customers.Clear();
+            _customers.AddRange(customers.Select(c => new PostTargetVm(c.Id.ToString(CultureInfo.InvariantCulture), $"{c.Code} — {c.Name}")));
+            _suppliers.Clear();
+            _suppliers.AddRange(suppliers.Select(s => new PostTargetVm(s.Id.ToString(CultureInfo.InvariantCulture), $"{s.Code} — {s.Name}")));
+            _accounts.Clear();
+            _accounts.AddRange(accounts.Select(a => new PostTargetVm(a.AccountCode, $"{a.AccountCode} — {a.Name}")));
+            RefillTargets();
 
             StatusMessage = Banks.Count == 0 ? "No bank accounts are set up." : "Choose a bank account.";
             SelectedBank = Banks.FirstOrDefault();
@@ -178,7 +283,7 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
             {
                 foreach (StatementWorkItem s in work.Value.StatementLines)
                 {
-                    StatementLines.Add(new StatementRowVm(s.Id, Date(s.Date), s.Description, s.Reference ?? string.Empty, Money(s.Amount), s.MatchedJournalLineId is null ? "Open" : "Matched", s.MatchedJournalLineId is not null));
+                    StatementLines.Add(new StatementRowVm(s.Id, Date(s.Date), s.Description, s.Reference ?? string.Empty, Money(s.Amount), s.MatchedJournalLineId is null ? "Open" : "Matched", s.MatchedJournalLineId is not null, s.Amount));
                 }
 
                 foreach (GlWorkItem g in work.Value.UnpresentedGlLines)
