@@ -99,6 +99,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Accounting.IPeriodCloseService, Accounting.PeriodCloseService>();
         services.AddScoped<Application.Abstractions.Inventory.IStocktakeService, Inventory.StocktakeService>();
         services.AddScoped<Application.Abstractions.Inventory.IReplenishmentService, Inventory.ReplenishmentService>();
+        services.AddScoped<Application.Abstractions.Inventory.IStockProvisionService, Inventory.StockProvisionService>();
         services.AddScoped<Application.Abstractions.Inventory.IPricingService, Inventory.PricingService>();
         services.AddScoped<Application.Abstractions.Inventory.IStockAvailabilityService, Inventory.StockAvailabilityService>();
         services.AddScoped<Application.Abstractions.Trading.IRecurringSalesInvoiceService, Trading.RecurringSalesInvoiceService>();

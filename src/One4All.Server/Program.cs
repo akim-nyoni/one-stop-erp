@@ -204,6 +204,16 @@ app.MapPost("/api/credit/{customerId:long}/release", async (long companyId, long
 .WithName("CreditRelease");
 
 // --- Stock: replenishment, availability, pricing ----------------------------------------------------------
+app.MapGet("/api/stock/provision", async (long companyId, DateOnly asAtDate, string provisionAccount, decimal? costToSellPercent, int? slowMovingDays, decimal? slowMovingPercent, int? obsoleteDays, decimal? obsoletePercent, One4All.Application.Abstractions.Inventory.IStockProvisionService provisions, CancellationToken ct) =>
+    ValueResponse(await provisions.AssessAsync(companyId, asAtDate, ProvisionPolicy(costToSellPercent, slowMovingDays, slowMovingPercent, obsoleteDays, obsoletePercent), provisionAccount, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("StockProvision");
+
+app.MapPost("/api/stock/provision", async (long companyId, DateOnly asAtDate, string provisionAccount, string expenseAccount, decimal? costToSellPercent, int? slowMovingDays, decimal? slowMovingPercent, int? obsoleteDays, decimal? obsoletePercent, One4All.Application.Abstractions.Inventory.IStockProvisionService provisions, CancellationToken ct) =>
+    ValueResponse(await provisions.PostAsync(companyId, asAtDate, ProvisionPolicy(costToSellPercent, slowMovingDays, slowMovingPercent, obsoleteDays, obsoletePercent), provisionAccount, expenseAccount, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PostStockProvision");
+
 app.MapGet("/api/stock/replenishment", async (long companyId, long? warehouseId, One4All.Application.Abstractions.Inventory.IReplenishmentService replenish, CancellationToken ct) =>
     Results.Ok(await replenish.SuggestAsync(companyId, warehouseId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
@@ -485,6 +495,18 @@ static IResult ActionResponse(Result result)
 }
 
 // Maps a value-bearing Result to an HTTP response: 200 with the value, 404 for not-found, else 400.
+// The stock provision policy from query parameters, each defaulting to the standard policy.
+static One4All.Application.Inventory.StockProvisionPolicy ProvisionPolicy(decimal? costToSellPercent, int? slowMovingDays, decimal? slowMovingPercent, int? obsoleteDays, decimal? obsoletePercent)
+{
+    One4All.Application.Inventory.StockProvisionPolicy standard = One4All.Application.Inventory.StockProvisionPolicy.Default;
+    return new One4All.Application.Inventory.StockProvisionPolicy(
+        costToSellPercent ?? standard.CostToSellPercent,
+        slowMovingDays ?? standard.SlowMovingDays,
+        slowMovingPercent ?? standard.SlowMovingPercent,
+        obsoleteDays ?? standard.ObsoleteDays,
+        obsoletePercent ?? standard.ObsoletePercent);
+}
+
 static IResult ValueResponse<T>(Result<T> result)
 {
     if (result.IsSuccess)
