@@ -9521,6 +9521,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
 
+                    b.Property<bool>("FundControlEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("fund_control_enabled");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");

@@ -113,6 +113,12 @@ public sealed class PostingEngine : IPostingEngine
                 $"Manual journals over {threshold:0.00} {baseCurrency} need a second user's approval: submit the journal for approval.");
         }
 
+        // Fund control: no expenditure against a vote without an appropriation.
+        if (company.FundControlEnabled && await CheckAppropriationAsync(request.CompanyId, fiscalYear.Id, journal, ct).ConfigureAwait(false) is { } unappropriated)
+        {
+            return unappropriated;
+        }
+
         // Allocate the gapless journal number (increment persists in this transaction).
         string journalNumber = await AllocateJournalNumberAsync(request.CompanyId, request.PostingDate.Year, ct).ConfigureAwait(false);
 
@@ -345,6 +351,37 @@ public sealed class PostingEngine : IPostingEngine
             : JournalLine.Credit(key, lineCurrency, lineRequest.TransactionAmount, rate, baseAmount, lineRequest.Narrative);
         line.SetTaxCode(lineRequest.TaxCode);
         return line;
+    }
+
+    // A debit to a budget-enabled expense account (a vote) needs an appropriation: a positive amount for the account
+    // (and the line's cost centre, where the budget names one) in the year's active approved or supplementary budget,
+    // company-wide or for the line's department.
+    private async Task<Error?> CheckAppropriationAsync(long companyId, long fiscalYearId, JournalEntry journal, CancellationToken ct)
+    {
+        List<JournalLine> debits = [.. journal.Lines.Where(l => l.BaseDebit > 0m)];
+        List<string> codes = [.. debits.Select(l => l.AccountCode).Distinct()];
+        List<string> votes = await _db.Accounts
+            .Where(a => a.CompanyId == companyId && codes.Contains(a.AccountCode) && a.BudgetEnabled && a.Type == AccountType.Expense)
+            .Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false);
+        foreach (JournalLine line in debits.Where(l => votes.Contains(l.AccountCode)))
+        {
+            string? costCentre = string.IsNullOrEmpty(line.CostCentre) ? null : line.CostCentre;
+            string? department = string.IsNullOrEmpty(line.Department) ? null : line.Department;
+            decimal appropriated = await _db.Budgets
+                .Where(b => b.CompanyId == companyId && b.FiscalYearId == fiscalYearId && b.IsActive
+                            && (b.Type == Core.Budgeting.BudgetType.OriginalApproved || b.Type == Core.Budgeting.BudgetType.SupplementaryRevised)
+                            && (b.Department == null || b.Department == department))
+                .SelectMany(b => b.Lines)
+                .Where(l => l.AccountCode == line.AccountCode && (l.CostCentre == null || l.CostCentre == costCentre))
+                .SumAsync(l => (decimal?)l.Amount, ct).ConfigureAwait(false) ?? 0m;
+            if (appropriated <= 0m)
+            {
+                return Error.Rule("Posting.NoAppropriation",
+                    $"Account '{line.AccountCode}' has no appropriation in this year's active budget; fund control does not allow expenditure against it.");
+            }
+        }
+
+        return null;
     }
 
     private async Task<Result<(FiscalYear, FiscalPeriod)>> ResolvePeriodAsync(long companyId, string moduleCode, DateOnly date, bool allowFuture, CancellationToken ct)

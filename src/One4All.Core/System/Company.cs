@@ -62,6 +62,12 @@ public sealed class Company : SoftDeletableEntity
     /// </summary>
     public decimal? ManualJournalApprovalThreshold { get; set; }
 
+    /// <summary>
+    /// Whether fund control is on (brief §4.4 / §4.18.5): expenditure cannot be posted to a budget-enabled expense account
+    /// (a vote) that has no appropriation in the year's active approved or supplementary budget.
+    /// </summary>
+    public bool FundControlEnabled { get; set; }
+
     /// <summary>Sets or clears the second reporting currency.</summary>
     /// <param name="reportingCurrency">The reporting currency, or null to disable dual-currency reporting.</param>
     public void SetReportingCurrency(CurrencyCode? reportingCurrency) => ReportingCurrency = reportingCurrency;
