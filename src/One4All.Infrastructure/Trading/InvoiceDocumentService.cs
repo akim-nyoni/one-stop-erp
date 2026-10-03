@@ -28,7 +28,7 @@ public sealed class InvoiceDocumentService : IInvoiceDocumentService
             return Error.NotFound("Ar.ItemNotFound", $"AR open item {openItemId} not found.");
         }
 
-        if (item.ItemType is not (OpenItemType.Invoice or OpenItemType.CreditNote))
+        if (item.ItemType is not (OpenItemType.Invoice or OpenItemType.CreditNote or OpenItemType.Interest))
         {
             return Error.Rule("Ar.NotADocument", $"{item.DocumentNumber} is a {item.ItemType}, not an invoice or credit note.");
         }

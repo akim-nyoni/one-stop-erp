@@ -9805,6 +9805,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,6)")
                         .HasColumnName("exchange_rate");
 
+                    b.Property<DateOnly?>("InterestChargedTo")
+                        .HasColumnType("date")
+                        .HasColumnName("interest_charged_to");
+
                     b.Property<int>("ItemType")
                         .HasColumnType("integer")
                         .HasColumnName("item_type");

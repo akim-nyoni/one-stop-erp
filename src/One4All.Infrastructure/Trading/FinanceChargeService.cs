@@ -44,10 +44,12 @@ public sealed class FinanceChargeService : IFinanceChargeService
 
         Company company = await _db.Companies.FirstAsync(c => c.Id == request.CompanyId, ct).ConfigureAwait(false);
 
+        // Finance charges themselves never earn interest (no interest on interest).
         List<OpenItem> arDebits = await _db.Set<OpenItem>()
             .Where(o => o.CompanyId == request.CompanyId
                 && o.Ledger == TradingLedger.AccountsReceivable
                 && o.Sign == LedgerSign.Debit
+                && o.ItemType != OpenItemType.Interest
                 && o.OutstandingBase > 0m)
             .ToListAsync(ct).ConfigureAwait(false);
 
@@ -62,17 +64,29 @@ public sealed class FinanceChargeService : IFinanceChargeService
             decimal interest = 0m;
             decimal overdueAmount = 0m;
             int maxDays = 0;
+            List<OpenItem> charged = [];
             foreach (OpenItem item in byCustomer)
             {
                 int daysOverdue = request.AsAtDate.DayNumber - item.DueDate.DayNumber;
-                interest += FinanceCharge.Interest(item.OutstandingBase, daysOverdue, request.AnnualRatePercent);
                 overdueAmount += item.OutstandingBase;
                 maxDays = Math.Max(maxDays, daysOverdue);
+
+                // Charge only the days not already charged: from the later of the due date and the last run.
+                DateOnly from = item.InterestChargedTo is { } last && last > item.DueDate ? last : item.DueDate;
+                int daysToCharge = request.AsAtDate.DayNumber - from.DayNumber;
+                if (daysToCharge <= 0)
+                {
+                    continue;
+                }
+
+                interest += FinanceCharge.Interest(item.OutstandingBase, daysToCharge, request.AnnualRatePercent);
+                charged.Add(item);
             }
 
             interest = decimal.Round(interest, 2, MidpointRounding.AwayFromZero);
             if (interest <= 0m || interest < request.MinimumCharge)
             {
+                // Below the minimum: the days stay uncharged and roll into a later run.
                 continue;
             }
 
@@ -94,6 +108,15 @@ public sealed class FinanceChargeService : IFinanceChargeService
             {
                 return posting.Error;
             }
+
+            foreach (OpenItem item in charged)
+            {
+                item.RecordInterestChargedTo(request.AsAtDate);
+            }
+
+            OpenItem chargeItem = await _db.Set<OpenItem>().FirstAsync(o => o.Id == posting.Value.OpenItemId, ct).ConfigureAwait(false);
+            chargeItem.MarkAsInterestCharge();
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
             charges.Add(new CustomerFinanceCharge(byCustomer.Key, overdueAmount, maxDays, interest, documentNumber));
         }

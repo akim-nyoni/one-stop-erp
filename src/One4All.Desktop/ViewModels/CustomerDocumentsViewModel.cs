@@ -142,13 +142,13 @@ public sealed partial class CustomerDocumentsViewModel : ObservableObject
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             List<OpenItem> items = await db.OpenItems
                 .Where(i => i.CompanyId == _companyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == customer.Id
-                    && (i.ItemType == OpenItemType.Invoice || i.ItemType == OpenItemType.CreditNote))
+                    && (i.ItemType == OpenItemType.Invoice || i.ItemType == OpenItemType.CreditNote || i.ItemType == OpenItemType.Interest))
                 .OrderByDescending(i => i.DocumentDate).ThenByDescending(i => i.Id)
                 .ToListAsync().ConfigureAwait(true);
 
             foreach (OpenItem i in items)
             {
-                Documents.Add(new CustomerDocumentVm(i.Id, i.ItemType == OpenItemType.Invoice ? "Invoice" : "Credit note", i.DocumentNumber,
+                Documents.Add(new CustomerDocumentVm(i.Id, i.ItemType switch { OpenItemType.Invoice => "Invoice", OpenItemType.Interest => "Finance charge", _ => "Credit note" }, i.DocumentNumber,
                     i.DocumentDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), i.DueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                     Money(i.OriginalTransaction), Money(i.OutstandingTransaction)));
             }

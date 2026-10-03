@@ -109,8 +109,38 @@ public sealed class OpenItem : AuditableEntity, ICompanyScoped
     /// <summary>Optional narrative.</summary>
     public string? Narrative { get; set; }
 
+    /// <summary>
+    /// The date finance charges on this item have been raised up to, or null when none have. The next run
+    /// charges only the days after it, so a period is never charged twice.
+    /// </summary>
+    public DateOnly? InterestChargedTo { get; private set; }
+
     /// <summary>True when fully allocated/settled (nothing outstanding in transaction currency).</summary>
     public bool IsSettled => OutstandingTransaction == 0m;
+
+    /// <summary>Records that finance charges have been raised on this item up to a date (never moves backwards).</summary>
+    /// <param name="date">The run date.</param>
+    public void RecordInterestChargedTo(DateOnly date)
+    {
+        if (InterestChargedTo is null || date > InterestChargedTo)
+        {
+            InterestChargedTo = date;
+        }
+    }
+
+    /// <summary>
+    /// Reclassifies a receivable invoice as a finance (interest) charge, so it is identifiable on statements and
+    /// is not itself charged interest. Only an AR debit invoice can be reclassified.
+    /// </summary>
+    public void MarkAsInterestCharge()
+    {
+        if (Ledger != TradingLedger.AccountsReceivable || Sign != LedgerSign.Debit || ItemType != OpenItemType.Invoice)
+        {
+            throw new InvalidOperationException($"{DocumentNumber} is not a receivable invoice and cannot be marked as a finance charge.");
+        }
+
+        ItemType = OpenItemType.Interest;
+    }
 
     /// <summary>
     /// Reduces the outstanding amounts by an allocation. The base reduction is supplied explicitly so the
