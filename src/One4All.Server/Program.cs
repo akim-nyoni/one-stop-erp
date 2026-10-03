@@ -267,6 +267,24 @@ app.MapPost("/api/trading/payment-run", async (One4All.Application.Abstractions.
 .RequireAuthorization()
 .WithName("PaymentRun");
 
+app.MapGet("/api/ap/withholding/return", async (long companyId, DateOnly fromDate, DateOnly toDate, One4All.Application.Abstractions.Trading.IWithholdingTaxService wht, CancellationToken ct) =>
+    ValueResponse(await wht.ReturnAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("WithholdingReturn");
+
+app.MapPost("/api/ap/withholding/remit", async (long companyId, DateOnly fromDate, DateOnly toDate, DateOnly remittanceDate, string bankAccount, One4All.Application.Abstractions.Trading.IWithholdingTaxService wht, CancellationToken ct) =>
+    ValueResponse(await wht.RemitAsync(companyId, fromDate, toDate, remittanceDate, bankAccount, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RemitWithholding");
+
+app.MapGet("/api/ap/withholding/{certificateId:long}/certificate", async (long companyId, long certificateId, One4All.Application.Abstractions.Trading.IWithholdingTaxService wht, CancellationToken ct) =>
+{
+    Result<string> text = await wht.CertificateTextAsync(companyId, certificateId, ct).ConfigureAwait(false);
+    return text.IsSuccess ? Results.Text(text.Value, "text/plain") : ValueResponse(text);
+})
+.RequireAuthorization()
+.WithName("WithholdingCertificate");
+
 app.MapPost("/api/trading/revalue", async (long companyId, One4All.Core.Trading.TradingLedger ledger, DateOnly asAtDate, bool? autoReverse, One4All.Application.Abstractions.Trading.ITradingRevaluationService reval, CancellationToken ct) =>
     ValueResponse(await reval.RevalueAsync(companyId, ledger, asAtDate, autoReverse ?? true, ct).ConfigureAwait(false)))
 .RequireAuthorization()

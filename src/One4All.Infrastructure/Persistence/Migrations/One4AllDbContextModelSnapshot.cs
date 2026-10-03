@@ -10393,6 +10393,102 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("supplier", "ap");
                 });
 
+            modelBuilder.Entity("One4All.Core.Trading.WithholdingCertificate", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CertificateNumber")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("certificate_number");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<decimal>("GrossAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("gross_amount");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("PaymentDate")
+                        .HasColumnType("date")
+                        .HasColumnName("payment_date");
+
+                    b.Property<string>("PaymentDocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("payment_document_number");
+
+                    b.Property<long>("PaymentOpenItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("payment_open_item_id");
+
+                    b.Property<decimal>("RatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("rate_percent");
+
+                    b.Property<string>("RemittanceJournalNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("remittance_journal_number");
+
+                    b.Property<DateOnly?>("RemittedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("remitted_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<string>("TaxCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("tax_code");
+
+                    b.Property<decimal>("WithheldAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("withheld_amount");
+
+                    b.HasKey("Id")
+                        .HasName("pk_withholding_certificate");
+
+                    b.HasIndex("CompanyId", "PaymentDate")
+                        .HasDatabaseName("ix_withholding_certificate_company_id_payment_date");
+
+                    b.ToTable("withholding_certificate", "trd");
+                });
+
             modelBuilder.Entity("One4All.Core.Vouchers.GiftCard", b =>
                 {
                     b.Property<long>("Id")

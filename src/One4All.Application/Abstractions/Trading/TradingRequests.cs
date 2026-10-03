@@ -6,7 +6,8 @@ namespace One4All.Application.Abstractions.Trading;
 /// <param name="OpenItemId">The created open-item id.</param>
 /// <param name="JournalNumber">The GL journal number.</param>
 /// <param name="BaseAmount">The gross amount in base currency.</param>
-public readonly record struct TradingPostingResult(long OpenItemId, string JournalNumber, decimal BaseAmount);
+/// <param name="WithheldBase">Withholding tax deducted from a supplier payment (base currency; 0 when none).</param>
+public readonly record struct TradingPostingResult(long OpenItemId, string JournalNumber, decimal BaseAmount, decimal WithheldBase = 0m);
 
 /// <summary>A request to post a sales invoice (AR).</summary>
 public sealed class SalesInvoiceRequest
@@ -233,4 +234,11 @@ public sealed class PaymentRequest
 
     /// <summary>Optional narrative.</summary>
     public string? Narrative { get; init; }
+
+    /// <summary>
+    /// A withholding tax code to apply (brief §3.5): when the supplier has no valid tax clearance on the payment date,
+    /// its rate is withheld from the payment — the supplier's account is settled for the full amount, the bank pays
+    /// the net and the tax is owed on the code's output (WHT payable) account. Ignored for a cleared supplier.
+    /// </summary>
+    public string? WithholdingTaxCode { get; init; }
 }

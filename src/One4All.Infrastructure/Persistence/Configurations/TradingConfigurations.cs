@@ -118,3 +118,20 @@ internal sealed class RecurringPurchaseInvoiceConfiguration : IEntityTypeConfigu
         b.HasIndex(x => new { x.CompanyId, x.IsActive, x.NextRunDate });
     }
 }
+
+internal sealed class WithholdingCertificateConfiguration : IEntityTypeConfiguration<WithholdingCertificate>
+{
+    public void Configure(EntityTypeBuilder<WithholdingCertificate> b)
+    {
+        b.ToTable("withholding_certificate", Schemas.Trading);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.CertificateNumber).HasMaxLength(60);
+        b.Property(x => x.PaymentDocumentNumber).HasMaxLength(60);
+        b.Property(x => x.TaxCode).HasMaxLength(20);
+        b.Property(x => x.RemittanceJournalNumber).HasMaxLength(30);
+        b.Property(x => x.RatePercent).HasPrecision(9, 4);
+        b.Property(x => x.GrossAmount).HasPrecision(19, 4);
+        b.Property(x => x.WithheldAmount).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.PaymentDate });
+    }
+}

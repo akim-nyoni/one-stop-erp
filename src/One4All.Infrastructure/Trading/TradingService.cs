@@ -578,15 +578,45 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         decimal rate = rateResult.Value;
         decimal baseAmount = Round(request.Amount * rate);
 
+        // Withholding tax applies to a supplier without a valid tax clearance on the payment date.
+        TaxCode? withholding = null;
+        if (!string.IsNullOrWhiteSpace(request.WithholdingTaxCode) && !(supplier.TaxClearanceExpiry is { } expiry && expiry >= request.PaymentDate))
+        {
+            string code = request.WithholdingTaxCode.Trim().ToUpperInvariant();
+            withholding = await _db.TaxCodes.Include(t => t.Rates)
+                .FirstOrDefaultAsync(t => t.CompanyId == request.CompanyId && t.Code == code && t.IsActive, ct).ConfigureAwait(false);
+            if (withholding is null || withholding.Type != TaxType.Withholding || string.IsNullOrWhiteSpace(withholding.OutputAccountCode))
+            {
+                return Error.Rule("Ap.WithholdingCode", $"{code} is not an active withholding tax code with a payable account.");
+            }
+        }
+
+        decimal ratePercent = withholding?.RateOn(request.PaymentDate) ?? 0m;
+        decimal withheld = Round(request.Amount * ratePercent / 100m);
+        decimal withheldBase = Round(withheld * rate);
+
         List<JournalLineRequest> lines =
         [
             Line(controlResult.Value, JournalSide.Debit, request.Amount, rate, baseAmount),
-            Line(request.BankAccountCode, JournalSide.Credit, request.Amount, rate, baseAmount),
+            Line(request.BankAccountCode, JournalSide.Credit, request.Amount - withheld, rate, baseAmount - withheldBase),
         ];
+        if (withheld != 0m)
+        {
+            lines.Add(Line(withholding!.OutputAccountCode!, JournalSide.Credit, withheld, rate, withheldBase));
+        }
 
-        return await PostAndOpenAsync(request.CompanyId, "AP", TradingLedger.AccountsPayable, supplier.Id, OpenItemType.Payment,
+        Result<TradingPostingResult> posted = await PostAndOpenAsync(request.CompanyId, "AP", TradingLedger.AccountsPayable, supplier.Id, OpenItemType.Payment,
             LedgerSign.Debit, request.DocumentNumber, request.PaymentDate, request.PaymentDate, request.Currency, rate,
             request.Amount, baseAmount, request.Narrative, lines, ct).ConfigureAwait(false);
+        if (posted.IsFailure || withheld == 0m)
+        {
+            return posted;
+        }
+
+        _db.Set<WithholdingCertificate>().Add(new WithholdingCertificate(request.CompanyId, $"WHT-{request.DocumentNumber}", supplier.Id, posted.Value.OpenItemId,
+            request.DocumentNumber, request.PaymentDate, withholding!.Code, ratePercent, baseAmount, withheldBase));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return posted.Value with { WithheldBase = withheldBase };
     }
 
     /// <inheritdoc />
