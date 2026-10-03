@@ -76,6 +76,12 @@ public sealed class JournalEntry : AuditableEntity, ICompanyScoped
     /// <summary>A narrative/description.</summary>
     public string? Narrative { get; set; }
 
+    /// <summary>
+    /// Whether this is a manual (user-keyed) journal. Manual journals may not touch control accounts — checked by the
+    /// posting engine and, independently, by a database trigger on the journal lines (brief §3.1).
+    /// </summary>
+    public bool IsManual { get; set; }
+
     /// <summary>The accounting date.</summary>
     public DateOnly PostingDate { get; private set; }
 

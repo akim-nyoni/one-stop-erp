@@ -56,7 +56,10 @@ public sealed class PostingEngine : IPostingEngine
         (FiscalYear fiscalYear, FiscalPeriod fiscalPeriod) = periodResult.Value;
 
         // Build and validate the lines.
-        JournalEntry journal = new(request.CompanyId, request.SourceModule, request.PostingDate, baseCurrency, request.TransactionCurrency);
+        JournalEntry journal = new(request.CompanyId, request.SourceModule, request.PostingDate, baseCurrency, request.TransactionCurrency)
+        {
+            IsManual = request.EnforceManualJournalRules,
+        };
         journal.DocumentType = request.DocumentType;
         journal.DocumentNumber = request.DocumentNumber;
         journal.Reference = request.Reference;

@@ -295,6 +295,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("fiscal_year_id");
 
+                    b.Property<bool>("IsManual")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_manual");
+
                     b.Property<bool>("IsReversal")
                         .HasColumnType("boolean")
                         .HasColumnName("is_reversal");
