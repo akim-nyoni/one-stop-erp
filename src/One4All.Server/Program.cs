@@ -564,6 +564,21 @@ app.MapGet("/api/budgets/vote-book", async (long companyId, long fiscalYearId, i
 .RequireAuthorization()
 .WithName("VoteBook");
 
+app.MapPost("/api/ar/customers/{customerId:long}/promises", async (long customerId, long companyId, long userId, DateOnly madeOn, DateOnly payBy, decimal amount, string? note, One4All.Application.Abstractions.Trading.IPromiseToPayService promises, CancellationToken ct) =>
+    ValueResponse(await promises.RecordAsync(companyId, customerId, madeOn, payBy, amount, note, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordPromiseToPay");
+
+app.MapGet("/api/ar/promises", async (long companyId, One4All.Core.Trading.PromiseStatus? status, One4All.Application.Abstractions.Trading.IPromiseToPayService promises, CancellationToken ct) =>
+    Results.Ok(await promises.DiaryAsync(companyId, status, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PromiseDiary");
+
+app.MapPost("/api/ar/promises/review", async (long companyId, DateOnly asAtDate, One4All.Application.Abstractions.Trading.IPromiseToPayService promises, CancellationToken ct) =>
+    Results.Ok(await promises.ReviewAsync(companyId, asAtDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReviewPromises");
+
 app.MapGet("/api/consolidation/trial-balance", async (long[] companyIds, DateOnly asAtDate, string? presentationCurrency, string[]? intercompanyAccounts, One4All.Application.Abstractions.Reporting.IConsolidationService consolidation, CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(presentationCurrency))

@@ -35,6 +35,12 @@ public sealed class DunningService : IDunningService
             .Where(c => c.CompanyId == companyId)
             .ToDictionaryAsync(c => c.Id, c => c.Name, ct).ConfigureAwait(false);
 
+        // A customer who has promised to pay, and whose promised date has not passed, is not chased meanwhile.
+        HashSet<long> promised = [.. await _db.Set<PaymentPromise>()
+            .Where(p => p.CompanyId == companyId && p.Status == PromiseStatus.Open && p.MadeOn <= asAtDate && p.PayBy >= asAtDate)
+            .Select(p => p.CustomerId).ToListAsync(ct).ConfigureAwait(false)];
+        overdue.RemoveAll(o => promised.Contains(o.TraderId));
+
         HashSet<long> chased = [.. overdue.Select(o => o.TraderId)];
         Dictionary<long, decimal> credits = await UnallocatedCreditsAsync(companyId, chased, asAtDate, ct).ConfigureAwait(false);
 

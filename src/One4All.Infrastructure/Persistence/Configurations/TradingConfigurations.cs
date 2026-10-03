@@ -45,6 +45,20 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
     }
 }
 
+internal sealed class PaymentPromiseConfiguration : IEntityTypeConfiguration<PaymentPromise>
+{
+    public void Configure(EntityTypeBuilder<PaymentPromise> b)
+    {
+        b.ToTable("payment_promise", Schemas.AccountsReceivable);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Note).HasMaxLength(500);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => x.CustomerId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_payment_promise_one_open");
+        b.HasIndex(x => new { x.CompanyId, x.Status, x.PayBy });
+    }
+}
+
 internal sealed class SupplierBankChangeConfiguration : IEntityTypeConfiguration<SupplierBankChange>
 {
     public void Configure(EntityTypeBuilder<SupplierBankChange> b)

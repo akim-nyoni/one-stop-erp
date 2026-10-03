@@ -10454,6 +10454,87 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("open_item", "trd");
                 });
 
+            modelBuilder.Entity("One4All.Core.Trading.PaymentPromise", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateOnly>("MadeOn")
+                        .HasColumnType("date")
+                        .HasColumnName("made_on");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<DateOnly>("PayBy")
+                        .HasColumnType("date")
+                        .HasColumnName("pay_by");
+
+                    b.Property<long>("RecordedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("recorded_by_user_id");
+
+                    b.Property<DateOnly?>("ResolvedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("resolved_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payment_promise");
+
+                    b.HasIndex("CustomerId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payment_promise_one_open")
+                        .HasFilter("status = 0");
+
+                    b.HasIndex("CompanyId", "Status", "PayBy")
+                        .HasDatabaseName("ix_payment_promise_company_id_status_pay_by");
+
+                    b.ToTable("payment_promise", "ar");
+                });
+
             modelBuilder.Entity("One4All.Core.Trading.RecurringPurchaseInvoice", b =>
                 {
                     b.Property<long>("Id")
