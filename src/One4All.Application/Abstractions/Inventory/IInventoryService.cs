@@ -141,4 +141,17 @@ public interface IInventoryService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The valuation lines and total.</returns>
     Task<IReadOnlyList<StockValuationLine>> StockValuationAsync(long companyId, long? warehouseId = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Changes a standard-costed item's standard cost, revaluing its stock on hand in every warehouse to the new standard:
+    /// Dr / Cr stock control against the revaluation account, in one unit.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="itemId">The item.</param>
+    /// <param name="newStandardCost">The new standard unit cost.</param>
+    /// <param name="date">The revaluation date.</param>
+    /// <param name="revaluationAccountCode">The account taking the revaluation.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The net revaluation (+ stock up, − stock down), or why it was refused.</returns>
+    Task<Result<decimal>> RevalueStandardCostAsync(long companyId, long itemId, decimal newStandardCost, DateOnly date, string revaluationAccountCode, CancellationToken ct = default);
 }

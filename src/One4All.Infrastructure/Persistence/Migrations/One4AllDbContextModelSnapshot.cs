@@ -2659,6 +2659,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<string>("PriceVarianceAccountCode")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("price_variance_account_code");
+
                     b.Property<decimal>("ReorderLevel")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -2684,6 +2689,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)")
                         .HasColumnName("short_description");
+
+                    b.Property<decimal?>("StandardCost")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("standard_cost");
 
                     b.Property<string>("TaxCode")
                         .HasMaxLength(20)

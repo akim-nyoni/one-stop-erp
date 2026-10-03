@@ -76,6 +76,15 @@ public sealed class Item : SoftDeletableEntity, ICompanyScoped
     /// <summary>Reorder quantity.</summary>
     public decimal ReorderQuantity { get; set; }
 
+    /// <summary>The standard unit cost a standard-costed item is valued at.</summary>
+    public decimal? StandardCost { get; set; }
+
+    /// <summary>
+    /// Where a standard-costed item's purchase price variance goes: the difference between what it cost and its standard,
+    /// on receipts and on landed charges.
+    /// </summary>
+    public string? PriceVarianceAccountCode { get; set; }
+
     /// <summary>The weight of one unit in kilograms, used to share landed costs by weight.</summary>
     public decimal? UnitWeightKg { get; set; }
 

@@ -41,7 +41,30 @@ public sealed class InventoryService : IInventoryService
         }
 
         (Item item, string stockCode, CurrencyCode currency) = setup.Value;
-        decimal value = decimal.Round(request.Quantity * request.UnitCost, 4, MidpointRounding.ToEven);
+        decimal actual = decimal.Round(request.Quantity * request.UnitCost, 4, MidpointRounding.ToEven);
+
+        // A standard-costed item goes into stock at its standard; what it really cost differs by the price variance.
+        Result<decimal> standard = StandardUnitCost(item, request.UnitCost);
+        if (standard.IsFailure)
+        {
+            return standard.Error;
+        }
+
+        decimal unitCost = standard.Value;
+        decimal value = decimal.Round(request.Quantity * unitCost, 4, MidpointRounding.ToEven);
+        List<JournalLineRequest> lines =
+        [
+            new JournalLineRequest { AccountCode = stockCode, Side = JournalSide.Debit, TransactionAmount = value },
+            new JournalLineRequest { AccountCode = request.CreditAccountCode, Side = JournalSide.Credit, TransactionAmount = actual },
+        ];
+        if (actual != value)
+        {
+            lines.Add(new JournalLineRequest
+            {
+                AccountCode = item.PriceVarianceAccountCode!, Side = actual > value ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(actual - value),
+                Narrative = $"Purchase price variance {item.Code}",
+            });
+        }
 
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
@@ -53,11 +76,7 @@ public sealed class InventoryService : IInventoryService
             DocumentType = "StockReceipt",
             DocumentNumber = request.Reference,
             Narrative = $"Stock receipt {item.Code}",
-            Lines =
-            [
-                new JournalLineRequest { AccountCode = stockCode, Side = JournalSide.Debit, TransactionAmount = value },
-                new JournalLineRequest { AccountCode = request.CreditAccountCode, Side = JournalSide.Credit, TransactionAmount = value },
-            ],
+            Lines = lines,
         }, ct).ConfigureAwait(false);
 
         if (posting.IsFailure)
@@ -68,7 +87,7 @@ public sealed class InventoryService : IInventoryService
         StockBalance balance = await LoadOrCreateBalanceAsync(request.CompanyId, request.ItemId, request.WarehouseId, ct).ConfigureAwait(false);
         StockCosting.Receive(_db, item, balance, request.Date, request.Reference, request.Quantity, value);
 
-        StockMovement movement = new(request.CompanyId, request.ItemId, request.WarehouseId, request.Date, StockMovementType.Receipt, request.Quantity, request.UnitCost, value, request.Reference)
+        StockMovement movement = new(request.CompanyId, request.ItemId, request.WarehouseId, request.Date, StockMovementType.Receipt, request.Quantity, unitCost, value, request.Reference)
         {
             JournalEntryId = posting.Value.JournalId,
         };
@@ -371,6 +390,92 @@ public sealed class InventoryService : IInventoryService
 
         var rows = await query.ToListAsync(ct).ConfigureAwait(false);
         return rows.Select(r => new StockValuationLine(r.Code, r.Description, r.WarehouseCode, r.QuantityOnHand, r.AverageCost, r.TotalValue)).ToList();
+    }
+
+    /// <inheritdoc />
+    public Task<Result<decimal>> RevalueStandardCostAsync(long companyId, long itemId, decimal newStandardCost, DateOnly date, string revaluationAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RevalueStandardCostCoreAsync(companyId, itemId, newStandardCost, date, revaluationAccountCode, ct), ct);
+
+    // One unit: the journal, every warehouse's balance and the new standard change together.
+    private async Task<Result<decimal>> RevalueStandardCostCoreAsync(long companyId, long itemId, decimal newStandardCost, DateOnly date, string revaluationAccountCode, CancellationToken ct)
+    {
+        if (newStandardCost < 0m || string.IsNullOrWhiteSpace(revaluationAccountCode))
+        {
+            return Error.Validation("Inv.InvalidRevaluation", "A standard cost revaluation needs a non-negative cost and a revaluation account.");
+        }
+
+        Result<(Item item, string stockCode, CurrencyCode currency)> setup = await SetupAsync(companyId, itemId, ct).ConfigureAwait(false);
+        if (setup.IsFailure)
+        {
+            return setup.Error;
+        }
+
+        (Item item, string stockCode, CurrencyCode currency) = setup.Value;
+        if (item.CostingMethod != CostingMethod.Standard)
+        {
+            return Error.Rule("Inv.NotStandardCosted", $"Item '{item.Code}' is not standard-costed.");
+        }
+
+        List<StockBalance> balances = await _db.Set<StockBalance>()
+            .Where(b => b.CompanyId == companyId && b.ItemId == itemId && b.QuantityOnHand > 0m)
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<(StockBalance Balance, decimal Change)> changes = [.. balances
+            .Select(b => (b, decimal.Round(b.QuantityOnHand * newStandardCost, 4, MidpointRounding.ToEven) - b.TotalValue))
+            .Where(c => c.Item2 != 0m)];
+        decimal net = changes.Sum(c => c.Change);
+        Result<PostingReceipt>? posting = null;
+        if (net != 0m)
+        {
+            posting = await _postingEngine.PostAsync(new JournalRequest
+            {
+                CompanyId = companyId,
+                SourceModule = "INV",
+                PostingDate = date,
+                TransactionCurrency = currency,
+                EnforceManualJournalRules = false,
+                DocumentType = "StandardCostRevaluation",
+                DocumentNumber = item.Code,
+                Narrative = $"Standard cost of {item.Code} to {newStandardCost:0.######}",
+                Lines =
+                [
+                    new JournalLineRequest { AccountCode = stockCode, Side = net > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(net) },
+                    new JournalLineRequest { AccountCode = revaluationAccountCode.Trim(), Side = net > 0m ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = Math.Abs(net) },
+                ],
+            }, ct).ConfigureAwait(false);
+            if (posting.IsFailure)
+            {
+                return posting.Error;
+            }
+        }
+
+        foreach ((StockBalance balance, decimal change) in changes)
+        {
+            balance.AddValue(change);
+            _db.Set<StockMovement>().Add(new StockMovement(companyId, itemId, balance.WarehouseId, date, StockMovementType.StandardRevaluation, 0m, newStandardCost, change, item.Code)
+            {
+                JournalEntryId = posting?.Value.JournalId,
+            });
+        }
+
+        item.StandardCost = newStandardCost;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return net;
+    }
+
+    // The unit cost stock goes in at: the standard for a standard-costed item (which needs a variance account), else the actual cost.
+    private static Result<decimal> StandardUnitCost(Item item, decimal actualUnitCost)
+    {
+        if (item.CostingMethod != CostingMethod.Standard)
+        {
+            return actualUnitCost;
+        }
+
+        if (item.StandardCost is not decimal standard || string.IsNullOrWhiteSpace(item.PriceVarianceAccountCode))
+        {
+            return Error.Rule("Inv.NoStandardCost", $"Item '{item.Code}' is standard-costed but has no standard cost or price variance account.");
+        }
+
+        return standard;
     }
 
     private async Task<Result<(Item, string, CurrencyCode)>> SetupAsync(long companyId, long itemId, CancellationToken ct)

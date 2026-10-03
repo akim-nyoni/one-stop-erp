@@ -58,4 +58,7 @@ public enum StockMovementType
 
     /// <summary>Landed charges (freight, duty …) added to the value of stock already received — no quantity.</summary>
     LandedCost = 7,
+
+    /// <summary>A change of standard cost revaluing stock on hand (value only, no quantity).</summary>
+    StandardRevaluation = 8,
 }

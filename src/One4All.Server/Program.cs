@@ -219,6 +219,11 @@ app.MapPost("/api/stock/landed-cost", async (One4All.Application.Abstractions.In
 .RequireAuthorization()
 .WithName("ApplyLandedCost");
 
+app.MapPost("/api/stock/items/{itemId:long}/standard-cost", async (long itemId, long companyId, decimal newStandardCost, DateOnly date, string revaluationAccountCode, One4All.Application.Abstractions.Inventory.IInventoryService inventory, CancellationToken ct) =>
+    ValueResponse(await inventory.RevalueStandardCostAsync(companyId, itemId, newStandardCost, date, revaluationAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RevalueStandardCost");
+
 app.MapGet("/api/stock/replenishment", async (long companyId, long? warehouseId, One4All.Application.Abstractions.Inventory.IReplenishmentService replenish, CancellationToken ct) =>
     Results.Ok(await replenish.SuggestAsync(companyId, warehouseId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

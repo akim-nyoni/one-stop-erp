@@ -126,6 +126,19 @@ public sealed class LandedCostService : ILandedCostService
                 toCostOfSales[item.CostOfSalesAccountCode] = toCostOfSales.GetValueOrDefault(item.CostOfSalesAccountCode) + expensed;
             }
 
+            if (capitalised != 0m && item.CostingMethod == CostingMethod.Standard)
+            {
+                // Standard-costed stock stays at standard: the charge on it is a purchase price variance.
+                if (string.IsNullOrWhiteSpace(item.PriceVarianceAccountCode))
+                {
+                    return Error.Rule("Landed.NoVarianceAccount", $"Item '{item.Code}' is standard-costed but has no price variance account.");
+                }
+
+                toCostOfSales[item.PriceVarianceAccountCode] = toCostOfSales.GetValueOrDefault(item.PriceVarianceAccountCode) + capitalised;
+                expensed += capitalised;
+                capitalised = 0m;
+            }
+
             if (capitalised != 0m)
             {
                 capitalise.Add((balance!, line.ItemId, warehouseId!.Value, capitalised, layers));
