@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
 using One4All.Core.Common;
 
@@ -14,7 +16,8 @@ internal static class AtomicWork
     /// <summary>
     /// Runs <paramref name="work"/> inside a transaction. When a caller already has one open the work simply joins it
     /// (the caller decides). Otherwise the work commits on success; on a failure result or an exception it rolls back
-    /// and clears the change tracker, so nothing the work loaded or changed can be saved afterwards from this scope.
+    /// and puts the change tracker back as it was before the work (see <see cref="RestoreTracker"/>), so nothing the
+    /// work did can be saved afterwards, while the caller's own entities stay tracked and usable.
     /// </summary>
     /// <typeparam name="T">The result type.</typeparam>
     /// <param name="db">The database context.</param>
@@ -28,6 +31,7 @@ internal static class AtomicWork
             return await work().ConfigureAwait(false);
         }
 
+        List<TrackedState> before = Snapshot(db);
         await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
         try
         {
@@ -39,14 +43,73 @@ internal static class AtomicWork
             }
 
             await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            db.ChangeTracker.Clear();
+            RestoreTracker(db, before);
             return result;
         }
         catch
         {
             await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
-            db.ChangeTracker.Clear();
+            RestoreTracker(db, before);
             throw;
         }
     }
+
+    private static List<TrackedState> Snapshot(One4AllDbContext db)
+    {
+        db.ChangeTracker.DetectChanges();
+        return [.. db.ChangeTracker.Entries().Select(e => new TrackedState(e, e.State, e.CurrentValues.Clone(), e.OriginalValues.Clone()))];
+    }
+
+    /// <summary>
+    /// Puts the change tracker back as it was before the failed work: every entity the work started tracking is removed
+    /// from the collections of entities that were already tracked and then detached; every entity that was already
+    /// tracked gets its values, original values (concurrency token included) and state back — the same instances, so
+    /// collections and references that hold them stay valid and match the rolled-back database.
+    /// </summary>
+    private static void RestoreTracker(One4AllDbContext db, List<TrackedState> before)
+    {
+        db.ChangeTracker.DetectChanges();
+        HashSet<object> known = new(before.Select(s => s.Entry.Entity), ReferenceEqualityComparer.Instance);
+        List<EntityEntry> added = [.. db.ChangeTracker.Entries().Where(e => !known.Contains(e.Entity))];
+
+        foreach (TrackedState was in before)
+        {
+            foreach (INavigationBase navigation in was.Entry.Metadata.GetNavigations().Cast<INavigationBase>().Where(n => n.IsCollection))
+            {
+                IClrCollectionAccessor? accessor = navigation.GetCollectionAccessor();
+                if (accessor is null || navigation.GetGetter().GetClrValue(was.Entry.Entity) is not System.Collections.IEnumerable items)
+                {
+                    continue;
+                }
+
+                foreach (object item in items.Cast<object>().Where(i => !known.Contains(i)).ToList())
+                {
+                    accessor.Remove(was.Entry.Entity, item);
+                }
+            }
+        }
+
+        foreach (EntityEntry entry in added)
+        {
+            entry.State = EntityState.Detached;
+        }
+
+        // Owners before the entities they own: an owned entity cannot be tracked without its owner.
+        foreach (TrackedState was in before.OrderBy(s => s.Entry.Metadata.IsOwned()))
+        {
+            EntityEntry entry = was.Entry;
+            if (entry.State == EntityState.Detached && was.State != EntityState.Detached)
+            {
+                // The work stopped tracking it (e.g. to re-read a counter row) and loaded another copy, which has just been
+                // detached — so this instance, with its earlier values, is tracked again.
+                entry.State = was.State;
+            }
+
+            entry.CurrentValues.SetValues(was.Values);
+            entry.OriginalValues.SetValues(was.OriginalValues);
+            entry.State = was.State;
+        }
+    }
+
+    private sealed record TrackedState(EntityEntry Entry, EntityState State, PropertyValues Values, PropertyValues OriginalValues);
 }
