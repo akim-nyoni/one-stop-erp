@@ -183,6 +183,9 @@ internal sealed class MeterConfiguration : IEntityTypeConfiguration<Meter>
         b.Property(x => x.Serial).HasMaxLength(60);
         b.Property(x => x.Multiplier).HasPrecision(19, 6);
         b.Property(x => x.LastReading).HasPrecision(19, 4);
+        b.Property(x => x.LastActualReading).HasPrecision(19, 4);
+        b.Property(x => x.EstimatedSinceActual).HasPrecision(19, 4);
+        b.Property(x => x.UnitsCredit).HasPrecision(19, 4);
         b.HasIndex(x => new { x.CompanyId, x.Serial }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);
     }
@@ -197,6 +200,9 @@ internal sealed class MeterReadingConfiguration : IEntityTypeConfiguration<Meter
         b.Property(x => x.Reading).HasPrecision(19, 4);
         b.Property(x => x.PreviousReading).HasPrecision(19, 4);
         b.Property(x => x.Consumption).HasPrecision(19, 4);
+        b.Property(x => x.BilledConsumption).HasPrecision(19, 4);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Flags).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.MeterId, x.ReadingDate });
     }
 }

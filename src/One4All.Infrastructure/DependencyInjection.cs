@@ -77,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Municipal.IClearanceService, Municipal.ClearanceService>();
         services.AddScoped<Application.Abstractions.Municipal.ICouncilLicensingService, Municipal.CouncilLicensingService>();
         services.AddScoped<Application.Abstractions.Municipal.IValuationRollService, Municipal.ValuationRollService>();
+        services.AddScoped<Application.Abstractions.Municipal.IMeterReadingService, Municipal.MeterReadingService>();
         services.AddScoped<Application.Abstractions.Trading.IDebtCollectionService, Trading.DebtCollectionService>();
         services.AddScoped<Application.Abstractions.Budgeting.IVarianceCommentaryService, Budgeting.VarianceCommentaryService>();
         services.AddScoped<Application.Abstractions.Trading.ISupplierBankDetailsService, Trading.SupplierBankDetailsService>();

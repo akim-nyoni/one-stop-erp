@@ -45,7 +45,7 @@ public sealed class MunicipalBillingService : IMunicipalBillingService
             return Error.Rule("Mun.ReadingRegressed", $"Reading {reading} is below the previous reading {previous}; record a correction instead.");
         }
 
-        decimal consumption = meter.RecordReading(reading);
+        decimal consumption = meter.RecordReading(reading, readingDate);
         _db.Set<MeterReading>().Add(new MeterReading(companyId, meterId, readingDate, reading, previous, consumption));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return consumption;

@@ -636,6 +636,36 @@ app.MapGet("/api/municipal/objections", async (long companyId, One4All.Core.Muni
 .RequireAuthorization()
 .WithName("ValuationObjectionsRegister");
 
+app.MapPost("/api/municipal/meters", async (long companyId, string serial, int digits, decimal multiplier, decimal startReading, DateOnly date, One4All.Application.Abstractions.Municipal.IMeterReadingService meters, CancellationToken ct) =>
+    ValueResponse(await meters.InstallAsync(companyId, serial, digits, multiplier, startReading, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("InstallMeter");
+
+app.MapPost("/api/municipal/meters/{meterId:long}/readings", async (long meterId, long companyId, DateOnly date, decimal reading, bool? tamperSuspected, One4All.Application.Abstractions.Municipal.IMeterReadingService meters, CancellationToken ct) =>
+    ValueResponse(await meters.CaptureAsync(companyId, meterId, date, reading, tamperSuspected ?? false, null, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CaptureMeterReading");
+
+app.MapPost("/api/municipal/meters/{meterId:long}/estimate", async (long meterId, long companyId, DateOnly date, One4All.Application.Abstractions.Municipal.IMeterReadingService meters, CancellationToken ct) =>
+    ValueResponse(await meters.EstimateAsync(companyId, meterId, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("EstimateMeterReading");
+
+app.MapPost("/api/municipal/meters/{meterId:long}/replace", async (long meterId, long companyId, DateOnly date, decimal finalReading, string newSerial, int newDigits, decimal newMultiplier, decimal newStartReading, One4All.Application.Abstractions.Municipal.IMeterReadingService meters, CancellationToken ct) =>
+    ValueResponse(await meters.ReplaceAsync(companyId, meterId, date, finalReading, newSerial, newDigits, newMultiplier, newStartReading, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReplaceMeter");
+
+app.MapGet("/api/municipal/meters/{meterId:long}/readings", async (long meterId, long companyId, One4All.Application.Abstractions.Municipal.IMeterReadingService meters, CancellationToken ct) =>
+    Results.Ok(await meters.HistoryAsync(companyId, meterId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("MeterConsumptionHistory");
+
+app.MapGet("/api/municipal/reading-exceptions", async (long companyId, DateOnly start, DateOnly end, One4All.Application.Abstractions.Municipal.IMeterReadingService meters, CancellationToken ct) =>
+    Results.Ok(await meters.ExceptionsAsync(companyId, start, end, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("MeterReadingExceptions");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

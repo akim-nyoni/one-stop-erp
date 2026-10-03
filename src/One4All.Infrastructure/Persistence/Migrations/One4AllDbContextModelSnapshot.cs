@@ -4380,6 +4380,19 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
 
+                    b.Property<int>("Digits")
+                        .HasColumnType("integer")
+                        .HasColumnName("digits");
+
+                    b.Property<decimal>("EstimatedSinceActual")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("estimated_since_actual");
+
+                    b.Property<DateOnly?>("InstalledOn")
+                        .HasColumnType("date")
+                        .HasColumnName("installed_on");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -4388,10 +4401,23 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<DateOnly?>("LastActualDate")
+                        .HasColumnType("date")
+                        .HasColumnName("last_actual_date");
+
+                    b.Property<decimal>("LastActualReading")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("last_actual_reading");
+
                     b.Property<decimal>("LastReading")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("last_reading");
+
+                    b.Property<DateOnly?>("LastReadingDate")
+                        .HasColumnType("date")
+                        .HasColumnName("last_reading_date");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
@@ -4406,6 +4432,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,6)")
                         .HasColumnName("multiplier");
 
+                    b.Property<DateOnly?>("RemovedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("removed_on");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -4417,6 +4447,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)")
                         .HasColumnName("serial");
+
+                    b.Property<decimal>("UnitsCredit")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("units_credit");
 
                     b.HasKey("Id")
                         .HasName("pk_meter");
@@ -4438,6 +4473,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<bool>("Accepted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("accepted");
+
+                    b.Property<decimal>("BilledConsumption")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("billed_consumption");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -4454,6 +4498,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
+
+                    b.Property<int>("Flags")
+                        .HasColumnType("integer")
+                        .HasColumnName("flags");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
 
                     b.Property<long>("MeterId")
                         .HasColumnType("bigint")
