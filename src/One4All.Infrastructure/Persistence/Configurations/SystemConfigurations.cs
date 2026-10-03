@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using One4All.Core.System;
 
@@ -131,5 +131,13 @@ internal sealed class NumberSequenceConfiguration : IEntityTypeConfiguration<Num
         b.Property(x => x.DocumentType).HasMaxLength(60);
         b.Property(x => x.Prefix).HasMaxLength(20);
         b.HasIndex(x => new { x.CompanyId, x.BranchId, x.DocumentType }).IsUnique();
+        b.OwnsMany(x => x.Years, y =>
+        {
+            y.ToTable("number_sequence_year", Schemas.System);
+            y.WithOwner().HasForeignKey("NumberSequenceId");
+            y.HasKey("NumberSequenceId", nameof(NumberSequenceYear.Year));
+            y.Property(x => x.Year).ValueGeneratedNever();
+        });
+        b.Navigation(x => x.Years).HasField("_years").UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }

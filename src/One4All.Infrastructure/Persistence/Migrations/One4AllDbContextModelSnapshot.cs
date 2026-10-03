@@ -11037,6 +11037,35 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_fiscal_period_fiscal_years_fiscal_year_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.System.NumberSequence", b =>
+                {
+                    b.OwnsMany("One4All.Core.System.NumberSequenceYear", "Years", b1 =>
+                        {
+                            b1.Property<long>("NumberSequenceId")
+                                .HasColumnType("bigint")
+                                .HasColumnName("number_sequence_id");
+
+                            b1.Property<int>("Year")
+                                .HasColumnType("integer")
+                                .HasColumnName("year");
+
+                            b1.Property<long>("NextValue")
+                                .HasColumnType("bigint")
+                                .HasColumnName("next_value");
+
+                            b1.HasKey("NumberSequenceId", "Year")
+                                .HasName("pk_number_sequence_year");
+
+                            b1.ToTable("number_sequence_year", "sys");
+
+                            b1.WithOwner()
+                                .HasForeignKey("NumberSequenceId")
+                                .HasConstraintName("fk_number_sequence_year_number_sequence_number_sequence_id");
+                        });
+
+                    b.Navigation("Years");
+                });
+
             modelBuilder.Entity("One4All.Core.System.PeriodModuleStatus", b =>
                 {
                     b.HasOne("One4All.Core.System.FiscalPeriod", null)

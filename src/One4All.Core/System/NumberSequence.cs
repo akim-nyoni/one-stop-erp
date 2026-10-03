@@ -10,6 +10,8 @@ namespace One4All.Core.System;
 /// </summary>
 public sealed class NumberSequence : AuditableEntity, ICompanyScoped
 {
+    private readonly List<NumberSequenceYear> _years = [];
+
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private NumberSequence()
     {
@@ -65,30 +67,84 @@ public sealed class NumberSequence : AuditableEntity, ICompanyScoped
     /// <summary>Whether the sequence must be gapless (fiscal compliance).</summary>
     public bool Gapless { get; private set; }
 
-    /// <summary>The year the counter currently applies to (for yearly reset).</summary>
+    /// <summary>
+    /// The year most recently allocated in (for a yearly-reset sequence). Together with <see cref="NextValue"/> it
+    /// mirrors that year's counter, so every allocation changes this row and the optimistic-concurrency check on it
+    /// serialises concurrent allocators.
+    /// </summary>
     public int CurrentYear { get; private set; }
 
-    /// <summary>The next value to allocate.</summary>
+    /// <summary>
+    /// The next value to allocate: the single counter of a continuous sequence, or a mirror of
+    /// <see cref="CurrentYear"/>'s counter for a yearly-reset sequence.
+    /// </summary>
     public long NextValue { get; private set; }
 
     /// <summary>
-    /// Allocates and returns the next formatted document number, incrementing the counter. Resets the
-    /// counter first when <see cref="ResetYearly"/> is set and the year has changed.
+    /// The per-year counters of a yearly-reset sequence (<c>sys.number_sequence_year</c>). Each year keeps its own
+    /// counter, so posting back into an earlier, still-open year continues that year's numbering instead of
+    /// restarting at 1 and colliding with numbers already issued.
     /// </summary>
-    /// <param name="year">The current accounting year (used only when <see cref="ResetYearly"/> is set).</param>
+    public IReadOnlyCollection<NumberSequenceYear> Years => _years.AsReadOnly();
+
+    /// <summary>
+    /// Allocates and returns the next formatted document number, incrementing the counter. A yearly-reset
+    /// sequence draws from <paramref name="year"/>'s own counter (starting at 1 the first time that year is used).
+    /// </summary>
+    /// <param name="year">The document's year (used only when <see cref="ResetYearly"/> is set).</param>
     /// <returns>The formatted number, e.g. <c>INV-2026-000042</c>.</returns>
     public string Allocate(int year)
     {
-        if (ResetYearly && year != CurrentYear)
+        long value;
+        if (ResetYearly)
         {
+            NumberSequenceYear? counter = _years.FirstOrDefault(y => y.Year == year);
+            if (counter is null)
+            {
+                // A sequence created before per-year counters existed carries its live year only on this row.
+                counter = new NumberSequenceYear(year, year == CurrentYear && NextValue > 1 ? NextValue : 1);
+                _years.Add(counter);
+            }
+
+            value = counter.Take();
             CurrentYear = year;
-            NextValue = 1;
+            NextValue = counter.NextValue;
+        }
+        else
+        {
+            value = NextValue;
+            NextValue++;
         }
 
-        long value = NextValue;
-        NextValue++;
-
-        string number = value.ToString().PadLeft(Padding, '0');
-        return ResetYearly ? $"{Prefix}{CurrentYear}-{number}" : $"{Prefix}{number}";
+        string number = value.ToString(global::System.Globalization.CultureInfo.InvariantCulture).PadLeft(Padding, '0');
+        return ResetYearly ? $"{Prefix}{year}-{number}" : $"{Prefix}{number}";
     }
+}
+
+/// <summary>One year's counter within a yearly-reset <see cref="NumberSequence"/>.</summary>
+public sealed class NumberSequenceYear
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private NumberSequenceYear()
+    {
+    }
+
+    /// <summary>Creates a year counter.</summary>
+    /// <param name="year">The year.</param>
+    /// <param name="nextValue">The first value to allocate.</param>
+    public NumberSequenceYear(int year, long nextValue)
+    {
+        Year = year;
+        NextValue = nextValue;
+    }
+
+    /// <summary>The year this counter numbers.</summary>
+    public int Year { get; private set; }
+
+    /// <summary>The next value to allocate in this year.</summary>
+    public long NextValue { get; private set; }
+
+    /// <summary>Returns the next value and advances the counter.</summary>
+    /// <returns>The allocated value.</returns>
+    internal long Take() => NextValue++;
 }
