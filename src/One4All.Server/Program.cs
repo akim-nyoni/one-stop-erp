@@ -676,6 +676,23 @@ app.MapGet("/api/municipal/prepaid/sales", async (long companyId, DateOnly start
 .RequireAuthorization()
 .WithName("PrepaidSales");
 
+app.MapPost("/api/municipal/properties/{propertyId:long}/owners", async (long propertyId, long companyId, DateOnly ownedFrom, string? deedsReference, IReadOnlyList<One4All.Application.Municipal.OwnerShare> owners, One4All.Application.Abstractions.Municipal.IOwnershipService ownership, CancellationToken ct) =>
+    ActionResponse(await ownership.RegisterOwnersAsync(companyId, propertyId, owners, ownedFrom, deedsReference, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RegisterPropertyOwners");
+
+app.MapPost("/api/municipal/properties/{propertyId:long}/transfer", async (long propertyId, long companyId, DateOnly transferDate, string clearanceNumber, string? deedsReference, IReadOnlyList<One4All.Application.Municipal.OwnerShare> buyers, One4All.Application.Abstractions.Municipal.IOwnershipService ownership, CancellationToken ct) =>
+    ActionResponse(await ownership.TransferAsync(companyId, propertyId, buyers, transferDate, clearanceNumber, deedsReference, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("TransferProperty");
+
+app.MapGet("/api/municipal/properties/{propertyId:long}/owners", async (long propertyId, long companyId, DateOnly? asAtDate, One4All.Application.Abstractions.Municipal.IOwnershipService ownership, CancellationToken ct) =>
+    Results.Ok(asAtDate is DateOnly date
+        ? await ownership.OwnersAsync(companyId, propertyId, date, ct).ConfigureAwait(false)
+        : await ownership.HistoryAsync(companyId, propertyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PropertyOwners");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

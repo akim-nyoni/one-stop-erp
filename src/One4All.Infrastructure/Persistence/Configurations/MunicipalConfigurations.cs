@@ -118,6 +118,22 @@ internal sealed class PrepaidSaleConfiguration : IEntityTypeConfiguration<Prepai
     }
 }
 
+internal sealed class PropertyOwnerConfiguration : IEntityTypeConfiguration<PropertyOwner>
+{
+    public void Configure(EntityTypeBuilder<PropertyOwner> b)
+    {
+        b.ToTable("property_owner", Schemas.Municipal, t => t.HasCheckConstraint("ck_property_owner_share", "share_percent > 0 AND share_percent <= 100 AND (owned_to IS NULL OR owned_to >= owned_from)"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.SharePercent).HasPrecision(9, 4);
+        b.Property(x => x.Reference).HasMaxLength(40);
+        b.Property(x => x.DeedsReference).HasMaxLength(60);
+        b.HasOne<Property>().WithMany().HasForeignKey(x => x.PropertyId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.PropertyId, x.OwnedFrom });
+        b.HasIndex(x => new { x.CompanyId, x.Reference });
+        b.HasIndex(x => new { x.PropertyId, x.CustomerId }).IsUnique().HasFilter("owned_to IS NULL").HasDatabaseName("ix_property_owner_one_current_share");
+    }
+}
+
 internal sealed class IndigentRegistrationConfiguration : IEntityTypeConfiguration<IndigentRegistration>
 {
     public void Configure(EntityTypeBuilder<IndigentRegistration> b)

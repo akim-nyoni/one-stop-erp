@@ -4747,6 +4747,95 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("property", "mun");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.PropertyOwner", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("DeedsReference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("deeds_reference");
+
+                    b.Property<bool>("IsRatepayer")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_ratepayer");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("OwnedFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("owned_from");
+
+                    b.Property<DateOnly?>("OwnedTo")
+                        .HasColumnType("date")
+                        .HasColumnName("owned_to");
+
+                    b.Property<long>("PropertyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("property_id");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal>("SharePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("share_percent");
+
+                    b.HasKey("Id")
+                        .HasName("pk_property_owner");
+
+                    b.HasIndex("CompanyId", "Reference")
+                        .HasDatabaseName("ix_property_owner_company_id_reference");
+
+                    b.HasIndex("PropertyId", "CustomerId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_property_owner_one_current_share")
+                        .HasFilter("owned_to IS NULL");
+
+                    b.HasIndex("PropertyId", "OwnedFrom")
+                        .HasDatabaseName("ix_property_owner_property_id_owned_from");
+
+                    b.ToTable("property_owner", "mun", t =>
+                        {
+                            t.HasCheckConstraint("ck_property_owner_share", "share_percent > 0 AND share_percent <= 100 AND (owned_to IS NULL OR owned_to >= owned_from)");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.PropertyServiceLink", b =>
                 {
                     b.Property<long>("Id")
@@ -14018,6 +14107,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_council_inspection_council_licence_licence_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.PropertyOwner", b =>
+                {
+                    b.HasOne("One4All.Core.Municipal.Property", null)
+                        .WithMany()
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_property_owner_property_property_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Municipal.PropertyServiceLink", b =>
