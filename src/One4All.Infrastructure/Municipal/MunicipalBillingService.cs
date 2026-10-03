@@ -60,8 +60,13 @@ public sealed class MunicipalBillingService : IMunicipalBillingService
         }
 
         string prefix = invoicePrefix.Trim();
+
+        // Services in place for at least part of the month: connected by its end and either running (not cut off) or
+        // ended within it. Part months are billed pro rata.
+        (DateOnly monthStart, DateOnly monthEnd) = ProRata.Month(date);
         List<long> propertyIds = await _db.Set<Property>()
-            .Where(p => p.CompanyId == companyId && p.Services.Any(s => s.ServiceType == serviceType && s.IsActive))
+            .Where(p => p.CompanyId == companyId && p.Services.Any(s => s.ServiceType == serviceType && s.StartDate <= monthEnd
+                && ((s.IsActive && (s.EndDate == null || s.EndDate >= monthStart)) || (s.EndDate != null && s.EndDate >= monthStart))))
             .OrderBy(p => p.Id)
             .Select(p => p.Id)
             .ToListAsync(ct).ConfigureAwait(false);
@@ -87,7 +92,7 @@ public sealed class MunicipalBillingService : IMunicipalBillingService
                 continue;
             }
 
-            Result<BillingResult> result = await BillServiceAsync(companyId, propertyId, serviceType, consumption: 0m, invoiceNumber, date, ct: ct).ConfigureAwait(false);
+            Result<BillingResult> result = await _db.AtomicAsync(() => BillServiceCoreAsync(companyId, propertyId, serviceType, 0m, invoiceNumber, date, 0m, null, ct, prorate: true), ct).ConfigureAwait(false);
             if (result.IsFailure)
             {
                 return result.Error;
@@ -102,10 +107,11 @@ public sealed class MunicipalBillingService : IMunicipalBillingService
 
     /// <inheritdoc />
     public Task<Result<BillingResult>> BillServiceAsync(long companyId, long propertyId, ServiceType serviceType, decimal consumption, string invoiceNumber, DateOnly date, decimal taxAmount = 0m, string? taxAccountCode = null, CancellationToken ct = default)
-        => _db.AtomicAsync(() => BillServiceCoreAsync(companyId, propertyId, serviceType, consumption, invoiceNumber, date, taxAmount, taxAccountCode, ct), ct);
+        => _db.AtomicAsync(() => BillServiceCoreAsync(companyId, propertyId, serviceType, consumption, invoiceNumber, date, taxAmount, taxAccountCode, ct, prorate: false), ct);
 
     // One unit of work: its postings and record changes commit together or not at all.
-    private async Task<Result<BillingResult>> BillServiceCoreAsync(long companyId, long propertyId, ServiceType serviceType, decimal consumption, string invoiceNumber, DateOnly date, decimal taxAmount, string? taxAccountCode, CancellationToken ct)
+    // With prorate, the link may have ended within the bill's month and the charge covers only the days it was in place.
+    private async Task<Result<BillingResult>> BillServiceCoreAsync(long companyId, long propertyId, ServiceType serviceType, decimal consumption, string invoiceNumber, DateOnly date, decimal taxAmount, string? taxAccountCode, CancellationToken ct, bool prorate)
     {
         Property? property = await _db.Set<Property>().Include(p => p.Services)
             .FirstOrDefaultAsync(p => p.Id == propertyId && p.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -114,7 +120,16 @@ public sealed class MunicipalBillingService : IMunicipalBillingService
             return Error.NotFound("Mun.PropertyNotFound", $"Property {propertyId} not found.");
         }
 
+        decimal fraction = 1m;
         PropertyServiceLink? link = property.Services.FirstOrDefault(s => s.ServiceType == serviceType && s.IsActive);
+        if (prorate)
+        {
+            link = property.Services.Where(s => s.ServiceType == serviceType)
+                .Select(s => (Link: s, Share: s.IsActive || s.EndDate != null ? ProRata.Fraction(date, s.StartDate, s.EndDate) : 0m))
+                .Where(x => x.Share > 0m).OrderByDescending(x => x.Share).Select(x => x.Link).FirstOrDefault();
+            fraction = link is null ? 0m : ProRata.Fraction(date, link.StartDate, link.EndDate);
+        }
+
         if (link is null)
         {
             return Error.Rule("Mun.ServiceNotLinked", $"Property {property.StandNumber} has no active {serviceType} service.");
@@ -129,7 +144,7 @@ public sealed class MunicipalBillingService : IMunicipalBillingService
 
         // The value in force on the bill date, from the valuation roll (the register value when there is no history).
         decimal valuation = ValuationRoll.ValueAt(await ValuationHistory.LoadAsync(_db, property.Id, ct).ConfigureAwait(false), date, property.Valuation);
-        decimal charge = tariff.CalculateCharge(consumption, valuation);
+        decimal charge = ProRata.Apply(tariff.CalculateCharge(consumption, valuation), fraction);
         if (charge <= 0m)
         {
             return Error.Rule("Mun.NothingToBill", $"Computed charge for {serviceType} on {property.StandNumber} is zero.");
