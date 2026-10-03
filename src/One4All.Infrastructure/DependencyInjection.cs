@@ -47,6 +47,7 @@ public static class DependencyInjection
         services.AddSingleton(new AuthenticationOptions());
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<IAuditService, Security.AuditService>();
 
         // Accounting.
         services.AddScoped<IPostingEngine, PostingEngine>();
