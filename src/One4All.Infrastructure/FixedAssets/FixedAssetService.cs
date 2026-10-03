@@ -334,24 +334,28 @@ public sealed class FixedAssetService : IFixedAssetService
             .Where(a => a.CompanyId == companyId && a.Status == FixedAssetStatus.Active)
             .ToListAsync(ct).ConfigureAwait(false);
 
-        // Simulate each asset month by month on local balances, never touching the entities.
-        (decimal Nbv, decimal Residual, decimal Straight, decimal RbRate, DepreciationMethod Method, bool ByLife)[] state = assets
+        // Simulate each asset month by month on local balances, never touching the entities. The same rule as the
+        // run applies: no charge before the acquisition month, nor for a month the run has already charged.
+        (decimal Nbv, decimal Residual, decimal Straight, decimal RbRate, DepreciationMethod Method, bool ByLife, int AcquiredPeriod, int LastCharged)[] state = assets
             .Select(a => (a.NetBookValue, a.ResidualValue,
                 a.UsefulLifeMonths <= 0 ? 0m : decimal.Round(a.DepreciableAmount / a.UsefulLifeMonths, 4, MidpointRounding.ToEven),
-                a.ReducingBalanceRatePercent, a.Method, a.Method == DepreciationMethod.StraightLine))
+                a.ReducingBalanceRatePercent, a.Method, a.Method == DepreciationMethod.StraightLine,
+                FixedAsset.PeriodOf(a.AcquisitionDate), a.LastDepreciatedPeriod ?? 0))
             .ToArray();
 
         DateOnly month = new(startMonth.Year, startMonth.Month, 1);
         List<DepreciationForecastPeriod> periods = [];
         for (int m = 0; m < months; m++)
         {
+            int period = FixedAsset.PeriodOf(month);
             decimal periodCharge = 0m;
             decimal closingNbv = 0m;
             for (int i = 0; i < state.Length; i++)
             {
                 decimal remaining = state[i].Nbv - state[i].Residual;
                 decimal charge = 0m;
-                if (remaining > 0m)
+                bool due = period >= state[i].AcquiredPeriod && period > state[i].LastCharged;
+                if (due && remaining > 0m)
                 {
                     charge = state[i].ByLife
                         ? state[i].Straight
