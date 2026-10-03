@@ -67,7 +67,11 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<ReceiptResult>> PostReceiptAsync(RcpReceiptRequest request, CancellationToken ct = default)
+    public Task<Result<ReceiptResult>> PostReceiptAsync(RcpReceiptRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PostReceiptCoreAsync(request, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<ReceiptResult>> PostReceiptCoreAsync(RcpReceiptRequest request, CancellationToken ct)
     {
         if (request.Lines.Count == 0)
         {
@@ -233,7 +237,11 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<ReceiptReversalResult>> ReverseReceiptAsync(long companyId, long receiptId, DateOnly date, long reverserUserId, string reason, CancellationToken ct = default)
+    public Task<Result<ReceiptReversalResult>> ReverseReceiptAsync(long companyId, long receiptId, DateOnly date, long reverserUserId, string reason, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReverseReceiptCoreAsync(companyId, receiptId, date, reverserUserId, reason, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<ReceiptReversalResult>> ReverseReceiptCoreAsync(long companyId, long receiptId, DateOnly date, long reverserUserId, string reason, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
@@ -338,7 +346,11 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<RefundResult>> RefundCreditAsync(long companyId, long customerId, decimal amount, DateOnly date, string bankAccountCode, long approverUserId, string reason, CancellationToken ct = default)
+    public Task<Result<RefundResult>> RefundCreditAsync(long companyId, long customerId, decimal amount, DateOnly date, string bankAccountCode, long approverUserId, string reason, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RefundCreditCoreAsync(companyId, customerId, amount, date, bankAccountCode, approverUserId, reason, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<RefundResult>> RefundCreditCoreAsync(long companyId, long customerId, decimal amount, DateOnly date, string bankAccountCode, long approverUserId, string reason, CancellationToken ct)
     {
         if (amount <= 0m)
         {
@@ -400,7 +412,11 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<RefundResult>> RefundDepositAsync(long companyId, decimal amount, decimal forfeitAmount, DateOnly date, string depositLiabilityAccountCode, string bankAccountCode, string? forfeitAccountCode, long approverUserId, string reason, CancellationToken ct = default)
+    public Task<Result<RefundResult>> RefundDepositAsync(long companyId, decimal amount, decimal forfeitAmount, DateOnly date, string depositLiabilityAccountCode, string bankAccountCode, string? forfeitAccountCode, long approverUserId, string reason, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RefundDepositCoreAsync(companyId, amount, forfeitAmount, date, depositLiabilityAccountCode, bankAccountCode, forfeitAccountCode, approverUserId, reason, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<RefundResult>> RefundDepositCoreAsync(long companyId, decimal amount, decimal forfeitAmount, DateOnly date, string depositLiabilityAccountCode, string bankAccountCode, string? forfeitAccountCode, long approverUserId, string reason, CancellationToken ct)
     {
         if (amount <= 0m)
         {
@@ -465,7 +481,11 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<ReceiptResult>> AllocateFromSuspenseAsync(long companyId, long customerId, decimal amount, DateOnly date, string suspenseAccountCode, ReceiptAllocationStrategy strategy, string reason, CancellationToken ct = default)
+    public Task<Result<ReceiptResult>> AllocateFromSuspenseAsync(long companyId, long customerId, decimal amount, DateOnly date, string suspenseAccountCode, ReceiptAllocationStrategy strategy, string reason, CancellationToken ct = default)
+        => _db.AtomicAsync(() => AllocateFromSuspenseCoreAsync(companyId, customerId, amount, date, suspenseAccountCode, strategy, reason, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<ReceiptResult>> AllocateFromSuspenseCoreAsync(long companyId, long customerId, decimal amount, DateOnly date, string suspenseAccountCode, ReceiptAllocationStrategy strategy, string reason, CancellationToken ct)
     {
         if (amount <= 0m)
         {
@@ -571,7 +591,11 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<CashUpResult>> CloseSessionAsync(long companyId, long sessionId, DateOnly date, IReadOnlyList<FloatDeclaration> countedCash, string cashAccountCode, string shortagesAccountCode, CancellationToken ct = default)
+    public Task<Result<CashUpResult>> CloseSessionAsync(long companyId, long sessionId, DateOnly date, IReadOnlyList<FloatDeclaration> countedCash, string cashAccountCode, string shortagesAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => CloseSessionCoreAsync(companyId, sessionId, date, countedCash, cashAccountCode, shortagesAccountCode, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<CashUpResult>> CloseSessionCoreAsync(long companyId, long sessionId, DateOnly date, IReadOnlyList<FloatDeclaration> countedCash, string cashAccountCode, string shortagesAccountCode, CancellationToken ct)
     {
         CashierSession? session = await _db.Set<CashierSession>().Include(s => s.Floats)
             .FirstOrDefaultAsync(s => s.Id == sessionId && s.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -647,7 +671,11 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
-    public async Task<Result> RecordDishonourAsync(long companyId, long receiptId, DateOnly date, decimal penaltyAmount, string? penaltyAccountCode, string? penaltyInvoiceNumber, long reverserUserId, string reason, CancellationToken ct = default)
+    public Task<Result> RecordDishonourAsync(long companyId, long receiptId, DateOnly date, decimal penaltyAmount, string? penaltyAccountCode, string? penaltyInvoiceNumber, long reverserUserId, string reason, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RecordDishonourCoreAsync(companyId, receiptId, date, penaltyAmount, penaltyAccountCode, penaltyInvoiceNumber, reverserUserId, reason, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result> RecordDishonourCoreAsync(long companyId, long receiptId, DateOnly date, decimal penaltyAmount, string? penaltyAccountCode, string? penaltyInvoiceNumber, long reverserUserId, string reason, CancellationToken ct)
     {
         Receipt? receipt = await _db.Set<Receipt>().Include(r => r.Tenders).Include(r => r.Lines)
             .FirstOrDefaultAsync(r => r.Id == receiptId && r.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -703,7 +731,11 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<string>> ConfirmPendingTenderAsync(long companyId, long pendingTenderId, DateOnly date, string bankAccountCode, CancellationToken ct = default)
+    public Task<Result<string>> ConfirmPendingTenderAsync(long companyId, long pendingTenderId, DateOnly date, string bankAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ConfirmPendingTenderCoreAsync(companyId, pendingTenderId, date, bankAccountCode, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<string>> ConfirmPendingTenderCoreAsync(long companyId, long pendingTenderId, DateOnly date, string bankAccountCode, CancellationToken ct)
     {
         PendingTender? tender = await _db.Set<PendingTender>().FirstOrDefaultAsync(t => t.Id == pendingTenderId && t.CompanyId == companyId, ct).ConfigureAwait(false);
         if (tender is null)

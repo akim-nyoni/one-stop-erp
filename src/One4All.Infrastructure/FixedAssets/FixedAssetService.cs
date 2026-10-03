@@ -27,7 +27,11 @@ public sealed class FixedAssetService : IFixedAssetService
     }
 
     /// <inheritdoc />
-    public async Task<Result<long>> RegisterAsync(RegisterAssetRequest request, CancellationToken ct = default)
+    public Task<Result<long>> RegisterAsync(RegisterAssetRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RegisterCoreAsync(request, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<long>> RegisterCoreAsync(RegisterAssetRequest request, CancellationToken ct)
     {
         Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == request.CompanyId, ct).ConfigureAwait(false);
         if (company is null)
@@ -144,7 +148,11 @@ public sealed class FixedAssetService : IFixedAssetService
     }
 
     /// <inheritdoc />
-    public async Task<Result<DisposalResult>> DisposeAsync(long companyId, long assetId, decimal proceeds, DateOnly date, string fundingAccountCode, string gainAccountCode, string lossAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result<DisposalResult>> DisposeAsync(long companyId, long assetId, decimal proceeds, DateOnly date, string fundingAccountCode, string gainAccountCode, string lossAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => DisposeCoreAsync(companyId, assetId, proceeds, date, fundingAccountCode, gainAccountCode, lossAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<DisposalResult>> DisposeCoreAsync(long companyId, long assetId, decimal proceeds, DateOnly date, string fundingAccountCode, string gainAccountCode, string lossAccountCode, string documentNumber, CancellationToken ct)
     {
         FixedAsset? asset = await _db.Set<FixedAsset>().FirstOrDefaultAsync(a => a.Id == assetId && a.CompanyId == companyId, ct).ConfigureAwait(false);
         if (asset is null)
@@ -207,7 +215,11 @@ public sealed class FixedAssetService : IFixedAssetService
     }
 
     /// <inheritdoc />
-    public async Task<Result<RevaluationResult>> RevalueAsync(long companyId, long assetId, decimal newCarryingAmount, DateOnly date, string revaluationReserveAccountCode, string impairmentExpenseAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result<RevaluationResult>> RevalueAsync(long companyId, long assetId, decimal newCarryingAmount, DateOnly date, string revaluationReserveAccountCode, string impairmentExpenseAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RevalueCoreAsync(companyId, assetId, newCarryingAmount, date, revaluationReserveAccountCode, impairmentExpenseAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<RevaluationResult>> RevalueCoreAsync(long companyId, long assetId, decimal newCarryingAmount, DateOnly date, string revaluationReserveAccountCode, string impairmentExpenseAccountCode, string documentNumber, CancellationToken ct)
     {
         if (newCarryingAmount < 0m)
         {

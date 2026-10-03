@@ -38,7 +38,11 @@ public sealed class ReceiptImportService : IReceiptImportService
     }
 
     /// <inheritdoc />
-    public async Task<Result<ImportResult>> ImportAsync(ImportRequest request, CancellationToken ct = default)
+    public Task<Result<ImportResult>> ImportAsync(ImportRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ImportCoreAsync(request, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<ImportResult>> ImportCoreAsync(ImportRequest request, CancellationToken ct)
     {
         if (request.Lines.Count == 0)
         {

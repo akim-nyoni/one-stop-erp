@@ -27,7 +27,11 @@ public sealed class BankingService : IBankingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<BankingResult>> BankCashAsync(long companyId, decimal amount, DateOnly date, string reference, string cashAccountCode, string cashInTransitAccountCode, CancellationToken ct = default)
+    public Task<Result<BankingResult>> BankCashAsync(long companyId, decimal amount, DateOnly date, string reference, string cashAccountCode, string cashInTransitAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => BankCashCoreAsync(companyId, amount, date, reference, cashAccountCode, cashInTransitAccountCode, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<BankingResult>> BankCashCoreAsync(long companyId, decimal amount, DateOnly date, string reference, string cashAccountCode, string cashInTransitAccountCode, CancellationToken ct)
     {
         if (amount <= 0m)
         {
@@ -69,7 +73,11 @@ public sealed class BankingService : IBankingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<string>> ConfirmBankedAsync(long companyId, long depositId, DateOnly date, string cashInTransitAccountCode, string bankAccountCode, CancellationToken ct = default)
+    public Task<Result<string>> ConfirmBankedAsync(long companyId, long depositId, DateOnly date, string cashInTransitAccountCode, string bankAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ConfirmBankedCoreAsync(companyId, depositId, date, cashInTransitAccountCode, bankAccountCode, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<string>> ConfirmBankedCoreAsync(long companyId, long depositId, DateOnly date, string cashInTransitAccountCode, string bankAccountCode, CancellationToken ct)
     {
         BankDeposit? deposit = await _db.Set<BankDeposit>().FirstOrDefaultAsync(d => d.Id == depositId && d.CompanyId == companyId, ct).ConfigureAwait(false);
         if (deposit is null)
@@ -115,7 +123,11 @@ public sealed class BankingService : IBankingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<string>> TransferAsync(long companyId, decimal amount, DateOnly date, string reference, string fromAccountCode, string toAccountCode, CancellationToken ct = default)
+    public Task<Result<string>> TransferAsync(long companyId, decimal amount, DateOnly date, string reference, string fromAccountCode, string toAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => TransferCoreAsync(companyId, amount, date, reference, fromAccountCode, toAccountCode, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<string>> TransferCoreAsync(long companyId, decimal amount, DateOnly date, string reference, string fromAccountCode, string toAccountCode, CancellationToken ct)
     {
         if (amount <= 0m)
         {

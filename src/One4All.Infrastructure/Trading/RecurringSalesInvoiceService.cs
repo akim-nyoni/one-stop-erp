@@ -56,7 +56,11 @@ public sealed class RecurringSalesInvoiceService : IRecurringSalesInvoiceService
     }
 
     /// <inheritdoc />
-    public async Task<Result<int>> GenerateDueAsync(long companyId, DateOnly asOf, CancellationToken ct = default)
+    public Task<Result<int>> GenerateDueAsync(long companyId, DateOnly asOf, CancellationToken ct = default)
+        => _db.AtomicAsync(() => GenerateDueCoreAsync(companyId, asOf, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<int>> GenerateDueCoreAsync(long companyId, DateOnly asOf, CancellationToken ct)
     {
         List<RecurringSalesInvoice> due = await _db.Set<RecurringSalesInvoice>()
             .Where(t => t.CompanyId == companyId && t.IsActive && t.NextRunDate <= asOf)

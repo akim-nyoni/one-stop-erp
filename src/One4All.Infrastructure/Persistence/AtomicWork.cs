@@ -24,7 +24,18 @@ internal static class AtomicWork
     /// <param name="work">The unit of work.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The work's result.</returns>
-    public static async Task<Result<T>> AtomicAsync<T>(this One4AllDbContext db, Func<Task<Result<T>>> work, CancellationToken ct)
+    public static Task<Result<T>> AtomicAsync<T>(this One4AllDbContext db, Func<Task<Result<T>>> work, CancellationToken ct)
+        => RunAsync(db, work, r => r.IsSuccess, ct);
+
+    /// <summary>As <see cref="AtomicAsync{T}"/>, for work that returns a plain <see cref="Result"/>.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="work">The unit of work.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The work's result.</returns>
+    public static Task<Result> AtomicAsync(this One4AllDbContext db, Func<Task<Result>> work, CancellationToken ct)
+        => RunAsync(db, work, r => r.IsSuccess, ct);
+
+    private static async Task<TResult> RunAsync<TResult>(One4AllDbContext db, Func<Task<TResult>> work, Func<TResult, bool> succeeded, CancellationToken ct)
     {
         if (db.Database.CurrentTransaction is not null)
         {
@@ -35,8 +46,8 @@ internal static class AtomicWork
         await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
         try
         {
-            Result<T> result = await work().ConfigureAwait(false);
-            if (result.IsSuccess)
+            TResult result = await work().ConfigureAwait(false);
+            if (succeeded(result))
             {
                 await transaction.CommitAsync(ct).ConfigureAwait(false);
                 return result;

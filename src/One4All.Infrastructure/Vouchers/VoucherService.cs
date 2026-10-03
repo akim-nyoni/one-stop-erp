@@ -88,7 +88,11 @@ public sealed class VoucherService : IVoucherService
     }
 
     /// <inheritdoc />
-    public async Task<Result<BreakageRunResult>> RecogniseExpiredBreakageAsync(long companyId, DateOnly asAtDate, string liabilityAccountCode, string breakageAccountCode, CancellationToken ct = default)
+    public Task<Result<BreakageRunResult>> RecogniseExpiredBreakageAsync(long companyId, DateOnly asAtDate, string liabilityAccountCode, string breakageAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RecogniseExpiredBreakageCoreAsync(companyId, asAtDate, liabilityAccountCode, breakageAccountCode, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<BreakageRunResult>> RecogniseExpiredBreakageCoreAsync(long companyId, DateOnly asAtDate, string liabilityAccountCode, string breakageAccountCode, CancellationToken ct)
     {
         List<GiftCard> expired = await _db.Set<GiftCard>()
             .Where(g => g.CompanyId == companyId && g.Status == GiftCardStatus.Active && g.Balance > 0m
@@ -118,7 +122,11 @@ public sealed class VoucherService : IVoucherService
     }
 
     /// <inheritdoc />
-    public async Task<Result<GiftCardResult>> RecogniseBreakageAsync(long companyId, string cardNumber, DateOnly date, string liabilityAccountCode, string breakageAccountCode, CancellationToken ct = default)
+    public Task<Result<GiftCardResult>> RecogniseBreakageAsync(long companyId, string cardNumber, DateOnly date, string liabilityAccountCode, string breakageAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RecogniseBreakageCoreAsync(companyId, cardNumber, date, liabilityAccountCode, breakageAccountCode, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<GiftCardResult>> RecogniseBreakageCoreAsync(long companyId, string cardNumber, DateOnly date, string liabilityAccountCode, string breakageAccountCode, CancellationToken ct)
     {
         Result<GiftCard> cardResult = await LoadAsync(companyId, cardNumber, ct).ConfigureAwait(false);
         if (cardResult.IsFailure)

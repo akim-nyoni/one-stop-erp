@@ -42,7 +42,11 @@ public sealed class JobCostingService : IJobCostingService
     }
 
     /// <inheritdoc />
-    public async Task<Result> CaptureCostAsync(long companyId, long contractId, string costHead, JobCostSource source, decimal amount, DateOnly date, string? reference, CancellationToken ct = default)
+    public Task<Result> CaptureCostAsync(long companyId, long contractId, string costHead, JobCostSource source, decimal amount, DateOnly date, string? reference, CancellationToken ct = default)
+        => _db.AtomicAsync(() => CaptureCostCoreAsync(companyId, contractId, costHead, source, amount, date, reference, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result> CaptureCostCoreAsync(long companyId, long contractId, string costHead, JobCostSource source, decimal amount, DateOnly date, string? reference, CancellationToken ct)
     {
         JobContract? contract = await _db.Set<JobContract>().Include(c => c.Costs)
             .FirstOrDefaultAsync(c => c.Id == contractId && c.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -57,7 +61,11 @@ public sealed class JobCostingService : IJobCostingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<CertificateResult>> CertifyProgressAsync(long companyId, long contractId, string certificateNumber, DateOnly date, decimal workDoneToDate, decimal materialsOnSite, string retentionReceivableAccountCode, CancellationToken ct = default)
+    public Task<Result<CertificateResult>> CertifyProgressAsync(long companyId, long contractId, string certificateNumber, DateOnly date, decimal workDoneToDate, decimal materialsOnSite, string retentionReceivableAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => CertifyProgressCoreAsync(companyId, contractId, certificateNumber, date, workDoneToDate, materialsOnSite, retentionReceivableAccountCode, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<CertificateResult>> CertifyProgressCoreAsync(long companyId, long contractId, string certificateNumber, DateOnly date, decimal workDoneToDate, decimal materialsOnSite, string retentionReceivableAccountCode, CancellationToken ct)
     {
         JobContract? contract = await _db.Set<JobContract>()
             .FirstOrDefaultAsync(c => c.Id == contractId && c.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -147,7 +155,11 @@ public sealed class JobCostingService : IJobCostingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<RetentionReleaseResult>> ReleaseRetentionAsync(long companyId, long contractId, decimal amount, DateOnly date, string retentionReceivableAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result<RetentionReleaseResult>> ReleaseRetentionAsync(long companyId, long contractId, decimal amount, DateOnly date, string retentionReceivableAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReleaseRetentionCoreAsync(companyId, contractId, amount, date, retentionReceivableAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<RetentionReleaseResult>> ReleaseRetentionCoreAsync(long companyId, long contractId, decimal amount, DateOnly date, string retentionReceivableAccountCode, string documentNumber, CancellationToken ct)
     {
         if (amount <= 0m)
         {
@@ -195,7 +207,11 @@ public sealed class JobCostingService : IJobCostingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<RevenueRecognitionResult>> RecogniseRevenueAsync(long companyId, long contractId, DateOnly date, string contractAssetAccountCode, string contractLiabilityAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result<RevenueRecognitionResult>> RecogniseRevenueAsync(long companyId, long contractId, DateOnly date, string contractAssetAccountCode, string contractLiabilityAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RecogniseRevenueCoreAsync(companyId, contractId, date, contractAssetAccountCode, contractLiabilityAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<RevenueRecognitionResult>> RecogniseRevenueCoreAsync(long companyId, long contractId, DateOnly date, string contractAssetAccountCode, string contractLiabilityAccountCode, string documentNumber, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(contractAssetAccountCode) || string.IsNullOrWhiteSpace(contractLiabilityAccountCode))
         {
@@ -292,7 +308,11 @@ public sealed class JobCostingService : IJobCostingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<ExpectedLossResult>> ProvideForExpectedLossAsync(long companyId, long contractId, DateOnly date, string lossExpenseAccountCode, string provisionAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result<ExpectedLossResult>> ProvideForExpectedLossAsync(long companyId, long contractId, DateOnly date, string lossExpenseAccountCode, string provisionAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ProvideForExpectedLossCoreAsync(companyId, contractId, date, lossExpenseAccountCode, provisionAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<ExpectedLossResult>> ProvideForExpectedLossCoreAsync(long companyId, long contractId, DateOnly date, string lossExpenseAccountCode, string provisionAccountCode, string documentNumber, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(lossExpenseAccountCode) || string.IsNullOrWhiteSpace(provisionAccountCode))
         {

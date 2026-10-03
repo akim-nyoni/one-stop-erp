@@ -44,7 +44,11 @@ public sealed class PosService : IPosService
     }
 
     /// <inheritdoc />
-    public async Task<Result<CompleteSaleResult>> CompleteSaleAsync(CompleteSaleRequest request, CancellationToken ct = default)
+    public Task<Result<CompleteSaleResult>> CompleteSaleAsync(CompleteSaleRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => CompleteSaleCoreAsync(request, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<CompleteSaleResult>> CompleteSaleCoreAsync(CompleteSaleRequest request, CancellationToken ct)
     {
         Company company = await _db.Companies.FirstAsync(c => c.Id == request.CompanyId, ct).ConfigureAwait(false);
         CurrencyCode baseCurrency = company.BaseCurrency;
@@ -138,7 +142,11 @@ public sealed class PosService : IPosService
     }
 
     /// <inheritdoc />
-    public async Task<Result<string>> VoidSaleAsync(long companyId, long saleId, DateOnly date, string reason, string? taxAccountCode = null, CancellationToken ct = default)
+    public Task<Result<string>> VoidSaleAsync(long companyId, long saleId, DateOnly date, string reason, string? taxAccountCode = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => VoidSaleCoreAsync(companyId, saleId, date, reason, taxAccountCode, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<string>> VoidSaleCoreAsync(long companyId, long saleId, DateOnly date, string reason, string? taxAccountCode, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
@@ -257,7 +265,11 @@ public sealed class PosService : IPosService
     }
 
     /// <inheritdoc />
-    public async Task<Result<CashUpResult>> CashUpAndCloseAsync(CashUpRequest request, CancellationToken ct = default)
+    public Task<Result<CashUpResult>> CashUpAndCloseAsync(CashUpRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => CashUpAndCloseCoreAsync(request, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<CashUpResult>> CashUpAndCloseCoreAsync(CashUpRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.CashAccountCode) || string.IsNullOrWhiteSpace(request.OverShortAccountCode))
         {

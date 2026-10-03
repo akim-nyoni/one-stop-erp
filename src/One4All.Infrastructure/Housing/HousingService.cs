@@ -33,7 +33,11 @@ public sealed class HousingService : IHousingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<AcquisitionResult>> AcquireLandAsync(long companyId, string parcelNumber, string description, decimal areaSquareMetres, decimal cost, DateOnly date, string wipAccountCode, string fundingAccountCode, string documentNumber, CancellationToken ct = default)
+    public Task<Result<AcquisitionResult>> AcquireLandAsync(long companyId, string parcelNumber, string description, decimal areaSquareMetres, decimal cost, DateOnly date, string wipAccountCode, string fundingAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => AcquireLandCoreAsync(companyId, parcelNumber, description, areaSquareMetres, cost, date, wipAccountCode, fundingAccountCode, documentNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<AcquisitionResult>> AcquireLandCoreAsync(long companyId, string parcelNumber, string description, decimal areaSquareMetres, decimal cost, DateOnly date, string wipAccountCode, string fundingAccountCode, string documentNumber, CancellationToken ct)
     {
         if (cost <= 0m)
         {
@@ -75,7 +79,11 @@ public sealed class HousingService : IHousingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<SubdivisionResult>> SubdivideAsync(long companyId, long landParcelId, long? schemeId, IReadOnlyList<NewStand> stands, ApportionMethod method, DateOnly date, string wipAccountCode, string standsAvailableAccountCode, CancellationToken ct = default)
+    public Task<Result<SubdivisionResult>> SubdivideAsync(long companyId, long landParcelId, long? schemeId, IReadOnlyList<NewStand> stands, ApportionMethod method, DateOnly date, string wipAccountCode, string standsAvailableAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => SubdivideCoreAsync(companyId, landParcelId, schemeId, stands, method, date, wipAccountCode, standsAvailableAccountCode, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<SubdivisionResult>> SubdivideCoreAsync(long companyId, long landParcelId, long? schemeId, IReadOnlyList<NewStand> stands, ApportionMethod method, DateOnly date, string wipAccountCode, string standsAvailableAccountCode, CancellationToken ct)
     {
         if (stands.Count == 0)
         {
@@ -138,7 +146,11 @@ public sealed class HousingService : IHousingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<StandSaleResult>> SellStandAsync(long companyId, long standId, long buyerCustomerId, string buyerName, decimal sellingPrice, DateOnly date, string salesAccountCode, string standsAvailableAccountCode, string costOfSalesAccountCode, string invoiceNumber, CancellationToken ct = default)
+    public Task<Result<StandSaleResult>> SellStandAsync(long companyId, long standId, long buyerCustomerId, string buyerName, decimal sellingPrice, DateOnly date, string salesAccountCode, string standsAvailableAccountCode, string costOfSalesAccountCode, string invoiceNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => SellStandCoreAsync(companyId, standId, buyerCustomerId, buyerName, sellingPrice, date, salesAccountCode, standsAvailableAccountCode, costOfSalesAccountCode, invoiceNumber, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result<StandSaleResult>> SellStandCoreAsync(long companyId, long standId, long buyerCustomerId, string buyerName, decimal sellingPrice, DateOnly date, string salesAccountCode, string standsAvailableAccountCode, string costOfSalesAccountCode, string invoiceNumber, CancellationToken ct)
     {
         HousingStand? stand = await _db.Set<HousingStand>().Include(s => s.Ownership)
             .FirstOrDefaultAsync(s => s.Id == standId && s.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -206,7 +218,11 @@ public sealed class HousingService : IHousingService
     }
 
     /// <inheritdoc />
-    public async Task<Result> TransferOwnershipAsync(long companyId, long standId, long newHolderCustomerId, string newHolderName, decimal consideration, DateOnly date, bool housingAccountClear, bool dualApprovalRecorded, CancellationToken ct = default)
+    public Task<Result> TransferOwnershipAsync(long companyId, long standId, long newHolderCustomerId, string newHolderName, decimal consideration, DateOnly date, bool housingAccountClear, bool dualApprovalRecorded, CancellationToken ct = default)
+        => _db.AtomicAsync(() => TransferOwnershipCoreAsync(companyId, standId, newHolderCustomerId, newHolderName, consideration, date, housingAccountClear, dualApprovalRecorded, ct), ct);
+
+    // One unit of work: its postings and record changes commit together or not at all.
+    private async Task<Result> TransferOwnershipCoreAsync(long companyId, long standId, long newHolderCustomerId, string newHolderName, decimal consideration, DateOnly date, bool housingAccountClear, bool dualApprovalRecorded, CancellationToken ct)
     {
         HousingStand? stand = await _db.Set<HousingStand>().Include(s => s.Ownership)
             .FirstOrDefaultAsync(s => s.Id == standId && s.CompanyId == companyId, ct).ConfigureAwait(false);
