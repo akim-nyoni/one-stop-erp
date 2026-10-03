@@ -55,6 +55,43 @@ public sealed class FeeStructure : SoftDeletableEntity, ICompanyScoped
     /// <summary>The fee-income account credited.</summary>
     public string RevenueAccountCode { get; private set; }
 
+    /// <summary>The first day of the term the fees pay for, when fees are deferred over it.</summary>
+    public DateOnly? TermStart { get; private set; }
+
+    /// <summary>The last day of the term, when fees are deferred over it.</summary>
+    public DateOnly? TermEnd { get; private set; }
+
+    /// <summary>
+    /// The deferred income (liability) account term fees are billed to when they are earned over the term (IFRS 15), or
+    /// null when they are recognised as revenue on billing.
+    /// </summary>
+    public string? DeferredIncomeAccountCode { get; private set; }
+
+    /// <summary>Whether billed fees are deferred and earned over the term.</summary>
+    public bool DefersIncome => DeferredIncomeAccountCode is not null && TermStart is not null && TermEnd is not null;
+
+    /// <summary>Bills this structure's fees to deferred income and earns them evenly over the term.</summary>
+    /// <param name="termStart">The first day of the term.</param>
+    /// <param name="termEnd">The last day of the term.</param>
+    /// <param name="deferredIncomeAccountCode">The deferred income account.</param>
+    /// <exception cref="ArgumentException">Thrown when the term ends before it starts or the account is blank.</exception>
+    public void DeferOverTerm(DateOnly termStart, DateOnly termEnd, string deferredIncomeAccountCode)
+    {
+        if (termEnd < termStart)
+        {
+            throw new ArgumentException("The term cannot end before it starts.", nameof(termEnd));
+        }
+
+        if (string.IsNullOrWhiteSpace(deferredIncomeAccountCode))
+        {
+            throw new ArgumentException("A deferred income account is required.", nameof(deferredIncomeAccountCode));
+        }
+
+        TermStart = termStart;
+        TermEnd = termEnd;
+        DeferredIncomeAccountCode = deferredIncomeAccountCode.Trim();
+    }
+
     /// <summary>The fee items.</summary>
     public IReadOnlyList<FeeItem> Items => _items.AsReadOnly();
 

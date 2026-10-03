@@ -145,3 +145,19 @@ internal sealed class RecurringJournalLineConfiguration : IEntityTypeConfigurati
         b.HasIndex(x => x.RecurringJournalId);
     }
 }
+
+internal sealed class DeferredIncomeScheduleConfiguration : IEntityTypeConfiguration<DeferredIncomeSchedule>
+{
+    public void Configure(EntityTypeBuilder<DeferredIncomeSchedule> b)
+    {
+        b.ToTable("deferred_income_schedule", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.Property(x => x.DeferredAccountCode).HasMaxLength(8);
+        b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.RecognisedAmount).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.StartDate });
+    }
+}

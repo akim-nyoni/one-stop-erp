@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Schools;
 using One4All.Application.Abstractions.Trading;
+using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.Schools;
 using One4All.Core.System;
@@ -61,7 +62,7 @@ public sealed class SchoolBillingService : ISchoolBillingService
             return Error.Conflict("School.AlreadyBilled", $"Invoice {number} has already been raised.");
         }
 
-        return await BillOneAsync(company, student, structure, number, date, ct).ConfigureAwait(false);
+        return await _db.AtomicAsync(() => BillOneAsync(company, student, structure, number, date, ct), ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -106,7 +107,7 @@ public sealed class SchoolBillingService : ISchoolBillingService
                 continue;
             }
 
-            Result<StudentBillResult> one = await BillOneAsync(company, student, structure, number, date, ct).ConfigureAwait(false);
+            Result<StudentBillResult> one = await _db.AtomicAsync(() => BillOneAsync(company, student, structure, number, date, ct), ct).ConfigureAwait(false);
             if (one.IsFailure)
             {
                 return one.Error;
@@ -144,13 +145,22 @@ public sealed class SchoolBillingService : ISchoolBillingService
             Currency = company.BaseCurrency,
             NetAmount = net,
             TaxAmount = 0m,
-            SalesAccountCode = structure.RevenueAccountCode,
+            SalesAccountCode = structure.DefersIncome ? structure.DeferredIncomeAccountCode! : structure.RevenueAccountCode,
             Narrative = $"{structure.Term} fees — {student.FullName} ({student.AdmissionNumber})",
         }, ct).ConfigureAwait(false);
 
         if (posted.IsFailure)
         {
             return posted.Error;
+        }
+
+        if (structure.DefersIncome)
+        {
+            // Fees paid in advance are earned over the term (IFRS 15): billed to deferred income, recognised by the
+            // deferred income run.
+            _db.Set<DeferredIncomeSchedule>().Add(new DeferredIncomeSchedule(company.Id, invoiceNumber, $"{structure.Term} fees — {student.FullName}",
+                structure.DeferredIncomeAccountCode!, structure.RevenueAccountCode, net, structure.TermStart!.Value, structure.TermEnd!.Value));
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
         return new StudentBillResult(student.Id, gross, discount, net, posted.Value.OpenItemId, posted.Value.JournalNumber);

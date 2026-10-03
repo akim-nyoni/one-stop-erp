@@ -427,6 +427,11 @@ app.MapGet("/api/consolidation/trial-balance", async (long[] companyIds, DateOnl
 .RequireAuthorization()
 .WithName("ConsolidatedTrialBalance");
 
+app.MapPost("/api/accounting/deferred-income/recognise", async (long companyId, DateOnly asAtDate, One4All.Application.Abstractions.Accounting.IDeferredIncomeService deferred, CancellationToken ct) =>
+    ValueResponse(await deferred.RecogniseAsync(companyId, asAtDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecogniseDeferredIncome");
+
 app.MapGet("/api/accounting/check-data", async (long companyId, One4All.Application.Abstractions.Accounting.ILedgerIntegrityService integrity, CancellationToken ct) =>
     ValueResponse(await integrity.CheckAsync(companyId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

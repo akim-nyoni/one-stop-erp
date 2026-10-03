@@ -15,6 +15,8 @@ internal sealed class FeeStructureConfiguration : IEntityTypeConfiguration<FeeSt
         b.Property(x => x.Grade).HasMaxLength(40);
         b.Property(x => x.Term).HasMaxLength(40);
         b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
+        b.Property(x => x.DeferredIncomeAccountCode).HasMaxLength(8);
+        b.Ignore(x => x.DefersIncome);
         b.Ignore(x => x.CompulsoryTotal);
         b.HasMany(x => x.Items).WithOne().HasForeignKey(x => x.FeeStructureId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
