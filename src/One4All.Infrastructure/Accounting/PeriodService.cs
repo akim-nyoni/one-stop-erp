@@ -57,7 +57,11 @@ public sealed class PeriodService : IPeriodService
     }
 
     /// <inheritdoc />
-    public async Task<Result> OpenYearAsync(long companyId, long fiscalYearId, IReadOnlyList<string> moduleCodes, CancellationToken ct = default)
+    public Task<Result> OpenYearAsync(long companyId, long fiscalYearId, IReadOnlyList<string> moduleCodes, CancellationToken ct = default)
+        => _db.AtomicAsync(() => OpenYearCoreAsync(companyId, fiscalYearId, moduleCodes, ct), ct);
+
+    // One unit of work: every period's status changes together or not at all.
+    private async Task<Result> OpenYearCoreAsync(long companyId, long fiscalYearId, IReadOnlyList<string> moduleCodes, CancellationToken ct)
     {
         FiscalYear? year = await LoadYearAsync(companyId, fiscalYearId, ct).ConfigureAwait(false);
         if (year is null)

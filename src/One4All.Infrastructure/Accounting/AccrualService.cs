@@ -28,12 +28,14 @@ public sealed class AccrualService : IAccrualService
 
     /// <inheritdoc />
     public Task<Result<ReversingJournalResult>> PostAccrualAsync(long companyId, DateOnly date, DateOnly reversalDate, string expenseAccountCode, string accrualAccountCode, decimal amount, string documentNumber, string narrative, CancellationToken ct = default)
-        => PostReversingAsync(companyId, date, reversalDate, expenseAccountCode, accrualAccountCode, amount, "GL-ACCR", documentNumber, narrative, ct);
+        => _db.AtomicAsync(() => PostReversingAsync(companyId, date, reversalDate, expenseAccountCode, accrualAccountCode, amount, "GL-ACCR", documentNumber, narrative, ct), ct);
 
     /// <inheritdoc />
     public Task<Result<ReversingJournalResult>> PostPrepaymentAsync(long companyId, DateOnly date, DateOnly reversalDate, string prepaymentAccountCode, string expenseAccountCode, decimal amount, string documentNumber, string narrative, CancellationToken ct = default)
-        => PostReversingAsync(companyId, date, reversalDate, prepaymentAccountCode, expenseAccountCode, amount, "GL-PREP", documentNumber, narrative, ct);
+        => _db.AtomicAsync(() => PostReversingAsync(companyId, date, reversalDate, prepaymentAccountCode, expenseAccountCode, amount, "GL-PREP", documentNumber, narrative, ct), ct);
 
+    // The journal and its reversal stand or fall together: an accrual whose reversal cannot post (a closed period, say)
+    // must not be left on the ledger un-reversed. Run inside AtomicWork by the public methods.
     private async Task<Result<ReversingJournalResult>> PostReversingAsync(long companyId, DateOnly date, DateOnly reversalDate, string debitAccountCode, string creditAccountCode, decimal amount, string documentType, string documentNumber, string narrative, CancellationToken ct)
     {
         if (amount <= 0m)
