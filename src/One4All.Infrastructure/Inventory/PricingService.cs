@@ -47,6 +47,77 @@ public sealed class PricingService : IPricingService
     }
 
     /// <inheritdoc />
+    public async Task<Result<int>> AdjustPricesAsync(long companyId, long priceListId, decimal percent, decimal roundTo, One4All.Application.Inventory.PriceRounding rounding, IReadOnlyCollection<long>? itemIds = null, CancellationToken ct = default)
+    {
+        if (percent <= -100m)
+        {
+            return Error.Validation("Price.Percent", "A price cannot be reduced by 100% or more.");
+        }
+
+        PriceList? list = await _db.PriceLists.Include(p => p.Lines)
+            .FirstOrDefaultAsync(p => p.Id == priceListId && p.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (list is null)
+        {
+            return Error.NotFound("Price.ListNotFound", $"Price list {priceListId} not found.");
+        }
+
+        HashSet<long>? only = itemIds is null ? null : [.. itemIds];
+        int changed = 0;
+        foreach (PriceListLine line in list.Lines.ToList())
+        {
+            if (only is not null && !only.Contains(line.ItemId))
+            {
+                continue;
+            }
+
+            decimal adjusted = One4All.Application.Inventory.PriceAdjustment.Apply(line.UnitPrice, percent, roundTo, rounding);
+            if (adjusted != line.UnitPrice)
+            {
+                list.SetPrice(line.ItemId, line.MinimumQuantity, adjusted);
+                changed++;
+            }
+        }
+
+        if (changed > 0)
+        {
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
+        return changed;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> CopyPriceListAsync(long companyId, long sourcePriceListId, string code, string name, decimal percent, decimal roundTo, One4All.Application.Inventory.PriceRounding rounding, CancellationToken ct = default)
+    {
+        if (percent <= -100m)
+        {
+            return Error.Validation("Price.Percent", "A price cannot be reduced by 100% or more.");
+        }
+
+        PriceList? source = await _db.PriceLists.Include(p => p.Lines)
+            .FirstOrDefaultAsync(p => p.Id == sourcePriceListId && p.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (source is null)
+        {
+            return Error.NotFound("Price.ListNotFound", $"Price list {sourcePriceListId} not found.");
+        }
+
+        Result<long> created = await CreatePriceListAsync(companyId, code, name, source.Currency, isDefault: false, ct).ConfigureAwait(false);
+        if (created.IsFailure)
+        {
+            return created.Error;
+        }
+
+        PriceList copy = await _db.PriceLists.Include(p => p.Lines).FirstAsync(p => p.Id == created.Value, ct).ConfigureAwait(false);
+        foreach (PriceListLine line in source.Lines)
+        {
+            copy.SetPrice(line.ItemId, line.MinimumQuantity, One4All.Application.Inventory.PriceAdjustment.Apply(line.UnitPrice, percent, roundTo, rounding));
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return copy.Id;
+    }
+
+    /// <inheritdoc />
     public async Task<Result> SetPriceAsync(long companyId, long priceListId, long itemId, decimal minimumQuantity, decimal unitPrice, CancellationToken ct = default)
     {
         if (minimumQuantity < 1m)

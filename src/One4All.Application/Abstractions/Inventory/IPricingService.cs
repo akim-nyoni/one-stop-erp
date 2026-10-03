@@ -31,6 +31,35 @@ public interface IPricingService
     /// <returns>The price list id.</returns>
     Task<Result<long>> CreatePriceListAsync(long companyId, string code, string name, CurrencyCode currency, bool isDefault, CancellationToken ct = default);
 
+    /// <summary>
+    /// Changes every price on a list (or only the given items) by a percentage, rounding each to a price-point
+    /// increment. Refuses a change of −100% or below. Returns how many price breaks changed.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="priceListId">The price list.</param>
+    /// <param name="percent">The change in percent (+5 = increase 5%).</param>
+    /// <param name="roundTo">The price-point increment (0 = cents).</param>
+    /// <param name="rounding">The rounding direction.</param>
+    /// <param name="itemIds">Only these items, or null for every item on the list.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The number of price breaks whose price changed.</returns>
+    Task<Result<int>> AdjustPricesAsync(long companyId, long priceListId, decimal percent, decimal roundTo, One4All.Application.Inventory.PriceRounding rounding, IReadOnlyCollection<long>? itemIds = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates a new (non-default) list in the same currency as a source list, with every price break copied
+    /// and adjusted by a percentage and rounded — e.g. a trade list at −10% of standard.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="sourcePriceListId">The list to copy.</param>
+    /// <param name="code">The new list's code.</param>
+    /// <param name="name">The new list's name.</param>
+    /// <param name="percent">The change in percent applied to every copied price.</param>
+    /// <param name="roundTo">The price-point increment (0 = cents).</param>
+    /// <param name="rounding">The rounding direction.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The new list's id.</returns>
+    Task<Result<long>> CopyPriceListAsync(long companyId, long sourcePriceListId, string code, string name, decimal percent, decimal roundTo, One4All.Application.Inventory.PriceRounding rounding, CancellationToken ct = default);
+
     /// <summary>Sets an item's price at a quantity break on a list (replacing an existing break at that quantity).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="priceListId">The price list.</param>
