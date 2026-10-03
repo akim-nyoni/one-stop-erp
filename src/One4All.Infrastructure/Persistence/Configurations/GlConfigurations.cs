@@ -86,6 +86,18 @@ internal sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journ
     }
 }
 
+internal sealed class PriceIndexConfiguration : IEntityTypeConfiguration<PriceIndex>
+{
+    public void Configure(EntityTypeBuilder<PriceIndex> b)
+    {
+        b.ToTable("price_index", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.IndexCode).HasMaxLength(20);
+        b.Property(x => x.Value).HasPrecision(19, 6);
+        b.HasIndex(x => new { x.CompanyId, x.IndexCode, x.Month }).IsUnique();
+    }
+}
+
 internal sealed class AllocationRuleConfiguration : IEntityTypeConfiguration<AllocationRule>
 {
     public void Configure(EntityTypeBuilder<AllocationRule> b)

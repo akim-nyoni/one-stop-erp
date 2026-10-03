@@ -762,6 +762,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
 
+                    b.Property<int>("Ias29")
+                        .HasColumnType("integer")
+                        .HasColumnName("ias29");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -809,6 +813,48 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("account", "gl");
+                });
+
+            modelBuilder.Entity("One4All.Core.Accounting.PriceIndex", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("IndexCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("index_code");
+
+                    b.Property<DateOnly>("Month")
+                        .HasColumnType("date")
+                        .HasColumnName("month");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_price_index");
+
+                    b.HasIndex("CompanyId", "IndexCode", "Month")
+                        .IsUnique()
+                        .HasDatabaseName("ix_price_index_company_id_index_code_month");
+
+                    b.ToTable("price_index", "gl");
                 });
 
             modelBuilder.Entity("One4All.Core.Accounting.RecurringJournal", b =>

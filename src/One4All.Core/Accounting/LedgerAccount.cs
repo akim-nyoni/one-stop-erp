@@ -71,6 +71,9 @@ public sealed class LedgerAccount : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the account participates in budgeting.</summary>
     public bool BudgetEnabled { get; set; }
 
+    /// <summary>How the account is treated when restating for hyperinflation (IAS 29); by account type unless set.</summary>
+    public Ias29Classification Ias29 { get; set; }
+
     /// <summary>The normal balance side, derived from the account type.</summary>
     public NormalBalance NormalBalance => Type.NormalBalance();
 

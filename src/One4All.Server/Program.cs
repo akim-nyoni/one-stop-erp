@@ -499,6 +499,16 @@ app.MapPost("/api/gl/allocations/run", async (long companyId, DateOnly periodDat
 .RequireAuthorization()
 .WithName("RunAllocations");
 
+app.MapPut("/api/accounting/ias29/index", async (long companyId, string indexCode, DateOnly month, decimal value, One4All.Application.Abstractions.Accounting.IHyperinflationService ias29, CancellationToken ct) =>
+    ActionResponse(await ias29.SetIndexAsync(companyId, indexCode, month, value, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SetPriceIndex");
+
+app.MapGet("/api/accounting/ias29/trial-balance", async (long companyId, DateOnly asAtDate, string? indexCode, One4All.Application.Abstractions.Accounting.IHyperinflationService ias29, CancellationToken ct) =>
+    ValueResponse(await ias29.RestatedTrialBalanceAsync(companyId, asAtDate, indexCode ?? "CPI", ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RestatedTrialBalance");
+
 app.MapGet("/api/consolidation/trial-balance", async (long[] companyIds, DateOnly asAtDate, string? presentationCurrency, string[]? intercompanyAccounts, One4All.Application.Abstractions.Reporting.IConsolidationService consolidation, CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(presentationCurrency))
