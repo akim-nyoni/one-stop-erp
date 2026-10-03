@@ -69,6 +69,12 @@ public partial class ShellWindow : Window
         audit.Show();
     }
 
+    private void OpenGroupConsolidation_Click(object sender, RoutedEventArgs e)
+    {
+        GroupConsolidationWindow consolidation = new(_services) { Owner = this };
+        consolidation.Show();
+    }
+
     private void OpenCheckData_Click(object sender, RoutedEventArgs e)
     {
         CheckDataWindow check = new(_services) { Owner = this };

@@ -64,6 +64,7 @@
                 <MenuItem Header="Analytics Dashboard…" Click="OpenAnalytics_Click" />
                 <MenuItem Header="Credit Control…" Click="OpenCreditControl_Click" />
                 <MenuItem Header="Customer Documents…" Click="OpenCustomerDocuments_Click" />
+                <MenuItem Header="Group Consolidation…" Click="OpenGroupConsolidation_Click" />
             </MenuItem>
             <MenuItem Header="_Reports">
                 <MenuItem Header="Report Viewer…" Click="OpenReportViewer_Click" />
