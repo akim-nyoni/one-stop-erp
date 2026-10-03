@@ -4,12 +4,17 @@ using One4All.Core.Common;
 namespace One4All.Core.Trading;
 
 /// <summary>
-/// A supplier (Purchase Ledger trader, brief §4.6, <c>ap.supplier</c>). Bank-detail changes are a
-/// dual-authorisation event elsewhere (a classic fraud vector); this record holds the current details and
-/// the trading terms that drive the payment run and ageing.
+/// A supplier (Purchase Ledger trader, brief §4.6, <c>ap.supplier</c>). Bank details are set when the supplier is
+/// created; after that they change only through an approved <see cref="SupplierBankChange"/> (a dual-authorisation
+/// event, since redirecting payments is a classic fraud vector). The record also holds the trading terms that drive the
+/// payment run and ageing.
 /// </summary>
 public sealed class Supplier : SoftDeletableEntity, ICompanyScoped
 {
+    private string? _bankAccountName;
+    private string? _bankAccountNumber;
+    private string? _bankName;
+
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private Supplier()
     {
@@ -62,14 +67,30 @@ public sealed class Supplier : SoftDeletableEntity, ICompanyScoped
     /// <summary>Tax-clearance expiry date (affects withholding on payments).</summary>
     public DateOnly? TaxClearanceExpiry { get; set; }
 
-    /// <summary>Bank account name.</summary>
-    public string? BankAccountName { get; set; }
+    /// <summary>Bank account name; set at creation, then changed only by an approved bank-detail change.</summary>
+    public string? BankAccountName { get => _bankAccountName; init => _bankAccountName = value; }
 
-    /// <summary>Bank account number.</summary>
-    public string? BankAccountNumber { get; set; }
+    /// <summary>Bank account number; set at creation, then changed only by an approved bank-detail change.</summary>
+    public string? BankAccountNumber { get => _bankAccountNumber; init => _bankAccountNumber = value; }
 
-    /// <summary>Bank name/branch.</summary>
-    public string? BankName { get; set; }
+    /// <summary>Bank name/branch; set at creation, then changed only by an approved bank-detail change.</summary>
+    public string? BankName { get => _bankName; init => _bankName = value; }
+
+    /// <summary>Applies an approved bank-detail change.</summary>
+    /// <param name="change">The change; it must be this supplier's and approved.</param>
+    /// <exception cref="InvalidOperationException">Thrown for a change that is not this supplier's or not approved.</exception>
+    public void ChangeBankDetails(SupplierBankChange change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        if (change.SupplierId != Id || change.Status != BankChangeStatus.Approved)
+        {
+            throw new InvalidOperationException("Supplier bank details change only through an approved bank-detail change.");
+        }
+
+        _bankAccountName = change.AccountName;
+        _bankAccountNumber = change.AccountNumber;
+        _bankName = change.BankName;
+    }
 
     /// <summary>Whether the supplier is active.</summary>
     public bool IsActive { get; set; }

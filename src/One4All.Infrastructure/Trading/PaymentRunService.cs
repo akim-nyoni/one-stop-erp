@@ -35,6 +35,7 @@ public sealed class PaymentRunService : IPaymentRunService
     private async Task<Result<PaymentRunResult>> RunCoreAsync(PaymentRunRequest request, CancellationToken ct)
     {
         (List<OpenItem> dueInvoices, List<OpenItem> credits, Dictionary<long, Supplier> suppliers) = await SelectAsync(request, ct).ConfigureAwait(false);
+        HashSet<long> bankChanging = await BankChangingAsync(request.CompanyId, ct).ConfigureAwait(false);
 
         // Continue the day's numbering if an earlier run already used it.
         string prefix = $"PMT-{request.PaymentDate:yyyyMMdd}-";
@@ -50,7 +51,8 @@ public sealed class PaymentRunService : IPaymentRunService
         foreach (IGrouping<(long SupplierId, string Currency), OpenItem> group in dueInvoices
             .GroupBy(i => (i.TraderId, i.Currency.Value)))
         {
-            if (!suppliers.TryGetValue(group.Key.SupplierId, out Supplier? supplier) || supplier.OnHold)
+            // Held: on hold, or bank details changing (paying to details about to change is how payment fraud works).
+            if (!suppliers.TryGetValue(group.Key.SupplierId, out Supplier? supplier) || supplier.OnHold || bankChanging.Contains(supplier.Id))
             {
                 continue;
             }
@@ -142,6 +144,7 @@ public sealed class PaymentRunService : IPaymentRunService
     public async Task<Result<PaymentRunProposal>> ProposeAsync(PaymentRunRequest request, CancellationToken ct = default)
     {
         (List<OpenItem> dueInvoices, List<OpenItem> credits, Dictionary<long, Supplier> suppliers) = await SelectAsync(request, ct).ConfigureAwait(false);
+        HashSet<long> bankChanging = await BankChangingAsync(request.CompanyId, ct).ConfigureAwait(false);
 
         List<PaymentProposalLine> lines = [];
         foreach (IGrouping<(long SupplierId, string Currency), OpenItem> group in dueInvoices.GroupBy(i => (i.TraderId, i.Currency.Value)))
@@ -155,14 +158,19 @@ public sealed class PaymentRunService : IPaymentRunService
             decimal available = credits.Where(c => c.TraderId == supplier.Id && c.Currency.Value == group.Key.Currency).Sum(c => c.OutstandingTransaction);
 
             // Exactly what the run does: credits are set against the invoices up to what is due; the rest is paid.
-            decimal apply = supplier.OnHold ? 0m : Math.Min(available, due);
-            decimal toPay = supplier.OnHold ? 0m : due - apply;
+            bool held = supplier.OnHold || bankChanging.Contains(supplier.Id);
+            decimal apply = held ? 0m : Math.Min(available, due);
+            decimal toPay = held ? 0m : due - apply;
             decimal withholding = toPay > 0m ? await WithholdingOnAsync(request, supplier, toPay, ct).ConfigureAwait(false) : 0m;
-            lines.Add(new PaymentProposalLine(supplier.Id, supplier.Code, supplier.Name, group.Key.Currency, group.Count(), due, available, apply, toPay, supplier.OnHold, withholding));
+            lines.Add(new PaymentProposalLine(supplier.Id, supplier.Code, supplier.Name, group.Key.Currency, group.Count(), due, available, apply, toPay, held, withholding, bankChanging.Contains(supplier.Id)));
         }
 
         return new PaymentRunProposal(request.PaymentDate, [.. lines.OrderBy(l => l.SupplierCode, StringComparer.Ordinal).ThenBy(l => l.Currency, StringComparer.Ordinal)]);
     }
+
+    private async Task<HashSet<long>> BankChangingAsync(long companyId, CancellationToken ct)
+        => [.. await _db.Set<SupplierBankChange>().Where(c => c.CompanyId == companyId && c.Status == BankChangeStatus.Pending)
+            .Select(c => c.SupplierId).ToListAsync(ct).ConfigureAwait(false)];
 
     private async Task<(List<OpenItem> DueInvoices, List<OpenItem> Credits, Dictionary<long, Supplier> Suppliers)> SelectAsync(PaymentRunRequest request, CancellationToken ct)
     {

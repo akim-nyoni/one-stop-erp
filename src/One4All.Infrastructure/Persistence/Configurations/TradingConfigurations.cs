@@ -45,6 +45,22 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
     }
 }
 
+internal sealed class SupplierBankChangeConfiguration : IEntityTypeConfiguration<SupplierBankChange>
+{
+    public void Configure(EntityTypeBuilder<SupplierBankChange> b)
+    {
+        b.ToTable("supplier_bank_change", Schemas.AccountsPayable, t =>
+            t.HasCheckConstraint("ck_supplier_bank_change_reviewer_not_requester", "status <> 1 OR reviewed_by_user_id <> requested_by_user_id"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AccountName).HasMaxLength(120);
+        b.Property(x => x.AccountNumber).HasMaxLength(40);
+        b.Property(x => x.BankName).HasMaxLength(120);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.RejectionReason).HasMaxLength(256);
+        b.HasIndex(x => x.SupplierId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_supplier_bank_change_one_pending");
+    }
+}
+
 internal sealed class OpenItemConfiguration : IEntityTypeConfiguration<OpenItem>
 {
     public void Configure(EntityTypeBuilder<OpenItem> b)

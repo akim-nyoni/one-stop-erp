@@ -10670,6 +10670,89 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("supplier", "ap");
                 });
 
+            modelBuilder.Entity("One4All.Core.Trading.SupplierBankChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("account_name");
+
+                    b.Property<string>("AccountNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("account_number");
+
+                    b.Property<string>("BankName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("bank_name");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<long>("RequestedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<long?>("ReviewedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reviewed_by_user_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_supplier_bank_change");
+
+                    b.HasIndex("SupplierId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_supplier_bank_change_one_pending")
+                        .HasFilter("status = 0");
+
+                    b.ToTable("supplier_bank_change", "ap", t =>
+                        {
+                            t.HasCheckConstraint("ck_supplier_bank_change_reviewer_not_requester", "status <> 1 OR reviewed_by_user_id <> requested_by_user_id");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Trading.WithholdingCertificate", b =>
                 {
                     b.Property<long>("Id")

@@ -509,6 +509,26 @@ app.MapGet("/api/accounting/ias29/trial-balance", async (long companyId, DateOnl
 .RequireAuthorization()
 .WithName("RestatedTrialBalance");
 
+app.MapPost("/api/ap/suppliers/{supplierId:long}/bank-change", async (long supplierId, long companyId, long userId, One4All.Application.Abstractions.Trading.SupplierBankDetails details, One4All.Application.Abstractions.Trading.ISupplierBankDetailsService bank, CancellationToken ct) =>
+    ValueResponse(await bank.RequestChangeAsync(companyId, supplierId, details, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RequestSupplierBankChange");
+
+app.MapGet("/api/ap/bank-changes", async (long companyId, One4All.Application.Abstractions.Trading.ISupplierBankDetailsService bank, CancellationToken ct) =>
+    Results.Ok(await bank.PendingAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PendingSupplierBankChanges");
+
+app.MapPost("/api/ap/bank-changes/{changeId:long}/approve", async (long changeId, long companyId, long userId, One4All.Application.Abstractions.Trading.ISupplierBankDetailsService bank, CancellationToken ct) =>
+    ActionResponse(await bank.ApproveAsync(companyId, changeId, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveSupplierBankChange");
+
+app.MapPost("/api/ap/bank-changes/{changeId:long}/reject", async (long changeId, long companyId, long userId, string reason, One4All.Application.Abstractions.Trading.ISupplierBankDetailsService bank, CancellationToken ct) =>
+    ActionResponse(await bank.RejectAsync(companyId, changeId, userId, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RejectSupplierBankChange");
+
 app.MapGet("/api/consolidation/trial-balance", async (long[] companyIds, DateOnly asAtDate, string? presentationCurrency, string[]? intercompanyAccounts, One4All.Application.Abstractions.Reporting.IConsolidationService consolidation, CancellationToken ct) =>
 {
     if (string.IsNullOrWhiteSpace(presentationCurrency))

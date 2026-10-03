@@ -61,7 +61,7 @@ public sealed record PaymentRunResult(IReadOnlyList<PaymentRunLine> Lines, decim
 /// <param name="ToPay">What the run would pay (0 for a supplier on hold).</param>
 /// <param name="OnHold">True when the supplier is on hold and would be skipped.</param>
 /// <param name="Withholding">Withholding tax that would be deducted (the supplier has no valid tax clearance).</param>
-public readonly record struct PaymentProposalLine(long SupplierId, string SupplierCode, string SupplierName, string Currency, int InvoicesDue, decimal AmountDue, decimal CreditsAvailable, decimal CreditsToApply, decimal ToPay, bool OnHold, decimal Withholding = 0m);
+public readonly record struct PaymentProposalLine(long SupplierId, string SupplierCode, string SupplierName, string Currency, int InvoicesDue, decimal AmountDue, decimal CreditsAvailable, decimal CreditsToApply, decimal ToPay, bool OnHold, decimal Withholding = 0m, bool BankChangePending = false);
 
 /// <summary>A payment run proposal: what <see cref="IPaymentRunService.RunAsync"/> would do with the same request.</summary>
 /// <param name="PaymentDate">The payment date.</param>
