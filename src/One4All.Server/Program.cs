@@ -432,6 +432,11 @@ app.MapPost("/api/banking/{bankAccountId:long}/reconciliation/sign-off", async (
 .RequireAuthorization()
 .WithName("SignOffBankReconciliation");
 
+app.MapPost("/api/banking/transfers", async (One4All.Application.Abstractions.Banking.BankTransferRequest request, One4All.Application.Abstractions.Banking.ITreasuryService treasury, CancellationToken ct) =>
+    ValueResponse(await treasury.TransferAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("TransferBetweenBankAccounts");
+
 app.MapGet("/api/gl/accounts/{accountCode}/activity", async (long companyId, string accountCode, DateOnly from, DateOnly to, One4All.Application.Abstractions.Reporting.IGeneralLedgerReports gl, CancellationToken ct) =>
     Results.Ok(await gl.NominalActivityAsync(companyId, accountCode, from, to, ct).ConfigureAwait(false)))
 .RequireAuthorization()
