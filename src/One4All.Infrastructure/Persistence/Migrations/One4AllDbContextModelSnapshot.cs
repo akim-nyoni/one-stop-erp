@@ -11469,6 +11469,121 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("customer", "ar");
                 });
 
+            modelBuilder.Entity("One4All.Core.Trading.DebtCase", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("AmountHandedOver")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount_handed_over");
+
+                    b.Property<string>("CaseNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("case_number");
+
+                    b.Property<DateOnly?>("ClosedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("closed_on");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Court")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("court");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateOnly>("HandedOverOn")
+                        .HasColumnType("date")
+                        .HasColumnName("handed_over_on");
+
+                    b.Property<string>("HandedOverTo")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("handed_over_to");
+
+                    b.Property<DateOnly?>("HearingDate")
+                        .HasColumnType("date")
+                        .HasColumnName("hearing_date");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage");
+
+                    b.Property<DateOnly?>("SummonsIssuedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("summons_issued_on");
+
+                    b.Property<string>("SummonsNumber")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("summons_number");
+
+                    b.Property<long?>("WriteOffApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("write_off_approved_by_user_id");
+
+                    b.Property<string>("WriteOffReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("write_off_reason");
+
+                    b.Property<long?>("WriteOffRequestedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("write_off_requested_by_user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_debt_case");
+
+                    b.HasIndex("CustomerId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_debt_case_one_open")
+                        .HasFilter("stage IN (0, 1)");
+
+                    b.HasIndex("CompanyId", "CaseNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_debt_case_company_id_case_number");
+
+                    b.ToTable("debt_case", "ar", t =>
+                        {
+                            t.HasCheckConstraint("ck_debt_case_write_off_approver", "write_off_approved_by_user_id IS NULL OR write_off_approved_by_user_id <> write_off_requested_by_user_id");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Trading.LaybyLine", b =>
                 {
                     b.Property<long>("Id")

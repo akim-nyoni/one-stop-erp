@@ -46,6 +46,26 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
     }
 }
 
+internal sealed class DebtCaseConfiguration : IEntityTypeConfiguration<DebtCase>
+{
+    public void Configure(EntityTypeBuilder<DebtCase> b)
+    {
+        b.ToTable("debt_case", Schemas.AccountsReceivable, t =>
+            t.HasCheckConstraint("ck_debt_case_write_off_approver", "write_off_approved_by_user_id IS NULL OR write_off_approved_by_user_id <> write_off_requested_by_user_id"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.CaseNumber).HasMaxLength(30);
+        b.Property(x => x.HandedOverTo).HasMaxLength(120);
+        b.Property(x => x.AmountHandedOver).HasPrecision(19, 4);
+        b.Property(x => x.Stage).HasConversion<int>();
+        b.Property(x => x.SummonsNumber).HasMaxLength(60);
+        b.Property(x => x.Court).HasMaxLength(120);
+        b.Property(x => x.WriteOffReason).HasMaxLength(500);
+        b.Ignore(x => x.IsOpen);
+        b.HasIndex(x => new { x.CompanyId, x.CaseNumber }).IsUnique();
+        b.HasIndex(x => x.CustomerId).IsUnique().HasFilter("stage IN (0, 1)").HasDatabaseName("ix_debt_case_one_open");
+    }
+}
+
 internal sealed class SalesRepConfiguration : IEntityTypeConfiguration<SalesRep>
 {
     public void Configure(EntityTypeBuilder<SalesRep> b)

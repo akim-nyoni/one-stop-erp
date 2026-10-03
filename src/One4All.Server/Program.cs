@@ -571,6 +571,36 @@ app.MapPost("/api/municipal/service-orders/{orderNumber}/cancel", async (string 
 .RequireAuthorization()
 .WithName("CancelServiceOrder");
 
+app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
+    ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("HandOverDebt");
+
+app.MapPost("/api/ar/debt-cases/{caseNumber}/summons", async (string caseNumber, long companyId, string summonsNumber, string court, DateOnly issuedOn, DateOnly? hearingDate, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
+    ActionResponse(await debts.RecordSummonsAsync(companyId, caseNumber, summonsNumber, court, issuedOn, hearingDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordSummons");
+
+app.MapGet("/api/ar/summons-register", async (long companyId, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
+    Results.Ok(await debts.SummonsRegisterAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SummonsRegister");
+
+app.MapPost("/api/ar/debt-cases/{caseNumber}/write-off/request", async (string caseNumber, long companyId, long userId, string reason, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
+    ActionResponse(await debts.RequestWriteOffAsync(companyId, caseNumber, userId, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RequestDebtWriteOff");
+
+app.MapPost("/api/ar/debt-cases/{caseNumber}/write-off/approve", async (string caseNumber, long companyId, long userId, DateOnly date, string badDebtAccountCode, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
+    ValueResponse(await debts.ApproveWriteOffAsync(companyId, caseNumber, userId, date, badDebtAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveDebtWriteOff");
+
+app.MapPost("/api/ar/debt-cases/{caseNumber}/close", async (string caseNumber, long companyId, One4All.Core.Trading.DebtCaseStage outcome, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
+    ActionResponse(await debts.CloseAsync(companyId, caseNumber, outcome, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CloseDebtCase");
+
 app.MapGet("/api/gl/accounts/{accountCode}/activity", async (long companyId, string accountCode, DateOnly from, DateOnly to, One4All.Application.Abstractions.Reporting.IGeneralLedgerReports gl, CancellationToken ct) =>
     Results.Ok(await gl.NominalActivityAsync(companyId, accountCode, from, to, ct).ConfigureAwait(false)))
 .RequireAuthorization()
