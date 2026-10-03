@@ -530,6 +530,26 @@ app.MapPost("/api/stock/requisitions/{requisitionId:long}/issue", async (long re
 .RequireAuthorization()
 .WithName("IssueStoreRequisition");
 
+app.MapPost("/api/municipal/indigent", async (long companyId, decimal maximumIncome, One4All.Application.Abstractions.Municipal.IndigentApplication application, One4All.Application.Abstractions.Municipal.IIndigentRegisterService register, CancellationToken ct) =>
+    ValueResponse(await register.RegisterAsync(companyId, application, maximumIncome, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RegisterIndigent");
+
+app.MapPost("/api/municipal/indigent/{registrationId:long}/review", async (long registrationId, long companyId, decimal householdIncome, decimal subsidyPercent, DateOnly reviewDue, decimal maximumIncome, long userId, One4All.Application.Abstractions.Municipal.IIndigentRegisterService register, CancellationToken ct) =>
+    ValueResponse(await register.ReviewAsync(companyId, registrationId, householdIncome, subsidyPercent, reviewDue, maximumIncome, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReviewIndigent");
+
+app.MapPost("/api/municipal/indigent/subsidies", async (long companyId, DateOnly monthEnd, string subsidyAccountCode, One4All.Application.Abstractions.Municipal.IIndigentRegisterService register, CancellationToken ct) =>
+    ValueResponse(await register.ApplySubsidiesAsync(companyId, monthEnd, subsidyAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApplyIndigentSubsidies");
+
+app.MapGet("/api/municipal/indigent/reviews-due", async (long companyId, DateOnly asAtDate, int withinDays, One4All.Application.Abstractions.Municipal.IIndigentRegisterService register, CancellationToken ct) =>
+    Results.Ok(await register.ReviewsDueAsync(companyId, asAtDate, withinDays, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("IndigentReviewsDue");
+
 app.MapGet("/api/gl/accounts/{accountCode}/activity", async (long companyId, string accountCode, DateOnly from, DateOnly to, One4All.Application.Abstractions.Reporting.IGeneralLedgerReports gl, CancellationToken ct) =>
     Results.Ok(await gl.NominalActivityAsync(companyId, accountCode, from, to, ct).ConfigureAwait(false)))
 .RequireAuthorization()

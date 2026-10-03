@@ -4,6 +4,19 @@ using One4All.Core.Municipal;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
+internal sealed class IndigentRegistrationConfiguration : IEntityTypeConfiguration<IndigentRegistration>
+{
+    public void Configure(EntityTypeBuilder<IndigentRegistration> b)
+    {
+        b.ToTable("indigent_registration", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.HouseholdIncome).HasPrecision(19, 4);
+        b.Property(x => x.SubsidyPercent).HasPrecision(9, 4);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => x.PropertyId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_indigent_registration_one_active");
+    }
+}
+
 internal sealed class TariffConfiguration : IEntityTypeConfiguration<Tariff>
 {
     public void Configure(EntityTypeBuilder<Tariff> b)
