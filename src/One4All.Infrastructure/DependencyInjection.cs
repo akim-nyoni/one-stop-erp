@@ -102,6 +102,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Trading.IRecurringPurchaseInvoiceService, Trading.RecurringPurchaseInvoiceService>();
         services.AddScoped<Application.Abstractions.Banking.IBankReconciliationService, Banking.BankReconciliationService>();
         services.AddScoped<Application.Abstractions.Banking.IBankStatementPostingService, Banking.BankStatementPostingService>();
+        services.AddScoped<Application.Abstractions.Banking.IBankRuleService, Banking.BankRuleService>();
 
         // Generic workflow / approvals engine.
         services.AddScoped<Application.Abstractions.Workflow.IWorkflowService, Workflow.WorkflowService>();

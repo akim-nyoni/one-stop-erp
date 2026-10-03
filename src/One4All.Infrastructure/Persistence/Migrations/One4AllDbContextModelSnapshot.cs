@@ -1056,6 +1056,97 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("bank_account", "cb");
                 });
 
+            modelBuilder.Entity("One4All.Core.Banking.BankRule", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("account_code");
+
+                    b.Property<long?>("BankAccountId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("bank_account_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("DescriptionContains")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description_contains");
+
+                    b.Property<int>("Direction")
+                        .HasColumnType("integer")
+                        .HasColumnName("direction");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<decimal?>("MaxAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("max_amount");
+
+                    b.Property<decimal?>("MinAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("min_amount");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Narrative")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("narrative");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer")
+                        .HasColumnName("priority");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bank_rule");
+
+                    b.HasIndex("CompanyId", "IsActive")
+                        .HasDatabaseName("ix_bank_rule_company_id_is_active");
+
+                    b.ToTable("bank_rule", "cb");
+                });
+
             modelBuilder.Entity("One4All.Core.Banking.BankStatementLine", b =>
                 {
                     b.Property<long>("Id")
