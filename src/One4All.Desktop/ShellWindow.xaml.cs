@@ -75,6 +75,12 @@ public partial class ShellWindow : Window
         documents.Show();
     }
 
+    private void OpenSupplierReconciliation_Click(object sender, RoutedEventArgs e)
+    {
+        SupplierReconciliationWindow recon = new(_services) { Owner = this };
+        recon.Show();
+    }
+
     private void OpenBankReconciliation_Click(object sender, RoutedEventArgs e)
     {
         BankReconciliationWindow recon = new(_services) { Owner = this };

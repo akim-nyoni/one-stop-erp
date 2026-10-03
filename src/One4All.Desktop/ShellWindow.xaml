@@ -56,6 +56,7 @@
                 <MenuItem Header="My Approvals…" Click="OpenApprovals_Click" />
                 <MenuItem Header="Stock Replenishment…" Click="OpenReplenishment_Click" />
                 <MenuItem Header="Bank Reconciliation…" Click="OpenBankReconciliation_Click" />
+                <MenuItem Header="Supplier Statement Reconciliation…" Click="OpenSupplierReconciliation_Click" />
             </MenuItem>
             <MenuItem Header="_Enquiries">
                 <MenuItem Header="Account Enquiry…" Click="OpenAccountEnquiry_Click" />
