@@ -5520,6 +5520,136 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("grn_line", "pop");
                 });
 
+            modelBuilder.Entity("One4All.Core.Procurement.InvoiceDispute", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("InvoiceDate")
+                        .HasColumnType("date")
+                        .HasColumnName("invoice_date");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("invoice_number");
+
+                    b.Property<string>("JournalNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("PurchaseOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("purchase_order_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reason_code");
+
+                    b.Property<string>("ResolutionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("resolution_note");
+
+                    b.Property<long?>("ResolvedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("resolved_by_user_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_invoice_dispute");
+
+                    b.HasIndex("CompanyId", "Status")
+                        .HasDatabaseName("ix_invoice_dispute_company_id_status");
+
+                    b.ToTable("invoice_dispute", "pop");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.InvoiceDisputeLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("InvoiceDisputeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("invoice_dispute_id");
+
+                    b.Property<long>("PurchaseOrderLineId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("purchase_order_line_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id")
+                        .HasName("pk_invoice_dispute_line");
+
+                    b.HasIndex("InvoiceDisputeId")
+                        .HasDatabaseName("ix_invoice_dispute_line_invoice_dispute_id");
+
+                    b.ToTable("invoice_dispute_line", "pop");
+                });
+
             modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrder", b =>
                 {
                     b.Property<long>("Id")
@@ -12097,6 +12227,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_grn_line_goods_received_notes_goods_received_note_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Procurement.InvoiceDisputeLine", b =>
+                {
+                    b.HasOne("One4All.Core.Procurement.InvoiceDispute", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("InvoiceDisputeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_invoice_dispute_line_invoice_dispute_invoice_dispute_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrderLine", b =>
                 {
                     b.HasOne("One4All.Core.Procurement.PurchaseOrder", null)
@@ -12529,6 +12669,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("One4All.Core.Procurement.GrnInspection", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.InvoiceDispute", b =>
                 {
                     b.Navigation("Lines");
                 });

@@ -4,6 +4,35 @@ using One4All.Core.Procurement;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
+internal sealed class InvoiceDisputeConfiguration : IEntityTypeConfiguration<InvoiceDispute>
+{
+    public void Configure(EntityTypeBuilder<InvoiceDispute> b)
+    {
+        b.ToTable("invoice_dispute", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.InvoiceNumber).HasMaxLength(60);
+        b.Property(x => x.ReasonCode).HasMaxLength(60);
+        b.Property(x => x.Reason).HasMaxLength(500);
+        b.Property(x => x.ResolutionNote).HasMaxLength(500);
+        b.Property(x => x.JournalNumber).HasMaxLength(30);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.InvoiceDisputeId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}
+
+internal sealed class InvoiceDisputeLineConfiguration : IEntityTypeConfiguration<InvoiceDisputeLine>
+{
+    public void Configure(EntityTypeBuilder<InvoiceDisputeLine> b)
+    {
+        b.ToTable("invoice_dispute_line", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.Property(x => x.UnitPrice).HasPrecision(19, 4);
+    }
+}
+
 internal sealed class GrnInspectionConfiguration : IEntityTypeConfiguration<GrnInspection>
 {
     public void Configure(EntityTypeBuilder<GrnInspection> b)

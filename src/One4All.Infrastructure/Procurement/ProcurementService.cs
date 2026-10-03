@@ -192,6 +192,7 @@ public sealed class ProcurementService : IProcurementService
         }
 
         decimal invoiceValue = 0m;
+        decimal accruedValue = 0m;
         foreach (InvoiceMatchLine invLine in request.Lines)
         {
             PurchaseOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == invLine.PurchaseOrderLineId);
@@ -217,10 +218,31 @@ public sealed class ProcurementService : IProcurementService
             }
 
             invoiceValue += decimal.Round(invLine.Quantity * invLine.UnitPrice, 4, MidpointRounding.ToEven);
+            accruedValue += decimal.Round(invLine.Quantity * line.UnitPrice, 4, MidpointRounding.ToEven);
             line.Invoice(invLine.Quantity);
         }
 
-        // Clear GRNI to AP: Dr GRNI, Cr AP control.
+        // Clear GRNI at what was accrued (the order price) and owe the supplier the invoice price; any difference is a
+        // purchase price variance, so GRNI clears exactly.
+        decimal variance = invoiceValue - accruedValue;
+        if (variance != 0m && string.IsNullOrWhiteSpace(request.PriceVarianceAccountCode))
+        {
+            return Error.Rule("Pop.NoPriceVarianceAccount", "The invoice is priced differently from the order: give a purchase price variance account.");
+        }
+
+        List<JournalLineRequest> matchLines =
+        [
+            new JournalLineRequest { AccountCode = grniCode, Side = JournalSide.Debit, TransactionAmount = accruedValue },
+            new JournalLineRequest { AccountCode = apCode, Side = JournalSide.Credit, TransactionAmount = invoiceValue },
+        ];
+        if (variance != 0m)
+        {
+            matchLines.Add(new JournalLineRequest
+            {
+                AccountCode = request.PriceVarianceAccountCode!.Trim(), Side = variance > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(variance),
+            });
+        }
+
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
             CompanyId = request.CompanyId,
@@ -231,11 +253,7 @@ public sealed class ProcurementService : IProcurementService
             DocumentType = "SupplierInvoice",
             DocumentNumber = request.InvoiceNumber,
             Narrative = $"3-way match {order.OrderNumber}",
-            Lines =
-            [
-                new JournalLineRequest { AccountCode = grniCode, Side = JournalSide.Debit, TransactionAmount = invoiceValue },
-                new JournalLineRequest { AccountCode = apCode, Side = JournalSide.Credit, TransactionAmount = invoiceValue },
-            ],
+            Lines = matchLines,
         }, ct).ConfigureAwait(false);
 
         if (posting.IsFailure)

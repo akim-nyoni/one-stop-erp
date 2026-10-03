@@ -630,6 +630,26 @@ app.MapPost("/api/pop/grns/{grnId:long}/inspection", async (long grnId, long com
 .RequireAuthorization()
 .WithName("InspectGoodsReceived");
 
+app.MapPost("/api/pop/invoices/submit", async (One4All.Application.Abstractions.Procurement.MatchInvoiceRequest request, One4All.Application.Abstractions.Procurement.IInvoiceDisputeService disputes, CancellationToken ct) =>
+    ValueResponse(await disputes.SubmitAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SubmitSupplierInvoice");
+
+app.MapGet("/api/pop/invoice-disputes", async (long companyId, One4All.Application.Abstractions.Procurement.IInvoiceDisputeService disputes, CancellationToken ct) =>
+    Results.Ok(await disputes.OpenAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("OpenInvoiceDisputes");
+
+app.MapPost("/api/pop/invoice-disputes/{disputeId:long}/accept", async (long disputeId, long companyId, long userId, string note, string priceVarianceAccountCode, One4All.Application.Abstractions.Procurement.IInvoiceDisputeService disputes, CancellationToken ct) =>
+    ValueResponse(await disputes.AcceptAsync(companyId, disputeId, userId, note, priceVarianceAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AcceptInvoiceDispute");
+
+app.MapPost("/api/pop/invoice-disputes/{disputeId:long}/reject", async (long disputeId, long companyId, long userId, string note, One4All.Application.Abstractions.Procurement.IInvoiceDisputeService disputes, CancellationToken ct) =>
+    ActionResponse(await disputes.RejectAsync(companyId, disputeId, userId, note, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RejectInvoiceDispute");
+
 app.MapPost("/api/ar/items/{openItemId:long}/write-off-with-vat-relief", async (long openItemId, long companyId, DateOnly date, string badDebtAccountCode, string reason, int minimumDaysOverdue, One4All.Application.Abstractions.Trading.ISalesLedgerService ar, CancellationToken ct) =>
     ValueResponse(await ar.WriteOffWithVatReliefAsync(companyId, openItemId, date, badDebtAccountCode, reason, minimumDaysOverdue, ct).ConfigureAwait(false)))
 .RequireAuthorization()

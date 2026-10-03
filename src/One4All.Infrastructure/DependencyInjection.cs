@@ -61,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Procurement.ISupplierScorecardService, Procurement.SupplierScorecardService>();
         services.AddScoped<Application.Abstractions.Procurement.IRfqService, Procurement.RfqService>();
         services.AddScoped<Application.Abstractions.Procurement.IQualityInspectionService, Procurement.QualityInspectionService>();
+        services.AddScoped<Application.Abstractions.Procurement.IInvoiceDisputeService, Procurement.InvoiceDisputeService>();
         services.AddScoped<Application.Abstractions.Budgeting.IVarianceCommentaryService, Budgeting.VarianceCommentaryService>();
         services.AddScoped<Application.Abstractions.Trading.ISupplierBankDetailsService, Trading.SupplierBankDetailsService>();
         services.AddScoped<IRecurringJournalService, Accounting.RecurringJournalService>();

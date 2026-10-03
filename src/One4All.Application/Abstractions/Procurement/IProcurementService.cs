@@ -85,6 +85,12 @@ public sealed class MatchInvoiceRequest
     /// <summary>The allowed price tolerance as a percentage (e.g. 5 = 5%).</summary>
     public decimal TolerancePercent { get; init; } = 5m;
 
+    /// <summary>
+    /// Where the difference between the invoice and order prices goes (purchase price variance). Required when the
+    /// invoice is priced differently from the order: GRNI clears at the order price and AP takes the invoice price.
+    /// </summary>
+    public string? PriceVarianceAccountCode { get; init; }
+
     /// <summary>The invoiced lines.</summary>
     public IReadOnlyList<InvoiceMatchLine> Lines { get; init; } = [];
 }
