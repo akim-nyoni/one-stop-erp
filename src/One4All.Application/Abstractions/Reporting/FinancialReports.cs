@@ -212,9 +212,10 @@ public sealed record FinancialSnapshotReport(DateOnly AsAtDate, IReadOnlyList<Fi
 /// <param name="Control">The control account (e.g. "Accounts Receivable").</param>
 /// <param name="AccountCode">The GL account code.</param>
 /// <param name="GlBalance">The GL balance in the account's natural sign.</param>
-/// <param name="SubLedgerBalance">The sub-ledger total that should equal it.</param>
-/// <param name="Difference">GL − sub-ledger (should be zero).</param>
-public sealed record ControlReconciliationRow(string Control, string AccountCode, decimal GlBalance, decimal SubLedgerBalance, decimal Difference);
+/// <param name="SubLedgerBalance">The sub-ledger total at historic rates.</param>
+/// <param name="Difference">GL − sub-ledger − revaluation (should be zero).</param>
+/// <param name="Revaluation">Unrealised FX revaluation booked on the control account at the date (a reconciling item, AR / AP only).</param>
+public sealed record ControlReconciliationRow(string Control, string AccountCode, decimal GlBalance, decimal SubLedgerBalance, decimal Difference, decimal Revaluation = 0m);
 
 /// <summary>The control-account reconciliation as at a date.</summary>
 /// <param name="AsAtDate">The as-at date.</param>

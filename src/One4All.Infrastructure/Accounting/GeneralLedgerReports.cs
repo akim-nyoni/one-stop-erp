@@ -510,7 +510,16 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
                 ControlAccountType.AccountsPayable => (cr - d, apSub, "Accounts Payable"),
                 _ => (d - cr, stockSub, "Stock"),
             };
-            rows.Add(new ControlReconciliationRow(label, c.AccountCode, glNatural, sub, glNatural - sub));
+
+            // Foreign-currency open items stay at historic rates; a period-end revaluation on the control is the
+            // reconciling difference until it is reversed.
+            decimal revaluation = c.ControlAccountType switch
+            {
+                ControlAccountType.AccountsReceivable => await Trading.TradingRevaluationService.BookedAsync(_db, companyId, Core.Trading.TradingLedger.AccountsReceivable, c.AccountCode, asAtDate, ct).ConfigureAwait(false),
+                ControlAccountType.AccountsPayable => await Trading.TradingRevaluationService.BookedAsync(_db, companyId, Core.Trading.TradingLedger.AccountsPayable, c.AccountCode, asAtDate, ct).ConfigureAwait(false),
+                _ => 0m,
+            };
+            rows.Add(new ControlReconciliationRow(label, c.AccountCode, glNatural, sub, glNatural - sub - revaluation, revaluation));
         }
 
         return new ControlReconciliationReport(asAtDate, rows);
