@@ -4,6 +4,20 @@ using One4All.Core.Vouchers;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
+internal sealed class GiftCardTransactionConfiguration : IEntityTypeConfiguration<GiftCardTransaction>
+{
+    public void Configure(EntityTypeBuilder<GiftCardTransaction> b)
+    {
+        b.ToTable("gift_card_transaction", Schemas.Vouchers);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Event).HasConversion<int>();
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.BalanceAfter).HasPrecision(19, 4);
+        b.Property(x => x.Note).HasMaxLength(200);
+        b.HasIndex(x => x.GiftCardId);
+    }
+}
+
 internal sealed class AllowanceVoucherConfiguration : IEntityTypeConfiguration<AllowanceVoucher>
 {
     public void Configure(EntityTypeBuilder<AllowanceVoucher> b)

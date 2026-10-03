@@ -56,6 +56,7 @@ public sealed class VoucherService : IVoucherService
         GiftCard card = new(request.CompanyId, request.CardNumber, request.Currency, request.Value, request.IssueDate, request.ExpiryDate);
         _db.Set<GiftCard>().Add(card);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await LogAsync(card, request.IssueDate, GiftCardEvent.Issued, request.Value, null, ct).ConfigureAwait(false);
 
         return new GiftCardResult(card.Id, card.Balance, card.Status);
     }
@@ -76,6 +77,7 @@ public sealed class VoucherService : IVoucherService
             return redeem.Error;
         }
 
+        _db.Set<GiftCardTransaction>().Add(new GiftCardTransaction(card.CompanyId, card.Id, DateOnly.FromDateTime(DateTime.UtcNow), GiftCardEvent.Redeemed, -amount, card.Balance, null));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new GiftCardResult(card.Id, card.Balance, card.Status);
     }
@@ -136,6 +138,7 @@ public sealed class VoucherService : IVoucherService
 
         GiftCard card = cardResult.Value;
         decimal breakage = card.RecogniseBreakage();
+        _db.Set<GiftCardTransaction>().Add(new GiftCardTransaction(card.CompanyId, card.Id, date, GiftCardEvent.Breakage, -breakage, 0m, null));
         if (breakage > 0m)
         {
             Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
@@ -163,6 +166,12 @@ public sealed class VoucherService : IVoucherService
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new GiftCardResult(card.Id, card.Balance, card.Status);
+    }
+
+    private async Task LogAsync(GiftCard card, DateOnly date, GiftCardEvent @event, decimal amount, string? note, CancellationToken ct)
+    {
+        _db.Set<GiftCardTransaction>().Add(new GiftCardTransaction(card.CompanyId, card.Id, date, @event, amount, card.Balance, note));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     private async Task<Result<GiftCard>> LoadAsync(long companyId, string cardNumber, CancellationToken ct)

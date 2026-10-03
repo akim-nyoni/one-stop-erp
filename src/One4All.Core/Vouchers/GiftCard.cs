@@ -72,6 +72,26 @@ public sealed class GiftCard : AuditableEntity, ICompanyScoped
     /// <summary>The status.</summary>
     public GiftCardStatus Status { get; private set; }
 
+    /// <summary>The card that replaced this one, when it was lost or stolen.</summary>
+    public long? ReplacedByCardId { get; private set; }
+
+    /// <summary>Moves a blocked card's balance to its replacement, leaving it empty.</summary>
+    /// <param name="replacementId">The replacement card.</param>
+    /// <returns>The balance moved.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when the card is not blocked or was already replaced.</exception>
+    public decimal TransferToReplacement(long replacementId)
+    {
+        if (Status != GiftCardStatus.Blocked || ReplacedByCardId is not null)
+        {
+            throw new InvalidOperationException("Only a blocked card that has not been replaced can be replaced.");
+        }
+
+        decimal moved = Balance;
+        Balance = 0m;
+        ReplacedByCardId = replacementId;
+        return moved;
+    }
+
     /// <summary>Redeems an amount from the card, reducing the balance.</summary>
     /// <param name="amount">The amount to redeem.</param>
     /// <returns>Success, or a rule error when blocked/expired/insufficient.</returns>

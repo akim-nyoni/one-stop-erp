@@ -93,3 +93,53 @@ public interface IVoucherService
 /// <param name="CardsExpired">The number of cards whose balance was recognised as breakage.</param>
 /// <param name="TotalBreakage">The total breakage income recognised.</param>
 public readonly record struct BreakageRunResult(int CardsExpired, decimal TotalBreakage);
+
+/// <summary>A line of a gift card's history.</summary>
+/// <param name="OccurredOn">When.</param>
+/// <param name="Event">What happened.</param>
+/// <param name="Amount">The change in balance.</param>
+/// <param name="BalanceAfter">The balance afterwards.</param>
+/// <param name="Note">A reference or reason.</param>
+public sealed record GiftCardHistoryLine(DateOnly OccurredOn, One4All.Core.Vouchers.GiftCardEvent Event, decimal Amount, decimal BalanceAfter, string? Note);
+
+/// <summary>Gift card servicing beyond issue and redemption (brief §4.8.1).</summary>
+public interface IGiftCardServicing
+{
+    /// <summary>Adds value to an active (or spent) card: Dr cash, Cr gift card liability.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="cardNumber">The card.</param>
+    /// <param name="amount">The amount.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="cashAccountCode">Where the money was received.</param>
+    /// <param name="liabilityAccountCode">The gift card liability.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The card's new balance, or why it was refused.</returns>
+    Task<Result<GiftCardResult>> TopUpAsync(long companyId, string cardNumber, decimal amount, DateOnly date, string cashAccountCode, string liabilityAccountCode, CancellationToken ct = default);
+
+    /// <summary>Blocks a card reported lost or stolen; it can no longer be spent.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="cardNumber">The card.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="reason">Why; required.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The blocked card, or why it was refused.</returns>
+    Task<Result<GiftCardResult>> BlockAsync(long companyId, string cardNumber, DateOnly date, string reason, CancellationToken ct = default);
+
+    /// <summary>
+    /// Replaces a blocked card: a new card takes over its balance and expiry. The liability is unchanged, so nothing posts.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="blockedCardNumber">The blocked card.</param>
+    /// <param name="newCardNumber">The replacement's number.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The replacement card, or why it was refused.</returns>
+    Task<Result<GiftCardResult>> ReplaceAsync(long companyId, string blockedCardNumber, string newCardNumber, DateOnly date, CancellationToken ct = default);
+
+    /// <summary>A card's full history, oldest first.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="cardNumber">The card.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The history, or why there is none.</returns>
+    Task<Result<IReadOnlyList<GiftCardHistoryLine>>> HistoryAsync(long companyId, string cardNumber, CancellationToken ct = default);
+}

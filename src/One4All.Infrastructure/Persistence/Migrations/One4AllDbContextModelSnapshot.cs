@@ -12259,6 +12259,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("original_value");
 
+                    b.Property<long?>("ReplacedByCardId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("replaced_by_card_id");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -12277,6 +12281,59 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_gift_card_company_id_card_number");
 
                     b.ToTable("gift_card", "vou");
+                });
+
+            modelBuilder.Entity("One4All.Core.Vouchers.GiftCardTransaction", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<decimal>("BalanceAfter")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("balance_after");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<int>("Event")
+                        .HasColumnType("integer")
+                        .HasColumnName("event");
+
+                    b.Property<long>("GiftCardId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("gift_card_id");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
+
+                    b.Property<DateOnly>("OccurredOn")
+                        .HasColumnType("date")
+                        .HasColumnName("occurred_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_gift_card_transaction");
+
+                    b.HasIndex("GiftCardId")
+                        .HasDatabaseName("ix_gift_card_transaction_gift_card_id");
+
+                    b.ToTable("gift_card_transaction", "vou");
                 });
 
             modelBuilder.Entity("One4All.Core.Vouchers.PromoCampaign", b =>

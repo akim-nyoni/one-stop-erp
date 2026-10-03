@@ -472,6 +472,26 @@ app.MapGet("/api/vouchers/allowances/outstanding", async (long companyId, DateOn
 .RequireAuthorization()
 .WithName("OutstandingAllowanceVouchers");
 
+app.MapPost("/api/vouchers/gift-cards/{cardNumber}/top-up", async (string cardNumber, long companyId, decimal amount, DateOnly date, string cashAccountCode, string liabilityAccountCode, One4All.Application.Abstractions.Vouchers.IGiftCardServicing cards, CancellationToken ct) =>
+    ValueResponse(await cards.TopUpAsync(companyId, cardNumber, amount, date, cashAccountCode, liabilityAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("TopUpGiftCard");
+
+app.MapPost("/api/vouchers/gift-cards/{cardNumber}/block", async (string cardNumber, long companyId, DateOnly date, string reason, One4All.Application.Abstractions.Vouchers.IGiftCardServicing cards, CancellationToken ct) =>
+    ValueResponse(await cards.BlockAsync(companyId, cardNumber, date, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("BlockGiftCard");
+
+app.MapPost("/api/vouchers/gift-cards/{cardNumber}/replace", async (string cardNumber, long companyId, string newCardNumber, DateOnly date, One4All.Application.Abstractions.Vouchers.IGiftCardServicing cards, CancellationToken ct) =>
+    ValueResponse(await cards.ReplaceAsync(companyId, cardNumber, newCardNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReplaceGiftCard");
+
+app.MapGet("/api/vouchers/gift-cards/{cardNumber}/history", async (string cardNumber, long companyId, One4All.Application.Abstractions.Vouchers.IGiftCardServicing cards, CancellationToken ct) =>
+    ValueResponse(await cards.HistoryAsync(companyId, cardNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("GiftCardHistory");
+
 app.MapGet("/api/gl/accounts/{accountCode}/activity", async (long companyId, string accountCode, DateOnly from, DateOnly to, One4All.Application.Abstractions.Reporting.IGeneralLedgerReports gl, CancellationToken ct) =>
     Results.Ok(await gl.NominalActivityAsync(companyId, accountCode, from, to, ct).ConfigureAwait(false)))
 .RequireAuthorization()
