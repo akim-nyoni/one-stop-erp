@@ -88,4 +88,11 @@ public interface IBudgetControlService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>One row per vote, by account.</returns>
     Task<IReadOnlyList<VoteBookRow>> VoteBookAsync(long companyId, long fiscalYearId, int asAtPeriod, CancellationToken ct = default);
+
+    /// <summary>Checks an approved budget's lines against its seal.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="budgetId">The budget.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True when the lines are as approved; an error when the budget is unknown or was never sealed.</returns>
+    Task<Result<bool>> VerifySealAsync(long companyId, long budgetId, CancellationToken ct = default);
 }

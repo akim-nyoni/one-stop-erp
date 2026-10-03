@@ -43,7 +43,7 @@ public sealed class BudgetingService : IBudgetingService
     /// <inheritdoc />
     public async Task<Result> ActivateAsync(long companyId, long budgetId, CancellationToken ct = default)
     {
-        Budget? budget = await _db.Set<Budget>().FirstOrDefaultAsync(b => b.Id == budgetId && b.CompanyId == companyId, ct).ConfigureAwait(false);
+        Budget? budget = await _db.Set<Budget>().Include(b => b.Lines).FirstOrDefaultAsync(b => b.Id == budgetId && b.CompanyId == companyId, ct).ConfigureAwait(false);
         if (budget is null)
         {
             return Result.Failure(Error.NotFound("Budget.NotFound", $"Budget {budgetId} not found."));

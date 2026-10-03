@@ -167,6 +167,23 @@ public sealed class BudgetControlService : IBudgetControlService
             commitments.GetValueOrDefault(code)))];
     }
 
+    /// <inheritdoc />
+    public async Task<Result<bool>> VerifySealAsync(long companyId, long budgetId, CancellationToken ct = default)
+    {
+        Budget? budget = await _db.Budgets.AsNoTracking().Include(b => b.Lines).FirstOrDefaultAsync(b => b.Id == budgetId && b.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (budget is null)
+        {
+            return Error.NotFound("Budget.NotFound", $"Budget {budgetId} not found.");
+        }
+
+        if (!budget.IsSealed)
+        {
+            return Error.Rule("Budget.NotSealed", $"Budget {budgetId} has not been approved, so it has no seal.");
+        }
+
+        return budget.VerifySeal();
+    }
+
     // Whether the source line lacks the budget to give: its year's budget less expenditure and open commitments.
     private async Task<Error?> SourceShortAsync(Budget budget, string accountCode, decimal amount, CancellationToken ct)
     {

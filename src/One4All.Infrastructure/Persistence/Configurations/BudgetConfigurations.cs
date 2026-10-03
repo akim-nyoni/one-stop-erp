@@ -15,6 +15,8 @@ internal sealed class BudgetConfiguration : IEntityTypeConfiguration<Budget>
         b.Property(x => x.Department).HasMaxLength(30);
         b.Property(x => x.Status).HasConversion<int>();
         b.Property(x => x.Reason).HasMaxLength(300);
+        b.Property(x => x.SealHash).HasMaxLength(64);
+        b.Ignore(x => x.IsSealed);
         b.Ignore(x => x.AnnualTotal);
         b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.BudgetId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);

@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using One4All.Core.Common;
 
 namespace One4All.Core.Budgeting;
@@ -103,6 +106,15 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
     /// <summary>The reason for this version (audit trail).</summary>
     public string? Reason { get; set; }
 
+    /// <summary>
+    /// The seal: a SHA-256 hash of the lines as approved, set when the budget is approved or activated, so an approved
+    /// budget can be proved unaltered years later (brief §4.18.3). Virement lines are not part of it.
+    /// </summary>
+    public string? SealHash { get; private set; }
+
+    /// <summary>Whether the budget is sealed, after which its approved lines cannot change.</summary>
+    public bool IsSealed => SealHash is not null;
+
     /// <summary>The budget lines.</summary>
     public IReadOnlyList<BudgetLine> Lines => _lines.AsReadOnly();
 
@@ -116,21 +128,50 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
     /// <param name="costCentre">The cost centre, if any.</param>
     /// <returns>The created line.</returns>
     /// <param name="virementId">The approved virement adding the line, if any.</param>
+    /// <exception cref="InvalidOperationException">Thrown when adding an ordinary line to a sealed budget: changes go in a new version or a virement.</exception>
     public BudgetLine AddLine(string accountCode, int period, decimal amount, string? costCentre = null, long? virementId = null)
     {
+        if (IsSealed && virementId is null)
+        {
+            throw new InvalidOperationException("An approved budget cannot be edited; create a new version or a virement.");
+        }
+
         BudgetLine line = new(accountCode, period, amount, costCentre, virementId);
         _lines.Add(line);
         return line;
     }
 
-    /// <summary>Marks the budget approved.</summary>
-    public void Approve() => Status = BudgetStatus.Approved;
+    /// <summary>Marks the budget approved and seals its lines.</summary>
+    public void Approve()
+    {
+        Status = BudgetStatus.Approved;
+        SealHash ??= ComputeSeal();
+    }
 
-    /// <summary>Activates this version as the live budget.</summary>
+    /// <summary>Activates this version as the live budget, sealing it if it was not already.</summary>
     public void Activate()
     {
         Status = BudgetStatus.Active;
         IsActive = true;
+        SealHash ??= ComputeSeal();
+    }
+
+    /// <summary>Whether the approved lines still match the seal.</summary>
+    /// <returns>True when sealed and unaltered.</returns>
+    public bool VerifySeal() => SealHash is not null && SealHash == ComputeSeal();
+
+    // The approved lines in a fixed order and format, hashed: virement lines are separate documents and left out.
+    private string ComputeSeal()
+    {
+        StringBuilder canonical = new();
+        canonical.Append(CultureInfo.InvariantCulture, $"{CompanyId}|{FiscalYearId}|{(int)Type}|{Department}|{VersionNumber}\n");
+        foreach (BudgetLine line in _lines.Where(l => l.VirementId is null)
+                     .OrderBy(l => l.AccountCode, StringComparer.Ordinal).ThenBy(l => l.CostCentre, StringComparer.Ordinal).ThenBy(l => l.Period).ThenBy(l => l.Amount))
+        {
+            canonical.Append(CultureInfo.InvariantCulture, $"{line.AccountCode}|{line.CostCentre}|{line.Period}|{line.Amount:0.0000}\n");
+        }
+
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical.ToString())));
     }
 
     /// <summary>Supersedes this version (retained, never deleted).</summary>
