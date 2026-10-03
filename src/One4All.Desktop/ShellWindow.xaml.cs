@@ -63,6 +63,12 @@ public partial class ShellWindow : Window
         credit.Show();
     }
 
+    private void OpenBankRules_Click(object sender, RoutedEventArgs e)
+    {
+        BankRulesWindow rules = new(_services) { Owner = this };
+        rules.Show();
+    }
+
     private void OpenPeriodClose_Click(object sender, RoutedEventArgs e)
     {
         PeriodCloseWindow close = new(_services) { Owner = this };

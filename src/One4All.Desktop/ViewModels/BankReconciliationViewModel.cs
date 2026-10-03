@@ -65,7 +65,7 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
 
     /// <summary>The selected bank account.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(LoadCommand), nameof(AutoMatchCommand))]
+    [NotifyCanExecuteChangedFor(nameof(LoadCommand), nameof(AutoMatchCommand), nameof(ApplyRulesCommand))]
     private BankChoiceVm? _selectedBank;
 
     /// <summary>The as-at date.</summary>
@@ -196,7 +196,7 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
 
     /// <summary>True while working.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(LoadCommand), nameof(AutoMatchCommand), nameof(MatchCommand), nameof(UnmatchCommand), nameof(PostLineCommand))]
+    [NotifyCanExecuteChangedFor(nameof(LoadCommand), nameof(AutoMatchCommand), nameof(ApplyRulesCommand), nameof(MatchCommand), nameof(UnmatchCommand), nameof(PostLineCommand))]
     private bool _isBusy;
 
     private bool CanLoad => SelectedBank is not null && !IsBusy;
@@ -315,6 +315,27 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
         return matched.IsSuccess ? Result.Success() : Result.Failure(matched.Error);
     }, "Auto-match complete.");
 
+    /// <summary>Applies the bank rules to the open lines up to the as-at date (posting and matching each), then reloads.</summary>
+    [RelayCommand(CanExecute = nameof(CanLoad))]
+    public Task ApplyRulesAsync()
+    {
+        string summary = string.Empty;
+        DateOnly asAt = DateOnly.FromDateTime(AsAt);
+        return ActAsync(async (_, bank) =>
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            Result<BankRuleRunResult> run = await scope.ServiceProvider.GetRequiredService<IBankRuleService>().ApplyAsync(_companyId, bank.Id, asAt).ConfigureAwait(true);
+            if (run.IsFailure)
+            {
+                return Result.Failure(run.Error);
+            }
+
+            summary = $"Bank rules posted and matched {run.Value.Posted.Count} line(s)"
+                + (run.Value.Failures.Count > 0 ? $"; {run.Value.Failures.Count} refused — {run.Value.Failures[0]}" : ".");
+            return Result.Success();
+        }, () => summary);
+    }
+
     /// <summary>Matches the selected statement line to the selected GL posting, then reloads.</summary>
     [RelayCommand(CanExecute = nameof(CanMatch))]
     public Task MatchAsync()
@@ -336,7 +357,9 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
             : ActAsync((recon, _) => recon.UnmatchLineAsync(_companyId, s.Id), $"Unmatched statement line {s.Date} {s.Amount}.");
     }
 
-    private async Task ActAsync(Func<IBankReconciliationService, BankChoiceVm, Task<Result>> action, string done)
+    private Task ActAsync(Func<IBankReconciliationService, BankChoiceVm, Task<Result>> action, string done) => ActAsync(action, () => done);
+
+    private async Task ActAsync(Func<IBankReconciliationService, BankChoiceVm, Task<Result>> action, Func<string> done)
     {
         BankChoiceVm? bank = SelectedBank;
         if (bank is null || IsBusy)
@@ -355,7 +378,7 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
                 return;
             }
 
-            StatusMessage = done;
+            StatusMessage = done();
         }
         catch (Exception ex)
         {

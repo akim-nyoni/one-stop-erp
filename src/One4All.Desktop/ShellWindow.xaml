@@ -70,6 +70,7 @@
             </MenuItem>
             <MenuItem Header="_Utilities">
                 <MenuItem Header="Period Close Checklist…" Click="OpenPeriodClose_Click" />
+                <MenuItem Header="Bank Rules…" Click="OpenBankRules_Click" />
             </MenuItem>
             <MenuItem Header="_Help" />
         </Menu>
