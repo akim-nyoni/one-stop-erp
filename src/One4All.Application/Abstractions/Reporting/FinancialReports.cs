@@ -134,6 +134,40 @@ public sealed record JournalDaybookLine(DateOnly Date, string JournalNumber, str
 public sealed record JournalDaybookReport(
     long CompanyId, DateOnly FromDate, DateOnly ToDate, IReadOnlyList<JournalDaybookLine> Lines, decimal Total);
 
+/// <summary>One line of a journal, for drill-down.</summary>
+/// <param name="AccountCode">The account code.</param>
+/// <param name="AccountName">The account name.</param>
+/// <param name="CostCentre">The cost centre (blank when none).</param>
+/// <param name="Department">The department (blank when none).</param>
+/// <param name="Debit">Base debit.</param>
+/// <param name="Credit">Base credit.</param>
+/// <param name="TransactionCurrency">The line's transaction currency.</param>
+/// <param name="TransactionAmount">The line's transaction-currency amount (debit positive, credit negative).</param>
+/// <param name="TaxCode">The tax code, if any.</param>
+/// <param name="Narrative">The line narrative, if any.</param>
+public sealed record JournalDetailLine(string AccountCode, string AccountName, string CostCentre, string Department, decimal Debit, decimal Credit, string TransactionCurrency, decimal TransactionAmount, string? TaxCode, string? Narrative);
+
+/// <summary>A journal with all its lines (the drill-down behind every ledger enquiry).</summary>
+/// <param name="JournalNumber">The journal number.</param>
+/// <param name="PostingDate">The posting date.</param>
+/// <param name="Status">The status (Draft, Deferred, Posted, Reversed).</param>
+/// <param name="SourceModule">The originating module.</param>
+/// <param name="DocumentType">The document type.</param>
+/// <param name="DocumentNumber">The document number.</param>
+/// <param name="Reference">The reference.</param>
+/// <param name="Narrative">The journal narrative.</param>
+/// <param name="ReversalOf">The journal this one reverses, if it is a reversal.</param>
+/// <param name="ReversedBy">The journal that reversed this one, if any.</param>
+/// <param name="Lines">The lines, debits first.</param>
+public sealed record JournalDetail(string JournalNumber, DateOnly PostingDate, string Status, string SourceModule, string? DocumentType, string? DocumentNumber, string? Reference, string? Narrative, string? ReversalOf, string? ReversedBy, IReadOnlyList<JournalDetailLine> Lines)
+{
+    /// <summary>Total base debits.</summary>
+    public decimal TotalDebit => Lines.Sum(l => l.Debit);
+
+    /// <summary>Total base credits.</summary>
+    public decimal TotalCredit => Lines.Sum(l => l.Credit);
+}
+
 /// <summary>One account row of the trial-balance movement report (base currency).</summary>
 /// <param name="AccountCode">The account code.</param>
 /// <param name="AccountName">The account name.</param>
@@ -386,4 +420,15 @@ public interface IGeneralLedgerReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The journal daybook report.</returns>
     Task<JournalDaybookReport> JournalDaybookAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns one journal with every line (account names, dimensions, base and transaction amounts) and its
+    /// reversal links — the drill-down from any ledger enquiry. Any status is returned, so a deferred or
+    /// reversed journal can be inspected too.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="journalNumber">The journal number.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The journal, or null when the company has no journal with that number.</returns>
+    Task<JournalDetail?> JournalDetailAsync(long companyId, string journalNumber, CancellationToken ct = default);
 }

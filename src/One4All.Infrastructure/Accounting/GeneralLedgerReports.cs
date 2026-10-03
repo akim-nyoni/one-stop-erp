@@ -315,6 +315,45 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
     }
 
     /// <inheritdoc />
+    public async Task<JournalDetail?> JournalDetailAsync(long companyId, string journalNumber, CancellationToken ct = default)
+    {
+        string number = journalNumber.Trim();
+        JournalEntry? journal = await _db.Journals.Include(j => j.Lines)
+            .FirstOrDefaultAsync(j => j.CompanyId == companyId && j.JournalNumber == number, ct).ConfigureAwait(false);
+        if (journal is null)
+        {
+            return null;
+        }
+
+        string? reversalOf = journal.ReversalOfJournalId is { } originalId
+            ? await _db.Journals.Where(j => j.Id == originalId).Select(j => j.JournalNumber).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+            : null;
+        string? reversedBy = await _db.Journals
+            .Where(j => j.CompanyId == companyId && j.ReversalOfJournalId == journal.Id)
+            .Select(j => j.JournalNumber).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+
+        Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);
+        List<JournalDetailLine> lines = journal.Lines
+            .OrderByDescending(l => l.BaseDebit > 0m)
+            .ThenBy(l => l.Id)
+            .Select(l => new JournalDetailLine(
+                l.AccountCode,
+                accounts.TryGetValue(l.AccountCode, out AccountMeta? meta) ? meta.Name : l.AccountCode,
+                l.CostCentre,
+                l.Department,
+                l.BaseDebit,
+                l.BaseCredit,
+                l.TransactionCurrency.Value,
+                l.TransactionDebit - l.TransactionCredit,
+                l.TaxCode,
+                l.Narrative))
+            .ToList();
+
+        return new JournalDetail(journal.JournalNumber, journal.PostingDate, journal.Status.ToString(), journal.SourceModule,
+            journal.DocumentType, journal.DocumentNumber, journal.Reference, journal.Narrative, reversalOf, reversedBy, lines);
+    }
+
+    /// <inheritdoc />
     public async Task<TrialBalanceMovementReport> TrialBalanceMovementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
     {
         Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);

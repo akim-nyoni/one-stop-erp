@@ -45,6 +45,12 @@ public partial class ShellWindow : Window
         terminal.Show();
     }
 
+    private void OpenAccountEnquiry_Click(object sender, RoutedEventArgs e)
+    {
+        AccountEnquiryWindow enquiry = new(_services) { Owner = this };
+        enquiry.Show();
+    }
+
     private void OpenAnalytics_Click(object sender, RoutedEventArgs e)
     {
         AnalyticsWindow analytics = new(_services) { Owner = this };
