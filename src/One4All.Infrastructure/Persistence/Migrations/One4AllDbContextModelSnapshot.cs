@@ -4246,6 +4246,7 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasName("pk_payslip");
 
                     b.HasIndex("CompanyId", "EmployeeId", "PeriodLabel")
+                        .IsUnique()
                         .HasDatabaseName("ix_payslip_company_id_employee_id_period_label");
 
                     b.ToTable("payslip", "pay");

@@ -39,7 +39,9 @@ public interface IPayrollService
 
     /// <summary>
     /// Runs and commits payroll for every active employee: resolves each pay element in sequence, produces
-    /// a payslip, and posts one balanced journal crediting net pay to the net-pay control account.
+    /// a payslip, and posts one balanced journal crediting net pay to the net-pay control account. A period
+    /// is paid once: a second run for the same period label is refused (<c>Payroll.PeriodAlreadyRun</c>),
+    /// as is a blank label.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="periodLabel">The pay-period label.</param>

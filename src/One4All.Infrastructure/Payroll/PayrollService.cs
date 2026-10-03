@@ -99,6 +99,18 @@ public sealed class PayrollService : IPayrollService
             return Error.NotFound("Payroll.CompanyNotFound", $"Company {companyId} not found.");
         }
 
+        periodLabel = (periodLabel ?? string.Empty).Trim();
+        if (periodLabel.Length == 0)
+        {
+            return Error.Validation("Payroll.PeriodRequired", "A payroll run needs a period label (e.g. 2026-01).");
+        }
+
+        // A period is paid once: a second run would pay every employee again.
+        if (await _db.Set<Payslip>().AnyAsync(p => p.CompanyId == companyId && p.PeriodLabel == periodLabel, ct).ConfigureAwait(false))
+        {
+            return Error.Conflict("Payroll.PeriodAlreadyRun", $"Payroll for period {periodLabel} has already been run.");
+        }
+
         Dictionary<long, PayElement> elements = await LoadElementsAsync(companyId, ct).ConfigureAwait(false);
         List<Employee> employees = await _db.Set<Employee>().Include(e => e.PayElements)
             .Where(e => e.CompanyId == companyId && e.Status == EmployeeStatus.Active)

@@ -62,7 +62,8 @@ internal sealed class PayslipConfiguration : IEntityTypeConfiguration<Payslip>
         b.Property(x => x.PeriodLabel).HasMaxLength(40);
         b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.PayslipId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
-        b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.PeriodLabel });
+        // One payslip per employee per period: the database backstop to the run's PeriodAlreadyRun check.
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.PeriodLabel }).IsUnique();
     }
 }
 
