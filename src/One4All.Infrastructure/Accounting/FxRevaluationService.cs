@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
@@ -54,9 +55,10 @@ public sealed class FxRevaluationService : IFxRevaluationService
             .ConfigureAwait(false);
 
         List<AccountRevaluation> revaluations = [];
-        List<JournalLineRequest> lines = [];
-        List<JournalLineRequest> reversalLines = [];
-        CurrencyCode? journalCurrency = null;
+
+        // A currency-restricted account only takes lines in its own currency, so each foreign currency gets its own
+        // journal (and reversal); the runs for all currencies stand or fall together.
+        SortedDictionary<string, (CurrencyCode Currency, List<JournalLineRequest> Lines, List<JournalLineRequest> Reversal)> byCurrency = new(StringComparer.Ordinal);
 
         foreach (LedgerAccount account in accounts)
         {
@@ -84,12 +86,10 @@ public sealed class FxRevaluationService : IFxRevaluationService
                 continue;
             }
 
-            // All revaluation lines in this run share one currency (validated below).
-            journalCurrency ??= currency;
-            if (journalCurrency.Value != currency)
+            if (!byCurrency.TryGetValue(currency.Value, out var group))
             {
-                return Error.Rule("Fx.MixedCurrencies",
-                    "Revaluation across multiple foreign currencies in one run is not supported yet; run per currency.");
+                group = (currency, [], []);
+                byCurrency[currency.Value] = group;
             }
 
             string fxCode = diff > 0m ? fxGainCode : fxLossCode;
@@ -97,47 +97,55 @@ public sealed class FxRevaluationService : IFxRevaluationService
             JournalSide fxSide = diff > 0m ? JournalSide.Credit : JournalSide.Debit;
             decimal magnitude = Math.Abs(diff);
 
-            lines.Add(new JournalLineRequest { AccountCode = account.AccountCode, Side = accountSide, TransactionAmount = 0m, BaseAmount = magnitude, Narrative = "FX revaluation" });
-            lines.Add(new JournalLineRequest { AccountCode = fxCode, Side = fxSide, TransactionAmount = 0m, BaseAmount = magnitude, Narrative = "FX revaluation" });
+            group.Lines.Add(new JournalLineRequest { AccountCode = account.AccountCode, Side = accountSide, TransactionAmount = 0m, BaseAmount = magnitude, Narrative = "FX revaluation" });
+            group.Lines.Add(new JournalLineRequest { AccountCode = fxCode, Side = fxSide, TransactionAmount = 0m, BaseAmount = magnitude, Narrative = "FX revaluation" });
 
-            reversalLines.Add(new JournalLineRequest { AccountCode = account.AccountCode, Side = fxSide, TransactionAmount = 0m, BaseAmount = magnitude, Narrative = "FX revaluation reversal" });
-            reversalLines.Add(new JournalLineRequest { AccountCode = fxCode, Side = accountSide, TransactionAmount = 0m, BaseAmount = magnitude, Narrative = "FX revaluation reversal" });
+            group.Reversal.Add(new JournalLineRequest { AccountCode = account.AccountCode, Side = fxSide, TransactionAmount = 0m, BaseAmount = magnitude, Narrative = "FX revaluation reversal" });
+            group.Reversal.Add(new JournalLineRequest { AccountCode = fxCode, Side = accountSide, TransactionAmount = 0m, BaseAmount = magnitude, Narrative = "FX revaluation reversal" });
         }
 
-        if (lines.Count == 0)
+        if (byCurrency.Count == 0)
         {
-            return new FxRevaluationResult(asAtDate, revaluations, null, null);
+            return new FxRevaluationResult(asAtDate, revaluations, [], []);
         }
 
-        Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
+        List<string> journalNumbers = [];
+        List<string> reversalNumbers = [];
+        await using IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+        foreach ((CurrencyCode currency, List<JournalLineRequest> lines, List<JournalLineRequest> reversalLines) in byCurrency.Values)
         {
-            CompanyId = companyId,
-            SourceModule = "GL",
-            PostingDate = asAtDate,
-            TransactionCurrency = journalCurrency!.Value,
-            EnforceManualJournalRules = false,
-            DocumentType = "FxRevaluation",
-            Narrative = $"FX revaluation as at {asAtDate:yyyy-MM-dd}",
-            Lines = lines,
-        }, ct).ConfigureAwait(false);
+            Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
+            {
+                CompanyId = companyId,
+                SourceModule = "GL",
+                PostingDate = asAtDate,
+                TransactionCurrency = currency,
+                EnforceManualJournalRules = false,
+                DocumentType = "FxRevaluation",
+                Narrative = $"FX revaluation ({currency}) as at {asAtDate:yyyy-MM-dd}",
+                Lines = lines,
+            }, ct).ConfigureAwait(false);
 
-        if (posting.IsFailure)
-        {
-            return posting.Error;
-        }
+            if (posting.IsFailure)
+            {
+                return posting.Error;
+            }
 
-        string? reversalNumber = null;
-        if (autoReverse)
-        {
+            journalNumbers.Add(posting.Value.JournalNumber);
+            if (!autoReverse)
+            {
+                continue;
+            }
+
             Result<PostingReceipt> reversal = await _postingEngine.PostAsync(new JournalRequest
             {
                 CompanyId = companyId,
                 SourceModule = "GL",
                 PostingDate = asAtDate.AddDays(1),
-                TransactionCurrency = journalCurrency!.Value,
+                TransactionCurrency = currency,
                 EnforceManualJournalRules = false,
                 DocumentType = "FxRevaluationReversal",
-                Narrative = $"FX revaluation reversal of {asAtDate:yyyy-MM-dd}",
+                Narrative = $"FX revaluation ({currency}) reversal of {asAtDate:yyyy-MM-dd}",
                 Lines = reversalLines,
             }, ct).ConfigureAwait(false);
 
@@ -146,10 +154,11 @@ public sealed class FxRevaluationService : IFxRevaluationService
                 return reversal.Error;
             }
 
-            reversalNumber = reversal.Value.JournalNumber;
+            reversalNumbers.Add(reversal.Value.JournalNumber);
         }
 
-        return new FxRevaluationResult(asAtDate, revaluations, posting.Value.JournalNumber, reversalNumber);
+        await transaction.CommitAsync(ct).ConfigureAwait(false);
+        return new FxRevaluationResult(asAtDate, revaluations, journalNumbers, reversalNumbers);
     }
 
     private async Task<string?> ControlAccountCodeAsync(long companyId, ControlAccountType type, CancellationToken ct) =>
