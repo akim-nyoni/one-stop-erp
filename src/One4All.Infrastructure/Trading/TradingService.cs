@@ -445,6 +445,23 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return Error.NotFound("Ap.SupplierNotFound", $"Supplier {request.SupplierId} not found.");
         }
 
+        // Duplicate-invoice control: the same supplier invoice entered twice is the classic double payment.
+        // Numbers compare on letters and digits only, so "INV-001", "inv 001" and "INV001" are one invoice.
+        if (string.IsNullOrWhiteSpace(request.DocumentNumber))
+        {
+            return Error.Validation("Ap.InvoiceNumberRequired", "A supplier invoice needs the supplier's invoice number.");
+        }
+
+        List<string> existing = await _db.OpenItems
+            .Where(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsPayable && i.TraderId == supplier.Id && i.ItemType == OpenItemType.Invoice)
+            .Select(i => i.DocumentNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+        string? clash = existing.FirstOrDefault(n => One4All.Application.Trading.DocumentNumbers.Same(n, request.DocumentNumber));
+        if (clash is not null)
+        {
+            return Error.Conflict("Ap.DuplicateInvoice", $"Supplier {supplier.Code} invoice {request.DocumentNumber} has already been entered (as {clash}).");
+        }
+
         Result<string> controlResult = await ControlCodeAsync(request.CompanyId, ControlAccountType.AccountsPayable, ct).ConfigureAwait(false);
         if (controlResult.IsFailure)
         {

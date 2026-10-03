@@ -160,6 +160,22 @@ public sealed class ProcurementService : IProcurementService
             return Error.NotFound("Pop.SupplierNotFound", $"Supplier {order.SupplierId} not found.");
         }
 
+        // The same duplicate-invoice control as direct purchase-ledger entry.
+        if (string.IsNullOrWhiteSpace(request.InvoiceNumber))
+        {
+            return Error.Validation("Ap.InvoiceNumberRequired", "A supplier invoice needs the supplier's invoice number.");
+        }
+
+        List<string> existingInvoices = await _db.OpenItems
+            .Where(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsPayable && i.TraderId == supplier.Id && i.ItemType == OpenItemType.Invoice)
+            .Select(i => i.DocumentNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+        string? clash = existingInvoices.FirstOrDefault(n => One4All.Application.Trading.DocumentNumbers.Same(n, request.InvoiceNumber));
+        if (clash is not null)
+        {
+            return Error.Conflict("Ap.DuplicateInvoice", $"Supplier {supplier.Code} invoice {request.InvoiceNumber} has already been entered (as {clash}).");
+        }
+
         string? grniCode = await ControlCodeAsync(request.CompanyId, ControlAccountType.GoodsReceivedNotInvoiced, ct).ConfigureAwait(false);
         string? apCode = await ControlCodeAsync(request.CompanyId, ControlAccountType.AccountsPayable, ct).ConfigureAwait(false);
         if (grniCode is null || apCode is null)

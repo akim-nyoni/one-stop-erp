@@ -82,13 +82,7 @@ public static class SupplierStatementReconciler
         // Pass 1: by document number.
         foreach (SupplierStatementLine line in theirs.ToList())
         {
-            string key = Key(line.DocumentNumber);
-            if (key.Length == 0)
-            {
-                continue;
-            }
-
-            SupplierLedgerItem? item = ours.FirstOrDefault(o => Key(o.DocumentNumber) == key);
+            SupplierLedgerItem? item = ours.FirstOrDefault(o => DocumentNumbers.Same(o.DocumentNumber, line.DocumentNumber));
             if (item is null)
             {
                 continue;
@@ -128,8 +122,4 @@ public static class SupplierStatementReconciler
 
         return new SupplierReconciliation(ordered, statement.Sum(s => s.Amount), ledger.Sum(l => l.Amount));
     }
-
-    // Document numbers compare on letters and digits only: "INV-0042", "inv 0042" and "INV0042" are the same.
-    private static string Key(string documentNumber) =>
-        new([.. documentNumber.Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant)]);
 }
