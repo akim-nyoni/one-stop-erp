@@ -844,6 +844,33 @@ internal sealed class LevyChargeConfiguration : IEntityTypeConfiguration<LevyCha
     }
 }
 
+internal sealed class StandCoOwnershipConfiguration : IEntityTypeConfiguration<StandCoOwnership>
+{
+    public void Configure(EntityTypeBuilder<StandCoOwnership> b)
+    {
+        b.ToTable("stand_co_ownership", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Regime).HasConversion<int>();
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.StandId).IsUnique();
+    }
+}
+
+internal sealed class StandHoldingConfiguration : IEntityTypeConfiguration<StandHolding>
+{
+    public void Configure(EntityTypeBuilder<StandHolding> b)
+    {
+        b.ToTable("stand_holding", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.SharePercent).HasPrecision(9, 4);
+        b.Property(x => x.Reason).HasMaxLength(200);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+
+        // One current share per holder per stand.
+        b.HasIndex(x => new { x.StandId, x.CustomerId }).IsUnique().HasFilter("held_to IS NULL");
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

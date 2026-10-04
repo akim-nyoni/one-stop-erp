@@ -5470,6 +5470,116 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("stand_block", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.StandCoOwnership", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<int>("Regime")
+                        .HasColumnType("integer")
+                        .HasColumnName("regime");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stand_co_ownership");
+
+                    b.HasIndex("StandId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stand_co_ownership_stand_id");
+
+                    b.ToTable("stand_co_ownership", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandHolding", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateOnly>("HeldFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("held_from");
+
+                    b.Property<DateOnly?>("HeldTo")
+                        .HasColumnType("date")
+                        .HasColumnName("held_to");
+
+                    b.Property<bool>("HolderDeceased")
+                        .HasColumnType("boolean")
+                        .HasColumnName("holder_deceased");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal>("SharePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("share_percent");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stand_holding");
+
+                    b.HasIndex("StandId", "CustomerId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stand_holding_stand_id_customer_id")
+                        .HasFilter("held_to IS NULL");
+
+                    b.ToTable("stand_holding", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.StandLease", b =>
                 {
                     b.Property<long>("Id")
@@ -18743,6 +18853,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_stand_block_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandCoOwnership", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stand_co_ownership_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandHolding", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stand_holding_stand_stand_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.StandLease", b =>
