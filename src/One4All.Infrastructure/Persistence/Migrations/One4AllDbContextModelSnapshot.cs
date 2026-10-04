@@ -3137,6 +3137,87 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("ownership_record", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.RentalUnit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("MonthlyRent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("monthly_rent");
+
+                    b.Property<string>("RentAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("rent_account_code");
+
+                    b.Property<int>("Rooms")
+                        .HasColumnType("integer")
+                        .HasColumnName("rooms");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("UnitType")
+                        .HasColumnType("integer")
+                        .HasColumnName("unit_type");
+
+                    b.Property<DateOnly?>("VacantSince")
+                        .HasColumnType("date")
+                        .HasColumnName("vacant_since");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rental_unit");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_rental_unit_company_id_code");
+
+                    b.ToTable("rental_unit", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_rental_unit_rent", "monthly_rent >= 0 AND rooms >= 0");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.StandAllocation", b =>
                 {
                     b.Property<long>("Id")
@@ -3210,6 +3291,102 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasFilter("status IN (0, 1, 2)");
 
                     b.ToTable("stand_allocation", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.Tenancy", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<decimal>("Deposit")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("deposit");
+
+                    b.Property<string>("DepositAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("deposit_account_code");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("end_date");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("MonthlyRent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("monthly_rent");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("TenancyNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("tenancy_number");
+
+                    b.Property<long>("TenantCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenant_customer_id");
+
+                    b.Property<long>("UnitId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("unit_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tenancy");
+
+                    b.HasIndex("TenantCustomerId")
+                        .HasDatabaseName("ix_tenancy_tenant_customer_id");
+
+                    b.HasIndex("UnitId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tenancy_one_active_per_unit")
+                        .HasFilter("status = 0");
+
+                    b.HasIndex("CompanyId", "TenancyNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tenancy_company_id_tenancy_number");
+
+                    b.ToTable("tenancy", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_tenancy_terms", "deposit >= 0 AND monthly_rent >= 0 AND (end_date IS NULL OR end_date >= start_date)");
+                        });
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.WaitingListPolicy", b =>
@@ -15342,6 +15519,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_stand_allocation_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.Tenancy", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.RentalUnit", null)
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenancy_rental_unit_unit_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Inventory.PriceListLine", b =>

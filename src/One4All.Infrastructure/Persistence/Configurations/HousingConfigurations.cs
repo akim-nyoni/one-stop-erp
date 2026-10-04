@@ -161,6 +161,40 @@ internal sealed class InstalmentScheduleLineConfiguration : IEntityTypeConfigura
     }
 }
 
+internal sealed class RentalUnitConfiguration : IEntityTypeConfiguration<RentalUnit>
+{
+    public void Configure(EntityTypeBuilder<RentalUnit> b)
+    {
+        b.ToTable("rental_unit", Schemas.Housing, t => t.HasCheckConstraint("ck_rental_unit_rent", "monthly_rent >= 0 AND rooms >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.Property(x => x.UnitType).HasConversion<int>();
+        b.Property(x => x.MonthlyRent).HasPrecision(19, 4);
+        b.Property(x => x.RentAccountCode).HasMaxLength(20);
+        b.Ignore(x => x.IsLet);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class TenancyConfiguration : IEntityTypeConfiguration<Tenancy>
+{
+    public void Configure(EntityTypeBuilder<Tenancy> b)
+    {
+        b.ToTable("tenancy", Schemas.Housing, t => t.HasCheckConstraint("ck_tenancy_terms", "deposit >= 0 AND monthly_rent >= 0 AND (end_date IS NULL OR end_date >= start_date)"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.TenancyNumber).HasMaxLength(30);
+        b.Property(x => x.MonthlyRent).HasPrecision(19, 4);
+        b.Property(x => x.Deposit).HasPrecision(19, 4);
+        b.Property(x => x.DepositAccountCode).HasMaxLength(20);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasOne<RentalUnit>().WithMany().HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.TenancyNumber }).IsUnique();
+        b.HasIndex(x => x.UnitId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_tenancy_one_active_per_unit");
+        b.HasIndex(x => x.TenantCustomerId);
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

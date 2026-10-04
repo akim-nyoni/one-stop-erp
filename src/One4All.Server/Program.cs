@@ -902,6 +902,31 @@ app.MapPost("/api/housing/instalment-sales/{agreementNumber}/settle", async (str
 .RequireAuthorization()
 .WithName("SettleInstalmentSale");
 
+app.MapPost("/api/housing/rental-units", async (long companyId, string code, string description, One4All.Core.Housing.RentalUnitType unitType, int rooms, decimal monthlyRent, string rentAccountCode, DateOnly vacantSince, One4All.Application.Abstractions.Housing.IRentalHousingService rentals, CancellationToken ct) =>
+    ValueResponse(await rentals.AddUnitAsync(companyId, code, description, unitType, rooms, monthlyRent, rentAccountCode, vacantSince, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AddRentalUnit");
+
+app.MapPost("/api/housing/tenancies", async (One4All.Application.Abstractions.Housing.LetUnitRequest request, One4All.Application.Abstractions.Housing.IRentalHousingService rentals, CancellationToken ct) =>
+    ValueResponse(await rentals.LetAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LetRentalUnit");
+
+app.MapPost("/api/housing/rent-runs", async (long companyId, DateOnly month, One4All.Application.Abstractions.Housing.IRentalHousingService rentals, CancellationToken ct) =>
+    ValueResponse(await rentals.RunRentAsync(companyId, month, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RunRent");
+
+app.MapPost("/api/housing/tenancies/{tenancyNumber}/end", async (string tenancyNumber, long companyId, DateOnly endDate, string refundBankAccountCode, One4All.Application.Abstractions.Housing.IRentalHousingService rentals, CancellationToken ct) =>
+    ValueResponse(await rentals.EndTenancyAsync(companyId, tenancyNumber, endDate, refundBankAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("EndTenancy");
+
+app.MapGet("/api/housing/voids", async (long companyId, DateOnly asAtDate, One4All.Application.Abstractions.Housing.IRentalHousingService rentals, CancellationToken ct) =>
+    Results.Ok(await rentals.VoidsAsync(companyId, asAtDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RentalVoids");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()
