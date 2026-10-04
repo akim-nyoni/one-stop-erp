@@ -1447,6 +1447,26 @@ app.MapPost("/api/housing/municipal-link", async (long companyId, One4All.Core.H
 .RequireAuthorization()
 .WithName("ConfigureHousingMunicipalLink");
 
+app.MapPost("/api/housing/stands/{standId:long}/boundary", async (long standId, long companyId, string wkt, One4All.Application.Abstractions.Housing.ISpatialRegisterService spatial, CancellationToken ct) =>
+    ValueResponse(await spatial.MapStandAsync(companyId, standId, wkt, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("MapStandBoundary");
+
+app.MapPost("/api/housing/parcels/{parcelId:long}/boundary", async (long parcelId, long companyId, string wkt, One4All.Application.Abstractions.Housing.ISpatialRegisterService spatial, CancellationToken ct) =>
+    ValueResponse(await spatial.MapParcelAsync(companyId, parcelId, wkt, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("MapParcelBoundary");
+
+app.MapGet("/api/housing/map/discrepancies", async (long companyId, decimal tolerancePercent, One4All.Application.Abstractions.Housing.ISpatialRegisterService spatial, CancellationToken ct) =>
+    Results.Ok(await spatial.DiscrepanciesAsync(companyId, tolerancePercent, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("MappedAreaDiscrepancies");
+
+app.MapGet("/api/housing/map/{layer}", async (One4All.Application.Abstractions.Housing.MapLayer layer, long companyId, long? schemeId, One4All.Application.Abstractions.Housing.ISpatialRegisterService spatial, CancellationToken ct) =>
+    Results.Text(await spatial.GeoJsonAsync(companyId, layer, schemeId, ct).ConfigureAwait(false), "application/geo+json"))
+.RequireAuthorization()
+.WithName("MapLayerGeoJson");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

@@ -66,4 +66,11 @@ public sealed class LandParcel : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Marks the parcel subdivided once its stands have been created.</summary>
     public void MarkSubdivided() => Status = LandParcelStatus.Subdivided;
+
+    /// <summary>The mapped boundary, once surveyed onto the map.</summary>
+    public MappedBoundary? Boundary { get; private set; }
+
+    /// <summary>Records the mapped boundary.</summary>
+    /// <param name="boundary">The boundary.</param>
+    public void Map(MappedBoundary boundary) => Boundary = boundary;
 }

@@ -18957,6 +18957,45 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_eviction_step_eviction_case_eviction_case_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.HousingStand", b =>
+                {
+                    b.OwnsOne("One4All.Core.Housing.MappedBoundary", "Boundary", b1 =>
+                        {
+                            b1.Property<long>("HousingStandId")
+                                .HasColumnType("bigint")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("AreaSquareMetres")
+                                .HasPrecision(19, 4)
+                                .HasColumnType("numeric(19,4)")
+                                .HasColumnName("mapped_area_m2");
+
+                            b1.Property<double>("CentroidLatitude")
+                                .HasColumnType("double precision")
+                                .HasColumnName("centroid_latitude");
+
+                            b1.Property<double>("CentroidLongitude")
+                                .HasColumnType("double precision")
+                                .HasColumnName("centroid_longitude");
+
+                            b1.Property<string>("Wkt")
+                                .IsRequired()
+                                .HasMaxLength(20000)
+                                .HasColumnType("character varying(20000)")
+                                .HasColumnName("boundary_wkt");
+
+                            b1.HasKey("HousingStandId");
+
+                            b1.ToTable("stand", "hse");
+
+                            b1.WithOwner()
+                                .HasForeignKey("HousingStandId")
+                                .HasConstraintName("fk_stand_stand_id");
+                        });
+
+                    b.Navigation("Boundary");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.InformalSettlement", b =>
                 {
                     b.HasOne("One4All.Core.Housing.LandParcel", null)
@@ -18993,6 +19032,45 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasForeignKey("LandParcelId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_land_acquisition_land_parcels_land_parcel_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.LandParcel", b =>
+                {
+                    b.OwnsOne("One4All.Core.Housing.MappedBoundary", "Boundary", b1 =>
+                        {
+                            b1.Property<long>("LandParcelId")
+                                .HasColumnType("bigint")
+                                .HasColumnName("id");
+
+                            b1.Property<decimal>("AreaSquareMetres")
+                                .HasPrecision(19, 4)
+                                .HasColumnType("numeric(19,4)")
+                                .HasColumnName("mapped_area_m2");
+
+                            b1.Property<double>("CentroidLatitude")
+                                .HasColumnType("double precision")
+                                .HasColumnName("centroid_latitude");
+
+                            b1.Property<double>("CentroidLongitude")
+                                .HasColumnType("double precision")
+                                .HasColumnName("centroid_longitude");
+
+                            b1.Property<string>("Wkt")
+                                .IsRequired()
+                                .HasMaxLength(20000)
+                                .HasColumnType("character varying(20000)")
+                                .HasColumnName("boundary_wkt");
+
+                            b1.HasKey("LandParcelId");
+
+                            b1.ToTable("land_parcel", "hse");
+
+                            b1.WithOwner()
+                                .HasForeignKey("LandParcelId")
+                                .HasConstraintName("fk_land_parcel_land_parcel_id");
+                        });
+
+                    b.Navigation("Boundary");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.LayoutPlan", b =>

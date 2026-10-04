@@ -100,6 +100,13 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
     /// <summary>The tamper-evident chain of ownership, in sequence.</summary>
     public IReadOnlyList<OwnershipRecord> Ownership => _ownership.OrderBy(x => x.Sequence).ToList();
 
+    /// <summary>The mapped boundary, once surveyed onto the map.</summary>
+    public MappedBoundary? Boundary { get; private set; }
+
+    /// <summary>Records the mapped boundary.</summary>
+    /// <param name="boundary">The boundary.</param>
+    public void Map(MappedBoundary boundary) => Boundary = boundary;
+
     /// <summary>Marks the stand allocated to a beneficiary under an approved allocation (brief §4.10.4).</summary>
     public void MarkAllocated() => Status = StandStatus.Allocated;
 

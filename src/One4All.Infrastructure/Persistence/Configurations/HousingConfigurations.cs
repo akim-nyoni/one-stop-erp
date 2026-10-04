@@ -14,6 +14,13 @@ internal sealed class LandParcelConfiguration : IEntityTypeConfiguration<LandPar
         b.Property(x => x.Description).HasMaxLength(300);
         b.Property(x => x.AreaSquareMetres).HasPrecision(19, 4);
         b.Property(x => x.Status).HasConversion<int>();
+        b.OwnsOne(x => x.Boundary, o =>
+        {
+            o.Property(p => p.Wkt).HasColumnName("boundary_wkt").HasMaxLength(20000);
+            o.Property(p => p.CentroidLongitude).HasColumnName("centroid_longitude");
+            o.Property(p => p.CentroidLatitude).HasColumnName("centroid_latitude");
+            o.Property(p => p.AreaSquareMetres).HasColumnName("mapped_area_m2").HasPrecision(19, 4);
+        });
         b.HasIndex(x => new { x.CompanyId, x.ParcelNumber }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);
     }
@@ -44,6 +51,13 @@ internal sealed class HousingStandConfiguration : IEntityTypeConfiguration<Housi
         b.Property(x => x.Status).HasConversion<int>();
         b.HasMany(x => x.Ownership).WithOne().HasForeignKey(x => x.HousingStandId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Ownership).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.OwnsOne(x => x.Boundary, o =>
+        {
+            o.Property(p => p.Wkt).HasColumnName("boundary_wkt").HasMaxLength(20000);
+            o.Property(p => p.CentroidLongitude).HasColumnName("centroid_longitude");
+            o.Property(p => p.CentroidLatitude).HasColumnName("centroid_latitude");
+            o.Property(p => p.AreaSquareMetres).HasColumnName("mapped_area_m2").HasPrecision(19, 4);
+        });
         b.HasIndex(x => new { x.CompanyId, x.StandNumber }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);
     }
