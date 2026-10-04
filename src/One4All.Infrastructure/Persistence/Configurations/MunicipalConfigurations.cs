@@ -402,3 +402,52 @@ internal sealed class MeterReadingConfiguration : IEntityTypeConfiguration<Meter
         b.HasIndex(x => new { x.CompanyId, x.MeterId, x.ReadingDate });
     }
 }
+
+internal sealed class TicketCategoryConfiguration : IEntityTypeConfiguration<TicketCategory>
+{
+    public void Configure(EntityTypeBuilder<TicketCategory> b)
+    {
+        b.ToTable("ticket_category", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.ServiceType).HasConversion<int?>();
+        b.Property(x => x.ResponseHours).HasPrecision(9, 2);
+        b.Property(x => x.ResolutionHours).HasPrecision(9, 2);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class ServiceTicketConfiguration : IEntityTypeConfiguration<ServiceTicket>
+{
+    public void Configure(EntityTypeBuilder<ServiceTicket> b)
+    {
+        b.ToTable("service_ticket", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(30);
+        b.Property(x => x.Priority).HasConversion<int>();
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.ReporterName).HasMaxLength(200);
+        b.Property(x => x.ReporterContact).HasMaxLength(100);
+        b.Property(x => x.Description).HasMaxLength(2000);
+        b.Property(x => x.Resolution).HasMaxLength(2000);
+        b.HasOne<TicketCategory>().WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<Property>().WithMany().HasForeignKey(x => x.PropertyId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Events).WithOne().HasForeignKey(x => x.ServiceTicketId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Events).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Reference }).IsUnique();
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}
+
+internal sealed class TicketEventConfiguration : IEntityTypeConfiguration<TicketEvent>
+{
+    public void Configure(EntityTypeBuilder<TicketEvent> b)
+    {
+        b.ToTable("ticket_event", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Note).HasMaxLength(2000);
+        b.HasIndex(x => x.ServiceTicketId);
+    }
+}

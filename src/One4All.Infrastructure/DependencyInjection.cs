@@ -87,6 +87,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Municipal.ITariffCatalogueService, Municipal.TariffCatalogueService>();
         services.AddScoped<Application.Abstractions.Municipal.IFacilityBookingService, Municipal.FacilityBookingService>();
         services.AddScoped<Application.Abstractions.Municipal.ICemeteryService, Municipal.CemeteryService>();
+        services.AddScoped<Application.Abstractions.Municipal.IServiceDeskService, Municipal.ServiceDeskService>();
         services.AddScoped<Application.Abstractions.Housing.IWaitingListService, Housing.WaitingListService>();
         services.AddScoped<Application.Abstractions.Housing.IAllocationService, Housing.AllocationService>();
         services.AddScoped<Application.Abstractions.Housing.IInstalmentSaleService, Housing.InstalmentSaleService>();

@@ -10065,6 +10065,131 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("service_order", "mun");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.ServiceTicket", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("AssignedToUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("assigned_to_user_id");
+
+                    b.Property<long>("CategoryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("category_id");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("description");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer")
+                        .HasColumnName("priority");
+
+                    b.Property<long?>("PropertyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("property_id");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("reference");
+
+                    b.Property<DateTimeOffset>("ReportedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reported_at");
+
+                    b.Property<string>("ReporterContact")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reporter_contact");
+
+                    b.Property<string>("ReporterName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reporter_name");
+
+                    b.Property<string>("Resolution")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("resolution");
+
+                    b.Property<DateTimeOffset>("ResolutionDueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolution_due_at");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<DateTimeOffset?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("responded_at");
+
+                    b.Property<DateTimeOffset>("ResponseDueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("response_due_at");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_service_ticket");
+
+                    b.HasIndex("CategoryId")
+                        .HasDatabaseName("ix_service_ticket_category_id");
+
+                    b.HasIndex("PropertyId")
+                        .HasDatabaseName("ix_service_ticket_property_id");
+
+                    b.HasIndex("CompanyId", "Reference")
+                        .IsUnique()
+                        .HasDatabaseName("ix_service_ticket_company_id_reference");
+
+                    b.HasIndex("CompanyId", "Status")
+                        .HasDatabaseName("ix_service_ticket_company_id_status");
+
+                    b.ToTable("service_ticket", "mun");
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.Tariff", b =>
                 {
                     b.Property<long>("Id")
@@ -10276,6 +10401,119 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_tariff_season_months", "from_month BETWEEN 1 AND 12 AND to_month BETWEEN 1 AND 12");
                         });
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.TicketCategory", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<decimal>("ResolutionHours")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("resolution_hours");
+
+                    b.Property<decimal>("ResponseHours")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("response_hours");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int?>("ServiceType")
+                        .HasColumnType("integer")
+                        .HasColumnName("service_type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ticket_category");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ticket_category_company_id_code");
+
+                    b.ToTable("ticket_category", "mun");
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.TicketEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("note");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("ServiceTicketId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("service_ticket_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long?>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ticket_event");
+
+                    b.HasIndex("ServiceTicketId")
+                        .HasDatabaseName("ix_ticket_event_service_ticket_id");
+
+                    b.ToTable("ticket_event", "mun");
                 });
 
             modelBuilder.Entity("One4All.Core.Municipal.ValuationObjection", b =>
@@ -19934,6 +20172,22 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_service_deposit_property_property_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.ServiceTicket", b =>
+                {
+                    b.HasOne("One4All.Core.Municipal.TicketCategory", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_service_ticket_ticket_category_category_id");
+
+                    b.HasOne("One4All.Core.Municipal.Property", null)
+                        .WithMany()
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_service_ticket_property_property_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.TariffBlock", b =>
                 {
                     b.HasOne("One4All.Core.Municipal.Tariff", null)
@@ -19952,6 +20206,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tariff_season_tariffs_tariff_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.TicketEvent", b =>
+                {
+                    b.HasOne("One4All.Core.Municipal.ServiceTicket", null)
+                        .WithMany("Events")
+                        .HasForeignKey("ServiceTicketId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ticket_event_service_ticket_service_ticket_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Municipal.ValuationObjection", b =>
@@ -20567,6 +20831,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Municipal.ReadingRoute", b =>
                 {
                     b.Navigation("Stops");
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.ServiceTicket", b =>
+                {
+                    b.Navigation("Events");
                 });
 
             modelBuilder.Entity("One4All.Core.Municipal.Tariff", b =>

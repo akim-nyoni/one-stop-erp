@@ -1522,6 +1522,45 @@ app.MapPost("/api/notifications/{notificationId:long}/read", async (long notific
 .RequireAuthorization()
 .WithName("MarkNotificationRead");
 
+app.MapPost("/api/municipal/faults/categories", async (long companyId, string code, string name, One4All.Core.Municipal.ServiceType? serviceType, decimal responseHours, decimal resolutionHours, One4All.Application.Abstractions.Municipal.IServiceDeskService desk, CancellationToken ct) =>
+    ValueResponse(await desk.DefineCategoryAsync(companyId, code, name, serviceType, responseHours, resolutionHours, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DefineFaultCategory");
+
+app.MapPost("/api/municipal/faults", async (One4All.Application.Abstractions.Municipal.FaultReport report, One4All.Application.Abstractions.Municipal.IServiceDeskService desk, CancellationToken ct) =>
+    ValueResponse(await desk.LogAsync(report, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LogFault");
+
+app.MapPost("/api/municipal/faults/{reference}/assign", async (string reference, long companyId, long userId, DateTimeOffset at, string? note, One4All.Application.Abstractions.Municipal.IServiceDeskService desk, CancellationToken ct) =>
+    ActionResponse(await desk.AssignAsync(companyId, reference, userId, at, note, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AssignFault");
+
+app.MapPost("/api/municipal/faults/{reference}/resolve", async (string reference, long companyId, string resolution, DateTimeOffset at, One4All.Application.Abstractions.Municipal.IServiceDeskService desk, CancellationToken ct) =>
+    ActionResponse(await desk.ResolveAsync(companyId, reference, resolution, at, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ResolveFault");
+
+app.MapPost("/api/municipal/faults/{reference}/close", async (string reference, long companyId, DateTimeOffset at, One4All.Application.Abstractions.Municipal.IServiceDeskService desk, CancellationToken ct) =>
+    ActionResponse(await desk.CloseAsync(companyId, reference, at, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CloseFault");
+
+app.MapPost("/api/municipal/faults/{reference}/reopen", async (string reference, long companyId, string reason, DateTimeOffset at, One4All.Application.Abstractions.Municipal.IServiceDeskService desk, CancellationToken ct) =>
+    ActionResponse(await desk.ReopenAsync(companyId, reference, reason, at, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReopenFault");
+
+app.MapGet("/api/municipal/faults/{reference}/status", async (string reference, long companyId, One4All.Application.Abstractions.Municipal.IServiceDeskService desk, CancellationToken ct) =>
+    ValueResponse(await desk.PublicStatusAsync(companyId, reference, ct).ConfigureAwait(false)))
+.WithName("PublicFaultStatus");
+
+app.MapGet("/api/municipal/faults/sla", async (long companyId, DateTimeOffset now, One4All.Application.Abstractions.Municipal.IServiceDeskService desk, CancellationToken ct) =>
+    Results.Ok(await desk.SlaBoardAsync(companyId, now, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("FaultSlaBoard");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
