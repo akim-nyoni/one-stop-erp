@@ -362,6 +362,25 @@ internal sealed class CovenantStepConfiguration : IEntityTypeConfiguration<Coven
     }
 }
 
+internal sealed class StandLeaseConfiguration : IEntityTypeConfiguration<StandLease>
+{
+    public void Configure(EntityTypeBuilder<StandLease> b)
+    {
+        b.ToTable("stand_lease", Schemas.Housing, t => t.HasCheckConstraint("ck_stand_lease_terms", "term_years BETWEEN 1 AND 99 AND review_every_years >= 1 AND annual_rent > 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.LeaseNumber).HasMaxLength(30);
+        b.Property(x => x.Use).HasConversion<int>();
+        b.Property(x => x.AnnualRent).HasPrecision(19, 4);
+        b.Property(x => x.EscalationPercent).HasPrecision(9, 4);
+        b.Property(x => x.IncomeAccountCode).HasMaxLength(20);
+        b.Property(x => x.AccruedIncomeAccountCode).HasMaxLength(20);
+        b.Ignore(x => x.EndDate);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.LeaseNumber }).IsUnique();
+        b.HasIndex(x => x.StandId);
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

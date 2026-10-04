@@ -3888,6 +3888,107 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("stand_allocation", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.StandLease", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccruedIncomeAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("accrued_income_account_code");
+
+                    b.Property<decimal>("AnnualRent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("annual_rent");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<decimal>("EscalationPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("escalation_percent");
+
+                    b.Property<string>("IncomeAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("income_account_code");
+
+                    b.Property<string>("LeaseNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("lease_number");
+
+                    b.Property<long>("LesseeCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("lessee_customer_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<int>("ReviewEveryYears")
+                        .HasColumnType("integer")
+                        .HasColumnName("review_every_years");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.Property<int>("TermYears")
+                        .HasColumnType("integer")
+                        .HasColumnName("term_years");
+
+                    b.Property<int>("Use")
+                        .HasColumnType("integer")
+                        .HasColumnName("use");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stand_lease");
+
+                    b.HasIndex("StandId")
+                        .HasDatabaseName("ix_stand_lease_stand_id");
+
+                    b.HasIndex("CompanyId", "LeaseNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stand_lease_company_id_lease_number");
+
+                    b.ToTable("stand_lease", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_stand_lease_terms", "term_years BETWEEN 1 AND 99 AND review_every_years >= 1 AND annual_rent > 0");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.Tenancy", b =>
                 {
                     b.Property<long>("Id")
@@ -16419,6 +16520,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_stand_allocation_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandLease", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stand_lease_stand_stand_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.Tenancy", b =>

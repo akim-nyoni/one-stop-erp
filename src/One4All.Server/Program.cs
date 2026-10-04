@@ -1047,6 +1047,21 @@ app.MapGet("/api/housing/covenants", async (long companyId, One4All.Application.
 .RequireAuthorization()
 .WithName("DevelopmentCovenantRegister");
 
+app.MapPost("/api/housing/stand-leases", async (One4All.Application.Abstractions.Housing.StandLeaseRequest request, One4All.Application.Abstractions.Housing.IStandLeaseService leases, CancellationToken ct) =>
+    ValueResponse(await leases.CreateAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CreateStandLease");
+
+app.MapGet("/api/housing/stand-leases/{leaseNumber}/schedule", async (string leaseNumber, long companyId, One4All.Application.Abstractions.Housing.IStandLeaseService leases, CancellationToken ct) =>
+    ValueResponse(await leases.ScheduleAsync(companyId, leaseNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("StandLeaseSchedule");
+
+app.MapPost("/api/housing/stand-leases/run", async (long companyId, DateOnly month, One4All.Application.Abstractions.Housing.IStandLeaseService leases, CancellationToken ct) =>
+    ValueResponse(await leases.RunMonthAsync(companyId, month, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RunStandLeaseBilling");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
