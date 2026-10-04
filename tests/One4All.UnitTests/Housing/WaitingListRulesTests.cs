@@ -48,6 +48,7 @@ public class WaitingListRulesTests
 
     [Theory]
     [InlineData(CurrentTenure.Homeless, 20)]
+    [InlineData(CurrentTenure.InformalSettlement, 20)]
     [InlineData(CurrentTenure.WithRelatives, 8)]
     [InlineData(CurrentTenure.Tenant, 0)]
     public void Housing_conditions_earn_points(CurrentTenure tenure, int points)

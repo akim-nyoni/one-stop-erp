@@ -35,6 +35,9 @@ public enum CurrentTenure
 
     /// <summary>Staying with relatives.</summary>
     WithRelatives = 4,
+
+    /// <summary>In an informal settlement (scored as homeless: no secure shelter).</summary>
+    InformalSettlement = 5,
 }
 
 /// <summary>Where an applicant stands on the waiting list.</summary>

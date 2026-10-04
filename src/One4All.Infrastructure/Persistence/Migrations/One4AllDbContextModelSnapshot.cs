@@ -3142,6 +3142,209 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.EnumeratedHousehold", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("EnumeratedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("enumerated_on");
+
+                    b.Property<long>("ExerciseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("exercise_id");
+
+                    b.Property<DateOnly>("HeadDateOfBirth")
+                        .HasColumnType("date")
+                        .HasColumnName("head_date_of_birth");
+
+                    b.Property<string>("HeadIdNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("head_id_number");
+
+                    b.Property<string>("HeadName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("head_name");
+
+                    b.Property<string>("HouseholdNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("household_number");
+
+                    b.Property<int>("HouseholdSize")
+                        .HasColumnType("integer")
+                        .HasColumnName("household_size");
+
+                    b.Property<string>("IneligibleReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("ineligible_reason");
+
+                    b.Property<bool>("IsEligible")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_eligible");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("MonthlyIncome")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("monthly_income");
+
+                    b.Property<DateOnly>("OccupiedSince")
+                        .HasColumnType("date")
+                        .HasColumnName("occupied_since");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("integer")
+                        .HasColumnName("outcome");
+
+                    b.Property<DateOnly?>("OutcomeDate")
+                        .HasColumnType("date")
+                        .HasColumnName("outcome_date");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SettlementId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("settlement_id");
+
+                    b.Property<long?>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.Property<string>("StructureReference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("structure_reference");
+
+                    b.Property<int>("StructureType")
+                        .HasColumnType("integer")
+                        .HasColumnName("structure_type");
+
+                    b.Property<string>("WaitingListNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("waiting_list_number");
+
+                    b.HasKey("Id")
+                        .HasName("pk_enumerated_household");
+
+                    b.HasIndex("ExerciseId")
+                        .HasDatabaseName("ix_enumerated_household_exercise_id");
+
+                    b.HasIndex("SettlementId")
+                        .HasDatabaseName("ix_enumerated_household_settlement_id");
+
+                    b.HasIndex("StandId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_enumerated_household_stand_id")
+                        .HasFilter("stand_id IS NOT NULL");
+
+                    b.HasIndex("CompanyId", "HeadIdNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_enumerated_household_company_id_head_id_number");
+
+                    b.HasIndex("CompanyId", "HouseholdNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_enumerated_household_company_id_household_number");
+
+                    b.ToTable("enumerated_household", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.EnumerationExercise", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly?>("ClosedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("closed_on");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SettlementId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("settlement_id");
+
+                    b.Property<DateOnly>("StartedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("started_on");
+
+                    b.HasKey("Id")
+                        .HasName("pk_enumeration_exercise");
+
+                    b.HasIndex("SettlementId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_enumeration_exercise_settlement_id")
+                        .HasFilter("closed_on IS NULL");
+
+                    b.ToTable("enumeration_exercise", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.EvictionCase", b =>
                 {
                     b.Property<long>("Id")
@@ -3740,6 +3943,87 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("stand", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.InformalSettlement", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("CutOffDate")
+                        .HasColumnType("date")
+                        .HasColumnName("cut_off_date");
+
+                    b.Property<long?>("LandParcelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("land_parcel_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<DateOnly?>("PlanApprovedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("plan_approved_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("UpgradingPlan")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("upgrading_plan");
+
+                    b.Property<string>("Ward")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("ward");
+
+                    b.HasKey("Id")
+                        .HasName("pk_informal_settlement");
+
+                    b.HasIndex("LandParcelId")
+                        .HasDatabaseName("ix_informal_settlement_land_parcel_id");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_informal_settlement_company_id_code");
+
+                    b.ToTable("informal_settlement", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.InstalmentAgreement", b =>
@@ -16993,6 +17277,39 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_development_covenant_housing_stands_stand_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.EnumeratedHousehold", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.EnumerationExercise", null)
+                        .WithMany()
+                        .HasForeignKey("ExerciseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_enumerated_household_enumeration_exercise_exercise_id");
+
+                    b.HasOne("One4All.Core.Housing.InformalSettlement", null)
+                        .WithMany()
+                        .HasForeignKey("SettlementId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_enumerated_household_informal_settlement_settlement_id");
+
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_enumerated_household_housing_stands_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.EnumerationExercise", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.InformalSettlement", null)
+                        .WithMany()
+                        .HasForeignKey("SettlementId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_enumeration_exercise_informal_settlement_settlement_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.EvictionCase", b =>
                 {
                     b.HasOne("One4All.Core.Housing.Tenancy", null)
@@ -17011,6 +17328,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_eviction_step_eviction_case_eviction_case_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.InformalSettlement", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.LandParcel", null)
+                        .WithMany()
+                        .HasForeignKey("LandParcelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_informal_settlement_land_parcels_land_parcel_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.InstalmentAgreement", b =>

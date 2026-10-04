@@ -496,6 +496,61 @@ internal sealed class AgreementVersionConfiguration : IEntityTypeConfiguration<A
     }
 }
 
+internal sealed class InformalSettlementConfiguration : IEntityTypeConfiguration<InformalSettlement>
+{
+    public void Configure(EntityTypeBuilder<InformalSettlement> b)
+    {
+        b.ToTable("informal_settlement", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.Ward).HasMaxLength(60);
+        b.Property(x => x.UpgradingPlan).HasMaxLength(4000);
+        b.HasOne<LandParcel>().WithMany().HasForeignKey(x => x.LandParcelId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class EnumerationExerciseConfiguration : IEntityTypeConfiguration<EnumerationExercise>
+{
+    public void Configure(EntityTypeBuilder<EnumerationExercise> b)
+    {
+        b.ToTable("enumeration_exercise", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.HasOne<InformalSettlement>().WithMany().HasForeignKey(x => x.SettlementId).OnDelete(DeleteBehavior.Restrict);
+
+        // One open exercise per settlement.
+        b.HasIndex(x => x.SettlementId).IsUnique().HasFilter("closed_on IS NULL");
+    }
+}
+
+internal sealed class EnumeratedHouseholdConfiguration : IEntityTypeConfiguration<EnumeratedHousehold>
+{
+    public void Configure(EntityTypeBuilder<EnumeratedHousehold> b)
+    {
+        b.ToTable("enumerated_household", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.HouseholdNumber).HasMaxLength(30);
+        b.Property(x => x.HeadIdNumber).HasMaxLength(40);
+        b.Property(x => x.HeadName).HasMaxLength(200);
+        b.Property(x => x.MonthlyIncome).HasPrecision(19, 4);
+        b.Property(x => x.StructureType).HasConversion<int>();
+        b.Property(x => x.StructureReference).HasMaxLength(60);
+        b.Property(x => x.IneligibleReason).HasMaxLength(1000);
+        b.Property(x => x.Outcome).HasConversion<int>();
+        b.Property(x => x.WaitingListNumber).HasMaxLength(30);
+        b.HasOne<InformalSettlement>().WithMany().HasForeignKey(x => x.SettlementId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<EnumerationExercise>().WithMany().HasForeignKey(x => x.ExerciseId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.HouseholdNumber }).IsUnique();
+
+        // A person is enumerated once per council, and a stand is regularised to one household.
+        b.HasIndex(x => new { x.CompanyId, x.HeadIdNumber }).IsUnique();
+        b.HasIndex(x => x.StandId).IsUnique().HasFilter("stand_id IS NOT NULL");
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

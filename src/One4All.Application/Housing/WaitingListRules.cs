@@ -124,7 +124,7 @@ public static class WaitingListRules
         int resident = FullYears(facts.ResidentSince, asAtDate);
         decimal conditions = facts.Tenure switch
         {
-            CurrentTenure.Homeless => terms.HomelessPoints,
+            CurrentTenure.Homeless or CurrentTenure.InformalSettlement => terms.HomelessPoints,
             CurrentTenure.Lodger or CurrentTenure.WithRelatives => terms.LodgerPoints,
             _ => 0m,
         };

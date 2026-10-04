@@ -1162,6 +1162,46 @@ app.MapGet("/api/housing/agreements/verify", async (long companyId, One4All.Appl
 .RequireAuthorization()
 .WithName("VerifyHousingAgreements");
 
+app.MapPost("/api/housing/settlements", async (One4All.Application.Abstractions.Housing.SettlementRegistration registration, One4All.Application.Abstractions.Housing.IInformalSettlementService settlements, CancellationToken ct) =>
+    ValueResponse(await settlements.RegisterAsync(registration, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RegisterInformalSettlement");
+
+app.MapPost("/api/housing/settlements/{code}/plan", async (string code, long companyId, string plan, DateOnly approvedOn, One4All.Application.Abstractions.Housing.IInformalSettlementService settlements, CancellationToken ct) =>
+    ActionResponse(await settlements.ApprovePlanAsync(companyId, code, plan, approvedOn, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveSettlementUpgradingPlan");
+
+app.MapPost("/api/housing/settlements/{code}/enumerations", async (string code, long companyId, string reference, DateOnly date, One4All.Application.Abstractions.Housing.IInformalSettlementService settlements, CancellationToken ct) =>
+    ValueResponse(await settlements.StartEnumerationAsync(companyId, code, reference, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("StartEnumeration");
+
+app.MapPost("/api/housing/settlements/households", async (One4All.Application.Abstractions.Housing.HouseholdSurvey survey, One4All.Application.Abstractions.Housing.IInformalSettlementService settlements, CancellationToken ct) =>
+    ValueResponse(await settlements.EnumerateAsync(survey, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("EnumerateHousehold");
+
+app.MapPost("/api/housing/settlements/{code}/enumerations/close", async (string code, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.IInformalSettlementService settlements, CancellationToken ct) =>
+    ValueResponse(await settlements.CloseEnumerationAsync(companyId, code, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CloseEnumeration");
+
+app.MapPost("/api/housing/settlements/households/{householdNumber}/waiting-list", async (string householdNumber, long companyId, One4All.Core.Housing.HousingCategory category, DateOnly date, One4All.Application.Abstractions.Housing.IInformalSettlementService settlements, CancellationToken ct) =>
+    ValueResponse(await settlements.ConvertToWaitingListAsync(companyId, householdNumber, category, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ConvertHouseholdToWaitingList");
+
+app.MapPost("/api/housing/settlements/households/{householdNumber}/regularise", async (string householdNumber, long companyId, long standId, DateOnly date, One4All.Application.Abstractions.Housing.IInformalSettlementService settlements, CancellationToken ct) =>
+    ActionResponse(await settlements.RegulariseAsync(companyId, householdNumber, standId, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RegulariseHousehold");
+
+app.MapGet("/api/housing/settlements/{code}", async (string code, long companyId, One4All.Application.Abstractions.Housing.IInformalSettlementService settlements, CancellationToken ct) =>
+    ValueResponse(await settlements.SummaryAsync(companyId, code, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SettlementSummary");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
