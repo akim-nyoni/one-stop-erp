@@ -116,6 +116,8 @@ internal sealed class AllocationRunConfiguration : IEntityTypeConfiguration<Allo
         b.Property(x => x.InputHash).HasMaxLength(64);
         b.HasMany(x => x.Allocations).WithOne().HasForeignKey(x => x.AllocationRunId).OnDelete(DeleteBehavior.Restrict);
         b.Navigation(x => x.Allocations).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasMany(x => x.Exclusions).WithOne().HasForeignKey(x => x.AllocationRunId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Exclusions).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.RunNumber }).IsUnique();
     }
 }
@@ -1111,5 +1113,32 @@ internal sealed class LandValuationConfiguration : IEntityTypeConfiguration<Land
         b.Property(x => x.Valuer).HasMaxLength(200);
         b.HasOne<LandParcel>().WithMany().HasForeignKey(x => x.LandParcelId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.LandParcelId, x.Date });
+    }
+}
+
+internal sealed class AllocationExclusionConfiguration : IEntityTypeConfiguration<AllocationExclusion>
+{
+    public void Configure(EntityTypeBuilder<AllocationExclusion> b)
+    {
+        b.ToTable("allocation_exclusion", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reason).HasConversion<int>();
+        b.HasOne<HousingApplicant>().WithMany().HasForeignKey(x => x.ApplicantId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class AllocationQuotaConfiguration : IEntityTypeConfiguration<AllocationQuota>
+{
+    public void Configure(EntityTypeBuilder<AllocationQuota> b)
+    {
+        b.ToTable("allocation_quota", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Group).HasConversion<int>();
+        b.Property(x => x.TargetPercent).HasPrecision(5, 2);
+        b.HasOne<HousingScheme>().WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Restrict);
+
+        // One quota per group per scheme, and one council-wide.
+        b.HasIndex(x => new { x.CompanyId, x.SchemeId, x.Group }).IsUnique().HasFilter("scheme_id IS NOT NULL");
+        b.HasIndex(x => new { x.CompanyId, x.Group }).IsUnique().HasFilter("scheme_id IS NULL");
     }
 }

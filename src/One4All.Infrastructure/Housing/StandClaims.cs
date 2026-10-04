@@ -27,6 +27,25 @@ internal static class StandClaims
                 && db.HousingStands.Any(s => standIds.Contains(s.Id) && s.LandParcelId == e.LandParcelId), ct).ConfigureAwait(false)
             || await db.Set<LandDispute>().AnyAsync(d => d.StandId != null && standIds.Contains(d.StandId.Value) && d.Stage != LandDisputeStage.Resolved, ct).ConfigureAwait(false);
 
+    /// <summary>Every stand of a council that is blocked or already promised through any route (for picking free stands).</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="companyId">The council.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The unavailable stand ids.</returns>
+    public static async Task<HashSet<long>> UnavailableAsync(One4AllDbContext db, long companyId, CancellationToken ct)
+    {
+        HashSet<long> ids = [.. await db.Set<StandBlock>().Where(b => b.CompanyId == companyId && b.LiftedOn == null).Select(b => b.StandId).ToListAsync(ct).ConfigureAwait(false)];
+        ids.UnionWith(await db.HousingStands.Where(s => s.CompanyId == companyId
+            && db.Set<LandEncumbrance>().Any(e => e.LandParcelId == s.LandParcelId && e.Type == EncumbranceType.Caveat && e.LiftedOn == null)).Select(s => s.Id).ToListAsync(ct).ConfigureAwait(false));
+        ids.UnionWith(await db.Set<LandDispute>().Where(d => d.CompanyId == companyId && d.StandId != null && d.Stage != LandDisputeStage.Resolved).Select(d => d.StandId!.Value).ToListAsync(ct).ConfigureAwait(false));
+        ids.UnionWith(await db.Set<StandAllocation>().Where(a => a.CompanyId == companyId && Live.Contains(a.Status)).Select(a => a.StandId).ToListAsync(ct).ConfigureAwait(false));
+        ids.UnionWith(await db.Set<CooperativeStand>().Where(c => c.CompanyId == companyId).Select(c => c.StandId).ToListAsync(ct).ConfigureAwait(false));
+        ids.UnionWith(await db.Set<EnumeratedHousehold>().Where(h => h.StandId != null && db.HousingStands.Any(s => s.Id == h.StandId && s.CompanyId == companyId)).Select(h => h.StandId!.Value).ToListAsync(ct).ConfigureAwait(false));
+        ids.UnionWith(await db.Set<DeveloperAgreementStand>().Where(d => !(d.Quota == StandQuota.Council && d.HandedOverOn != null) && db.HousingStands.Any(s => s.Id == d.StandId && s.CompanyId == companyId))
+            .Select(d => d.StandId).ToListAsync(ct).ConfigureAwait(false));
+        return ids;
+    }
+
     /// <summary>Whether any of the stands is blocked, or already promised through any route.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="standIds">The stands.</param>

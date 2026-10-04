@@ -140,6 +140,10 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             "HOUSINGNRVTEST" => await NrvTestAsync(companyId, asAt, parameters, ct).ConfigureAwait(false),
             "HOUSINGSURVEYSTATUS" => await SurveyStatusAsync(companyId, asAt, ct).ConfigureAwait(false),
             "HOUSINGSERVICINGSTATUS" => await ServicingStatusAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "HOUSINGSKIPPEDAPPLICANTS" => await SkippedApplicantsAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGQUOTACOMPLIANCE" => await QuotaComplianceAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGAPPROVALAUDIT" => await ApprovalAuditAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGOVERRIDES" => await OverridesAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -1456,6 +1460,136 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             return Row(("Scheme", scheme.Code), ("Water", Percent(BulkService.Water)), ("Sewer", Percent(BulkService.Sewer)), ("Roads", Percent(BulkService.Roads)),
                 ("Electricity", Percent(BulkService.Electricity)), ("StormWater", Percent(BulkService.StormWater)), ("Stands", stands), ("Serviced", serviced), ("Unserviced", stands - serviced));
         })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SkippedApplicantsAsync(long companyId, CancellationToken ct)
+    {
+        List<AllocationRun> runs = await _db.Set<AllocationRun>().AsNoTracking().Include(r => r.Allocations).Include(r => r.Exclusions)
+            .Where(r => r.CompanyId == companyId).OrderBy(r => r.RunNumber).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> schemes = await _db.HousingSchemes.AsNoTracking().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Code, ct).ConfigureAwait(false);
+        var applicants = await _db.HousingApplicants.AsNoTracking().Where(a => a.CompanyId == companyId)
+            .ToDictionaryAsync(a => a.Id, a => new { a.WaitingListNumber, a.FullName }, ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (AllocationRun run in runs)
+        {
+            IReadOnlyDictionary<string, object?> Line(long applicantId, string outcome, string reason) => Row(("Run", run.RunNumber), ("Scheme", schemes.GetValueOrDefault(run.SchemeId, "?")),
+                ("Method", run.Method.ToString()), ("WaitingListNumber", applicants.GetValueOrDefault(applicantId)?.WaitingListNumber ?? "?"),
+                ("Applicant", applicants.GetValueOrDefault(applicantId)?.FullName ?? "?"), ("Outcome", outcome), ("Reason", reason));
+            rows.AddRange(run.Exclusions.Select(e => Line(e.ApplicantId, "Left out", e.Reason == ExclusionReason.Suspended
+                ? "Suspended for not confirming on the list" : "Already holds a live allocation from another run")));
+            rows.AddRange(run.Allocations.Where(a => a.Status is AllocationStatus.Declined or AllocationStatus.Lapsed or AllocationStatus.Cancelled).OrderBy(a => a.Sequence)
+                .Select(a => Line(a.ApplicantId, a.Status.ToString(), a.Reason ?? (a.Status == AllocationStatus.Lapsed ? "Offer not accepted in time" : "—"))));
+        }
+
+        return rows;
+    }
+
+    // Allocations that stand (offered or accepted) in approved runs; membership on the approval date; the scheme's own quota overrides the council-wide one.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> QuotaComplianceAsync(long companyId, CancellationToken ct)
+    {
+        List<AllocationQuota> quotas = await _db.Set<AllocationQuota>().AsNoTracking().Where(q => q.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        if (quotas.Count == 0)
+        {
+            return [];
+        }
+
+        var allocations = await (from a in _db.Set<StandAllocation>().AsNoTracking()
+                                 join r in _db.Set<AllocationRun>().AsNoTracking() on a.AllocationRunId equals r.Id
+                                 join p in _db.HousingApplicants.AsNoTracking() on a.ApplicantId equals p.Id
+                                 where a.CompanyId == companyId && r.ApprovedOn != null && (a.Status == AllocationStatus.Offered || a.Status == AllocationStatus.Accepted)
+                                 select new { r.SchemeId, ApprovedOn = r.ApprovedOn!.Value, p.DeclaredGroups, p.HasDisability, p.DateOfBirth }).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> schemes = await _db.HousingSchemes.AsNoTracking().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Code, ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (var scheme in allocations.GroupBy(a => a.SchemeId).OrderBy(g => schemes.GetValueOrDefault(g.Key), StringComparer.Ordinal))
+        {
+            List<BeneficiaryGroups> members = [.. scheme.Select(a => QuotaGroups.Of(a.DeclaredGroups, a.HasDisability, a.DateOfBirth, a.ApprovedOn))];
+            foreach (BeneficiaryGroups group in QuotaGroups.All)
+            {
+                AllocationQuota? quota = quotas.FirstOrDefault(q => q.SchemeId == scheme.Key && q.Group == group) ?? quotas.FirstOrDefault(q => q.SchemeId == null && q.Group == group);
+                if (quota is null)
+                {
+                    continue;
+                }
+
+                int count = members.Count(m => m.HasFlag(group));
+                decimal actual = QuotaGroups.Share(count, members.Count);
+                rows.Add(Row(("Scheme", schemes.GetValueOrDefault(scheme.Key, "?")), ("Group", group.ToString()), ("Allocations", members.Count), ("Members", count),
+                    ("Actual", actual.ToString("0.0", CultureInfo.InvariantCulture)), ("Target", quota.TargetPercent.ToString("0.0", CultureInfo.InvariantCulture)),
+                    ("Variance", (actual - quota.TargetPercent).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture)), ("Status", actual >= quota.TargetPercent ? "Met" : "Short")));
+            }
+        }
+
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ApprovalAuditAsync(long companyId, CancellationToken ct)
+    {
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        string Who(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "—";
+        List<(string Area, string Reference, long? By, string ApprovedBy, DateOnly Requested, DateOnly? Approved, string Exception, decimal Value)> entries = [];
+
+        foreach (AllocationRun run in await _db.Set<AllocationRun>().AsNoTracking().Include(r => r.Allocations).Where(r => r.CompanyId == companyId && r.ApprovedOn != null).ToListAsync(ct).ConfigureAwait(false))
+        {
+            entries.Add(("Allocation run", run.RunNumber, run.ProposedByUserId, Who(run.ApprovedByUserId), DateOnly.FromDateTime(run.CreatedOnUtc.UtcDateTime), run.ApprovedOn,
+                run.ApprovedByUserId == run.ProposedByUserId ? "Approved by its proposer" : string.Empty, run.Allocations.Sum(a => a.OfferedPrice ?? 0m)));
+        }
+
+        foreach (TransferApplication transfer in await _db.Set<TransferApplication>().AsNoTracking().Include(t => t.Approvals)
+                     .Where(t => t.CompanyId == companyId && t.Approvals.Any()).ToListAsync(ct).ConfigureAwait(false))
+        {
+            List<TransferApproval> approvals = [.. transfer.Approvals.OrderBy(a => a.ApprovedOn)];
+            entries.Add(("Ownership transfer", transfer.ApplicationNumber, transfer.SubmittedByUserId, string.Join(" + ", approvals.Select(a => Who(a.UserId))), transfer.LodgedOn,
+                transfer.DecidedOn ?? approvals[^1].ApprovedOn, approvals.Any(a => a.UserId == transfer.SubmittedByUserId) ? "Approved by its submitter" : string.Empty, transfer.Consideration));
+        }
+
+        foreach (RegistrationDateChange change in await _db.Set<RegistrationDateChange>().AsNoTracking()
+                     .Where(c => c.CompanyId == companyId && c.Status != ChangeRequestStatus.Pending).ToListAsync(ct).ConfigureAwait(false))
+        {
+            entries.Add(($"Seniority date {change.Status.ToString().ToLowerInvariant()}", $"{Date(change.OldDate)}→{Date(change.NewDate)}", change.RequestedByUserId, Who(change.DecidedByUserId),
+                DateOnly.FromDateTime(change.CreatedOnUtc.UtcDateTime), change.ModifiedOnUtc is DateTimeOffset m ? DateOnly.FromDateTime(m.UtcDateTime) : null,
+                change.DecidedByUserId == change.RequestedByUserId ? "Decided by its requester" : string.Empty, 0m));
+        }
+
+        foreach (StandPricingRule rule in await _db.Set<StandPricingRule>().AsNoTracking().Where(r => r.CompanyId == companyId && r.ApprovedOn != null).ToListAsync(ct).ConfigureAwait(false))
+        {
+            entries.Add(("Price rule", $"{rule.Scope} from {Date(rule.EffectiveFrom)}", rule.ProposedByUserId, Who(rule.ApprovedByUserId), DateOnly.FromDateTime(rule.CreatedOnUtc.UtcDateTime), rule.ApprovedOn,
+                rule.ApprovedByUserId == rule.ProposedByUserId ? "Approved by its proposer" : string.Empty, 0m));
+        }
+
+        Dictionary<long, string> stands = await StandNumbersAsync(companyId, ct).ConfigureAwait(false);
+        foreach (StandBlock block in await _db.Set<StandBlock>().AsNoTracking().Where(b => b.CompanyId == companyId && b.LiftedOn != null).ToListAsync(ct).ConfigureAwait(false))
+        {
+            entries.Add(("Block lifted", stands.GetValueOrDefault(block.StandId, "?"), block.PlacedByUserId, Who(block.LiftedByUserId), block.PlacedOn, block.LiftedOn,
+                block.LiftedByUserId == block.PlacedByUserId ? "Lifted by the officer who placed it" : string.Empty, 0m));
+        }
+
+        return [.. entries.OrderBy(e => e.Approved ?? e.Requested).ThenBy(e => e.Area, StringComparer.Ordinal).ThenBy(e => e.Reference, StringComparer.Ordinal)
+            .Select(e => Row(("Area", e.Area), ("Reference", e.Reference), ("RequestedBy", Who(e.By)), ("ApprovedBy", e.ApprovedBy), ("Requested", Date(e.Requested)),
+                ("Approved", e.Approved is DateOnly a ? Date(a) : "—"), ("Days", e.Approved is DateOnly d ? Math.Max(0, d.DayNumber - e.Requested.DayNumber).ToString(CultureInfo.InvariantCulture) : "—"),
+                ("Exception", e.Exception.Length == 0 ? "—" : e.Exception), ("Value", e.Value)))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> OverridesAsync(long companyId, CancellationToken ct)
+    {
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        string Who(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "—";
+        Dictionary<long, string> stands = await StandNumbersAsync(companyId, ct).ConfigureAwait(false);
+        var applicants = await _db.HousingApplicants.AsNoTracking().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.Id, a => a.WaitingListNumber ?? a.IdNumber, ct).ConfigureAwait(false);
+        List<(DateOnly Date, string Type, string Reference, string Detail, string By, string Reason)> entries = [];
+
+        entries.AddRange((await _db.Set<RegistrationDateChange>().AsNoTracking().Where(c => c.CompanyId == companyId && c.Status == ChangeRequestStatus.Approved).ToListAsync(ct).ConfigureAwait(false))
+            .Select(c => (c.ModifiedOnUtc is DateTimeOffset m ? DateOnly.FromDateTime(m.UtcDateTime) : DateOnly.FromDateTime(c.CreatedOnUtc.UtcDateTime), "Seniority date changed",
+                applicants.GetValueOrDefault(c.ApplicantId, "?"), $"{Date(c.OldDate)} → {Date(c.NewDate)}", Who(c.DecidedByUserId), c.Reason)));
+        entries.AddRange((await _db.Set<StandPricingRule>().AsNoTracking().Where(r => r.CompanyId == companyId && r.Scope == PricingScope.Stand && r.StandId != null).ToListAsync(ct).ConfigureAwait(false))
+            .Select(r => (r.EffectiveFrom, "Stand-specific price", stands.GetValueOrDefault(r.StandId!.Value, "?"),
+                $"margin {r.MarginPercent:0.##}%, overhead {r.OverheadPercent:0.##}%{(r.ApprovedOn is null ? " (not approved)" : string.Empty)}", Who(r.ApprovedByUserId ?? r.ProposedByUserId), "—")));
+        entries.AddRange((await _db.Set<StandAllocation>().AsNoTracking().Where(a => a.CompanyId == companyId && a.CertificateNumber != null && a.OfferedPrice == null).ToListAsync(ct).ConfigureAwait(false))
+            .Select(a => (a.OfferExpires ?? DateOnly.MinValue, "Offer without an approved price", a.CertificateNumber!, $"stand {stands.GetValueOrDefault(a.StandId, "?")}", "—",
+                "No approved price rule applied on the offer date")));
+        entries.AddRange((await _db.Set<StandBlock>().AsNoTracking().Where(b => b.CompanyId == companyId && b.LiftedOn != null).ToListAsync(ct).ConfigureAwait(false))
+            .Select(b => (b.LiftedOn!.Value, "Block lifted", stands.GetValueOrDefault(b.StandId, "?"), $"{b.Reason}: {b.Detail}", Who(b.LiftedByUserId), b.LiftReason ?? "—")));
+        return [.. entries.OrderBy(e => e.Date).ThenBy(e => e.Type, StringComparer.Ordinal)
+            .Select(e => Row(("Type", e.Type), ("Reference", e.Reference), ("Detail", e.Detail), ("Date", e.Date == DateOnly.MinValue ? "—" : Date(e.Date)), ("By", e.By), ("Reason", e.Reason)))];
     }
 
     private Task<Dictionary<long, string>> ParcelNumbersAsync(long companyId, CancellationToken ct)

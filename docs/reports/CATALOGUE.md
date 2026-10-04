@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-211 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+215 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -86,8 +86,10 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H31 | Allocation Register | Allocations with stand, beneficiary, certificate, frozen price and approval. | — | Certificate, Run, Stand, WaitingListNumber, Beneficiary, Status, ApprovedOn, Price | — | Sum(Price) |
 | H32 | Ballot / Draw Result Report | Ballot runs with the stored seed and input hash, re-verified now. | — | Run, Status, Seed, InputHash, Verified | — | — |
 | H33 | Allocations by Scheme, Month and Approver | Approved allocations counted by scheme, approval month and approving officer. | — | Scheme, Month, Approver, Allocations | — | — |
+| H34 | Skipped Applicant / Substitution Report | Per allocation run: listed applicants left out and why, and offers declined, lapsed or cancelled — the appeal-defence report. | — | Run, Scheme, Method, WaitingListNumber, Applicant, Outcome, Reason | — | — |
 | H35 | Offers Outstanding / Expiring / Expired | Open offers with the acceptance deadline countdown. | AsAtDate (Date, optional) | Certificate, Stand, Beneficiary, Expires, DaysLeft, State | — | — |
 | H36 | Declined, Lapsed & Cancelled Offers | Offers that did not proceed, with when and why. | — | Certificate, Stand, Applicant, Status, DecidedOn, Reason | — | — |
+| H37 | Quota Compliance Report | Per scheme: allocations to each beneficiary group against its policy quota. | — | Scheme, Group, Allocations, Members, Actual, Target, Variance, Status | — | — |
 | H38 | Appeals Register & Outcomes | Appeals lodged against allocation runs with hearing and outcome. | — | Appeal, WaitingListNumber, Run, Lodged, Status, Hearing, Outcome | — | — |
 | H39 | Double Allocation Exception Report | Stands promised through more than one route — must always be empty; any row is an incident. | — | Stand, Claims, Routes | — | — |
 | H4 | Due Diligence Outstanding | Open acquisitions and the due-diligence items blocking each. | — | Acquisition, Parcel, Outstanding | — | — |
@@ -141,7 +143,9 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H89 | Housing Subsidy & Grant Utilisation | Grants received, spent, recognised and deferred (IAS 20), with conditions. | — | Grant, Grantor, Received, Conditions, Amount, Spent, Recognised, Deferred | — | Sum(Deferred) |
 | H9 | Land Bank Valuation vs Carrying Value (IAS 2 NRV test) | Undivided parcels against their latest valuation and unsold stands against their approved price, less costs to sell — the write-down working paper. | AsAtDate (Date, optional), CostToSellPercent (Decimal, optional) | Item, Kind, Scheme, Carrying, Basis, Price, CostsToSell, Nrv, WriteDown | — | Sum(WriteDown) |
 | H90 | Housing Audit Trail Report | Every recorded change to housing records — before and after values, user, time. | AsAtDate (Date, optional) | When, User, Entity, Id, Action, Changed | — | — |
+| H91 | Allocation & Ownership Change Approval Audit | Who requested and who approved each run, transfer, seniority change, price rule and block lift — turnaround and dual-authorisation exceptions. | — | Area, Reference, RequestedBy, ApprovedBy, Requested, Approved, Days, Exception, Value | — | Sum(Value) |
 | H92 | Segregation of Duties Violations — Housing | Users whose permissions combine housing duties that must be separated. | — | User, Rule, Conflict | — | — |
+| H93 | Manual Override & Exception Report | Seniority dates changed, stand-specific prices, offers without an approved price and blocks lifted — each with the stated reason. | — | Type, Reference, Detail, Date, By, Reason | — | — |
 | H95 | Housing Executive Dashboard | Land bank, stands, waiting list, allocations, titles and debtors at a glance. | AsAtDate (Date, optional) | Measure, Value | — | — |
 | H96 | Housing Delivery / Statutory Return | Stands delivered in the year by density, tenure and beneficiary category. | AsAtDate (Date, optional) | Density, Tenure, Category, Stands | — | — |
 | HSE-STAND | Housing Stand Register | Stands with status, apportioned cost, selling price and current holder. | — | StandNumber, Status, Holder, AllocatedCost, SellingPrice | — | Sum(SellingPrice) |

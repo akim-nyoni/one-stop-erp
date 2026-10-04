@@ -131,6 +131,13 @@ public sealed class HousingApplicant : SoftDeletableEntity, ICompanyScoped
     /// <summary>Where the applicant stands on the list.</summary>
     public ApplicantStatus Status { get; private set; } = ApplicantStatus.Active;
 
+    /// <summary>The beneficiary groups the applicant declared and proved (age and disability groups are also derived).</summary>
+    public BeneficiaryGroups DeclaredGroups { get; private set; }
+
+    /// <summary>Records the beneficiary groups the applicant declared and proved.</summary>
+    /// <param name="groups">The groups.</param>
+    public void DeclareGroups(BeneficiaryGroups groups) => DeclaredGroups = groups;
+
     /// <summary>Marks the applicant verified.</summary>
     public void Verify() => IsVerified = true;
 

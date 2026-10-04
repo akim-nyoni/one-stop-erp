@@ -1303,6 +1303,16 @@ app.MapPost("/api/housing/land/{parcelNumber}/valuations", async (string parcelN
 .RequireAuthorization()
 .WithName("RecordLandValuation");
 
+app.MapPost("/api/housing/quotas", async (long companyId, string? schemeCode, One4All.Core.Housing.BeneficiaryGroups group, decimal targetPercent, One4All.Application.Abstractions.Housing.IAllocationQuotaService quotas, CancellationToken ct) =>
+    ActionResponse(await quotas.SetQuotaAsync(companyId, schemeCode, group, targetPercent, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SetAllocationQuota");
+
+app.MapPost("/api/housing/applicants/{waitingListNumber}/groups", async (string waitingListNumber, long companyId, One4All.Core.Housing.BeneficiaryGroups groups, One4All.Application.Abstractions.Housing.IAllocationQuotaService quotas, CancellationToken ct) =>
+    ActionResponse(await quotas.DeclareGroupsAsync(companyId, waitingListNumber, groups, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DeclareBeneficiaryGroups");
+
 app.MapPost("/api/housing/titles", async (long companyId, long standId, DateOnly date, One4All.Application.Abstractions.Housing.ITitleDeedService titles, CancellationToken ct) =>
     ValueResponse(await titles.ApplyAsync(companyId, standId, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

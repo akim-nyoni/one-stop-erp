@@ -104,6 +104,12 @@ public static class HousingReports
         yield return Listing("H36", "Declined, Lapsed & Cancelled Offers", "Housing", "Offers that did not proceed, with when and why.", "HousingFailedOffers",
             [new Column("Certificate", "Certificate", 100), new Column("Stand", "Stand", 80), new Column("Applicant", "Applicant", 160), new Column("Status", "Outcome", 80), new Column("DecidedOn", "On", 80),
              new Column("Reason", "Reason", 200)], []);
+        yield return Listing("H34", "Skipped Applicant / Substitution Report", "Housing", "Per allocation run: listed applicants left out and why, and offers declined, lapsed or cancelled — the appeal-defence report.",
+            "HousingSkippedApplicants", [new Column("Run", "Run", 80), new Column("Scheme", "Scheme", 80), new Column("Method", "Method", 70), new Column("WaitingListNumber", "WL number", 80),
+             new Column("Applicant", "Applicant", 150), new Column("Outcome", "Outcome", 90), new Column("Reason", "Reason", 240)], []);
+        yield return Listing("H37", "Quota Compliance Report", "Housing", "Per scheme: allocations to each beneficiary group against its policy quota.", "HousingQuotaCompliance",
+            [new Column("Scheme", "Scheme", 80), new Column("Group", "Group", 100), new Column("Allocations", "Allocations", 70), new Column("Members", "To group", 60), new Column("Actual", "Actual %", 60),
+             new Column("Target", "Target %", 60), new Column("Variance", "Variance", 60), new Column("Status", "Status", 60)], []);
         yield return Listing("H38","Appeals Register & Outcomes", "Housing", "Appeals lodged against allocation runs with hearing and outcome.", "HousingAppeals",
             [new Column("Appeal", "Appeal", 90), new Column("WaitingListNumber", "Appellant", 100), new Column("Run", "Run", 90), new Column("Lodged", "Lodged", 80),
              new Column("Status", "Status", 80), new Column("Hearing", "Hearing", 80), new Column("Outcome", "Outcome", 220)], []);
@@ -234,6 +240,12 @@ public static class HousingReports
         yield return Listing("H90", "Housing Audit Trail Report", "Housing", "Every recorded change to housing records — before and after values, user, time.", "HousingAuditTrail",
             [new Column("When", "When", 120), new Column("User", "User", 90), new Column("Entity", "Record", 130), new Column("Id", "Id", 50), new Column("Action", "Action", 60), new Column("Changed", "Fields changed", 260)],
             [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H91", "Allocation & Ownership Change Approval Audit", "Housing", "Who requested and who approved each run, transfer, seniority change, price rule and block lift — turnaround and dual-authorisation exceptions.",
+            "HousingApprovalAudit", [new Column("Area", "Area", 100), new Column("Reference", "Reference", 90), new Column("RequestedBy", "Requested by", 90), new Column("ApprovedBy", "Approved by", 110),
+             new Column("Requested", "Requested", 75), new Column("Approved", "Approved", 75), new Column("Days", "Days", 45), new Column("Exception", "Exception", 170), new Column("Value", "Value", 90, true)], []);
+        yield return Listing("H93", "Manual Override & Exception Report", "Housing", "Seniority dates changed, stand-specific prices, offers without an approved price and blocks lifted — each with the stated reason.",
+            "HousingOverrides", [new Column("Type", "Type", 150), new Column("Reference", "Reference", 100), new Column("Detail", "Detail", 200), new Column("Date", "Date", 75), new Column("By", "By", 90),
+             new Column("Reason", "Reason", 220)], []);
         yield return Listing("H92", "Segregation of Duties Violations — Housing", "Housing", "Users whose permissions combine housing duties that must be separated.", "HousingSodViolations",
             [new Column("User", "User", 120), new Column("Rule", "Rule", 90), new Column("Conflict", "Conflict", 360)], []);
         yield return Listing("H95", "Housing Executive Dashboard", "Housing", "Land bank, stands, waiting list, allocations, titles and debtors at a glance.", "HousingDashboard",

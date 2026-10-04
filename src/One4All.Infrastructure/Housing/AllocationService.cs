@@ -46,16 +46,18 @@ public sealed class AllocationService : IAllocationService
             return Error.NotFound("Hse.SchemeNotFound", $"Scheme {proposal.SchemeId} not found.");
         }
 
-        List<long> liveStands = await _db.Set<StandAllocation>().Where(a => Live.Contains(a.Status)).Select(a => a.StandId).ToListAsync(ct).ConfigureAwait(false);
-        liveStands.AddRange(await _db.Set<StandBlock>().Where(b => b.CompanyId == proposal.CompanyId && b.LiftedOn == null).Select(b => b.StandId).ToListAsync(ct).ConfigureAwait(false));
-        List<long> liveApplicants = await _db.Set<StandAllocation>().Where(a => Live.Contains(a.Status)).Select(a => a.ApplicantId).ToListAsync(ct).ConfigureAwait(false);
-        var stands = await _db.Set<HousingStand>().AsNoTracking()
-            .Where(s => s.CompanyId == proposal.CompanyId && s.SchemeId == proposal.SchemeId && s.Status == StandStatus.Available && !liveStands.Contains(s.Id))
-            .OrderBy(s => s.StandNumber).Select(s => new { s.Id, s.StandNumber }).ToListAsync(ct).ConfigureAwait(false);
+        // Free stands exclude every route a stand can be blocked or promised through, so an approval does not then trip over one.
+        HashSet<long> unavailable = await StandClaims.UnavailableAsync(_db, proposal.CompanyId, ct).ConfigureAwait(false);
+        HashSet<long> liveApplicants = [.. await _db.Set<StandAllocation>().Where(a => a.CompanyId == proposal.CompanyId && Live.Contains(a.Status)).Select(a => a.ApplicantId).ToListAsync(ct).ConfigureAwait(false)];
+        var stands = (await _db.Set<HousingStand>().AsNoTracking()
+                .Where(s => s.CompanyId == proposal.CompanyId && s.SchemeId == proposal.SchemeId && s.Status == StandStatus.Available)
+                .OrderBy(s => s.StandNumber).Select(s => new { s.Id, s.StandNumber }).ToListAsync(ct).ConfigureAwait(false))
+            .Where(s => !unavailable.Contains(s.Id)).ToList();
 
-        var applicants = await _db.HousingApplicants.AsNoTracking()
-            .Where(a => a.CompanyId == proposal.CompanyId && a.Category == proposal.Category && a.Status == ApplicantStatus.Active && a.WaitingListNumber != null && !liveApplicants.Contains(a.Id))
-            .Select(a => new { a.Id, Number = a.WaitingListNumber! }).ToListAsync(ct).ConfigureAwait(false);
+        var listed = await _db.HousingApplicants.AsNoTracking()
+            .Where(a => a.CompanyId == proposal.CompanyId && a.Category == proposal.Category && a.WaitingListNumber != null && (a.Status == ApplicantStatus.Active || a.Status == ApplicantStatus.Suspended))
+            .Select(a => new { a.Id, Number = a.WaitingListNumber!, a.Status }).ToListAsync(ct).ConfigureAwait(false);
+        var applicants = listed.Where(a => a.Status == ApplicantStatus.Active && !liveApplicants.Contains(a.Id)).ToList();
         Dictionary<string, long> applicantIds = applicants.ToDictionary(a => a.Number, a => a.Id, StringComparer.Ordinal);
 
         // The canonical candidate list: ranked for seniority and score, waiting-list-number order for a ballot.
@@ -94,6 +96,11 @@ public sealed class AllocationService : IAllocationService
         foreach ((string stand, string candidate) in AllocationDraw.Pair(standNumbers, drawn))
         {
             run.Add(new StandAllocation(++sequence, standIds[stand], applicantIds[candidate]));
+        }
+
+        foreach (var left in listed.Where(a => !applicantIds.ContainsKey(a.Number)).OrderBy(a => a.Number, StringComparer.Ordinal))
+        {
+            run.Exclude(left.Id, left.Status == ApplicantStatus.Suspended ? ExclusionReason.Suspended : ExclusionReason.LiveAllocation);
         }
 
         _db.Set<AllocationRun>().Add(run);

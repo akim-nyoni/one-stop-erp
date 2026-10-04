@@ -59,6 +59,7 @@ public enum AllocationStatus
 public sealed class AllocationRun : AuditableEntity, ICompanyScoped
 {
     private readonly List<StandAllocation> _allocations = [];
+    private readonly List<AllocationExclusion> _exclusions = [];
 
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private AllocationRun()
@@ -137,6 +138,14 @@ public sealed class AllocationRun : AuditableEntity, ICompanyScoped
 
     /// <summary>The stand-to-applicant pairings.</summary>
     public IReadOnlyList<StandAllocation> Allocations => _allocations.AsReadOnly();
+
+    /// <summary>The listed applicants in the run's category left out of it, and why (the appeal-defence record).</summary>
+    public IReadOnlyList<AllocationExclusion> Exclusions => _exclusions.AsReadOnly();
+
+    /// <summary>Records that a listed applicant was left out of the run.</summary>
+    /// <param name="applicantId">The applicant.</param>
+    /// <param name="reason">Why.</param>
+    public void Exclude(long applicantId, ExclusionReason reason) => _exclusions.Add(new AllocationExclusion(applicantId, reason));
 
     /// <summary>Adds a pairing.</summary>
     /// <param name="allocation">The pairing.</param>
@@ -262,4 +271,41 @@ public sealed class StandAllocation : Entity
         DecidedOn = date;
         Reason = reason;
     }
+}
+
+/// <summary>Why a listed applicant in a run's category was left out of it (brief §14 H34).</summary>
+public enum ExclusionReason
+{
+    /// <summary>Suspended for not confirming in time.</summary>
+    Suspended = 1,
+
+    /// <summary>Already holds a live allocation (proposed, offered or accepted) from another run.</summary>
+    LiveAllocation = 2,
+}
+
+/// <summary>A listed applicant left out of an allocation run, recorded when the run is proposed (<c>hse.allocation_exclusion</c>).</summary>
+public sealed class AllocationExclusion : Entity
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private AllocationExclusion()
+    {
+    }
+
+    /// <summary>Records an exclusion.</summary>
+    /// <param name="applicantId">The applicant.</param>
+    /// <param name="reason">Why.</param>
+    public AllocationExclusion(long applicantId, ExclusionReason reason)
+    {
+        ApplicantId = applicantId;
+        Reason = reason;
+    }
+
+    /// <summary>The run.</summary>
+    public long AllocationRunId { get; private set; }
+
+    /// <summary>The applicant.</summary>
+    public long ApplicantId { get; private set; }
+
+    /// <summary>Why.</summary>
+    public ExclusionReason Reason { get; private set; }
 }

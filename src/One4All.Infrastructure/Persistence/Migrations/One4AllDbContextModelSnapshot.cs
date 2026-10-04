@@ -2908,6 +2908,108 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("allocation_appeal", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.AllocationExclusion", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AllocationRunId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("allocation_run_id");
+
+                    b.Property<long>("ApplicantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("applicant_id");
+
+                    b.Property<int>("Reason")
+                        .HasColumnType("integer")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_allocation_exclusion");
+
+                    b.HasIndex("AllocationRunId")
+                        .HasDatabaseName("ix_allocation_exclusion_allocation_run_id");
+
+                    b.HasIndex("ApplicantId")
+                        .HasDatabaseName("ix_allocation_exclusion_applicant_id");
+
+                    b.ToTable("allocation_exclusion", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.AllocationQuota", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<int>("Group")
+                        .HasColumnType("integer")
+                        .HasColumnName("group");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long?>("SchemeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("scheme_id");
+
+                    b.Property<decimal>("TargetPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("target_percent");
+
+                    b.HasKey("Id")
+                        .HasName("pk_allocation_quota");
+
+                    b.HasIndex("SchemeId")
+                        .HasDatabaseName("ix_allocation_quota_scheme_id");
+
+                    b.HasIndex("CompanyId", "Group")
+                        .IsUnique()
+                        .HasDatabaseName("ix_allocation_quota_company_id_group")
+                        .HasFilter("scheme_id IS NULL");
+
+                    b.HasIndex("CompanyId", "SchemeId", "Group")
+                        .IsUnique()
+                        .HasDatabaseName("ix_allocation_quota_company_id_scheme_id_group")
+                        .HasFilter("scheme_id IS NOT NULL");
+
+                    b.ToTable("allocation_quota", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.AllocationRun", b =>
                 {
                     b.Property<long>("Id")
@@ -4189,6 +4291,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("DateOfBirth")
                         .HasColumnType("date")
                         .HasColumnName("date_of_birth");
+
+                    b.Property<int>("DeclaredGroups")
+                        .HasColumnType("integer")
+                        .HasColumnName("declared_groups");
 
                     b.Property<long?>("DeletedByUserId")
                         .HasColumnType("bigint")
@@ -20343,6 +20449,32 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_allocation_appeal_housing_applicants_applicant_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.AllocationExclusion", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.AllocationRun", null)
+                        .WithMany("Exclusions")
+                        .HasForeignKey("AllocationRunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_allocation_exclusion_allocation_run_allocation_run_id");
+
+                    b.HasOne("One4All.Core.Housing.HousingApplicant", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_allocation_exclusion_housing_applicants_applicant_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.AllocationQuota", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingScheme", null)
+                        .WithMany()
+                        .HasForeignKey("SchemeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_allocation_quota_housing_schemes_scheme_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.ApplicantNotice", b =>
                 {
                     b.HasOne("One4All.Core.Housing.HousingApplicant", null)
@@ -21746,6 +21878,8 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Housing.AllocationRun", b =>
                 {
                     b.Navigation("Allocations");
+
+                    b.Navigation("Exclusions");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.Cooperative", b =>
