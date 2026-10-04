@@ -81,6 +81,12 @@ public partial class ShellWindow : Window
         check.Show();
     }
 
+    private void OpenDataHealth_Click(object sender, RoutedEventArgs e)
+    {
+        DataHealthWindow health = new(_services) { Owner = this };
+        health.Show();
+    }
+
     private void OpenBankRules_Click(object sender, RoutedEventArgs e)
     {
         BankRulesWindow rules = new(_services) { Owner = this };
