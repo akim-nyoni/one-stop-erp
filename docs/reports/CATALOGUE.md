@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-208 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+211 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -64,6 +64,8 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H1 | Land Bank Register | All parcels with area, cost, status and mapped area. | — | Parcel, Description, AreaM2, MappedM2, Status, Cost | — | Sum(Cost) |
 | H10 | Layout Plans Register & Approval Status | Layouts with the version in force, pending amendments and approval turnaround. | — | Plan, Parcel, Version, Status, Stands, TurnaroundDays | — | — |
 | H11 | Stand Creation / Subdivision Report | Stands created from each parent parcel, with size, scheme, status and carried cost. | — | Parcel, Stand, SizeM2, Scheme, Status, Cost | — | Sum(Cost) |
+| H12 | Survey Status Report | Per scheme as at the date: stands not pegged, pegged, awaiting the Surveyor-General and approved, with the longest wait. | AsAtDate (Date, optional) | Scheme, Stands, NotPegged, Pegged, AwaitingSg, Approved, LongestWait | — | — |
+| H13 | Servicing Status by Scheme | Water, sewer, roads, electricity and storm water % complete, with stands serviced and unserviced. | AsAtDate (Date, optional) | Scheme, Water, Sewer, Roads, Electricity, StormWater, Stands, Serviced, Unserviced | — | — |
 | H14 | Servicing Cost Apportionment Schedule | Servicing cost per stand by contract and basis. | — | Stand, Contract, Basis, Date, Journal, Amount | — | Sum(Amount) |
 | H15 | Cost per Stand / Selling Price Build-up | Land and servicing cost, overhead, levy and margin to price, with margin %. | AsAtDate (Date, optional) | Stand, Scope, Cost, Overhead, Levy, Margin, MarginPercent, Price | — | Sum(Price) |
 | H16 | Price List by Scheme & Stand Size Band | Every pricing rule with its scope, effective date, terms and approval — the price change history. | — | Scope, Applies, Effective, Terms, Approved | — | — |
@@ -137,6 +139,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H87 | Informal Settlement / Enumeration Register | Settlements with ward, cut-off date, households counted and eligible. | — | Settlement, Name, Ward, CutOff, Households, Eligible, Plan | — | — |
 | H88 | Regularisation Progress Report | Per settlement: enumerated → eligible → waiting-listed or regularised → outstanding. | — | Settlement, Enumerated, Eligible, WaitingListed, Regularised, Outstanding | — | — |
 | H89 | Housing Subsidy & Grant Utilisation | Grants received, spent, recognised and deferred (IAS 20), with conditions. | — | Grant, Grantor, Received, Conditions, Amount, Spent, Recognised, Deferred | — | Sum(Deferred) |
+| H9 | Land Bank Valuation vs Carrying Value (IAS 2 NRV test) | Undivided parcels against their latest valuation and unsold stands against their approved price, less costs to sell — the write-down working paper. | AsAtDate (Date, optional), CostToSellPercent (Decimal, optional) | Item, Kind, Scheme, Carrying, Basis, Price, CostsToSell, Nrv, WriteDown | — | Sum(WriteDown) |
 | H90 | Housing Audit Trail Report | Every recorded change to housing records — before and after values, user, time. | AsAtDate (Date, optional) | When, User, Entity, Id, Action, Changed | — | — |
 | H92 | Segregation of Duties Violations — Housing | Users whose permissions combine housing duties that must be separated. | — | User, Rule, Conflict | — | — |
 | H95 | Housing Executive Dashboard | Land bank, stands, waiting list, allocations, titles and debtors at a glance. | AsAtDate (Date, optional) | Measure, Value | — | — |

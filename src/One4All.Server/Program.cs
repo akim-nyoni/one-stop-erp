@@ -1288,6 +1288,21 @@ app.MapPost("/api/housing/land/disposals", async (One4All.Application.Abstractio
 .RequireAuthorization()
 .WithName("DisposeOfLand");
 
+app.MapPost("/api/housing/survey", async (long companyId, string[] standNumbers, One4All.Core.Housing.SurveyStage stage, DateOnly date, string reference, One4All.Application.Abstractions.Housing.ISchemeProgressService progress, CancellationToken ct) =>
+    ValueResponse(await progress.RecordSurveyAsync(companyId, standNumbers, stage, date, reference, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordSurvey");
+
+app.MapPost("/api/housing/servicing-progress", async (One4All.Application.Abstractions.Housing.ServicingCertificate certificate, One4All.Application.Abstractions.Housing.ISchemeProgressService progress, CancellationToken ct) =>
+    ValueResponse(await progress.RecordServicingAsync(certificate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordServicingProgress");
+
+app.MapPost("/api/housing/land/{parcelNumber}/valuations", async (string parcelNumber, long companyId, DateOnly date, decimal value, string valuer, One4All.Application.Abstractions.Housing.ISchemeProgressService progress, CancellationToken ct) =>
+    ValueResponse(await progress.RecordValuationAsync(companyId, parcelNumber, date, value, valuer, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordLandValuation");
+
 app.MapPost("/api/housing/titles", async (long companyId, long standId, DateOnly date, One4All.Application.Abstractions.Housing.ITitleDeedService titles, CancellationToken ct) =>
     ValueResponse(await titles.ApplyAsync(companyId, standId, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

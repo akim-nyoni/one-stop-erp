@@ -137,6 +137,9 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             "HOUSINGLANDDISPOSALS" => await LandDisposalsAsync(companyId, ct).ConfigureAwait(false),
             "HOUSINGENCUMBRANCES" => await EncumbrancesAsync(companyId, ct).ConfigureAwait(false),
             "HOUSINGLANDDISPUTES" => await LandDisputesAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "HOUSINGNRVTEST" => await NrvTestAsync(companyId, asAt, parameters, ct).ConfigureAwait(false),
+            "HOUSINGSURVEYSTATUS" => await SurveyStatusAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "HOUSINGSERVICINGSTATUS" => await ServicingStatusAsync(companyId, asAt, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -1381,6 +1384,78 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                 ("Stand", x.Dispute.StandId is long s ? stands.GetValueOrDefault(s, "?") : "—"), ("Type", x.Dispute.Type.ToString()), ("Claimant", x.Dispute.Claimant),
                 ("Opened", Date(x.Dispute.OpenedOn)), ("Stage", x.Step.Stage.ToString()), ("StageSince", Date(x.Step.Date)),
                 ("AgeDays", LandRegisterRules.AgeInDays(x.Dispute.OpenedOn, null, asAt))))];
+    }
+
+    // Undivided parcels at their latest valuation; unsold, unclaimed stands at their approved price (else their recorded selling price).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> NrvTestAsync(long companyId, DateOnly asAt, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        decimal costToSell = parameters.TryGetValue("CostToSellPercent", out object? rate) && rate is not null and not "" ? Convert.ToDecimal(rate, CultureInfo.InvariantCulture) : 0m;
+        Dictionary<long, string> schemes = await _db.HousingSchemes.AsNoTracking().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Code, ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        void Add(string item, string kind, string scheme, decimal carrying, string basis, decimal? price)
+        {
+            NrvAssessment? test = price is decimal p ? SchemeProgressRules.Assess(carrying, p, 0m, costToSell) : null;
+            rows.Add(Row(("Item", item), ("Kind", kind), ("Scheme", scheme), ("Carrying", Money(carrying)), ("Basis", basis), ("Price", price is decimal q ? Money(q) : "—"),
+                ("CostsToSell", test is null ? "—" : Money(test.CostsToSell)), ("Nrv", test is null ? "—" : Money(test.NetRealisableValue)), ("WriteDown", test?.WriteDown ?? 0m)));
+        }
+
+        List<LandParcel> parcels = await _db.LandParcels.AsNoTracking().Where(p => p.CompanyId == companyId && p.Status == LandParcelStatus.Acquired && p.AcquisitionCost > 0m)
+            .OrderBy(p => p.ParcelNumber).ToListAsync(ct).ConfigureAwait(false);
+        List<long> parcelIds = [.. parcels.Select(p => p.Id)];
+        Dictionary<long, LandValuation> valuations = (await _db.Set<LandValuation>().AsNoTracking().Where(v => parcelIds.Contains(v.LandParcelId) && v.Date <= asAt).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(v => v.LandParcelId).ToDictionary(g => g.Key, g => g.OrderBy(v => v.Date).ThenBy(v => v.Id).Last());
+        foreach (LandParcel parcel in parcels)
+        {
+            LandValuation? valuation = valuations.GetValueOrDefault(parcel.Id);
+            Add(parcel.ParcelNumber, "Parcel", "—", parcel.AcquisitionCost, valuation is null ? "No valuation" : $"Valuation {Date(valuation.Date)} ({valuation.Valuer})", valuation?.Value);
+        }
+
+        List<HousingStand> stands = await _db.HousingStands.AsNoTracking()
+            .Where(s => s.CompanyId == companyId && s.Status == StandStatus.Available && s.CurrentHolderCustomerId == null && !_db.Set<StandAllocation>().Any(a => a.StandId == s.Id && Live.Contains(a.Status)))
+            .OrderBy(s => s.StandNumber).ToListAsync(ct).ConfigureAwait(false);
+        foreach (HousingStand stand in stands)
+        {
+            StandPriceQuote? quote = await StandPrices.QuoteAsync(_db, stand, asAt, ct).ConfigureAwait(false);
+            (string basis, decimal? price) = quote is not null ? ($"Price rule {quote.Scope} from {Date(quote.EffectiveFrom)}", quote.BuildUp.Price)
+                : stand.SellingPrice > 0m ? ("Recorded selling price", stand.SellingPrice) : ("No price evidence", (decimal?)null);
+            Add(stand.StandNumber, "Stand", stand.SchemeId is long sid ? schemes.GetValueOrDefault(sid, "?") : "—", stand.AllocatedCost, basis, price);
+        }
+
+        return rows;
+    }
+
+    // Each stand's stage as at the date is its latest step by then; the wait is days at DiagramLodged.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SurveyStatusAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        Dictionary<long, string> schemes = await _db.HousingSchemes.AsNoTracking().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Code, ct).ConfigureAwait(false);
+        var stands = await _db.HousingStands.AsNoTracking().Where(s => s.CompanyId == companyId).Select(s => new { s.Id, s.SchemeId }).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, StandSurveyStep> latest = (await _db.Set<StandSurveyStep>().AsNoTracking().Where(s => s.CompanyId == companyId && s.Date <= asAt).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(s => s.StandId).ToDictionary(g => g.Key, g => g.OrderBy(s => s.Stage).Last());
+        return [.. stands.GroupBy(s => s.SchemeId is long id ? schemes.GetValueOrDefault(id, "?") : "(no scheme)").OrderBy(g => g.Key, StringComparer.Ordinal).Select(g =>
+        {
+            List<StandSurveyStep?> steps = [.. g.Select(s => latest.GetValueOrDefault(s.Id))];
+            List<int> waits = [.. steps.Where(s => s?.Stage == SurveyStage.DiagramLodged).Select(s => asAt.DayNumber - s!.Date.DayNumber)];
+            return Row(("Scheme", g.Key), ("Stands", steps.Count), ("NotPegged", steps.Count(s => s is null)), ("Pegged", steps.Count(s => s?.Stage == SurveyStage.Pegged)),
+                ("AwaitingSg", waits.Count), ("Approved", steps.Count(s => s?.Stage == SurveyStage.DiagramApproved)), ("LongestWait", waits.Count == 0 ? "—" : waits.Max().ToString(CultureInfo.InvariantCulture)));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ServicingStatusAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<HousingScheme> schemes = await _db.HousingSchemes.AsNoTracking().Where(s => s.CompanyId == companyId).OrderBy(s => s.Code).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, int> standCounts = await _db.HousingStands.AsNoTracking().Where(s => s.CompanyId == companyId && s.SchemeId != null)
+            .GroupBy(s => s.SchemeId!.Value).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count, ct).ConfigureAwait(false);
+        Dictionary<(long, BulkService), SchemeServicingProgress> latest = (await _db.Set<SchemeServicingProgress>().AsNoTracking().Where(p => p.CompanyId == companyId && p.Date <= asAt)
+                .ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(p => (p.SchemeId, p.Service)).ToDictionary(g => g.Key, g => g.OrderBy(p => p.Date).ThenBy(p => p.Id).Last());
+        return [.. schemes.Select(scheme =>
+        {
+            string Percent(BulkService service) => latest.TryGetValue((scheme.Id, service), out SchemeServicingProgress? p) ? p.PercentComplete.ToString("0.#", CultureInfo.InvariantCulture) + "%" : "—";
+            int stands = standCounts.GetValueOrDefault(scheme.Id);
+            int serviced = SchemeProgressRules.ServicedStands(latest.Where(x => x.Key.Item1 == scheme.Id).ToDictionary(x => x.Key.Item2, x => x.Value.StandsReached), stands);
+            return Row(("Scheme", scheme.Code), ("Water", Percent(BulkService.Water)), ("Sewer", Percent(BulkService.Sewer)), ("Roads", Percent(BulkService.Roads)),
+                ("Electricity", Percent(BulkService.Electricity)), ("StormWater", Percent(BulkService.StormWater)), ("Stands", stands), ("Serviced", serviced), ("Unserviced", stands - serviced));
+        })];
     }
 
     private Task<Dictionary<long, string>> ParcelNumbersAsync(long companyId, CancellationToken ct)

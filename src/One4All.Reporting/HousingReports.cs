@@ -34,6 +34,11 @@ public static class HousingReports
         yield return Listing("H7", "Encumbrances, Servitudes & Caveats on Land", "Housing", "Every right or restriction registered against land, in force or lifted.", "HousingEncumbrances",
             [new Column("Parcel", "Parcel", 80), new Column("Type", "Type", 110), new Column("Reference", "Reference", 90), new Column("InFavourOf", "In favour of", 150),
              new Column("Registered", "Registered", 75), new Column("Status", "Status", 110), new Column("Description", "Particulars", 220)], []);
+        yield return Listing("H9", "Land Bank Valuation vs Carrying Value (IAS 2 NRV test)", "Housing",
+            "Undivided parcels against their latest valuation and unsold stands against their approved price, less costs to sell — the write-down working paper.",
+            "HousingNrvTest", [new Column("Item", "Item", 90), new Column("Kind", "Kind", 55), new Column("Scheme", "Scheme", 80), new Column("Carrying", "Carrying", 90), new Column("Basis", "Price basis", 140),
+             new Column("Price", "Estimated price", 90), new Column("CostsToSell", "Costs to sell", 85), new Column("Nrv", "NRV", 90), new Column("WriteDown", "Write-down", 90, true)],
+            [("AsAtDate", ParameterType.Date), ("CostToSellPercent", ParameterType.Decimal)]);
         yield return Listing("H8", "Disputed & Encroached Land", "Housing", "Disputes open at the date with their age and current legal stage.", "HousingLandDisputes",
             [new Column("Dispute", "Dispute", 80), new Column("Parcel", "Parcel", 80), new Column("Stand", "Stand", 70), new Column("Type", "Type", 90), new Column("Claimant", "Claimant", 140),
              new Column("Opened", "Opened", 75), new Column("Stage", "Stage", 90), new Column("StageSince", "Since", 75), new Column("AgeDays", "Age (days)", 65)], [("AsAtDate", ParameterType.Date)]);
@@ -45,6 +50,13 @@ public static class HousingReports
         yield return Listing("H11", "Stand Creation / Subdivision Report", "Housing", "Stands created from each parent parcel, with size, scheme, status and carried cost.", "HousingSubdivision",
             [new Column("Parcel", "Parent parcel", 100), new Column("Stand", "Stand", 80), new Column("SizeM2", "Size m²", 70), new Column("Scheme", "Scheme", 100), new Column("Status", "Status", 80),
              new Column("Cost", "Cost", 90, true)], []);
+        yield return Listing("H12", "Survey Status Report", "Housing", "Per scheme as at the date: stands not pegged, pegged, awaiting the Surveyor-General and approved, with the longest wait.",
+            "HousingSurveyStatus", [new Column("Scheme", "Scheme", 90), new Column("Stands", "Stands", 55), new Column("NotPegged", "Not pegged", 65), new Column("Pegged", "Pegged", 55),
+             new Column("AwaitingSg", "Awaiting SG", 70), new Column("Approved", "Approved", 60), new Column("LongestWait", "Longest wait (days)", 90)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H13", "Servicing Status by Scheme", "Housing", "Water, sewer, roads, electricity and storm water % complete, with stands serviced and unserviced.",
+            "HousingServicingStatus", [new Column("Scheme", "Scheme", 90), new Column("Water", "Water", 55), new Column("Sewer", "Sewer", 55), new Column("Roads", "Roads", 55),
+             new Column("Electricity", "Electricity", 65), new Column("StormWater", "Storm water", 70), new Column("Stands", "Stands", 55), new Column("Serviced", "Serviced", 60),
+             new Column("Unserviced", "Unserviced", 65)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("H14","Servicing Cost Apportionment Schedule", "Housing", "Servicing cost per stand by contract and basis.", "HousingServicing",
             [new Column("Stand", "Stand", 90), new Column("Contract", "Contract", 110), new Column("Basis", "Basis", 100), new Column("Date", "Date", 80),
              new Column("Journal", "Journal", 100), new Column("Amount", "Amount", 100, true)], []);

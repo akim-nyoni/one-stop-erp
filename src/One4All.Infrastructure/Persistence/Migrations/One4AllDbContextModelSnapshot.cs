@@ -5363,6 +5363,67 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("land_parcel", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.LandValuation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long>("LandParcelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("land_parcel_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("value");
+
+                    b.Property<string>("Valuer")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("valuer");
+
+                    b.HasKey("Id")
+                        .HasName("pk_land_valuation");
+
+                    b.HasIndex("LandParcelId", "Date")
+                        .HasDatabaseName("ix_land_valuation_land_parcel_id_date");
+
+                    b.ToTable("land_valuation", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.LayoutPlan", b =>
                 {
                     b.Property<long>("Id")
@@ -5963,6 +6024,75 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_repossession_approver", "approved_by_user_id <> requested_by_user_id");
                         });
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.SchemeServicingProgress", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CertificateReference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("certificate_reference");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("PercentComplete")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("percent_complete");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SchemeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("scheme_id");
+
+                    b.Property<int>("Service")
+                        .HasColumnType("integer")
+                        .HasColumnName("service");
+
+                    b.Property<int>("StandsReached")
+                        .HasColumnType("integer")
+                        .HasColumnName("stands_reached");
+
+                    b.HasKey("Id")
+                        .HasName("pk_scheme_servicing_progress");
+
+                    b.HasIndex("SchemeId", "Service", "Date")
+                        .HasDatabaseName("ix_scheme_servicing_progress_scheme_id_service_date");
+
+                    b.ToTable("scheme_servicing_progress", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.SectionalLevyRun", b =>
@@ -6729,6 +6859,67 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_stand_pricing_rule_company_id_effective_from");
 
                     b.ToTable("stand_pricing_rule", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandSurveyStep", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stand_survey_step");
+
+                    b.HasIndex("StandId", "Stage")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stand_survey_step_stand_id_stage");
+
+                    b.ToTable("stand_survey_step", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.Tenancy", b =>
@@ -20493,6 +20684,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Navigation("Boundary");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.LandValuation", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.LandParcel", null)
+                        .WithMany()
+                        .HasForeignKey("LandParcelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_land_valuation_land_parcel_land_parcel_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.LayoutPlan", b =>
                 {
                     b.HasOne("One4All.Core.Housing.LandParcel", null)
@@ -20575,6 +20776,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_repossession_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.SchemeServicingProgress", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingScheme", null)
+                        .WithMany()
+                        .HasForeignKey("SchemeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_scheme_servicing_progress_scheme_scheme_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.SectionalLevyRun", b =>
@@ -20718,6 +20929,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasForeignKey("StandId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_stand_pricing_rule_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandSurveyStep", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stand_survey_step_stand_stand_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.Tenancy", b =>

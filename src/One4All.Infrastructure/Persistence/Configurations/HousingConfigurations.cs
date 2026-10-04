@@ -1071,3 +1071,45 @@ internal sealed class LandDisposalConfiguration : IEntityTypeConfiguration<LandD
         b.HasIndex(x => new { x.CompanyId, x.DisposalNumber }).IsUnique();
     }
 }
+
+internal sealed class StandSurveyStepConfiguration : IEntityTypeConfiguration<StandSurveyStep>
+{
+    public void Configure(EntityTypeBuilder<StandSurveyStep> b)
+    {
+        b.ToTable("stand_survey_step", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Stage).HasConversion<int>();
+        b.Property(x => x.Reference).HasMaxLength(100);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+
+        // A stand reaches each stage once.
+        b.HasIndex(x => new { x.StandId, x.Stage }).IsUnique();
+    }
+}
+
+internal sealed class SchemeServicingProgressConfiguration : IEntityTypeConfiguration<SchemeServicingProgress>
+{
+    public void Configure(EntityTypeBuilder<SchemeServicingProgress> b)
+    {
+        b.ToTable("scheme_servicing_progress", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Service).HasConversion<int>();
+        b.Property(x => x.PercentComplete).HasPrecision(5, 2);
+        b.Property(x => x.CertificateReference).HasMaxLength(100);
+        b.HasOne<HousingScheme>().WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.SchemeId, x.Service, x.Date });
+    }
+}
+
+internal sealed class LandValuationConfiguration : IEntityTypeConfiguration<LandValuation>
+{
+    public void Configure(EntityTypeBuilder<LandValuation> b)
+    {
+        b.ToTable("land_valuation", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Value).HasPrecision(19, 4);
+        b.Property(x => x.Valuer).HasMaxLength(200);
+        b.HasOne<LandParcel>().WithMany().HasForeignKey(x => x.LandParcelId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.LandParcelId, x.Date });
+    }
+}
