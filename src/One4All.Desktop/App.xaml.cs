@@ -42,6 +42,7 @@ public partial class App : System.Windows.Application
             ServiceCollection services = new();
             services.AddOne4AllInfrastructure(connectionString, licensing);
             services.AddTransient<ViewModels.LoginViewModel>();
+            services.AddSingleton<DesktopSession>();
             _services = services.BuildServiceProvider();
 
             await InitialiseAsync().ConfigureAwait(true);
@@ -78,6 +79,7 @@ public partial class App : System.Windows.Application
             return false;
         }
 
+        Services.GetRequiredService<DesktopSession>().SignIn(result);
         ILicenceService licence = Services.GetRequiredService<ILicenceService>();
         ShellWindow shell = new(new ShellViewModel(result, licence), Services);
         MainWindow = shell;

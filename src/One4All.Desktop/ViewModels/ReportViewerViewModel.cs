@@ -194,7 +194,8 @@ public sealed partial class ReportViewerViewModel : ObservableObject
         return await RenderAsync(format, ReportRunPurpose.Export).ConfigureAwait(true);
     }
 
-    // Every preview and export goes through the audited runner, so it is in the report run log (brief §13.3).
+    // Every preview and export goes through the audited runner as the signed-in user, so it is permission-checked and in
+    // the report run log (brief §13.3).
     private async Task<Result<RenderedDocument>> RenderAsync(ReportFormat format, ReportRunPurpose purpose)
     {
         ReportListItem report = SelectedReport!;
@@ -202,7 +203,8 @@ public sealed partial class ReportViewerViewModel : ObservableObject
 
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         IAuditedReportRunner runner = scope.ServiceProvider.GetRequiredService<IAuditedReportRunner>();
-        Result<AuditedReport> run = await runner.RunAsync(_companyId, report.Code, parameters, format, purpose, null).ConfigureAwait(true);
+        long? userId = _services.GetService<DesktopSession>()?.UserId;
+        Result<AuditedReport> run = await runner.RunAsync(_companyId, report.Code, parameters, format, purpose, userId).ConfigureAwait(true);
         return run.IsSuccess ? run.Value.Document : run.Error;
     }
 
