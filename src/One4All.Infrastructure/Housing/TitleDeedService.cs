@@ -14,14 +14,17 @@ public sealed class TitleDeedService : ITitleDeedService
 {
     private readonly One4AllDbContext _db;
     private readonly INumberSequenceService _numbers;
+    private readonly IHousingMunicipalLinkService _municipalLink;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="numbers">The number sequences.</param>
-    public TitleDeedService(One4AllDbContext db, INumberSequenceService numbers)
+    /// <param name="municipalLink">The link to the municipal register.</param>
+    public TitleDeedService(One4AllDbContext db, INumberSequenceService numbers, IHousingMunicipalLinkService municipalLink)
     {
         _db = db;
         _numbers = numbers;
+        _municipalLink = municipalLink;
     }
 
     /// <inheritdoc />
@@ -69,9 +72,14 @@ public sealed class TitleDeedService : ITitleDeedService
     }
 
     /// <inheritdoc />
-    public async Task<Result> AdvanceAsync(long companyId, string applicationNumber, TitleStepInput step, CancellationToken ct = default)
+    public Task<Result> AdvanceAsync(long companyId, string applicationNumber, TitleStepInput step, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(step);
+        return _db.AtomicAsync(() => AdvanceCoreAsync(companyId, applicationNumber, step, ct), ct);
+    }
+
+    private async Task<Result> AdvanceCoreAsync(long companyId, string applicationNumber, TitleStepInput step, CancellationToken ct)
+    {
         string number = (applicationNumber ?? string.Empty).Trim();
         TitleDeed? title = await _db.Set<TitleDeed>().Include(t => t.Steps)
             .FirstOrDefaultAsync(t => t.CompanyId == companyId && t.ApplicationNumber == number, ct).ConfigureAwait(false);
@@ -118,6 +126,15 @@ public sealed class TitleDeedService : ITitleDeedService
 
         title.Advance(step.Stage, step.Date, string.IsNullOrWhiteSpace(step.Note) ? null : step.Note.Trim());
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (step.Stage == TitleStage.Registered)
+        {
+            Result<MunicipalLinkResult> linked = await _municipalLink.OnEventAsync(companyId, title.StandId, title.HolderCustomerId, MunicipalLinkTrigger.TitleRegistered, step.Date, title.DeedNumber, ct).ConfigureAwait(false);
+            if (linked.IsFailure)
+            {
+                return Result.Failure(linked.Error);
+            }
+        }
+
         return Result.Success();
     }
 

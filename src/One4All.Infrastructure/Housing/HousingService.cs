@@ -20,16 +20,19 @@ public sealed class HousingService : IHousingService
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _posting;
     private readonly ISalesLedgerService _salesLedger;
+    private readonly IHousingMunicipalLinkService _municipalLink;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="posting">The central posting engine.</param>
     /// <param name="salesLedger">The AR ledger (for stand sales).</param>
-    public HousingService(One4AllDbContext db, IPostingEngine posting, ISalesLedgerService salesLedger)
+    /// <param name="municipalLink">The link to the municipal register.</param>
+    public HousingService(One4AllDbContext db, IPostingEngine posting, ISalesLedgerService salesLedger, IHousingMunicipalLinkService municipalLink)
     {
         _db = db;
         _posting = posting;
         _salesLedger = salesLedger;
+        _municipalLink = municipalLink;
     }
 
     /// <inheritdoc />
@@ -218,6 +221,12 @@ public sealed class HousingService : IHousingService
 
         stand.Sell(buyerCustomerId, buyerName, sellingPrice, date);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        Result<MunicipalLinkResult> linked = await _municipalLink.OnEventAsync(companyId, standId, buyerCustomerId, MunicipalLinkTrigger.Sale, date, null, ct).ConfigureAwait(false);
+        if (linked.IsFailure)
+        {
+            return linked.Error;
+        }
 
         return new StandSaleResult(sale.Value.OpenItemId, sale.Value.JournalNumber, cogs.Value.JournalNumber, stand.AllocatedCost);
     }

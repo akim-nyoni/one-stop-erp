@@ -929,6 +929,18 @@ internal sealed class SectionalLevyRunConfiguration : IEntityTypeConfiguration<S
     }
 }
 
+internal sealed class MunicipalLinkSettingsConfiguration : IEntityTypeConfiguration<MunicipalLinkSettings>
+{
+    public void Configure(EntityTypeBuilder<MunicipalLinkSettings> b)
+    {
+        b.ToTable("municipal_link_settings", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Trigger).HasConversion<int>();
+        b.Property(x => x.Ward).HasMaxLength(60);
+        b.HasIndex(x => x.CompanyId).IsUnique();
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

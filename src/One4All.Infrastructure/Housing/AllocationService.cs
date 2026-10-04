@@ -17,16 +17,19 @@ public sealed class AllocationService : IAllocationService
     private readonly One4AllDbContext _db;
     private readonly INumberSequenceService _numbers;
     private readonly IWaitingListService _waitingList;
+    private readonly IHousingMunicipalLinkService _municipalLink;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="numbers">The number sequences.</param>
     /// <param name="waitingList">The waiting list, for rankings.</param>
-    public AllocationService(One4AllDbContext db, INumberSequenceService numbers, IWaitingListService waitingList)
+    /// <param name="municipalLink">The link to the municipal register.</param>
+    public AllocationService(One4AllDbContext db, INumberSequenceService numbers, IWaitingListService waitingList, IHousingMunicipalLinkService municipalLink)
     {
         _db = db;
         _numbers = numbers;
         _waitingList = waitingList;
+        _municipalLink = municipalLink;
     }
 
     /// <inheritdoc />
@@ -178,7 +181,10 @@ public sealed class AllocationService : IAllocationService
     }
 
     /// <inheritdoc />
-    public async Task<Result> AcceptAsync(long companyId, string certificateNumber, DateOnly date, CancellationToken ct = default)
+    public Task<Result> AcceptAsync(long companyId, string certificateNumber, DateOnly date, CancellationToken ct = default)
+        => _db.AtomicAsync(() => AcceptCoreAsync(companyId, certificateNumber, date, ct), ct);
+
+    private async Task<Result> AcceptCoreAsync(long companyId, string certificateNumber, DateOnly date, CancellationToken ct)
     {
         Result<StandAllocation> found = await FindOfferAsync(companyId, certificateNumber, ct).ConfigureAwait(false);
         if (found.IsFailure)
@@ -196,6 +202,18 @@ public sealed class AllocationService : IAllocationService
         allocation.Accept(date);
         applicant.SetStatus(ApplicantStatus.Allocated);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // Where the council links stands to the municipal register on acceptance, the beneficiary's account becomes the ratepayer.
+        long? beneficiary = await _db.Customers.Where(c => c.CompanyId == companyId && c.NationalIdNumber == applicant.IdNumber).Select(c => (long?)c.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (beneficiary is long customerId)
+        {
+            Result<MunicipalLinkResult> linked = await _municipalLink.OnEventAsync(companyId, allocation.StandId, customerId, MunicipalLinkTrigger.AllocationAccepted, date, null, ct).ConfigureAwait(false);
+            if (linked.IsFailure)
+            {
+                return Result.Failure(linked.Error);
+            }
+        }
+
         return Result.Success();
     }
 

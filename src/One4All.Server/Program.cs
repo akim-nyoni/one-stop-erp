@@ -1442,6 +1442,11 @@ app.MapPost("/api/housing/sectional/{code}/levies", async (string code, long com
 .RequireAuthorization()
 .WithName("RaiseSectionalLevy");
 
+app.MapPost("/api/housing/municipal-link", async (long companyId, One4All.Core.Housing.MunicipalLinkTrigger trigger, string ward, IReadOnlyList<long> tariffIds, One4All.Application.Abstractions.Housing.IHousingMunicipalLinkService link, CancellationToken ct) =>
+    ActionResponse(await link.ConfigureAsync(companyId, trigger, ward, tariffIds, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ConfigureHousingMunicipalLink");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
