@@ -37,4 +37,29 @@ public static class WaitingListAgeing
         < 10 => WaitingAgeBand.FiveToTen,
         _ => WaitingAgeBand.TenPlus,
     };
+
+    /// <summary>An applicant's monthly income band (brief §14 H19).</summary>
+    /// <param name="monthlyIncome">The monthly income.</param>
+    /// <returns>The band's label.</returns>
+    public static string IncomeBand(decimal monthlyIncome) => monthlyIncome switch
+    {
+        < 300m => "Under 300",
+        < 600m => "300 – 599",
+        < 1000m => "600 – 999",
+        _ => "1,000 and over",
+    };
+
+    /// <summary>An applicant's age band (brief §14 H19), in completed years on a date.</summary>
+    /// <param name="dateOfBirth">The date of birth, if recorded.</param>
+    /// <param name="asAt">The date.</param>
+    /// <returns>The band's label.</returns>
+    public static string AgeBand(DateOnly? dateOfBirth, DateOnly asAt) => dateOfBirth is not DateOnly born
+        ? "Not recorded"
+        : WaitingListRules.FullYears(born, asAt) switch
+        {
+            < 26 => "Under 26",
+            < 36 => "26 – 35",
+            < 51 => "36 – 50",
+            _ => "51 and over",
+        };
 }

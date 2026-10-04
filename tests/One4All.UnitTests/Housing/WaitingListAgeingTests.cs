@@ -21,4 +21,24 @@ public class WaitingListAgeingTests
     {
         WaitingListAgeing.Band(new DateOnly(year, month, day), AsAt).Should().Be(band);
     }
+
+    [Theory]
+    [InlineData(0.0, "Under 300")]
+    [InlineData(299.99, "Under 300")]
+    [InlineData(300.0, "300 – 599")]
+    [InlineData(999.99, "600 – 999")]
+    [InlineData(1000.0, "1,000 and over")]
+    public void Income_bands_include_their_lower_bound(double income, string band)
+    {
+        WaitingListAgeing.IncomeBand((decimal)income).Should().Be(band);
+    }
+
+    [Fact]
+    public void Age_bands_use_completed_years()
+    {
+        WaitingListAgeing.AgeBand(new DateOnly(2000, 6, 2), AsAt).Should().Be("Under 26");
+        WaitingListAgeing.AgeBand(new DateOnly(2000, 6, 1), AsAt).Should().Be("26 – 35");
+        WaitingListAgeing.AgeBand(new DateOnly(1975, 6, 1), AsAt).Should().Be("51 and over");
+        WaitingListAgeing.AgeBand(null, AsAt).Should().Be("Not recorded");
+    }
 }

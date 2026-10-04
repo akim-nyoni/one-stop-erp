@@ -20,7 +20,9 @@ public static class HousingReports
         yield return Listing("H2", "Land Acquisition Register", "Housing", "Acquisitions by method with counterparty, council resolution, status and cost.", "HousingAcquisitions",
             [new Column("Acquisition", "Acquisition", 90), new Column("Parcel", "Parcel", 90), new Column("Method", "Method", 90), new Column("Counterparty", "Counterparty", 150),
              new Column("Resolution", "Resolution", 120), new Column("Status", "Status", 80), new Column("Cost", "Cost", 100, true)], []);
-        yield return Listing("H4", "Due Diligence Outstanding", "Housing", "Open acquisitions and the due-diligence items blocking each.", "HousingDueDiligence",
+        yield return Listing("H3", "Land Acquisition Cost Build-up per Parcel", "Housing", "Each acquisition's cost by element with the total and cost per m².", "HousingAcquisitionCosts",
+            [new Column("Acquisition", "Acquisition", 90), new Column("Parcel", "Parcel", 90), new Column("Element", "Element", 140), new Column("PerM2", "Per m²", 70), new Column("Amount", "Amount", 100, true)], []);
+        yield return Listing("H4","Due Diligence Outstanding", "Housing", "Open acquisitions and the due-diligence items blocking each.", "HousingDueDiligence",
             [new Column("Acquisition", "Acquisition", 90), new Column("Parcel", "Parcel", 90), new Column("Outstanding", "What blocks completion", 420)], []);
         yield return Listing("H5", "Compulsory Acquisition Compensation Register", "Housing", "Compensation claims with provision, settlement and status.", "HousingCompensation",
             [new Column("Claim", "Claim", 90), new Column("Parcel", "Parcel", 90), new Column("Claimant", "Claimant", 160), new Column("Lodged", "Lodged", 80),
@@ -30,13 +32,20 @@ public static class HousingReports
         yield return Listing("H10", "Layout Plans Register & Approval Status", "Housing", "Layouts with the version in force, pending amendments and approval turnaround.", "HousingLayouts",
             [new Column("Plan", "Layout", 90), new Column("Parcel", "Parcel", 90), new Column("Version", "Version", 60), new Column("Status", "Status", 110),
              new Column("Stands", "Stands", 60), new Column("TurnaroundDays", "Turnaround days", 90)], []);
-        yield return Listing("H14", "Servicing Cost Apportionment Schedule", "Housing", "Servicing cost per stand by contract and basis.", "HousingServicing",
+        yield return Listing("H11", "Stand Creation / Subdivision Report", "Housing", "Stands created from each parent parcel, with size, scheme, status and carried cost.", "HousingSubdivision",
+            [new Column("Parcel", "Parent parcel", 100), new Column("Stand", "Stand", 80), new Column("SizeM2", "Size m²", 70), new Column("Scheme", "Scheme", 100), new Column("Status", "Status", 80),
+             new Column("Cost", "Cost", 90, true)], []);
+        yield return Listing("H14","Servicing Cost Apportionment Schedule", "Housing", "Servicing cost per stand by contract and basis.", "HousingServicing",
             [new Column("Stand", "Stand", 90), new Column("Contract", "Contract", 110), new Column("Basis", "Basis", 100), new Column("Date", "Date", 80),
              new Column("Journal", "Journal", 100), new Column("Amount", "Amount", 100, true)], []);
         yield return Listing("H15", "Cost per Stand / Selling Price Build-up", "Housing", "Land and servicing cost, overhead, levy and margin to price, with margin %.", "HousingPriceBuildUp",
             [new Column("Stand", "Stand", 80), new Column("Scope", "Rule", 70), new Column("Cost", "Cost", 90, true), new Column("Overhead", "Overhead", 80, true),
              new Column("Levy", "Levy", 80, true), new Column("Margin", "Margin", 80, true), new Column("MarginPercent", "Margin %", 60), new Column("Price", "Price", 90, true)],
             [("AsAtDate", ParameterType.Date)]);
+
+        yield return Listing("H16", "Price List by Scheme & Stand Size Band", "Housing", "Every pricing rule with its scope, effective date, terms and approval — the price change history.", "HousingPriceList",
+            [new Column("Scope", "Scope", 70), new Column("Applies", "Applies to", 160), new Column("Effective", "Effective", 80), new Column("Terms", "Overhead / levy / margin", 200),
+             new Column("Approved", "Approved", 130)], []);
 
         // Waiting list.
         yield return Listing("H18", "Waiting List Register", "Housing", "Active applicants by category in seniority order with score and position.", "HousingWaitingList",
@@ -45,24 +54,50 @@ public static class HousingReports
         yield return Listing("H20", "Waiting List Age Analysis", "Housing", "How long active applicants have been waiting, by category.", "HousingWaitingAgeing",
             [new Column("Category", "Category", 110), new Column("UnderOne", "< 1 yr", 60), new Column("OneToThree", "1–3", 60), new Column("ThreeToFive", "3–5", 60),
              new Column("FiveToTen", "5–10", 60), new Column("TenPlus", "10+", 60), new Column("Total", "Total", 60)], [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("H26", "Registration Date Change Audit", "Housing", "Every requested change to a seniority date: who asked, who decided, why.", "HousingRegistrationChanges",
+        yield return Listing("H19", "Waiting List Summary", "Housing", "Active applicants by category, income band and age band.", "HousingWaitingSummary",
+            [new Column("Category", "Category", 110), new Column("IncomeBand", "Income band", 110), new Column("AgeBand", "Age band", 90), new Column("Applicants", "Applicants", 70)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H22", "Priority Score Derivation", "Housing", "How each active applicant's points were computed, factor by factor.", "HousingScoreDerivation",
+            [new Column("WaitingListNumber", "WL number", 100), new Column("Factor", "Factor", 130), new Column("Detail", "Applicant's figure", 140), new Column("Points", "Points", 70), new Column("Total", "Total score", 80)],
+            [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H24", "Applicants Already Owning Property", "Housing", "Active applicants holding a council stand or owning rated property — disqualification candidates.", "HousingApplicantOwners",
+            [new Column("WaitingListNumber", "WL number", 100), new Column("Name", "Applicant", 160), new Column("Holds", "Holds", 360)], []);
+        yield return Listing("H26","Registration Date Change Audit", "Housing", "Every requested change to a seniority date: who asked, who decided, why.", "HousingRegistrationChanges",
             [new Column("WaitingListNumber", "WL number", 100), new Column("OldDate", "From", 80), new Column("NewDate", "To", 80), new Column("Reason", "Reason", 200),
              new Column("Status", "Status", 80), new Column("RequestedBy", "Requested by", 80), new Column("DecidedBy", "Decided by", 80)], []);
 
         // Allocation.
-        yield return Listing("H31", "Allocation Register", "Housing", "Allocations with stand, beneficiary, certificate, frozen price and approval.", "HousingAllocations",
+        yield return Listing("H30", "Proposed Allocation List", "Housing", "Pre-approval pairings of runs awaiting approval: stand, applicant, place and method.", "HousingProposedAllocations",
+            [new Column("Run", "Run", 90), new Column("Method", "Method", 80), new Column("Sequence", "Place", 50), new Column("Stand", "Stand", 80), new Column("WaitingListNumber", "WL number", 100),
+             new Column("Applicant", "Applicant", 160)], []);
+        yield return Listing("H31","Allocation Register", "Housing", "Allocations with stand, beneficiary, certificate, frozen price and approval.", "HousingAllocations",
             [new Column("Certificate", "Certificate", 100), new Column("Run", "Run", 90), new Column("Stand", "Stand", 80), new Column("WaitingListNumber", "WL number", 90),
              new Column("Beneficiary", "Beneficiary", 150), new Column("Status", "Status", 80), new Column("ApprovedOn", "Approved", 80), new Column("Price", "Price", 90, true)], []);
-        yield return Listing("H35", "Offers Outstanding / Expiring / Expired", "Housing", "Open offers with the acceptance deadline countdown.", "HousingOffers",
+        yield return Listing("H32", "Ballot / Draw Result Report", "Housing", "Ballot runs with the stored seed and input hash, re-verified now.", "HousingBallots",
+            [new Column("Run", "Run", 90), new Column("Status", "Status", 80), new Column("Seed", "Seed", 120), new Column("InputHash", "Input hash", 200), new Column("Verified", "Re-verified", 160)], []);
+        yield return Listing("H33", "Allocations by Scheme, Month and Approver", "Housing", "Approved allocations counted by scheme, approval month and approving officer.", "HousingAllocationsByMonth",
+            [new Column("Scheme", "Scheme", 120), new Column("Month", "Month", 70), new Column("Approver", "Approver", 70), new Column("Allocations", "Allocations", 80)], []);
+        yield return Listing("H35","Offers Outstanding / Expiring / Expired", "Housing", "Open offers with the acceptance deadline countdown.", "HousingOffers",
             [new Column("Certificate", "Certificate", 100), new Column("Stand", "Stand", 80), new Column("Beneficiary", "Beneficiary", 160), new Column("Expires", "Expires", 80),
              new Column("DaysLeft", "Days left", 70), new Column("State", "State", 80)], [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("H38", "Appeals Register & Outcomes", "Housing", "Appeals lodged against allocation runs with hearing and outcome.", "HousingAppeals",
+        yield return Listing("H36", "Declined, Lapsed & Cancelled Offers", "Housing", "Offers that did not proceed, with when and why.", "HousingFailedOffers",
+            [new Column("Certificate", "Certificate", 100), new Column("Stand", "Stand", 80), new Column("Applicant", "Applicant", 160), new Column("Status", "Outcome", 80), new Column("DecidedOn", "On", 80),
+             new Column("Reason", "Reason", 200)], []);
+        yield return Listing("H38","Appeals Register & Outcomes", "Housing", "Appeals lodged against allocation runs with hearing and outcome.", "HousingAppeals",
             [new Column("Appeal", "Appeal", 90), new Column("WaitingListNumber", "Appellant", 100), new Column("Run", "Run", 90), new Column("Lodged", "Lodged", 80),
              new Column("Status", "Status", 80), new Column("Hearing", "Hearing", 80), new Column("Outcome", "Outcome", 220)], []);
         yield return Listing("H39", "Double Allocation Exception Report", "Housing", "Stands promised through more than one route — must always be empty; any row is an incident.", "HousingDoubleAllocations",
             [new Column("Stand", "Stand", 90), new Column("Claims", "Claims", 60), new Column("Routes", "Promised through", 420)], []);
 
+        yield return Listing("H40", "Beneficiaries with More Than One Stand", "Housing", "People (by national ID) holding or allocated more than one stand across schemes.", "HousingMultipleStands",
+            [new Column("IdNumber", "National ID", 110), new Column("Name", "Name", 160), new Column("Stands", "Stands", 60), new Column("Detail", "Held / allocated", 300)], []);
+        yield return Listing("H41", "Allocation-to-Agreement Conversion", "Housing", "Accepted allocations with no agreement or instalment sale yet, with age since acceptance.", "HousingUnconverted",
+            [new Column("Certificate", "Certificate", 100), new Column("Stand", "Stand", 80), new Column("Beneficiary", "Beneficiary", 160), new Column("AcceptedOn", "Accepted", 80),
+             new Column("DaysWaiting", "Days waiting", 80)], [("AsAtDate", ParameterType.Date)]);
+
         // Agreements & title readiness.
+        yield return Listing("H42", "Agreement Register", "Housing", "Agreements by type with party, stand, version in force, signature and price.", "HousingAgreements",
+            [new Column("Agreement", "Agreement", 90), new Column("Type", "Type", 100), new Column("Party", "Party", 150), new Column("Stand", "Stand", 70), new Column("Version", "In force", 60),
+             new Column("Status", "Status", 120), new Column("Price", "Price", 90, true)], []);
         yield return Listing("H49", "Fully Paid / Ready for Transfer", "Housing", "Sold stands whose holders owe nothing and have no title application — the most actionable list.", "HousingReadyForTitle",
             [new Column("Stand", "Stand", 80), new Column("Holder", "Holder", 170), new Column("Status", "Stand status", 90), new Column("SoldOn", "Sold", 80), new Column("Price", "Price", 90, true)], []);
 
