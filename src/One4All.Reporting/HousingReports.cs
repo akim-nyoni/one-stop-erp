@@ -216,5 +216,39 @@ public static class HousingReports
             [new Column("User", "User", 120), new Column("Rule", "Rule", 90), new Column("Conflict", "Conflict", 360)], []);
         yield return Listing("H95", "Housing Executive Dashboard", "Housing", "Land bank, stands, waiting list, allocations, titles and debtors at a glance.", "HousingDashboard",
             [new Column("Measure", "Measure", 260), new Column("Value", "Value", 140)], [("AsAtDate", ParameterType.Date)]);
+
+        // Applicant verification, statements and scheme delivery.
+        yield return Listing("H21", "Applicant Detail / Verification Sheet", "Housing", "One applicant: every captured detail, notices, date changes and the score derivation — printable for the applicant.",
+            "HousingApplicantSheet", [new Column("Section", "Section", 90), new Column("Item", "Item", 170), new Column("Value", "Value", 300)],
+            [("WaitingListNumber", ParameterType.String), ("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H23", "Duplicate & Suspected Fraudulent Applicants", "Housing", "Fuzzy name, ID and date-of-birth matches across the waiting list, stand holders and the property register.",
+            "HousingDuplicates", [new Column("FirstSource", "Source", 90), new Column("First", "Reference", 80), new Column("FirstName", "Name", 140), new Column("SecondSource", "Source", 90),
+             new Column("Second", "Reference", 80), new Column("SecondName", "Name", 140), new Column("Reason", "Why", 260)], []);
+        yield return Listing("H25", "Registration Renewal Compliance", "Housing", "Applicants by status with last confirmation, months since and the notices sent.", "HousingRenewals",
+            [new Column("Status", "Status", 70), new Column("WaitingListNumber", "WL number", 80), new Column("Applicant", "Applicant", 150), new Column("LastConfirmed", "Last confirmed", 85),
+             new Column("MonthsSince", "Months since", 60), new Column("Notices", "Notices", 50), new Column("LastNotice", "Last notice", 150)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H28", "New Registrations & Removals Movement", "Housing", "Month by month for the year to date: opening list, registered, removed, allocated, closing.",
+            "HousingRegistrationMovement", [new Column("Month", "Month", 70), new Column("Opening", "Opening", 60), new Column("Registered", "Registered", 70), new Column("Removed", "Removed", 60),
+             new Column("Allocated", "Allocated", 60), new Column("Closing", "Closing", 60)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H29", "Demand vs Supply (the Housing Gap)", "Housing", "Active applicants by category against stands and rental units available for it.", "HousingDemandSupply",
+            [new Column("Category", "Category", 110), new Column("Demand", "Applicants", 70), new Column("Supply", "Available", 70), new Column("Gap", "Gap", 70)], []);
+        yield return Listing("H43", "Beneficiary Account Statement", "Housing", "Charges, instalments, receipts and balance per beneficiary, with the next instalment — one or all (burst by beneficiary).",
+            "HousingBeneficiaryStatement", [new Column("Beneficiary", "Beneficiary", 140), new Column("Date", "Date", 75), new Column("Document", "Document", 100), new Column("Type", "Type", 90),
+             new Column("Due", "Due", 75), new Column("Balance", "Balance", 90), new Column("Amount", "Amount", 90, true)], [("Beneficiary", ParameterType.String)]);
+        yield return Listing("H60", "Transfer Checklist Exception Report", "Housing", "Open transfer applications and the mandatory documents still missing.", "HousingTransferExceptions",
+            [new Column("Application", "Application", 90), new Column("Stand", "Stand", 70), new Column("Type", "Type", 90), new Column("Status", "Status", 70), new Column("Lodged", "Lodged", 75),
+             new Column("Missing", "Missing", 300)], []);
+        yield return Listing("H74", "Tenant Statement", "Housing", "Rent charges, receipts and balance per tenant — one or all (burst by tenant).", "HousingTenantStatement",
+            [new Column("Tenant", "Tenant", 140), new Column("Date", "Date", 75), new Column("Document", "Document", 100), new Column("Type", "Type", 90), new Column("Due", "Due", 75),
+             new Column("Balance", "Balance", 90), new Column("Amount", "Amount", 90, true)], [("Tenant", ParameterType.String)]);
+        yield return Listing("H82", "Scheme Delivery Dashboard", "Housing", "Per scheme: target, stands created, serviced, allocated, sold and titled, and % delivered.", "HousingSchemeDelivery",
+            [new Column("Scheme", "Scheme", 80), new Column("Target", "Target", 60), new Column("Stands", "Stands", 60), new Column("Serviced", "Serviced", 60), new Column("Allocated", "Allocated", 60),
+             new Column("Sold", "Sold", 60), new Column("Titled", "Titled", 60), new Column("Delivered", "% delivered", 70)], []);
+        yield return Listing("H83", "Scheme Profitability & Cost Recovery", "Housing", "Per scheme: cost in (land and servicing), revenue from stands sold, cost recovered and margin.",
+            "HousingSchemeProfitability", [new Column("Scheme", "Scheme", 80), new Column("Stands", "Stands", 55), new Column("Sold", "Sold", 55), new Column("Cost", "Cost in", 95),
+             new Column("Revenue", "Revenue", 95), new Column("Recovered", "Recovered", 70), new Column("CostPerStand", "Cost / stand", 85), new Column("Margin", "Margin on sold", 95, true)], []);
+        yield return Listing("H96", "Housing Delivery / Statutory Return", "Housing", "Stands delivered in the year by density, tenure and beneficiary category.", "HousingDeliveryReturn",
+            [new Column("Density", "Density", 100), new Column("Tenure", "Tenure", 110), new Column("Category", "Beneficiary category", 130), new Column("Stands", "Stands", 60)],
+            [("AsAtDate", ParameterType.Date)]);
     }
 }
