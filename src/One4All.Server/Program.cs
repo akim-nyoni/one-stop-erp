@@ -957,6 +957,16 @@ app.MapGet("/api/housing/rental-units/{unitCode}/maintenance", async (string uni
 .RequireAuthorization()
 .WithName("UnitMaintenanceHistory");
 
+app.MapPost("/api/housing/ecl/assess", async (One4All.Application.Abstractions.Housing.HousingEclRequest request, One4All.Application.Abstractions.Housing.IHousingEclService ecl, CancellationToken ct) =>
+    ValueResponse(await ecl.AssessAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AssessHousingEcl");
+
+app.MapPost("/api/housing/ecl/post", async (One4All.Application.Abstractions.Housing.HousingEclRequest request, One4All.Application.Abstractions.Housing.IHousingEclService ecl, CancellationToken ct) =>
+    ValueResponse(await ecl.PostAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PostHousingEcl");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
