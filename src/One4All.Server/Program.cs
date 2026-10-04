@@ -703,6 +703,31 @@ app.MapGet("/api/municipal/properties/{propertyId:long}/owners", async (long pro
 .RequireAuthorization()
 .WithName("PropertyOwners");
 
+app.MapPost("/api/municipal/billing-runs", async (One4All.Application.Abstractions.Municipal.BillingRunProposal proposal, One4All.Application.Abstractions.Municipal.IBillingRunService runs, CancellationToken ct) =>
+    ValueResponse(await runs.ProposeAsync(proposal, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ProposeBillingRun");
+
+app.MapGet("/api/municipal/billing-runs/{runNumber}/lines", async (string runNumber, long companyId, bool? exceptionsOnly, One4All.Application.Abstractions.Municipal.IBillingRunService runs, CancellationToken ct) =>
+    ValueResponse(await runs.LinesAsync(companyId, runNumber, exceptionsOnly ?? false, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("BillingRunLines");
+
+app.MapPost("/api/municipal/billing-runs/{runNumber}/lines/{propertyId:long}", async (string runNumber, long propertyId, long companyId, bool included, One4All.Application.Abstractions.Municipal.IBillingRunService runs, CancellationToken ct) =>
+    ValueResponse(await runs.SetIncludedAsync(companyId, runNumber, propertyId, included, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SetBillingRunLine");
+
+app.MapPost("/api/municipal/billing-runs/{runNumber}/approve", async (string runNumber, long companyId, long userId, One4All.Application.Abstractions.Municipal.IBillingRunService runs, CancellationToken ct) =>
+    ValueResponse(await runs.ApproveAsync(companyId, runNumber, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveBillingRun");
+
+app.MapPost("/api/municipal/billing-runs/{runNumber}/cancel", async (string runNumber, long companyId, One4All.Application.Abstractions.Municipal.IBillingRunService runs, CancellationToken ct) =>
+    ActionResponse(await runs.CancelAsync(companyId, runNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CancelBillingRun");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

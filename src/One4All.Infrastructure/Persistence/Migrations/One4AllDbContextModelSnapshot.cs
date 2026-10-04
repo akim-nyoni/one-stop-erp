@@ -4027,6 +4027,180 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("installed_licence", "lic");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.BillingRun", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<DateOnly>("BillDate")
+                        .HasColumnType("date")
+                        .HasColumnName("bill_date");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("InvoicePrefix")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("invoice_prefix");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("Period")
+                        .HasColumnType("date")
+                        .HasColumnName("period");
+
+                    b.Property<long>("ProposedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("proposed_by_user_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("RunNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("run_number");
+
+                    b.Property<int>("ServiceType")
+                        .HasColumnType("integer")
+                        .HasColumnName("service_type");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Ward")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("ward");
+
+                    b.HasKey("Id")
+                        .HasName("pk_billing_run");
+
+                    b.HasIndex("CompanyId", "RunNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_billing_run_company_id_run_number");
+
+                    b.HasIndex("CompanyId", "ServiceType", "Period")
+                        .IsUnique()
+                        .HasDatabaseName("ix_billing_run_one_proposed")
+                        .HasFilter("status = 0");
+
+                    b.ToTable("billing_run", "mun", t =>
+                        {
+                            t.HasCheckConstraint("ck_billing_run_approver", "approved_by_user_id IS NULL OR approved_by_user_id <> proposed_by_user_id");
+                        });
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.BillingRunLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("BillingRunId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("billing_run_id");
+
+                    b.Property<decimal>("Charge")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("charge");
+
+                    b.Property<int>("Exceptions")
+                        .HasColumnType("integer")
+                        .HasColumnName("exceptions");
+
+                    b.Property<bool>("Included")
+                        .HasColumnType("boolean")
+                        .HasColumnName("included");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("invoice_number");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("message");
+
+                    b.Property<string>("Narrative")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("narrative");
+
+                    b.Property<decimal?>("PreviousCharge")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("previous_charge");
+
+                    b.Property<long>("PropertyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("property_id");
+
+                    b.Property<long>("RatepayerCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ratepayer_customer_id");
+
+                    b.Property<string>("RevenueAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("revenue_account_code");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("StandNumber")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("stand_number");
+
+                    b.HasKey("Id")
+                        .HasName("pk_billing_run_line");
+
+                    b.HasIndex("BillingRunId", "PropertyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_billing_run_line_billing_run_id_property_id");
+
+                    b.ToTable("billing_run_line", "mun");
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.ClearanceCertificate", b =>
                 {
                     b.Property<long>("Id")
@@ -14103,6 +14277,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_cost_entry_contract_job_contract_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.BillingRunLine", b =>
+                {
+                    b.HasOne("One4All.Core.Municipal.BillingRun", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("BillingRunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_billing_run_line_billing_run_billing_run_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.CouncilInspection", b =>
                 {
                     b.HasOne("One4All.Core.Municipal.CouncilLicence", null)
@@ -14665,6 +14849,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.JobCosting.JobContract", b =>
                 {
                     b.Navigation("Costs");
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.BillingRun", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("One4All.Core.Municipal.Property", b =>

@@ -134,6 +134,43 @@ internal sealed class PropertyOwnerConfiguration : IEntityTypeConfiguration<Prop
     }
 }
 
+internal sealed class BillingRunConfiguration : IEntityTypeConfiguration<BillingRun>
+{
+    public void Configure(EntityTypeBuilder<BillingRun> b)
+    {
+        b.ToTable("billing_run", Schemas.Municipal, t => t.HasCheckConstraint("ck_billing_run_approver", "approved_by_user_id IS NULL OR approved_by_user_id <> proposed_by_user_id"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.RunNumber).HasMaxLength(30);
+        b.Property(x => x.ServiceType).HasConversion<int>();
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Ward).HasMaxLength(60);
+        b.Property(x => x.InvoicePrefix).HasMaxLength(20);
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.BillingRunId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.RunNumber }).IsUnique();
+        b.HasIndex(x => new { x.CompanyId, x.ServiceType, x.Period }).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_billing_run_one_proposed");
+    }
+}
+
+internal sealed class BillingRunLineConfiguration : IEntityTypeConfiguration<BillingRunLine>
+{
+    public void Configure(EntityTypeBuilder<BillingRunLine> b)
+    {
+        b.ToTable("billing_run_line", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.StandNumber).HasMaxLength(60);
+        b.Property(x => x.InvoiceNumber).HasMaxLength(60);
+        b.Property(x => x.Charge).HasPrecision(19, 4);
+        b.Property(x => x.PreviousCharge).HasPrecision(19, 4);
+        b.Property(x => x.RevenueAccountCode).HasMaxLength(20);
+        b.Property(x => x.Narrative).HasMaxLength(256);
+        b.Property(x => x.Exceptions).HasConversion<int>();
+        b.Property(x => x.Message).HasMaxLength(500);
+        b.Ignore(x => x.IsBlocked);
+        b.HasIndex(x => new { x.BillingRunId, x.PropertyId }).IsUnique();
+    }
+}
+
 internal sealed class IndigentRegistrationConfiguration : IEntityTypeConfiguration<IndigentRegistration>
 {
     public void Configure(EntityTypeBuilder<IndigentRegistration> b)
