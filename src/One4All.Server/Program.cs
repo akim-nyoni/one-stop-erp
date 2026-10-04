@@ -1062,6 +1062,26 @@ app.MapPost("/api/housing/stand-leases/run", async (long companyId, DateOnly mon
 .RequireAuthorization()
 .WithName("RunStandLeaseBilling");
 
+app.MapPost("/api/housing/grants", async (One4All.Application.Abstractions.Housing.GrantReceipt receipt, One4All.Application.Abstractions.Housing.IHousingGrantService grants, CancellationToken ct) =>
+    ValueResponse(await grants.ReceiveAsync(receipt, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReceiveHousingGrant");
+
+app.MapPost("/api/housing/grants/{grantNumber}/assure", async (string grantNumber, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.IHousingGrantService grants, CancellationToken ct) =>
+    ValueResponse(await grants.AssureConditionsAsync(companyId, grantNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AssureGrantConditions");
+
+app.MapPost("/api/housing/grants/{grantNumber}/expenditure", async (string grantNumber, long companyId, decimal expenditureToDate, DateOnly date, One4All.Application.Abstractions.Housing.IHousingGrantService grants, CancellationToken ct) =>
+    ValueResponse(await grants.RecordExpenditureAsync(companyId, grantNumber, expenditureToDate, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordGrantExpenditure");
+
+app.MapGet("/api/housing/grants/disclosure", async (long companyId, One4All.Application.Abstractions.Housing.IHousingGrantService grants, CancellationToken ct) =>
+    Results.Ok(await grants.DisclosureAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("HousingGrantDisclosure");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

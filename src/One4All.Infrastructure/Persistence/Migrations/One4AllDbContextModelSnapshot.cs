@@ -3050,6 +3050,114 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("applicant", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.HousingGrant", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<decimal>("BudgetedExpenditure")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("budgeted_expenditure");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Conditions")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("conditions");
+
+                    b.Property<DateOnly?>("ConditionsAssuredOn")
+                        .HasColumnType("date")
+                        .HasColumnName("conditions_assured_on");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("DeferredAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("deferred_account_code");
+
+                    b.Property<decimal>("ExpenditureToDate")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("expenditure_to_date");
+
+                    b.Property<string>("GrantNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("grant_number");
+
+                    b.Property<string>("Grantor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("grantor");
+
+                    b.Property<string>("IncomeAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("income_account_code");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("ReceivedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("received_on");
+
+                    b.Property<decimal>("RecognisedToDate")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("recognised_to_date");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long?>("SchemeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("scheme_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_housing_grant");
+
+                    b.HasIndex("CompanyId", "GrantNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_housing_grant_company_id_grant_number");
+
+                    b.ToTable("housing_grant", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_housing_grant_amounts", "amount > 0 AND budgeted_expenditure > 0 AND recognised_to_date >= 0 AND recognised_to_date <= amount");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.HousingScheme", b =>
                 {
                     b.Property<long>("Id")

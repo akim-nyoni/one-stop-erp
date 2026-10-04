@@ -381,6 +381,26 @@ internal sealed class StandLeaseConfiguration : IEntityTypeConfiguration<StandLe
     }
 }
 
+internal sealed class HousingGrantConfiguration : IEntityTypeConfiguration<HousingGrant>
+{
+    public void Configure(EntityTypeBuilder<HousingGrant> b)
+    {
+        b.ToTable("housing_grant", Schemas.Housing, t => t.HasCheckConstraint("ck_housing_grant_amounts", "amount > 0 AND budgeted_expenditure > 0 AND recognised_to_date >= 0 AND recognised_to_date <= amount"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.GrantNumber).HasMaxLength(30);
+        b.Property(x => x.Grantor).HasMaxLength(200);
+        b.Property(x => x.Conditions).HasMaxLength(2000);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.BudgetedExpenditure).HasPrecision(19, 4);
+        b.Property(x => x.ExpenditureToDate).HasPrecision(19, 4);
+        b.Property(x => x.RecognisedToDate).HasPrecision(19, 4);
+        b.Property(x => x.DeferredAccountCode).HasMaxLength(20);
+        b.Property(x => x.IncomeAccountCode).HasMaxLength(20);
+        b.Ignore(x => x.Deferred);
+        b.HasIndex(x => new { x.CompanyId, x.GrantNumber }).IsUnique();
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)
