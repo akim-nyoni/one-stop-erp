@@ -772,6 +772,16 @@ app.MapGet("/api/municipal/properties/{propertyId:long}/deposits", async (long p
 .RequireAuthorization()
 .WithName("HeldServiceDeposits");
 
+app.MapGet("/api/municipal/tariffs", async (long companyId, One4All.Core.Municipal.ServiceType serviceType, DateOnly date, One4All.Application.Abstractions.Municipal.ITariffCatalogueService catalogue, CancellationToken ct) =>
+    Results.Ok(await catalogue.ListAsync(companyId, serviceType, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("TariffCatalogue");
+
+app.MapGet("/api/municipal/tariffs/resolve", async (long companyId, One4All.Core.Municipal.ServiceType serviceType, One4All.Core.Municipal.ConsumerCategory category, string? ward, DateOnly date, One4All.Application.Abstractions.Municipal.ITariffCatalogueService catalogue, CancellationToken ct) =>
+    ValueResponse(await catalogue.ResolveAsync(companyId, serviceType, category, ward, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ResolveTariff");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

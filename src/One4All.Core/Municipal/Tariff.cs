@@ -124,6 +124,12 @@ public sealed class Tariff : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the tariff is active.</summary>
     public bool IsActive { get; set; }
 
+    /// <summary>The consumer category the tariff applies to (brief §4.9: tariffs vary by category).</summary>
+    public ConsumerCategory Category { get; set; } = ConsumerCategory.Domestic;
+
+    /// <summary>The ward the tariff applies to, or null for the whole council.</summary>
+    public string? Ward { get; set; }
+
     /// <summary>The stepped-tariff blocks (used when <see cref="TariffType"/> is <see cref="TariffType.Stepped"/>).</summary>
     public IReadOnlyList<TariffBlock> Blocks => _blocks.OrderBy(x => x.FromUnit).ToList();
 

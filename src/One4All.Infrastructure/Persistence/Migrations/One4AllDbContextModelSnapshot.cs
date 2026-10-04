@@ -5424,6 +5424,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<int>("Category")
+                        .HasColumnType("integer")
+                        .HasColumnName("category");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -5520,6 +5524,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("TariffType")
                         .HasColumnType("integer")
                         .HasColumnName("tariff_type");
+
+                    b.Property<string>("Ward")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("ward");
 
                     b.HasKey("Id")
                         .HasName("pk_tariff");

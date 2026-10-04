@@ -242,6 +242,8 @@ internal sealed class TariffConfiguration : IEntityTypeConfiguration<Tariff>
         b.Property(x => x.PerUnitRate).HasPrecision(19, 6);
         b.Property(x => x.RatePerValuationCents).HasPrecision(19, 6);
         b.Property(x => x.RatePerSquareMetre).HasPrecision(19, 6);
+        b.Property(x => x.Category).HasConversion<int>();
+        b.Property(x => x.Ward).HasMaxLength(60);
         b.HasMany(x => x.Blocks).WithOne().HasForeignKey(x => x.TariffId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Blocks).UsePropertyAccessMode(PropertyAccessMode.Field);
         // A tariff code has effective-dated versions: one per code and effective date.
