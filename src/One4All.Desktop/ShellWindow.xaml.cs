@@ -93,6 +93,12 @@ public partial class ShellWindow : Window
         notifications.Show();
     }
 
+    private void OpenScheduledJobs_Click(object sender, RoutedEventArgs e)
+    {
+        ScheduledJobsWindow jobs = new(_services) { Owner = this };
+        jobs.Show();
+    }
+
     private void OpenDataHealth_Click(object sender, RoutedEventArgs e)
     {
         DataHealthWindow health = new(_services) { Owner = this };

@@ -79,6 +79,7 @@
                 <MenuItem Header="Audit Trail…" Click="OpenAuditTrail_Click" />
                 <MenuItem Header="Check Data…" Click="OpenCheckData_Click" />
                 <MenuItem Header="Data Health…" Click="OpenDataHealth_Click" />
+                <MenuItem Header="Scheduled Jobs…" Click="OpenScheduledJobs_Click" />
             </MenuItem>
             <MenuItem Header="_Help" />
         </Menu>
