@@ -51,6 +51,8 @@ internal sealed class HousingStandConfiguration : IEntityTypeConfiguration<Housi
         b.Property(x => x.Status).HasConversion<int>();
         b.HasMany(x => x.Ownership).WithOne().HasForeignKey(x => x.HousingStandId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Ownership).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.Property(x => x.FrontageMetres).HasPrecision(19, 4);
+        b.Property(x => x.ZoningWeight).HasPrecision(9, 4);
         b.OwnsOne(x => x.Boundary, o =>
         {
             o.Property(p => p.Wkt).HasColumnName("boundary_wkt").HasMaxLength(20000);
@@ -952,6 +954,36 @@ internal sealed class MunicipalLinkSettingsConfiguration : IEntityTypeConfigurat
         b.Property(x => x.Trigger).HasConversion<int>();
         b.Property(x => x.Ward).HasMaxLength(60);
         b.HasIndex(x => x.CompanyId).IsUnique();
+    }
+}
+
+internal sealed class ServicingLinkConfiguration : IEntityTypeConfiguration<ServicingLink>
+{
+    public void Configure(EntityTypeBuilder<ServicingLink> b)
+    {
+        b.ToTable("servicing_link", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Basis).HasConversion<int>();
+        b.Property(x => x.ApportionedToDate).HasPrecision(19, 4);
+        b.HasOne<HousingScheme>().WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<One4All.Core.JobCosting.JobContract>().WithMany().HasForeignKey(x => x.JobContractId).OnDelete(DeleteBehavior.Restrict);
+
+        // A contract services one scheme.
+        b.HasIndex(x => x.JobContractId).IsUnique();
+    }
+}
+
+internal sealed class ServicingChargeConfiguration : IEntityTypeConfiguration<ServicingCharge>
+{
+    public void Configure(EntityTypeBuilder<ServicingCharge> b)
+    {
+        b.ToTable("servicing_charge", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.JournalNumber).HasMaxLength(30);
+        b.HasOne<ServicingLink>().WithMany().HasForeignKey(x => x.ServicingLinkId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.StandId);
     }
 }
 

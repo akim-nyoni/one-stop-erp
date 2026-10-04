@@ -4238,6 +4238,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
 
+                    b.Property<decimal?>("FrontageMetres")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("frontage_metres");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
@@ -4283,6 +4288,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");
+
+                    b.Property<decimal?>("ZoningWeight")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("zoning_weight");
 
                     b.HasKey("Id")
                         .HasName("pk_stand");
@@ -5507,6 +5517,121 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_sectional_unit_sectional_scheme_id_unit_number");
 
                     b.ToTable("sectional_unit", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.ServicingCharge", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("JournalNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("ServicingLinkId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("servicing_link_id");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_servicing_charge");
+
+                    b.HasIndex("ServicingLinkId")
+                        .HasDatabaseName("ix_servicing_charge_servicing_link_id");
+
+                    b.HasIndex("StandId")
+                        .HasDatabaseName("ix_servicing_charge_stand_id");
+
+                    b.ToTable("servicing_charge", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.ServicingLink", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("ApportionedToDate")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("apportioned_to_date");
+
+                    b.Property<int>("Basis")
+                        .HasColumnType("integer")
+                        .HasColumnName("basis");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("JobContractId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("job_contract_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SchemeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("scheme_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_servicing_link");
+
+                    b.HasIndex("JobContractId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_servicing_link_job_contract_id");
+
+                    b.HasIndex("SchemeId")
+                        .HasDatabaseName("ix_servicing_link_scheme_id");
+
+                    b.ToTable("servicing_link", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.StandAllocation", b =>
@@ -19185,6 +19310,40 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_sectional_unit_sectional_scheme_sectional_scheme_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.ServicingCharge", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.ServicingLink", null)
+                        .WithMany()
+                        .HasForeignKey("ServicingLinkId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_servicing_charge_servicing_link_servicing_link_id");
+
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_servicing_charge_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.ServicingLink", b =>
+                {
+                    b.HasOne("One4All.Core.JobCosting.JobContract", null)
+                        .WithMany()
+                        .HasForeignKey("JobContractId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_servicing_link_contract_job_contract_id");
+
+                    b.HasOne("One4All.Core.Housing.HousingScheme", null)
+                        .WithMany()
+                        .HasForeignKey("SchemeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_servicing_link_scheme_scheme_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.StandAllocation", b =>

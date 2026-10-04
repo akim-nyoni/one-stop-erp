@@ -103,6 +103,25 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
     /// <summary>The mapped boundary, once surveyed onto the map.</summary>
     public MappedBoundary? Boundary { get; private set; }
 
+    /// <summary>The road frontage, for apportioning servicing cost.</summary>
+    public decimal? FrontageMetres { get; private set; }
+
+    /// <summary>The zoning weight, for apportioning servicing cost.</summary>
+    public decimal? ZoningWeight { get; private set; }
+
+    /// <summary>Records the measures servicing cost is apportioned on.</summary>
+    /// <param name="frontageMetres">The road frontage.</param>
+    /// <param name="zoningWeight">The zoning weight.</param>
+    public void SetServicingMeasures(decimal? frontageMetres, decimal? zoningWeight)
+    {
+        FrontageMetres = frontageMetres;
+        ZoningWeight = zoningWeight;
+    }
+
+    /// <summary>Capitalises a share of servicing cost into the stand (it is still in stock).</summary>
+    /// <param name="amount">The share.</param>
+    public void AddServicingCost(decimal amount) => AllocatedCost += amount;
+
     /// <summary>Records the mapped boundary.</summary>
     /// <param name="boundary">The boundary.</param>
     public void Map(MappedBoundary boundary) => Boundary = boundary;
