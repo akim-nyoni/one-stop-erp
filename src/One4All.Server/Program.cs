@@ -2020,6 +2020,26 @@ app.MapPost("/api/reports/{code}/rollback", async (string code, long companyId, 
 .RequireAuthorization()
 .WithName("RollbackReportVersion");
 
+app.MapPost("/api/reports/subscriptions", async (One4All.Application.Abstractions.Reporting.SubscriptionRequest request, One4All.Application.Abstractions.Reporting.IReportSubscriptionService subscriptions, CancellationToken ct) =>
+    ActionResponse(await subscriptions.SubscribeAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SubscribeToReport");
+
+app.MapPost("/api/reports/subscriptions/{code}/active", async (string code, long companyId, bool active, One4All.Application.Abstractions.Reporting.IReportSubscriptionService subscriptions, CancellationToken ct) =>
+    ActionResponse(await subscriptions.SetActiveAsync(companyId, code, active, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SetReportSubscriptionActive");
+
+app.MapPost("/api/reports/subscriptions/{code}/run", async (string code, long companyId, One4All.Application.Abstractions.Reporting.IReportSubscriptionService subscriptions, CancellationToken ct) =>
+    ValueResponse(await subscriptions.RunAsync(companyId, code, DateTimeOffset.UtcNow, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RunReportSubscription");
+
+app.MapGet("/api/reports/subscriptions/{code}/deliveries", async (string code, long companyId, One4All.Application.Abstractions.Reporting.IReportSubscriptionService subscriptions, CancellationToken ct) =>
+    ValueResponse(await subscriptions.DeliveryLogAsync(companyId, code, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReportDeliveryLog");
+
 app.MapGet("/api/accounting/data-health", async (long companyId, DateOnly asAtDate, One4All.Application.Abstractions.Accounting.IDataHealthService health, CancellationToken ct) =>
     ValueResponse(await health.SnapshotAsync(companyId, asAtDate, ct).ConfigureAwait(false)))
 .RequireAuthorization()

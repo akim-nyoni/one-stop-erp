@@ -44,6 +44,8 @@ internal sealed class OutboundMessageConfiguration : IEntityTypeConfiguration<Ou
         b.Property(x => x.Body).HasMaxLength(20000);
         b.Property(x => x.LastError).HasMaxLength(1000);
         b.Property(x => x.ProviderReference).HasMaxLength(200);
+        b.Property(x => x.AttachmentName).HasMaxLength(200);
+        b.Property(x => x.AttachmentContentType).HasMaxLength(100);
         b.HasOne<DespatchBatch>().WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.CompanyId, x.Status });
         b.HasIndex(x => x.BatchId);

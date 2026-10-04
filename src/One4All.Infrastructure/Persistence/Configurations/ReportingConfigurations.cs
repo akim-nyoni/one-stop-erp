@@ -19,6 +19,33 @@ internal sealed class ReportDefinitionRecordConfiguration : IEntityTypeConfigura
     }
 }
 
+internal sealed class ReportSubscriptionConfiguration : IEntityTypeConfiguration<ReportSubscription>
+{
+    public void Configure(EntityTypeBuilder<ReportSubscription> b)
+    {
+        b.ToTable("report_subscription", Schemas.Reporting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(40);
+        b.Property(x => x.ReportCode).HasMaxLength(60);
+        b.Property(x => x.ParametersJson).HasColumnType("jsonb");
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class ReportDeliveryConfiguration : IEntityTypeConfiguration<ReportDelivery>
+{
+    public void Configure(EntityTypeBuilder<ReportDelivery> b)
+    {
+        b.ToTable("report_delivery", Schemas.Reporting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Recipient).HasMaxLength(200);
+        b.Property(x => x.FileName).HasMaxLength(200);
+        b.Property(x => x.Detail).HasMaxLength(1000);
+        b.HasOne<ReportSubscription>().WithMany().HasForeignKey(x => x.SubscriptionId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.SubscriptionId);
+    }
+}
+
 internal sealed class ReportDefinitionVersionConfiguration : IEntityTypeConfiguration<ReportDefinitionVersion>
 {
     public void Configure(EntityTypeBuilder<ReportDefinitionVersion> b)

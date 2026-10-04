@@ -199,6 +199,26 @@ public sealed class OutboundMessage : Entity, ICompanyScoped
     /// <summary>When it was sent.</summary>
     public DateTimeOffset? SentAt { get; private set; }
 
+    /// <summary>The attached document's file name, if any.</summary>
+    public string? AttachmentName { get; private set; }
+
+    /// <summary>The attached document's content type.</summary>
+    public string? AttachmentContentType { get; private set; }
+
+    /// <summary>The attached document.</summary>
+    public byte[]? AttachmentContent { get; private set; }
+
+    /// <summary>Attaches a document (a report, a statement...).</summary>
+    /// <param name="name">Its file name.</param>
+    /// <param name="contentType">Its content type.</param>
+    /// <param name="content">Its bytes.</param>
+    public void Attach(string name, string contentType, byte[] content)
+    {
+        AttachmentName = name;
+        AttachmentContentType = contentType;
+        AttachmentContent = content;
+    }
+
     /// <summary>Records a successful attempt.</summary>
     /// <param name="reference">The gateway's reference.</param>
     /// <param name="at">When.</param>

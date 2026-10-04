@@ -134,6 +134,8 @@ public static class DependencyInjection
         services.AddScoped<ILedgerIntegrityService, Accounting.LedgerIntegrityService>();
         services.AddScoped<IDataHealthService, Accounting.DataHealthService>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDefinitionService, Reporting.ReportDefinitionService>();
+        services.AddScoped<Application.Abstractions.Reporting.IReportSubscriptionService, Reporting.ReportSubscriptionService>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Reporting.ReportSubscriptionsTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.DespatchMessagesTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.LapseOffersTask>();
         services.AddScoped<Application.Abstractions.Communications.IStatementDespatchService, Communications.StatementDespatchService>();

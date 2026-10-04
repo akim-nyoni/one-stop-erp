@@ -9,6 +9,12 @@ namespace One4All.Application.Abstractions.Communications;
 /// <param name="Reference">The gateway's reference when accepted, or the reason when not.</param>
 public sealed record GatewayResult(bool Accepted, string Reference);
 
+/// <summary>A document attached to a message.</summary>
+/// <param name="Name">Its file name.</param>
+/// <param name="ContentType">Its content type.</param>
+/// <param name="Content">Its bytes.</param>
+public sealed record MessageAttachment(string Name, string ContentType, byte[] Content);
+
 /// <summary>
 /// A delivery channel's gateway (brief §8: SMTP/Graph email, an SMS gateway abstraction, optional WhatsApp/Telegram).
 /// Register one per channel; a channel without one leaves its messages queued with the reason.
@@ -26,6 +32,17 @@ public interface IMessageGateway
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The outcome.</returns>
     Task<GatewayResult> SendAsync(long companyId, string recipient, string subject, string body, CancellationToken ct = default);
+
+    /// <summary>Sends a message with an attached document. Gateways that cannot carry attachments send the text only.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="recipient">The address, number or user id.</param>
+    /// <param name="subject">The subject.</param>
+    /// <param name="body">The body.</param>
+    /// <param name="attachment">The document.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The outcome.</returns>
+    Task<GatewayResult> SendAsync(long companyId, string recipient, string subject, string body, MessageAttachment attachment, CancellationToken ct = default)
+        => SendAsync(companyId, recipient, subject, body, ct);
 }
 
 /// <summary>A recipient of a bulk despatch.</summary>
@@ -94,6 +111,18 @@ public interface INotificationService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The batch id, or why it was refused.</returns>
     Task<Result<long>> QueueAsync(long companyId, string name, string code, string language, MessageChannel channel, IReadOnlyList<DespatchRecipient> recipients, CancellationToken ct = default);
+
+    /// <summary>Queues one message, written out rather than from a template, to each recipient — with an attachment if given.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="name">What the batch is.</param>
+    /// <param name="channel">The channel.</param>
+    /// <param name="recipients">The recipients.</param>
+    /// <param name="subject">The subject.</param>
+    /// <param name="body">The body.</param>
+    /// <param name="attachment">The document to attach, if any.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The batch id, or why it was refused.</returns>
+    Task<Result<long>> QueueDirectAsync(long companyId, string name, MessageChannel channel, IReadOnlyList<string> recipients, string subject, string body, MessageAttachment? attachment, CancellationToken ct = default);
 
     /// <summary>Sends queued messages through their gateways, retrying failures up to the attempts allowed.</summary>
     /// <param name="companyId">The company.</param>

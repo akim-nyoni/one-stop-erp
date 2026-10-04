@@ -103,6 +103,39 @@ public sealed class NotificationService : INotificationService
     }
 
     /// <inheritdoc />
+    public async Task<Result<long>> QueueDirectAsync(long companyId, string name, MessageChannel channel, IReadOnlyList<string> recipients, string subject, string body, MessageAttachment? attachment, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(recipients);
+        if (string.IsNullOrWhiteSpace(name) || recipients.Count == 0 || !Enum.IsDefined(channel) || string.IsNullOrWhiteSpace(body))
+        {
+            return Error.Validation("Msg.Batch", "A despatch needs a name, a channel, a body and at least one recipient.");
+        }
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DespatchBatch batch = new(companyId, name.Trim(), "(direct)", now);
+        _db.Set<DespatchBatch>().Add(batch);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        foreach (string recipient in recipients)
+        {
+            OutboundMessage message = new(companyId, batch.Id, channel, (recipient ?? string.Empty).Trim(), subject ?? string.Empty, body, now);
+            if (attachment is not null)
+            {
+                message.Attach(attachment.Name, attachment.ContentType, attachment.Content);
+            }
+
+            if (string.IsNullOrWhiteSpace(recipient))
+            {
+                message.Reject("No recipient address.");
+            }
+
+            _db.Set<OutboundMessage>().Add(message);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return batch.Id;
+    }
+
+    /// <inheritdoc />
     public async Task<DespatchRun> DespatchAsync(long companyId, int maxAttempts, CancellationToken ct = default)
     {
         int allowed = Math.Max(1, maxAttempts);
@@ -120,7 +153,9 @@ public sealed class NotificationService : INotificationService
             {
                 try
                 {
-                    result = await gateway.SendAsync(companyId, message.Recipient, message.Subject, message.Body, ct).ConfigureAwait(false);
+                    result = message.AttachmentContent is byte[] content
+                        ? await gateway.SendAsync(companyId, message.Recipient, message.Subject, message.Body, new MessageAttachment(message.AttachmentName!, message.AttachmentContentType!, content), ct).ConfigureAwait(false)
+                        : await gateway.SendAsync(companyId, message.Recipient, message.Subject, message.Body, ct).ConfigureAwait(false);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
