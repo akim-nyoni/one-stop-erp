@@ -1960,6 +1960,11 @@ app.MapPost("/api/accounting/deferred-income/recognise", async (long companyId, 
 .RequireAuthorization()
 .WithName("RecogniseDeferredIncome");
 
+app.MapGet("/api/accounting/data-health", async (long companyId, DateOnly asAtDate, One4All.Application.Abstractions.Accounting.IDataHealthService health, CancellationToken ct) =>
+    ValueResponse(await health.SnapshotAsync(companyId, asAtDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DataHealthDashboard");
+
 app.MapGet("/api/accounting/check-data", async (long companyId, One4All.Application.Abstractions.Accounting.ILedgerIntegrityService integrity, CancellationToken ct) =>
     ValueResponse(await integrity.CheckAsync(companyId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

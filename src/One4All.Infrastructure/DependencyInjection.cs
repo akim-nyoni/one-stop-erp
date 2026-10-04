@@ -132,6 +132,7 @@ public static class DependencyInjection
         services.AddScoped<IRecurringJournalService, Accounting.RecurringJournalService>();
         services.AddScoped<IDeferredIncomeService, Accounting.DeferredIncomeService>();
         services.AddScoped<ILedgerIntegrityService, Accounting.LedgerIntegrityService>();
+        services.AddScoped<IDataHealthService, Accounting.DataHealthService>();
         services.AddScoped<IAccrualService, Accounting.AccrualService>();
         services.AddScoped<IPeriodService, PeriodService>();
         services.AddScoped<Application.Abstractions.Numbering.INumberSequenceService, Infrastructure.Numbering.NumberSequenceService>();
