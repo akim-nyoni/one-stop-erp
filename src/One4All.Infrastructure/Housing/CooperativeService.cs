@@ -9,8 +9,6 @@ namespace One4All.Infrastructure.Housing;
 /// <summary>Cooperative allocations: stands to cooperatives, then to their members.</summary>
 public sealed class CooperativeService : ICooperativeService
 {
-    private static readonly AllocationStatus[] Live = [AllocationStatus.Proposed, AllocationStatus.Offered, AllocationStatus.Accepted];
-
     private readonly One4AllDbContext _db;
 
     /// <summary>Creates the service.</summary>
@@ -108,10 +106,8 @@ public sealed class CooperativeService : ICooperativeService
             return Error.NotFound("Hse.StandNotFound", "A stand is not on the register.");
         }
 
-        bool individuallyAllocated = await _db.Set<StandAllocation>().AnyAsync(a => standIds.Contains(a.StandId) && Live.Contains(a.Status), ct).ConfigureAwait(false);
-        bool cooperativeHeld = await _db.Set<CooperativeStand>().AnyAsync(c => standIds.Contains(c.StandId), ct).ConfigureAwait(false);
         HousingStand? unavailable = stands.FirstOrDefault(s => s.Status != StandStatus.Available);
-        if (unavailable is not null || individuallyAllocated || cooperativeHeld)
+        if (unavailable is not null || await StandClaims.AnyClaimedAsync(_db, standIds, ct).ConfigureAwait(false))
         {
             return Error.Conflict("Hse.StandUnavailable", "Every stand must be available and not already allocated.");
         }

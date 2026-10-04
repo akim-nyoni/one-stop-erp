@@ -551,6 +551,49 @@ internal sealed class EnumeratedHouseholdConfiguration : IEntityTypeConfiguratio
     }
 }
 
+internal sealed class DeveloperAgreementConfiguration : IEntityTypeConfiguration<DeveloperAgreement>
+{
+    public void Configure(EntityTypeBuilder<DeveloperAgreement> b)
+    {
+        b.ToTable("developer_agreement", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AgreementNumber).HasMaxLength(30);
+        b.Property(x => x.PenaltyPerStandPerMonth).HasPrecision(19, 4);
+        b.Property(x => x.PenaltiesCharged).HasPrecision(19, 4);
+        b.HasOne<HousingScheme>().WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Stands).WithOne().HasForeignKey(x => x.DeveloperAgreementId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Stands).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasMany(x => x.Milestones).WithOne().HasForeignKey(x => x.DeveloperAgreementId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Milestones).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.AgreementNumber }).IsUnique();
+    }
+}
+
+internal sealed class DeveloperAgreementStandConfiguration : IEntityTypeConfiguration<DeveloperAgreementStand>
+{
+    public void Configure(EntityTypeBuilder<DeveloperAgreementStand> b)
+    {
+        b.ToTable("developer_agreement_stand", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Quota).HasConversion<int>();
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+
+        // A stand is on one developer agreement.
+        b.HasIndex(x => x.StandId).IsUnique();
+    }
+}
+
+internal sealed class DeliveryMilestoneConfiguration : IEntityTypeConfiguration<DeliveryMilestone>
+{
+    public void Configure(EntityTypeBuilder<DeliveryMilestone> b)
+    {
+        b.ToTable("delivery_milestone", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Description).HasMaxLength(300);
+        b.HasIndex(x => x.DeveloperAgreementId);
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

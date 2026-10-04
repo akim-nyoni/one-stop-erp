@@ -235,10 +235,7 @@ public sealed class InformalSettlementService : IInformalSettlementService
         }
 
         // The stand: available, and not promised to anyone through any other route.
-        bool allocated = await _db.Set<StandAllocation>().AnyAsync(a => a.StandId == standId && Live.Contains(a.Status), ct).ConfigureAwait(false)
-            || await _db.Set<CooperativeStand>().AnyAsync(c => c.StandId == standId, ct).ConfigureAwait(false)
-            || await _db.Set<EnumeratedHousehold>().AnyAsync(h => h.StandId == standId, ct).ConfigureAwait(false);
-        if (stand.Status != StandStatus.Available || allocated)
+        if (stand.Status != StandStatus.Available || await StandClaims.AnyClaimedAsync(_db, [standId], ct).ConfigureAwait(false))
         {
             return Result.Failure(Error.Conflict("Hse.StandUnavailable", $"Stand {stand.StandNumber} is not available."));
         }

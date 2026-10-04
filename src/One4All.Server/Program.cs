@@ -1202,6 +1202,41 @@ app.MapGet("/api/housing/settlements/{code}", async (string code, long companyId
 .RequireAuthorization()
 .WithName("SettlementSummary");
 
+app.MapPost("/api/housing/developer-agreements", async (One4All.Application.Abstractions.Housing.DeveloperAgreementTerms terms, One4All.Application.Abstractions.Housing.IDeveloperAgreementService developers, CancellationToken ct) =>
+    ValueResponse(await developers.CreateAsync(terms, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CreateDeveloperAgreement");
+
+app.MapPost("/api/housing/developer-agreements/{agreementNumber}/milestones", async (string agreementNumber, long companyId, string description, DateOnly dueOn, One4All.Application.Abstractions.Housing.IDeveloperAgreementService developers, CancellationToken ct) =>
+    ActionResponse(await developers.AddMilestoneAsync(companyId, agreementNumber, description, dueOn, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AddDeliveryMilestone");
+
+app.MapPost("/api/housing/developer-agreements/{agreementNumber}/milestones/complete", async (string agreementNumber, long companyId, string description, DateOnly date, One4All.Application.Abstractions.Housing.IDeveloperAgreementService developers, CancellationToken ct) =>
+    ActionResponse(await developers.CompleteMilestoneAsync(companyId, agreementNumber, description, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CompleteDeliveryMilestone");
+
+app.MapPost("/api/housing/developer-agreements/{agreementNumber}/stands", async (string agreementNumber, long companyId, One4All.Core.Housing.StandQuota quota, DateOnly date, IReadOnlyList<long> standIds, One4All.Application.Abstractions.Housing.IDeveloperAgreementService developers, CancellationToken ct) =>
+    ValueResponse(await developers.AssignStandsAsync(companyId, agreementNumber, quota, standIds, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AssignDeveloperStands");
+
+app.MapPost("/api/housing/developer-agreements/{agreementNumber}/stands/{standId:long}/hand-over", async (string agreementNumber, long standId, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.IDeveloperAgreementService developers, CancellationToken ct) =>
+    ActionResponse(await developers.HandOverAsync(companyId, agreementNumber, standId, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("HandOverDeveloperStand");
+
+app.MapGet("/api/housing/developer-agreements/{agreementNumber}/reconciliation", async (string agreementNumber, long companyId, DateOnly asAt, One4All.Application.Abstractions.Housing.IDeveloperAgreementService developers, CancellationToken ct) =>
+    ValueResponse(await developers.ReconcileAsync(companyId, agreementNumber, asAt, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReconcileDeveloperAgreement");
+
+app.MapPost("/api/housing/developer-agreements/{agreementNumber}/penalties", async (string agreementNumber, long companyId, DateOnly asAt, string penaltyIncomeAccountCode, One4All.Application.Abstractions.Housing.IDeveloperAgreementService developers, CancellationToken ct) =>
+    ValueResponse(await developers.ChargePenaltiesAsync(companyId, agreementNumber, asAt, penaltyIncomeAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ChargeDeveloperPenalties");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
