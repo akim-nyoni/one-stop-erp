@@ -2513,6 +2513,129 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.EvictionCase", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("ArrearsAtOpening")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("arrears_at_opening");
+
+                    b.Property<string>("CaseNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("case_number");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<int>("NoticePeriodDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("notice_period_days");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("TenancyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenancy_id");
+
+                    b.Property<string>("WithdrawnReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("withdrawn_reason");
+
+                    b.HasKey("Id")
+                        .HasName("pk_eviction_case");
+
+                    b.HasIndex("TenancyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_eviction_case_one_open_per_tenancy")
+                        .HasFilter("status = 0");
+
+                    b.HasIndex("CompanyId", "CaseNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_eviction_case_company_id_case_number");
+
+                    b.ToTable("eviction_case", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_eviction_case_notice", "notice_period_days >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.EvictionStep", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long>("EvictionCaseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("eviction_case_id");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_eviction_step");
+
+                    b.HasIndex("EvictionCaseId", "Stage")
+                        .IsUnique()
+                        .HasDatabaseName("ix_eviction_step_eviction_case_id_stage");
+
+                    b.ToTable("eviction_step", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.HousingApplicant", b =>
                 {
                     b.Property<long>("Id")
@@ -15467,6 +15590,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_claim_line_claim_expense_claim_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.EvictionCase", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.Tenancy", null)
+                        .WithMany()
+                        .HasForeignKey("TenancyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_eviction_case_tenancy_tenancy_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.EvictionStep", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.EvictionCase", null)
+                        .WithMany("Steps")
+                        .HasForeignKey("EvictionCaseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_eviction_step_eviction_case_eviction_case_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.InstalmentAgreement", b =>
                 {
                     b.HasOne("One4All.Core.Housing.HousingStand", null)
@@ -16180,6 +16323,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Housing.AllocationRun", b =>
                 {
                     b.Navigation("Allocations");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.EvictionCase", b =>
+                {
+                    b.Navigation("Steps");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.HousingStand", b =>

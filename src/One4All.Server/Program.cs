@@ -927,6 +927,26 @@ app.MapGet("/api/housing/voids", async (long companyId, DateOnly asAtDate, One4A
 .RequireAuthorization()
 .WithName("RentalVoids");
 
+app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
+    ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("OpenEvictionCase");
+
+app.MapPost("/api/housing/evictions/{caseNumber}/advance", async (string caseNumber, long companyId, One4All.Core.Housing.EvictionStage stage, DateOnly date, string? reference, string? refundBankAccountCode, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
+    ActionResponse(await evictions.AdvanceAsync(companyId, caseNumber, stage, date, reference, refundBankAccountCode, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AdvanceEvictionCase");
+
+app.MapPost("/api/housing/evictions/{caseNumber}/withdraw", async (string caseNumber, long companyId, string reason, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
+    ActionResponse(await evictions.WithdrawAsync(companyId, caseNumber, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("WithdrawEvictionCase");
+
+app.MapGet("/api/housing/evictions", async (long companyId, bool? openOnly, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
+    Results.Ok(await evictions.RegisterAsync(companyId, openOnly ?? false, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("EvictionRegister");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

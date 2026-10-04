@@ -195,6 +195,37 @@ internal sealed class TenancyConfiguration : IEntityTypeConfiguration<Tenancy>
     }
 }
 
+internal sealed class EvictionCaseConfiguration : IEntityTypeConfiguration<EvictionCase>
+{
+    public void Configure(EntityTypeBuilder<EvictionCase> b)
+    {
+        b.ToTable("eviction_case", Schemas.Housing, t => t.HasCheckConstraint("ck_eviction_case_notice", "notice_period_days >= 1"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.CaseNumber).HasMaxLength(30);
+        b.Property(x => x.ArrearsAtOpening).HasPrecision(19, 4);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.WithdrawnReason).HasMaxLength(500);
+        b.Ignore(x => x.Current);
+        b.HasOne<Tenancy>().WithMany().HasForeignKey(x => x.TenancyId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Steps).WithOne().HasForeignKey(x => x.EvictionCaseId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Steps).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.CaseNumber }).IsUnique();
+        b.HasIndex(x => x.TenancyId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_eviction_case_one_open_per_tenancy");
+    }
+}
+
+internal sealed class EvictionStepConfiguration : IEntityTypeConfiguration<EvictionStep>
+{
+    public void Configure(EntityTypeBuilder<EvictionStep> b)
+    {
+        b.ToTable("eviction_step", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Stage).HasConversion<int>();
+        b.Property(x => x.Reference).HasMaxLength(120);
+        b.HasIndex(x => new { x.EvictionCaseId, x.Stage }).IsUnique();
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)
