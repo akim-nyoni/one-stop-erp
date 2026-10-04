@@ -81,6 +81,12 @@ public partial class ShellWindow : Window
         check.Show();
     }
 
+    private void OpenFaultDesk_Click(object sender, RoutedEventArgs e)
+    {
+        FaultDeskWindow desk = new(_services) { Owner = this };
+        desk.Show();
+    }
+
     private void OpenNotifications_Click(object sender, RoutedEventArgs e)
     {
         NotificationCentreWindow notifications = new(_services) { Owner = this };

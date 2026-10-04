@@ -55,6 +55,7 @@
                 <Separator />
                 <MenuItem Header="My Approvals…" Click="OpenApprovals_Click" />
                 <MenuItem Header="My Notifications…" Click="OpenNotifications_Click" />
+                <MenuItem Header="Fault Desk…" Click="OpenFaultDesk_Click" />
                 <MenuItem Header="Journals Awaiting Approval…" Click="OpenJournalApprovals_Click" />
                 <MenuItem Header="Stock Replenishment…" Click="OpenReplenishment_Click" />
                 <MenuItem Header="Supplier Payment Run…" Click="OpenPaymentRun_Click" />
