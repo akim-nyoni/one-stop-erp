@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-142 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+153 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -74,7 +74,18 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H38 | Appeals Register & Outcomes | Appeals lodged against allocation runs with hearing and outcome. | — | Appeal, WaitingListNumber, Run, Lodged, Status, Hearing, Outcome | — | — |
 | H39 | Double Allocation Exception Report | Stands promised through more than one route — must always be empty; any row is an incident. | — | Stand, Claims, Routes | — | — |
 | H4 | Due Diligence Outstanding | Open acquisitions and the due-diligence items blocking each. | — | Acquisition, Parcel, Outstanding | — | — |
+| H49 | Fully Paid / Ready for Transfer | Sold stands whose holders owe nothing and have no title application — the most actionable list. | — | Stand, Holder, Status, SoldOn, Price | — | Sum(Price) |
 | H5 | Compulsory Acquisition Compensation Register | Compensation claims with provision, settlement and status. | — | Claim, Parcel, Claimant, Lodged, Status, Provision, Settled | — | Sum(Settled) |
+| H56 | Ownership History / Chain of Title per Stand | Every holder of a stand in sequence with the change type, date and consideration, and whether the hash chain verifies. | StandNumber (String, optional) | Stand, Sequence, ChangeType, Holder, Effective, ChainVerified, Consideration | — | Sum(Consideration) |
+| H57 | Change of Ownership Register | Completed transfers by type with parties, consideration and clearance relied on. | — | Application, Stand, Type, From, To, Completed, Clearance, Consideration | — | Sum(Consideration) |
+| H58 | Transfers in Progress / Pending Approval | Open transfer applications with status, approvals and age. | AsAtDate (Date, optional) | Application, Stand, Type, Status, Approvals, DaysOpen, Waiting | — | — |
+| H59 | Transfers Blocked by Outstanding Rates or Housing Arrears | Open transfers failing a live check, with what is needed to clear them. | AsAtDate (Date, optional) | Application, Stand, Check, Detail | — | — |
+| H64 | Title Deed Pipeline Report | Open title applications with stage, days at the stage, days since applied and conveyancer. | AsAtDate (Date, optional) | Application, Stand, Stage, DaysAtStage, DaysSinceApplied, Conveyancer | — | — |
+| H65 | Title Deeds Held but Uncollected | Deeds in council custody not yet handed over, aged, with the owner's contact — the chase list. | AsAtDate (Date, optional) | Application, Stand, Deed, Owner, Contact, DaysHeld | — | — |
+| H66 | Deeds Register | Registered deeds with registration date and current custody. | — | Deed, Stand, Registered, Custody | — | — |
+| H68 | Caveats, Blocks & Disputes Register | Every block placed: reason, particulars, document, who placed and lifted it, age. | AsAtDate (Date, optional) | Stand, Reason, Detail, Document, PlacedOn, State, AgeDays | — | — |
+| H69 | Stands with No Recorded Owner / Broken Ownership Chain | Data-integrity exceptions — must be empty. | — | Stand, Problem | — | — |
+| H70 | Sectional Title Unit Register & Participation Quotas | Units of every sectional scheme with floor area, quota and owner. | — | Scheme, Building, Unit, FloorArea, Quota, Owner | — | — |
 | HSE-STAND | Housing Stand Register | Stands with status, apportioned cost, selling price and current holder. | — | StandNumber, Status, Holder, AllocatedCost, SellingPrice | — | Sum(SellingPrice) |
 
 ## HumanResources

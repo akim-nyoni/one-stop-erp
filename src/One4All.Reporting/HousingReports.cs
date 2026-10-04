@@ -61,5 +61,38 @@ public static class HousingReports
              new Column("Status", "Status", 80), new Column("Hearing", "Hearing", 80), new Column("Outcome", "Outcome", 220)], []);
         yield return Listing("H39", "Double Allocation Exception Report", "Housing", "Stands promised through more than one route — must always be empty; any row is an incident.", "HousingDoubleAllocations",
             [new Column("Stand", "Stand", 90), new Column("Claims", "Claims", 60), new Column("Routes", "Promised through", 420)], []);
+
+        // Agreements & title readiness.
+        yield return Listing("H49", "Fully Paid / Ready for Transfer", "Housing", "Sold stands whose holders owe nothing and have no title application — the most actionable list.", "HousingReadyForTitle",
+            [new Column("Stand", "Stand", 80), new Column("Holder", "Holder", 170), new Column("Status", "Stand status", 90), new Column("SoldOn", "Sold", 80), new Column("Price", "Price", 90, true)], []);
+
+        // Change of ownership, cession & title.
+        yield return Listing("H56", "Ownership History / Chain of Title per Stand", "Housing", "Every holder of a stand in sequence with the change type, date and consideration, and whether the hash chain verifies.", "HousingChainOfTitle",
+            [new Column("Stand", "Stand", 80), new Column("Sequence", "#", 35), new Column("ChangeType", "Change", 90), new Column("Holder", "Holder", 170), new Column("Effective", "Effective", 80),
+             new Column("ChainVerified", "Chain", 60), new Column("Consideration", "Consideration", 100, true)], [("StandNumber", ParameterType.String)]);
+        yield return Listing("H57", "Change of Ownership Register", "Housing", "Completed transfers by type with parties, consideration and clearance relied on.", "HousingTransfers",
+            [new Column("Application", "Application", 90), new Column("Stand", "Stand", 80), new Column("Type", "Type", 90), new Column("From", "From", 140), new Column("To", "To", 140),
+             new Column("Completed", "Completed", 80), new Column("Clearance", "Clearance", 90), new Column("Consideration", "Consideration", 100, true)], []);
+        yield return Listing("H58", "Transfers in Progress / Pending Approval", "Housing", "Open transfer applications with status, approvals and age.", "HousingTransfersOpen",
+            [new Column("Application", "Application", 90), new Column("Stand", "Stand", 80), new Column("Type", "Type", 90), new Column("Status", "Status", 80),
+             new Column("Approvals", "Approvals", 70), new Column("DaysOpen", "Days open", 70), new Column("Waiting", "Waiting for", 220)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H59", "Transfers Blocked by Outstanding Rates or Housing Arrears", "Housing", "Open transfers failing a live check, with what is needed to clear them.", "HousingTransfersBlocked",
+            [new Column("Application", "Application", 90), new Column("Stand", "Stand", 80), new Column("Check", "Check", 140), new Column("Detail", "What is needed", 360)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H64", "Title Deed Pipeline Report", "Housing", "Open title applications with stage, days at the stage, days since applied and conveyancer.", "HousingTitlePipeline",
+            [new Column("Application", "Application", 90), new Column("Stand", "Stand", 80), new Column("Stage", "Stage", 110), new Column("DaysAtStage", "Days at stage", 80),
+             new Column("DaysSinceApplied", "Since applied", 80), new Column("Conveyancer", "Conveyancer", 160)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H65", "Title Deeds Held but Uncollected", "Housing", "Deeds in council custody not yet handed over, aged, with the owner's contact — the chase list.", "HousingDeedsUncollected",
+            [new Column("Application", "Application", 90), new Column("Stand", "Stand", 80), new Column("Deed", "Deed", 100), new Column("Owner", "Owner", 160), new Column("Contact", "Contact", 160),
+             new Column("DaysHeld", "Days held", 70)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H66", "Deeds Register", "Housing", "Registered deeds with registration date and current custody.", "HousingDeeds",
+            [new Column("Deed", "Deed", 110), new Column("Stand", "Stand", 80), new Column("Registered", "Registered", 80), new Column("Custody", "Custody", 220)], []);
+        yield return Listing("H68", "Caveats, Blocks & Disputes Register", "Housing", "Every block placed: reason, particulars, document, who placed and lifted it, age.", "HousingBlocks",
+            [new Column("Stand", "Stand", 80), new Column("Reason", "Reason", 110), new Column("Detail", "Particulars", 200), new Column("Document", "Document", 90),
+             new Column("PlacedOn", "Placed", 80), new Column("State", "State", 110), new Column("AgeDays", "Age (days)", 70)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H69", "Stands with No Recorded Owner / Broken Ownership Chain", "Housing", "Data-integrity exceptions — must be empty.", "HousingBrokenChains",
+            [new Column("Stand", "Stand", 90), new Column("Problem", "Problem", 460)], []);
+        yield return Listing("H70", "Sectional Title Unit Register & Participation Quotas", "Housing", "Units of every sectional scheme with floor area, quota and owner.", "HousingSectionalUnits",
+            [new Column("Scheme", "Scheme", 90), new Column("Building", "Building", 150), new Column("Unit", "Unit", 60), new Column("FloorArea", "Floor m²", 70), new Column("Quota", "Quota %", 70),
+             new Column("Owner", "Owner", 170)], []);
     }
 }
