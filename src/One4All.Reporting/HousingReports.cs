@@ -66,6 +66,14 @@ public static class HousingReports
         yield return Listing("H49", "Fully Paid / Ready for Transfer", "Housing", "Sold stands whose holders owe nothing and have no title application — the most actionable list.", "HousingReadyForTitle",
             [new Column("Stand", "Stand", 80), new Column("Holder", "Holder", 170), new Column("Status", "Stand status", 90), new Column("SoldOn", "Sold", 80), new Column("Price", "Price", 90, true)], []);
 
+        yield return Listing("H54", "Development Covenant Compliance", "Housing", "Covenants with the latest milestone, deadline, extensions and breach status.", "HousingCovenants",
+            [new Column("Covenant", "Covenant", 90), new Column("Stand", "Stand", 80), new Column("Holder", "Holder", 150), new Column("Deadline", "Deadline", 80),
+             new Column("Milestone", "Latest milestone", 120), new Column("Extensions", "Ext.", 40), new Column("Status", "Status", 90), new Column("DaysLeft", "Days left", 70)],
+            [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H55", "Repossession Register", "Housing", "Stands repossessed with the receivable derecognised, NRV, inventory recognised and gain or loss.", "HousingRepossessions",
+            [new Column("Reference", "Reference", 90), new Column("Stand", "Stand", 80), new Column("Date", "Date", 80), new Column("Reason", "Reason", 160), new Column("Receivable", "Receivable", 90, true),
+             new Column("Nrv", "NRV", 90, true), new Column("Inventory", "Inventory", 90, true), new Column("GainOrLoss", "Gain / (loss)", 90, true)], []);
+
         // Change of ownership, cession & title.
         yield return Listing("H56", "Ownership History / Chain of Title per Stand", "Housing", "Every holder of a stand in sequence with the change type, date and consideration, and whether the hash chain verifies.", "HousingChainOfTitle",
             [new Column("Stand", "Stand", 80), new Column("Sequence", "#", 35), new Column("ChangeType", "Change", 90), new Column("Holder", "Holder", 170), new Column("Effective", "Effective", 80),
@@ -94,5 +102,41 @@ public static class HousingReports
         yield return Listing("H70", "Sectional Title Unit Register & Participation Quotas", "Housing", "Units of every sectional scheme with floor area, quota and owner.", "HousingSectionalUnits",
             [new Column("Scheme", "Scheme", 90), new Column("Building", "Building", 150), new Column("Unit", "Unit", 60), new Column("FloorArea", "Floor m²", 70), new Column("Quota", "Quota %", 70),
              new Column("Owner", "Owner", 170)], []);
+
+        // Council rental housing stock.
+        yield return Listing("H71", "Rent Roll", "Housing", "Let units with tenant, rent and arrears.", "HousingRentRoll",
+            [new Column("Unit", "Unit", 80), new Column("Type", "Type", 80), new Column("Tenancy", "Tenancy", 90), new Column("Tenant", "Tenant", 160), new Column("Since", "Since", 80),
+             new Column("Rent", "Rent", 80, true), new Column("Arrears", "Arrears", 90, true)], []);
+        yield return Listing("H72", "Housing Stock Register & Condition", "Housing", "Every unit with type, rooms, occupancy and its latest inspection grade.", "HousingStock",
+            [new Column("Unit", "Unit", 80), new Column("Description", "Description", 160), new Column("Type", "Type", 80), new Column("Rooms", "Rooms", 50), new Column("Occupancy", "Occupancy", 80),
+             new Column("Inspected", "Last inspected", 90), new Column("Grade", "Grade", 50)], []);
+        yield return Listing("H73", "Occupancy & Voids Report", "Housing", "Void units with days void and rent lost to voids.", "HousingVoids",
+            [new Column("Unit", "Unit", 80), new Column("Type", "Type", 80), new Column("VacantSince", "Void since", 80), new Column("DaysVoid", "Days void", 70), new Column("RentLost", "Rent lost", 90, true)],
+            [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H76", "Eviction Pipeline & Register", "Housing", "Eviction cases with the current stage, its date and the arrears at opening.", "HousingEvictions",
+            [new Column("Case", "Case", 90), new Column("Tenancy", "Tenancy", 90), new Column("Stage", "Stage", 110), new Column("StageDate", "Since", 80), new Column("Status", "Status", 90),
+             new Column("Arrears", "Arrears at opening", 110, true)], []);
+        yield return Listing("H77", "Lease Expiry & Renewal Due", "Housing", "Stand leases and tenancies ending within a year of the date.", "HousingLeaseExpiry",
+            [new Column("Kind", "Kind", 70), new Column("Reference", "Reference", 100), new Column("Subject", "Stand / unit", 90), new Column("Ends", "Ends", 80), new Column("DaysLeft", "Days left", 70)],
+            [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H80", "Inspections Due & Findings Summary", "Housing", "Units never inspected or not inspected for a year, and follow-ups outstanding.", "HousingInspectionsDue",
+            [new Column("Unit", "Unit", 80), new Column("LastInspected", "Last inspected", 90), new Column("Grade", "Grade", 50), new Column("Due", "Why due", 300)], [("AsAtDate", ParameterType.Date)]);
+
+        // Schemes, partners, cooperatives & settlements.
+        yield return Listing("H85", "Developer / Joint Venture Reconciliation", "Housing", "Stands contracted vs delivered per quota, overdue milestones and penalties.", "HousingDevelopers",
+            [new Column("Agreement", "Agreement", 90), new Column("Quota", "Quota", 80), new Column("Contracted", "Contracted", 70), new Column("HandedOver", "Delivered", 70), new Column("Outstanding", "Outstanding", 75),
+             new Column("OverdueMilestones", "Overdue milestones", 200), new Column("PenaltyAccrued", "Penalty accrued", 100, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H86", "Housing Cooperative Register", "Housing", "Cooperatives with active members, stands held and stands sub-allocated.", "HousingCooperatives",
+            [new Column("Cooperative", "Code", 80), new Column("Name", "Name", 180), new Column("Registration", "Registration", 100), new Column("Members", "Members", 60),
+             new Column("Stands", "Stands", 60), new Column("SubAllocated", "Sub-allocated", 80)], []);
+        yield return Listing("H87", "Informal Settlement / Enumeration Register", "Housing", "Settlements with ward, cut-off date, households counted and eligible.", "HousingSettlements",
+            [new Column("Settlement", "Code", 80), new Column("Name", "Name", 160), new Column("Ward", "Ward", 80), new Column("CutOff", "Cut-off", 80), new Column("Households", "Households", 70),
+             new Column("Eligible", "Eligible", 60), new Column("Plan", "Upgrading plan", 100)], []);
+        yield return Listing("H88", "Regularisation Progress Report", "Housing", "Per settlement: enumerated → eligible → waiting-listed or regularised → outstanding.", "HousingRegularisation",
+            [new Column("Settlement", "Settlement", 90), new Column("Enumerated", "Enumerated", 70), new Column("Eligible", "Eligible", 60), new Column("WaitingListed", "Waiting list", 70),
+             new Column("Regularised", "Regularised", 70), new Column("Outstanding", "Outstanding", 70)], []);
+        yield return Listing("H89", "Housing Subsidy & Grant Utilisation", "Housing", "Grants received, spent, recognised and deferred (IAS 20), with conditions.", "HousingGrants",
+            [new Column("Grant", "Grant", 90), new Column("Grantor", "Grantor", 140), new Column("Received", "Received", 80), new Column("Conditions", "Conditions assured", 100),
+             new Column("Amount", "Amount", 90, true), new Column("Spent", "Spent", 90, true), new Column("Recognised", "Recognised", 90, true), new Column("Deferred", "Deferred", 90, true)], []);
     }
 }
