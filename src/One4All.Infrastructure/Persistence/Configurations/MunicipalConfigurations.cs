@@ -246,6 +246,39 @@ internal sealed class FacilityBookingConfiguration : IEntityTypeConfiguration<Fa
     }
 }
 
+internal sealed class CemeteryPlotConfiguration : IEntityTypeConfiguration<CemeteryPlot>
+{
+    public void Configure(EntityTypeBuilder<CemeteryPlot> b)
+    {
+        b.ToTable("cemetery_plot", Schemas.Municipal, t => t.HasCheckConstraint("ck_cemetery_plot_terms", "price >= 0 AND capacity >= 1"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(120);
+        b.Property(x => x.Cemetery).HasMaxLength(60);
+        b.Property(x => x.Section).HasMaxLength(30);
+        b.Property(x => x.PlotNumber).HasMaxLength(30);
+        b.Property(x => x.Price).HasPrecision(19, 4);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.SaleInvoiceNumber).HasMaxLength(30);
+        b.HasMany(x => x.Interments).WithOne().HasForeignKey(x => x.CemeteryPlotId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Interments).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Reference }).IsUnique();
+        b.HasIndex(x => new { x.CompanyId, x.Cemetery, x.Status });
+    }
+}
+
+internal sealed class CemeteryIntermentConfiguration : IEntityTypeConfiguration<CemeteryInterment>
+{
+    public void Configure(EntityTypeBuilder<CemeteryInterment> b)
+    {
+        b.ToTable("cemetery_interment", Schemas.Municipal, t => t.HasCheckConstraint("ck_cemetery_interment_dates", "interment_date >= date_of_death"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.IntermentNumber).HasMaxLength(30);
+        b.Property(x => x.DeceasedName).HasMaxLength(200);
+        b.HasIndex(x => x.IntermentNumber);
+        b.HasIndex(x => x.IntermentDate);
+    }
+}
+
 internal sealed class IndigentRegistrationConfiguration : IEntityTypeConfiguration<IndigentRegistration>
 {
     public void Configure(EntityTypeBuilder<IndigentRegistration> b)

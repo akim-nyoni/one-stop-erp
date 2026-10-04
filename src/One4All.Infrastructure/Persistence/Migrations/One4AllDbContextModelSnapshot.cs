@@ -4201,6 +4201,160 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("billing_run_line", "mun");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.CemeteryInterment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CemeteryPlotId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cemetery_plot_id");
+
+                    b.Property<DateOnly>("DateOfDeath")
+                        .HasColumnType("date")
+                        .HasColumnName("date_of_death");
+
+                    b.Property<string>("DeceasedName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("deceased_name");
+
+                    b.Property<DateOnly>("IntermentDate")
+                        .HasColumnType("date")
+                        .HasColumnName("interment_date");
+
+                    b.Property<string>("IntermentNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("interment_number");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cemetery_interment");
+
+                    b.HasIndex("CemeteryPlotId")
+                        .HasDatabaseName("ix_cemetery_interment_cemetery_plot_id");
+
+                    b.HasIndex("IntermentDate")
+                        .HasDatabaseName("ix_cemetery_interment_interment_date");
+
+                    b.HasIndex("IntermentNumber")
+                        .HasDatabaseName("ix_cemetery_interment_interment_number");
+
+                    b.ToTable("cemetery_interment", "mun", t =>
+                        {
+                            t.HasCheckConstraint("ck_cemetery_interment_dates", "interment_date >= date_of_death");
+                        });
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.CemeteryPlot", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("integer")
+                        .HasColumnName("capacity");
+
+                    b.Property<string>("Cemetery")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("cemetery");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("HolderCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("holder_customer_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("PlotNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("plot_number");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("price");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("SaleInvoiceNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("sale_invoice_number");
+
+                    b.Property<string>("Section")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("section");
+
+                    b.Property<DateOnly?>("SoldOn")
+                        .HasColumnType("date")
+                        .HasColumnName("sold_on");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cemetery_plot");
+
+                    b.HasIndex("CompanyId", "Reference")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cemetery_plot_company_id_reference");
+
+                    b.HasIndex("CompanyId", "Cemetery", "Status")
+                        .HasDatabaseName("ix_cemetery_plot_company_id_cemetery_status");
+
+                    b.ToTable("cemetery_plot", "mun", t =>
+                        {
+                            t.HasCheckConstraint("ck_cemetery_plot_terms", "price >= 0 AND capacity >= 1");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.ClearanceCertificate", b =>
                 {
                     b.Property<long>("Id")
@@ -14701,6 +14855,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_billing_run_line_billing_run_billing_run_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.CemeteryInterment", b =>
+                {
+                    b.HasOne("One4All.Core.Municipal.CemeteryPlot", null)
+                        .WithMany("Interments")
+                        .HasForeignKey("CemeteryPlotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cemetery_interment_cemetery_plot_cemetery_plot_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.CouncilInspection", b =>
                 {
                     b.HasOne("One4All.Core.Municipal.CouncilLicence", null)
@@ -15315,6 +15479,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Municipal.BillingRun", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.CemeteryPlot", b =>
+                {
+                    b.Navigation("Interments");
                 });
 
             modelBuilder.Entity("One4All.Core.Municipal.Property", b =>

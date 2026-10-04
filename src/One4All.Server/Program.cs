@@ -802,6 +802,31 @@ app.MapGet("/api/municipal/facilities/{code}/calendar", async (string code, long
 .RequireAuthorization()
 .WithName("FacilityCalendar");
 
+app.MapPost("/api/municipal/cemeteries/{cemetery}/plots", async (string cemetery, long companyId, string section, decimal price, int capacity, IReadOnlyList<string> plotNumbers, One4All.Application.Abstractions.Municipal.ICemeteryService cemeteries, CancellationToken ct) =>
+    ValueResponse(await cemeteries.AddPlotsAsync(companyId, cemetery, section, plotNumbers, price, capacity, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AddCemeteryPlots");
+
+app.MapGet("/api/municipal/cemeteries/{cemetery}/plots", async (string cemetery, long companyId, One4All.Core.Municipal.CemeteryPlotStatus? status, One4All.Application.Abstractions.Municipal.ICemeteryService cemeteries, CancellationToken ct) =>
+    Results.Ok(await cemeteries.PlotsAsync(companyId, cemetery, status, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CemeteryPlots");
+
+app.MapPost("/api/municipal/cemetery-plots/{plotReference}/sell", async (string plotReference, long companyId, long holderCustomerId, DateOnly date, string revenueAccountCode, One4All.Application.Abstractions.Municipal.ICemeteryService cemeteries, CancellationToken ct) =>
+    ValueResponse(await cemeteries.SellAsync(companyId, plotReference, holderCustomerId, date, revenueAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SellCemeteryPlot");
+
+app.MapPost("/api/municipal/interments", async (One4All.Application.Abstractions.Municipal.IntermentRequest request, One4All.Application.Abstractions.Municipal.ICemeteryService cemeteries, CancellationToken ct) =>
+    ValueResponse(await cemeteries.RecordIntermentAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordInterment");
+
+app.MapGet("/api/municipal/burial-register", async (long companyId, DateOnly start, DateOnly end, One4All.Application.Abstractions.Municipal.ICemeteryService cemeteries, CancellationToken ct) =>
+    Results.Ok(await cemeteries.BurialRegisterAsync(companyId, start, end, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("BurialRegister");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()
