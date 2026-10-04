@@ -230,19 +230,17 @@ public sealed partial class ReportDesignerViewModel : ObservableObject
         ReportDefinition definition = SystemReports.Listing(Code.Trim(), ReportName.Trim(), Module.Trim(), string.Empty, _command, columns, _parameters);
         string json = ReportDefinitionSerializer.Serialize(definition);
 
+        // A company-scoped record with this code overrides the system report for this company; each save is a new
+        // version and the one it replaces is kept (brief §13.2).
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
-        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        Result<int> saved = await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Reporting.IReportDefinitionService>()
+            .SaveAsync(_companyId, definition.Code, definition.Name, string.IsNullOrWhiteSpace(Module) ? null : Module.Trim(), json, null, "Saved in the designer", ct).ConfigureAwait(true);
+        if (saved.IsFailure)
+        {
+            return Result.Failure(saved.Error);
+        }
 
-        // A company-scoped record with this code overrides the system report for this company; replace any prior one.
-        List<ReportDefinitionRecord> existing = await db.ReportDefinitions
-            .Where(r => r.Scope == ReportScope.Company && r.CompanyId == _companyId && r.Code == definition.Code)
-            .ToListAsync(ct).ConfigureAwait(true);
-        db.ReportDefinitions.RemoveRange(existing);
-
-        db.ReportDefinitions.Add(new ReportDefinitionRecord(definition.Code, definition.Name, json, ReportScope.Company, companyId: _companyId, module: string.IsNullOrWhiteSpace(Module) ? null : Module.Trim()));
-        await db.SaveChangesAsync(ct).ConfigureAwait(true);
-
-        StatusMessage = $"Saved company report {definition.Code} ({columns.Length} columns).";
+        StatusMessage = $"Saved company report {definition.Code} v{saved.Value} ({columns.Length} columns).";
         return Result.Success();
     }
 

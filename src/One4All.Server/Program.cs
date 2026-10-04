@@ -1991,6 +1991,35 @@ app.MapGet("/api/system/jobs/{code}/history", async (string code, long companyId
 .RequireAuthorization()
 .WithName("ScheduledJobHistory");
 
+app.MapPost("/api/reports/{code}/copy", async (string code, long companyId, long? userId, One4All.Application.Abstractions.Reporting.IReportDefinitionService reports, CancellationToken ct) =>
+    ActionResponse(await reports.CopySystemReportAsync(companyId, code, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CopySystemReport");
+
+app.MapPut("/api/reports/{code}", async (string code, long companyId, string name, string? module, long? userId, string? note, HttpRequest request, One4All.Application.Abstractions.Reporting.IReportDefinitionService reports, CancellationToken ct) =>
+{
+    using StreamReader reader = new(request.Body);
+    string json = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+    return ValueResponse(await reports.SaveAsync(companyId, code, name, module, json, userId, note, ct).ConfigureAwait(false));
+})
+.RequireAuthorization()
+.WithName("SaveCompanyReport");
+
+app.MapGet("/api/reports/{code}/versions", async (string code, long companyId, One4All.Application.Abstractions.Reporting.IReportDefinitionService reports, CancellationToken ct) =>
+    ValueResponse(await reports.HistoryAsync(companyId, code, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReportVersionHistory");
+
+app.MapGet("/api/reports/{code}/diff", async (string code, long companyId, int fromVersion, int toVersion, One4All.Application.Abstractions.Reporting.IReportDefinitionService reports, CancellationToken ct) =>
+    ValueResponse(await reports.DiffAsync(companyId, code, fromVersion, toVersion, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReportVersionDiff");
+
+app.MapPost("/api/reports/{code}/rollback", async (string code, long companyId, int version, long? userId, One4All.Application.Abstractions.Reporting.IReportDefinitionService reports, CancellationToken ct) =>
+    ValueResponse(await reports.RollbackAsync(companyId, code, version, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RollbackReportVersion");
+
 app.MapGet("/api/accounting/data-health", async (long companyId, DateOnly asAtDate, One4All.Application.Abstractions.Accounting.IDataHealthService health, CancellationToken ct) =>
     ValueResponse(await health.SnapshotAsync(companyId, asAtDate, ct).ConfigureAwait(false)))
 .RequireAuthorization()

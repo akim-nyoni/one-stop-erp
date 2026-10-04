@@ -14056,6 +14056,57 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("report_definition", "rpt");
                 });
 
+            modelBuilder.Entity("One4All.Core.Reporting.ReportDefinitionVersion", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("DefinitionJson")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("definition_json");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("note");
+
+                    b.Property<long>("ReportDefinitionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("report_definition_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<DateTimeOffset>("SavedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("saved_at");
+
+                    b.Property<long?>("SavedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("saved_by_user_id");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_report_definition_version");
+
+                    b.HasIndex("ReportDefinitionId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_report_definition_version_report_definition_id_version");
+
+                    b.ToTable("report_definition_version", "rpt");
+                });
+
             modelBuilder.Entity("One4All.Core.Restaurant.FloorSection", b =>
                 {
                     b.Property<long>("Id")
@@ -20550,6 +20601,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_session_float_cashier_sessions_cashier_session_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Reporting.ReportDefinitionVersion", b =>
+                {
+                    b.HasOne("One4All.Core.Reporting.ReportDefinitionRecord", null)
+                        .WithMany()
+                        .HasForeignKey("ReportDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_report_definition_version_report_definition_report_definiti");
                 });
 
             modelBuilder.Entity("One4All.Core.Restaurant.KitchenTicketLine", b =>

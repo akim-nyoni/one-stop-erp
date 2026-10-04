@@ -18,3 +18,16 @@ internal sealed class ReportDefinitionRecordConfiguration : IEntityTypeConfigura
         b.HasIndex(x => new { x.Code, x.Scope, x.CompanyId, x.OwnerUserId }).IsUnique();
     }
 }
+
+internal sealed class ReportDefinitionVersionConfiguration : IEntityTypeConfiguration<ReportDefinitionVersion>
+{
+    public void Configure(EntityTypeBuilder<ReportDefinitionVersion> b)
+    {
+        b.ToTable("report_definition_version", Schemas.Reporting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.DefinitionJson).HasColumnType("jsonb");
+        b.Property(x => x.Note).HasMaxLength(300);
+        b.HasOne<ReportDefinitionRecord>().WithMany().HasForeignKey(x => x.ReportDefinitionId).OnDelete(DeleteBehavior.Cascade);
+        b.HasIndex(x => new { x.ReportDefinitionId, x.Version }).IsUnique();
+    }
+}
