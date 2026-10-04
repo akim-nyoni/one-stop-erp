@@ -2513,6 +2513,60 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.ApplicantNotice", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ApplicantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("applicant_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<int>("NoticeType")
+                        .HasColumnType("integer")
+                        .HasColumnName("notice_type");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<DateOnly>("SentOn")
+                        .HasColumnType("date")
+                        .HasColumnName("sent_on");
+
+                    b.HasKey("Id")
+                        .HasName("pk_applicant_notice");
+
+                    b.HasIndex("ApplicantId", "SentOn")
+                        .HasDatabaseName("ix_applicant_notice_applicant_id_sent_on");
+
+                    b.ToTable("applicant_notice", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.EvictionCase", b =>
                 {
                     b.Property<long>("Id")
@@ -2702,6 +2756,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsVerified")
                         .HasColumnType("boolean")
                         .HasColumnName("is_verified");
+
+                    b.Property<DateOnly?>("LastConfirmedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("last_confirmed_on");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
@@ -3258,6 +3316,83 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_ownership_record_housing_stand_id_sequence");
 
                     b.ToTable("ownership_record", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.RegistrationDateChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ApplicantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("applicant_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DecidedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("decided_by_user_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("NewDate")
+                        .HasColumnType("date")
+                        .HasColumnName("new_date");
+
+                    b.Property<DateOnly>("OldDate")
+                        .HasColumnType("date")
+                        .HasColumnName("old_date");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("RequestedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_registration_date_change");
+
+                    b.HasIndex("ApplicantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_registration_date_change_one_pending")
+                        .HasFilter("status = 0");
+
+                    b.ToTable("registration_date_change", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_registration_date_change_decider", "decided_by_user_id IS NULL OR decided_by_user_id <> requested_by_user_id");
+                        });
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.RentalUnit", b =>
@@ -15906,6 +16041,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_claim_line_claim_expense_claim_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.ApplicantNotice", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingApplicant", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_applicant_notice_housing_applicants_applicant_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.EvictionCase", b =>
                 {
                     b.HasOne("One4All.Core.Housing.Tenancy", null)
@@ -15954,6 +16099,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_ownership_record_housing_stands_housing_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.RegistrationDateChange", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingApplicant", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_registration_date_change_applicant_applicant_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.Repossession", b =>

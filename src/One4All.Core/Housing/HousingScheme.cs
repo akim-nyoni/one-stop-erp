@@ -169,4 +169,33 @@ public sealed class HousingApplicant : SoftDeletableEntity, ICompanyScoped
     /// <summary>Changes where the applicant stands on the list.</summary>
     /// <param name="status">The new status.</param>
     public void SetStatus(ApplicantStatus status) => Status = status;
+
+    /// <summary>When the applicant last confirmed they still want to stay on the list.</summary>
+    public DateOnly? LastConfirmedOn { get; private set; }
+
+    /// <summary>Records a renewal confirmation, putting a suspended applicant back on the list.</summary>
+    /// <param name="date">When.</param>
+    public void Confirm(DateOnly date)
+    {
+        LastConfirmedOn = date;
+        if (Status == ApplicantStatus.Suspended)
+        {
+            Status = ApplicantStatus.Active;
+        }
+    }
+
+    /// <summary>
+    /// Changes the registration date — the date that sets seniority — under an approved dual-authorised change only.
+    /// </summary>
+    /// <param name="change">The approved change.</param>
+    public void ChangeRegistrationDate(RegistrationDateChange change)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        if (change.Status != ChangeRequestStatus.Approved || change.ApplicantId != Id)
+        {
+            throw new InvalidOperationException("Only an approved change for this applicant can move a registration date.");
+        }
+
+        RegistrationDate = change.NewDate;
+    }
 }

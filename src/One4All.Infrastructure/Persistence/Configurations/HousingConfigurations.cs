@@ -289,6 +289,31 @@ internal sealed class UnitInspectionConfiguration : IEntityTypeConfiguration<Uni
     }
 }
 
+internal sealed class RegistrationDateChangeConfiguration : IEntityTypeConfiguration<RegistrationDateChange>
+{
+    public void Configure(EntityTypeBuilder<RegistrationDateChange> b)
+    {
+        b.ToTable("registration_date_change", Schemas.Housing, t => t.HasCheckConstraint("ck_registration_date_change_decider", "decided_by_user_id IS NULL OR decided_by_user_id <> requested_by_user_id"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reason).HasMaxLength(500);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasOne<HousingApplicant>().WithMany().HasForeignKey(x => x.ApplicantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.ApplicantId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_registration_date_change_one_pending");
+    }
+}
+
+internal sealed class ApplicantNoticeConfiguration : IEntityTypeConfiguration<ApplicantNotice>
+{
+    public void Configure(EntityTypeBuilder<ApplicantNotice> b)
+    {
+        b.ToTable("applicant_notice", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.NoticeType).HasConversion<int>();
+        b.HasOne<HousingApplicant>().WithMany().HasForeignKey(x => x.ApplicantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.ApplicantId, x.SentOn });
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

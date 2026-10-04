@@ -967,6 +967,31 @@ app.MapPost("/api/housing/ecl/post", async (One4All.Application.Abstractions.Hou
 .RequireAuthorization()
 .WithName("PostHousingEcl");
 
+app.MapPost("/api/housing/waiting-list/{waitingListNumber}/date-change", async (string waitingListNumber, long companyId, DateOnly newDate, string reason, long userId, One4All.Application.Abstractions.Housing.IWaitingListControlService controls, CancellationToken ct) =>
+    ValueResponse(await controls.RequestDateChangeAsync(companyId, waitingListNumber, newDate, reason, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RequestRegistrationDateChange");
+
+app.MapPost("/api/housing/date-changes/{requestId:long}/decide", async (long requestId, long companyId, bool approve, long userId, One4All.Application.Abstractions.Housing.IWaitingListControlService controls, CancellationToken ct) =>
+    ActionResponse(await controls.DecideDateChangeAsync(companyId, requestId, approve, userId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DecideRegistrationDateChange");
+
+app.MapPost("/api/housing/waiting-list/{waitingListNumber}/confirm", async (string waitingListNumber, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.IWaitingListControlService controls, CancellationToken ct) =>
+    ActionResponse(await controls.ConfirmAsync(companyId, waitingListNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ConfirmWaitingListRenewal");
+
+app.MapPost("/api/housing/waiting-list/renewal-run", async (long companyId, DateOnly asAtDate, int cycleMonths, int graceDays, One4All.Application.Abstractions.Housing.IWaitingListControlService controls, CancellationToken ct) =>
+    Results.Ok(await controls.RunRenewalsAsync(companyId, asAtDate, cycleMonths, graceDays, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RunWaitingListRenewals");
+
+app.MapGet("/api/housing/waiting-list/{waitingListNumber}/notices", async (string waitingListNumber, long companyId, One4All.Application.Abstractions.Housing.IWaitingListControlService controls, CancellationToken ct) =>
+    Results.Ok(await controls.NoticesAsync(companyId, waitingListNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApplicantNotices");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

@@ -95,7 +95,7 @@ public sealed class StandAllocationTests
 
         // The database itself refuses a second live allocation of the accepted stand.
         AllocationRun rogue = new(companyId, $"ROGUE-{companyId}", scheme.Id, HousingCategory.HighDensity, AllocationMethod.Seniority, null, string.Empty, string.Empty, string.Empty, 71);
-        HousingApplicant someone = await db.HousingApplicants.SingleAsync(a => a.WaitingListNumber == newest);
+        HousingApplicant someone = await db.HousingApplicants.SingleAsync(a => a.CompanyId == companyId && a.WaitingListNumber == newest);
         rogue.Add(new StandAllocation(1, first.Id, someone.Id));
         db.Set<AllocationRun>().Add(rogue);
         Func<Task> act = () => db.SaveChangesAsync();
