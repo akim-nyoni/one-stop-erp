@@ -1,0 +1,70 @@
+<Window x:Class="One4All.Desktop.TitlePipelineWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Title Deed Pipeline" Height="620" Width="1060"
+        WindowStartupLocation="CenterOwner" Background="#F4F6F4" FontFamily="Segoe UI">
+    <DockPanel Margin="10">
+        <DockPanel DockPanel.Dock="Top" Margin="6,0,6,6">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="As at" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="#445" />
+                <DatePicker SelectedDate="{Binding AsAt}" Width="130" />
+                <Button Content="Refresh" Padding="14,6" Margin="8,0,0,0" FontWeight="SemiBold" Background="#DDEFE0" Command="{Binding RefreshCommand}" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Title Deed Pipeline" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
+                <TextBlock Text="How long every open title application has been at its stage — conveyancer, registry, custody, hand-over." Foreground="#667" FontSize="12" />
+            </StackPanel>
+        </DockPanel>
+
+        <Border DockPanel.Dock="Bottom" Background="#E8EEE8" Padding="10,5" Margin="6,6,6,0" CornerRadius="4">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#334" FontSize="12" TextWrapping="Wrap" />
+        </Border>
+
+        <!-- Next step for the selected application -->
+        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="8" Margin="6,8,6,0">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Left" Text="Move to" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="#445" />
+                <ComboBox DockPanel.Dock="Left" ItemsSource="{Binding NextStages}" SelectedItem="{Binding NextStage}" Width="170" />
+                <Button DockPanel.Dock="Right" Content="Record step" Padding="14,6" FontWeight="SemiBold" Background="#DDEFE0" Command="{Binding AdvanceCommand}" />
+                <TextBox Text="{Binding Particulars, UpdateSourceTrigger=PropertyChanged}" Margin="8,0" VerticalContentAlignment="Center"
+                         ToolTip="Conveyancer (assigned), the registry's query (query raised), deed number (registered), who signed for it (handed over)." />
+            </DockPanel>
+        </Border>
+
+        <Grid Margin="6,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="360" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="6">
+                <ListView ItemsSource="{Binding Stages}" BorderThickness="0">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Stage" Width="140" DisplayMemberBinding="{Binding Stage}" />
+                            <GridViewColumn Header="Deeds" Width="55" DisplayMemberBinding="{Binding Count}" />
+                            <GridViewColumn Header="Avg days" Width="70" DisplayMemberBinding="{Binding AverageDays}" />
+                            <GridViewColumn Header="Oldest" Width="65" DisplayMemberBinding="{Binding OldestDays}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </Border>
+
+            <Border Grid.Column="2" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="6">
+                <ListView ItemsSource="{Binding Applications}" SelectedItem="{Binding Selected}" BorderThickness="0">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Application" Width="120" DisplayMemberBinding="{Binding ApplicationNumber}" />
+                            <GridViewColumn Header="Stand" Width="90" DisplayMemberBinding="{Binding StandNumber}" />
+                            <GridViewColumn Header="Stage" Width="130" DisplayMemberBinding="{Binding Stage}" />
+                            <GridViewColumn Header="Days at stage" Width="90" DisplayMemberBinding="{Binding DaysAtStage}" />
+                            <GridViewColumn Header="Days since applied" Width="115" DisplayMemberBinding="{Binding DaysSinceApplied}" />
+                            <GridViewColumn Header="Conveyancer" Width="150" DisplayMemberBinding="{Binding Conveyancer}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

@@ -93,6 +93,12 @@ public partial class ShellWindow : Window
         notifications.Show();
     }
 
+    private void OpenTitlePipeline_Click(object sender, RoutedEventArgs e)
+    {
+        TitlePipelineWindow titles = new(_services) { Owner = this };
+        titles.Show();
+    }
+
     private void OpenScheduledJobs_Click(object sender, RoutedEventArgs e)
     {
         ScheduledJobsWindow jobs = new(_services) { Owner = this };
