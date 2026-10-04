@@ -847,6 +847,41 @@ app.MapGet("/api/housing/waiting-list/{numberOrId}", async (string numberOrId, l
 .RequireAuthorization()
 .WithName("WaitingListEnquiry");
 
+app.MapPost("/api/housing/allocation-runs", async (One4All.Application.Abstractions.Housing.AllocationProposal proposal, One4All.Application.Abstractions.Housing.IAllocationService allocations, CancellationToken ct) =>
+    ValueResponse(await allocations.ProposeAsync(proposal, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ProposeAllocationRun");
+
+app.MapPost("/api/housing/allocation-runs/{runNumber}/approve", async (string runNumber, long companyId, long approverUserId, DateOnly date, int offerDays, One4All.Application.Abstractions.Housing.IAllocationService allocations, CancellationToken ct) =>
+    ValueResponse(await allocations.ApproveAsync(companyId, runNumber, approverUserId, date, offerDays, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveAllocationRun");
+
+app.MapPost("/api/housing/allocation-runs/{runNumber}/cancel", async (string runNumber, long companyId, One4All.Application.Abstractions.Housing.IAllocationService allocations, CancellationToken ct) =>
+    ActionResponse(await allocations.CancelAsync(companyId, runNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CancelAllocationRun");
+
+app.MapGet("/api/housing/allocation-runs/{runNumber}/verify", async (string runNumber, long companyId, One4All.Application.Abstractions.Housing.IAllocationService allocations, CancellationToken ct) =>
+    ValueResponse(await allocations.VerifyDrawAsync(companyId, runNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("VerifyAllocationDraw");
+
+app.MapPost("/api/housing/allocations/{certificateNumber}/accept", async (string certificateNumber, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.IAllocationService allocations, CancellationToken ct) =>
+    ActionResponse(await allocations.AcceptAsync(companyId, certificateNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AcceptAllocation");
+
+app.MapPost("/api/housing/allocations/{certificateNumber}/decline", async (string certificateNumber, long companyId, DateOnly date, string reason, One4All.Application.Abstractions.Housing.IAllocationService allocations, CancellationToken ct) =>
+    ActionResponse(await allocations.DeclineAsync(companyId, certificateNumber, date, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DeclineAllocation");
+
+app.MapPost("/api/housing/allocations/lapse-expired", async (long companyId, DateOnly asAtDate, One4All.Application.Abstractions.Housing.IAllocationService allocations, CancellationToken ct) =>
+    Results.Ok(await allocations.LapseExpiredAsync(companyId, asAtDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LapseExpiredAllocations");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

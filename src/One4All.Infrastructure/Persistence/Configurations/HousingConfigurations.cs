@@ -85,6 +85,45 @@ internal sealed class HousingApplicantConfiguration : IEntityTypeConfiguration<H
     }
 }
 
+internal sealed class AllocationRunConfiguration : IEntityTypeConfiguration<AllocationRun>
+{
+    public void Configure(EntityTypeBuilder<AllocationRun> b)
+    {
+        b.ToTable("allocation_run", Schemas.Housing, t => t.HasCheckConstraint("ck_allocation_run_approver", "approved_by_user_id IS NULL OR approved_by_user_id <> proposed_by_user_id"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.RunNumber).HasMaxLength(30);
+        b.Property(x => x.Category).HasConversion<int>();
+        b.Property(x => x.Method).HasConversion<int>();
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.InputCandidates).HasMaxLength(100_000);
+        b.Property(x => x.InputStands).HasMaxLength(100_000);
+        b.Property(x => x.InputHash).HasMaxLength(64);
+        b.HasMany(x => x.Allocations).WithOne().HasForeignKey(x => x.AllocationRunId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Allocations).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.RunNumber }).IsUnique();
+    }
+}
+
+internal sealed class StandAllocationConfiguration : IEntityTypeConfiguration<StandAllocation>
+{
+    public void Configure(EntityTypeBuilder<StandAllocation> b)
+    {
+        b.ToTable("stand_allocation", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.CertificateNumber).HasMaxLength(30);
+        b.Property(x => x.Reason).HasMaxLength(500);
+        b.Ignore(x => x.IsLive);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<HousingApplicant>().WithMany().HasForeignKey(x => x.ApplicantId).OnDelete(DeleteBehavior.Restrict);
+
+        // Hard controls (brief §4.10.4): one live allocation per stand, one per beneficiary, certificates never reused.
+        b.HasIndex(x => x.StandId).IsUnique().HasFilter("status IN (0, 1, 2)").HasDatabaseName("ix_stand_allocation_one_live_per_stand");
+        b.HasIndex(x => x.ApplicantId).IsUnique().HasFilter("status IN (0, 1, 2)").HasDatabaseName("ix_stand_allocation_one_live_per_applicant");
+        b.HasIndex(x => x.CertificateNumber).IsUnique().HasFilter("certificate_number IS NOT NULL");
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

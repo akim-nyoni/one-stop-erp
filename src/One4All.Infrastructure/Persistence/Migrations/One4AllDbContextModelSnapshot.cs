@@ -2411,6 +2411,108 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("asset", "fa");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.AllocationRun", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<DateOnly?>("ApprovedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("approved_on");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("integer")
+                        .HasColumnName("category");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("InputCandidates")
+                        .IsRequired()
+                        .HasMaxLength(100000)
+                        .HasColumnType("character varying(100000)")
+                        .HasColumnName("input_candidates");
+
+                    b.Property<string>("InputHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("input_hash");
+
+                    b.Property<string>("InputStands")
+                        .IsRequired()
+                        .HasMaxLength(100000)
+                        .HasColumnType("character varying(100000)")
+                        .HasColumnName("input_stands");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer")
+                        .HasColumnName("method");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("ProposedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("proposed_by_user_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("RunNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("run_number");
+
+                    b.Property<long>("SchemeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("scheme_id");
+
+                    b.Property<long?>("Seed")
+                        .HasColumnType("bigint")
+                        .HasColumnName("seed");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_allocation_run");
+
+                    b.HasIndex("CompanyId", "RunNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_allocation_run_company_id_run_number");
+
+                    b.ToTable("allocation_run", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_allocation_run_approver", "approved_by_user_id IS NULL OR approved_by_user_id <> proposed_by_user_id");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.HousingApplicant", b =>
                 {
                     b.Property<long>("Id")
@@ -2861,6 +2963,81 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_ownership_record_housing_stand_id_sequence");
 
                     b.ToTable("ownership_record", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandAllocation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AllocationRunId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("allocation_run_id");
+
+                    b.Property<long>("ApplicantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("applicant_id");
+
+                    b.Property<string>("CertificateNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("certificate_number");
+
+                    b.Property<DateOnly?>("DecidedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("decided_on");
+
+                    b.Property<DateOnly?>("OfferExpires")
+                        .HasColumnType("date")
+                        .HasColumnName("offer_expires");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stand_allocation");
+
+                    b.HasIndex("AllocationRunId")
+                        .HasDatabaseName("ix_stand_allocation_allocation_run_id");
+
+                    b.HasIndex("ApplicantId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stand_allocation_one_live_per_applicant")
+                        .HasFilter("status IN (0, 1, 2)");
+
+                    b.HasIndex("CertificateNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stand_allocation_certificate_number")
+                        .HasFilter("certificate_number IS NOT NULL");
+
+                    b.HasIndex("StandId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stand_allocation_one_live_per_stand")
+                        .HasFilter("status IN (0, 1, 2)");
+
+                    b.ToTable("stand_allocation", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.WaitingListPolicy", b =>
@@ -14951,6 +15128,30 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_ownership_record_housing_stands_housing_stand_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.StandAllocation", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.AllocationRun", null)
+                        .WithMany("Allocations")
+                        .HasForeignKey("AllocationRunId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stand_allocation_allocation_run_allocation_run_id");
+
+                    b.HasOne("One4All.Core.Housing.HousingApplicant", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stand_allocation_applicant_applicant_id");
+
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stand_allocation_stand_stand_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.PriceListLine", b =>
                 {
                     b.HasOne("One4All.Core.Inventory.PriceList", null)
@@ -15595,6 +15796,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Expenses.ExpenseClaim", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.AllocationRun", b =>
+                {
+                    b.Navigation("Allocations");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.HousingStand", b =>

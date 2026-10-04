@@ -97,6 +97,18 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
     /// <summary>The tamper-evident chain of ownership, in sequence.</summary>
     public IReadOnlyList<OwnershipRecord> Ownership => _ownership.OrderBy(x => x.Sequence).ToList();
 
+    /// <summary>Marks the stand allocated to a beneficiary under an approved allocation (brief §4.10.4).</summary>
+    public void MarkAllocated() => Status = StandStatus.Allocated;
+
+    /// <summary>Returns an allocated stand to the available pool (the offer was declined or lapsed).</summary>
+    public void ReleaseAllocation()
+    {
+        if (Status == StandStatus.Allocated)
+        {
+            Status = StandStatus.Available;
+        }
+    }
+
     /// <summary>Records the first sale (transfer of control) to a beneficiary.</summary>
     /// <param name="buyerCustomerId">The buyer's account.</param>
     /// <param name="buyerName">The buyer's name.</param>
