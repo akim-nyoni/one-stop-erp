@@ -811,6 +811,39 @@ internal sealed class StandPricingRuleConfiguration : IEntityTypeConfiguration<S
     }
 }
 
+internal sealed class DevelopmentLevyConfiguration : IEntityTypeConfiguration<DevelopmentLevy>
+{
+    public void Configure(EntityTypeBuilder<DevelopmentLevy> b)
+    {
+        b.ToTable("development_levy", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.Trigger).HasConversion<int>();
+        b.Property(x => x.Basis).HasConversion<int>();
+        b.Property(x => x.Rate).HasPrecision(19, 4);
+        b.Property(x => x.IncomeAccountCode).HasMaxLength(20);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class LevyChargeConfiguration : IEntityTypeConfiguration<LevyCharge>
+{
+    public void Configure(EntityTypeBuilder<LevyCharge> b)
+    {
+        b.ToTable("levy_charge", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.EventReference).HasMaxLength(30);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.DocumentNumber).HasMaxLength(30);
+        b.HasOne<DevelopmentLevy>().WithMany().HasForeignKey(x => x.LevyId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+
+        // Each levy is raised once per allocation or transfer.
+        b.HasIndex(x => new { x.LevyId, x.EventReference }).IsUnique();
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

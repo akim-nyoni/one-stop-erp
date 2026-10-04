@@ -1382,6 +1382,26 @@ app.MapGet("/api/housing/pricing/stands/{standId:long}", async (long standId, lo
 .RequireAuthorization()
 .WithName("QuoteStandPrice");
 
+app.MapPost("/api/housing/levies", async (long companyId, string code, string name, One4All.Core.Housing.LevyTrigger trigger, One4All.Core.Housing.LevyBasis basis, decimal rate, string incomeAccountCode, One4All.Application.Abstractions.Housing.IDevelopmentLevyService levies, CancellationToken ct) =>
+    ValueResponse(await levies.DefineAsync(companyId, code, name, trigger, basis, rate, incomeAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DefineDevelopmentLevy");
+
+app.MapPost("/api/housing/levies/{code}/deactivate", async (string code, long companyId, One4All.Application.Abstractions.Housing.IDevelopmentLevyService levies, CancellationToken ct) =>
+    ActionResponse(await levies.DeactivateAsync(companyId, code, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DeactivateDevelopmentLevy");
+
+app.MapPost("/api/housing/levies/allocations/{certificateNumber}", async (string certificateNumber, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.IDevelopmentLevyService levies, CancellationToken ct) =>
+    ValueResponse(await levies.ChargeAllocationAsync(companyId, certificateNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ChargeAllocationLevies");
+
+app.MapPost("/api/housing/levies/transfers/{applicationNumber}", async (string applicationNumber, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.IDevelopmentLevyService levies, CancellationToken ct) =>
+    ValueResponse(await levies.ChargeTransferAsync(companyId, applicationNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ChargeTransferLevies");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
