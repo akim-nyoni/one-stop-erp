@@ -115,7 +115,7 @@ public sealed class HousingService : IHousingService
         List<HousingStand> created = [];
         for (int i = 0; i < stands.Count; i++)
         {
-            HousingStand stand = new(companyId, parcel.Id, schemeId, stands[i].StandNumber, stands[i].SizeSquareMetres, shares[i]);
+            HousingStand stand = new(companyId, parcel.Id, schemeId, stands[i].StandNumber, stands[i].SizeSquareMetres, shares[i], date);
             _db.Set<HousingStand>().Add(stand);
             created.Add(stand);
         }

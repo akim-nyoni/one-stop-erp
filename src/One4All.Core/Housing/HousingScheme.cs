@@ -61,6 +61,9 @@ public sealed class HousingScheme : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>The target beneficiary count.</summary>
     public int TargetBeneficiaries { get; set; }
+
+    /// <summary>The ward the scheme lies in (for the ward housing pack, brief §14 H97).</summary>
+    public string? Ward { get; set; }
 }
 
 /// <summary>

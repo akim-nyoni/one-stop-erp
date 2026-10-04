@@ -70,6 +70,9 @@ public static class HousingReports
              new Column("Approved", "Approved", 130)], []);
 
         // Waiting list.
+        yield return Listing("H17", "Stand Inventory Movement & Reconciliation", "Housing", "Year to date: opening stands + created + repossessed − sold = closing, in units and cost, reconciled to the stands control account.",
+            "HousingStandMovement", [new Column("Line", "Line", 200), new Column("Units", "Units", 60), new Column("Value", "Cost", 110)],
+            [("AsAtDate", ParameterType.Date), ("StandsAccountCode", ParameterType.String)]);
         yield return Listing("H18", "Waiting List Register", "Housing", "Active applicants by category in seniority order with score and position.", "HousingWaitingList",
             [new Column("Category", "Category", 100), new Column("Position", "Pos.", 45), new Column("WaitingListNumber", "WL number", 100), new Column("Name", "Applicant", 170),
              new Column("Registered", "Registered", 80), new Column("Score", "Score", 60)], [("AsAtDate", ParameterType.Date)]);
@@ -140,6 +143,9 @@ public static class HousingReports
              new Column("InterestRebated", "Interest rebated", 100, true)], []);
         yield return Listing("H52", "Expected Credit Loss (IFRS 9) Provision Working", "Housing", "Housing debtors' exposure and provision by portfolio and arrears band, with the allowance booked.", "HousingEcl",
             [new Column("Portfolio", "Portfolio", 140), new Column("Band", "Arrears band", 110), new Column("Exposure", "Exposure", 100), new Column("Provision", "Provision", 100, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H48", "Collections Report", "Housing", "Receipts from housing debtors and tenants in the month, by scheme or tenancy, day, method, currency and officer.",
+            "HousingCollections", [new Column("Scheme", "Scheme / type", 90), new Column("Day", "Day", 75), new Column("Method", "Method", 85), new Column("Currency", "Currency", 55),
+             new Column("Officer", "Officer", 90), new Column("Receipts", "Receipts", 55), new Column("Amount", "Amount", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("H49","Fully Paid / Ready for Transfer", "Housing", "Sold stands whose holders owe nothing and have no title application — the most actionable list.", "HousingReadyForTitle",
             [new Column("Stand", "Stand", 80), new Column("Holder", "Holder", 170), new Column("Status", "Stand status", 90), new Column("SoldOn", "Sold", 80), new Column("Price", "Price", 90, true)], []);
 
@@ -248,8 +254,14 @@ public static class HousingReports
              new Column("Reason", "Reason", 220)], []);
         yield return Listing("H92", "Segregation of Duties Violations — Housing", "Housing", "Users whose permissions combine housing duties that must be separated.", "HousingSodViolations",
             [new Column("User", "User", 120), new Column("Rule", "Rule", 90), new Column("Conflict", "Conflict", 360)], []);
+        yield return Listing("H94", "Housing Revenue Summary", "Housing", "Year to date against the same period last year: stand sales, instalment interest, rentals and recharges, development levies.",
+            "HousingRevenueSummary", [new Column("Stream", "Stream", 180), new Column("PriorYear", "Same period last year", 120), new Column("Change", "Change", 80), new Column("YearToDate", "Year to date", 110, true)],
+            [("AsAtDate", ParameterType.Date)]);
         yield return Listing("H95", "Housing Executive Dashboard", "Housing", "Land bank, stands, waiting list, allocations, titles and debtors at a glance.", "HousingDashboard",
             [new Column("Measure", "Measure", 260), new Column("Value", "Value", 140)], [("AsAtDate", ParameterType.Date)]);
+
+        yield return Listing("H97", "Ward Housing Pack", "Housing", "One ward for its councillor: schemes, stands by status, allocations, beneficiaries, instalment arrears and the council-wide waiting list.",
+            "HousingWardPack", [new Column("Section", "Section", 100), new Column("Item", "Item", 200), new Column("Value", "Value", 160)], [("Ward", ParameterType.String), ("AsAtDate", ParameterType.Date)]);
 
         // Applicant verification, statements and scheme delivery.
         yield return Listing("H21", "Applicant Detail / Verification Sheet", "Housing", "One applicant: every captured detail, notices, date changes and the score derivation — printable for the applicant.",

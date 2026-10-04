@@ -4572,6 +4572,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("target_beneficiaries");
 
+                    b.Property<string>("Ward")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ward");
+
                     b.HasKey("Id")
                         .HasName("pk_scheme");
 

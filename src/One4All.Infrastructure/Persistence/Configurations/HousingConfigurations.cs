@@ -34,6 +34,7 @@ internal sealed class HousingSchemeConfiguration : IEntityTypeConfiguration<Hous
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).HasMaxLength(30);
         b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.Ward).HasMaxLength(40);
         b.Property(x => x.SchemeType).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);

@@ -58,7 +58,8 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
     /// <param name="standNumber">The stand/erf number.</param>
     /// <param name="sizeSquareMetres">The size in square metres.</param>
     /// <param name="allocatedCost">The cost apportioned from the parcel.</param>
-    public HousingStand(long companyId, long landParcelId, long? schemeId, string standNumber, decimal sizeSquareMetres, decimal allocatedCost)
+    /// <param name="createdOn">When the stand was created (the subdivision date; today when not given).</param>
+    public HousingStand(long companyId, long landParcelId, long? schemeId, string standNumber, decimal sizeSquareMetres, decimal allocatedCost, DateOnly? createdOn = null)
     {
         CompanyId = companyId;
         LandParcelId = landParcelId;
@@ -67,7 +68,7 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
         SizeSquareMetres = sizeSquareMetres;
         AllocatedCost = allocatedCost;
         Status = StandStatus.Available;
-        AppendOwnership(OwnershipChangeType.Origination, null, "Municipality/Developer", DateOnly.FromDateTime(DateTime.UtcNow), 0m);
+        AppendOwnership(OwnershipChangeType.Origination, null, "Municipality/Developer", createdOn ?? DateOnly.FromDateTime(DateTime.UtcNow), 0m);
     }
 
     /// <inheritdoc />

@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-215 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+219 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -69,6 +69,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H14 | Servicing Cost Apportionment Schedule | Servicing cost per stand by contract and basis. | — | Stand, Contract, Basis, Date, Journal, Amount | — | Sum(Amount) |
 | H15 | Cost per Stand / Selling Price Build-up | Land and servicing cost, overhead, levy and margin to price, with margin %. | AsAtDate (Date, optional) | Stand, Scope, Cost, Overhead, Levy, Margin, MarginPercent, Price | — | Sum(Price) |
 | H16 | Price List by Scheme & Stand Size Band | Every pricing rule with its scope, effective date, terms and approval — the price change history. | — | Scope, Applies, Effective, Terms, Approved | — | — |
+| H17 | Stand Inventory Movement & Reconciliation | Year to date: opening stands + created + repossessed − sold = closing, in units and cost, reconciled to the stands control account. | AsAtDate (Date, optional), StandsAccountCode (String, optional) | Line, Units, Value | — | — |
 | H18 | Waiting List Register | Active applicants by category in seniority order with score and position. | AsAtDate (Date, optional) | Category, Position, WaitingListNumber, Name, Registered, Score | — | — |
 | H19 | Waiting List Summary | Active applicants by category, income band and age band. | AsAtDate (Date, optional) | Category, IncomeBand, AgeBand, Applicants | — | — |
 | H2 | Land Acquisition Register | Acquisitions by method with counterparty, council resolution, status and cost. | — | Acquisition, Parcel, Method, Counterparty, Resolution, Status, Cost | — | Sum(Cost) |
@@ -100,6 +101,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H44 | Instalment Amortisation Schedule | Each instalment's capital, interest and balance — for one agreement or all. | AgreementNumber (String, optional) | Agreement, Number, Due, Interest, Principal, Balance, State, Amount | — | Sum(Amount) |
 | H45 | Housing Debtors Age Analysis | Instalment-sale debtors aged 30/60/90/120+ by scheme, as at any date. | AsAtDate (Date, optional) | Scheme, Debtor, Current, D30, D60, D90, D120, Over120, Total | — | Sum(Total) |
 | H46 | Instalment Arrears & Default Report | Active instalment sales with overdue instalments, amount owing and last payment. | AsAtDate (Date, optional) | Agreement, Stand, Buyer, Overdue, LastPaid, Owing | — | Sum(Owing) |
+| H48 | Collections Report | Receipts from housing debtors and tenants in the month, by scheme or tenancy, day, method, currency and officer. | AsAtDate (Date, optional) | Scheme, Day, Method, Currency, Officer, Receipts, Amount | — | Sum(Amount) |
 | H49 | Fully Paid / Ready for Transfer | Sold stands whose holders owe nothing and have no title application — the most actionable list. | — | Stand, Holder, Status, SoldOn, Price | — | Sum(Price) |
 | H5 | Compulsory Acquisition Compensation Register | Compensation claims with provision, settlement and status. | — | Claim, Parcel, Claimant, Lodged, Status, Provision, Settled | — | Sum(Settled) |
 | H50 | Early Settlement & Rebate Report | Instalment sales settled early with the interest rebated. | — | Agreement, Stand, Buyer, SettledOn, Rebated, InterestRebated | — | Sum(InterestRebated) |
@@ -146,8 +148,10 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H91 | Allocation & Ownership Change Approval Audit | Who requested and who approved each run, transfer, seniority change, price rule and block lift — turnaround and dual-authorisation exceptions. | — | Area, Reference, RequestedBy, ApprovedBy, Requested, Approved, Days, Exception, Value | — | Sum(Value) |
 | H92 | Segregation of Duties Violations — Housing | Users whose permissions combine housing duties that must be separated. | — | User, Rule, Conflict | — | — |
 | H93 | Manual Override & Exception Report | Seniority dates changed, stand-specific prices, offers without an approved price and blocks lifted — each with the stated reason. | — | Type, Reference, Detail, Date, By, Reason | — | — |
+| H94 | Housing Revenue Summary | Year to date against the same period last year: stand sales, instalment interest, rentals and recharges, development levies. | AsAtDate (Date, optional) | Stream, PriorYear, Change, YearToDate | — | Sum(YearToDate) |
 | H95 | Housing Executive Dashboard | Land bank, stands, waiting list, allocations, titles and debtors at a glance. | AsAtDate (Date, optional) | Measure, Value | — | — |
 | H96 | Housing Delivery / Statutory Return | Stands delivered in the year by density, tenure and beneficiary category. | AsAtDate (Date, optional) | Density, Tenure, Category, Stands | — | — |
+| H97 | Ward Housing Pack | One ward for its councillor: schemes, stands by status, allocations, beneficiaries, instalment arrears and the council-wide waiting list. | Ward (String, optional), AsAtDate (Date, optional) | Section, Item, Value | — | — |
 | HSE-STAND | Housing Stand Register | Stands with status, apportioned cost, selling price and current holder. | — | StandNumber, Status, Holder, AllocatedCost, SellingPrice | — | Sum(SellingPrice) |
 
 ## HumanResources
