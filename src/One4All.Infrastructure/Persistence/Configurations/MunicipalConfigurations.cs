@@ -171,6 +171,33 @@ internal sealed class BillingRunLineConfiguration : IEntityTypeConfiguration<Bil
     }
 }
 
+internal sealed class ReadingRouteConfiguration : IEntityTypeConfiguration<ReadingRoute>
+{
+    public void Configure(EntityTypeBuilder<ReadingRoute> b)
+    {
+        b.ToTable("reading_route", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.ReaderName).HasMaxLength(120);
+        b.HasMany(x => x.Stops).WithOne().HasForeignKey(x => x.ReadingRouteId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Stops).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class ReadingRouteStopConfiguration : IEntityTypeConfiguration<ReadingRouteStop>
+{
+    public void Configure(EntityTypeBuilder<ReadingRouteStop> b)
+    {
+        b.ToTable("reading_route_stop", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.HasOne<Meter>().WithMany().HasForeignKey(x => x.MeterId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.MeterId).IsUnique();
+        b.HasIndex(x => new { x.ReadingRouteId, x.Sequence }).IsUnique();
+    }
+}
+
 internal sealed class IndigentRegistrationConfiguration : IEntityTypeConfiguration<IndigentRegistration>
 {
     public void Configure(EntityTypeBuilder<IndigentRegistration> b)

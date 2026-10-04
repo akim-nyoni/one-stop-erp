@@ -5135,6 +5135,106 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.ReadingRoute", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ReaderName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("reader_name");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reading_route");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_reading_route_company_id_code");
+
+                    b.ToTable("reading_route", "mun");
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.ReadingRouteStop", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("MeterId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("meter_id");
+
+                    b.Property<long>("ReadingRouteId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reading_route_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reading_route_stop");
+
+                    b.HasIndex("MeterId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_reading_route_stop_meter_id");
+
+                    b.HasIndex("ReadingRouteId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("ix_reading_route_stop_reading_route_id_sequence");
+
+                    b.ToTable("reading_route_stop", "mun");
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.ServiceOrder", b =>
                 {
                     b.Property<long>("Id")
@@ -14327,6 +14427,23 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_property_valuation_property_property_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.ReadingRouteStop", b =>
+                {
+                    b.HasOne("One4All.Core.Municipal.Meter", null)
+                        .WithMany()
+                        .HasForeignKey("MeterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_reading_route_stop_meter_meter_id");
+
+                    b.HasOne("One4All.Core.Municipal.ReadingRoute", null)
+                        .WithMany("Stops")
+                        .HasForeignKey("ReadingRouteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_reading_route_stop_reading_route_reading_route_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.TariffBlock", b =>
                 {
                     b.HasOne("One4All.Core.Municipal.Tariff", null)
@@ -14859,6 +14976,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Municipal.Property", b =>
                 {
                     b.Navigation("Services");
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.ReadingRoute", b =>
+                {
+                    b.Navigation("Stops");
                 });
 
             modelBuilder.Entity("One4All.Core.Municipal.Tariff", b =>

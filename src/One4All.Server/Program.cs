@@ -733,6 +733,25 @@ app.MapGet("/api/municipal/properties/{propertyId:long}/enquiry", async (long pr
 .RequireAuthorization()
 .WithName("PropertyEnquiry");
 
+app.MapPost("/api/municipal/reading-routes", async (long companyId, string code, string name, string readerName, IReadOnlyList<long> meterIds, One4All.Application.Abstractions.Municipal.IReadingRouteService routes, CancellationToken ct) =>
+    ValueResponse(await routes.CreateRouteAsync(companyId, code, name, readerName, meterIds, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CreateReadingRoute");
+
+app.MapGet("/api/municipal/reading-routes/{code}/sheet", async (string code, long companyId, One4All.Application.Abstractions.Municipal.IReadingRouteService routes, CancellationToken ct) =>
+    ValueResponse(await routes.RouteSheetAsync(companyId, code, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReadingRouteSheet");
+
+app.MapPost("/api/municipal/readings/import", async (long companyId, HttpRequest http, One4All.Application.Abstractions.Municipal.IReadingRouteService routes, CancellationToken ct) =>
+{
+    using StreamReader reader = new(http.Body);
+    string csv = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+    return Results.Ok(await routes.ImportReadingsAsync(companyId, csv, ct).ConfigureAwait(false));
+})
+.RequireAuthorization()
+.WithName("ImportMeterReadings");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()
