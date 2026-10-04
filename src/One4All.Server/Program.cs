@@ -1137,6 +1137,31 @@ app.MapGet("/api/housing/cooperatives/{code}/stands", async (string code, long c
 .RequireAuthorization()
 .WithName("CooperativeStands");
 
+app.MapPost("/api/housing/agreements", async (One4All.Application.Abstractions.Housing.AgreementDraft draft, One4All.Application.Abstractions.Housing.IAgreementRegisterService agreements, CancellationToken ct) =>
+    ValueResponse(await agreements.DraftAsync(draft, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DraftHousingAgreement");
+
+app.MapPost("/api/housing/agreements/{agreementNumber}/sign", async (string agreementNumber, long companyId, DateOnly date, IReadOnlyList<string> witnesses, One4All.Application.Abstractions.Housing.IAgreementRegisterService agreements, CancellationToken ct) =>
+    ActionResponse(await agreements.SignAsync(companyId, agreementNumber, date, witnesses, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SignHousingAgreement");
+
+app.MapPost("/api/housing/agreements/{agreementNumber}/amend", async (string agreementNumber, long companyId, decimal price, string terms, string? specialConditions, string reason, One4All.Application.Abstractions.Housing.IAgreementRegisterService agreements, CancellationToken ct) =>
+    ValueResponse(await agreements.AmendAsync(companyId, agreementNumber, price, terms, specialConditions, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AmendHousingAgreement");
+
+app.MapGet("/api/housing/agreements/{agreementNumber}/history", async (string agreementNumber, long companyId, One4All.Application.Abstractions.Housing.IAgreementRegisterService agreements, CancellationToken ct) =>
+    ValueResponse(await agreements.HistoryAsync(companyId, agreementNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("HousingAgreementHistory");
+
+app.MapGet("/api/housing/agreements/verify", async (long companyId, One4All.Application.Abstractions.Housing.IAgreementRegisterService agreements, CancellationToken ct) =>
+    Results.Ok(await agreements.VerifyDocumentsAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("VerifyHousingAgreements");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

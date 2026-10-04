@@ -462,6 +462,40 @@ internal sealed class CooperativeStandConfiguration : IEntityTypeConfiguration<C
     }
 }
 
+internal sealed class HousingAgreementConfiguration : IEntityTypeConfiguration<HousingAgreement>
+{
+    public void Configure(EntityTypeBuilder<HousingAgreement> b)
+    {
+        b.ToTable("housing_agreement", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AgreementNumber).HasMaxLength(30);
+        b.Property(x => x.AgreementType).HasConversion<int>();
+        b.Ignore(x => x.Latest);
+        b.Ignore(x => x.InForce);
+        b.HasMany(x => x.Versions).WithOne().HasForeignKey(x => x.HousingAgreementId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Versions).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.AgreementNumber }).IsUnique();
+        b.HasIndex(x => x.StandId);
+    }
+}
+
+internal sealed class AgreementVersionConfiguration : IEntityTypeConfiguration<AgreementVersion>
+{
+    public void Configure(EntityTypeBuilder<AgreementVersion> b)
+    {
+        b.ToTable("agreement_version", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Price).HasPrecision(19, 4);
+        b.Property(x => x.Terms).HasMaxLength(2000);
+        b.Property(x => x.SpecialConditions).HasMaxLength(2000);
+        b.Property(x => x.AmendmentReason).HasMaxLength(500);
+        b.Property(x => x.Document).HasMaxLength(20000);
+        b.Property(x => x.DocumentHash).HasMaxLength(64);
+        b.Property(x => x.Witnesses).HasMaxLength(500);
+        b.HasIndex(x => new { x.HousingAgreementId, x.Version }).IsUnique();
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)
