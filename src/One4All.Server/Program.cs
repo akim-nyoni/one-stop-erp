@@ -1991,6 +1991,21 @@ app.MapGet("/api/system/jobs/{code}/history", async (string code, long companyId
 .RequireAuthorization()
 .WithName("ScheduledJobHistory");
 
+app.MapPost("/api/reports/{code}/run", async (string code, long companyId, One4All.Application.Abstractions.Reporting.ReportFormat format, One4All.Core.Reporting.ReportRunPurpose purpose, Dictionary<string, string>? parameters, ClaimsPrincipal user, One4All.Application.Abstractions.Reporting.IAuditedReportRunner reports, CancellationToken ct) =>
+{
+    long? userId = long.TryParse(user.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long id) ? id : null;
+    Dictionary<string, object?> values = (parameters ?? []).ToDictionary(p => p.Key, p => (object?)(DateOnly.TryParseExact(p.Value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateOnly d) ? d : p.Value), StringComparer.OrdinalIgnoreCase);
+    One4All.Core.Common.Result<One4All.Application.Abstractions.Reporting.AuditedReport> run = await reports.RunAsync(companyId, code, values, format, purpose, userId, ct).ConfigureAwait(false);
+    return run.IsSuccess ? Results.File(run.Value.Document.Content, run.Value.Document.ContentType, run.Value.Document.FileName) : ValueResponse(run);
+})
+.RequireAuthorization()
+.WithName("RunReportAudited");
+
+app.MapGet("/api/reports/{code}/runs", async (string code, long companyId, One4All.Application.Abstractions.Reporting.IAuditedReportRunner reports, CancellationToken ct) =>
+    Results.Ok(await reports.RunLogAsync(companyId, code, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReportRunLog");
+
 app.MapPost("/api/reports/{code}/copy", async (string code, long companyId, long? userId, One4All.Application.Abstractions.Reporting.IReportDefinitionService reports, CancellationToken ct) =>
     ActionResponse(await reports.CopySystemReportAsync(companyId, code, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

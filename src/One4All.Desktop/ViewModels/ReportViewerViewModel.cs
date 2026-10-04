@@ -164,7 +164,7 @@ public sealed partial class ReportViewerViewModel : ObservableObject
         StatusMessage = "Running…";
         try
         {
-            Result<RenderedDocument> result = await RenderAsync(ReportFormat.Html).ConfigureAwait(true);
+            Result<RenderedDocument> result = await RenderAsync(ReportFormat.Html, ReportRunPurpose.View).ConfigureAwait(true);
             if (result.IsFailure)
             {
                 StatusMessage = result.Error.ToString();
@@ -191,17 +191,19 @@ public sealed partial class ReportViewerViewModel : ObservableObject
             return Error.Validation("Report.None", "No report is selected.");
         }
 
-        return await RenderAsync(format).ConfigureAwait(true);
+        return await RenderAsync(format, ReportRunPurpose.Export).ConfigureAwait(true);
     }
 
-    private async Task<Result<RenderedDocument>> RenderAsync(ReportFormat format)
+    // Every preview and export goes through the audited runner, so it is in the report run log (brief §13.3).
+    private async Task<Result<RenderedDocument>> RenderAsync(ReportFormat format, ReportRunPurpose purpose)
     {
         ReportListItem report = SelectedReport!;
         Dictionary<string, object?> parameters = BuildParameters();
 
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
-        IReportRunner runner = scope.ServiceProvider.GetRequiredService<IReportRunner>();
-        return await runner.RenderAsync(_companyId, report.Code, parameters, format).ConfigureAwait(true);
+        IAuditedReportRunner runner = scope.ServiceProvider.GetRequiredService<IAuditedReportRunner>();
+        Result<AuditedReport> run = await runner.RunAsync(_companyId, report.Code, parameters, format, purpose, null).ConfigureAwait(true);
+        return run.IsSuccess ? run.Value.Document : run.Error;
     }
 
     private Dictionary<string, object?> BuildParameters()

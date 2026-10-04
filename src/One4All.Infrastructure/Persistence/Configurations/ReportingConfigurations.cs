@@ -46,6 +46,21 @@ internal sealed class ReportDeliveryConfiguration : IEntityTypeConfiguration<Rep
     }
 }
 
+internal sealed class ReportRunConfiguration : IEntityTypeConfiguration<ReportRun>
+{
+    public void Configure(EntityTypeBuilder<ReportRun> b)
+    {
+        b.ToTable("report_run", Schemas.Reporting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ReportCode).HasMaxLength(60);
+        b.Property(x => x.Purpose).HasConversion<int>();
+        b.Property(x => x.Format).HasMaxLength(10);
+        b.Property(x => x.Parameters).HasMaxLength(2000);
+        b.Property(x => x.ContentHash).HasMaxLength(64);
+        b.HasIndex(x => new { x.CompanyId, x.ReportCode, x.RunAt });
+    }
+}
+
 internal sealed class ReportDefinitionVersionConfiguration : IEntityTypeConfiguration<ReportDefinitionVersion>
 {
     public void Configure(EntityTypeBuilder<ReportDefinitionVersion> b)
