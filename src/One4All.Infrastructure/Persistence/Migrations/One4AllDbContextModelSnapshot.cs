@@ -4674,6 +4674,157 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("land_parcel", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.LayoutPlan", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("LandParcelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("land_parcel_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("PlanNumber")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("plan_number");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_layout_plan");
+
+                    b.HasIndex("LandParcelId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_layout_plan_land_parcel_id");
+
+                    b.HasIndex("CompanyId", "PlanNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_layout_plan_company_id_plan_number");
+
+                    b.ToTable("layout_plan", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.LayoutPlanVersion", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AmendmentReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("amendment_reason");
+
+                    b.Property<string>("ApprovalAuthority")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("approval_authority");
+
+                    b.Property<DateOnly?>("ApprovedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("approved_on");
+
+                    b.Property<int>("Density")
+                        .HasColumnType("integer")
+                        .HasColumnName("density");
+
+                    b.Property<long>("LayoutPlanId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("layout_plan_id");
+
+                    b.Property<string>("Planner")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("planner");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<DateOnly>("SubmittedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("submitted_on");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_layout_plan_version");
+
+                    b.HasIndex("LayoutPlanId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_layout_plan_version_layout_plan_id_version");
+
+                    b.ToTable("layout_plan_version", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.LayoutUseCount", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("LayoutPlanVersionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("layout_plan_version_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Stands")
+                        .HasColumnType("integer")
+                        .HasColumnName("stands");
+
+                    b.Property<int>("Use")
+                        .HasColumnType("integer")
+                        .HasColumnName("use");
+
+                    b.HasKey("Id")
+                        .HasName("pk_layout_use_count");
+
+                    b.HasIndex("LayoutPlanVersionId", "Use")
+                        .IsUnique()
+                        .HasDatabaseName("ix_layout_use_count_layout_plan_version_id_use");
+
+                    b.ToTable("layout_use_count", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.OwnershipRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -18219,6 +18370,36 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_land_acquisition_land_parcels_land_parcel_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.LayoutPlan", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.LandParcel", null)
+                        .WithMany()
+                        .HasForeignKey("LandParcelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_layout_plan_land_parcel_land_parcel_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.LayoutPlanVersion", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.LayoutPlan", null)
+                        .WithMany("Versions")
+                        .HasForeignKey("LayoutPlanId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_layout_plan_version_layout_plan_layout_plan_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.LayoutUseCount", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.LayoutPlanVersion", null)
+                        .WithMany("Uses")
+                        .HasForeignKey("LayoutPlanVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_layout_use_count_layout_plan_version_layout_plan_version_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.OwnershipRecord", b =>
                 {
                     b.HasOne("One4All.Core.Housing.HousingStand", null)
@@ -19083,6 +19264,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Navigation("Checks");
 
                     b.Navigation("Costs");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.LayoutPlan", b =>
+                {
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.LayoutPlanVersion", b =>
+                {
+                    b.Navigation("Uses");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.Tenancy", b =>

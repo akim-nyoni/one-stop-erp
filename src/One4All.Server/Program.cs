@@ -1342,6 +1342,31 @@ app.MapPost("/api/housing/acquisitions/{acquisitionNumber}/abandon", async (stri
 .RequireAuthorization()
 .WithName("AbandonLandAcquisition");
 
+app.MapPost("/api/housing/layouts", async (One4All.Application.Abstractions.Housing.LayoutSubmission submission, One4All.Application.Abstractions.Housing.ILayoutPlanService layouts, CancellationToken ct) =>
+    ActionResponse(await layouts.SubmitAsync(submission, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SubmitLayoutPlan");
+
+app.MapPost("/api/housing/layouts/{planNumber}/approve", async (string planNumber, long companyId, string authority, DateOnly date, One4All.Application.Abstractions.Housing.ILayoutPlanService layouts, CancellationToken ct) =>
+    ActionResponse(await layouts.ApproveAsync(companyId, planNumber, authority, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveLayoutPlan");
+
+app.MapPost("/api/housing/layouts/amend", async (One4All.Application.Abstractions.Housing.LayoutSubmission submission, One4All.Application.Abstractions.Housing.ILayoutPlanService layouts, CancellationToken ct) =>
+    ValueResponse(await layouts.AmendAsync(submission, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AmendLayoutPlan");
+
+app.MapGet("/api/housing/layouts/{planNumber}/history", async (string planNumber, long companyId, One4All.Application.Abstractions.Housing.ILayoutPlanService layouts, CancellationToken ct) =>
+    ValueResponse(await layouts.HistoryAsync(companyId, planNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LayoutPlanHistory");
+
+app.MapGet("/api/housing/layouts/{planNumber}/reconciliation", async (string planNumber, long companyId, One4All.Application.Abstractions.Housing.ILayoutPlanService layouts, CancellationToken ct) =>
+    ValueResponse(await layouts.ReconcileAsync(companyId, planNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReconcileLayoutPlan");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

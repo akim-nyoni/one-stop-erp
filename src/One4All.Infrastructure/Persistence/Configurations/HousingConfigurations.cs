@@ -745,6 +745,52 @@ internal sealed class AcquisitionCostConfiguration : IEntityTypeConfiguration<Ac
     }
 }
 
+internal sealed class LayoutPlanConfiguration : IEntityTypeConfiguration<LayoutPlan>
+{
+    public void Configure(EntityTypeBuilder<LayoutPlan> b)
+    {
+        b.ToTable("layout_plan", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PlanNumber).HasMaxLength(60);
+        b.Ignore(x => x.Latest);
+        b.Ignore(x => x.InForce);
+        b.HasOne<LandParcel>().WithMany().HasForeignKey(x => x.LandParcelId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Versions).WithOne().HasForeignKey(x => x.LayoutPlanId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Versions).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.PlanNumber }).IsUnique();
+
+        // One layout per parcel; changes are versions of it.
+        b.HasIndex(x => x.LandParcelId).IsUnique();
+    }
+}
+
+internal sealed class LayoutPlanVersionConfiguration : IEntityTypeConfiguration<LayoutPlanVersion>
+{
+    public void Configure(EntityTypeBuilder<LayoutPlanVersion> b)
+    {
+        b.ToTable("layout_plan_version", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Planner).HasMaxLength(200);
+        b.Property(x => x.Density).HasConversion<int>();
+        b.Property(x => x.AmendmentReason).HasMaxLength(1000);
+        b.Property(x => x.ApprovalAuthority).HasMaxLength(200);
+        b.HasMany(x => x.Uses).WithOne().HasForeignKey(x => x.LayoutPlanVersionId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Uses).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.LayoutPlanId, x.Version }).IsUnique();
+    }
+}
+
+internal sealed class LayoutUseCountConfiguration : IEntityTypeConfiguration<LayoutUseCount>
+{
+    public void Configure(EntityTypeBuilder<LayoutUseCount> b)
+    {
+        b.ToTable("layout_use_count", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Use).HasConversion<int>();
+        b.HasIndex(x => new { x.LayoutPlanVersionId, x.Use }).IsUnique();
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)
