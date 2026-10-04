@@ -5584,6 +5584,50 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("tariff_block", "mun");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.TariffSeason", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("FromMonth")
+                        .HasColumnType("integer")
+                        .HasColumnName("from_month");
+
+                    b.Property<decimal>("PerUnitRate")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("per_unit_rate");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("TariffId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tariff_id");
+
+                    b.Property<int>("ToMonth")
+                        .HasColumnType("integer")
+                        .HasColumnName("to_month");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tariff_season");
+
+                    b.HasIndex("TariffId")
+                        .HasDatabaseName("ix_tariff_season_tariff_id");
+
+                    b.ToTable("tariff_season", "mun", t =>
+                        {
+                            t.HasCheckConstraint("ck_tariff_season_months", "from_month BETWEEN 1 AND 12 AND to_month BETWEEN 1 AND 12");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.ValuationObjection", b =>
                 {
                     b.Property<long>("Id")
@@ -14570,6 +14614,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tariff_block_tariffs_tariff_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.TariffSeason", b =>
+                {
+                    b.HasOne("One4All.Core.Municipal.Tariff", null)
+                        .WithMany("Seasons")
+                        .HasForeignKey("TariffId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tariff_season_tariffs_tariff_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.ValuationObjection", b =>
                 {
                     b.HasOne("One4All.Core.Municipal.PropertyValuation", null)
@@ -15102,6 +15156,8 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Municipal.Tariff", b =>
                 {
                     b.Navigation("Blocks");
+
+                    b.Navigation("Seasons");
                 });
 
             modelBuilder.Entity("One4All.Core.Payroll.Employee", b =>

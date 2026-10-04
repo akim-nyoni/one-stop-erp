@@ -40,7 +40,7 @@ internal static class TariffVersions
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The versions.</returns>
     public static Task<List<Tariff>> LoadAsync(One4AllDbContext db, Tariff linked, CancellationToken ct)
-        => db.Set<Tariff>().Include(t => t.Blocks).AsNoTracking()
+        => db.Set<Tariff>().Include(t => t.Blocks).Include(t => t.Seasons).AsNoTracking()
             .Where(t => t.CompanyId == linked.CompanyId && t.Code == linked.Code && t.IsActive)
             .OrderBy(t => t.EffectiveFrom).ToListAsync(ct);
 
@@ -286,7 +286,7 @@ public sealed class ValuationRollService : IValuationRollService
 
         PropertyServiceLink? rates = property.Services.FirstOrDefault(s => s.ServiceType == ServiceType.Rates && s.IsActive);
         Tariff? tariff = rates is null ? null
-            : await _db.Set<Tariff>().Include(t => t.Blocks).AsNoTracking().FirstOrDefaultAsync(t => t.Id == rates.TariffId, ct).ConfigureAwait(false);
+            : await _db.Set<Tariff>().Include(t => t.Blocks).Include(t => t.Seasons).AsNoTracking().FirstOrDefaultAsync(t => t.Id == rates.TariffId, ct).ConfigureAwait(false);
         if (tariff is null)
         {
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);

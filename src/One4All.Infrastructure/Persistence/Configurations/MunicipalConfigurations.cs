@@ -246,6 +246,8 @@ internal sealed class TariffConfiguration : IEntityTypeConfiguration<Tariff>
         b.Property(x => x.Ward).HasMaxLength(60);
         b.HasMany(x => x.Blocks).WithOne().HasForeignKey(x => x.TariffId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Blocks).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasMany(x => x.Seasons).WithOne().HasForeignKey(x => x.TariffId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Seasons).UsePropertyAccessMode(PropertyAccessMode.Field);
         // A tariff code has effective-dated versions: one per code and effective date.
         b.HasIndex(x => new { x.CompanyId, x.Code, x.EffectiveFrom }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);
@@ -261,6 +263,16 @@ internal sealed class TariffBlockConfiguration : IEntityTypeConfiguration<Tariff
         b.Property(x => x.FromUnit).HasPrecision(19, 4);
         b.Property(x => x.ToUnit).HasPrecision(19, 4);
         b.Property(x => x.Rate).HasPrecision(19, 6);
+    }
+}
+
+internal sealed class TariffSeasonConfiguration : IEntityTypeConfiguration<TariffSeason>
+{
+    public void Configure(EntityTypeBuilder<TariffSeason> b)
+    {
+        b.ToTable("tariff_season", Schemas.Municipal, t => t.HasCheckConstraint("ck_tariff_season_months", "from_month BETWEEN 1 AND 12 AND to_month BETWEEN 1 AND 12"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PerUnitRate).HasPrecision(19, 6);
     }
 }
 

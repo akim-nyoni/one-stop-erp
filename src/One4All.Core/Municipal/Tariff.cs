@@ -56,6 +56,7 @@ public enum TariffType
 public sealed class Tariff : SoftDeletableEntity, ICompanyScoped
 {
     private readonly List<TariffBlock> _blocks = [];
+    private readonly List<TariffSeason> _seasons = [];
 
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private Tariff()
@@ -145,6 +146,43 @@ public sealed class Tariff : SoftDeletableEntity, ICompanyScoped
         return block;
     }
 
+    /// <summary>The seasonal per-unit rates (brief §4.9: seasonal rates), each covering a range of months.</summary>
+    public IReadOnlyList<TariffSeason> Seasons => _seasons.AsReadOnly();
+
+    /// <summary>
+    /// Adds a seasonal per-unit rate covering the months from <paramref name="fromMonth"/> to <paramref name="toMonth"/>
+    /// inclusive. A range wraps the year when the first month is after the last (for example November to February).
+    /// </summary>
+    /// <param name="fromMonth">The first month (1–12).</param>
+    /// <param name="toMonth">The last month (1–12).</param>
+    /// <param name="perUnitRate">The per-unit rate in that season.</param>
+    /// <returns>The created season.</returns>
+    public TariffSeason AddSeason(int fromMonth, int toMonth, decimal perUnitRate)
+    {
+        TariffSeason season = new(fromMonth, toMonth, perUnitRate);
+        _seasons.Add(season);
+        return season;
+    }
+
+    /// <summary>The per-unit rate for a month: a covering season's rate, or the standard rate when none covers it.</summary>
+    /// <param name="month">The month (1–12).</param>
+    /// <returns>The rate.</returns>
+    public decimal PerUnitRateFor(int month)
+    {
+        foreach (TariffSeason season in _seasons)
+        {
+            bool covers = season.FromMonth <= season.ToMonth
+                ? month >= season.FromMonth && month <= season.ToMonth
+                : month >= season.FromMonth || month <= season.ToMonth; // wraps the year end
+            if (covers)
+            {
+                return season.PerUnitRate;
+            }
+        }
+
+        return PerUnitRate;
+    }
+
     /// <summary>
     /// Calculates the charge for a billing period given the metered <paramref name="consumption"/> and the
     /// property <paramref name="valuation"/>, applying the minimum charge as a floor.
@@ -162,12 +200,24 @@ public sealed class Tariff : SoftDeletableEntity, ICompanyScoped
     /// <param name="valuation">The property valuation (for rate-per-valuation tariffs).</param>
     /// <param name="areaSquareMetres">The stand's area (for area-based tariffs).</param>
     /// <returns>The computed charge.</returns>
-    public decimal CalculateCharge(decimal consumption, decimal valuation, decimal areaSquareMetres)
+    public decimal CalculateCharge(decimal consumption, decimal valuation, decimal areaSquareMetres) => CalculateCharge(consumption, valuation, areaSquareMetres, null);
+
+    /// <summary>
+    /// Calculates the charge, using the per-unit rate for <paramref name="billMonth"/> when the tariff has seasonal
+    /// rates (brief §4.9). Applies the minimum charge as a floor.
+    /// </summary>
+    /// <param name="consumption">The consumption (e.g. m³ of water); ignored for flat/valuation/area tariffs.</param>
+    /// <param name="valuation">The property valuation (for rate-per-valuation tariffs).</param>
+    /// <param name="areaSquareMetres">The stand's area (for area-based tariffs).</param>
+    /// <param name="billMonth">The billing month (1–12) for seasonal rates, or null to use the standard rate.</param>
+    /// <returns>The computed charge.</returns>
+    public decimal CalculateCharge(decimal consumption, decimal valuation, decimal areaSquareMetres, int? billMonth)
     {
+        decimal perUnit = billMonth is int month ? PerUnitRateFor(month) : PerUnitRate;
         decimal charge = TariffType switch
         {
             TariffType.Flat => FixedCharge,
-            TariffType.PerUnit => FixedCharge + consumption * PerUnitRate,
+            TariffType.PerUnit => FixedCharge + consumption * perUnit,
             TariffType.RatePerValuation => FixedCharge + valuation * RatePerValuationCents / 100m,
             TariffType.AreaBased => FixedCharge + areaSquareMetres * RatePerSquareMetre,
             TariffType.Stepped => FixedCharge + SteppedCharge(consumption),
@@ -227,4 +277,44 @@ public sealed class TariffBlock : Entity
 
     /// <summary>The per-unit rate in the block.</summary>
     public decimal Rate { get; private set; }
+}
+
+/// <summary>
+/// A seasonal per-unit rate on a tariff (<c>mun.tariff_season</c>, brief §4.9 seasonal rates): the per-unit rate that
+/// applies for the months from <see cref="FromMonth"/> to <see cref="ToMonth"/> inclusive, wrapping the year end when
+/// the first month is after the last.
+/// </summary>
+public sealed class TariffSeason : Entity
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private TariffSeason()
+    {
+    }
+
+    /// <summary>Creates a season.</summary>
+    /// <param name="fromMonth">The first month (1–12).</param>
+    /// <param name="toMonth">The last month (1–12).</param>
+    /// <param name="perUnitRate">The per-unit rate in that season.</param>
+    public TariffSeason(int fromMonth, int toMonth, decimal perUnitRate)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(fromMonth, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(fromMonth, 12);
+        ArgumentOutOfRangeException.ThrowIfLessThan(toMonth, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(toMonth, 12);
+        FromMonth = fromMonth;
+        ToMonth = toMonth;
+        PerUnitRate = perUnitRate;
+    }
+
+    /// <summary>The owning tariff id.</summary>
+    public long TariffId { get; private set; }
+
+    /// <summary>The first month (1–12).</summary>
+    public int FromMonth { get; private set; }
+
+    /// <summary>The last month (1–12).</summary>
+    public int ToMonth { get; private set; }
+
+    /// <summary>The per-unit rate in that season.</summary>
+    public decimal PerUnitRate { get; private set; }
 }

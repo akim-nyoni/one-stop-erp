@@ -82,7 +82,7 @@ internal static class MunicipalCharges
             return Error.Rule("Mun.ServiceNotLinked", $"Property {property.StandNumber} has no active {serviceType} service.");
         }
 
-        Tariff? linked = await db.Set<Tariff>().Include(t => t.Blocks)
+        Tariff? linked = await db.Set<Tariff>().Include(t => t.Blocks).Include(t => t.Seasons)
             .FirstOrDefaultAsync(t => t.Id == link.TariffId && t.CompanyId == companyId, ct).ConfigureAwait(false);
         if (linked is null)
         {
@@ -94,7 +94,7 @@ internal static class MunicipalCharges
 
         // The value in force on the bill date, from the valuation roll (the register value when there is no history).
         decimal valuation = ValuationRoll.ValueAt(await ValuationHistory.LoadAsync(db, property.Id, ct).ConfigureAwait(false), date, property.Valuation);
-        decimal charge = ProRata.Apply(tariff.CalculateCharge(consumption, valuation, property.SizeSquareMetres), fraction);
+        decimal charge = ProRata.Apply(tariff.CalculateCharge(consumption, valuation, property.SizeSquareMetres, date.Month), fraction);
         if (charge <= 0m)
         {
             return Error.Rule("Mun.NothingToBill", $"Computed charge for {serviceType} on {property.StandNumber} is zero.");
