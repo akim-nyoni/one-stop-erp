@@ -1017,6 +1017,36 @@ app.MapGet("/api/housing/appeals", async (long companyId, One4All.Application.Ab
 .RequireAuthorization()
 .WithName("AllocationAppealsRegister");
 
+app.MapPost("/api/housing/covenants", async (long companyId, long standId, long holderCustomerId, DateOnly startDate, int years, One4All.Application.Abstractions.Housing.IDevelopmentCovenantService covenants, CancellationToken ct) =>
+    ValueResponse(await covenants.CreateAsync(companyId, standId, holderCustomerId, startDate, years, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CreateDevelopmentCovenant");
+
+app.MapPost("/api/housing/covenants/{covenantNumber}/milestones", async (string covenantNumber, long companyId, One4All.Core.Housing.CovenantMilestone milestone, DateOnly date, string? reference, One4All.Application.Abstractions.Housing.IDevelopmentCovenantService covenants, CancellationToken ct) =>
+    ActionResponse(await covenants.RecordMilestoneAsync(companyId, covenantNumber, milestone, date, reference, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordCovenantMilestone");
+
+app.MapPost("/api/housing/covenants/{covenantNumber}/extend", async (string covenantNumber, long companyId, int months, DateOnly date, decimal fee, string? feeAccountCode, One4All.Application.Abstractions.Housing.IDevelopmentCovenantService covenants, CancellationToken ct) =>
+    ValueResponse(await covenants.GrantExtensionAsync(companyId, covenantNumber, months, date, fee, feeAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ExtendDevelopmentCovenant");
+
+app.MapPost("/api/housing/covenants/breach-run", async (long companyId, DateOnly asAtDate, decimal penaltyLevy, string levyAccountCode, One4All.Application.Abstractions.Housing.IDevelopmentCovenantService covenants, CancellationToken ct) =>
+    ValueResponse(await covenants.RunBreachesAsync(companyId, asAtDate, penaltyLevy, levyAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RunCovenantBreaches");
+
+app.MapPost("/api/housing/covenants/{covenantNumber}/notice", async (string covenantNumber, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.IDevelopmentCovenantService covenants, CancellationToken ct) =>
+    ActionResponse(await covenants.IssueNoticeAsync(companyId, covenantNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("IssueCovenantNotice");
+
+app.MapGet("/api/housing/covenants", async (long companyId, One4All.Application.Abstractions.Housing.IDevelopmentCovenantService covenants, CancellationToken ct) =>
+    Results.Ok(await covenants.RegisterAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DevelopmentCovenantRegister");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

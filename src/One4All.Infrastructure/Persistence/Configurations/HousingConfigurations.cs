@@ -332,6 +332,36 @@ internal sealed class AllocationAppealConfiguration : IEntityTypeConfiguration<A
     }
 }
 
+internal sealed class DevelopmentCovenantConfiguration : IEntityTypeConfiguration<DevelopmentCovenant>
+{
+    public void Configure(EntityTypeBuilder<DevelopmentCovenant> b)
+    {
+        b.ToTable("development_covenant", Schemas.Housing, t => t.HasCheckConstraint("ck_development_covenant_deadline", "deadline >= start_date"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.CovenantNumber).HasMaxLength(30);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Ignore(x => x.Latest);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Steps).WithOne().HasForeignKey(x => x.DevelopmentCovenantId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Steps).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.CovenantNumber }).IsUnique();
+        b.HasIndex(x => x.StandId).IsUnique().HasFilter("status <> 1").HasDatabaseName("ix_development_covenant_one_live_per_stand");
+        b.HasIndex(x => new { x.CompanyId, x.Status, x.Deadline });
+    }
+}
+
+internal sealed class CovenantStepConfiguration : IEntityTypeConfiguration<CovenantStep>
+{
+    public void Configure(EntityTypeBuilder<CovenantStep> b)
+    {
+        b.ToTable("covenant_step", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Milestone).HasConversion<int>();
+        b.Property(x => x.Reference).HasMaxLength(120);
+        b.HasIndex(x => new { x.DevelopmentCovenantId, x.Milestone }).IsUnique();
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

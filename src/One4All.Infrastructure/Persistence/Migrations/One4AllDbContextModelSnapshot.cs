@@ -2663,6 +2663,138 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("applicant_notice", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.CovenantStep", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long>("DevelopmentCovenantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("development_covenant_id");
+
+                    b.Property<int>("Milestone")
+                        .HasColumnType("integer")
+                        .HasColumnName("milestone");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_covenant_step");
+
+                    b.HasIndex("DevelopmentCovenantId", "Milestone")
+                        .IsUnique()
+                        .HasDatabaseName("ix_covenant_step_development_covenant_id_milestone");
+
+                    b.ToTable("covenant_step", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.DevelopmentCovenant", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly?>("BreachedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("breached_on");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("CovenantNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("covenant_number");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Deadline")
+                        .HasColumnType("date")
+                        .HasColumnName("deadline");
+
+                    b.Property<int>("Extensions")
+                        .HasColumnType("integer")
+                        .HasColumnName("extensions");
+
+                    b.Property<long>("HolderCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("holder_customer_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly?>("NoticeIssuedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("notice_issued_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_development_covenant");
+
+                    b.HasIndex("StandId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_development_covenant_one_live_per_stand")
+                        .HasFilter("status <> 1");
+
+                    b.HasIndex("CompanyId", "CovenantNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_development_covenant_company_id_covenant_number");
+
+                    b.HasIndex("CompanyId", "Status", "Deadline")
+                        .HasDatabaseName("ix_development_covenant_company_id_status_deadline");
+
+                    b.ToTable("development_covenant", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_development_covenant_deadline", "deadline >= start_date");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.EvictionCase", b =>
                 {
                     b.Property<long>("Id")
@@ -16168,6 +16300,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_applicant_notice_housing_applicants_applicant_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.CovenantStep", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.DevelopmentCovenant", null)
+                        .WithMany("Steps")
+                        .HasForeignKey("DevelopmentCovenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_covenant_step_development_covenant_development_covenant_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.DevelopmentCovenant", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_development_covenant_housing_stands_stand_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.EvictionCase", b =>
                 {
                     b.HasOne("One4All.Core.Housing.Tenancy", null)
@@ -16958,6 +17110,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Housing.AllocationRun", b =>
                 {
                     b.Navigation("Allocations");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.DevelopmentCovenant", b =>
+                {
+                    b.Navigation("Steps");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.EvictionCase", b =>
