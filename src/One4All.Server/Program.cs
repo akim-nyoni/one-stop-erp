@@ -1257,6 +1257,21 @@ app.MapGet("/api/housing/stands/blocked", async (long companyId, One4All.Applica
 .RequireAuthorization()
 .WithName("BlockedStands");
 
+app.MapPost("/api/housing/titles", async (long companyId, long standId, DateOnly date, One4All.Application.Abstractions.Housing.ITitleDeedService titles, CancellationToken ct) =>
+    ValueResponse(await titles.ApplyAsync(companyId, standId, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApplyForTitle");
+
+app.MapPost("/api/housing/titles/{applicationNumber}/advance", async (string applicationNumber, long companyId, One4All.Application.Abstractions.Housing.TitleStepInput step, One4All.Application.Abstractions.Housing.ITitleDeedService titles, CancellationToken ct) =>
+    ActionResponse(await titles.AdvanceAsync(companyId, applicationNumber, step, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AdvanceTitle");
+
+app.MapGet("/api/housing/titles/pipeline", async (long companyId, DateOnly asAt, One4All.Application.Abstractions.Housing.ITitleDeedService titles, CancellationToken ct) =>
+    Results.Ok(await titles.PipelineAsync(companyId, asAt, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("TitlePipeline");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

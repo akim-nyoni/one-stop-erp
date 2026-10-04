@@ -5189,6 +5189,137 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.TitleDeed", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ApplicationNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("application_number");
+
+                    b.Property<DateOnly>("AppliedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("applied_on");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Conveyancer")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("conveyancer");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("DeedNumber")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("deed_number");
+
+                    b.Property<long>("HolderCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("holder_customer_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("ReceivedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("received_by");
+
+                    b.Property<DateOnly?>("RegisteredOn")
+                        .HasColumnType("date")
+                        .HasColumnName("registered_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage");
+
+                    b.Property<DateOnly>("StageSince")
+                        .HasColumnType("date")
+                        .HasColumnName("stage_since");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_title_deed");
+
+                    b.HasIndex("StandId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_title_deed_stand_id");
+
+                    b.HasIndex("CompanyId", "ApplicationNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_title_deed_company_id_application_number");
+
+                    b.ToTable("title_deed", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.TitleDeedStep", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("note");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage");
+
+                    b.Property<long>("TitleDeedId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("title_deed_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_title_deed_step");
+
+                    b.HasIndex("TitleDeedId")
+                        .HasDatabaseName("ix_title_deed_step_title_deed_id");
+
+                    b.ToTable("title_deed_step", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.UnitInspection", b =>
                 {
                     b.Property<long>("Id")
@@ -17759,6 +17890,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenancy_rent_change_tenancy_tenancy_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.TitleDeed", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_title_deed_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.TitleDeedStep", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.TitleDeed", null)
+                        .WithMany("Steps")
+                        .HasForeignKey("TitleDeedId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_title_deed_step_title_deed_title_deed_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.UnitInspection", b =>
                 {
                     b.HasOne("One4All.Core.Housing.RentalUnit", null)
@@ -18470,6 +18621,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Housing.Tenancy", b =>
                 {
                     b.Navigation("RentChanges");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.TitleDeed", b =>
+                {
+                    b.Navigation("Steps");
                 });
 
             modelBuilder.Entity("One4All.Core.Inventory.PriceList", b =>

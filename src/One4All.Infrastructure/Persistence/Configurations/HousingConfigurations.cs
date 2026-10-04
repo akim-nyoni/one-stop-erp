@@ -612,6 +612,40 @@ internal sealed class StandBlockConfiguration : IEntityTypeConfiguration<StandBl
     }
 }
 
+internal sealed class TitleDeedConfiguration : IEntityTypeConfiguration<TitleDeed>
+{
+    public void Configure(EntityTypeBuilder<TitleDeed> b)
+    {
+        b.ToTable("title_deed", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ApplicationNumber).HasMaxLength(30);
+        b.Property(x => x.Stage).HasConversion<int>();
+        b.Property(x => x.Conveyancer).HasMaxLength(200);
+        b.Property(x => x.DeedNumber).HasMaxLength(60);
+        b.Property(x => x.ReceivedBy).HasMaxLength(200);
+        b.Ignore(x => x.IsClosed);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Steps).WithOne().HasForeignKey(x => x.TitleDeedId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Steps).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.ApplicationNumber }).IsUnique();
+
+        // Title is applied for once per stand.
+        b.HasIndex(x => x.StandId).IsUnique();
+    }
+}
+
+internal sealed class TitleDeedStepConfiguration : IEntityTypeConfiguration<TitleDeedStep>
+{
+    public void Configure(EntityTypeBuilder<TitleDeedStep> b)
+    {
+        b.ToTable("title_deed_step", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Stage).HasConversion<int>();
+        b.Property(x => x.Note).HasMaxLength(1000);
+        b.HasIndex(x => x.TitleDeedId);
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)
