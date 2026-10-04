@@ -1237,6 +1237,26 @@ app.MapPost("/api/housing/developer-agreements/{agreementNumber}/penalties", asy
 .RequireAuthorization()
 .WithName("ChargeDeveloperPenalties");
 
+app.MapPost("/api/housing/stands/{standId:long}/block", async (long standId, long companyId, One4All.Core.Housing.BlockReason reason, string detail, string documentReference, long userId, DateOnly date, One4All.Application.Abstractions.Housing.IStandBlockService blocks, CancellationToken ct) =>
+    ActionResponse(await blocks.PlaceAsync(companyId, standId, reason, detail, documentReference, userId, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("BlockStand");
+
+app.MapPost("/api/housing/stands/{standId:long}/block/lift", async (long standId, long companyId, string reason, string documentReference, long userId, DateOnly date, One4All.Application.Abstractions.Housing.IStandBlockService blocks, CancellationToken ct) =>
+    ActionResponse(await blocks.LiftAsync(companyId, standId, reason, documentReference, userId, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LiftStandBlock");
+
+app.MapGet("/api/housing/stands/{standId:long}/blocks", async (long standId, long companyId, One4All.Application.Abstractions.Housing.IStandBlockService blocks, CancellationToken ct) =>
+    Results.Ok(await blocks.HistoryAsync(companyId, standId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("StandBlockHistory");
+
+app.MapGet("/api/housing/stands/blocked", async (long companyId, One4All.Application.Abstractions.Housing.IStandBlockService blocks, CancellationToken ct) =>
+    Results.Ok(await blocks.InForceAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("BlockedStands");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

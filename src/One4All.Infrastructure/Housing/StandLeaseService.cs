@@ -49,6 +49,11 @@ public sealed class StandLeaseService : IStandLeaseService
             return Error.NotFound("Hse.StandNotFound", $"Stand {request.StandId} not found.");
         }
 
+        if (await StandClaims.AnyBlockedAsync(_db, [request.StandId], ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Hse.StandBlocked", "The stand is blocked by a caveat and cannot be leased.");
+        }
+
         if (!await _db.Customers.AnyAsync(c => c.Id == request.LesseeCustomerId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false))
         {
             return Error.NotFound("Hse.LesseeNotFound", $"Customer {request.LesseeCustomerId} not found.");

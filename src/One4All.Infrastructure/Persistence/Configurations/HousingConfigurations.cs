@@ -594,6 +594,24 @@ internal sealed class DeliveryMilestoneConfiguration : IEntityTypeConfiguration<
     }
 }
 
+internal sealed class StandBlockConfiguration : IEntityTypeConfiguration<StandBlock>
+{
+    public void Configure(EntityTypeBuilder<StandBlock> b)
+    {
+        b.ToTable("stand_block", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reason).HasConversion<int>();
+        b.Property(x => x.Detail).HasMaxLength(1000);
+        b.Property(x => x.DocumentReference).HasMaxLength(100);
+        b.Property(x => x.LiftReason).HasMaxLength(1000);
+        b.Property(x => x.LiftDocumentReference).HasMaxLength(100);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+
+        // One block in force per stand.
+        b.HasIndex(x => x.StandId).IsUnique().HasFilter("lifted_on IS NULL");
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

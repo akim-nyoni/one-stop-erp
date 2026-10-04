@@ -164,6 +164,11 @@ public sealed class HousingService : IHousingService
             return Error.Rule("Housing.AlreadySold", $"Stand {stand.StandNumber} has already been sold or transferred.");
         }
 
+        if (await StandClaims.AnyBlockedAsync(_db, [standId], ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Housing.StandBlocked", $"Stand {stand.StandNumber} is blocked by a caveat and cannot be sold.");
+        }
+
         Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         if (company is null)
         {
@@ -229,6 +234,11 @@ public sealed class HousingService : IHousingService
         if (stand is null)
         {
             return Result.Failure(Error.NotFound("Housing.StandNotFound", $"Stand {standId} not found."));
+        }
+
+        if (await StandClaims.AnyBlockedAsync(_db, [standId], ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.Rule("Housing.StandBlocked", $"Stand {stand.StandNumber} is blocked by a caveat and cannot be transferred."));
         }
 
         if (!housingAccountClear)

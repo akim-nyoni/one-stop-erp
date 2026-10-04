@@ -4863,6 +4863,96 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("stand_allocation", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.StandBlock", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Detail")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("detail");
+
+                    b.Property<string>("DocumentReference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("document_reference");
+
+                    b.Property<string>("LiftDocumentReference")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("lift_document_reference");
+
+                    b.Property<string>("LiftReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("lift_reason");
+
+                    b.Property<long?>("LiftedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("lifted_by_user_id");
+
+                    b.Property<DateOnly?>("LiftedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("lifted_on");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("PlacedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("placed_by_user_id");
+
+                    b.Property<DateOnly>("PlacedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("placed_on");
+
+                    b.Property<int>("Reason")
+                        .HasColumnType("integer")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stand_block");
+
+                    b.HasIndex("StandId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stand_block_stand_id")
+                        .HasFilter("lifted_on IS NULL");
+
+                    b.ToTable("stand_block", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.StandLease", b =>
                 {
                     b.Property<long>("Id")
@@ -17627,6 +17717,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_stand_allocation_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandBlock", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stand_block_stand_stand_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.StandLease", b =>

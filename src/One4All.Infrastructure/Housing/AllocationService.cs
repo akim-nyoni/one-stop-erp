@@ -44,6 +44,7 @@ public sealed class AllocationService : IAllocationService
         }
 
         List<long> liveStands = await _db.Set<StandAllocation>().Where(a => Live.Contains(a.Status)).Select(a => a.StandId).ToListAsync(ct).ConfigureAwait(false);
+        liveStands.AddRange(await _db.Set<StandBlock>().Where(b => b.CompanyId == proposal.CompanyId && b.LiftedOn == null).Select(b => b.StandId).ToListAsync(ct).ConfigureAwait(false));
         List<long> liveApplicants = await _db.Set<StandAllocation>().Where(a => Live.Contains(a.Status)).Select(a => a.ApplicantId).ToListAsync(ct).ConfigureAwait(false);
         var stands = await _db.Set<HousingStand>().AsNoTracking()
             .Where(s => s.CompanyId == proposal.CompanyId && s.SchemeId == proposal.SchemeId && s.Status == StandStatus.Available && !liveStands.Contains(s.Id))
@@ -131,6 +132,11 @@ public sealed class AllocationService : IAllocationService
         if (gone is not null)
         {
             return Error.Conflict("Hse.StandUnavailable", $"Stand {gone.StandNumber} is no longer available; cancel the run and propose again.");
+        }
+
+        if (await StandClaims.AnyBlockedAsync(_db, standIds, ct).ConfigureAwait(false))
+        {
+            return Error.Conflict("Hse.StandBlocked", "A stand in the run has since been blocked; cancel the run and propose again.");
         }
 
         foreach (StandAllocation allocation in run.Allocations.OrderBy(a => a.Sequence))
