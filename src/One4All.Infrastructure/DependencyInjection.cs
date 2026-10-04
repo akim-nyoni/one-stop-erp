@@ -85,6 +85,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Municipal.IReadingRouteService, Municipal.ReadingRouteService>();
         services.AddScoped<Application.Abstractions.Municipal.IServiceDepositService, Municipal.ServiceDepositService>();
         services.AddScoped<Application.Abstractions.Municipal.ITariffCatalogueService, Municipal.TariffCatalogueService>();
+        services.AddScoped<Application.Abstractions.Municipal.IFacilityBookingService, Municipal.FacilityBookingService>();
         if (!services.Any(d => d.ServiceType == typeof(Application.Municipal.IPrepaidTokenGenerator)))
         {
             // A live installation registers its token vendor's generator before this; the placeholder is for testing.

@@ -215,6 +215,37 @@ internal sealed class ServiceDepositConfiguration : IEntityTypeConfiguration<Ser
     }
 }
 
+internal sealed class FacilityConfiguration : IEntityTypeConfiguration<Facility>
+{
+    public void Configure(EntityTypeBuilder<Facility> b)
+    {
+        b.ToTable("facility", Schemas.Municipal, t => t.HasCheckConstraint("ck_facility_rate", "daily_rate >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.DailyRate).HasPrecision(19, 4);
+        b.Property(x => x.RevenueAccountCode).HasMaxLength(20);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class FacilityBookingConfiguration : IEntityTypeConfiguration<FacilityBooking>
+{
+    public void Configure(EntityTypeBuilder<FacilityBooking> b)
+    {
+        b.ToTable("facility_booking", Schemas.Municipal, t => t.HasCheckConstraint("ck_facility_booking_dates", "to_date >= from_date AND fee >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.BookingNumber).HasMaxLength(30);
+        b.Property(x => x.Fee).HasPrecision(19, 4);
+        b.Property(x => x.Refunded).HasPrecision(19, 4);
+        b.Property(x => x.Purpose).HasMaxLength(200);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasOne<Facility>().WithMany().HasForeignKey(x => x.FacilityId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.BookingNumber }).IsUnique();
+        b.HasIndex(x => new { x.FacilityId, x.FromDate });
+    }
+}
+
 internal sealed class IndigentRegistrationConfiguration : IEntityTypeConfiguration<IndigentRegistration>
 {
     public void Configure(EntityTypeBuilder<IndigentRegistration> b)

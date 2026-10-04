@@ -782,6 +782,26 @@ app.MapGet("/api/municipal/tariffs/resolve", async (long companyId, One4All.Core
 .RequireAuthorization()
 .WithName("ResolveTariff");
 
+app.MapPost("/api/municipal/facilities", async (long companyId, string code, string name, decimal dailyRate, string revenueAccountCode, One4All.Application.Abstractions.Municipal.IFacilityBookingService facilities, CancellationToken ct) =>
+    ValueResponse(await facilities.CreateFacilityAsync(companyId, code, name, dailyRate, revenueAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CreateFacility");
+
+app.MapPost("/api/municipal/facility-bookings", async (One4All.Application.Abstractions.Municipal.FacilityBookingRequest request, One4All.Application.Abstractions.Municipal.IFacilityBookingService facilities, CancellationToken ct) =>
+    ValueResponse(await facilities.BookAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("BookFacility");
+
+app.MapPost("/api/municipal/facility-bookings/{bookingNumber}/cancel", async (string bookingNumber, long companyId, DateOnly date, decimal refundPercent, One4All.Application.Abstractions.Municipal.IFacilityBookingService facilities, CancellationToken ct) =>
+    ValueResponse(await facilities.CancelAsync(companyId, bookingNumber, date, refundPercent, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CancelFacilityBooking");
+
+app.MapGet("/api/municipal/facilities/{code}/calendar", async (string code, long companyId, DateOnly start, DateOnly end, One4All.Application.Abstractions.Municipal.IFacilityBookingService facilities, CancellationToken ct) =>
+    ValueResponse(await facilities.CalendarAsync(companyId, code, start, end, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("FacilityCalendar");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()
