@@ -1513,6 +1513,11 @@ app.MapPost("/api/messages/despatch", async (long companyId, int maxAttempts, On
 .RequireAuthorization()
 .WithName("DespatchMessages");
 
+app.MapPost("/api/messages/statements", async (long companyId, DateOnly asAt, string templateCode, string language, decimal minimumBalance, One4All.Application.Abstractions.Communications.IStatementDespatchService statements, CancellationToken ct) =>
+    ValueResponse(await statements.QueueAsync(companyId, asAt, templateCode, language, minimumBalance, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("QueueStatementEmails");
+
 app.MapGet("/api/messages/batches/{batchId:long}", async (long batchId, long companyId, One4All.Application.Abstractions.Communications.INotificationService messages, CancellationToken ct) =>
     ValueResponse(await messages.BatchStatusAsync(companyId, batchId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

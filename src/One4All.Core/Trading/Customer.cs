@@ -107,6 +107,12 @@ public sealed class Customer : SoftDeletableEntity, ICompanyScoped
     /// </summary>
     public string? NationalIdNumber { get; set; }
 
+    /// <summary>The email address statements and notices are sent to (brief §8).</summary>
+    public string? Email { get; set; }
+
+    /// <summary>The mobile number SMS reminders are sent to (brief §8).</summary>
+    public string? MobileNumber { get; set; }
+
     /// <summary>Optional default tax code for this customer.</summary>
     public string? DefaultTaxCode { get; set; }
 

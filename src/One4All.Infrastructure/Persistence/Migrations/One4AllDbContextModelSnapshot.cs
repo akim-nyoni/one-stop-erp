@@ -17508,6 +17508,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
 
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("email");
+
                     b.Property<bool>("InterestExempt")
                         .HasColumnType("boolean")
                         .HasColumnName("interest_exempt");
@@ -17519,6 +17524,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<string>("MobileNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("mobile_number");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")

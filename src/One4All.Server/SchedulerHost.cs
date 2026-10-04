@@ -31,7 +31,7 @@ public sealed partial class SchedulerHost : BackgroundService
             try
             {
                 await using AsyncServiceScope scope = _scopes.CreateAsyncScope();
-                SchedulerPass pass = await scope.ServiceProvider.GetRequiredService<IJobScheduler>().RunDueAsync(DateTimeOffset.UtcNow, stoppingToken).ConfigureAwait(false);
+                SchedulerPass pass = await scope.ServiceProvider.GetRequiredService<IJobScheduler>().RunDueAsync(DateTimeOffset.UtcNow, null, stoppingToken).ConfigureAwait(false);
                 if (pass.Ran > 0)
                 {
                     LogPass(pass.Ran, pass.Failed);

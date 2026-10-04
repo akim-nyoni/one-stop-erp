@@ -53,7 +53,7 @@ public sealed class SchedulerTests
         (await jobs.DefineAsync(Job("COUNT", "test.count", JobFrequency.Daily, new TimeOnly(3, 0)))).Error.Code.Should().Be("Job.Exists");
 
         // 10:20: the overdue despatch and the hourly job run; the hourly one throws, but the despatch still runs.
-        SchedulerPass first = await jobs.RunDueAsync(start.AddMinutes(20));
+        SchedulerPass first = await jobs.RunDueAsync(start.AddMinutes(20), companyId);
         (first.Ran, first.Failed).Should().Be((2, 1));
         counter.Runs.Should().Be(0);
         IReadOnlyList<JobRunEntry> boom = (await jobs.HistoryAsync(companyId, "BOOM")).Value;
@@ -64,14 +64,14 @@ public sealed class SchedulerTests
         despatch.NextRunAt.Should().Be(new DateTimeOffset(2026, 5, 31, 6, 0, 0, TimeSpan.Zero));
 
         // 2 May 02:00: the daily job's first run, and the hourly job again.
-        SchedulerPass second = await jobs.RunDueAsync(new DateTimeOffset(2026, 5, 2, 2, 0, 0, TimeSpan.Zero));
+        SchedulerPass second = await jobs.RunDueAsync(new DateTimeOffset(2026, 5, 2, 2, 0, 0, TimeSpan.Zero), companyId);
         (second.Ran, second.Failed).Should().Be((2, 1));
         counter.Runs.Should().Be(1);
 
         // Disabled, the daily job is skipped; it can still be run on demand without moving its schedule.
         (await jobs.SetEnabledAsync(companyId, "COUNT", false, new DateTimeOffset(2026, 5, 2, 3, 0, 0, TimeSpan.Zero))).IsSuccess.Should().BeTrue();
         (await jobs.SetEnabledAsync(companyId, "BOOM", false, new DateTimeOffset(2026, 5, 2, 3, 0, 0, TimeSpan.Zero))).IsSuccess.Should().BeTrue();
-        (await jobs.RunDueAsync(new DateTimeOffset(2026, 5, 3, 3, 0, 0, TimeSpan.Zero))).Ran.Should().Be(0);
+        (await jobs.RunDueAsync(new DateTimeOffset(2026, 5, 3, 3, 0, 0, TimeSpan.Zero), companyId)).Ran.Should().Be(0);
         (await jobs.RunNowAsync(companyId, "count", new DateTimeOffset(2026, 5, 3, 9, 0, 0, TimeSpan.Zero))).Value.Succeeded.Should().BeTrue();
         counter.Runs.Should().Be(2);
         (await jobs.HistoryAsync(companyId, "COUNT")).Value.Select(r => r.StartedAt.Day).Should().Equal(3, 2);

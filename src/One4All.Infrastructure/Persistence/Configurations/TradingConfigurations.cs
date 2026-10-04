@@ -21,6 +21,8 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         b.Property(x => x.DefaultTaxCode).HasMaxLength(20);
         b.Property(x => x.SalesAgent).HasMaxLength(40);
         b.Property(x => x.NationalIdNumber).HasMaxLength(40);
+        b.Property(x => x.Email).HasMaxLength(200);
+        b.Property(x => x.MobileNumber).HasMaxLength(30);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => new { x.CompanyId, x.NationalIdNumber });
         b.HasQueryFilter(x => !x.IsDeleted);
