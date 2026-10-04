@@ -1107,6 +1107,36 @@ app.MapGet("/api/housing/compensation-claims", async (long companyId, One4All.Ap
 .RequireAuthorization()
 .WithName("CompensationRegister");
 
+app.MapPost("/api/housing/cooperatives", async (long companyId, string code, string name, string registrationNumber, One4All.Application.Abstractions.Housing.ICooperativeService cooperatives, CancellationToken ct) =>
+    ValueResponse(await cooperatives.RegisterAsync(companyId, code, name, registrationNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RegisterCooperative");
+
+app.MapPost("/api/housing/cooperatives/{code}/members", async (string code, long companyId, string idNumber, string fullName, DateOnly joinedOn, One4All.Application.Abstractions.Housing.ICooperativeService cooperatives, CancellationToken ct) =>
+    ActionResponse(await cooperatives.AddMemberAsync(companyId, code, idNumber, fullName, joinedOn, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AddCooperativeMember");
+
+app.MapDelete("/api/housing/cooperatives/{code}/members/{idNumber}", async (string code, string idNumber, long companyId, One4All.Application.Abstractions.Housing.ICooperativeService cooperatives, CancellationToken ct) =>
+    ActionResponse(await cooperatives.RemoveMemberAsync(companyId, code, idNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RemoveCooperativeMember");
+
+app.MapPost("/api/housing/cooperatives/{code}/stands", async (string code, long companyId, DateOnly date, IReadOnlyList<long> standIds, One4All.Application.Abstractions.Housing.ICooperativeService cooperatives, CancellationToken ct) =>
+    ValueResponse(await cooperatives.AllocateStandsAsync(companyId, code, standIds, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AllocateStandsToCooperative");
+
+app.MapPost("/api/housing/cooperatives/{code}/stands/{standId:long}/member", async (string code, long standId, long companyId, string memberIdNumber, DateOnly date, One4All.Application.Abstractions.Housing.ICooperativeService cooperatives, CancellationToken ct) =>
+    ActionResponse(await cooperatives.SubAllocateAsync(companyId, code, standId, memberIdNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SubAllocateCooperativeStand");
+
+app.MapGet("/api/housing/cooperatives/{code}/stands", async (string code, long companyId, One4All.Application.Abstractions.Housing.ICooperativeService cooperatives, CancellationToken ct) =>
+    ValueResponse(await cooperatives.StandsAsync(companyId, code, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CooperativeStands");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

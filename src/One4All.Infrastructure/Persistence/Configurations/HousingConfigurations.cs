@@ -419,6 +419,49 @@ internal sealed class CompensationClaimConfiguration : IEntityTypeConfiguration<
     }
 }
 
+internal sealed class CooperativeConfiguration : IEntityTypeConfiguration<Cooperative>
+{
+    public void Configure(EntityTypeBuilder<Cooperative> b)
+    {
+        b.ToTable("cooperative", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.RegistrationNumber).HasMaxLength(60);
+        b.HasMany(x => x.Members).WithOne().HasForeignKey(x => x.CooperativeId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Members).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class CooperativeMemberConfiguration : IEntityTypeConfiguration<CooperativeMember>
+{
+    public void Configure(EntityTypeBuilder<CooperativeMember> b)
+    {
+        b.ToTable("cooperative_member", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.IdNumber).HasMaxLength(40);
+        b.Property(x => x.FullName).HasMaxLength(200);
+        b.HasIndex(x => new { x.CooperativeId, x.IdNumber }).IsUnique();
+    }
+}
+
+internal sealed class CooperativeStandConfiguration : IEntityTypeConfiguration<CooperativeStand>
+{
+    public void Configure(EntityTypeBuilder<CooperativeStand> b)
+    {
+        b.ToTable("cooperative_stand", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.HasOne<Cooperative>().WithMany().HasForeignKey(x => x.CooperativeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<CooperativeMember>().WithMany().HasForeignKey(x => x.MemberId).OnDelete(DeleteBehavior.Restrict);
+
+        // Both levels are controlled in the database: a stand belongs to one cooperative, a member holds one stand.
+        b.HasIndex(x => x.StandId).IsUnique();
+        b.HasIndex(x => x.MemberId).IsUnique().HasFilter("member_id IS NOT NULL");
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

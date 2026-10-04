@@ -2758,6 +2758,185 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.Cooperative", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("RegistrationNumber")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("registration_number");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cooperative");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cooperative_company_id_code");
+
+                    b.ToTable("cooperative", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.CooperativeMember", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CooperativeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cooperative_id");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("full_name");
+
+                    b.Property<string>("IdNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("id_number");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateOnly>("JoinedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("joined_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cooperative_member");
+
+                    b.HasIndex("CooperativeId", "IdNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cooperative_member_cooperative_id_id_number");
+
+                    b.ToTable("cooperative_member", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.CooperativeStand", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly>("AllocatedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("allocated_on");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CooperativeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cooperative_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("MemberId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("member_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.Property<DateOnly?>("SubAllocatedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("sub_allocated_on");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cooperative_stand");
+
+                    b.HasIndex("CooperativeId")
+                        .HasDatabaseName("ix_cooperative_stand_cooperative_id");
+
+                    b.HasIndex("MemberId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cooperative_stand_member_id")
+                        .HasFilter("member_id IS NOT NULL");
+
+                    b.HasIndex("StandId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cooperative_stand_stand_id");
+
+                    b.ToTable("cooperative_stand", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.CovenantStep", b =>
                 {
                     b.Property<long>("Id")
@@ -16614,6 +16793,39 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_compensation_claim_land_parcels_land_parcel_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.CooperativeMember", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.Cooperative", null)
+                        .WithMany("Members")
+                        .HasForeignKey("CooperativeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cooperative_member_cooperative_cooperative_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.CooperativeStand", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.Cooperative", null)
+                        .WithMany()
+                        .HasForeignKey("CooperativeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cooperative_stand_cooperative_cooperative_id");
+
+                    b.HasOne("One4All.Core.Housing.CooperativeMember", null)
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_cooperative_stand_cooperative_member_member_id");
+
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cooperative_stand_housing_stands_stand_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.CovenantStep", b =>
                 {
                     b.HasOne("One4All.Core.Housing.DevelopmentCovenant", null)
@@ -17434,6 +17646,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Housing.AllocationRun", b =>
                 {
                     b.Navigation("Allocations");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.Cooperative", b =>
+                {
+                    b.Navigation("Members");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.DevelopmentCovenant", b =>
