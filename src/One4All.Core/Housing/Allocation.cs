@@ -140,7 +140,12 @@ public sealed class AllocationRun : AuditableEntity, ICompanyScoped
 
     /// <summary>Adds a pairing.</summary>
     /// <param name="allocation">The pairing.</param>
-    public void Add(StandAllocation allocation) => _allocations.Add(allocation);
+    public void Add(StandAllocation allocation)
+    {
+        ArgumentNullException.ThrowIfNull(allocation);
+        allocation.AssignCompany(CompanyId);
+        _allocations.Add(allocation);
+    }
 
     /// <summary>Marks it approved.</summary>
     /// <param name="userId">The approver.</param>
@@ -190,6 +195,9 @@ public sealed class StandAllocation : Entity
     /// <summary>The run.</summary>
     public long AllocationRunId { get; private set; }
 
+    /// <summary>The council (certificate numbers are unique within it).</summary>
+    public long CompanyId { get; private set; }
+
     /// <summary>Its place on the list.</summary>
     public int Sequence { get; private set; }
 
@@ -216,6 +224,10 @@ public sealed class StandAllocation : Entity
 
     /// <summary>Whether it still holds the stand and the applicant.</summary>
     public bool IsLive => Status is AllocationStatus.Proposed or AllocationStatus.Offered or AllocationStatus.Accepted;
+
+    /// <summary>Sets the council from the run it belongs to.</summary>
+    /// <param name="companyId">The council.</param>
+    internal void AssignCompany(long companyId) => CompanyId = companyId;
 
     /// <summary>Issues the offer.</summary>
     /// <param name="certificateNumber">The certificate number.</param>

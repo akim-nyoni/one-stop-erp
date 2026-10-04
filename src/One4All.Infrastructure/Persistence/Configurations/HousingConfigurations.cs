@@ -120,7 +120,7 @@ internal sealed class StandAllocationConfiguration : IEntityTypeConfiguration<St
         // Hard controls (brief §4.10.4): one live allocation per stand, one per beneficiary, certificates never reused.
         b.HasIndex(x => x.StandId).IsUnique().HasFilter("status IN (0, 1, 2)").HasDatabaseName("ix_stand_allocation_one_live_per_stand");
         b.HasIndex(x => x.ApplicantId).IsUnique().HasFilter("status IN (0, 1, 2)").HasDatabaseName("ix_stand_allocation_one_live_per_applicant");
-        b.HasIndex(x => x.CertificateNumber).IsUnique().HasFilter("certificate_number IS NOT NULL");
+        b.HasIndex(x => new { x.CompanyId, x.CertificateNumber }).IsUnique().HasFilter("certificate_number IS NOT NULL");
     }
 }
 
@@ -311,6 +311,24 @@ internal sealed class ApplicantNoticeConfiguration : IEntityTypeConfiguration<Ap
         b.Property(x => x.NoticeType).HasConversion<int>();
         b.HasOne<HousingApplicant>().WithMany().HasForeignKey(x => x.ApplicantId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.ApplicantId, x.SentOn });
+    }
+}
+
+internal sealed class AllocationAppealConfiguration : IEntityTypeConfiguration<AllocationAppeal>
+{
+    public void Configure(EntityTypeBuilder<AllocationAppeal> b)
+    {
+        b.ToTable("allocation_appeal", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AppealNumber).HasMaxLength(30);
+        b.Property(x => x.Grounds).HasMaxLength(1000);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.OutcomeReasons).HasMaxLength(1000);
+        b.Property(x => x.ReallocationCertificate).HasMaxLength(30);
+        b.HasOne<HousingApplicant>().WithMany().HasForeignKey(x => x.ApplicantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<AllocationRun>().WithMany().HasForeignKey(x => x.AllocationRunId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.AppealNumber }).IsUnique();
+        b.HasIndex(x => new { x.ApplicantId, x.AllocationRunId }).IsUnique();
     }
 }
 

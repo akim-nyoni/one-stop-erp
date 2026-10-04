@@ -992,6 +992,31 @@ app.MapGet("/api/housing/waiting-list/{waitingListNumber}/notices", async (strin
 .RequireAuthorization()
 .WithName("ApplicantNotices");
 
+app.MapPost("/api/housing/appeals", async (long companyId, string waitingListNumber, string runNumber, string grounds, DateOnly lodgedOn, One4All.Application.Abstractions.Housing.IAllocationAppealService appeals, CancellationToken ct) =>
+    ValueResponse(await appeals.LodgeAsync(companyId, waitingListNumber, runNumber, grounds, lodgedOn, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LodgeAllocationAppeal");
+
+app.MapPost("/api/housing/appeals/{appealNumber}/hearing", async (string appealNumber, long companyId, DateOnly hearingDate, One4All.Application.Abstractions.Housing.IAllocationAppealService appeals, CancellationToken ct) =>
+    ActionResponse(await appeals.SetHearingAsync(companyId, appealNumber, hearingDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SetAppealHearing");
+
+app.MapPost("/api/housing/appeals/{appealNumber}/decide", async (string appealNumber, long companyId, bool upheld, DateOnly date, string reasons, One4All.Application.Abstractions.Housing.IAllocationAppealService appeals, CancellationToken ct) =>
+    ActionResponse(await appeals.DecideAsync(companyId, appealNumber, upheld, date, reasons, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DecideAllocationAppeal");
+
+app.MapPost("/api/housing/appeals/{appealNumber}/reallocation", async (string appealNumber, long companyId, string certificateNumber, One4All.Application.Abstractions.Housing.IAllocationAppealService appeals, CancellationToken ct) =>
+    ActionResponse(await appeals.LinkReallocationAsync(companyId, appealNumber, certificateNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LinkAppealReallocation");
+
+app.MapGet("/api/housing/appeals", async (long companyId, One4All.Application.Abstractions.Housing.IAllocationAppealService appeals, CancellationToken ct) =>
+    Results.Ok(await appeals.RegisterAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AllocationAppealsRegister");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
