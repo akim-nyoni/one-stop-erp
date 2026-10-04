@@ -117,7 +117,7 @@ public sealed class RentalHousingService : IRentalHousingService
     private async Task<Result<RentRunResult>> RunCoreAsync(long companyId, DateOnly month, CancellationToken ct)
     {
         (DateOnly first, DateOnly last) = ProRata.Month(month);
-        List<Tenancy> tenancies = await _db.Set<Tenancy>()
+        List<Tenancy> tenancies = await _db.Set<Tenancy>().Include(t => t.RentChanges)
             .Where(t => t.CompanyId == companyId && t.StartDate <= last && (t.EndDate == null || t.EndDate >= first))
             .OrderBy(t => t.TenancyNumber).ToListAsync(ct).ConfigureAwait(false);
         int billed = 0;
@@ -147,7 +147,7 @@ public sealed class RentalHousingService : IRentalHousingService
     private async Task<Result<TenancyEnded>> EndCoreAsync(long companyId, string tenancyNumber, DateOnly endDate, string refundBankAccountCode, CancellationToken ct)
     {
         string number = (tenancyNumber ?? string.Empty).Trim();
-        Tenancy? tenancy = await _db.Set<Tenancy>().FirstOrDefaultAsync(t => t.CompanyId == companyId && t.TenancyNumber == number, ct).ConfigureAwait(false);
+        Tenancy? tenancy = await _db.Set<Tenancy>().Include(t => t.RentChanges).FirstOrDefaultAsync(t => t.CompanyId == companyId && t.TenancyNumber == number, ct).ConfigureAwait(false);
         if (tenancy is null)
         {
             return Error.NotFound("Hse.TenancyNotFound", $"Tenancy {number} not found.");
@@ -218,6 +218,41 @@ public sealed class RentalHousingService : IRentalHousingService
     }
 
     /// <inheritdoc />
+    public Task<Result<RentReviewResult>> ReviewRentsAsync(long companyId, DateOnly effectiveFrom, decimal percent, RentalUnitType? unitType, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReviewCoreAsync(companyId, effectiveFrom, percent, unitType, ct), ct);
+
+    private async Task<Result<RentReviewResult>> ReviewCoreAsync(long companyId, DateOnly effectiveFrom, decimal percent, RentalUnitType? unitType, CancellationToken ct)
+    {
+        if (effectiveFrom.Day != 1 || percent <= -100m)
+        {
+            return Error.Validation("Hse.RentReview", "A rent review takes effect from the first of a month, and cannot cut rents by 100% or more.");
+        }
+
+        List<RentalUnit> units = await _db.Set<RentalUnit>()
+            .Where(u => u.CompanyId == companyId && (unitType == null || u.UnitType == unitType)).ToListAsync(ct).ConfigureAwait(false);
+        List<long> unitIds = [.. units.Select(u => u.Id)];
+        List<Tenancy> running = await _db.Set<Tenancy>().Include(t => t.RentChanges)
+            .Where(t => t.CompanyId == companyId && t.Status == TenancyStatus.Active && unitIds.Contains(t.UnitId)).ToListAsync(ct).ConfigureAwait(false);
+        if (running.Any(t => t.RentChanges.Any(c => c.EffectiveFrom == effectiveFrom)))
+        {
+            return Error.Conflict("Hse.RentReviewed", $"Rents have already been reviewed from {effectiveFrom:yyyy-MM-dd}.");
+        }
+
+        foreach (RentalUnit unit in units)
+        {
+            unit.MonthlyRent = RentalArithmetic.Escalate(unit.MonthlyRent, percent);
+        }
+
+        foreach (Tenancy tenancy in running)
+        {
+            tenancy.ChangeRent(effectiveFrom, RentalArithmetic.Escalate(tenancy.RentOn(effectiveFrom.AddDays(-1)), percent));
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new RentReviewResult(units.Count, running.Count);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<VoidUnit>> VoidsAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
     {
         var units = await _db.Set<RentalUnit>().AsNoTracking()
@@ -231,7 +266,7 @@ public sealed class RentalHousingService : IRentalHousingService
     // Raises one month's rent on a tenancy, pro rata, unless already raised; returns the rent raised.
     private async Task<Result<decimal>> BillMonthAsync(Tenancy tenancy, DateOnly month, CancellationToken ct)
     {
-        decimal rent = RentalArithmetic.RentFor(tenancy.MonthlyRent, month, tenancy.StartDate, tenancy.EndDate);
+        decimal rent = RentalArithmetic.RentFor(tenancy.RentOn(new DateOnly(month.Year, month.Month, 1)), month, tenancy.StartDate, tenancy.EndDate);
         string document = $"{tenancy.TenancyNumber}-{month:yyyyMM}";
         if (rent <= 0m || await _db.OpenItems.AnyAsync(i => i.CompanyId == tenancy.CompanyId && i.Ledger == TradingLedger.AccountsReceivable && i.DocumentNumber == document, ct).ConfigureAwait(false))
         {

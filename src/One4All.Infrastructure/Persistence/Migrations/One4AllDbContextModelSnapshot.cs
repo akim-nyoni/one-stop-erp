@@ -3617,6 +3617,45 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.TenancyRentChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<decimal>("MonthlyRent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("monthly_rent");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("TenancyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenancy_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tenancy_rent_change");
+
+                    b.HasIndex("TenancyId", "EffectiveFrom")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tenancy_rent_change_tenancy_id_effective_from");
+
+                    b.ToTable("tenancy_rent_change", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_tenancy_rent_change_rent", "monthly_rent >= 0");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.WaitingListPolicy", b =>
                 {
                     b.Property<long>("Id")
@@ -15796,6 +15835,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tenancy_rental_unit_unit_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.TenancyRentChange", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.Tenancy", null)
+                        .WithMany("RentChanges")
+                        .HasForeignKey("TenancyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenancy_rent_change_tenancy_tenancy_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.PriceListLine", b =>
                 {
                     b.HasOne("One4All.Core.Inventory.PriceList", null)
@@ -16460,6 +16509,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Housing.InstalmentAgreement", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.Tenancy", b =>
+                {
+                    b.Navigation("RentChanges");
                 });
 
             modelBuilder.Entity("One4All.Core.Inventory.PriceList", b =>

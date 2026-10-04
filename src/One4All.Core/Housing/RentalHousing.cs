@@ -107,6 +107,8 @@ public enum TenancyStatus
 /// </summary>
 public sealed class Tenancy : AuditableEntity, ICompanyScoped
 {
+    private readonly List<TenancyRentChange> _rentChanges = [];
+
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private Tenancy()
     {
@@ -166,6 +168,20 @@ public sealed class Tenancy : AuditableEntity, ICompanyScoped
     /// <summary>Where it stands.</summary>
     public TenancyStatus Status { get; private set; }
 
+    /// <summary>Rent changes from reviews, each from the first of a month.</summary>
+    public IReadOnlyList<TenancyRentChange> RentChanges => _rentChanges.AsReadOnly();
+
+    /// <summary>The monthly rent in force on a date: the latest review effective by then, or the rent at letting.</summary>
+    /// <param name="date">The date.</param>
+    /// <returns>The monthly rent.</returns>
+    public decimal RentOn(DateOnly date)
+        => _rentChanges.Where(c => c.EffectiveFrom <= date).OrderByDescending(c => c.EffectiveFrom).Select(c => (decimal?)c.MonthlyRent).FirstOrDefault() ?? MonthlyRent;
+
+    /// <summary>Records a rent change from a review.</summary>
+    /// <param name="effectiveFrom">The first day of the month it applies from.</param>
+    /// <param name="monthlyRent">The new monthly rent.</param>
+    public void ChangeRent(DateOnly effectiveFrom, decimal monthlyRent) => _rentChanges.Add(new TenancyRentChange(effectiveFrom, monthlyRent));
+
     /// <summary>Ends it.</summary>
     /// <param name="endDate">The last day.</param>
     public void End(DateOnly endDate)
@@ -173,4 +189,31 @@ public sealed class Tenancy : AuditableEntity, ICompanyScoped
         EndDate = endDate;
         Status = TenancyStatus.Ended;
     }
+}
+
+/// <summary>A rent change on a tenancy from a rent review (<c>hse.tenancy_rent_change</c>).</summary>
+public sealed class TenancyRentChange : Entity
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private TenancyRentChange()
+    {
+    }
+
+    /// <summary>Records a change.</summary>
+    /// <param name="effectiveFrom">The first day of the month it applies from.</param>
+    /// <param name="monthlyRent">The new monthly rent.</param>
+    public TenancyRentChange(DateOnly effectiveFrom, decimal monthlyRent)
+    {
+        EffectiveFrom = effectiveFrom;
+        MonthlyRent = monthlyRent;
+    }
+
+    /// <summary>The tenancy.</summary>
+    public long TenancyId { get; private set; }
+
+    /// <summary>The first day of the month it applies from.</summary>
+    public DateOnly EffectiveFrom { get; private set; }
+
+    /// <summary>The new monthly rent.</summary>
+    public decimal MonthlyRent { get; private set; }
 }

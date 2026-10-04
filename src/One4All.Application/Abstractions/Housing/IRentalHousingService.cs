@@ -39,6 +39,11 @@ public sealed record RentRunResult(int TenanciesBilled, decimal TotalRent);
 /// <param name="Settlement">How the deposit was applied and refunded.</param>
 public sealed record TenancyEnded(decimal FinalRent, DepositSettlement Settlement);
 
+/// <summary>A rent review's result.</summary>
+/// <param name="UnitsReviewed">Units whose rent was raised.</param>
+/// <param name="TenanciesReviewed">Running tenancies given a rent change.</param>
+public sealed record RentReviewResult(int UnitsReviewed, int TenanciesReviewed);
+
 /// <summary>A void unit.</summary>
 /// <param name="UnitCode">The unit.</param>
 /// <param name="VacantSince">The first empty day.</param>
@@ -90,6 +95,18 @@ public interface IRentalHousingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The final figures, or why it was refused.</returns>
     Task<Result<TenancyEnded>> EndTenancyAsync(long companyId, string tenancyNumber, DateOnly endDate, string refundBankAccountCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Runs a rent review: raises the rent of every unit (or every unit of one type) by a percentage from the first of a
+    /// month, and gives each running tenancy on them a rent change from that date. Months before it keep the old rent.
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="effectiveFrom">The first day of the month the new rents apply from.</param>
+    /// <param name="percent">The escalation percentage.</param>
+    /// <param name="unitType">Only this kind of unit, or null for all.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What was reviewed, or why it was refused.</returns>
+    Task<Result<RentReviewResult>> ReviewRentsAsync(long companyId, DateOnly effectiveFrom, decimal percent, RentalUnitType? unitType, CancellationToken ct = default);
 
     /// <summary>The void units as at a date, longest void first, with the rent lost.</summary>
     /// <param name="companyId">The council.</param>

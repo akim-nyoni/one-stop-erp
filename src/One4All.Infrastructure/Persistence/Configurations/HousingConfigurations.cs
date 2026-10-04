@@ -192,6 +192,19 @@ internal sealed class TenancyConfiguration : IEntityTypeConfiguration<Tenancy>
         b.HasIndex(x => new { x.CompanyId, x.TenancyNumber }).IsUnique();
         b.HasIndex(x => x.UnitId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_tenancy_one_active_per_unit");
         b.HasIndex(x => x.TenantCustomerId);
+        b.HasMany(x => x.RentChanges).WithOne().HasForeignKey(x => x.TenancyId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.RentChanges).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class TenancyRentChangeConfiguration : IEntityTypeConfiguration<TenancyRentChange>
+{
+    public void Configure(EntityTypeBuilder<TenancyRentChange> b)
+    {
+        b.ToTable("tenancy_rent_change", Schemas.Housing, t => t.HasCheckConstraint("ck_tenancy_rent_change_rent", "monthly_rent >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.MonthlyRent).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.TenancyId, x.EffectiveFrom }).IsUnique();
     }
 }
 

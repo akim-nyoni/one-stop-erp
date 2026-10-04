@@ -24,6 +24,15 @@ public class RentalArithmeticTests
         RentalArithmetic.Settle(deposit, owed).Should().Be(new DepositSettlement(applied, refund));
     }
 
+    [Theory]
+    [InlineData(300.0, 10, 330.0)]
+    [InlineData(333.33, 5, 350.0)]
+    [InlineData(300.0, -10, 270.0)]
+    public void Escalation_raises_the_rent_to_the_cent(double rent, int percent, double expected)
+    {
+        RentalArithmetic.Escalate((decimal)rent, percent).Should().Be((decimal)expected);
+    }
+
     [Fact]
     public void Void_days_count_both_ends_and_rent_lost_follows_the_annual_rent()
     {

@@ -22,6 +22,12 @@ public static class RentalArithmetic
     public static decimal RentFor(decimal monthlyRent, DateOnly month, DateOnly start, DateOnly? end)
         => ProRata.Apply(monthlyRent, ProRata.Fraction(month, start, end));
 
+    /// <summary>A rent raised by an escalation percentage, to the cent.</summary>
+    /// <param name="monthlyRent">The current rent.</param>
+    /// <param name="percent">The escalation percentage.</param>
+    /// <returns>The new rent.</returns>
+    public static decimal Escalate(decimal monthlyRent, decimal percent) => decimal.Round(monthlyRent * (1m + percent / 100m), 2, MidpointRounding.AwayFromZero);
+
     /// <summary>Splits a deposit between what the tenant owes and a refund.</summary>
     /// <param name="deposit">The deposit held.</param>
     /// <param name="owed">What the tenant owes (nothing when in credit).</param>

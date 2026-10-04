@@ -927,6 +927,11 @@ app.MapGet("/api/housing/voids", async (long companyId, DateOnly asAtDate, One4A
 .RequireAuthorization()
 .WithName("RentalVoids");
 
+app.MapPost("/api/housing/rent-reviews", async (long companyId, DateOnly effectiveFrom, decimal percent, One4All.Core.Housing.RentalUnitType? unitType, One4All.Application.Abstractions.Housing.IRentalHousingService rentals, CancellationToken ct) =>
+    ValueResponse(await rentals.ReviewRentsAsync(companyId, effectiveFrom, percent, unitType, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReviewRents");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
