@@ -118,6 +118,8 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Housing.IMapProvider, Housing.RegisterMapProvider>();
         services.AddScoped<Application.Abstractions.Housing.ISpatialRegisterService, Housing.SpatialRegisterService>();
         services.AddScoped<Application.Abstractions.Housing.IServicingCostService, Housing.ServicingCostService>();
+        services.AddScoped<Application.Abstractions.Communications.IMessageGateway, Communications.InAppGateway>();
+        services.AddScoped<Application.Abstractions.Communications.INotificationService, Communications.NotificationService>();
         if (!services.Any(d => d.ServiceType == typeof(Application.Municipal.IPrepaidTokenGenerator)))
         {
             // A live installation registers its token vendor's generator before this; the placeholder is for testing.

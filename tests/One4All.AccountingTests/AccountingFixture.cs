@@ -27,10 +27,17 @@ public sealed class AccountingFixture : IAsyncLifetime
 
     /// <summary>Builds a wired service provider against the test database.</summary>
     /// <returns>A disposable provider.</returns>
-    public ServiceProvider BuildServiceProvider()
+    public ServiceProvider BuildServiceProvider() => BuildServiceProvider(_ => { });
+
+    /// <summary>Builds a provider with extra registrations (fakes for external gateways, say) added after the infrastructure.</summary>
+    /// <param name="configure">The extra registrations.</param>
+    /// <returns>The provider.</returns>
+    public ServiceProvider BuildServiceProvider(Action<IServiceCollection> configure)
     {
+        ArgumentNullException.ThrowIfNull(configure);
         ServiceCollection services = new();
         services.AddOne4AllInfrastructure(ConnectionString);
+        configure(services);
         return services.BuildServiceProvider();
     }
 

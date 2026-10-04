@@ -92,4 +92,7 @@ public static class Schemas
 
     /// <summary>Offline sync: the outbox of operations captured while a terminal was offline.</summary>
     public const string Sync = "sync";
+
+    /// <summary>Notifications &amp; communications: templates, despatches, outbound messages, the notification centre.</summary>
+    public const string Communications = "msg";
 }

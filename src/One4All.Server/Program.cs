@@ -1487,6 +1487,41 @@ app.MapGet("/api/housing/schemes/{schemeId:long}/stand-costs", async (long schem
 .RequireAuthorization()
 .WithName("SchemeCostPerStand");
 
+app.MapPost("/api/messages/templates", async (long companyId, string code, string documentType, string language, One4All.Core.Communications.MessageChannel channel, string? subject, string body, One4All.Application.Abstractions.Communications.INotificationService messages, CancellationToken ct) =>
+    ValueResponse(await messages.SaveTemplateAsync(companyId, code, documentType, language, channel, subject ?? string.Empty, body, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SaveMessageTemplate");
+
+app.MapPost("/api/messages/templates/{code}/preview", async (string code, long companyId, string language, One4All.Core.Communications.MessageChannel channel, Dictionary<string, string> values, One4All.Application.Abstractions.Communications.INotificationService messages, CancellationToken ct) =>
+    ValueResponse(await messages.PreviewAsync(companyId, code, language, channel, values, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PreviewMessageTemplate");
+
+app.MapPost("/api/messages/batches", async (long companyId, string name, string code, string language, One4All.Core.Communications.MessageChannel channel, IReadOnlyList<One4All.Application.Abstractions.Communications.DespatchRecipient> recipients, One4All.Application.Abstractions.Communications.INotificationService messages, CancellationToken ct) =>
+    ValueResponse(await messages.QueueAsync(companyId, name, code, language, channel, recipients, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("QueueDespatch");
+
+app.MapPost("/api/messages/despatch", async (long companyId, int maxAttempts, One4All.Application.Abstractions.Communications.INotificationService messages, CancellationToken ct) =>
+    Results.Ok(await messages.DespatchAsync(companyId, maxAttempts, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DespatchMessages");
+
+app.MapGet("/api/messages/batches/{batchId:long}", async (long batchId, long companyId, One4All.Application.Abstractions.Communications.INotificationService messages, CancellationToken ct) =>
+    ValueResponse(await messages.BatchStatusAsync(companyId, batchId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DespatchBatchStatus");
+
+app.MapGet("/api/notifications", async (long companyId, long userId, bool unreadOnly, One4All.Application.Abstractions.Communications.INotificationService messages, CancellationToken ct) =>
+    Results.Ok(await messages.InboxAsync(companyId, userId, unreadOnly, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("NotificationInbox");
+
+app.MapPost("/api/notifications/{notificationId:long}/read", async (long notificationId, long companyId, long userId, One4All.Application.Abstractions.Communications.INotificationService messages, CancellationToken ct) =>
+    ActionResponse(await messages.MarkReadAsync(companyId, userId, notificationId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("MarkNotificationRead");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
