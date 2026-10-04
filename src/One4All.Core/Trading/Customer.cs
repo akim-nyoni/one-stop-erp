@@ -101,6 +101,12 @@ public sealed class Customer : SoftDeletableEntity, ICompanyScoped
     /// <summary>Optional tax registration / VAT number.</summary>
     public string? TaxRegistration { get; set; }
 
+    /// <summary>
+    /// The individual's national ID number, when the account belongs to a person (brief §4.10.3: ownership and
+    /// duplicate checks match on it). Stored upper case without spaces.
+    /// </summary>
+    public string? NationalIdNumber { get; set; }
+
     /// <summary>Optional default tax code for this customer.</summary>
     public string? DefaultTaxCode { get; set; }
 

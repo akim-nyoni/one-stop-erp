@@ -71,7 +71,33 @@ internal sealed class HousingApplicantConfiguration : IEntityTypeConfiguration<H
         b.HasKey(x => x.Id);
         b.Property(x => x.IdNumber).HasMaxLength(40);
         b.Property(x => x.FullName).HasMaxLength(200);
-        b.HasIndex(x => new { x.CompanyId, x.IdNumber });
+        b.Property(x => x.WaitingListNumber).HasMaxLength(30);
+        b.Property(x => x.Category).HasConversion<int>().HasDefaultValue(HousingCategory.HighDensity).HasSentinel((HousingCategory)0);
+        b.Property(x => x.Tenure).HasConversion<int>().HasDefaultValue(CurrentTenure.Tenant).HasSentinel((CurrentTenure)0);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.MonthlyIncome).HasPrecision(19, 4);
+
+        // One applicant record per national ID, and waiting-list numbers are unique (brief §4.10.3).
+        b.HasIndex(x => new { x.CompanyId, x.IdNumber }).IsUnique().HasFilter("is_deleted = false");
+        b.HasIndex(x => new { x.CompanyId, x.WaitingListNumber }).IsUnique().HasFilter("waiting_list_number IS NOT NULL");
+        b.HasIndex(x => new { x.CompanyId, x.Category, x.Status });
         b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
+{
+    public void Configure(EntityTypeBuilder<WaitingListPolicy> b)
+    {
+        b.ToTable("waiting_list_policy", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.MaximumMonthlyIncome).HasPrecision(19, 4);
+        b.Property(x => x.PointsPerYearOnList).HasPrecision(9, 2);
+        b.Property(x => x.PointsPerYearResident).HasPrecision(9, 2);
+        b.Property(x => x.PointsPerDependant).HasPrecision(9, 2);
+        b.Property(x => x.DisabilityPoints).HasPrecision(9, 2);
+        b.Property(x => x.HomelessPoints).HasPrecision(9, 2);
+        b.Property(x => x.LodgerPoints).HasPrecision(9, 2);
+        b.HasIndex(x => x.CompanyId).IsUnique();
     }
 }

@@ -827,6 +827,26 @@ app.MapGet("/api/municipal/burial-register", async (long companyId, DateOnly sta
 .RequireAuthorization()
 .WithName("BurialRegister");
 
+app.MapPut("/api/housing/waiting-list/policy", async (long companyId, One4All.Application.Housing.WaitingListTerms terms, One4All.Application.Abstractions.Housing.IWaitingListService waitingList, CancellationToken ct) =>
+    ActionResponse(await waitingList.SetPolicyAsync(companyId, new One4All.Application.Abstractions.Housing.WaitingListPolicyInput(terms), ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SetWaitingListPolicy");
+
+app.MapPost("/api/housing/waiting-list", async (One4All.Application.Abstractions.Housing.WaitingListApplication application, One4All.Application.Abstractions.Housing.IWaitingListService waitingList, CancellationToken ct) =>
+    ValueResponse(await waitingList.RegisterAsync(application, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RegisterOnWaitingList");
+
+app.MapGet("/api/housing/waiting-list", async (long companyId, One4All.Core.Housing.HousingCategory category, One4All.Application.Abstractions.Housing.WaitingListOrder order, DateOnly asAtDate, One4All.Application.Abstractions.Housing.IWaitingListService waitingList, CancellationToken ct) =>
+    Results.Ok(await waitingList.RankingAsync(companyId, category, order, asAtDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("WaitingListRanking");
+
+app.MapGet("/api/housing/waiting-list/{numberOrId}", async (string numberOrId, long companyId, DateOnly asAtDate, One4All.Application.Abstractions.Housing.IWaitingListService waitingList, CancellationToken ct) =>
+    ValueResponse(await waitingList.EnquireAsync(companyId, numberOrId, asAtDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("WaitingListEnquiry");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

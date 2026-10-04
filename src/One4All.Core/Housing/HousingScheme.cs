@@ -104,6 +104,69 @@ public sealed class HousingApplicant : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the applicant has been verified.</summary>
     public bool IsVerified { get; private set; }
 
+    /// <summary>The waiting-list number, once registered (brief §4.10.3).</summary>
+    public string? WaitingListNumber { get; private set; }
+
+    /// <summary>The waiting-list category.</summary>
+    public HousingCategory Category { get; private set; } = HousingCategory.HighDensity;
+
+    /// <summary>The applicant's date of birth.</summary>
+    public DateOnly? DateOfBirth { get; private set; }
+
+    /// <summary>Since when the applicant has lived in the local authority area.</summary>
+    public DateOnly? ResidentSince { get; private set; }
+
+    /// <summary>The number of dependants.</summary>
+    public int Dependants { get; private set; }
+
+    /// <summary>Whether the applicant has a disability.</summary>
+    public bool HasDisability { get; private set; }
+
+    /// <summary>The applicant's monthly income.</summary>
+    public decimal MonthlyIncome { get; private set; }
+
+    /// <summary>Where the applicant lives now.</summary>
+    public CurrentTenure Tenure { get; private set; } = CurrentTenure.Tenant;
+
+    /// <summary>Where the applicant stands on the list.</summary>
+    public ApplicantStatus Status { get; private set; } = ApplicantStatus.Active;
+
     /// <summary>Marks the applicant verified.</summary>
     public void Verify() => IsVerified = true;
+
+    /// <summary>Records the facts the qualification rules and the priority score use.</summary>
+    /// <param name="category">The waiting-list category.</param>
+    /// <param name="dateOfBirth">The date of birth.</param>
+    /// <param name="residentSince">Since when resident in the area.</param>
+    /// <param name="dependants">The number of dependants.</param>
+    /// <param name="hasDisability">Whether the applicant has a disability.</param>
+    /// <param name="monthlyIncome">The monthly income.</param>
+    /// <param name="tenure">Where the applicant lives now.</param>
+    public void SetDetails(HousingCategory category, DateOnly dateOfBirth, DateOnly residentSince, int dependants, bool hasDisability, decimal monthlyIncome, CurrentTenure tenure)
+    {
+        Category = category;
+        DateOfBirth = dateOfBirth;
+        ResidentSince = residentSince;
+        Dependants = dependants;
+        HasDisability = hasDisability;
+        MonthlyIncome = monthlyIncome;
+        Tenure = tenure;
+    }
+
+    /// <summary>
+    /// Puts the applicant on the list under a waiting-list number from a registration date (a removed applicant who
+    /// applies again starts afresh; the date sets seniority).
+    /// </summary>
+    /// <param name="waitingListNumber">The number.</param>
+    /// <param name="registrationDate">The registration date.</param>
+    public void Register(string waitingListNumber, DateOnly registrationDate)
+    {
+        WaitingListNumber = waitingListNumber;
+        RegistrationDate = registrationDate;
+        Status = ApplicantStatus.Active;
+    }
+
+    /// <summary>Changes where the applicant stands on the list.</summary>
+    /// <param name="status">The new status.</param>
+    public void SetStatus(ApplicantStatus status) => Status = status;
 }

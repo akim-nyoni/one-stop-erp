@@ -2420,6 +2420,12 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<int>("Category")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("category");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -2432,6 +2438,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<DateOnly?>("DateOfBirth")
+                        .HasColumnType("date")
+                        .HasColumnName("date_of_birth");
+
                     b.Property<long?>("DeletedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("deleted_by_user_id");
@@ -2440,11 +2450,19 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
 
+                    b.Property<int>("Dependants")
+                        .HasColumnType("integer")
+                        .HasColumnName("dependants");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("full_name");
+
+                    b.Property<bool>("HasDisability")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_disability");
 
                     b.Property<string>("IdNumber")
                         .IsRequired()
@@ -2468,9 +2486,18 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<decimal>("MonthlyIncome")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("monthly_income");
+
                     b.Property<DateOnly>("RegistrationDate")
                         .HasColumnType("date")
                         .HasColumnName("registration_date");
+
+                    b.Property<DateOnly?>("ResidentSince")
+                        .HasColumnType("date")
+                        .HasColumnName("resident_since");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
@@ -2478,11 +2505,36 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<int>("Tenure")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(2)
+                        .HasColumnName("tenure");
+
+                    b.Property<string>("WaitingListNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("waiting_list_number");
+
                     b.HasKey("Id")
                         .HasName("pk_applicant");
 
                     b.HasIndex("CompanyId", "IdNumber")
-                        .HasDatabaseName("ix_applicant_company_id_id_number");
+                        .IsUnique()
+                        .HasDatabaseName("ix_applicant_company_id_id_number")
+                        .HasFilter("is_deleted = false");
+
+                    b.HasIndex("CompanyId", "WaitingListNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_applicant_company_id_waiting_list_number")
+                        .HasFilter("waiting_list_number IS NOT NULL");
+
+                    b.HasIndex("CompanyId", "Category", "Status")
+                        .HasDatabaseName("ix_applicant_company_id_category_status");
 
                     b.ToTable("applicant", "hse");
                 });
@@ -2809,6 +2861,92 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_ownership_record_housing_stand_id_sequence");
 
                     b.ToTable("ownership_record", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.WaitingListPolicy", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<decimal>("DisabilityPoints")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("disability_points");
+
+                    b.Property<decimal>("HomelessPoints")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("homeless_points");
+
+                    b.Property<decimal>("LodgerPoints")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("lodger_points");
+
+                    b.Property<decimal?>("MaximumMonthlyIncome")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("maximum_monthly_income");
+
+                    b.Property<int>("MinimumAge")
+                        .HasColumnType("integer")
+                        .HasColumnName("minimum_age");
+
+                    b.Property<int>("MinimumResidencyYears")
+                        .HasColumnType("integer")
+                        .HasColumnName("minimum_residency_years");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("PointsPerDependant")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("points_per_dependant");
+
+                    b.Property<decimal>("PointsPerYearOnList")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("points_per_year_on_list");
+
+                    b.Property<decimal>("PointsPerYearResident")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("points_per_year_resident");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_waiting_list_policy");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_waiting_list_policy_company_id");
+
+                    b.ToTable("waiting_list_policy", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Inventory.Item", b =>
@@ -12830,6 +12968,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<string>("NationalIdNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("national_id_number");
+
                     b.Property<bool>("OnHold")
                         .HasColumnType("boolean")
                         .HasColumnName("on_hold");
@@ -12878,6 +13021,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_customer_company_id_code")
                         .HasFilter("is_deleted = false");
+
+                    b.HasIndex("CompanyId", "NationalIdNumber")
+                        .HasDatabaseName("ix_customer_company_id_national_id_number");
 
                     b.ToTable("customer", "ar");
                 });

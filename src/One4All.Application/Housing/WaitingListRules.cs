@@ -1,0 +1,142 @@
+using One4All.Core.Housing;
+
+namespace One4All.Application.Housing;
+
+/// <summary>What the qualification rules and priority score look at.</summary>
+/// <param name="DateOfBirth">The date of birth.</param>
+/// <param name="ResidentSince">Since when resident in the area.</param>
+/// <param name="RegistrationDate">When registered on the list (seniority).</param>
+/// <param name="Dependants">The number of dependants.</param>
+/// <param name="HasDisability">Whether the applicant has a disability.</param>
+/// <param name="MonthlyIncome">The monthly income.</param>
+/// <param name="Tenure">Where the applicant lives now.</param>
+public sealed record ApplicantFacts(DateOnly DateOfBirth, DateOnly ResidentSince, DateOnly RegistrationDate, int Dependants, bool HasDisability, decimal MonthlyIncome, CurrentTenure Tenure);
+
+/// <summary>The qualification thresholds and score weights in force.</summary>
+/// <param name="MinimumAge">The minimum age.</param>
+/// <param name="MinimumResidencyYears">The minimum years resident.</param>
+/// <param name="MaximumMonthlyIncome">The income ceiling, or null for none.</param>
+/// <param name="PointsPerYearOnList">Points per full year on the list.</param>
+/// <param name="PointsPerYearResident">Points per full year resident.</param>
+/// <param name="PointsPerDependant">Points per dependant.</param>
+/// <param name="DisabilityPoints">Points for a disability.</param>
+/// <param name="HomelessPoints">Points for being homeless.</param>
+/// <param name="LodgerPoints">Points for lodging or staying with relatives.</param>
+public sealed record WaitingListTerms(int MinimumAge, int MinimumResidencyYears, decimal? MaximumMonthlyIncome, decimal PointsPerYearOnList, decimal PointsPerYearResident,
+    decimal PointsPerDependant, decimal DisabilityPoints, decimal HomelessPoints, decimal LodgerPoints)
+{
+    /// <summary>The terms of a council's stored policy.</summary>
+    /// <param name="policy">The policy.</param>
+    /// <returns>The terms.</returns>
+    public static WaitingListTerms From(WaitingListPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        return new(policy.MinimumAge, policy.MinimumResidencyYears, policy.MaximumMonthlyIncome, policy.PointsPerYearOnList, policy.PointsPerYearResident,
+            policy.PointsPerDependant, policy.DisabilityPoints, policy.HomelessPoints, policy.LodgerPoints);
+    }
+}
+
+/// <summary>One line of a score explanation.</summary>
+/// <param name="Factor">What earned the points.</param>
+/// <param name="Detail">The applicant's figure for it.</param>
+/// <param name="Points">The points earned.</param>
+public sealed record ScoreLine(string Factor, string Detail, decimal Points);
+
+/// <summary>An applicant's priority score with how it was derived.</summary>
+/// <param name="Total">The score.</param>
+/// <param name="Lines">The explanation, one line per factor.</param>
+public sealed record PriorityScore(decimal Total, IReadOnlyList<ScoreLine> Lines);
+
+/// <summary>
+/// Waiting-list qualification and priority scoring (brief §4.10.3): the configurable rules an applicant must meet, and
+/// a points score from years on the list, residency, dependants, disability and housing conditions — with a full
+/// explanation an officer can print for the applicant. Pure and unit-tested.
+/// </summary>
+public static class WaitingListRules
+{
+    /// <summary>Full years between two dates.</summary>
+    /// <param name="from">The earlier date.</param>
+    /// <param name="to">The later date.</param>
+    /// <returns>The completed years (0 when the dates are backwards).</returns>
+    public static int FullYears(DateOnly from, DateOnly to)
+    {
+        if (to < from)
+        {
+            return 0;
+        }
+
+        int years = to.Year - from.Year;
+        return from.AddYears(years) > to ? years - 1 : years;
+    }
+
+    /// <summary>Why an applicant does not qualify; empty when they do.</summary>
+    /// <param name="facts">The applicant.</param>
+    /// <param name="terms">The rules.</param>
+    /// <param name="ownsProperty">Whether the applicant already owns or holds property in the area.</param>
+    /// <param name="previouslyAllocated">Whether the applicant has already been allocated a stand or unit.</param>
+    /// <param name="asAtDate">The date of the check.</param>
+    /// <returns>The reasons.</returns>
+    public static IReadOnlyList<string> Problems(ApplicantFacts facts, WaitingListTerms terms, bool ownsProperty, bool previouslyAllocated, DateOnly asAtDate)
+    {
+        ArgumentNullException.ThrowIfNull(facts);
+        ArgumentNullException.ThrowIfNull(terms);
+        List<string> problems = [];
+        int age = FullYears(facts.DateOfBirth, asAtDate);
+        if (age < terms.MinimumAge)
+        {
+            problems.Add($"Under the minimum age of {terms.MinimumAge} (aged {age}).");
+        }
+
+        int resident = FullYears(facts.ResidentSince, asAtDate);
+        if (resident < terms.MinimumResidencyYears)
+        {
+            problems.Add($"Resident {resident} years; {terms.MinimumResidencyYears} required.");
+        }
+
+        if (terms.MaximumMonthlyIncome is decimal ceiling && facts.MonthlyIncome > ceiling)
+        {
+            problems.Add($"Monthly income {facts.MonthlyIncome:0.00} is above the {ceiling:0.00} limit.");
+        }
+
+        if (ownsProperty)
+        {
+            problems.Add("Already owns or holds property in the area.");
+        }
+
+        if (previouslyAllocated)
+        {
+            problems.Add("Already allocated a stand or unit.");
+        }
+
+        return problems;
+    }
+
+    /// <summary>The priority score as at a date, with its explanation.</summary>
+    /// <param name="facts">The applicant.</param>
+    /// <param name="terms">The weights.</param>
+    /// <param name="asAtDate">The date.</param>
+    /// <returns>The score.</returns>
+    public static PriorityScore Score(ApplicantFacts facts, WaitingListTerms terms, DateOnly asAtDate)
+    {
+        ArgumentNullException.ThrowIfNull(facts);
+        ArgumentNullException.ThrowIfNull(terms);
+        int onList = FullYears(facts.RegistrationDate, asAtDate);
+        int resident = FullYears(facts.ResidentSince, asAtDate);
+        decimal conditions = facts.Tenure switch
+        {
+            CurrentTenure.Homeless => terms.HomelessPoints,
+            CurrentTenure.Lodger or CurrentTenure.WithRelatives => terms.LodgerPoints,
+            _ => 0m,
+        };
+
+        List<ScoreLine> lines =
+        [
+            new("Years on the list", $"{onList} × {terms.PointsPerYearOnList:0.##}", onList * terms.PointsPerYearOnList),
+            new("Years resident", $"{resident} × {terms.PointsPerYearResident:0.##}", resident * terms.PointsPerYearResident),
+            new("Dependants", $"{facts.Dependants} × {terms.PointsPerDependant:0.##}", facts.Dependants * terms.PointsPerDependant),
+            new("Disability", facts.HasDisability ? "Yes" : "No", facts.HasDisability ? terms.DisabilityPoints : 0m),
+            new("Housing conditions", facts.Tenure.ToString(), conditions),
+        ];
+        return new PriorityScore(lines.Sum(l => l.Points), lines);
+    }
+}
