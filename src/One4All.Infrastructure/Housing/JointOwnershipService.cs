@@ -72,7 +72,7 @@ public sealed class JointOwnershipService : IJointOwnershipService
 
         if (await StandClaims.AnyBlockedAsync(_db, [standId], ct).ConfigureAwait(false))
         {
-            return Result.Failure(Error.Rule("Hse.StandBlocked", "The stand is blocked by a caveat; no share can be transferred."));
+            return Result.Failure(Error.Rule("Hse.StandBlocked", "The stand is blocked by a caveat or an open land dispute; no share can be transferred."));
         }
 
         if (!await _db.Customers.AnyAsync(c => c.Id == toCustomerId && c.CompanyId == companyId, ct).ConfigureAwait(false))

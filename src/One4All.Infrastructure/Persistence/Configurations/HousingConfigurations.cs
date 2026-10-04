@@ -1003,3 +1003,71 @@ internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<
         b.HasIndex(x => x.CompanyId).IsUnique();
     }
 }
+
+internal sealed class LandEncumbranceConfiguration : IEntityTypeConfiguration<LandEncumbrance>
+{
+    public void Configure(EntityTypeBuilder<LandEncumbrance> b)
+    {
+        b.ToTable("land_encumbrance", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Type).HasConversion<int>();
+        b.Property(x => x.Reference).HasMaxLength(100);
+        b.Property(x => x.InFavourOf).HasMaxLength(200);
+        b.Property(x => x.Description).HasMaxLength(1000);
+        b.Property(x => x.LiftReference).HasMaxLength(100);
+        b.HasOne<LandParcel>().WithMany().HasForeignKey(x => x.LandParcelId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.LandParcelId });
+    }
+}
+
+internal sealed class LandDisputeConfiguration : IEntityTypeConfiguration<LandDispute>
+{
+    public void Configure(EntityTypeBuilder<LandDispute> b)
+    {
+        b.ToTable("land_dispute", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.DisputeNumber).HasMaxLength(40);
+        b.Property(x => x.Type).HasConversion<int>();
+        b.Property(x => x.Stage).HasConversion<int>();
+        b.Property(x => x.Claimant).HasMaxLength(200);
+        b.Property(x => x.Particulars).HasMaxLength(2000);
+        b.Property(x => x.Outcome).HasMaxLength(2000);
+        b.HasOne<LandParcel>().WithMany().HasForeignKey(x => x.LandParcelId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.DisputeNumber }).IsUnique();
+        b.HasMany(x => x.Steps).WithOne().HasForeignKey(x => x.LandDisputeId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Steps).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class LandDisputeStepConfiguration : IEntityTypeConfiguration<LandDisputeStep>
+{
+    public void Configure(EntityTypeBuilder<LandDisputeStep> b)
+    {
+        b.ToTable("land_dispute_step", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Stage).HasConversion<int>();
+        b.Property(x => x.Note).HasMaxLength(2000);
+    }
+}
+
+internal sealed class LandDisposalConfiguration : IEntityTypeConfiguration<LandDisposal>
+{
+    public void Configure(EntityTypeBuilder<LandDisposal> b)
+    {
+        b.ToTable("land_disposal", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.DisposalNumber).HasMaxLength(40);
+        b.Property(x => x.Type).HasConversion<int>();
+        b.Property(x => x.Counterparty).HasMaxLength(200);
+        b.Property(x => x.ResolutionReference).HasMaxLength(100);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+        b.Property(x => x.AreaSquareMetres).HasPrecision(19, 4);
+        b.Property(x => x.CostDerecognised).HasPrecision(19, 4);
+        b.Property(x => x.Consideration).HasPrecision(19, 4);
+        b.Ignore(x => x.GainOrLoss);
+        b.HasOne<LandParcel>().WithMany().HasForeignKey(x => x.LandParcelId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<LandParcel>().WithMany().HasForeignKey(x => x.ExchangeParcelId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.DisposalNumber }).IsUnique();
+    }
+}

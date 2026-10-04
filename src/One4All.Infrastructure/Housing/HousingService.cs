@@ -169,7 +169,7 @@ public sealed class HousingService : IHousingService
 
         if (await StandClaims.AnyBlockedAsync(_db, [standId], ct).ConfigureAwait(false))
         {
-            return Error.Rule("Housing.StandBlocked", $"Stand {stand.StandNumber} is blocked by a caveat and cannot be sold.");
+            return Error.Rule("Housing.StandBlocked", $"Stand {stand.StandNumber} is blocked by a caveat or an open land dispute and cannot be sold.");
         }
 
         Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
@@ -247,7 +247,7 @@ public sealed class HousingService : IHousingService
 
         if (await StandClaims.AnyBlockedAsync(_db, [standId], ct).ConfigureAwait(false))
         {
-            return Result.Failure(Error.Rule("Housing.StandBlocked", $"Stand {stand.StandNumber} is blocked by a caveat and cannot be transferred."));
+            return Result.Failure(Error.Rule("Housing.StandBlocked", $"Stand {stand.StandNumber} is blocked by a caveat or an open land dispute and cannot be transferred."));
         }
 
         if (!housingAccountClear)

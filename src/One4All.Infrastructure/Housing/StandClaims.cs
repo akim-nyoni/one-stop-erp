@@ -13,13 +13,19 @@ internal static class StandClaims
 {
     private static readonly AllocationStatus[] Live = [AllocationStatus.Proposed, AllocationStatus.Offered, AllocationStatus.Accepted];
 
-    /// <summary>Whether any of the stands is blocked by a caveat in force.</summary>
+    /// <summary>
+    /// Whether any of the stands is blocked: by a stand block in force, a caveat in force on its parent parcel, or an open
+    /// land dispute over the stand itself.
+    /// </summary>
     /// <param name="db">The database context.</param>
     /// <param name="standIds">The stands.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>True when at least one is blocked.</returns>
-    public static Task<bool> AnyBlockedAsync(One4AllDbContext db, IReadOnlyCollection<long> standIds, CancellationToken ct)
-        => db.Set<StandBlock>().AnyAsync(b => standIds.Contains(b.StandId) && b.LiftedOn == null, ct);
+    public static async Task<bool> AnyBlockedAsync(One4AllDbContext db, IReadOnlyCollection<long> standIds, CancellationToken ct)
+        => await db.Set<StandBlock>().AnyAsync(b => standIds.Contains(b.StandId) && b.LiftedOn == null, ct).ConfigureAwait(false)
+            || await db.Set<LandEncumbrance>().AnyAsync(e => e.Type == EncumbranceType.Caveat && e.LiftedOn == null
+                && db.HousingStands.Any(s => standIds.Contains(s.Id) && s.LandParcelId == e.LandParcelId), ct).ConfigureAwait(false)
+            || await db.Set<LandDispute>().AnyAsync(d => d.StandId != null && standIds.Contains(d.StandId.Value) && d.Stage != LandDisputeStage.Resolved, ct).ConfigureAwait(false);
 
     /// <summary>Whether any of the stands is blocked, or already promised through any route.</summary>
     /// <param name="db">The database context.</param>

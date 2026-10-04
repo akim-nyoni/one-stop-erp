@@ -10,6 +10,9 @@ public enum LandParcelStatus
 
     /// <summary>Subdivided into stands; cost released to Stands Available for Sale.</summary>
     Subdivided = 2,
+
+    /// <summary>Wholly disposed of or exchanged away (brief §14 H6).</summary>
+    Disposed = 3,
 }
 
 /// <summary>
@@ -66,6 +69,19 @@ public sealed class LandParcel : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Marks the parcel subdivided once its stands have been created.</summary>
     public void MarkSubdivided() => Status = LandParcelStatus.Subdivided;
+
+    /// <summary>Takes area and its cost out of the parcel on a disposal; disposed of once nothing is left.</summary>
+    /// <param name="areaSquareMetres">The area disposed of.</param>
+    /// <param name="cost">The cost taken out with it.</param>
+    public void ReleaseArea(decimal areaSquareMetres, decimal cost)
+    {
+        AreaSquareMetres -= areaSquareMetres;
+        AcquisitionCost -= cost;
+        if (AreaSquareMetres <= 0m)
+        {
+            Status = LandParcelStatus.Disposed;
+        }
+    }
 
     /// <summary>The mapped boundary, once surveyed onto the map.</summary>
     public MappedBoundary? Boundary { get; private set; }

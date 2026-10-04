@@ -43,7 +43,7 @@ public sealed class TitleDeedService : ITitleDeedService
 
         if (await StandClaims.AnyBlockedAsync(_db, [standId], ct).ConfigureAwait(false))
         {
-            return Error.Rule("Hse.StandBlocked", $"Stand {stand.StandNumber} is blocked by a caveat; title cannot be processed.");
+            return Error.Rule("Hse.StandBlocked", $"Stand {stand.StandNumber} is blocked by a caveat or an open land dispute; title cannot be processed.");
         }
 
         if (await _db.Set<TitleDeed>().AnyAsync(t => t.StandId == standId, ct).ConfigureAwait(false))
@@ -100,7 +100,7 @@ public sealed class TitleDeedService : ITitleDeedService
 
         if (await StandClaims.AnyBlockedAsync(_db, [title.StandId], ct).ConfigureAwait(false))
         {
-            return Result.Failure(Error.Rule("Hse.StandBlocked", "The stand is blocked by a caveat; title cannot be processed."));
+            return Result.Failure(Error.Rule("Hse.StandBlocked", "The stand is blocked by a caveat or an open land dispute; title cannot be processed."));
         }
 
         switch (step.Stage)

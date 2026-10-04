@@ -134,6 +134,9 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             "HOUSINGSCHEMEDELIVERY" => await SchemeDeliveryAsync(companyId, ct).ConfigureAwait(false),
             "HOUSINGSCHEMEPROFITABILITY" => await SchemeProfitabilityAsync(companyId, ct).ConfigureAwait(false),
             "HOUSINGDELIVERYRETURN" => await DeliveryReturnAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "HOUSINGLANDDISPOSALS" => await LandDisposalsAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGENCUMBRANCES" => await EncumbrancesAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGLANDDISPUTES" => await LandDisputesAsync(companyId, asAt, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -1346,6 +1349,42 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             .GroupBy(x => x).OrderBy(g => g.Key.Density, StringComparer.Ordinal).ThenBy(g => g.Key.Tenure, StringComparer.Ordinal).ThenBy(g => g.Key.Category, StringComparer.Ordinal)
             .Select(g => Row(("Density", g.Key.Density), ("Tenure", g.Key.Tenure), ("Category", g.Key.Category), ("Stands", g.Count())))];
     }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LandDisposalsAsync(long companyId, CancellationToken ct)
+    {
+        Dictionary<long, string> parcels = await ParcelNumbersAsync(companyId, ct).ConfigureAwait(false);
+        return [.. (await _db.Set<LandDisposal>().AsNoTracking().Where(d => d.CompanyId == companyId).OrderBy(d => d.Date).ThenBy(d => d.DisposalNumber).ToListAsync(ct).ConfigureAwait(false))
+            .Select(d => Row(("Disposal", d.DisposalNumber), ("Date", Date(d.Date)), ("Parcel", parcels.GetValueOrDefault(d.LandParcelId, "?")), ("Type", d.Type.ToString()),
+                ("Counterparty", d.Counterparty), ("Resolution", d.ResolutionReference), ("Area", d.AreaSquareMetres.ToString("N2", CultureInfo.InvariantCulture)), ("Cost", Money(d.CostDerecognised)),
+                ("Consideration", Money(d.Consideration)), ("Received", d.ExchangeParcelId is long r ? parcels.GetValueOrDefault(r, "?") : "—"), ("GainOrLoss", d.GainOrLoss)))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EncumbrancesAsync(long companyId, CancellationToken ct)
+    {
+        Dictionary<long, string> parcels = await ParcelNumbersAsync(companyId, ct).ConfigureAwait(false);
+        return [.. (await _db.Set<LandEncumbrance>().AsNoTracking().Where(e => e.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false))
+            .OrderBy(e => parcels.GetValueOrDefault(e.LandParcelId), StringComparer.Ordinal).ThenBy(e => e.RegisteredOn).ThenBy(e => e.Id)
+            .Select(e => Row(("Parcel", parcels.GetValueOrDefault(e.LandParcelId, "?")), ("Type", e.Type.ToString()), ("Reference", e.Reference), ("InFavourOf", e.InFavourOf),
+                ("Registered", Date(e.RegisteredOn)), ("Status", e.LiftedOn is DateOnly lifted ? $"Lifted {Date(lifted)}" : "In force"), ("Description", e.Description)))];
+    }
+
+    // Disputes open at the date, at the stage they had reached by then (from the dated steps).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LandDisputesAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        Dictionary<long, string> parcels = await ParcelNumbersAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> stands = await StandNumbersAsync(companyId, ct).ConfigureAwait(false);
+        List<LandDispute> disputes = await _db.Set<LandDispute>().AsNoTracking().Include(d => d.Steps).Where(d => d.CompanyId == companyId && d.OpenedOn <= asAt)
+            .OrderBy(d => d.OpenedOn).ThenBy(d => d.DisputeNumber).ToListAsync(ct).ConfigureAwait(false);
+        return [.. disputes.Select(d => (Dispute: d, Step: d.Steps.Where(s => s.Date <= asAt).OrderBy(s => s.Stage).Last()))
+            .Where(x => x.Step.Stage != LandDisputeStage.Resolved)
+            .Select(x => Row(("Dispute", x.Dispute.DisputeNumber), ("Parcel", parcels.GetValueOrDefault(x.Dispute.LandParcelId, "?")),
+                ("Stand", x.Dispute.StandId is long s ? stands.GetValueOrDefault(s, "?") : "—"), ("Type", x.Dispute.Type.ToString()), ("Claimant", x.Dispute.Claimant),
+                ("Opened", Date(x.Dispute.OpenedOn)), ("Stage", x.Step.Stage.ToString()), ("StageSince", Date(x.Step.Date)),
+                ("AgeDays", LandRegisterRules.AgeInDays(x.Dispute.OpenedOn, null, asAt))))];
+    }
+
+    private Task<Dictionary<long, string>> ParcelNumbersAsync(long companyId, CancellationToken ct)
+        => _db.Set<LandParcel>().AsNoTracking().IgnoreQueryFilters().Where(p => p.CompanyId == companyId).ToDictionaryAsync(p => p.Id, p => p.ParcelNumber, ct);
 
     private static string? Text(IReadOnlyDictionary<string, object?> parameters, string name)
         => parameters.TryGetValue(name, out object? value) && value is string text && text.Trim().Length > 0 ? text.Trim() : null;

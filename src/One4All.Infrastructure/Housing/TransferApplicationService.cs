@@ -74,7 +74,7 @@ public sealed class TransferApplicationService : ITransferApplicationService
 
         if (await StandClaims.AnyBlockedAsync(_db, [stand.Id], ct).ConfigureAwait(false))
         {
-            return Error.Rule("Hse.StandBlocked", $"Stand {stand.StandNumber} is blocked by a caveat and cannot be transferred.");
+            return Error.Rule("Hse.StandBlocked", $"Stand {stand.StandNumber} is blocked by a caveat or an open land dispute and cannot be transferred.");
         }
 
         if (await _db.Set<TransferApplication>().AnyAsync(a => a.StandId == stand.Id && a.Status != TransferStatus.Completed && a.Status != TransferStatus.Rejected, ct).ConfigureAwait(false))

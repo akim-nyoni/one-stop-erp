@@ -107,6 +107,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Housing.IInformalSettlementService, Housing.InformalSettlementService>();
         services.AddScoped<Application.Abstractions.Housing.IDeveloperAgreementService, Housing.DeveloperAgreementService>();
         services.AddScoped<Application.Abstractions.Housing.IStandBlockService, Housing.StandBlockService>();
+        services.AddScoped<Application.Abstractions.Housing.ILandRegisterService, Housing.LandRegisterService>();
         services.AddScoped<Application.Abstractions.Housing.ITitleDeedService, Housing.TitleDeedService>();
         services.AddScoped<Application.Abstractions.Housing.ITransferApplicationService, Housing.TransferApplicationService>();
         services.AddScoped<Application.Abstractions.Housing.ILandAcquisitionService, Housing.LandAcquisitionService>();

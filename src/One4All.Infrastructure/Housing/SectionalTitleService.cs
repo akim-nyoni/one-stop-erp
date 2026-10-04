@@ -96,7 +96,7 @@ public sealed class SectionalTitleService : ISectionalTitleService
 
         if (await StandClaims.AnyBlockedAsync(_db, [found.Value.StandId], ct).ConfigureAwait(false))
         {
-            return Result.Failure(Error.Rule("Hse.StandBlocked", "The building's stand is blocked by a caveat; no unit can be transferred."));
+            return Result.Failure(Error.Rule("Hse.StandBlocked", "The building's stand is blocked by a caveat or an open land dispute; no unit can be transferred."));
         }
 
         unit.Transfer(toCustomerId, date, consideration);

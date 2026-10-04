@@ -1263,6 +1263,31 @@ app.MapGet("/api/housing/stands/blocked", async (long companyId, One4All.Applica
 .RequireAuthorization()
 .WithName("BlockedStands");
 
+app.MapPost("/api/housing/land/encumbrances", async (One4All.Application.Abstractions.Housing.EncumbranceRegistration registration, One4All.Application.Abstractions.Housing.ILandRegisterService land, CancellationToken ct) =>
+    ValueResponse(await land.RegisterEncumbranceAsync(registration, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RegisterEncumbrance");
+
+app.MapPost("/api/housing/land/encumbrances/{encumbranceId:long}/lift", async (long encumbranceId, long companyId, DateOnly date, string reference, One4All.Application.Abstractions.Housing.ILandRegisterService land, CancellationToken ct) =>
+    ActionResponse(await land.LiftEncumbranceAsync(companyId, encumbranceId, date, reference, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LiftEncumbrance");
+
+app.MapPost("/api/housing/land/disputes", async (One4All.Application.Abstractions.Housing.LandDisputeLodgement lodgement, One4All.Application.Abstractions.Housing.ILandRegisterService land, CancellationToken ct) =>
+    ValueResponse(await land.OpenDisputeAsync(lodgement, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("OpenLandDispute");
+
+app.MapPost("/api/housing/land/disputes/{disputeNumber}/advance", async (string disputeNumber, long companyId, One4All.Core.Housing.LandDisputeStage stage, DateOnly date, string note, One4All.Application.Abstractions.Housing.ILandRegisterService land, CancellationToken ct) =>
+    ActionResponse(await land.AdvanceDisputeAsync(companyId, disputeNumber, stage, date, note, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AdvanceLandDispute");
+
+app.MapPost("/api/housing/land/disposals", async (One4All.Application.Abstractions.Housing.LandDisposalRequest request, One4All.Application.Abstractions.Housing.ILandRegisterService land, CancellationToken ct) =>
+    ValueResponse(await land.DisposeAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DisposeOfLand");
+
 app.MapPost("/api/housing/titles", async (long companyId, long standId, DateOnly date, One4All.Application.Abstractions.Housing.ITitleDeedService titles, CancellationToken ct) =>
     ValueResponse(await titles.ApplyAsync(companyId, standId, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

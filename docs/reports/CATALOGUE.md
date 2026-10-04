@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-205 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+208 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -106,6 +106,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H57 | Change of Ownership Register | Completed transfers by type with parties, consideration and clearance relied on. | — | Application, Stand, Type, From, To, Completed, Clearance, Consideration | — | Sum(Consideration) |
 | H58 | Transfers in Progress / Pending Approval | Open transfer applications with status, approvals and age. | AsAtDate (Date, optional) | Application, Stand, Type, Status, Approvals, DaysOpen, Waiting | — | — |
 | H59 | Transfers Blocked by Outstanding Rates or Housing Arrears | Open transfers failing a live check, with what is needed to clear them. | AsAtDate (Date, optional) | Application, Stand, Check, Detail | — | — |
+| H6 | Land Disposals & Exchanges Register | Land sold, exchanged, donated or expropriated: resolution, area, cost out, consideration and gain or loss. | — | Disposal, Date, Parcel, Type, Counterparty, Resolution, Area, Cost, Consideration, Received, GainOrLoss | — | Sum(GainOrLoss) |
 | H60 | Transfer Checklist Exception Report | Open transfer applications and the mandatory documents still missing. | — | Application, Stand, Type, Status, Lodged, Missing | — | — |
 | H61 | Deceased Estate Transfers Register | Inheritance and deceased-joint-holder transfers with the estate documents relied on. | — | Application, Stand, Type, Deceased, Beneficiary, Status, Documents | — | — |
 | H62 | Development Levy & Transfer Fee Collection | Levies and fees raised, by levy, with the event they were raised on. | — | Levy, Event, Stand, Customer, ChargedOn, Invoice, Amount | — | Sum(Amount) |
@@ -115,6 +116,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H67 | Conveyancer Performance | Files allocated, registered, average days to registration and registry queries per conveyancer. | — | Conveyancer, Files, Registered, AverageDays, Queries | — | — |
 | H68 | Caveats, Blocks & Disputes Register | Every block placed: reason, particulars, document, who placed and lifted it, age. | AsAtDate (Date, optional) | Stand, Reason, Detail, Document, PlacedOn, State, AgeDays | — | — |
 | H69 | Stands with No Recorded Owner / Broken Ownership Chain | Data-integrity exceptions — must be empty. | — | Stand, Problem | — | — |
+| H7 | Encumbrances, Servitudes & Caveats on Land | Every right or restriction registered against land, in force or lifted. | — | Parcel, Type, Reference, InFavourOf, Registered, Status, Description | — | — |
 | H70 | Sectional Title Unit Register & Participation Quotas | Units of every sectional scheme with floor area, quota and owner. | — | Scheme, Building, Unit, FloorArea, Quota, Owner | — | — |
 | H71 | Rent Roll | Let units with tenant, rent and arrears. | — | Unit, Type, Tenancy, Tenant, Since, Rent, Arrears | — | Sum(Arrears) |
 | H72 | Housing Stock Register & Condition | Every unit with type, rooms, occupancy and its latest inspection grade. | — | Unit, Description, Type, Rooms, Occupancy, Inspected, Grade | — | — |
@@ -125,6 +127,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H77 | Lease Expiry & Renewal Due | Stand leases and tenancies ending within a year of the date. | AsAtDate (Date, optional) | Kind, Reference, Subject, Ends, DaysLeft | — | — |
 | H78 | Tenant Deposits Held | Deposits held on active tenancies (a liability listing). | — | Tenancy, Unit, Tenant, Since, Deposit | — | Sum(Deposit) |
 | H79 | Maintenance & Repairs Cost per Unit | Completed repairs per unit, separating what was recharged to tenants. | — | Unit, Repairs, Recharged, Council, Cost | — | Sum(Cost) |
+| H8 | Disputed & Encroached Land | Disputes open at the date with their age and current legal stage. | AsAtDate (Date, optional) | Dispute, Parcel, Stand, Type, Claimant, Opened, Stage, StageSince, AgeDays | — | — |
 | H80 | Inspections Due & Findings Summary | Units never inspected or not inspected for a year, and follow-ups outstanding. | AsAtDate (Date, optional) | Unit, LastInspected, Grade, Due | — | — |
 | H81 | Straight-lined Rental Income Schedule (IFRS 16) | Each stand lease's contractual rent per year against the straight-line income recognised. | — | Lease, Year, Contractual, StraightLine, Difference | — | Sum(Difference) |
 | H82 | Scheme Delivery Dashboard | Per scheme: target, stands created, serviced, allocated, sold and titled, and % delivered. | — | Scheme, Target, Stands, Serviced, Allocated, Sold, Titled, Delivered | — | — |

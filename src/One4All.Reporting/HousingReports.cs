@@ -27,6 +27,16 @@ public static class HousingReports
         yield return Listing("H5", "Compulsory Acquisition Compensation Register", "Housing", "Compensation claims with provision, settlement and status.", "HousingCompensation",
             [new Column("Claim", "Claim", 90), new Column("Parcel", "Parcel", 90), new Column("Claimant", "Claimant", 160), new Column("Lodged", "Lodged", 80),
              new Column("Status", "Status", 80), new Column("Provision", "Provision", 90, true), new Column("Settled", "Settled", 90, true)], []);
+        yield return Listing("H6", "Land Disposals & Exchanges Register", "Housing", "Land sold, exchanged, donated or expropriated: resolution, area, cost out, consideration and gain or loss.",
+            "HousingLandDisposals", [new Column("Disposal", "Disposal", 80), new Column("Date", "Date", 75), new Column("Parcel", "Parcel", 80), new Column("Type", "Type", 85),
+             new Column("Counterparty", "Counterparty", 150), new Column("Resolution", "Resolution", 90), new Column("Area", "Area m²", 75), new Column("Cost", "Cost out", 90),
+             new Column("Consideration", "Consideration", 90), new Column("Received", "Parcel received", 90), new Column("GainOrLoss", "Gain / (loss)", 90, true)], []);
+        yield return Listing("H7", "Encumbrances, Servitudes & Caveats on Land", "Housing", "Every right or restriction registered against land, in force or lifted.", "HousingEncumbrances",
+            [new Column("Parcel", "Parcel", 80), new Column("Type", "Type", 110), new Column("Reference", "Reference", 90), new Column("InFavourOf", "In favour of", 150),
+             new Column("Registered", "Registered", 75), new Column("Status", "Status", 110), new Column("Description", "Particulars", 220)], []);
+        yield return Listing("H8", "Disputed & Encroached Land", "Housing", "Disputes open at the date with their age and current legal stage.", "HousingLandDisputes",
+            [new Column("Dispute", "Dispute", 80), new Column("Parcel", "Parcel", 80), new Column("Stand", "Stand", 70), new Column("Type", "Type", 90), new Column("Claimant", "Claimant", 140),
+             new Column("Opened", "Opened", 75), new Column("Stage", "Stage", 90), new Column("StageSince", "Since", 75), new Column("AgeDays", "Age (days)", 65)], [("AsAtDate", ParameterType.Date)]);
 
         // Planning, survey & servicing.
         yield return Listing("H10", "Layout Plans Register & Approval Status", "Housing", "Layouts with the version in force, pending amendments and approval turnaround.", "HousingLayouts",
