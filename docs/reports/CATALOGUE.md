@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-179 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+194 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -87,31 +87,46 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H40 | Beneficiaries with More Than One Stand | People (by national ID) holding or allocated more than one stand across schemes. | — | IdNumber, Name, Stands, Detail | — | — |
 | H41 | Allocation-to-Agreement Conversion | Accepted allocations with no agreement or instalment sale yet, with age since acceptance. | AsAtDate (Date, optional) | Certificate, Stand, Beneficiary, AcceptedOn, DaysWaiting | — | — |
 | H42 | Agreement Register | Agreements by type with party, stand, version in force, signature and price. | — | Agreement, Type, Party, Stand, Version, Status, Price | — | Sum(Price) |
+| H44 | Instalment Amortisation Schedule | Each instalment's capital, interest and balance — for one agreement or all. | AgreementNumber (String, optional) | Agreement, Number, Due, Interest, Principal, Balance, State, Amount | — | Sum(Amount) |
+| H45 | Housing Debtors Age Analysis | Instalment-sale debtors aged 30/60/90/120+ by scheme, as at any date. | AsAtDate (Date, optional) | Scheme, Debtor, Current, D30, D60, D90, D120, Over120, Total | — | Sum(Total) |
+| H46 | Instalment Arrears & Default Report | Active instalment sales with overdue instalments, amount owing and last payment. | AsAtDate (Date, optional) | Agreement, Stand, Buyer, Overdue, LastPaid, Owing | — | Sum(Owing) |
 | H49 | Fully Paid / Ready for Transfer | Sold stands whose holders owe nothing and have no title application — the most actionable list. | — | Stand, Holder, Status, SoldOn, Price | — | Sum(Price) |
 | H5 | Compulsory Acquisition Compensation Register | Compensation claims with provision, settlement and status. | — | Claim, Parcel, Claimant, Lodged, Status, Provision, Settled | — | Sum(Settled) |
+| H50 | Early Settlement & Rebate Report | Instalment sales settled early with the interest rebated. | — | Agreement, Stand, Buyer, SettledOn, Rebated, InterestRebated | — | Sum(InterestRebated) |
+| H52 | Expected Credit Loss (IFRS 9) Provision Working | Housing debtors' exposure and provision by portfolio and arrears band, with the allowance booked. | AsAtDate (Date, optional) | Portfolio, Band, Exposure, Provision | — | Sum(Provision) |
 | H54 | Development Covenant Compliance | Covenants with the latest milestone, deadline, extensions and breach status. | AsAtDate (Date, optional) | Covenant, Stand, Holder, Deadline, Milestone, Extensions, Status, DaysLeft | — | — |
 | H55 | Repossession Register | Stands repossessed with the receivable derecognised, NRV, inventory recognised and gain or loss. | — | Reference, Stand, Date, Reason, Receivable, Nrv, Inventory, GainOrLoss | — | Sum(GainOrLoss) |
 | H56 | Ownership History / Chain of Title per Stand | Every holder of a stand in sequence with the change type, date and consideration, and whether the hash chain verifies. | StandNumber (String, optional) | Stand, Sequence, ChangeType, Holder, Effective, ChainVerified, Consideration | — | Sum(Consideration) |
 | H57 | Change of Ownership Register | Completed transfers by type with parties, consideration and clearance relied on. | — | Application, Stand, Type, From, To, Completed, Clearance, Consideration | — | Sum(Consideration) |
 | H58 | Transfers in Progress / Pending Approval | Open transfer applications with status, approvals and age. | AsAtDate (Date, optional) | Application, Stand, Type, Status, Approvals, DaysOpen, Waiting | — | — |
 | H59 | Transfers Blocked by Outstanding Rates or Housing Arrears | Open transfers failing a live check, with what is needed to clear them. | AsAtDate (Date, optional) | Application, Stand, Check, Detail | — | — |
+| H61 | Deceased Estate Transfers Register | Inheritance and deceased-joint-holder transfers with the estate documents relied on. | — | Application, Stand, Type, Deceased, Beneficiary, Status, Documents | — | — |
+| H62 | Development Levy & Transfer Fee Collection | Levies and fees raised, by levy, with the event they were raised on. | — | Levy, Event, Stand, Customer, ChargedOn, Invoice, Amount | — | Sum(Amount) |
 | H64 | Title Deed Pipeline Report | Open title applications with stage, days at the stage, days since applied and conveyancer. | AsAtDate (Date, optional) | Application, Stand, Stage, DaysAtStage, DaysSinceApplied, Conveyancer | — | — |
 | H65 | Title Deeds Held but Uncollected | Deeds in council custody not yet handed over, aged, with the owner's contact — the chase list. | AsAtDate (Date, optional) | Application, Stand, Deed, Owner, Contact, DaysHeld | — | — |
 | H66 | Deeds Register | Registered deeds with registration date and current custody. | — | Deed, Stand, Registered, Custody | — | — |
+| H67 | Conveyancer Performance | Files allocated, registered, average days to registration and registry queries per conveyancer. | — | Conveyancer, Files, Registered, AverageDays, Queries | — | — |
 | H68 | Caveats, Blocks & Disputes Register | Every block placed: reason, particulars, document, who placed and lifted it, age. | AsAtDate (Date, optional) | Stand, Reason, Detail, Document, PlacedOn, State, AgeDays | — | — |
 | H69 | Stands with No Recorded Owner / Broken Ownership Chain | Data-integrity exceptions — must be empty. | — | Stand, Problem | — | — |
 | H70 | Sectional Title Unit Register & Participation Quotas | Units of every sectional scheme with floor area, quota and owner. | — | Scheme, Building, Unit, FloorArea, Quota, Owner | — | — |
 | H71 | Rent Roll | Let units with tenant, rent and arrears. | — | Unit, Type, Tenancy, Tenant, Since, Rent, Arrears | — | Sum(Arrears) |
 | H72 | Housing Stock Register & Condition | Every unit with type, rooms, occupancy and its latest inspection grade. | — | Unit, Description, Type, Rooms, Occupancy, Inspected, Grade | — | — |
 | H73 | Occupancy & Voids Report | Void units with days void and rent lost to voids. | AsAtDate (Date, optional) | Unit, Type, VacantSince, DaysVoid, RentLost | — | Sum(RentLost) |
+| H75 | Rent Arrears Age Analysis | Tenants' arrears aged 30/60/90/120+ by unit type, as at any date. | AsAtDate (Date, optional) | Type, Tenant, Current, D30, D60, D90, D120, Over120, Total | — | Sum(Total) |
 | H76 | Eviction Pipeline & Register | Eviction cases with the current stage, its date and the arrears at opening. | — | Case, Tenancy, Stage, StageDate, Status, Arrears | — | Sum(Arrears) |
 | H77 | Lease Expiry & Renewal Due | Stand leases and tenancies ending within a year of the date. | AsAtDate (Date, optional) | Kind, Reference, Subject, Ends, DaysLeft | — | — |
+| H78 | Tenant Deposits Held | Deposits held on active tenancies (a liability listing). | — | Tenancy, Unit, Tenant, Since, Deposit | — | Sum(Deposit) |
+| H79 | Maintenance & Repairs Cost per Unit | Completed repairs per unit, separating what was recharged to tenants. | — | Unit, Repairs, Recharged, Council, Cost | — | Sum(Cost) |
 | H80 | Inspections Due & Findings Summary | Units never inspected or not inspected for a year, and follow-ups outstanding. | AsAtDate (Date, optional) | Unit, LastInspected, Grade, Due | — | — |
+| H81 | Straight-lined Rental Income Schedule (IFRS 16) | Each stand lease's contractual rent per year against the straight-line income recognised. | — | Lease, Year, Contractual, StraightLine, Difference | — | Sum(Difference) |
 | H85 | Developer / Joint Venture Reconciliation | Stands contracted vs delivered per quota, overdue milestones and penalties. | AsAtDate (Date, optional) | Agreement, Quota, Contracted, HandedOver, Outstanding, OverdueMilestones, PenaltyAccrued | — | Sum(PenaltyAccrued) |
 | H86 | Housing Cooperative Register | Cooperatives with active members, stands held and stands sub-allocated. | — | Cooperative, Name, Registration, Members, Stands, SubAllocated | — | — |
 | H87 | Informal Settlement / Enumeration Register | Settlements with ward, cut-off date, households counted and eligible. | — | Settlement, Name, Ward, CutOff, Households, Eligible, Plan | — | — |
 | H88 | Regularisation Progress Report | Per settlement: enumerated → eligible → waiting-listed or regularised → outstanding. | — | Settlement, Enumerated, Eligible, WaitingListed, Regularised, Outstanding | — | — |
 | H89 | Housing Subsidy & Grant Utilisation | Grants received, spent, recognised and deferred (IAS 20), with conditions. | — | Grant, Grantor, Received, Conditions, Amount, Spent, Recognised, Deferred | — | Sum(Deferred) |
+| H90 | Housing Audit Trail Report | Every recorded change to housing records — before and after values, user, time. | AsAtDate (Date, optional) | When, User, Entity, Id, Action, Changed | — | — |
+| H92 | Segregation of Duties Violations — Housing | Users whose permissions combine housing duties that must be separated. | — | User, Rule, Conflict | — | — |
+| H95 | Housing Executive Dashboard | Land bank, stands, waiting list, allocations, titles and debtors at a glance. | AsAtDate (Date, optional) | Measure, Value | — | — |
 | HSE-STAND | Housing Stand Register | Stands with status, apportioned cost, selling price and current holder. | — | StandNumber, Status, Holder, AllocatedCost, SellingPrice | — | Sum(SellingPrice) |
 
 ## HumanResources

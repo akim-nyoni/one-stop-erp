@@ -7,6 +7,8 @@ using One4All.Core.Housing;
 using One4All.Core.JobCosting;
 using One4All.Infrastructure.Housing;
 using One4All.Infrastructure.Persistence;
+using One4All.Infrastructure.Trading;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace One4All.Infrastructure.Reporting;
 
@@ -22,6 +24,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
     private readonly IDeveloperAgreementService _developers;
     private readonly IInformalSettlementService _settlements;
     private readonly IAllocationService _allocations;
+    private readonly IServiceProvider _services;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
@@ -31,10 +34,12 @@ public sealed class HousingReportDataProvider : IReportDataProvider
     /// <param name="developers">Developer agreements (for their reconciliation).</param>
     /// <param name="settlements">Informal settlements (for regularisation progress).</param>
     /// <param name="allocations">Allocation runs (for ballot re-verification).</param>
+    /// <param name="services">Resolves the services the less common reports need (ECL, leases, permissions) only when run.</param>
     public HousingReportDataProvider(One4AllDbContext db, IWaitingListService waitingList, ITitleDeedService titles, ITransferApplicationService transfers,
-        IDeveloperAgreementService developers, IInformalSettlementService settlements, IAllocationService allocations)
+        IDeveloperAgreementService developers, IInformalSettlementService settlements, IAllocationService allocations, IServiceProvider services)
     {
         _allocations = allocations;
+        _services = services;
         _db = db;
         _waitingList = waitingList;
         _titles = titles;
@@ -103,6 +108,21 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             "HOUSINGMULTIPLESTANDS" => await MultipleStandsAsync(companyId, ct).ConfigureAwait(false),
             "HOUSINGUNCONVERTED" => await UnconvertedAsync(companyId, asAt, ct).ConfigureAwait(false),
             "HOUSINGAGREEMENTS" => await AgreementsAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGAMORTISATION" => await AmortisationAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "HOUSINGDEBTORSAGEING" => await InstalmentAgeingAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "HOUSINGRENTAGEING" => await RentAgeingAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "HOUSINGINSTALMENTARREARS" => await InstalmentArrearsAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "HOUSINGEARLYSETTLEMENTS" => await EarlySettlementsAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGECL" => await EclAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "HOUSINGESTATETRANSFERS" => await EstateTransfersAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGLEVIES" => await LeviesAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGCONVEYANCERS" => await ConveyancersAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGTENANTDEPOSITS" => await TenantDepositsAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGREPAIRCOSTS" => await RepairCostsAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGLEASESCHEDULE" => await LeaseScheduleAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGAUDITTRAIL" => await AuditTrailAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "HOUSINGSODVIOLATIONS" => await SodViolationsAsync(ct).ConfigureAwait(false),
+            "HOUSINGDASHBOARD" => await DashboardAsync(companyId, asAt, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -812,6 +832,244 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                 ("Price", (inForce ?? latest).Price));
         })];
     }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AmortisationAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        string? only = parameters.TryGetValue("AgreementNumber", out object? value) && value is string text && text.Length > 0 ? text.Trim() : null;
+        List<InstalmentAgreement> agreements = await _db.Set<InstalmentAgreement>().AsNoTracking().Include(a => a.Lines)
+            .Where(a => a.CompanyId == companyId && (only == null || a.AgreementNumber == only)).OrderBy(a => a.AgreementNumber).ToListAsync(ct).ConfigureAwait(false);
+        return [.. agreements.SelectMany(a => a.Lines.OrderBy(l => l.Number).Select(l => Row(("Agreement", a.AgreementNumber), ("Number", l.Number), ("Due", Date(l.DueDate)),
+            ("Interest", Money(l.Interest)), ("Principal", Money(l.Principal)), ("Balance", Money(l.BalanceAfter)), ("State", l.Rebated ? "Rebated" : l.Raised ? "Raised" : "Future"), ("Amount", l.Amount))))];
+    }
+
+    // Tenants' open items, aged by due date as at the date; unallocated credits reduce the current band.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RentAgeingAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        Dictionary<long, string> types = (await (from t in _db.Set<Tenancy>().AsNoTracking() join u in _db.Set<RentalUnit>().AsNoTracking() on t.UnitId equals u.Id
+                                                 where t.CompanyId == companyId select new { t.TenantCustomerId, t.StartDate, u.UnitType }).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(t => t.TenantCustomerId).ToDictionary(g => g.Key, g => g.OrderByDescending(t => t.StartDate).First().UnitType.ToString());
+        Dictionary<long, string> names = await CustomerNamesAsync(companyId, ct).ConfigureAwait(false);
+        List<OpenItemAsAt> items = [.. (await OpenItemsAsAt.LoadAsync(_db, companyId, Core.Trading.TradingLedger.AccountsReceivable, asAt, ct).ConfigureAwait(false)).Where(i => types.ContainsKey(i.Item.TraderId))];
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (IGrouping<long, OpenItemAsAt> tenant in items.GroupBy(i => i.Item.TraderId).OrderBy(g => types[g.Key], StringComparer.Ordinal).ThenBy(g => names.GetValueOrDefault(g.Key), StringComparer.Ordinal))
+        {
+            decimal[] bands = new decimal[DebtorAgeing.Bands.Count];
+            foreach (OpenItemAsAt item in tenant)
+            {
+                decimal signed = item.Signed(Core.Trading.LedgerSign.Debit);
+                bands[signed < 0m ? 0 : DebtorAgeing.Band(item.Item.DueDate, asAt)] += signed;
+            }
+
+            if (bands.Sum() != 0m)
+            {
+                rows.Add(AgeingRow("Type", types[tenant.Key], "Tenant", names.GetValueOrDefault(tenant.Key, "?"), bands));
+            }
+        }
+
+        return rows;
+    }
+
+    // Instalment buyers: the unbilled principal is current; the arrears sit in the latest raised instalments (DebtorAgeing.AgeInstalments).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> InstalmentAgeingAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<InstalmentDebtor> debtors = await InstalmentDebtorsAsync(companyId, asAt, ct).ConfigureAwait(false);
+        Dictionary<long, string> names = await CustomerNamesAsync(companyId, ct).ConfigureAwait(false);
+        return [.. debtors.Where(d => d.Owing != 0m).OrderBy(d => d.Scheme, StringComparer.Ordinal).ThenBy(d => names.GetValueOrDefault(d.BuyerId), StringComparer.Ordinal)
+            .Select(d => AgeingRow("Scheme", d.Scheme, "Debtor", names.GetValueOrDefault(d.BuyerId, "?"), DebtorAgeing.AgeInstalments(d.Owing, d.NotYetBilled, d.Raised, asAt)))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> InstalmentArrearsAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<InstalmentDebtor> debtors = await InstalmentDebtorsAsync(companyId, asAt, ct).ConfigureAwait(false);
+        List<long> buyers = [.. debtors.Select(d => d.BuyerId)];
+        Dictionary<long, DateOnly> lastPaid = await _db.OpenItems.AsNoTracking()
+            .Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsReceivable && i.ItemType == Core.Trading.OpenItemType.Receipt && buyers.Contains(i.TraderId) && i.DocumentDate <= asAt)
+            .GroupBy(i => i.TraderId).Select(g => new { g.Key, Last = g.Max(i => i.DocumentDate) }).ToDictionaryAsync(x => x.Key, x => x.Last, ct).ConfigureAwait(false);
+        Dictionary<long, string> names = await CustomerNamesAsync(companyId, ct).ConfigureAwait(false);
+        return [.. debtors.Select(d => (Debtor: d, Arrears: d.Owing - d.NotYetBilled)).Where(x => x.Arrears > 0m).OrderBy(x => x.Debtor.Agreements, StringComparer.Ordinal)
+            .Select(x => Row(("Agreement", x.Debtor.Agreements), ("Stand", x.Debtor.Stands), ("Buyer", names.GetValueOrDefault(x.Debtor.BuyerId, "?")),
+                ("Overdue", DebtorAgeing.UnpaidInstalments(x.Arrears, x.Debtor.Raised.OrderByDescending(r => r.Due).Select(r => r.Amount))),
+                ("LastPaid", lastPaid.TryGetValue(x.Debtor.BuyerId, out DateOnly paid) ? Date(paid) : "never"), ("Owing", x.Arrears)))];
+    }
+
+    // Each buyer with an active instalment agreement: net balance as at the date, principal not yet billed, and the instalments raised by then.
+    private async Task<List<InstalmentDebtor>> InstalmentDebtorsAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<InstalmentAgreement> active = await _db.Set<InstalmentAgreement>().AsNoTracking().Include(a => a.Lines)
+            .Where(a => a.CompanyId == companyId && a.Status == InstalmentAgreementStatus.Active && a.SignedOn <= asAt).ToListAsync(ct).ConfigureAwait(false);
+        var stands = await (from s in _db.HousingStands.AsNoTracking()
+                            join sc in _db.HousingSchemes.AsNoTracking() on s.SchemeId equals sc.Id into schemes from sc in schemes.DefaultIfEmpty()
+                            where s.CompanyId == companyId select new { s.Id, s.StandNumber, Scheme = sc == null ? "(no scheme)" : sc.Code }).ToDictionaryAsync(s => s.Id, ct).ConfigureAwait(false);
+        Dictionary<long, decimal> owing = (await OpenItemsAsAt.LoadAsync(_db, companyId, Core.Trading.TradingLedger.AccountsReceivable, asAt, ct).ConfigureAwait(false))
+            .GroupBy(i => i.Item.TraderId).ToDictionary(g => g.Key, g => g.Sum(i => i.Signed(Core.Trading.LedgerSign.Debit)));
+        return [.. active.GroupBy(a => a.BuyerCustomerId).Select(g =>
+        {
+            List<(DateOnly Due, decimal Amount)> raised = [.. g.SelectMany(a => a.Lines).Where(l => l.Raised && l.DueDate <= asAt).Select(l => (l.DueDate, l.Amount))];
+            decimal notYetBilled = g.Sum(a => a.Lines.Where(l => l.Raised && l.DueDate <= asAt).OrderBy(l => l.Number).Select(l => (decimal?)l.BalanceAfter).LastOrDefault() ?? a.Financed);
+            return new InstalmentDebtor(g.Key, string.Join(", ", g.Select(a => stands.TryGetValue(a.StandId, out var s) ? s.Scheme : "?").Distinct().Order(StringComparer.Ordinal)),
+                string.Join(", ", g.Select(a => a.AgreementNumber).Order(StringComparer.Ordinal)), string.Join(", ", g.Select(a => stands.TryGetValue(a.StandId, out var s) ? s.StandNumber : "?")),
+                owing.GetValueOrDefault(g.Key), notYetBilled, raised);
+        })];
+    }
+
+    private static IReadOnlyDictionary<string, object?> AgeingRow(string groupColumn, string group, string nameColumn, string name, decimal[] bands)
+        => Row((groupColumn, group), (nameColumn, name), ("Current", Money(bands[0])), ("D30", Money(bands[1])), ("D60", Money(bands[2])), ("D90", Money(bands[3])),
+            ("D120", Money(bands[4])), ("Over120", Money(bands[5])), ("Total", bands.Sum()));
+
+    private sealed record InstalmentDebtor(long BuyerId, string Scheme, string Agreements, string Stands, decimal Owing, decimal NotYetBilled, List<(DateOnly Due, decimal Amount)> Raised);
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EarlySettlementsAsync(long companyId, CancellationToken ct)
+    {
+        List<InstalmentAgreement> settled = await _db.Set<InstalmentAgreement>().AsNoTracking().Include(a => a.Lines)
+            .Where(a => a.CompanyId == companyId && a.Status == InstalmentAgreementStatus.SettledEarly).OrderBy(a => a.SettledOn).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> stands = await StandNumbersAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> names = await CustomerNamesAsync(companyId, ct).ConfigureAwait(false);
+        return [.. settled.Select(a => Row(("Agreement", a.AgreementNumber), ("Stand", stands.GetValueOrDefault(a.StandId, "?")), ("Buyer", names.GetValueOrDefault(a.BuyerCustomerId, "?")),
+            ("SettledOn", a.SettledOn is DateOnly d ? Date(d) : "—"), ("Rebated", a.Lines.Count(l => l.Rebated)), ("InterestRebated", a.Lines.Where(l => l.Rebated).Sum(l => l.Interest))))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EclAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        var assessed = await _services.GetRequiredService<IHousingEclService>().AssessAsync(new HousingEclRequest { CompanyId = companyId, AsAtDate = asAt }, ct).ConfigureAwait(false);
+        if (assessed.IsFailure)
+        {
+            return [];
+        }
+
+        List<IReadOnlyDictionary<string, object?>> rows = [.. assessed.Value.Portfolios.SelectMany(p => p.Bands.Where(b => b.Exposure != 0m)
+            .Select(b => Row(("Portfolio", p.Portfolio), ("Band", b.Band.ToString()), ("Exposure", Money(b.Exposure)), ("Provision", b.Provision))))];
+        rows.Add(Row(("Portfolio", "Allowance already booked"), ("Band", Money(assessed.Value.BookedAllowance)), ("Exposure", string.Empty), ("Provision", 0m)));
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EstateTransfersAsync(long companyId, CancellationToken ct)
+    {
+        List<TransferApplication> estates = await _db.Set<TransferApplication>().AsNoTracking().Include(t => t.Checks)
+            .Where(t => t.CompanyId == companyId && (t.TransferType == TransferType.Inheritance || t.TransferType == TransferType.DeceasedJointHolder))
+            .OrderBy(t => t.LodgedOn).ThenBy(t => t.ApplicationNumber).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> stands = await StandNumbersAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> names = await CustomerNamesAsync(companyId, ct).ConfigureAwait(false);
+        return [.. estates.Select(t => Row(("Application", t.ApplicationNumber), ("Stand", stands.GetValueOrDefault(t.StandId, "?")), ("Type", t.TransferType.ToString()),
+            ("Deceased", names.GetValueOrDefault(t.FromCustomerId, "?")), ("Beneficiary", names.GetValueOrDefault(t.ToCustomerId, "?")), ("Status", t.Status.ToString()),
+            ("Documents", t.Checks.FirstOrDefault(c => c.Requirement == TransferRequirement.EstateDocuments)?.DocumentReference ?? "not yet verified")))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LeviesAsync(long companyId, CancellationToken ct)
+        => [.. (await (from c in _db.Set<LevyCharge>().AsNoTracking()
+                       join l in _db.Set<DevelopmentLevy>().AsNoTracking() on c.LevyId equals l.Id
+                       join s in _db.HousingStands.AsNoTracking() on c.StandId equals s.Id
+                       join cu in _db.Customers.AsNoTracking() on c.CustomerId equals cu.Id
+                       where c.CompanyId == companyId
+                       orderby l.Code, c.ChargedOn, c.Id
+                       select new { l.Code, c.EventReference, s.StandNumber, cu.Name, c.ChargedOn, c.DocumentNumber, c.Amount }).ToListAsync(ct).ConfigureAwait(false))
+            .Select(c => Row(("Levy", c.Code), ("Event", c.EventReference), ("Stand", c.StandNumber), ("Customer", c.Name), ("ChargedOn", Date(c.ChargedOn)), ("Invoice", c.DocumentNumber), ("Amount", c.Amount)))];
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ConveyancersAsync(long companyId, CancellationToken ct)
+        => [.. (await _db.Set<TitleDeed>().AsNoTracking().Include(t => t.Steps).Where(t => t.CompanyId == companyId && t.Conveyancer != null).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(t => t.Conveyancer!, StringComparer.OrdinalIgnoreCase).OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
+            {
+                List<int> days = [.. g.Where(t => t.RegisteredOn is not null).Select(t => t.RegisteredOn!.Value.DayNumber - t.AppliedOn.DayNumber)];
+                return Row(("Conveyancer", g.Key), ("Files", g.Count()), ("Registered", days.Count), ("AverageDays", days.Count == 0 ? "—" : Math.Round(days.Average()).ToString(CultureInfo.InvariantCulture)),
+                    ("Queries", g.Sum(t => t.Steps.Count(s => s.Stage == TitleStage.QueryRaised))));
+            })];
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TenantDepositsAsync(long companyId, CancellationToken ct)
+        => [.. (await (from t in _db.Set<Tenancy>().AsNoTracking()
+                       join u in _db.Set<RentalUnit>().AsNoTracking() on t.UnitId equals u.Id
+                       join c in _db.Customers.AsNoTracking() on t.TenantCustomerId equals c.Id
+                       where t.CompanyId == companyId && t.Status == TenancyStatus.Active && t.Deposit > 0m
+                       orderby u.Code
+                       select new { t.TenancyNumber, u.Code, c.Name, t.StartDate, t.Deposit }).ToListAsync(ct).ConfigureAwait(false))
+            .Select(t => Row(("Tenancy", t.TenancyNumber), ("Unit", t.Code), ("Tenant", t.Name), ("Since", Date(t.StartDate)), ("Deposit", t.Deposit)))];
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RepairCostsAsync(long companyId, CancellationToken ct)
+        => [.. (await (from r in _db.Set<UnitRepair>().AsNoTracking()
+                       join u in _db.Set<RentalUnit>().AsNoTracking() on r.UnitId equals u.Id
+                       where r.CompanyId == companyId && r.Status == RepairStatus.Completed
+                       select new { u.Code, r.Cost, r.TenantCaused }).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(r => r.Code).OrderBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => Row(("Unit", g.Key), ("Repairs", g.Count()), ("Recharged", Money(g.Where(r => r.TenantCaused).Sum(r => r.Cost))),
+                ("Council", Money(g.Where(r => !r.TenantCaused).Sum(r => r.Cost))), ("Cost", g.Sum(r => r.Cost))))];
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LeaseScheduleAsync(long companyId, CancellationToken ct)
+    {
+        IStandLeaseService leases = _services.GetRequiredService<IStandLeaseService>();
+        List<string> numbers = await _db.Set<StandLease>().AsNoTracking().Where(l => l.CompanyId == companyId).OrderBy(l => l.LeaseNumber).Select(l => l.LeaseNumber).ToListAsync(ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (string number in numbers)
+        {
+            var schedule = await leases.ScheduleAsync(companyId, number, ct).ConfigureAwait(false);
+            if (schedule.IsFailure || schedule.Value.Count == 0)
+            {
+                continue;
+            }
+
+            decimal straight = Math.Round(schedule.Value.Sum(y => y.AnnualRent) / schedule.Value.Count, 2, MidpointRounding.AwayFromZero);
+            rows.AddRange(schedule.Value.Select(y => Row(("Lease", number), ("Year", y.Year), ("Contractual", Money(y.AnnualRent)), ("StraightLine", Money(straight)), ("Difference", straight - y.AnnualRent))));
+        }
+
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AuditTrailAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<string> housingTypes = [.. typeof(HousingStand).Assembly.GetTypes().Where(t => t.Namespace == typeof(HousingStand).Namespace && t.IsClass).Select(t => t.Name)];
+        DateTimeOffset until = new(asAt.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
+        var entries = await _db.ChangeLog.AsNoTracking().Where(c => c.CompanyId == companyId && housingTypes.Contains(c.EntityType) && c.OccurredOnUtc <= until)
+            .OrderByDescending(c => c.Id).Take(5000).ToListAsync(ct).ConfigureAwait(false);
+        return [.. entries.OrderBy(c => c.Id).Select(c => Row(("When", c.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("User", c.UserName), ("Entity", c.EntityType),
+            ("Id", c.EntityId ?? "—"), ("Action", c.Action.ToString()), ("Changed", c.ChangedFields.Count == 0 ? "—" : string.Join(", ", c.ChangedFields))))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SodViolationsAsync(CancellationToken ct)
+    {
+        Application.Abstractions.Security.IPermissionService permissions = _services.GetRequiredService<Application.Abstractions.Security.IPermissionService>();
+        var users = await _db.Users.AsNoTracking().Where(u => u.IsActive && !u.IsSystemAdministrator).OrderBy(u => u.Username).Select(u => new { u.Id, u.Username }).ToListAsync(ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (var user in users)
+        {
+            foreach (Core.Security.SodRule rule in (await permissions.GetSodViolationsAsync(user.Id, ct).ConfigureAwait(false)).Where(r => r.Code.StartsWith("SOD-HSE", StringComparison.Ordinal)))
+            {
+                rows.Add(Row(("User", user.Username), ("Rule", rule.Code), ("Conflict", rule.Name)));
+            }
+        }
+
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DashboardAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        DateOnly yearStart = new(asAt.Year, 1, 1);
+        decimal hectares = await _db.LandParcels.Where(p => p.CompanyId == companyId).SumAsync(p => p.AreaSquareMetres, ct).ConfigureAwait(false) / 10000m;
+        int available = await _db.HousingStands.CountAsync(s => s.CompanyId == companyId && s.Status == StandStatus.Available, ct).ConfigureAwait(false);
+        int waiting = await _db.HousingApplicants.CountAsync(a => a.CompanyId == companyId && a.Status == ApplicantStatus.Active && a.WaitingListNumber != null, ct).ConfigureAwait(false);
+        int waitingTen = await _db.HousingApplicants.CountAsync(a => a.CompanyId == companyId && a.Status == ApplicantStatus.Active && a.WaitingListNumber != null && a.RegistrationDate <= asAt.AddYears(-10), ct).ConfigureAwait(false);
+        int allocated = await _db.Set<StandAllocation>().CountAsync(a => a.CompanyId == companyId && a.CertificateNumber != null
+            && _db.Set<AllocationRun>().Any(r => r.Id == a.AllocationRunId && r.ApprovedOn >= yearStart && r.ApprovedOn <= asAt), ct).ConfigureAwait(false);
+        int titles = await _db.Set<TitleDeed>().CountAsync(t => t.CompanyId == companyId && t.RegisteredOn >= yearStart && t.RegisteredOn <= asAt, ct).ConfigureAwait(false);
+        List<long> buyers = await _db.Set<InstalmentAgreement>().Where(a => a.CompanyId == companyId).Select(a => a.BuyerCustomerId).Distinct().ToListAsync(ct).ConfigureAwait(false);
+        List<long> tenants = await _db.Set<Tenancy>().Where(t => t.CompanyId == companyId && t.Status == TenancyStatus.Active).Select(t => t.TenantCustomerId).Distinct().ToListAsync(ct).ConfigureAwait(false);
+        decimal debtors = (await NetOwingAsync(companyId, buyers, ct).ConfigureAwait(false)).Values.Where(v => v > 0m).Sum();
+        decimal arrears = (await InstalmentDebtorsAsync(companyId, asAt, ct).ConfigureAwait(false)).Sum(d => Math.Max(0m, d.Owing - d.NotYetBilled));
+        decimal rent = (await NetOwingAsync(companyId, tenants, ct).ConfigureAwait(false)).Values.Where(v => v > 0m).Sum();
+        int voids = await _db.Set<RentalUnit>().CountAsync(u => u.CompanyId == companyId && u.VacantSince != null, ct).ConfigureAwait(false);
+        return
+        [
+            Row(("Measure", "Land bank (hectares)"), ("Value", hectares.ToString("N2", CultureInfo.InvariantCulture))),
+            Row(("Measure", "Stands available"), ("Value", available.ToString(CultureInfo.InvariantCulture))),
+            Row(("Measure", "Applicants on the waiting list"), ("Value", waiting.ToString(CultureInfo.InvariantCulture))),
+            Row(("Measure", "of whom waiting 10 years or more"), ("Value", waitingTen.ToString(CultureInfo.InvariantCulture))),
+            Row(("Measure", $"Allocations approved in {asAt.Year}"), ("Value", allocated.ToString(CultureInfo.InvariantCulture))),
+            Row(("Measure", $"Title deeds registered in {asAt.Year}"), ("Value", titles.ToString(CultureInfo.InvariantCulture))),
+            Row(("Measure", "Housing debtors (instalment sales)"), ("Value", debtors.ToString("N2", CultureInfo.InvariantCulture))),
+            Row(("Measure", "of which instalments in arrears"), ("Value", arrears.ToString("N2", CultureInfo.InvariantCulture))),
+            Row(("Measure", "Rent arrears"), ("Value", rent.ToString("N2", CultureInfo.InvariantCulture))),
+            Row(("Measure", "Void rental units"), ("Value", voids.ToString(CultureInfo.InvariantCulture))),
+        ];
+    }
+
+    private static string Money(decimal amount) => amount.ToString("N2", CultureInfo.InvariantCulture);
 
     private static string PerM2(decimal amount, decimal area) => area <= 0m ? "—" : (amount / area).ToString("N2", CultureInfo.InvariantCulture);
 
