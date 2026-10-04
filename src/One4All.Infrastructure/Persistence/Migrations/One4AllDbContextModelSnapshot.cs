@@ -5320,6 +5320,187 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("title_deed_step", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.TransferApplication", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ApplicationNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("application_number");
+
+                    b.Property<string>("ClearanceNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("clearance_number");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("Consideration")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("consideration");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly?>("DecidedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("decided_on");
+
+                    b.Property<long>("FromCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("from_customer_id");
+
+                    b.Property<DateOnly>("LodgedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("lodged_on");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long?>("SubmittedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("submitted_by_user_id");
+
+                    b.Property<long>("ToCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("to_customer_id");
+
+                    b.Property<int>("TransferType")
+                        .HasColumnType("integer")
+                        .HasColumnName("transfer_type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_transfer_application");
+
+                    b.HasIndex("StandId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_transfer_application_stand_id")
+                        .HasFilter("status IN (1, 2, 3)");
+
+                    b.HasIndex("CompanyId", "ApplicationNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_transfer_application_company_id_application_number");
+
+                    b.ToTable("transfer_application", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.TransferApproval", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly>("ApprovedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("approved_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("TransferApplicationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("transfer_application_id");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_transfer_approval");
+
+                    b.HasIndex("TransferApplicationId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_transfer_approval_transfer_application_id_user_id");
+
+                    b.ToTable("transfer_approval", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.TransferCheck", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("DocumentReference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("document_reference");
+
+                    b.Property<int>("Requirement")
+                        .HasColumnType("integer")
+                        .HasColumnName("requirement");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("TransferApplicationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("transfer_application_id");
+
+                    b.Property<long>("VerifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("verified_by_user_id");
+
+                    b.Property<DateOnly>("VerifiedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("verified_on");
+
+                    b.HasKey("Id")
+                        .HasName("pk_transfer_check");
+
+                    b.HasIndex("TransferApplicationId", "Requirement")
+                        .IsUnique()
+                        .HasDatabaseName("ix_transfer_check_transfer_application_id_requirement");
+
+                    b.ToTable("transfer_check", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.UnitInspection", b =>
                 {
                     b.Property<long>("Id")
@@ -17910,6 +18091,36 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_title_deed_step_title_deed_title_deed_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.TransferApplication", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_transfer_application_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.TransferApproval", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.TransferApplication", null)
+                        .WithMany("Approvals")
+                        .HasForeignKey("TransferApplicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_transfer_approval_transfer_application_transfer_application");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.TransferCheck", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.TransferApplication", null)
+                        .WithMany("Checks")
+                        .HasForeignKey("TransferApplicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_transfer_check_transfer_application_transfer_application_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.UnitInspection", b =>
                 {
                     b.HasOne("One4All.Core.Housing.RentalUnit", null)
@@ -18626,6 +18837,13 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Housing.TitleDeed", b =>
                 {
                     b.Navigation("Steps");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.TransferApplication", b =>
+                {
+                    b.Navigation("Approvals");
+
+                    b.Navigation("Checks");
                 });
 
             modelBuilder.Entity("One4All.Core.Inventory.PriceList", b =>

@@ -1272,6 +1272,41 @@ app.MapGet("/api/housing/titles/pipeline", async (long companyId, DateOnly asAt,
 .RequireAuthorization()
 .WithName("TitlePipeline");
 
+app.MapPost("/api/housing/transfers", async (One4All.Application.Abstractions.Housing.TransferLodgement lodgement, One4All.Application.Abstractions.Housing.ITransferApplicationService transfers, CancellationToken ct) =>
+    ValueResponse(await transfers.LodgeAsync(lodgement, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LodgeTransfer");
+
+app.MapPost("/api/housing/transfers/{applicationNumber}/verify", async (string applicationNumber, long companyId, One4All.Core.Housing.TransferRequirement requirement, string documentReference, long userId, DateOnly date, One4All.Application.Abstractions.Housing.ITransferApplicationService transfers, CancellationToken ct) =>
+    ActionResponse(await transfers.VerifyAsync(companyId, applicationNumber, requirement, documentReference, userId, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("VerifyTransferItem");
+
+app.MapGet("/api/housing/transfers/{applicationNumber}/checklist", async (string applicationNumber, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.ITransferApplicationService transfers, CancellationToken ct) =>
+    ValueResponse(await transfers.ChecklistAsync(companyId, applicationNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("TransferChecklist");
+
+app.MapPost("/api/housing/transfers/{applicationNumber}/submit", async (string applicationNumber, long companyId, long userId, DateOnly date, One4All.Application.Abstractions.Housing.ITransferApplicationService transfers, CancellationToken ct) =>
+    ActionResponse(await transfers.SubmitAsync(companyId, applicationNumber, userId, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SubmitTransfer");
+
+app.MapPost("/api/housing/transfers/{applicationNumber}/approve", async (string applicationNumber, long companyId, long userId, DateOnly date, One4All.Application.Abstractions.Housing.ITransferApplicationService transfers, CancellationToken ct) =>
+    ActionResponse(await transfers.ApproveAsync(companyId, applicationNumber, userId, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveTransfer");
+
+app.MapPost("/api/housing/transfers/{applicationNumber}/complete", async (string applicationNumber, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.ITransferApplicationService transfers, CancellationToken ct) =>
+    ActionResponse(await transfers.CompleteAsync(companyId, applicationNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CompleteTransfer");
+
+app.MapPost("/api/housing/transfers/{applicationNumber}/reject", async (string applicationNumber, long companyId, string reason, DateOnly date, One4All.Application.Abstractions.Housing.ITransferApplicationService transfers, CancellationToken ct) =>
+    ActionResponse(await transfers.RejectAsync(companyId, applicationNumber, reason, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RejectTransfer");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

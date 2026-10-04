@@ -646,6 +646,52 @@ internal sealed class TitleDeedStepConfiguration : IEntityTypeConfiguration<Titl
     }
 }
 
+internal sealed class TransferApplicationConfiguration : IEntityTypeConfiguration<TransferApplication>
+{
+    public void Configure(EntityTypeBuilder<TransferApplication> b)
+    {
+        b.ToTable("transfer_application", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ApplicationNumber).HasMaxLength(30);
+        b.Property(x => x.TransferType).HasConversion<int>();
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Consideration).HasPrecision(19, 4);
+        b.Property(x => x.RejectionReason).HasMaxLength(1000);
+        b.Property(x => x.ClearanceNumber).HasMaxLength(30);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Checks).WithOne().HasForeignKey(x => x.TransferApplicationId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Checks).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasMany(x => x.Approvals).WithOne().HasForeignKey(x => x.TransferApplicationId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Approvals).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.ApplicationNumber }).IsUnique();
+
+        // One open application per stand (lodged, submitted or approved).
+        b.HasIndex(x => x.StandId).IsUnique().HasFilter("status IN (1, 2, 3)");
+    }
+}
+
+internal sealed class TransferCheckConfiguration : IEntityTypeConfiguration<TransferCheck>
+{
+    public void Configure(EntityTypeBuilder<TransferCheck> b)
+    {
+        b.ToTable("transfer_check", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Requirement).HasConversion<int>();
+        b.Property(x => x.DocumentReference).HasMaxLength(100);
+        b.HasIndex(x => new { x.TransferApplicationId, x.Requirement }).IsUnique();
+    }
+}
+
+internal sealed class TransferApprovalConfiguration : IEntityTypeConfiguration<TransferApproval>
+{
+    public void Configure(EntityTypeBuilder<TransferApproval> b)
+    {
+        b.ToTable("transfer_approval", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.TransferApplicationId, x.UserId }).IsUnique();
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)
