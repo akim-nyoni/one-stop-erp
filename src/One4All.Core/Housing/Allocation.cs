@@ -229,13 +229,18 @@ public sealed class StandAllocation : Entity
     /// <param name="companyId">The council.</param>
     internal void AssignCompany(long companyId) => CompanyId = companyId;
 
+    /// <summary>The stand's price frozen at the offer date, when an approved price applied.</summary>
+    public decimal? OfferedPrice { get; private set; }
+
     /// <summary>Issues the offer.</summary>
     /// <param name="certificateNumber">The certificate number.</param>
     /// <param name="expires">The acceptance deadline.</param>
-    public void Offer(string certificateNumber, DateOnly expires)
+    /// <param name="price">The stand's price on the offer date, if one applies.</param>
+    public void Offer(string certificateNumber, DateOnly expires, decimal? price = null)
     {
         CertificateNumber = certificateNumber;
         OfferExpires = expires;
+        OfferedPrice = price;
         Status = AllocationStatus.Offered;
     }
 

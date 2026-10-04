@@ -34,7 +34,8 @@ public sealed class AllocationProposal
 /// <param name="WaitingListNumber">The applicant.</param>
 /// <param name="Status">Where it stands.</param>
 /// <param name="CertificateNumber">The allocation certificate, once approved.</param>
-public sealed record AllocationLine(int Sequence, string StandNumber, string WaitingListNumber, AllocationStatus Status, string? CertificateNumber);
+/// <param name="OfferedPrice">The stand's price frozen at the offer date, when an approved price applied.</param>
+public sealed record AllocationLine(int Sequence, string StandNumber, string WaitingListNumber, AllocationStatus Status, string? CertificateNumber, decimal? OfferedPrice = null);
 
 /// <summary>An allocation run and its list.</summary>
 /// <param name="RunNumber">The run number.</param>

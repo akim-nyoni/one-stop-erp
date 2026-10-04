@@ -147,7 +147,9 @@ public sealed class AllocationService : IAllocationService
                 return certificate.Error;
             }
 
-            allocation.Offer(certificate.Value, date.AddDays(offerDays));
+            // The beneficiary's price is frozen at the offer date (brief §4.10.2); later price changes do not touch it.
+            StandPriceQuote? price = await StandPrices.QuoteAsync(_db, stands[allocation.StandId], date, ct).ConfigureAwait(false);
+            allocation.Offer(certificate.Value, date.AddDays(offerDays), price?.BuildUp.Price);
             stands[allocation.StandId].MarkAllocated();
         }
 
@@ -301,7 +303,7 @@ public sealed class AllocationService : IAllocationService
         Dictionary<long, string> stands = await _db.Set<HousingStand>().AsNoTracking().Where(s => standIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => s.StandNumber, ct).ConfigureAwait(false);
         Dictionary<long, string> applicants = await _db.HousingApplicants.AsNoTracking().Where(a => applicantIds.Contains(a.Id)).ToDictionaryAsync(a => a.Id, a => a.WaitingListNumber ?? string.Empty, ct).ConfigureAwait(false);
         List<AllocationLine> lines = [.. run.Allocations.OrderBy(a => a.Sequence)
-            .Select(a => new AllocationLine(a.Sequence, stands[a.StandId], applicants[a.ApplicantId], a.Status, a.CertificateNumber))];
+            .Select(a => new AllocationLine(a.Sequence, stands[a.StandId], applicants[a.ApplicantId], a.Status, a.CertificateNumber, a.OfferedPrice))];
         return new AllocationRunView(run.RunNumber, run.Method, run.Seed, run.InputHash, run.Status, lines);
     }
 }

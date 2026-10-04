@@ -1367,6 +1367,21 @@ app.MapGet("/api/housing/layouts/{planNumber}/reconciliation", async (string pla
 .RequireAuthorization()
 .WithName("ReconcileLayoutPlan");
 
+app.MapPost("/api/housing/pricing/rules", async (One4All.Application.Abstractions.Housing.PricingRuleInput input, One4All.Application.Abstractions.Housing.IStandPricingService pricing, CancellationToken ct) =>
+    ValueResponse(await pricing.ProposeAsync(input, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ProposeStandPricingRule");
+
+app.MapPost("/api/housing/pricing/rules/{ruleId:long}/approve", async (long ruleId, long companyId, long userId, DateOnly date, One4All.Application.Abstractions.Housing.IStandPricingService pricing, CancellationToken ct) =>
+    ActionResponse(await pricing.ApproveAsync(companyId, ruleId, userId, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveStandPricingRule");
+
+app.MapGet("/api/housing/pricing/stands/{standId:long}", async (long standId, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.IStandPricingService pricing, CancellationToken ct) =>
+    ValueResponse(await pricing.QuoteAsync(companyId, standId, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("QuoteStandPrice");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

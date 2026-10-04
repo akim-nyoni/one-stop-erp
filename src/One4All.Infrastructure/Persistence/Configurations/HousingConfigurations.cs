@@ -791,6 +791,26 @@ internal sealed class LayoutUseCountConfiguration : IEntityTypeConfiguration<Lay
     }
 }
 
+internal sealed class StandPricingRuleConfiguration : IEntityTypeConfiguration<StandPricingRule>
+{
+    public void Configure(EntityTypeBuilder<StandPricingRule> b)
+    {
+        b.ToTable("stand_pricing_rule", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Scope).HasConversion<int>();
+        b.Property(x => x.MinSize).HasPrecision(19, 4);
+        b.Property(x => x.MaxSize).HasPrecision(19, 4);
+        b.Property(x => x.OverheadPercent).HasPrecision(9, 4);
+        b.Property(x => x.LevyPerStand).HasPrecision(19, 4);
+        b.Property(x => x.LevyPerSquareMetre).HasPrecision(19, 4);
+        b.Property(x => x.MarginPercent).HasPrecision(9, 4);
+        b.Property(x => x.RoundTo).HasPrecision(19, 4);
+        b.HasOne<HousingScheme>().WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.EffectiveFrom });
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)
