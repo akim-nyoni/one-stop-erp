@@ -692,6 +692,59 @@ internal sealed class TransferApprovalConfiguration : IEntityTypeConfiguration<T
     }
 }
 
+internal sealed class LandAcquisitionConfiguration : IEntityTypeConfiguration<LandAcquisition>
+{
+    public void Configure(EntityTypeBuilder<LandAcquisition> b)
+    {
+        b.ToTable("land_acquisition", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AcquisitionNumber).HasMaxLength(30);
+        b.Property(x => x.ParcelNumber).HasMaxLength(60);
+        b.Property(x => x.Description).HasMaxLength(500);
+        b.Property(x => x.AreaSquareMetres).HasPrecision(19, 4);
+        b.Property(x => x.Method).HasConversion<int>();
+        b.Property(x => x.Counterparty).HasMaxLength(200);
+        b.Property(x => x.ResolutionReference).HasMaxLength(100);
+        b.Property(x => x.Valuer).HasMaxLength(200);
+        b.Property(x => x.ValuedAt).HasPrecision(19, 4);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.AbandonReason).HasMaxLength(1000);
+        b.Ignore(x => x.TotalCost);
+        b.HasOne<LandParcel>().WithMany().HasForeignKey(x => x.LandParcelId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Checks).WithOne().HasForeignKey(x => x.LandAcquisitionId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Checks).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasMany(x => x.Costs).WithOne().HasForeignKey(x => x.LandAcquisitionId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Costs).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.AcquisitionNumber }).IsUnique();
+    }
+}
+
+internal sealed class DueDiligenceCheckConfiguration : IEntityTypeConfiguration<DueDiligenceCheck>
+{
+    public void Configure(EntityTypeBuilder<DueDiligenceCheck> b)
+    {
+        b.ToTable("due_diligence_check", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Item).HasConversion<int>();
+        b.Property(x => x.Finding).HasMaxLength(1000);
+        b.HasIndex(x => new { x.LandAcquisitionId, x.Item }).IsUnique();
+    }
+}
+
+internal sealed class AcquisitionCostConfiguration : IEntityTypeConfiguration<AcquisitionCost>
+{
+    public void Configure(EntityTypeBuilder<AcquisitionCost> b)
+    {
+        b.ToTable("acquisition_cost", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Component).HasConversion<int>();
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Reference).HasMaxLength(100);
+        b.Property(x => x.JournalNumber).HasMaxLength(30);
+        b.HasIndex(x => x.LandAcquisitionId);
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

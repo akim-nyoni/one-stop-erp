@@ -2411,6 +2411,57 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("asset", "fa");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.AcquisitionCost", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<int>("Component")
+                        .HasColumnType("integer")
+                        .HasColumnName("component");
+
+                    b.Property<DateOnly>("IncurredOn")
+                        .HasColumnType("date")
+                        .HasColumnName("incurred_on");
+
+                    b.Property<string>("JournalNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<long>("LandAcquisitionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("land_acquisition_id");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_acquisition_cost");
+
+                    b.HasIndex("LandAcquisitionId")
+                        .HasDatabaseName("ix_acquisition_cost_land_acquisition_id");
+
+                    b.ToTable("acquisition_cost", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.AgreementVersion", b =>
                 {
                     b.Property<long>("Id")
@@ -3312,6 +3363,55 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_development_covenant_deadline", "deadline >= start_date");
                         });
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.DueDiligenceCheck", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("Acceptable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("acceptable");
+
+                    b.Property<string>("Finding")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("finding");
+
+                    b.Property<int>("Item")
+                        .HasColumnType("integer")
+                        .HasColumnName("item");
+
+                    b.Property<long>("LandAcquisitionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("land_acquisition_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SignedOffByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("signed_off_by_user_id");
+
+                    b.Property<DateOnly>("SignedOffOn")
+                        .HasColumnType("date")
+                        .HasColumnName("signed_off_on");
+
+                    b.HasKey("Id")
+                        .HasName("pk_due_diligence_check");
+
+                    b.HasIndex("LandAcquisitionId", "Item")
+                        .IsUnique()
+                        .HasDatabaseName("ix_due_diligence_check_land_acquisition_id_item");
+
+                    b.ToTable("due_diligence_check", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.EnumeratedHousehold", b =>
@@ -4368,6 +4468,126 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_instalment_schedule_line_instalment_agreement_id_number");
 
                     b.ToTable("instalment_schedule_line", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.LandAcquisition", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AbandonReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("abandon_reason");
+
+                    b.Property<string>("AcquisitionNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("acquisition_number");
+
+                    b.Property<decimal>("AreaSquareMetres")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("area_square_metres");
+
+                    b.Property<DateOnly?>("ClosedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("closed_on");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Counterparty")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("counterparty");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<long?>("LandParcelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("land_parcel_id");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer")
+                        .HasColumnName("method");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("OpenedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("opened_on");
+
+                    b.Property<string>("ParcelNumber")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("parcel_number");
+
+                    b.Property<string>("ResolutionReference")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("resolution_reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<decimal?>("ValuedAt")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("valued_at");
+
+                    b.Property<DateOnly?>("ValuedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("valued_on");
+
+                    b.Property<string>("Valuer")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("valuer");
+
+                    b.HasKey("Id")
+                        .HasName("pk_land_acquisition");
+
+                    b.HasIndex("LandParcelId")
+                        .HasDatabaseName("ix_land_acquisition_land_parcel_id");
+
+                    b.HasIndex("CompanyId", "AcquisitionNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_land_acquisition_company_id_acquisition_number");
+
+                    b.ToTable("land_acquisition", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.LandParcel", b =>
@@ -17751,6 +17971,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_claim_line_claim_expense_claim_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.AcquisitionCost", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.LandAcquisition", null)
+                        .WithMany("Costs")
+                        .HasForeignKey("LandAcquisitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_acquisition_cost_land_acquisition_land_acquisition_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.AgreementVersion", b =>
                 {
                     b.HasOne("One4All.Core.Housing.HousingAgreement", null)
@@ -17888,6 +18118,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_development_covenant_housing_stands_stand_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.DueDiligenceCheck", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.LandAcquisition", null)
+                        .WithMany("Checks")
+                        .HasForeignKey("LandAcquisitionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_due_diligence_check_land_acquisition_land_acquisition_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.EnumeratedHousehold", b =>
                 {
                     b.HasOne("One4All.Core.Housing.EnumerationExercise", null)
@@ -17968,6 +18208,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_instalment_schedule_line_instalment_agreement_instalment_ag");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.LandAcquisition", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.LandParcel", null)
+                        .WithMany()
+                        .HasForeignKey("LandParcelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_land_acquisition_land_parcels_land_parcel_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.OwnershipRecord", b =>
@@ -18827,6 +19076,13 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Housing.InstalmentAgreement", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.LandAcquisition", b =>
+                {
+                    b.Navigation("Checks");
+
+                    b.Navigation("Costs");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.Tenancy", b =>

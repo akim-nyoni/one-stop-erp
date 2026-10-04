@@ -1307,6 +1307,41 @@ app.MapPost("/api/housing/transfers/{applicationNumber}/reject", async (string a
 .RequireAuthorization()
 .WithName("RejectTransfer");
 
+app.MapPost("/api/housing/acquisitions", async (One4All.Application.Abstractions.Housing.AcquisitionCase acquisition, One4All.Application.Abstractions.Housing.ILandAcquisitionService acquisitions, CancellationToken ct) =>
+    ValueResponse(await acquisitions.OpenAsync(acquisition, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("OpenLandAcquisition");
+
+app.MapPost("/api/housing/acquisitions/{acquisitionNumber}/valuation", async (string acquisitionNumber, long companyId, string valuer, DateOnly valuedOn, decimal value, One4All.Application.Abstractions.Housing.ILandAcquisitionService acquisitions, CancellationToken ct) =>
+    ActionResponse(await acquisitions.RecordValuationAsync(companyId, acquisitionNumber, valuer, valuedOn, value, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordAcquisitionValuation");
+
+app.MapPost("/api/housing/acquisitions/{acquisitionNumber}/due-diligence", async (string acquisitionNumber, long companyId, One4All.Core.Housing.DueDiligenceItem item, string finding, bool acceptable, long userId, DateOnly date, One4All.Application.Abstractions.Housing.ILandAcquisitionService acquisitions, CancellationToken ct) =>
+    ActionResponse(await acquisitions.SignOffAsync(companyId, acquisitionNumber, item, finding, acceptable, userId, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SignOffDueDiligence");
+
+app.MapPost("/api/housing/acquisitions/{acquisitionNumber}/costs", async (string acquisitionNumber, long companyId, One4All.Application.Abstractions.Housing.AcquisitionCostInput cost, One4All.Application.Abstractions.Housing.ILandAcquisitionService acquisitions, CancellationToken ct) =>
+    ValueResponse(await acquisitions.AddCostAsync(companyId, acquisitionNumber, cost, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AddAcquisitionCost");
+
+app.MapGet("/api/housing/acquisitions/{acquisitionNumber}", async (string acquisitionNumber, long companyId, One4All.Application.Abstractions.Housing.ILandAcquisitionService acquisitions, CancellationToken ct) =>
+    ValueResponse(await acquisitions.PositionAsync(companyId, acquisitionNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AcquisitionPosition");
+
+app.MapPost("/api/housing/acquisitions/{acquisitionNumber}/complete", async (string acquisitionNumber, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.ILandAcquisitionService acquisitions, CancellationToken ct) =>
+    ValueResponse(await acquisitions.CompleteAsync(companyId, acquisitionNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CompleteLandAcquisition");
+
+app.MapPost("/api/housing/acquisitions/{acquisitionNumber}/abandon", async (string acquisitionNumber, long companyId, DateOnly date, string reason, string expenseAccountCode, string wipAccountCode, One4All.Application.Abstractions.Housing.ILandAcquisitionService acquisitions, CancellationToken ct) =>
+    ValueResponse(await acquisitions.AbandonAsync(companyId, acquisitionNumber, date, reason, expenseAccountCode, wipAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AbandonLandAcquisition");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
