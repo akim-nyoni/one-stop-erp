@@ -88,6 +88,12 @@ public static class SystemReportCatalogue
         yield return SystemReports.Bills();
         yield return SystemReports.MenuCost();
 
+        // Housing, Land & Estates catalogue (brief §14 I-B, the H series).
+        foreach (ReportDefinition definition in HousingReports.All())
+        {
+            yield return definition;
+        }
+
         // Cashiering & Receipting catalogue (brief §RCP-16, the RC series).
         foreach (ReportDefinition definition in ReceiptingReports.All())
         {

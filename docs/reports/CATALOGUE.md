@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-128 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+142 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -61,6 +61,20 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
+| H1 | Land Bank Register | All parcels with area, cost, status and mapped area. | — | Parcel, Description, AreaM2, MappedM2, Status, Cost | — | Sum(Cost) |
+| H10 | Layout Plans Register & Approval Status | Layouts with the version in force, pending amendments and approval turnaround. | — | Plan, Parcel, Version, Status, Stands, TurnaroundDays | — | — |
+| H14 | Servicing Cost Apportionment Schedule | Servicing cost per stand by contract and basis. | — | Stand, Contract, Basis, Date, Journal, Amount | — | Sum(Amount) |
+| H15 | Cost per Stand / Selling Price Build-up | Land and servicing cost, overhead, levy and margin to price, with margin %. | AsAtDate (Date, optional) | Stand, Scope, Cost, Overhead, Levy, Margin, MarginPercent, Price | — | Sum(Price) |
+| H18 | Waiting List Register | Active applicants by category in seniority order with score and position. | AsAtDate (Date, optional) | Category, Position, WaitingListNumber, Name, Registered, Score | — | — |
+| H2 | Land Acquisition Register | Acquisitions by method with counterparty, council resolution, status and cost. | — | Acquisition, Parcel, Method, Counterparty, Resolution, Status, Cost | — | Sum(Cost) |
+| H20 | Waiting List Age Analysis | How long active applicants have been waiting, by category. | AsAtDate (Date, optional) | Category, UnderOne, OneToThree, ThreeToFive, FiveToTen, TenPlus, Total | — | — |
+| H26 | Registration Date Change Audit | Every requested change to a seniority date: who asked, who decided, why. | — | WaitingListNumber, OldDate, NewDate, Reason, Status, RequestedBy, DecidedBy | — | — |
+| H31 | Allocation Register | Allocations with stand, beneficiary, certificate, frozen price and approval. | — | Certificate, Run, Stand, WaitingListNumber, Beneficiary, Status, ApprovedOn, Price | — | Sum(Price) |
+| H35 | Offers Outstanding / Expiring / Expired | Open offers with the acceptance deadline countdown. | AsAtDate (Date, optional) | Certificate, Stand, Beneficiary, Expires, DaysLeft, State | — | — |
+| H38 | Appeals Register & Outcomes | Appeals lodged against allocation runs with hearing and outcome. | — | Appeal, WaitingListNumber, Run, Lodged, Status, Hearing, Outcome | — | — |
+| H39 | Double Allocation Exception Report | Stands promised through more than one route — must always be empty; any row is an incident. | — | Stand, Claims, Routes | — | — |
+| H4 | Due Diligence Outstanding | Open acquisitions and the due-diligence items blocking each. | — | Acquisition, Parcel, Outstanding | — | — |
+| H5 | Compulsory Acquisition Compensation Register | Compensation claims with provision, settlement and status. | — | Claim, Parcel, Claimant, Lodged, Status, Provision, Settled | — | Sum(Settled) |
 | HSE-STAND | Housing Stand Register | Stands with status, apportioned cost, selling price and current holder. | — | StandNumber, Status, Holder, AllocatedCost, SellingPrice | — | Sum(SellingPrice) |
 
 ## HumanResources
