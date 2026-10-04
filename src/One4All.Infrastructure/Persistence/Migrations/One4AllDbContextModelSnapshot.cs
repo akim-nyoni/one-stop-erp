@@ -2663,6 +2663,101 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("applicant_notice", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.CompensationClaim", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ClaimNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("claim_number");
+
+                    b.Property<string>("Claimant")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("claimant");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("LandCostAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("land_cost_account_code");
+
+                    b.Property<long>("LandParcelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("land_parcel_id");
+
+                    b.Property<DateOnly>("LodgedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("lodged_on");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("Provision")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("provision");
+
+                    b.Property<string>("ProvisionAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provision_account_code");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal?>("SettledAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("settled_amount");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_compensation_claim");
+
+                    b.HasIndex("LandParcelId")
+                        .HasDatabaseName("ix_compensation_claim_land_parcel_id");
+
+                    b.HasIndex("CompanyId", "ClaimNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_compensation_claim_company_id_claim_number");
+
+                    b.ToTable("compensation_claim", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_compensation_claim_provision", "provision >= 0");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.CovenantStep", b =>
                 {
                     b.Property<long>("Id")
@@ -16507,6 +16602,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_applicant_notice_housing_applicants_applicant_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.CompensationClaim", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.LandParcel", null)
+                        .WithMany()
+                        .HasForeignKey("LandParcelId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_compensation_claim_land_parcels_land_parcel_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.CovenantStep", b =>

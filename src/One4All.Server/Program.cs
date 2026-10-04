@@ -1082,6 +1082,31 @@ app.MapGet("/api/housing/grants/disclosure", async (long companyId, One4All.Appl
 .RequireAuthorization()
 .WithName("HousingGrantDisclosure");
 
+app.MapPost("/api/housing/compensation-claims", async (long companyId, long landParcelId, string claimant, DateOnly lodgedOn, string landCostAccountCode, string provisionAccountCode, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ValueResponse(await compensation.LodgeAsync(companyId, landParcelId, claimant, lodgedOn, landCostAccountCode, provisionAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LodgeCompensationClaim");
+
+app.MapPost("/api/housing/compensation-claims/{claimNumber}/provide", async (string claimNumber, long companyId, decimal bestEstimate, DateOnly date, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ValueResponse(await compensation.ProvideAsync(companyId, claimNumber, bestEstimate, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ProvideCompensation");
+
+app.MapPost("/api/housing/compensation-claims/{claimNumber}/settle", async (string claimNumber, long companyId, decimal paid, string bankAccountCode, DateOnly date, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ActionResponse(await compensation.SettleAsync(companyId, claimNumber, paid, bankAccountCode, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SettleCompensation");
+
+app.MapPost("/api/housing/compensation-claims/{claimNumber}/withdraw", async (string claimNumber, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ActionResponse(await compensation.WithdrawAsync(companyId, claimNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("WithdrawCompensation");
+
+app.MapGet("/api/housing/compensation-claims", async (long companyId, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    Results.Ok(await compensation.RegisterAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CompensationRegister");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

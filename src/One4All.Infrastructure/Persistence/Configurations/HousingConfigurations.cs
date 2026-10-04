@@ -401,6 +401,24 @@ internal sealed class HousingGrantConfiguration : IEntityTypeConfiguration<Housi
     }
 }
 
+internal sealed class CompensationClaimConfiguration : IEntityTypeConfiguration<CompensationClaim>
+{
+    public void Configure(EntityTypeBuilder<CompensationClaim> b)
+    {
+        b.ToTable("compensation_claim", Schemas.Housing, t => t.HasCheckConstraint("ck_compensation_claim_provision", "provision >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ClaimNumber).HasMaxLength(30);
+        b.Property(x => x.Claimant).HasMaxLength(200);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Provision).HasPrecision(19, 4);
+        b.Property(x => x.SettledAmount).HasPrecision(19, 4);
+        b.Property(x => x.LandCostAccountCode).HasMaxLength(20);
+        b.Property(x => x.ProvisionAccountCode).HasMaxLength(20);
+        b.HasOne<LandParcel>().WithMany().HasForeignKey(x => x.LandParcelId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.ClaimNumber }).IsUnique();
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)
