@@ -226,6 +226,26 @@ internal sealed class EvictionStepConfiguration : IEntityTypeConfiguration<Evict
     }
 }
 
+internal sealed class RepossessionConfiguration : IEntityTypeConfiguration<Repossession>
+{
+    public void Configure(EntityTypeBuilder<Repossession> b)
+    {
+        b.ToTable("repossession", Schemas.Housing, t => t.HasCheckConstraint("ck_repossession_approver", "approved_by_user_id <> requested_by_user_id"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(30);
+        b.Property(x => x.ReceivableDerecognised).HasPrecision(19, 4);
+        b.Property(x => x.PreviousCarryingAmount).HasPrecision(19, 4);
+        b.Property(x => x.NetRealisableValue).HasPrecision(19, 4);
+        b.Property(x => x.InventoryRecognised).HasPrecision(19, 4);
+        b.Property(x => x.Reason).HasMaxLength(500);
+        b.Ignore(x => x.GainOrLoss);
+        b.HasOne<InstalmentAgreement>().WithMany().HasForeignKey(x => x.AgreementId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.Reference }).IsUnique();
+        b.HasIndex(x => x.AgreementId).IsUnique();
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

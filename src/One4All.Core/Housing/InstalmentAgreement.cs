@@ -26,6 +26,9 @@ public enum InstalmentAgreementStatus
 
     /// <summary>Every instalment has fallen due.</summary>
     Completed = 2,
+
+    /// <summary>The stand was repossessed for default.</summary>
+    Repossessed = 3,
 }
 
 /// <summary>
@@ -124,6 +127,18 @@ public sealed class InstalmentAgreement : AuditableEntity, ICompanyScoped
 
     /// <summary>Marks every instalment raised: the agreement has run its term.</summary>
     public void Complete() => Status = InstalmentAgreementStatus.Completed;
+
+    /// <summary>Closes it on repossession: instalments not yet raised are never charged.</summary>
+    /// <param name="date">When.</param>
+    public void Repossess(DateOnly date)
+    {
+        Status = InstalmentAgreementStatus.Repossessed;
+        SettledOn = date;
+        foreach (InstalmentScheduleLine line in _lines.Where(l => !l.Raised))
+        {
+            line.Rebate();
+        }
+    }
 
     /// <summary>Settles it early, rebating the interest of instalments not yet raised.</summary>
     /// <param name="date">When.</param>

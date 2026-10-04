@@ -35,6 +35,9 @@ public enum OwnershipChangeType
 
     /// <summary>Cession / change of ownership to a subsequent holder.</summary>
     Cession = 3,
+
+    /// <summary>Repossessed by the council from a defaulting holder (brief §4.10.5 / §4.10.9).</summary>
+    Repossession = 4,
 }
 
 /// <summary>
@@ -99,6 +102,20 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Marks the stand allocated to a beneficiary under an approved allocation (brief §4.10.4).</summary>
     public void MarkAllocated() => Status = StandStatus.Allocated;
+
+    /// <summary>
+    /// Takes the stand back from a defaulting holder: it returns to the available pool at its new carrying amount (the
+    /// lower of its previous cost and net realisable value), and the repossession is recorded on the ownership chain.
+    /// </summary>
+    /// <param name="date">The repossession date.</param>
+    /// <param name="carryingAmount">The amount the stand is re-recognised at in inventory.</param>
+    public void Repossess(DateOnly date, decimal carryingAmount)
+    {
+        AllocatedCost = carryingAmount;
+        CurrentHolderCustomerId = null;
+        Status = StandStatus.Available;
+        AppendOwnership(OwnershipChangeType.Repossession, null, "Council (repossessed)", date, 0m);
+    }
 
     /// <summary>Returns an allocated stand to the available pool (the offer was declined or lapsed).</summary>
     public void ReleaseAllocation()

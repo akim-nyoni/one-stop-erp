@@ -947,6 +947,16 @@ app.MapGet("/api/housing/evictions", async (long companyId, bool? openOnly, One4
 .RequireAuthorization()
 .WithName("EvictionRegister");
 
+app.MapPost("/api/housing/repossessions", async (One4All.Application.Abstractions.Housing.RepossessionRequest request, One4All.Application.Abstractions.Housing.IRepossessionService repossessions, CancellationToken ct) =>
+    ValueResponse(await repossessions.RepossessAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RepossessStand");
+
+app.MapGet("/api/housing/repossessions", async (long companyId, DateOnly start, DateOnly end, One4All.Application.Abstractions.Housing.IRepossessionService repossessions, CancellationToken ct) =>
+    Results.Ok(await repossessions.RegisterAsync(companyId, start, end, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RepossessionRegister");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()
