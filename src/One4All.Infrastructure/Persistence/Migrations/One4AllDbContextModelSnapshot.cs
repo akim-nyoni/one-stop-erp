@@ -16973,6 +16973,50 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("fiscal_year", "sys");
                 });
 
+            modelBuilder.Entity("One4All.Core.System.JobRun", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("FinishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("finished_at");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("message");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("ScheduledJobId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("scheduled_job_id");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<bool>("Succeeded")
+                        .HasColumnType("boolean")
+                        .HasColumnName("succeeded");
+
+                    b.HasKey("Id")
+                        .HasName("pk_job_run");
+
+                    b.HasIndex("ScheduledJobId")
+                        .HasDatabaseName("ix_job_run_scheduled_job_id");
+
+                    b.ToTable("job_run", "sys");
+                });
+
             modelBuilder.Entity("One4All.Core.System.NumberSequence", b =>
                 {
                     b.Property<long>("Id")
@@ -17091,6 +17135,96 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_period_module_status_fiscal_period_id_module_code");
 
                     b.ToTable("period_module_status", "sys");
+                });
+
+            modelBuilder.Entity("One4All.Core.System.ScheduledJob", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<int?>("DayOfMonth")
+                        .HasColumnType("integer")
+                        .HasColumnName("day_of_month");
+
+                    b.Property<int?>("DayOfWeek")
+                        .HasColumnType("integer")
+                        .HasColumnName("day_of_week");
+
+                    b.Property<int>("Frequency")
+                        .HasColumnType("integer")
+                        .HasColumnName("frequency");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<DateTimeOffset?>("LastRunAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_run_at");
+
+                    b.Property<bool?>("LastSucceeded")
+                        .HasColumnType("boolean")
+                        .HasColumnName("last_succeeded");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateTimeOffset>("NextRunAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_run_at");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("TaskKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("task_key");
+
+                    b.Property<TimeOnly>("TimeOfDay")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("time_of_day");
+
+                    b.HasKey("Id")
+                        .HasName("pk_scheduled_job");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_scheduled_job_company_id_code");
+
+                    b.HasIndex("IsEnabled", "NextRunAt")
+                        .HasDatabaseName("ix_scheduled_job_is_enabled_next_run_at");
+
+                    b.ToTable("scheduled_job", "sys");
                 });
 
             modelBuilder.Entity("One4All.Core.Trading.Allocation", b =>
@@ -20586,6 +20720,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_fiscal_period_fiscal_years_fiscal_year_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.System.JobRun", b =>
+                {
+                    b.HasOne("One4All.Core.System.ScheduledJob", null)
+                        .WithMany()
+                        .HasForeignKey("ScheduledJobId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_job_run_scheduled_job_scheduled_job_id");
                 });
 
             modelBuilder.Entity("One4All.Core.System.NumberSequence", b =>

@@ -18,6 +18,12 @@ string connectionString = builder.Configuration.GetConnectionString("One4All")
     ?? throw new InvalidOperationException("No database connection string (ConnectionStrings:One4All or ONE4ALL_CONNECTION).");
 builder.Services.AddOne4AllInfrastructure(connectionString);
 
+// Scheduled jobs (brief §4.17): due jobs run once a minute; set Scheduler:Enabled=false to keep a node from running them.
+if (builder.Configuration.GetValue("Scheduler:Enabled", true))
+{
+    builder.Services.AddHostedService<One4All.Server.SchedulerHost>();
+}
+
 // --- JWT options + token service --------------------------------------------------------------------------
 JwtOptions jwt = new();
 builder.Configuration.GetSection("Jwt").Bind(jwt);
@@ -1959,6 +1965,26 @@ app.MapPost("/api/accounting/deferred-income/recognise", async (long companyId, 
     ValueResponse(await deferred.RecogniseAsync(companyId, asAtDate, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("RecogniseDeferredIncome");
+
+app.MapPost("/api/system/jobs", async (One4All.Application.Abstractions.Scheduling.JobDefinition definition, One4All.Application.Abstractions.Scheduling.IJobScheduler jobs, CancellationToken ct) =>
+    ValueResponse(await jobs.DefineAsync(definition, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DefineScheduledJob");
+
+app.MapPost("/api/system/jobs/{code}/enabled", async (string code, long companyId, bool enabled, One4All.Application.Abstractions.Scheduling.IJobScheduler jobs, CancellationToken ct) =>
+    ActionResponse(await jobs.SetEnabledAsync(companyId, code, enabled, DateTimeOffset.UtcNow, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("EnableScheduledJob");
+
+app.MapPost("/api/system/jobs/{code}/run", async (string code, long companyId, One4All.Application.Abstractions.Scheduling.IJobScheduler jobs, CancellationToken ct) =>
+    ValueResponse(await jobs.RunNowAsync(companyId, code, DateTimeOffset.UtcNow, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RunScheduledJob");
+
+app.MapGet("/api/system/jobs/{code}/history", async (string code, long companyId, One4All.Application.Abstractions.Scheduling.IJobScheduler jobs, CancellationToken ct) =>
+    ValueResponse(await jobs.HistoryAsync(companyId, code, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ScheduledJobHistory");
 
 app.MapGet("/api/accounting/data-health", async (long companyId, DateOnly asAtDate, One4All.Application.Abstractions.Accounting.IDataHealthService health, CancellationToken ct) =>
     ValueResponse(await health.SnapshotAsync(companyId, asAtDate, ct).ConfigureAwait(false)))

@@ -141,3 +141,30 @@ internal sealed class NumberSequenceConfiguration : IEntityTypeConfiguration<Num
         b.Navigation(x => x.Years).HasField("_years").UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }
+
+internal sealed class ScheduledJobConfiguration : IEntityTypeConfiguration<ScheduledJob>
+{
+    public void Configure(EntityTypeBuilder<ScheduledJob> b)
+    {
+        b.ToTable("scheduled_job", Schemas.System);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(40);
+        b.Property(x => x.TaskKey).HasMaxLength(100);
+        b.Property(x => x.Frequency).HasConversion<int>();
+        b.Property(x => x.DayOfWeek).HasConversion<int?>();
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+        b.HasIndex(x => new { x.IsEnabled, x.NextRunAt });
+    }
+}
+
+internal sealed class JobRunConfiguration : IEntityTypeConfiguration<JobRun>
+{
+    public void Configure(EntityTypeBuilder<JobRun> b)
+    {
+        b.ToTable("job_run", Schemas.System);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Message).HasMaxLength(2000);
+        b.HasOne<ScheduledJob>().WithMany().HasForeignKey(x => x.ScheduledJobId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.ScheduledJobId);
+    }
+}
