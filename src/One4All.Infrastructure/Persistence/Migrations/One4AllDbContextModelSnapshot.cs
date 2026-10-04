@@ -5491,6 +5491,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,6)")
                         .HasColumnName("per_unit_rate");
 
+                    b.Property<decimal>("RatePerSquareMetre")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("rate_per_square_metre");
+
                     b.Property<decimal>("RatePerValuationCents")
                         .HasPrecision(19, 6)
                         .HasColumnType("numeric(19,6)")

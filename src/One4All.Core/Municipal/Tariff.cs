@@ -44,6 +44,9 @@ public enum TariffType
 
     /// <summary>Rate per valuation (cents in the dollar on the property value).</summary>
     RatePerValuation = 3,
+
+    /// <summary>A fixed availability charge plus a rate per square metre of the stand's area.</summary>
+    AreaBased = 4,
 }
 
 /// <summary>
@@ -109,6 +112,9 @@ public sealed class Tariff : SoftDeletableEntity, ICompanyScoped
     /// <summary>The rate per unit of valuation, in cents (for <see cref="TariffType.RatePerValuation"/>).</summary>
     public decimal RatePerValuationCents { get; set; }
 
+    /// <summary>The rate per square metre of the stand's area (for <see cref="TariffType.AreaBased"/>).</summary>
+    public decimal RatePerSquareMetre { get; set; }
+
     /// <summary>The minimum charge (floor).</summary>
     public decimal MinimumCharge { get; set; }
 
@@ -140,13 +146,24 @@ public sealed class Tariff : SoftDeletableEntity, ICompanyScoped
     /// <param name="consumption">The consumption (e.g. m³ of water); ignored for flat/valuation tariffs.</param>
     /// <param name="valuation">The property valuation (for rate-per-valuation tariffs).</param>
     /// <returns>The computed charge.</returns>
-    public decimal CalculateCharge(decimal consumption, decimal valuation)
+    public decimal CalculateCharge(decimal consumption, decimal valuation) => CalculateCharge(consumption, valuation, 0m);
+
+    /// <summary>
+    /// Calculates the charge for a billing period given the metered <paramref name="consumption"/>, the property
+    /// <paramref name="valuation"/> and its <paramref name="areaSquareMetres"/>, applying the minimum charge as a floor.
+    /// </summary>
+    /// <param name="consumption">The consumption (e.g. m³ of water); ignored for flat/valuation/area tariffs.</param>
+    /// <param name="valuation">The property valuation (for rate-per-valuation tariffs).</param>
+    /// <param name="areaSquareMetres">The stand's area (for area-based tariffs).</param>
+    /// <returns>The computed charge.</returns>
+    public decimal CalculateCharge(decimal consumption, decimal valuation, decimal areaSquareMetres)
     {
         decimal charge = TariffType switch
         {
             TariffType.Flat => FixedCharge,
             TariffType.PerUnit => FixedCharge + consumption * PerUnitRate,
             TariffType.RatePerValuation => FixedCharge + valuation * RatePerValuationCents / 100m,
+            TariffType.AreaBased => FixedCharge + areaSquareMetres * RatePerSquareMetre,
             TariffType.Stepped => FixedCharge + SteppedCharge(consumption),
             _ => FixedCharge,
         };

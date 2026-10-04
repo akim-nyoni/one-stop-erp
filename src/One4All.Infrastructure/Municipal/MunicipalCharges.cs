@@ -94,7 +94,7 @@ internal static class MunicipalCharges
 
         // The value in force on the bill date, from the valuation roll (the register value when there is no history).
         decimal valuation = ValuationRoll.ValueAt(await ValuationHistory.LoadAsync(db, property.Id, ct).ConfigureAwait(false), date, property.Valuation);
-        decimal charge = ProRata.Apply(tariff.CalculateCharge(consumption, valuation), fraction);
+        decimal charge = ProRata.Apply(tariff.CalculateCharge(consumption, valuation, property.SizeSquareMetres), fraction);
         if (charge <= 0m)
         {
             return Error.Rule("Mun.NothingToBill", $"Computed charge for {serviceType} on {property.StandNumber} is zero.");

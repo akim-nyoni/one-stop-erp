@@ -44,4 +44,12 @@ public class TariffTests
         Tariff t = new(1, "FLAT", "Flat", ServiceType.Other, TariffType.Flat, new DateOnly(2026, 1, 1), "4000") { FixedCharge = 3m, MinimumCharge = 10m };
         t.CalculateCharge(0m, 0m).Should().Be(10m);
     }
+
+    [Fact]
+    public void Area_based_tariff_charges_the_availability_plus_rate_per_square_metre()
+    {
+        Tariff t = new(1, "ROADS", "Roads Levy", ServiceType.Other, TariffType.AreaBased, new DateOnly(2026, 1, 1), "4000") { FixedCharge = 5m, RatePerSquareMetre = 0.02m };
+        t.CalculateCharge(0m, 0m, areaSquareMetres: 800m).Should().Be(21m); // 5 + 800 × 0.02
+        t.CalculateCharge(0m, 0m).Should().Be(5m); // no area → availability charge only
+    }
 }
