@@ -728,6 +728,11 @@ app.MapPost("/api/municipal/billing-runs/{runNumber}/cancel", async (string runN
 .RequireAuthorization()
 .WithName("CancelBillingRun");
 
+app.MapGet("/api/municipal/properties/{propertyId:long}/enquiry", async (long propertyId, long companyId, DateOnly asAtDate, int? recentTransactions, One4All.Application.Abstractions.Municipal.IPropertyEnquiryService enquiry, CancellationToken ct) =>
+    ValueResponse(await enquiry.EnquireAsync(companyId, propertyId, asAtDate, recentTransactions ?? 10, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PropertyEnquiry");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()
