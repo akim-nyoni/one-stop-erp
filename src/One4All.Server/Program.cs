@@ -752,6 +752,26 @@ app.MapPost("/api/municipal/readings/import", async (long companyId, HttpRequest
 .RequireAuthorization()
 .WithName("ImportMeterReadings");
 
+app.MapPost("/api/municipal/deposits", async (One4All.Application.Abstractions.Municipal.TakeDepositRequest request, One4All.Application.Abstractions.Municipal.IServiceDepositService deposits, CancellationToken ct) =>
+    ValueResponse(await deposits.TakeAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("TakeServiceDeposit");
+
+app.MapPost("/api/municipal/deposits/{reference}/refund", async (string reference, long companyId, DateOnly date, string bankAccountCode, One4All.Application.Abstractions.Municipal.IServiceDepositService deposits, CancellationToken ct) =>
+    ValueResponse(await deposits.RefundAsync(companyId, reference, date, bankAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RefundServiceDeposit");
+
+app.MapPost("/api/municipal/deposits/{reference}/apply", async (string reference, long companyId, DateOnly date, One4All.Application.Abstractions.Municipal.IServiceDepositService deposits, CancellationToken ct) =>
+    ValueResponse(await deposits.ApplyToArrearsAsync(companyId, reference, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApplyServiceDeposit");
+
+app.MapGet("/api/municipal/properties/{propertyId:long}/deposits", async (long propertyId, long companyId, One4All.Application.Abstractions.Municipal.IServiceDepositService deposits, CancellationToken ct) =>
+    Results.Ok(await deposits.HeldAsync(companyId, propertyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("HeldServiceDeposits");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

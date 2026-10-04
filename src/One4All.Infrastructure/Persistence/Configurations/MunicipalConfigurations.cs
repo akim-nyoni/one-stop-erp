@@ -198,6 +198,23 @@ internal sealed class ReadingRouteStopConfiguration : IEntityTypeConfiguration<R
     }
 }
 
+internal sealed class ServiceDepositConfiguration : IEntityTypeConfiguration<ServiceDeposit>
+{
+    public void Configure(EntityTypeBuilder<ServiceDeposit> b)
+    {
+        b.ToTable("service_deposit", Schemas.Municipal, t => t.HasCheckConstraint("ck_service_deposit_amount", "amount > 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(30);
+        b.Property(x => x.ServiceType).HasConversion<int>();
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.LiabilityAccountCode).HasMaxLength(20);
+        b.HasOne<Property>().WithMany().HasForeignKey(x => x.PropertyId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.Reference }).IsUnique();
+        b.HasIndex(x => new { x.PropertyId, x.ServiceType }).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_service_deposit_one_held");
+    }
+}
+
 internal sealed class IndigentRegistrationConfiguration : IEntityTypeConfiguration<IndigentRegistration>
 {
     public void Configure(EntityTypeBuilder<IndigentRegistration> b)

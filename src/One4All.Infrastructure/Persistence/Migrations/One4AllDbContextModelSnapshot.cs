@@ -5235,6 +5235,98 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("reading_route_stop", "mun");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.ServiceDeposit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("LiabilityAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("liability_account_code");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("PropertyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("property_id");
+
+                    b.Property<long>("RatepayerCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("ratepayer_customer_id");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("reference");
+
+                    b.Property<DateOnly?>("ReleasedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("released_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("ServiceType")
+                        .HasColumnType("integer")
+                        .HasColumnName("service_type");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<DateOnly>("TakenOn")
+                        .HasColumnType("date")
+                        .HasColumnName("taken_on");
+
+                    b.HasKey("Id")
+                        .HasName("pk_service_deposit");
+
+                    b.HasIndex("CompanyId", "Reference")
+                        .IsUnique()
+                        .HasDatabaseName("ix_service_deposit_company_id_reference");
+
+                    b.HasIndex("PropertyId", "ServiceType")
+                        .IsUnique()
+                        .HasDatabaseName("ix_service_deposit_one_held")
+                        .HasFilter("status = 0");
+
+                    b.ToTable("service_deposit", "mun", t =>
+                        {
+                            t.HasCheckConstraint("ck_service_deposit_amount", "amount > 0");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.ServiceOrder", b =>
                 {
                     b.Property<long>("Id")
@@ -14442,6 +14534,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_reading_route_stop_reading_route_reading_route_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.ServiceDeposit", b =>
+                {
+                    b.HasOne("One4All.Core.Municipal.Property", null)
+                        .WithMany()
+                        .HasForeignKey("PropertyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_service_deposit_property_property_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Municipal.TariffBlock", b =>
