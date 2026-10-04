@@ -932,6 +932,31 @@ app.MapPost("/api/housing/rent-reviews", async (long companyId, DateOnly effecti
 .RequireAuthorization()
 .WithName("ReviewRents");
 
+app.MapPost("/api/housing/rental-units/{unitCode}/repairs", async (string unitCode, long companyId, DateOnly reportedOn, string description, One4All.Application.Abstractions.Housing.IRentalMaintenanceService maintenance, CancellationToken ct) =>
+    ValueResponse(await maintenance.ReportRepairAsync(companyId, unitCode, reportedOn, description, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ReportUnitRepair");
+
+app.MapPost("/api/housing/repairs/complete", async (One4All.Application.Abstractions.Housing.RepairCompletion completion, One4All.Application.Abstractions.Housing.IRentalMaintenanceService maintenance, CancellationToken ct) =>
+    ValueResponse(await maintenance.CompleteRepairAsync(completion, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CompleteUnitRepair");
+
+app.MapPost("/api/housing/rental-units/{unitCode}/inspections", async (string unitCode, long companyId, DateOnly date, string inspector, int conditionGrade, string findings, bool followUpRequired, One4All.Application.Abstractions.Housing.IRentalMaintenanceService maintenance, CancellationToken ct) =>
+    ValueResponse(await maintenance.RecordInspectionAsync(companyId, unitCode, date, inspector, conditionGrade, findings, followUpRequired, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordUnitInspection");
+
+app.MapPost("/api/housing/inspections/{inspectionId:long}/close-follow-up", async (long inspectionId, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.IRentalMaintenanceService maintenance, CancellationToken ct) =>
+    ActionResponse(await maintenance.CloseFollowUpAsync(companyId, inspectionId, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CloseInspectionFollowUp");
+
+app.MapGet("/api/housing/rental-units/{unitCode}/maintenance", async (string unitCode, long companyId, One4All.Application.Abstractions.Housing.IRentalMaintenanceService maintenance, CancellationToken ct) =>
+    ValueResponse(await maintenance.HistoryAsync(companyId, unitCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("UnitMaintenanceHistory");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

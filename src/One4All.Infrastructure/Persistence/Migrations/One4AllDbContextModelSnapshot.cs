@@ -3656,6 +3656,178 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.UnitInspection", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<int>("ConditionGrade")
+                        .HasColumnType("integer")
+                        .HasColumnName("condition_grade");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Findings")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("findings");
+
+                    b.Property<DateOnly?>("FollowUpDoneOn")
+                        .HasColumnType("date")
+                        .HasColumnName("follow_up_done_on");
+
+                    b.Property<bool>("FollowUpRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("follow_up_required");
+
+                    b.Property<DateOnly>("InspectedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("inspected_on");
+
+                    b.Property<string>("Inspector")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("inspector");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("UnitId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("unit_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_unit_inspection");
+
+                    b.HasIndex("UnitId", "InspectedOn")
+                        .HasDatabaseName("ix_unit_inspection_unit_id_inspected_on");
+
+                    b.ToTable("unit_inspection", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_unit_inspection_grade", "condition_grade BETWEEN 1 AND 5");
+                        });
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.UnitRepair", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly?>("CompletedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("completed_on");
+
+                    b.Property<decimal>("Cost")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("cost");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("RechargeInvoiceNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("recharge_invoice_number");
+
+                    b.Property<string>("RepairNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("repair_number");
+
+                    b.Property<DateOnly>("ReportedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("reported_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long?>("TenancyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tenancy_id");
+
+                    b.Property<bool>("TenantCaused")
+                        .HasColumnType("boolean")
+                        .HasColumnName("tenant_caused");
+
+                    b.Property<long>("UnitId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("unit_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_unit_repair");
+
+                    b.HasIndex("CompanyId", "RepairNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_unit_repair_company_id_repair_number");
+
+                    b.HasIndex("UnitId", "Status")
+                        .HasDatabaseName("ix_unit_repair_unit_id_status");
+
+                    b.ToTable("unit_repair", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_unit_repair_cost", "cost >= 0");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.WaitingListPolicy", b =>
                 {
                     b.Property<long>("Id")
@@ -15843,6 +16015,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenancy_rent_change_tenancy_tenancy_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.UnitInspection", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.RentalUnit", null)
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_unit_inspection_rental_unit_unit_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.UnitRepair", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.RentalUnit", null)
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_unit_repair_rental_unit_unit_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Inventory.PriceListLine", b =>

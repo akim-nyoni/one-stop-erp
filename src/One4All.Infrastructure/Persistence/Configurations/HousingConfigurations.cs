@@ -259,6 +259,36 @@ internal sealed class RepossessionConfiguration : IEntityTypeConfiguration<Repos
     }
 }
 
+internal sealed class UnitRepairConfiguration : IEntityTypeConfiguration<UnitRepair>
+{
+    public void Configure(EntityTypeBuilder<UnitRepair> b)
+    {
+        b.ToTable("unit_repair", Schemas.Housing, t => t.HasCheckConstraint("ck_unit_repair_cost", "cost >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.RepairNumber).HasMaxLength(30);
+        b.Property(x => x.Description).HasMaxLength(500);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Cost).HasPrecision(19, 4);
+        b.Property(x => x.RechargeInvoiceNumber).HasMaxLength(40);
+        b.HasOne<RentalUnit>().WithMany().HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.RepairNumber }).IsUnique();
+        b.HasIndex(x => new { x.UnitId, x.Status });
+    }
+}
+
+internal sealed class UnitInspectionConfiguration : IEntityTypeConfiguration<UnitInspection>
+{
+    public void Configure(EntityTypeBuilder<UnitInspection> b)
+    {
+        b.ToTable("unit_inspection", Schemas.Housing, t => t.HasCheckConstraint("ck_unit_inspection_grade", "condition_grade BETWEEN 1 AND 5"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Inspector).HasMaxLength(120);
+        b.Property(x => x.Findings).HasMaxLength(1000);
+        b.HasOne<RentalUnit>().WithMany().HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.UnitId, x.InspectedOn });
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)
