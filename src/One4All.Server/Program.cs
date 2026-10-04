@@ -1422,6 +1422,26 @@ app.MapGet("/api/housing/stands/{standId:long}/holders", async (long standId, lo
 .RequireAuthorization()
 .WithName("StandHolders");
 
+app.MapPost("/api/housing/sectional", async (long companyId, string code, string name, long standId, IReadOnlyList<One4All.Application.Housing.UnitArea> units, One4All.Application.Abstractions.Housing.ISectionalTitleService sectional, CancellationToken ct) =>
+    ValueResponse(await sectional.RegisterAsync(companyId, code, name, standId, units, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RegisterSectionalScheme");
+
+app.MapPost("/api/housing/sectional/{code}/units/{unitNumber}/transfer", async (string code, string unitNumber, long companyId, long toCustomerId, decimal consideration, DateOnly date, One4All.Application.Abstractions.Housing.ISectionalTitleService sectional, CancellationToken ct) =>
+    ActionResponse(await sectional.TransferUnitAsync(companyId, code, unitNumber, toCustomerId, consideration, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("TransferSectionalUnit");
+
+app.MapGet("/api/housing/sectional/{code}/units", async (string code, long companyId, One4All.Application.Abstractions.Housing.ISectionalTitleService sectional, CancellationToken ct) =>
+    ValueResponse(await sectional.UnitsAsync(companyId, code, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SectionalUnits");
+
+app.MapPost("/api/housing/sectional/{code}/levies", async (string code, long companyId, int period, decimal levy, string incomeAccountCode, DateOnly date, One4All.Application.Abstractions.Housing.ISectionalTitleService sectional, CancellationToken ct) =>
+    ValueResponse(await sectional.RaiseLevyAsync(companyId, code, period, levy, incomeAccountCode, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RaiseSectionalLevy");
+
 app.MapPost("/api/housing/evictions", async (long companyId, string tenancyNumber, DateOnly date, int noticePeriodDays, long userId, One4All.Application.Abstractions.Housing.IEvictionService evictions, CancellationToken ct) =>
     ValueResponse(await evictions.OpenAsync(companyId, tenancyNumber, date, noticePeriodDays, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

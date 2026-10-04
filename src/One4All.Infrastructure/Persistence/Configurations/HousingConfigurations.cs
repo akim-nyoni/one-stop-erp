@@ -871,6 +871,64 @@ internal sealed class StandHoldingConfiguration : IEntityTypeConfiguration<Stand
     }
 }
 
+internal sealed class SectionalSchemeConfiguration : IEntityTypeConfiguration<SectionalScheme>
+{
+    public void Configure(EntityTypeBuilder<SectionalScheme> b)
+    {
+        b.ToTable("sectional_scheme", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(200);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Units).WithOne().HasForeignKey(x => x.SectionalSchemeId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Units).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+        b.HasIndex(x => x.StandId).IsUnique();
+    }
+}
+
+internal sealed class SectionalUnitConfiguration : IEntityTypeConfiguration<SectionalUnit>
+{
+    public void Configure(EntityTypeBuilder<SectionalUnit> b)
+    {
+        b.ToTable("sectional_unit", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.UnitNumber).HasMaxLength(20);
+        b.Property(x => x.FloorArea).HasPrecision(19, 4);
+        b.Property(x => x.ParticipationQuota).HasPrecision(9, 4);
+        b.Ignore(x => x.CurrentOwnerCustomerId);
+        b.HasMany(x => x.Owners).WithOne().HasForeignKey(x => x.SectionalUnitId).OnDelete(DeleteBehavior.Restrict);
+        b.Navigation(x => x.Owners).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.SectionalSchemeId, x.UnitNumber }).IsUnique();
+    }
+}
+
+internal sealed class UnitOwnershipConfiguration : IEntityTypeConfiguration<UnitOwnership>
+{
+    public void Configure(EntityTypeBuilder<UnitOwnership> b)
+    {
+        b.ToTable("unit_ownership", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Consideration).HasPrecision(19, 4);
+
+        // One current owner per unit.
+        b.HasIndex(x => x.SectionalUnitId).IsUnique().HasFilter("owned_to IS NULL");
+    }
+}
+
+internal sealed class SectionalLevyRunConfiguration : IEntityTypeConfiguration<SectionalLevyRun>
+{
+    public void Configure(EntityTypeBuilder<SectionalLevyRun> b)
+    {
+        b.ToTable("sectional_levy_run", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Levy).HasPrecision(19, 4);
+        b.Property(x => x.Billed).HasPrecision(19, 4);
+        b.HasOne<SectionalScheme>().WithMany().HasForeignKey(x => x.SectionalSchemeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.SectionalSchemeId, x.Period }).IsUnique();
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

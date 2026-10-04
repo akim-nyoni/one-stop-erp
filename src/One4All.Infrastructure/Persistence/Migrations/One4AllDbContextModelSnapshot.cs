@@ -5296,6 +5296,161 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.SectionalLevyRun", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Billed")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("billed");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("Levy")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("levy");
+
+                    b.Property<int>("Period")
+                        .HasColumnType("integer")
+                        .HasColumnName("period");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<DateOnly>("RunOn")
+                        .HasColumnType("date")
+                        .HasColumnName("run_on");
+
+                    b.Property<long>("SectionalSchemeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sectional_scheme_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sectional_levy_run");
+
+                    b.HasIndex("SectionalSchemeId", "Period")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sectional_levy_run_sectional_scheme_id_period");
+
+                    b.ToTable("sectional_levy_run", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.SectionalScheme", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sectional_scheme");
+
+                    b.HasIndex("StandId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sectional_scheme_stand_id");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sectional_scheme_company_id_code");
+
+                    b.ToTable("sectional_scheme", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.SectionalUnit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("FloorArea")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("floor_area");
+
+                    b.Property<decimal>("ParticipationQuota")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("participation_quota");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SectionalSchemeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sectional_scheme_id");
+
+                    b.Property<string>("UnitNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("unit_number");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sectional_unit");
+
+                    b.HasIndex("SectionalSchemeId", "UnitNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sectional_unit_sectional_scheme_id_unit_number");
+
+                    b.ToTable("sectional_unit", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.StandAllocation", b =>
                 {
                     b.Property<long>("Id")
@@ -6314,6 +6469,51 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_unit_inspection_grade", "condition_grade BETWEEN 1 AND 5");
                         });
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.UnitOwnership", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Consideration")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("consideration");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateOnly>("OwnedFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("owned_from");
+
+                    b.Property<DateOnly?>("OwnedTo")
+                        .HasColumnType("date")
+                        .HasColumnName("owned_to");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SectionalUnitId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sectional_unit_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_unit_ownership");
+
+                    b.HasIndex("SectionalUnitId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_unit_ownership_sectional_unit_id")
+                        .HasFilter("owned_to IS NULL");
+
+                    b.ToTable("unit_ownership", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.UnitRepair", b =>
@@ -18821,6 +19021,36 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_repossession_stand_stand_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.SectionalLevyRun", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.SectionalScheme", null)
+                        .WithMany()
+                        .HasForeignKey("SectionalSchemeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sectional_levy_run_sectional_scheme_sectional_scheme_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.SectionalScheme", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sectional_scheme_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.SectionalUnit", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.SectionalScheme", null)
+                        .WithMany("Units")
+                        .HasForeignKey("SectionalSchemeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_sectional_unit_sectional_scheme_sectional_scheme_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.StandAllocation", b =>
                 {
                     b.HasOne("One4All.Core.Housing.AllocationRun", null)
@@ -18978,6 +19208,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_unit_inspection_rental_unit_unit_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.UnitOwnership", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.SectionalUnit", null)
+                        .WithMany("Owners")
+                        .HasForeignKey("SectionalUnitId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_unit_ownership_sectional_unit_sectional_unit_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.UnitRepair", b =>
@@ -19693,6 +19933,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Housing.LayoutPlanVersion", b =>
                 {
                     b.Navigation("Uses");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.SectionalScheme", b =>
+                {
+                    b.Navigation("Units");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.SectionalUnit", b =>
+                {
+                    b.Navigation("Owners");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.Tenancy", b =>
