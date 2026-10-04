@@ -882,6 +882,26 @@ app.MapPost("/api/housing/allocations/lapse-expired", async (long companyId, Dat
 .RequireAuthorization()
 .WithName("LapseExpiredAllocations");
 
+app.MapPost("/api/housing/instalment-sales", async (One4All.Application.Abstractions.Housing.InstalmentSaleRequest request, One4All.Application.Abstractions.Housing.IInstalmentSaleService sales, CancellationToken ct) =>
+    ValueResponse(await sales.SignAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SignInstalmentSale");
+
+app.MapPost("/api/housing/instalment-sales/raise-due", async (long companyId, DateOnly asAtDate, One4All.Application.Abstractions.Housing.IInstalmentSaleService sales, CancellationToken ct) =>
+    ValueResponse(await sales.RaiseDueAsync(companyId, asAtDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RaiseDueInstalments");
+
+app.MapGet("/api/housing/instalment-sales/{agreementNumber}/settlement", async (string agreementNumber, long companyId, DateOnly asAtDate, One4All.Application.Abstractions.Housing.IInstalmentSaleService sales, CancellationToken ct) =>
+    ValueResponse(await sales.QuoteSettlementAsync(companyId, agreementNumber, asAtDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("QuoteInstalmentSettlement");
+
+app.MapPost("/api/housing/instalment-sales/{agreementNumber}/settle", async (string agreementNumber, long companyId, DateOnly asAtDate, One4All.Application.Abstractions.Housing.IInstalmentSaleService sales, CancellationToken ct) =>
+    ValueResponse(await sales.SettleEarlyAsync(companyId, agreementNumber, asAtDate, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SettleInstalmentSale");
+
 app.MapPost("/api/ar/debt-cases", async (long companyId, long customerId, string handedOverTo, DateOnly date, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
     ValueResponse(await debts.HandOverAsync(companyId, customerId, handedOverTo, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

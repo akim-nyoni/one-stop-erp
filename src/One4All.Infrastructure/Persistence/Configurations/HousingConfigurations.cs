@@ -124,6 +124,43 @@ internal sealed class StandAllocationConfiguration : IEntityTypeConfiguration<St
     }
 }
 
+internal sealed class InstalmentAgreementConfiguration : IEntityTypeConfiguration<InstalmentAgreement>
+{
+    public void Configure(EntityTypeBuilder<InstalmentAgreement> b)
+    {
+        b.ToTable("instalment_agreement", Schemas.Housing, t => t.HasCheckConstraint("ck_instalment_agreement_terms", "cash_price > 0 AND deposit >= 0 AND deposit < cash_price AND term_months >= 1 AND annual_rate_percent >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AgreementNumber).HasMaxLength(30);
+        b.Property(x => x.CashPrice).HasPrecision(19, 4);
+        b.Property(x => x.Deposit).HasPrecision(19, 4);
+        b.Property(x => x.AnnualRatePercent).HasPrecision(9, 4);
+        b.Property(x => x.Method).HasConversion<int>();
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.InterestAccountCode).HasMaxLength(20);
+        b.Ignore(x => x.Financed);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.InstalmentAgreementId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.AgreementNumber }).IsUnique();
+        b.HasIndex(x => x.StandId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_instalment_agreement_one_active_per_stand");
+    }
+}
+
+internal sealed class InstalmentScheduleLineConfiguration : IEntityTypeConfiguration<InstalmentScheduleLine>
+{
+    public void Configure(EntityTypeBuilder<InstalmentScheduleLine> b)
+    {
+        b.ToTable("instalment_schedule_line", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Interest).HasPrecision(19, 4);
+        b.Property(x => x.Principal).HasPrecision(19, 4);
+        b.Property(x => x.BalanceAfter).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.InstalmentAgreementId, x.Number }).IsUnique();
+        b.HasIndex(x => x.DueDate);
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)
