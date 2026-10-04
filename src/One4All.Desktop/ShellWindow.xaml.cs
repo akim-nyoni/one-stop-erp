@@ -81,6 +81,12 @@ public partial class ShellWindow : Window
         check.Show();
     }
 
+    private void OpenNotifications_Click(object sender, RoutedEventArgs e)
+    {
+        NotificationCentreWindow notifications = new(_services) { Owner = this };
+        notifications.Show();
+    }
+
     private void OpenDataHealth_Click(object sender, RoutedEventArgs e)
     {
         DataHealthWindow health = new(_services) { Owner = this };
