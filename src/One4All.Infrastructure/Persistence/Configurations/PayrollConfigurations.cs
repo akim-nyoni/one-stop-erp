@@ -15,6 +15,17 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         b.Property(x => x.Department).HasMaxLength(30);
         b.Property(x => x.CostCentre).HasMaxLength(30);
         b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.NationalIdNumber).HasMaxLength(40);
+        b.Property(x => x.TaxNumber).HasMaxLength(40);
+        b.Property(x => x.Gender).HasConversion<int>();
+        b.Property(x => x.Grade).HasMaxLength(20);
+        b.Property(x => x.PaymentMethod).HasConversion<int>();
+        b.Property(x => x.BankName).HasMaxLength(100);
+        b.Property(x => x.BankBranch).HasMaxLength(30);
+        b.Property(x => x.BankAccountNumber).HasMaxLength(40);
+        b.Property(x => x.MobileMoneyNumber).HasMaxLength(30);
+        b.Property(x => x.TerminationReason).HasMaxLength(300);
+        b.Property(x => x.HoldReason).HasMaxLength(300);
         b.HasMany(x => x.PayElements).WithOne().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.PayElements).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.EmployeeNumber }).IsUnique().HasFilter("is_deleted = false");

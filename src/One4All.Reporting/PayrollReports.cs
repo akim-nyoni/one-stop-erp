@@ -60,5 +60,31 @@ public static class PayrollReports
         yield return Listing("PR70", "Year-to-Date Payroll Register", "Payroll", "Per employee for the year to the end of the period: gross, taxable, deductions, employer contributions and net.",
             "PyrlYtd", [new Column("Employee", "Employee", 160), new Column("Department", "Department", 90), new Column("Gross", "Gross", 95), new Column("Taxable", "Taxable", 95), new Column("Deductions", "Deductions", 95),
              new Column("Employer", "Employer", 90), new Column("Net", "Net pay", 100, true)], Period);
+
+        // Employee master data.
+        yield return Listing("PR4", "Pre-Payroll Validation", "Payroll", "Active employees whose records would stop a clean payment or return: missing ID, tax number, bank or wallet details, date of birth.",
+            "PyrlValidation", [new Column("Employee", "Employee", 160), new Column("Department", "Department", 90), new Column("Method", "Paid by", 90), new Column("Issues", "Issues", 340)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("PR11", "Bank Transfer (EFT) Schedule", "Payroll", "Net pay for the period to employees paid by bank transfer (held salaries excluded), with bank, branch and account.",
+            "PyrlEft", [new Column("Employee", "Employee", 160), new Column("Bank", "Bank", 110), new Column("Branch", "Branch", 60), new Column("Account", "Account", 110), new Column("Reference", "Reference", 80),
+             new Column("Net", "Net pay", 100, true)], Period);
+        yield return Listing("PR13", "Mobile Money Payment Schedule", "Payroll", "Net pay for the period to employees paid by mobile money (held salaries excluded), with the wallet.",
+            "PyrlMobile", [new Column("Employee", "Employee", 160), new Column("Wallet", "Wallet", 110), new Column("Reference", "Reference", 80), new Column("Net", "Net pay", 100, true)], Period);
+        yield return Listing("PR15", "Held Salaries", "Payroll", "Employees whose pay is held back, why, and the net pay held for the period.",
+            "PyrlHeld", [new Column("Employee", "Employee", 160), new Column("Department", "Department", 90), new Column("Method", "Paid by", 90), new Column("Reason", "Reason", 220), new Column("Net", "Net held", 100, true)], Period);
+        yield return Listing("PR45", "Headcount Reconciliation", "Payroll", "Per department over the period: opening headcount, starters, leavers and closing.",
+            "PyrlHeadcount", [new Column("Department", "Department", 110), new Column("Opening", "Opening", 60), new Column("Starters", "Starters", 60), new Column("Leavers", "Leavers", 60), new Column("Closing", "Closing", 60)], Period);
+        yield return Listing("PR46", "Starters & Leavers", "Payroll", "Employees engaged or leaving in the period, with the date and the reason for leaving.",
+            "PyrlStartersLeavers", [new Column("Kind", "Kind", 70), new Column("Employee", "Employee", 160), new Column("Department", "Department", 90), new Column("Date", "Date", 75), new Column("Reason", "Reason", 200),
+             new Column("Basic", "Basic salary", 95, true)], Period);
+        yield return Listing("PR48", "Grade & Gender Distribution", "Payroll", "Active headcount per grade with the gender split and the basic salary range.",
+            "PyrlGrades", [new Column("Grade", "Grade", 70), new Column("Headcount", "Headcount", 65), new Column("Female", "Female", 55), new Column("Male", "Male", 50), new Column("Unspecified", "Not recorded", 75),
+             new Column("Range", "Basic range", 150), new Column("Average", "Average basic", 100, true)], []);
+        yield return Listing("PR50", "Employee Bank Detail Change Audit", "Payroll", "Every change to how or where an employee is paid, with who changed it (account numbers masked).",
+            "PyrlBankChanges", [new Column("When", "When", 115), new Column("Employee", "Employee", 160), new Column("User", "Changed by", 90), new Column("Changed", "Fields", 180), new Column("New", "New details", 200)], Period);
+        yield return Listing("PR51", "Contract, Probation & Permit Expiry", "Payroll", "Fixed-term contracts, probations and work permits ending within 90 days of the date, or already passed.",
+            "PyrlExpiries", [new Column("Kind", "Kind", 90), new Column("Employee", "Employee", 160), new Column("Department", "Department", 90), new Column("Date", "Date", 75), new Column("Due", "Days", 110)],
+            [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("PR68", "Ghost Worker Investigation Pack", "Payroll", "Active employees sharing a bank account, wallet or national ID with another, with no ID, or with no leave in over a year.",
+            "PyrlGhosts", [new Column("Employee", "Employee", 160), new Column("Department", "Department", 90), new Column("Engaged", "Engaged", 75), new Column("Signals", "Signals", 360)], [("AsAtDate", ParameterType.Date)]);
     }
 }

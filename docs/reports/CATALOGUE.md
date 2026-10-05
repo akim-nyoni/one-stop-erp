@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-386 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+396 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -273,15 +273,24 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | PAY-LEAVE | Leave Balances | Employee leave balances by type — days accrued, taken and available. | — | Employee, LeaveType, Accrued, Taken, Balance | — | Sum(Balance) |
 | PAY-LOANS | Employee Loans | Outstanding employee loans — principal, balance, installment and status. | — | Employee, Reference, Principal, Outstanding, Installment | — | Sum(Installment) |
 | PAY-SUM | Payroll Summary | Gross, deductions and net pay per employee for a period. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Gross, Deductions, Net | — | Sum(Net) |
+| PR11 | Bank Transfer (EFT) Schedule | Net pay for the period to employees paid by bank transfer (held salaries excluded), with bank, branch and account. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Bank, Branch, Account, Reference, Net | — | Sum(Net) |
 | PR12 | Cash Pay Denomination Breakdown | Net pay in the period broken into the base currency's notes and coins, per employee, for cash payouts. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Breakdown, Net | — | Sum(Net) |
+| PR13 | Mobile Money Payment Schedule | Net pay for the period to employees paid by mobile money (held salaries excluded), with the wallet. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Wallet, Reference, Net | — | Sum(Net) |
+| PR15 | Held Salaries | Employees whose pay is held back, why, and the net pay held for the period. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Department, Method, Reason, Net | — | Sum(Net) |
 | PR16 | Net Pay Control Reconciliation | Per pay month: gross, deductions and net from the payslips against the net pay credited in the payroll journals. | FromDate (Date, optional), ToDate (Date, optional) | Month, Payslips, Gross, Deductions, Net, Journal, Difference | — | Sum(Difference) |
 | PR17 | Earnings Analysis | Earnings in the period by department and element. | FromDate (Date, optional), ToDate (Date, optional) | Department, Element, Description, Employees, Amount | — | Sum(Amount) |
 | PR2 | Payroll Summary by Element | Totals for the period by earning, deduction and employer contribution, with how many employees each. | FromDate (Date, optional), ToDate (Date, optional) | Type, Element, Description, Employees, Amount | — | Sum(Amount) |
 | PR29 | Tax Reconciliation | Per employee over the period: taxable earnings, PAYE deducted and the effective rate. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Taxable, Rate, Tax | — | Sum(Tax) |
 | PR3 | Payroll Journal | The payroll postings of the period by account, with debits and credits. | FromDate (Date, optional), ToDate (Date, optional) | Journal, Date, Account, Name, Debit, Credit, Net | — | Sum(Net) |
 | PR38 | Leave Liability (IAS 19) | Leave days owed at the date per employee and type, valued at the daily rate of basic salary (annual ÷ 260). | — | Employee, LeaveType, Accrued, Taken, Balance, DailyRate, Liability | — | Sum(Liability) |
+| PR4 | Pre-Payroll Validation | Active employees whose records would stop a clean payment or return: missing ID, tax number, bank or wallet details, date of birth. | AsAtDate (Date, optional) | Employee, Department, Method, Issues | — | — |
+| PR45 | Headcount Reconciliation | Per department over the period: opening headcount, starters, leavers and closing. | FromDate (Date, optional), ToDate (Date, optional) | Department, Opening, Starters, Leavers, Closing | — | — |
+| PR46 | Starters & Leavers | Employees engaged or leaving in the period, with the date and the reason for leaving. | FromDate (Date, optional), ToDate (Date, optional) | Kind, Employee, Department, Date, Reason, Basic | — | Sum(Basic) |
+| PR48 | Grade & Gender Distribution | Active headcount per grade with the gender split and the basic salary range. | — | Grade, Headcount, Female, Male, Unspecified, Range, Average | — | Sum(Average) |
 | PR49 | Salary Change Audit | Every change to an employee's basic salary in the period, with who changed it. | FromDate (Date, optional), ToDate (Date, optional) | When, Employee, User, Old, New | — | — |
 | PR5 | Payroll Variance / Movement | Each employee's net pay this pay month against last, with starters, leavers and changes over 10% flagged. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Department, Previous, Current, Flag, Change | — | Sum(Change) |
+| PR50 | Employee Bank Detail Change Audit | Every change to how or where an employee is paid, with who changed it (account numbers masked). | FromDate (Date, optional), ToDate (Date, optional) | When, Employee, User, Changed, New | — | — |
+| PR51 | Contract, Probation & Permit Expiry | Fixed-term contracts, probations and work permits ending within 90 days of the date, or already passed. | AsAtDate (Date, optional) | Kind, Employee, Department, Date, Due | — | — |
 | PR59 | Labour Cost by Department & Cost Centre | Gross pay plus employer contributions in the period by department and cost centre. | FromDate (Date, optional), ToDate (Date, optional) | Department, CostCentre, Employees, Gross, Employer, Cost | — | Sum(Cost) |
 | PR6 | Payroll Calculation Trace | Every payslip line in the period with how its element is calculated and the employee's basic salary. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Period, Element, Basis, Rule, Basic, Amount | — | Sum(Amount) |
 | PR60 | Payroll Cost vs Budget | Year to date on each payroll expense account: budget, actual and the variance. | AsAtDate (Date, optional) | Account, Name, Budget, Actual, Variance | — | Sum(Variance) |
@@ -289,6 +298,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | PR64 | Payroll GL Reconciliation | Per element account: what the payslips say against what the ledger holds for the period. | FromDate (Date, optional), ToDate (Date, optional) | Account, Name, Payslips, Ledger, Difference | — | Sum(Difference) |
 | PR65 | Payroll Audit Trail | Every recorded change in the period to employees, elements, assignments, loans, leave and payslips. | FromDate (Date, optional), ToDate (Date, optional) | When, User, Entity, Id, Action, Changed | — | — |
 | PR67 | Payroll Report Access & Export Log | Every run of a payroll report in the period — who, what, format and copy. | FromDate (Date, optional), ToDate (Date, optional) | When, Report, User, Purpose, Format, Copy | — | — |
+| PR68 | Ghost Worker Investigation Pack | Active employees sharing a bank account, wallet or national ID with another, with no ID, or with no leave in over a year. | AsAtDate (Date, optional) | Employee, Department, Engaged, Signals | — | — |
 | PR70 | Year-to-Date Payroll Register | Per employee for the year to the end of the period: gross, taxable, deductions, employer contributions and net. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Department, Gross, Taxable, Deductions, Employer, Net | — | Sum(Net) |
 
 ## PointOfSale

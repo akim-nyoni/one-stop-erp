@@ -41,7 +41,18 @@ public sealed class PayrollReportsTests
         employee.AssignPayElement(basic.Id);
         employee.AssignPayElement(pension.Id);
         employee.AssignPayElement(paye.Id);
-        db.Employees.Add(employee);
+        employee.NationalIdNumber = "63-123456A07";
+        employee.TaxNumber = "TX-1";
+        employee.DateOfBirth = new DateOnly(1990, 5, 5);
+        employee.BankName = "First Bank";
+        employee.BankAccountNumber = "123456789";
+        employee.Grade = "G3";
+        employee.Gender = Gender.Female;
+        employee.ContractEndDate = new DateOnly(2026, 3, 15);
+        Employee casual = new(companyId, "PR-EMP2", "Casey Casual", 1500m, new DateOnly(2026, 1, 5)) { PaymentMethod = PayMethod.MobileMoney, Grade = "G1" };
+        casual.AssignPayElement(basic.Id);
+        casual.HoldSalary("Pending verification");
+        db.Employees.AddRange(employee, casual);
         await db.SaveChangesAsync();
         (await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-01", new DateOnly(2026, 1, 25), "2420", "PRR-2026-01")).IsSuccess.Should().BeTrue();
 
@@ -54,12 +65,21 @@ public sealed class PayrollReportsTests
             return Encoding.UTF8.GetString(rendered.Value.Content);
         }
 
-        (await Render("PR2")).Should().Contain("Deduction,PAYE,PAYE,1,180").And.Contain("Earning,BASIC,Basic Salary,1,2000");
-        (await Render("PR16")).Should().Contain("2026-01,1,\"2,000.00\",280.00,\"1,720.00\",\"1,720.00\",0");
+        (await Render("PR2")).Should().Contain("Deduction,PAYE,PAYE,1,180").And.Contain("Earning,BASIC,Basic Salary,2,3500");
+        (await Render("PR16")).Should().Contain("2026-01,2,\"3,500.00\",280.00,\"3,220.00\",\"3,220.00\",0");
         (await Render("PR29")).Should().Contain("PR-EMP Pat Payee,\"2,000.00\",9.0%,180");
         string gl = await Render("PR64");
-        gl.Should().Contain("6100,").And.Contain("\"2,000.00\",\"2,000.00\",0").And.Contain("-100.00,-100.00,0");
+        gl.Should().Contain("6100,").And.Contain("\"3,500.00\",\"3,500.00\",0").And.Contain("-100.00,-100.00,0");
         (await Render("PR70")).Should().Contain("PR-EMP Pat Payee,—,\"2,000.00\",\"2,000.00\",280.00,0.00,1720");
+
+        (await Render("PR4")).Should().Contain("PR-EMP2 Casey Casual,—,MobileMoney,No national ID; No tax number; Mobile money without a wallet number; No date of birth").And.NotContain("PR-EMP Pat Payee");
+        (await Render("PR11")).Should().Contain("PR-EMP Pat Payee,First Bank,—,123456789,2026-01,1720");
+        (await Render("PR13")).Should().NotContain("Casey"); // held
+        (await Render("PR15")).Should().Contain("PR-EMP2 Casey Casual,—,MobileMoney,Pending verification,1500");
+        (await Render("PR46")).Should().Contain("Starter,PR-EMP2 Casey Casual,—,2026-01-05");
+        (await Render("PR48")).Should().Contain("G3,1,1,0,0").And.Contain("G1,1,0,0,1");
+        (await Render("PR51")).Should().Contain("Contract end,PR-EMP Pat Payee,—,2026-03-15,in 43 days");
+        (await Render("PR68")).Should().Contain("PR-EMP2 Casey Casual,—,2026-01-05,No national ID");
 
         foreach (string code in PayrollReports.All().Select(r => r.Code))
         {

@@ -15,6 +15,32 @@ public enum EmployeeStatus
     Terminated = 3,
 }
 
+/// <summary>How an employee's net pay is paid (brief §14 PR11–PR13).</summary>
+public enum PayMethod
+{
+    /// <summary>By bank transfer (EFT).</summary>
+    BankTransfer = 1,
+
+    /// <summary>In cash (see the denomination breakdown).</summary>
+    Cash = 2,
+
+    /// <summary>To a mobile-money wallet.</summary>
+    MobileMoney = 3,
+}
+
+/// <summary>An employee's gender, for statutory headcount returns.</summary>
+public enum Gender
+{
+    /// <summary>Not recorded.</summary>
+    Unspecified = 0,
+
+    /// <summary>Female.</summary>
+    Female = 1,
+
+    /// <summary>Male.</summary>
+    Male = 2,
+}
+
 /// <summary>
 /// An employee (brief §4.15.1, <c>hr.employee</c>). Carries the basic salary and the department/cost-centre
 /// that drive the payroll journal; pay is assembled from assigned pay elements at run time.
@@ -88,6 +114,85 @@ public sealed class Employee : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Terminates the employee.</summary>
     public void Terminate() => Status = EmployeeStatus.Terminated;
+
+    /// <summary>The national ID number.</summary>
+    public string? NationalIdNumber { get; set; }
+
+    /// <summary>The tax authority's number for the employee.</summary>
+    public string? TaxNumber { get; set; }
+
+    /// <summary>Gender, for statutory returns.</summary>
+    public Gender Gender { get; set; }
+
+    /// <summary>Date of birth.</summary>
+    public DateOnly? DateOfBirth { get; set; }
+
+    /// <summary>Salary grade.</summary>
+    public string? Grade { get; set; }
+
+    /// <summary>Notch within the grade.</summary>
+    public int? Notch { get; set; }
+
+    /// <summary>When a fixed-term contract ends.</summary>
+    public DateOnly? ContractEndDate { get; set; }
+
+    /// <summary>When probation ends.</summary>
+    public DateOnly? ProbationEndDate { get; set; }
+
+    /// <summary>When the work permit expires (non-citizens).</summary>
+    public DateOnly? WorkPermitExpiry { get; set; }
+
+    /// <summary>How net pay is paid.</summary>
+    public PayMethod PaymentMethod { get; set; } = PayMethod.BankTransfer;
+
+    /// <summary>The bank, for bank transfers.</summary>
+    public string? BankName { get; set; }
+
+    /// <summary>The branch code, for bank transfers.</summary>
+    public string? BankBranch { get; set; }
+
+    /// <summary>The account number, for bank transfers.</summary>
+    public string? BankAccountNumber { get; set; }
+
+    /// <summary>The wallet number, for mobile-money payment.</summary>
+    public string? MobileMoneyNumber { get; set; }
+
+    /// <summary>When employment ended.</summary>
+    public DateOnly? TerminationDate { get; private set; }
+
+    /// <summary>Why employment ended.</summary>
+    public string? TerminationReason { get; private set; }
+
+    /// <summary>True while the employee's pay is held back from payment.</summary>
+    public bool IsSalaryHeld { get; private set; }
+
+    /// <summary>Why pay is held.</summary>
+    public string? HoldReason { get; private set; }
+
+    /// <summary>Ends employment on a date, with the reason.</summary>
+    /// <param name="date">The last day.</param>
+    /// <param name="reason">Why.</param>
+    public void Terminate(DateOnly date, string reason)
+    {
+        Status = EmployeeStatus.Terminated;
+        TerminationDate = date;
+        TerminationReason = reason;
+    }
+
+    /// <summary>Holds the employee's pay back from payment.</summary>
+    /// <param name="reason">Why.</param>
+    public void HoldSalary(string reason)
+    {
+        IsSalaryHeld = true;
+        HoldReason = reason;
+    }
+
+    /// <summary>Releases held pay for payment.</summary>
+    public void ReleaseSalary()
+    {
+        IsSalaryHeld = false;
+        HoldReason = null;
+    }
 }
 
 /// <summary>An assignment of a pay element to an employee (<c>hr.employee_pay_element</c>).</summary>
