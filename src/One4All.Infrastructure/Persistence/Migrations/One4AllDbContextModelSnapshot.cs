@@ -2402,6 +2402,127 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("claim_line", "exp");
                 });
 
+            modelBuilder.Entity("One4All.Core.FixedAssets.AssetCount", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("CountNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("count_number");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<bool>("IsClosed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_closed");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("location");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_asset_count");
+
+                    b.HasIndex("CompanyId", "CountNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_asset_count_company_id_count_number");
+
+                    b.ToTable("asset_count", "fa");
+                });
+
+            modelBuilder.Entity("One4All.Core.FixedAssets.AssetCountLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AssetCountId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("asset_count_id");
+
+                    b.Property<long?>("AssetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("asset_id");
+
+                    b.Property<string>("Condition")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("condition");
+
+                    b.Property<string>("ExpectedLocation")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("expected_location");
+
+                    b.Property<string>("FoundLocation")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("found_location");
+
+                    b.Property<int>("Result")
+                        .HasColumnType("integer")
+                        .HasColumnName("result");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Tag")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("tag");
+
+                    b.HasKey("Id")
+                        .HasName("pk_asset_count_line");
+
+                    b.HasIndex("AssetCountId")
+                        .HasDatabaseName("ix_asset_count_line_asset_count_id");
+
+                    b.ToTable("asset_count_line", "fa");
+                });
+
             modelBuilder.Entity("One4All.Core.FixedAssets.AssetDisposal", b =>
                 {
                     b.Property<long>("Id")
@@ -2633,6 +2754,20 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("description");
 
+                    b.Property<DateOnly?>("InsuranceExpiry")
+                        .HasColumnType("date")
+                        .HasColumnName("insurance_expiry");
+
+                    b.Property<decimal?>("InsuredValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("insured_value");
+
+                    b.Property<string>("Insurer")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("insurer");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
@@ -2658,6 +2793,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<string>("PolicyNumber")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("policy_number");
+
                     b.Property<decimal>("ReducingBalanceRatePercent")
                         .HasPrecision(9, 4)
                         .HasColumnType("numeric(9,4)")
@@ -2682,6 +2822,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("useful_life_months");
 
+                    b.Property<DateOnly?>("WarrantyExpiry")
+                        .HasColumnType("date")
+                        .HasColumnName("warranty_expiry");
+
                     b.HasKey("Id")
                         .HasName("pk_asset");
 
@@ -2691,6 +2835,60 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("asset", "fa");
+                });
+
+            modelBuilder.Entity("One4All.Core.FixedAssets.MaintenancePlan", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AssetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("asset_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("IntervalMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("interval_months");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateOnly?>("LastDone")
+                        .HasColumnType("date")
+                        .HasColumnName("last_done");
+
+                    b.Property<DateOnly>("NextDue")
+                        .HasColumnType("date")
+                        .HasColumnName("next_due");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_maintenance_plan");
+
+                    b.HasIndex("CompanyId", "AssetId")
+                        .HasDatabaseName("ix_maintenance_plan_company_id_asset_id");
+
+                    b.ToTable("maintenance_plan", "fa");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.AcquisitionCost", b =>
@@ -22158,6 +22356,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_claim_line_claim_expense_claim_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.FixedAssets.AssetCountLine", b =>
+                {
+                    b.HasOne("One4All.Core.FixedAssets.AssetCount", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("AssetCountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_asset_count_line_asset_counts_asset_count_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.AcquisitionCost", b =>
                 {
                     b.HasOne("One4All.Core.Housing.LandAcquisition", null)
@@ -23724,6 +23932,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("One4All.Core.Expenses.ExpenseClaim", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.FixedAssets.AssetCount", b =>
                 {
                     b.Navigation("Lines");
                 });

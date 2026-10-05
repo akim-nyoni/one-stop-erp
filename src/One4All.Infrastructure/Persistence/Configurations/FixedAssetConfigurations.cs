@@ -11,6 +11,9 @@ internal sealed class FixedAssetConfiguration : IEntityTypeConfiguration<FixedAs
     {
         b.ToTable("asset", Schemas.FixedAssets);
         b.HasKey(x => x.Id);
+        b.Property(x => x.Insurer).HasMaxLength(120);
+        b.Property(x => x.PolicyNumber).HasMaxLength(60);
+        b.Property(x => x.InsuredValue).HasPrecision(19, 4);
         b.Property(x => x.AssetNumber).HasMaxLength(40);
         b.Property(x => x.Description).HasMaxLength(200);
         b.Property(x => x.AssetClass).HasMaxLength(60);
@@ -71,5 +74,44 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
         b.Ignore(x => x.WeightedValue);
         b.HasIndex(x => new { x.CompanyId, x.Stage });
         b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+internal sealed class AssetCountConfiguration : IEntityTypeConfiguration<AssetCount>
+{
+    public void Configure(EntityTypeBuilder<AssetCount> b)
+    {
+        b.ToTable("asset_count", Schemas.FixedAssets);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.CountNumber).HasMaxLength(40);
+        b.Property(x => x.Location).HasMaxLength(120);
+        b.HasIndex(x => new { x.CompanyId, x.CountNumber }).IsUnique();
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.AssetCountId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class AssetCountLineConfiguration : IEntityTypeConfiguration<AssetCountLine>
+{
+    public void Configure(EntityTypeBuilder<AssetCountLine> b)
+    {
+        b.ToTable("asset_count_line", Schemas.FixedAssets);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Tag).HasMaxLength(40);
+        b.Property(x => x.ExpectedLocation).HasMaxLength(120);
+        b.Property(x => x.FoundLocation).HasMaxLength(120);
+        b.Property(x => x.Condition).HasMaxLength(120);
+        b.Property(x => x.Result).HasConversion<int>();
+    }
+}
+
+internal sealed class MaintenancePlanConfiguration : IEntityTypeConfiguration<MaintenancePlan>
+{
+    public void Configure(EntityTypeBuilder<MaintenancePlan> b)
+    {
+        b.ToTable("maintenance_plan", Schemas.FixedAssets);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.AssetId });
     }
 }

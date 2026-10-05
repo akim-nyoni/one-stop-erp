@@ -144,6 +144,21 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
     /// <summary>The depreciation-expense account.</summary>
     public string DepreciationExpenseAccountCode { get; private set; }
 
+    /// <summary>Gets or sets the insurer.</summary>
+    public string? Insurer { get; set; }
+
+    /// <summary>Gets or sets the insurance policy number.</summary>
+    public string? PolicyNumber { get; set; }
+
+    /// <summary>Gets or sets the sum insured.</summary>
+    public decimal? InsuredValue { get; set; }
+
+    /// <summary>Gets or sets when the insurance cover ends.</summary>
+    public DateOnly? InsuranceExpiry { get; set; }
+
+    /// <summary>Gets or sets when the manufacturer's / supplier's warranty ends.</summary>
+    public DateOnly? WarrantyExpiry { get; set; }
+
     /// <summary>The net book value (cost − accumulated depreciation).</summary>
     public decimal NetBookValue => Cost - AccumulatedDepreciation;
 

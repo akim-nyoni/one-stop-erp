@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-443 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+446 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -61,7 +61,10 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | FA207 | Depreciation Schedule (actual) | Depreciation charged in the period, by month and asset, from the posted depreciation runs. | FromDate (Date, optional), ToDate (Date, optional) | Month, Asset, Description, Class, Charge | — | Sum(Charge) |
 | FA208 | Asset Additions & Transfers | Assets acquired in the period, and changes of location or custodian recorded in the audit trail. | FromDate (Date, optional), ToDate (Date, optional) | Kind, Asset, Description, Class, Date, Detail, Cost | — | Sum(Cost) |
 | FA209 | Asset Movement Schedule (note) | Per asset class: cost and accumulated depreciation brought forward, additions, disposals, charge and carried forward, and the net book value. | FromDate (Date, optional), ToDate (Date, optional) | Class, CostOpening, Additions, Disposals, CostClosing, DepOpening, Charge, DepDisposals, DepClosing, Nbv | — | Sum(Nbv) |
+| FA210 | Asset Verification / Count Variance | Each verification in the period: every asset expected or seen, where the register has it and where it was found, its condition and result, with the net book value at risk. | FromDate (Date, optional), ToDate (Date, optional) | Count, Date, Asset, Description, Expected, Found, Condition, Result, Nbv | — | Sum(Nbv) |
 | FA212 | Fully Depreciated Assets Still in Use | Assets written down to residual value that are still held, with where they are and who holds them. | — | Asset, Description, Class, Acquired, Location, Custodian, Cost | — | Sum(Cost) |
+| FA213 | Insurance & Warranty Expiry | Held assets whose insurance or warranty has lapsed or ends within the window, uninsured assets, and cover below net book value. | AsAtDate (Date, optional), Days (Integer, optional) | Asset, Description, Insurer, InsuranceExpiry, WarrantyExpiry, Issue, Insured, Nbv | — | Sum(Nbv) |
+| FA214 | Maintenance Schedule & History | Planned tasks with when they were last done and are next due (overdue flagged), then the maintenance logged in the period. | FromDate (Date, optional), ToDate (Date, optional), AsAtDate (Date, optional) | Section, Asset, Description, Task, LastDone, NextDue, Status, Cost | — | Sum(Cost) |
 
 ## GeneralLedger
 

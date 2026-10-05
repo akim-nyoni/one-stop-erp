@@ -31,6 +31,10 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
             "FATXDEPRECIATION" => await DepreciationAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "FATXADDITIONS" => await AdditionsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "FATXMOVEMENT" => await MovementAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "FATXVERIFICATION" => await VerificationAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "FATXINSURANCE" => await InsuranceAsync(companyId, DateParameter(parameters, "AsAtDate") ?? today,
+                parameters.TryGetValue("Days", out object? days) && days is not null and not "" ? Convert.ToInt32(days, CultureInfo.InvariantCulture) : 30, ct).ConfigureAwait(false),
+            "FATXMAINTENANCE" => await MaintenanceAsync(companyId, fromDate, toDate, DateParameter(parameters, "AsAtDate") ?? toDate, ct).ConfigureAwait(false),
             "FATXFULLYDEPRECIATED" => await FullyDepreciatedAsync(companyId, ct).ConfigureAwait(false),
             "FATXVATDETAIL" => await VatDetailAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "FATXVATRECON" => await VatReconAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -173,6 +177,78 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
             .GroupBy(c => (Month: c.PaymentDate.ToString("yyyy-MM", CultureInfo.InvariantCulture), c.TaxCode)).OrderBy(g => g.Key.Month, StringComparer.Ordinal).ThenBy(g => g.Key.TaxCode, StringComparer.Ordinal)
             .Select(g => Row(("Month", g.Key.Month), ("TaxCode", g.Key.TaxCode), ("Certificates", g.Count()), ("Gross", Money(g.Sum(c => c.GrossAmount))),
                 ("Remitted", Money(g.Where(c => c.RemittedOn != null).Sum(c => c.WithheldAmount))), ("Withheld", g.Sum(c => c.WithheldAmount))))];
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VerificationAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<AssetCount> counts = await _db.AssetCounts.AsNoTracking().Include(c => c.Lines).Where(c => c.CompanyId == companyId && c.Date >= fromDate && c.Date <= toDate)
+            .OrderBy(c => c.Date).ThenBy(c => c.CountNumber).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, FixedAsset> assets = await _db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.Id, ct).ConfigureAwait(false);
+        return [.. counts.SelectMany(c => c.Lines.OrderBy(l => l.Result == AssetCountResult.Found).ThenBy(l => l.Tag, StringComparer.Ordinal).Select(l =>
+        {
+            FixedAsset? asset = l.AssetId is long id ? assets.GetValueOrDefault(id) : null;
+            string result = l.Result switch
+            {
+                AssetCountResult.NotSeen => "Not yet seen",
+                AssetCountResult.FoundElsewhere => "Found elsewhere",
+                _ => l.Result.ToString(),
+            };
+            return Row(("Count", c.CountNumber), ("Date", Date(c.Date)), ("Asset", l.Tag), ("Description", asset?.Description ?? "Not on the register"), ("Expected", l.ExpectedLocation ?? "—"),
+                ("Found", l.FoundLocation ?? "—"), ("Condition", l.Condition ?? string.Empty), ("Result", result),
+                ("Nbv", l.Result is AssetCountResult.Missing or AssetCountResult.NotSeen ? asset?.NetBookValue ?? 0m : 0m));
+        }))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> InsuranceAsync(long companyId, DateOnly asAt, int windowDays, CancellationToken ct)
+    {
+        List<FixedAsset> held = await _db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == companyId && a.Status != FixedAssetStatus.Disposed).OrderBy(a => a.AssetNumber).ToListAsync(ct).ConfigureAwait(false);
+        DateOnly horizon = asAt.AddDays(windowDays);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (FixedAsset asset in held)
+        {
+            List<string> issues = [];
+            if (asset.InsuranceExpiry is null && asset.InsuredValue is null)
+            {
+                issues.Add("Not insured");
+            }
+            else if (asset.InsuranceExpiry is DateOnly cover)
+            {
+                issues.Add(cover < asAt ? "Insurance lapsed" : cover <= horizon ? $"Insurance ends in {cover.DayNumber - asAt.DayNumber} days" : string.Empty);
+            }
+
+            if (asset.InsuredValue is decimal insured && insured < asset.NetBookValue)
+            {
+                issues.Add("Under-insured");
+            }
+
+            if (asset.WarrantyExpiry is DateOnly warranty && warranty <= horizon)
+            {
+                issues.Add(warranty < asAt ? "Warranty expired" : $"Warranty ends in {warranty.DayNumber - asAt.DayNumber} days");
+            }
+
+            issues.RemoveAll(i => i.Length == 0);
+            if (issues.Count > 0)
+            {
+                rows.Add(Row(("Asset", asset.AssetNumber), ("Description", asset.Description), ("Insurer", string.Join(" ", new[] { asset.Insurer, asset.PolicyNumber }.Where(x => !string.IsNullOrEmpty(x))) is { Length: > 0 } p ? p : "—"),
+                    ("InsuranceExpiry", asset.InsuranceExpiry is DateOnly i ? Date(i) : "—"), ("WarrantyExpiry", asset.WarrantyExpiry is DateOnly w ? Date(w) : "—"), ("Issue", string.Join("; ", issues)),
+                    ("Insured", asset.InsuredValue is decimal v ? Money(v) : "—"), ("Nbv", asset.NetBookValue)));
+            }
+        }
+
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> MaintenanceAsync(long companyId, DateOnly fromDate, DateOnly toDate, DateOnly asAt, CancellationToken ct)
+    {
+        Dictionary<long, FixedAsset> assets = await _db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.Id, ct).ConfigureAwait(false);
+        List<MaintenancePlan> plans = await _db.MaintenancePlans.AsNoTracking().Where(p => p.CompanyId == companyId && p.IsActive).OrderBy(p => p.NextDue).ToListAsync(ct).ConfigureAwait(false);
+        List<AssetMaintenance> history = await _db.AssetMaintenance.AsNoTracking().Where(m => m.CompanyId == companyId && m.Date >= fromDate && m.Date <= toDate).OrderBy(m => m.Date).ToListAsync(ct).ConfigureAwait(false);
+        string Number(long id) => assets.GetValueOrDefault(id)?.AssetNumber ?? "?";
+        string Name(long id) => assets.GetValueOrDefault(id)?.Description ?? "?";
+        return [.. plans.Select(p => Row(("Section", "Schedule"), ("Asset", Number(p.AssetId)), ("Description", Name(p.AssetId)), ("Task", $"{p.Description} (every {p.IntervalMonths} months)"),
+                ("LastDone", p.LastDone is DateOnly d ? Date(d) : "—"), ("NextDue", Date(p.NextDue)), ("Status", p.NextDue < asAt ? "Overdue" : p.NextDue <= asAt.AddDays(30) ? "Due soon" : "Planned"), ("Cost", 0m))),
+            .. history.Select(m => Row(("Section", "History"), ("Asset", Number(m.AssetId)), ("Description", Name(m.AssetId)), ("Task", m.Description), ("LastDone", Date(m.Date)), ("NextDue", m.Provider ?? "—"),
+                ("Status", "Done"), ("Cost", m.Cost)))];
+    }
 
     private Task<Dictionary<string, FixedAsset>> AssetsAsync(long companyId, CancellationToken ct)
         => _db.FixedAssets.AsNoTracking().IgnoreQueryFilters().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AssetNumber, ct);

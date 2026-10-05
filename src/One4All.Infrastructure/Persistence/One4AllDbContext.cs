@@ -239,6 +239,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Fixed-asset maintenance log entries.</summary>
     public DbSet<Core.FixedAssets.AssetMaintenance> AssetMaintenance => Set<Core.FixedAssets.AssetMaintenance>();
 
+    /// <summary>Gets the physical asset verifications.</summary>
+    public DbSet<Core.FixedAssets.AssetCount> AssetCounts => Set<Core.FixedAssets.AssetCount>();
+
+    /// <summary>Gets the planned maintenance tasks.</summary>
+    public DbSet<Core.FixedAssets.MaintenancePlan> MaintenancePlans => Set<Core.FixedAssets.MaintenancePlan>();
+
     /// <summary>Fixed-asset disposal records.</summary>
     public DbSet<Core.FixedAssets.AssetDisposal> AssetDisposals => Set<Core.FixedAssets.AssetDisposal>();
 

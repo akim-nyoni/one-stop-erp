@@ -70,7 +70,8 @@ missing domain data. Items are struck through as they ship (with the report code
 
 ## M. Fixed Assets
 - ~~207 Depreciation Schedule (FA207)~~, ~~208 Additions & Transfers (FA208)~~, ~~209 Movement Schedule (FA209)~~, ~~212 Fully Depreciated in Use (FA212)~~
-- Needs new data: 210 counts, 211 CWIP, 213 insurance / warranty, 214 planned maintenance
+- ~~210 Asset Verification (FA210)~~, ~~213 Insurance & Warranty Expiry (FA213)~~, ~~214 Maintenance Schedule & History (FA214)~~
+- Needs new data: 211 CWIP
 
 ## N. Tax & Statutory
 - ~~216 VAT Detail (TX216)~~, ~~217 VAT Reconciliation (TX217)~~, ~~218 Exempt / Zero / Out-of-scope (TX218)~~, ~~220 WHT Return (TX220)~~
