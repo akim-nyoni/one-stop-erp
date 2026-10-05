@@ -27,6 +27,9 @@ public static class AssetTaxReports
         yield return Listing("FA210", "Asset Verification / Count Variance", "FixedAssets", "Each verification in the period: every asset expected or seen, where the register has it and where it was found, its condition and result, with the net book value at risk.",
             "FatxVerification", [new Column("Count", "Count", 85), new Column("Date", "Date", 75), new Column("Asset", "Asset", 90), new Column("Description", "Description", 160), new Column("Expected", "Register location", 100),
              new Column("Found", "Found at", 100), new Column("Condition", "Condition", 90), new Column("Result", "Result", 90), new Column("Nbv", "NBV", 90, true)], Period);
+        yield return Listing("FA211", "Capital Work in Progress", "FixedAssets", "Each capital project: budget, cost brought forward, added and capitalised in the period, the CWIP balance carried forward and the share of budget spent.",
+            "FatxCwip", [new Column("Project", "Project", 80), new Column("Name", "Name", 160), new Column("Opened", "Opened", 75), new Column("Status", "Status", 110), new Column("Budget", "Budget", 90),
+             new Column("Opening", "B/f", 90), new Column("Added", "Added", 90), new Column("Capitalised", "Capitalised", 90), new Column("Spent", "Spent %", 60), new Column("Closing", "CWIP c/f", 95, true)], Period);
         yield return Listing("FA212", "Fully Depreciated Assets Still in Use", "FixedAssets", "Assets written down to residual value that are still held, with where they are and who holds them.",
             "FatxFullyDepreciated", [new Column("Asset", "Asset", 90), new Column("Description", "Description", 180), new Column("Class", "Class", 90), new Column("Acquired", "Acquired", 75),
              new Column("Location", "Location", 100), new Column("Custodian", "Custodian", 100), new Column("Cost", "Cost", 95, true)], []);

@@ -35,6 +35,7 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
             "FATXINSURANCE" => await InsuranceAsync(companyId, DateParameter(parameters, "AsAtDate") ?? today,
                 parameters.TryGetValue("Days", out object? days) && days is not null and not "" ? Convert.ToInt32(days, CultureInfo.InvariantCulture) : 30, ct).ConfigureAwait(false),
             "FATXMAINTENANCE" => await MaintenanceAsync(companyId, fromDate, toDate, DateParameter(parameters, "AsAtDate") ?? toDate, ct).ConfigureAwait(false),
+            "FATXCWIP" => await CwipAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "FATXFULLYDEPRECIATED" => await FullyDepreciatedAsync(companyId, ct).ConfigureAwait(false),
             "FATXVATDETAIL" => await VatDetailAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "FATXVATRECON" => await VatReconAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -177,6 +178,23 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
             .GroupBy(c => (Month: c.PaymentDate.ToString("yyyy-MM", CultureInfo.InvariantCulture), c.TaxCode)).OrderBy(g => g.Key.Month, StringComparer.Ordinal).ThenBy(g => g.Key.TaxCode, StringComparer.Ordinal)
             .Select(g => Row(("Month", g.Key.Month), ("TaxCode", g.Key.TaxCode), ("Certificates", g.Count()), ("Gross", Money(g.Sum(c => c.GrossAmount))),
                 ("Remitted", Money(g.Where(c => c.RemittedOn != null).Sum(c => c.WithheldAmount))), ("Withheld", g.Sum(c => c.WithheldAmount))))];
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CwipAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<CapitalProject> projects = await _db.CapitalProjects.AsNoTracking().Include(p => p.Costs).Where(p => p.CompanyId == companyId && p.OpenedOn <= toDate && (p.CapitalisedOn == null || p.CapitalisedOn >= fromDate))
+            .OrderBy(p => p.Code).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> assets = await _db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.Id, a => a.AssetNumber, ct).ConfigureAwait(false);
+        return [.. projects.Select(p =>
+        {
+            decimal opening = p.Costs.Where(c => c.Date < fromDate).Sum(c => c.Amount), added = p.Costs.Where(c => c.Date >= fromDate && c.Date <= toDate).Sum(c => c.Amount);
+            bool capitalisedInPeriod = p.CapitalisedOn is DateOnly on && on <= toDate;
+            decimal capitalised = capitalisedInPeriod ? opening + added : 0m;
+            decimal spent = p.Costs.Where(c => c.Date <= toDate).Sum(c => c.Amount);
+            return Row(("Project", p.Code), ("Name", p.Name), ("Opened", Date(p.OpenedOn)), ("Status", capitalisedInPeriod ? $"Capitalised {assets.GetValueOrDefault(p.AssetId ?? 0, "?")}" : "In progress"),
+                ("Budget", Money(p.Budget)), ("Opening", Money(opening)), ("Added", Money(added)), ("Capitalised", Money(capitalised)),
+                ("Spent", p.Budget == 0m ? "—" : (spent * 100m / p.Budget).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Closing", opening + added - capitalised));
+        })];
+    }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VerificationAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {

@@ -115,3 +115,33 @@ internal sealed class MaintenancePlanConfiguration : IEntityTypeConfiguration<Ma
         b.HasIndex(x => new { x.CompanyId, x.AssetId });
     }
 }
+
+internal sealed class CapitalProjectConfiguration : IEntityTypeConfiguration<CapitalProject>
+{
+    public void Configure(EntityTypeBuilder<CapitalProject> b)
+    {
+        b.ToTable("capital_project", Schemas.FixedAssets);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(40);
+        b.Property(x => x.Name).HasMaxLength(160);
+        b.Property(x => x.CwipAccountCode).HasMaxLength(20);
+        b.Property(x => x.Budget).HasPrecision(19, 4);
+        b.Ignore(x => x.TotalCost);
+        b.Ignore(x => x.IsCapitalised);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+        b.HasMany(x => x.Costs).WithOne().HasForeignKey(l => l.CapitalProjectId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Costs).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class CapitalProjectCostConfiguration : IEntityTypeConfiguration<CapitalProjectCost>
+{
+    public void Configure(EntityTypeBuilder<CapitalProjectCost> b)
+    {
+        b.ToTable("capital_project_cost", Schemas.FixedAssets);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+    }
+}

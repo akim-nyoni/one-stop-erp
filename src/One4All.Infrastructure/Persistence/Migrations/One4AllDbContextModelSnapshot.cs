@@ -2670,6 +2670,134 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("asset_maintenance", "fa");
                 });
 
+            modelBuilder.Entity("One4All.Core.FixedAssets.CapitalProject", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("AssetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("asset_id");
+
+                    b.Property<decimal>("Budget")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("budget");
+
+                    b.Property<DateOnly?>("CapitalisedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("capitalised_on");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("CwipAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cwip_account_code");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<DateOnly>("OpenedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("opened_on");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_capital_project");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_capital_project_company_id_code");
+
+                    b.ToTable("capital_project", "fa");
+                });
+
+            modelBuilder.Entity("One4All.Core.FixedAssets.CapitalProjectCost", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CapitalProjectId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("capital_project_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("JournalNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_capital_project_cost");
+
+                    b.HasIndex("CapitalProjectId")
+                        .HasDatabaseName("ix_capital_project_cost_capital_project_id");
+
+                    b.ToTable("capital_project_cost", "fa");
+                });
+
             modelBuilder.Entity("One4All.Core.FixedAssets.FixedAsset", b =>
                 {
                     b.Property<long>("Id")
@@ -22366,6 +22494,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_asset_count_line_asset_counts_asset_count_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.FixedAssets.CapitalProjectCost", b =>
+                {
+                    b.HasOne("One4All.Core.FixedAssets.CapitalProject", null)
+                        .WithMany("Costs")
+                        .HasForeignKey("CapitalProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_capital_project_cost_capital_projects_capital_project_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.AcquisitionCost", b =>
                 {
                     b.HasOne("One4All.Core.Housing.LandAcquisition", null)
@@ -23939,6 +24077,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.FixedAssets.AssetCount", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.FixedAssets.CapitalProject", b =>
+                {
+                    b.Navigation("Costs");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.AllocationRun", b =>

@@ -245,6 +245,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the planned maintenance tasks.</summary>
     public DbSet<Core.FixedAssets.MaintenancePlan> MaintenancePlans => Set<Core.FixedAssets.MaintenancePlan>();
 
+    /// <summary>Gets the capital projects (CWIP).</summary>
+    public DbSet<Core.FixedAssets.CapitalProject> CapitalProjects => Set<Core.FixedAssets.CapitalProject>();
+
     /// <summary>Fixed-asset disposal records.</summary>
     public DbSet<Core.FixedAssets.AssetDisposal> AssetDisposals => Set<Core.FixedAssets.AssetDisposal>();
 
