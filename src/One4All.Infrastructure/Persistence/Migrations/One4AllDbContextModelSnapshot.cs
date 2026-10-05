@@ -12835,6 +12835,119 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("tax_table", "hr");
                 });
 
+            modelBuilder.Entity("One4All.Core.Pos.PosEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long?>("AuthorisedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("authorised_by_user_id");
+
+                    b.Property<long>("CashierUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cashier_user_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("CustomerReference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("customer_reference");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<DateOnly>("EventDate")
+                        .HasColumnType("date")
+                        .HasColumnName("event_date");
+
+                    b.Property<long?>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("OccurredOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_on_utc");
+
+                    b.Property<decimal?>("OriginalAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("original_amount");
+
+                    b.Property<string>("Outcome")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("outcome");
+
+                    b.Property<decimal?>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long?>("SaleLineId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sale_line_id");
+
+                    b.Property<string>("SaleNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("sale_number");
+
+                    b.Property<long>("TerminalId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("terminal_id");
+
+                    b.Property<long?>("TillSessionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("till_session_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_event");
+
+                    b.HasIndex("CompanyId", "SaleNumber")
+                        .HasDatabaseName("ix_event_company_id_sale_number");
+
+                    b.HasIndex("CompanyId", "Kind", "EventDate")
+                        .HasDatabaseName("ix_event_company_id_kind_event_date");
+
+                    b.ToTable("event", "pos");
+                });
+
             modelBuilder.Entity("One4All.Core.Pos.PosTerminal", b =>
                 {
                     b.Property<long>("Id")

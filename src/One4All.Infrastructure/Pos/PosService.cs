@@ -219,6 +219,10 @@ public sealed class PosService : IPosService
         }
 
         sale.Void();
+        _db.PosEvents.Add(new PosEvent(companyId, sale.TerminalId, sale.CashierUserId, PosEventKind.SaleVoid, _clock.UtcNow, date, $"Sale {sale.SaleNumber}", sale.TotalNet + sale.TotalTax)
+        {
+            TillSessionId = sale.TillSessionId, SaleNumber = sale.SaleNumber, Reason = reason.Trim(), Reference = posting.Value.JournalNumber,
+        });
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return posting.Value.JournalNumber;
     }

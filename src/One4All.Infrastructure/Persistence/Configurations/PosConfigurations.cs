@@ -80,3 +80,24 @@ internal sealed class SaleTenderConfiguration : IEntityTypeConfiguration<SaleTen
         b.Property(x => x.AccountCode).HasMaxLength(8);
     }
 }
+
+internal sealed class PosEventConfiguration : IEntityTypeConfiguration<PosEvent>
+{
+    public void Configure(EntityTypeBuilder<PosEvent> b)
+    {
+        b.ToTable("event", Schemas.PointOfSale);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.SaleNumber).HasMaxLength(40);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.OriginalAmount).HasPrecision(19, 4);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.Property(x => x.Reason).HasMaxLength(200);
+        b.Property(x => x.CustomerReference).HasMaxLength(60);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.Property(x => x.Outcome).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.Kind, x.EventDate });
+        b.HasIndex(x => new { x.CompanyId, x.SaleNumber });
+    }
+}

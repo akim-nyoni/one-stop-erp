@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Reporting;
+using One4All.Application.Pos;
 using One4All.Core.Accounting;
 using One4All.Core.Pos;
 using One4All.Core.Vouchers;
@@ -35,6 +36,24 @@ public sealed class RetailReportDataProvider : IReportDataProvider
             "RETLPRODUCTMIX" => await ProductMixAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLPROMOTIONS" => await PromotionsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLTENDERS" => await TendersAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "RETLVOIDS" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.LineVoid, PosEventKind.SaleVoid], (e, n) => Row(("Date", Date(e.EventDate)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)),
+                ("Kind", e.Kind == PosEventKind.SaleVoid ? "Sale" : "Line"), ("Sale", e.SaleNumber ?? "—"), ("Description", e.Description), ("Reason", e.Reason ?? string.Empty), ("AuthorisedBy", n.Authoriser(e)), ("Amount", e.Amount)), ct)
+                .ConfigureAwait(false),
+            "RETLREFUNDS" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.Refund], (e, n) => Row(("Date", Date(e.EventDate)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)), ("Sale", e.SaleNumber ?? "—"),
+                ("Description", e.Description), ("Quantity", Qty(e.Quantity ?? 0m)), ("Reason", e.Reason ?? string.Empty), ("AuthorisedBy", n.Authoriser(e)), ("Journal", e.Reference ?? "—"), ("Restock", e.Outcome ?? string.Empty),
+                ("Amount", e.Amount)), ct).ConfigureAwait(false),
+            "RETLDISCOUNTS" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.LineDiscount], (e, n) => Row(("Date", Date(e.EventDate)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)), ("Sale", e.SaleNumber ?? "—"),
+                ("Description", e.Description), ("List", Money(e.OriginalAmount ?? 0m)), ("Rate", Percent(e.Amount, e.OriginalAmount ?? 0m)), ("Reason", e.Reason ?? string.Empty), ("Amount", e.Amount)), ct).ConfigureAwait(false),
+            "RETLOVERRIDES" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.PriceOverride], (e, n) => Row(("Date", Date(e.EventDate)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)), ("AuthorisedBy", n.Authoriser(e)),
+                ("Sale", e.SaleNumber ?? "—"), ("Description", e.Description), ("List", Money(e.OriginalAmount ?? 0m)), ("Keyed", Money(e.Amount)), ("Reason", e.Reason ?? string.Empty), ("Difference", e.Amount - (e.OriginalAmount ?? 0m))), ct)
+                .ConfigureAwait(false),
+            "RETLNOSALE" => await NoSaleAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "RETLPARKED" => await ParkedAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "RETLLOYALTY" => await LoyaltyAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "RETLREPRINTS" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.Reprint], (e, n) => Row(("Printed", Stamp(e.OccurredOnUtc)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)), ("Sale", e.SaleNumber ?? "—"),
+                ("Reason", e.Reason ?? string.Empty), ("Amount", e.Amount)), ct).ConfigureAwait(false),
+            "RETLFISCAL" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.FiscalSubmission], (e, n) => Row(("Submitted", Stamp(e.OccurredOnUtc)), ("Till", n.Till(e)), ("Sale", e.SaleNumber ?? "—"),
+                ("Reference", e.Reference ?? "—"), ("Outcome", e.Outcome ?? "Pending"), ("Amount", e.Amount)), ct).ConfigureAwait(false),
             "RETLOFFLINE" => await OfflineAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             _ => [],
         };
@@ -182,6 +201,68 @@ public sealed class RetailReportDataProvider : IReportDataProvider
         return [.. (await _db.OfflineOperations.AsNoTracking().Where(o => o.CompanyId == companyId && o.CreatedUtc >= start && o.CreatedUtc <= end).OrderBy(o => o.CreatedUtc).ToListAsync(ct).ConfigureAwait(false))
             .Select(o => Row(("Created", Stamp(o.CreatedUtc)), ("Kind", o.Kind), ("Status", o.Status.ToString()), ("Attempts", o.Attempts), ("Synced", o.SyncedUtc is DateTimeOffset s ? Stamp(s) : "—"),
                 ("Error", o.LastError ?? string.Empty)))];
+    }
+
+    // Resolves till and user names for event rows.
+    private sealed record EventNames(Dictionary<long, string> Tills, Dictionary<long, string> Users)
+    {
+        public string Till(PosEvent e) => Tills.GetValueOrDefault(e.TerminalId, "?");
+
+        public string Cashier(PosEvent e) => Users.GetValueOrDefault(e.CashierUserId, $"user {e.CashierUserId}");
+
+        public string Authoriser(PosEvent e) => e.AuthorisedByUserId is long id ? Users.GetValueOrDefault(id, $"user {id}") : "—";
+    }
+
+    private async Task<(List<PosEvent> Events, EventNames Names)> LoadEventsAsync(long companyId, DateOnly fromDate, DateOnly toDate, PosEventKind[] kinds, CancellationToken ct)
+    {
+        List<PosEvent> events = await _db.PosEvents.AsNoTracking().Where(e => e.CompanyId == companyId && kinds.Contains(e.Kind) && e.EventDate >= fromDate && e.EventDate <= toDate)
+            .OrderBy(e => e.OccurredOnUtc).ThenBy(e => e.Id).ToListAsync(ct).ConfigureAwait(false);
+        return (events, new EventNames(await TillsAsync(companyId, ct).ConfigureAwait(false), await UsersAsync(ct).ConfigureAwait(false)));
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EventsAsync(long companyId, DateOnly fromDate, DateOnly toDate, PosEventKind[] kinds,
+        Func<PosEvent, EventNames, IReadOnlyDictionary<string, object?>> row, CancellationToken ct)
+    {
+        (List<PosEvent> events, EventNames names) = await LoadEventsAsync(companyId, fromDate, toDate, kinds, ct).ConfigureAwait(false);
+        return [.. events.Select(e => row(e, names))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> NoSaleAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        (List<PosEvent> events, EventNames names) = await LoadEventsAsync(companyId, fromDate, toDate, [PosEventKind.NoSale], ct).ConfigureAwait(false);
+        Dictionary<long, int> perCashier = events.GroupBy(e => e.CashierUserId).ToDictionary(g => g.Key, g => g.Count());
+        return [.. events.Select(e => Row(("Opened", Stamp(e.OccurredOnUtc)), ("Till", names.Till(e)), ("Cashier", names.Cashier(e)), ("Reason", e.Reason ?? string.Empty), ("AuthorisedBy", names.Authoriser(e)),
+            ("CashierCount", perCashier[e.CashierUserId])))];
+    }
+
+    // A parked sale is resumed when a later ResumedSale event names the same sale number; otherwise it was abandoned.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ParkedAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        (List<PosEvent> parked, EventNames names) = await LoadEventsAsync(companyId, fromDate, toDate, [PosEventKind.ParkedSale], ct).ConfigureAwait(false);
+        List<string> numbers = [.. parked.Where(e => e.SaleNumber != null).Select(e => e.SaleNumber!).Distinct()];
+        List<PosEvent> resumed = await _db.PosEvents.AsNoTracking().Where(e => e.CompanyId == companyId && e.Kind == PosEventKind.ResumedSale && numbers.Contains(e.SaleNumber!))
+            .ToListAsync(ct).ConfigureAwait(false);
+        return [.. parked.Select(e =>
+        {
+            PosEvent? back = resumed.Where(r => r.SaleNumber == e.SaleNumber && r.OccurredOnUtc >= e.OccurredOnUtc).OrderBy(r => r.OccurredOnUtc).FirstOrDefault();
+            return Row(("Parked", Stamp(e.OccurredOnUtc)), ("Till", names.Till(e)), ("Cashier", names.Cashier(e)), ("Sale", e.SaleNumber ?? "—"), ("Status", back is null ? "Abandoned" : "Resumed"),
+                ("Resumed", back is null ? "—" : Stamp(back.OccurredOnUtc)), ("Waited", back is null ? "—" : $"{(int)(back.OccurredOnUtc - e.OccurredOnUtc).TotalMinutes} min"), ("Amount", e.Amount));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LoyaltyAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<PosEvent> events = await _db.PosEvents.AsNoTracking()
+            .Where(e => e.CompanyId == companyId && (e.Kind == PosEventKind.LoyaltyEarned || e.Kind == PosEventKind.LoyaltyRedeemed) && e.EventDate <= toDate && e.CustomerReference != null)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return [.. events.GroupBy(e => e.CustomerReference!).OrderBy(g => g.Key, StringComparer.Ordinal).Select(g =>
+        {
+            List<PosEvent> inPeriod = [.. g.Where(e => e.EventDate >= fromDate)];
+            var period = PosEventRules.Loyalty(inPeriod.Select(e => (e.Kind, e.Amount)));
+            var toDateTotals = PosEventRules.Loyalty(g.Select(e => (e.Kind, e.Amount)));
+            return Row(("Customer", g.Key), ("Transactions", inPeriod.Count), ("Earned", Qty(period.Earned)), ("Redeemed", Qty(period.Redeemed)), ("LastActivity", Date(g.Max(e => e.EventDate))),
+                ("Balance", toDateTotals.Balance));
+        })];
     }
 
     private Task<Dictionary<long, string>> TillsAsync(long companyId, CancellationToken ct)

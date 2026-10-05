@@ -161,6 +161,9 @@ public class One4AllDbContext : DbContext
     /// <summary>POS sales.</summary>
     public DbSet<Core.Pos.Sale> Sales => Set<Core.Pos.Sale>();
 
+    /// <summary>Gets the till event log (voids, refunds, discounts, overrides, no-sales, parking, loyalty, reprints, fiscal).</summary>
+    public DbSet<Core.Pos.PosEvent> PosEvents => Set<Core.Pos.PosEvent>();
+
     /// <summary>Gift cards.</summary>
     public DbSet<Core.Vouchers.GiftCard> GiftCards => Set<Core.Vouchers.GiftCard>();
 

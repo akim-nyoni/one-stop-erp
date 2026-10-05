@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-418 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+427 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -327,11 +327,20 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | POS103 | Daily Sales Summary | Per day, till and cashier: sales, voids, net, tax, the tender split and gross takings. | FromDate (Date, optional), ToDate (Date, optional) | Date, Till, Cashier, Sales, Voided, Net, Tax, Tenders, Gross | — | Sum(Gross) |
 | POS104 | Cashier Performance | Per cashier over the period: sessions, sales, items, average basket, voids, cash-up variance and net sales. | FromDate (Date, optional), ToDate (Date, optional) | Cashier, Sessions, Sales, Items, AverageBasket, Voids, Variance, Net | — | Sum(Net) |
 | POS105 | Till Variance & Cash-up Report | Each closed till session: float, cash taken, change given, expected, counted and the over or short. | FromDate (Date, optional), ToDate (Date, optional) | Session, Till, Cashier, Closed, Float, CashIn, Change, Expected, Counted, Variance | — | Sum(Variance) |
+| POS106 | Void & Cancellation Analysis by Reason | Lines and sales voided in the period with who, why and who authorised it. | FromDate (Date, optional), ToDate (Date, optional) | Date, Till, Cashier, Kind, Sale, Description, Reason, AuthorisedBy, Amount | — | Sum(Amount) |
+| POS107 | Refunds & Returns Register | Every refund in the period: the sale and line, quantity, reason, authoriser, journal and whether the goods were restocked. | FromDate (Date, optional), ToDate (Date, optional) | Date, Till, Cashier, Sale, Description, Quantity, Reason, AuthorisedBy, Journal, Restock, Amount | — | Sum(Amount) |
+| POS108 | Line Discounts Given | Discounts keyed on lines in the period, with the list amount, the rate and the reason, by cashier. | FromDate (Date, optional), ToDate (Date, optional) | Date, Till, Cashier, Sale, Description, List, Rate, Reason, Amount | — | Sum(Amount) |
+| POS109 | Price Overrides | Prices keyed over list in the period: list and keyed price, the difference, reason and the authorising supervisor. | FromDate (Date, optional), ToDate (Date, optional) | Date, Till, Cashier, AuthorisedBy, Sale, Description, List, Keyed, Reason, Difference | — | Sum(Difference) |
+| POS110 | No-Sale Drawer Openings | Every drawer opened without a sale in the period, with the reason and authoriser, and each cashier's count. | FromDate (Date, optional), ToDate (Date, optional) | Opened, Till, Cashier, Reason, AuthorisedBy, CashierCount | — | — |
+| POS111 | Parked / Suspended Sales | Sales parked in the period and whether they were resumed or abandoned, with the time they sat. | FromDate (Date, optional), ToDate (Date, optional) | Parked, Till, Cashier, Sale, Status, Resumed, Waited, Amount | — | Sum(Amount) |
 | POS112 | Hourly Sales Heatmap & Basket Analysis | Sales by weekday and hour: count, items per basket, average basket and net. | FromDate (Date, optional), ToDate (Date, optional) | Weekday, Hour, Sales, ItemsPerBasket, AverageBasket, Net | — | Sum(Net) |
 | POS113 | Product Mix Ranking | Items ranked by POS net sales in the period, with quantity, share and cumulative share. | FromDate (Date, optional), ToDate (Date, optional) | Rank, Item, Quantity, Share, Cumulative, Net | — | Sum(Net) |
 | POS114 | Promotion Effectiveness | Each promotion's redemptions in the period, the spend they drove and the discount given. | FromDate (Date, optional), ToDate (Date, optional) | Campaign, Name, Valid, Redemptions, Spend, AverageSpend, DiscountRate, Discount | — | Sum(Discount) |
+| POS115 | Loyalty Points Statement | Per loyalty customer: points earned and redeemed in the period and the balance to date. | FromDate (Date, optional), ToDate (Date, optional) | Customer, Transactions, Earned, Redeemed, LastActivity, Balance | — | Sum(Balance) |
+| POS116 | Receipt Reprint Log | Every receipt reprinted in the period: when, by whom, the sale and its value. | FromDate (Date, optional), ToDate (Date, optional) | Printed, Till, Cashier, Sale, Reason, Amount | — | Sum(Amount) |
 | POS117 | Tender & Multi-currency Tender Analysis | Tenders taken in the period by type and currency, in currency and base, net of change. | FromDate (Date, optional), ToDate (Date, optional) | Tender, Currency, Count, Amount, Share, Base | — | Sum(Base) |
 | POS120 | Offline Sync Log | Operations captured offline in the period: kind, status, attempts, when synced and any error. | FromDate (Date, optional), ToDate (Date, optional) | Created, Kind, Status, Attempts, Synced, Error | — | — |
+| POS121 | Fiscal Submission Log | Sales submitted to the fiscal device or revenue authority in the period, with the fiscal receipt reference and outcome. | FromDate (Date, optional), ToDate (Date, optional) | Submitted, Till, Sale, Reference, Outcome, Amount | — | Sum(Amount) |
 
 ## Purchasing
 
