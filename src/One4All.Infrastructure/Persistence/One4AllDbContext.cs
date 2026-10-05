@@ -143,6 +143,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Stock movements.</summary>
     public DbSet<Core.Inventory.StockMovement> StockMovements => Set<Core.Inventory.StockMovement>();
 
+    /// <summary>Gets the batch / serial quantities behind stock movements.</summary>
+    public DbSet<Core.Inventory.StockLotMovement> StockLotMovements => Set<Core.Inventory.StockLotMovement>();
+
+    /// <summary>Gets the stock adjustment reason codes.</summary>
+    public DbSet<Core.Inventory.StockReasonCode> StockReasonCodes => Set<Core.Inventory.StockReasonCode>();
+
     /// <summary>Purchase orders.</summary>
     public DbSet<Core.Procurement.PurchaseOrder> PurchaseOrders => Set<Core.Procurement.PurchaseOrder>();
 

@@ -66,6 +66,9 @@ public sealed class StockMovement : AuditableEntity, ICompanyScoped
     /// <summary>The GL journal that posted the movement.</summary>
     public long? JournalEntryId { get; set; }
 
+    /// <summary>Gets or sets the adjustment reason code (damaged, expired, theft…), for adjustments.</summary>
+    public string? ReasonCode { get; set; }
+
     /// <summary>True once this movement has been reversed (prevents a double reversal).</summary>
     public bool IsReversed { get; private set; }
 

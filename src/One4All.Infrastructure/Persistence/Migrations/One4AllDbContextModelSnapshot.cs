@@ -8397,6 +8397,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<int?>("ShelfLifeDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("shelf_life_days");
+
                     b.Property<string>("ShortDescription")
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)")
@@ -8411,6 +8415,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("tax_code");
+
+                    b.Property<int>("Tracking")
+                        .HasColumnType("integer")
+                        .HasColumnName("tracking");
 
                     b.Property<string>("UnitOfMeasure")
                         .IsRequired()
@@ -8676,6 +8684,68 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("stock_cost_layer", "inv");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.StockLotMovement", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<DateOnly?>("ExpiryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("expiry_date");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<string>("LotNumber")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("lot_number");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("StockMovementId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stock_movement_id");
+
+                    b.Property<long>("WarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lot_movement");
+
+                    b.HasIndex("StockMovementId")
+                        .HasDatabaseName("ix_lot_movement_stock_movement_id");
+
+                    b.HasIndex("CompanyId", "ItemId", "LotNumber")
+                        .HasDatabaseName("ix_lot_movement_company_id_item_id_lot_number");
+
+                    b.ToTable("lot_movement", "inv");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.StockMovement", b =>
                 {
                     b.Property<long>("Id")
@@ -8726,6 +8796,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("quantity");
 
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("reason_code");
+
                     b.Property<string>("Reference")
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)")
@@ -8762,6 +8837,51 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_stock_movement_company_id_item_id_warehouse_id_date");
 
                     b.ToTable("stock_movement", "inv");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.StockReasonCode", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reason_code");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_reason_code_company_id_code");
+
+                    b.ToTable("reason_code", "inv");
                 });
 
             modelBuilder.Entity("One4All.Core.Inventory.StocktakeLine", b =>

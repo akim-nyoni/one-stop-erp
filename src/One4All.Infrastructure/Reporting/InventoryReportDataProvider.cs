@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Inventory;
 using One4All.Application.Abstractions.Reporting;
+using One4All.Application.Inventory;
 using One4All.Core.Accounting;
 using One4All.Core.Inventory;
 using One4All.Core.Pos;
@@ -39,6 +40,11 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
             "STKVALUATIONVSGL" => await ValuationVsGlAsync(companyId, asAt, ct).ConfigureAwait(false),
             "STKAVAILABILITY" => await AvailabilityAsync(companyId, ct).ConfigureAwait(false),
             "STKSTOCKTAKE" => await StocktakeAsync(companyId, ct).ConfigureAwait(false),
+            "STKREASONS" => await ReasonsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "STKBATCHES" => await BatchesAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "STKSERIALS" => await SerialsAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "STKEXPIRY" => await ExpiryAsync(companyId, asAt, parameters.TryGetValue("Days", out object? days) && days is not null and not "" ? Convert.ToInt32(days, CultureInfo.InvariantCulture) : 30, ct)
+                .ConfigureAwait(false),
             "STKOVERSTOCK" => await OverstockAsync(companyId, asAt, ct).ConfigureAwait(false),
             "STKNEGATIVE" => await NegativeAsync(companyId, ct).ConfigureAwait(false),
             "STKTURNOVER" => await TurnoverAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -209,6 +215,78 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
             return Row(("Date", Date(m.Date)), ("Reference", m.Reference ?? "—"), ("Item", items.GetValueOrDefault(m.ItemId, "?")), ("Goods", Money(goods)),
                 ("Uplift", goods == 0m ? "—" : (m.Value * 100m / goods).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Landed", m.Value));
         })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReasonsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<StockMovement> adjustments = await _db.StockMovements.AsNoTracking()
+            .Where(m => m.CompanyId == companyId && m.Type == StockMovementType.Adjustment && m.Date >= fromDate && m.Date <= toDate).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<string, string> names = await _db.StockReasonCodes.AsNoTracking().Where(r => r.CompanyId == companyId).ToDictionaryAsync(r => r.Code, r => r.Name, ct).ConfigureAwait(false);
+        return [.. adjustments.GroupBy(m => m.ReasonCode ?? string.Empty).OrderBy(g => g.Key.Length == 0).ThenBy(g => g.Key, StringComparer.Ordinal).Select(g => Row(
+            ("Reason", g.Key.Length == 0 ? "—" : g.Key), ("Name", g.Key.Length == 0 ? "No reason (stocktake / unspecified)" : names.GetValueOrDefault(g.Key, "?")), ("Count", g.Count()),
+            ("Gained", Qty(g.Where(m => m.Quantity > 0m).Sum(m => m.Quantity))), ("Lost", Qty(-g.Where(m => m.Quantity < 0m).Sum(m => m.Quantity))), ("Value", g.Sum(m => m.Value))))];
+    }
+
+    private sealed record LotBalance(long ItemId, long WarehouseId, string Lot, decimal OnHand, DateOnly First, DateOnly Last, DateOnly? Expiry);
+
+    private async Task<List<LotBalance>> LotBalancesAsync(long companyId, DateOnly asAt, ItemTracking tracking, CancellationToken ct)
+    {
+        List<long> tracked = await _db.Items.AsNoTracking().Where(i => i.CompanyId == companyId && i.Tracking == tracking).Select(i => i.Id).ToListAsync(ct).ConfigureAwait(false);
+        return [.. (await _db.StockLotMovements.AsNoTracking().Where(l => l.CompanyId == companyId && tracked.Contains(l.ItemId) && l.Date <= asAt)
+                .GroupBy(l => new { l.ItemId, l.WarehouseId, l.LotNumber })
+                .Select(g => new { g.Key.ItemId, g.Key.WarehouseId, g.Key.LotNumber, OnHand = g.Sum(l => l.Quantity), First = g.Min(l => l.Date), Last = g.Max(l => l.Date), Expiry = g.Max(l => l.ExpiryDate) })
+                .ToListAsync(ct).ConfigureAwait(false))
+            .Select(g => new LotBalance(g.ItemId, g.WarehouseId, g.LotNumber, g.OnHand, g.First, g.Last, g.Expiry))];
+    }
+
+    private async Task<Dictionary<(long, long), decimal>> AverageCostsAsync(long companyId, CancellationToken ct)
+        => await _db.StockBalances.AsNoTracking().Where(b => b.CompanyId == companyId).ToDictionaryAsync(b => (b.ItemId, b.WarehouseId), b => b.AverageCost, ct).ConfigureAwait(false);
+
+    private Task<Dictionary<long, string>> WarehousesAsync(long companyId, CancellationToken ct)
+        => _db.Warehouses.AsNoTracking().IgnoreQueryFilters().Where(w => w.CompanyId == companyId).ToDictionaryAsync(w => w.Id, w => w.Code, ct);
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BatchesAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<LotBalance> lots = await LotBalancesAsync(companyId, asAt, ItemTracking.Batch, ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await ItemsAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> warehouses = await WarehousesAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<(long, long), decimal> costs = await AverageCostsAsync(companyId, ct).ConfigureAwait(false);
+        return [.. lots.Where(l => l.OnHand != 0m).OrderBy(l => items.GetValueOrDefault(l.ItemId), StringComparer.Ordinal).ThenBy(l => warehouses.GetValueOrDefault(l.WarehouseId), StringComparer.Ordinal)
+            .ThenBy(l => l.Expiry ?? DateOnly.MaxValue).ThenBy(l => l.Lot, StringComparer.Ordinal)
+            .Select(l => Row(("Item", items.GetValueOrDefault(l.ItemId, "?")), ("Warehouse", warehouses.GetValueOrDefault(l.WarehouseId, "?")), ("Batch", l.Lot), ("Received", Date(l.First)),
+                ("Expiry", l.Expiry is DateOnly e ? Date(e) : "—"), ("OnHand", Qty(l.OnHand)), ("Value", Math.Round(l.OnHand * costs.GetValueOrDefault((l.ItemId, l.WarehouseId)), 2))))];
+    }
+
+    // A serial is in stock where its lot quantity nets to one; otherwise it last left from the warehouse of its latest movement.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SerialsAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<long> tracked = await _db.Items.AsNoTracking().Where(i => i.CompanyId == companyId && i.Tracking == ItemTracking.Serial).Select(i => i.Id).ToListAsync(ct).ConfigureAwait(false);
+        var moves = await (from l in _db.StockLotMovements.AsNoTracking()
+                           join m in _db.StockMovements.AsNoTracking() on l.StockMovementId equals m.Id
+                           where l.CompanyId == companyId && tracked.Contains(l.ItemId) && l.Date <= asAt
+                           select new { l.Id, l.ItemId, l.WarehouseId, l.LotNumber, l.Quantity, l.Date, m.Type, m.Reference }).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await ItemsAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> warehouses = await WarehousesAsync(companyId, ct).ConfigureAwait(false);
+        return [.. moves.GroupBy(m => (m.ItemId, m.LotNumber)).OrderBy(g => items.GetValueOrDefault(g.Key.ItemId), StringComparer.Ordinal).ThenBy(g => g.Key.LotNumber, StringComparer.Ordinal).Select(g =>
+        {
+            var inStock = g.GroupBy(m => m.WarehouseId).FirstOrDefault(w => w.Sum(m => m.Quantity) > 0m);
+            var last = g.OrderBy(m => m.Date).ThenBy(m => m.Id).Last();
+            return Row(("Item", items.GetValueOrDefault(g.Key.ItemId, "?")), ("Serial", g.Key.LotNumber), ("Status", inStock is null ? "Out" : "In stock"),
+                ("Warehouse", warehouses.GetValueOrDefault(inStock?.Key ?? last.WarehouseId, "?")), ("Received", Date(g.Where(m => m.Quantity > 0m).Select(m => m.Date).DefaultIfEmpty(last.Date).Min())),
+                ("LastMoved", Date(last.Date)), ("LastMovement", $"{last.Type} {last.Reference ?? string.Empty}".TrimEnd()));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ExpiryAsync(long companyId, DateOnly asAt, int windowDays, CancellationToken ct)
+    {
+        List<LotBalance> lots = await LotBalancesAsync(companyId, asAt, ItemTracking.Batch, ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await ItemsAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> warehouses = await WarehousesAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<(long, long), decimal> costs = await AverageCostsAsync(companyId, ct).ConfigureAwait(false);
+        return [.. lots.Where(l => l.OnHand > 0m && l.Expiry is DateOnly e && LotRules.ExpiryStatus(e, asAt, windowDays) != "OK").OrderBy(l => l.Expiry).ThenBy(l => items.GetValueOrDefault(l.ItemId), StringComparer.Ordinal)
+            .Select(l => Row(("Item", items.GetValueOrDefault(l.ItemId, "?")), ("Warehouse", warehouses.GetValueOrDefault(l.WarehouseId, "?")), ("Batch", l.Lot), ("Expiry", Date(l.Expiry!.Value)),
+                ("Days", l.Expiry!.Value.DayNumber - asAt.DayNumber), ("Status", LotRules.ExpiryStatus(l.Expiry!.Value, asAt, windowDays)), ("OnHand", Qty(l.OnHand)),
+                ("Value", Math.Round(l.OnHand * costs.GetValueOrDefault((l.ItemId, l.WarehouseId)), 2))))];
     }
 
     private Task<Dictionary<long, string>> ItemsAsync(long companyId, CancellationToken ct)

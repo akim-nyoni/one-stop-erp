@@ -91,6 +91,12 @@ public sealed class Item : SoftDeletableEntity, ICompanyScoped
     /// <summary>The volume of one unit in cubic metres, used to share landed costs by volume.</summary>
     public decimal? UnitVolumeM3 { get; set; }
 
+    /// <summary>Gets or sets how the item's units are traced (batch or serial).</summary>
+    public ItemTracking Tracking { get; set; }
+
+    /// <summary>Gets or sets the shelf life in days, giving received batches an expiry when none is keyed.</summary>
+    public int? ShelfLifeDays { get; set; }
+
     /// <summary>Whether the item is active.</summary>
     public bool IsActive { get; set; }
 

@@ -299,12 +299,20 @@ public sealed class InventoryService : IInventoryService
     }
 
     /// <inheritdoc />
-    public Task<Result<decimal>> AdjustAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, string adjustmentAccountCode, string? reference = null, CancellationToken ct = default)
-        => _db.AtomicAsync(() => AdjustCoreAsync(companyId, itemId, warehouseId, date, countedQuantity, adjustmentAccountCode, reference, ct), ct);
+    public Task<Result<decimal>> AdjustAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, string adjustmentAccountCode, string? reference = null, string? reasonCode = null,
+        CancellationToken ct = default)
+        => _db.AtomicAsync(() => AdjustCoreAsync(companyId, itemId, warehouseId, date, countedQuantity, adjustmentAccountCode, reference, reasonCode, ct), ct);
 
     // One unit of work, retried if another posting changes the same stock balance at the same moment.
-    private async Task<Result<decimal>> AdjustCoreAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, string adjustmentAccountCode, string? reference, CancellationToken ct)
+    private async Task<Result<decimal>> AdjustCoreAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, string adjustmentAccountCode, string? reference, string? reasonCode,
+        CancellationToken ct)
     {
+        reasonCode = string.IsNullOrWhiteSpace(reasonCode) ? null : reasonCode.Trim().ToUpperInvariant();
+        if (reasonCode != null && !await _db.StockReasonCodes.AnyAsync(r => r.CompanyId == companyId && r.Code == reasonCode && r.IsActive, ct).ConfigureAwait(false))
+        {
+            return Error.Validation("Inv.UnknownReason", $"'{reasonCode}' is not an active stock reason code.");
+        }
+
         if (countedQuantity < 0m)
         {
             return Error.Rule("Inv.NegativeCount", "The counted quantity cannot be negative.");
@@ -353,7 +361,7 @@ public sealed class InventoryService : IInventoryService
         {
             // No cost basis (average cost is zero): move the quantity only, no journal.
             ApplyVariance(item, balance, shortage, date, reference, variance, 0m);
-            _db.Set<StockMovement>().Add(new StockMovement(companyId, itemId, warehouseId, date, StockMovementType.Adjustment, variance, unitCost, 0m, reference));
+            _db.Set<StockMovement>().Add(new StockMovement(companyId, itemId, warehouseId, date, StockMovementType.Adjustment, variance, unitCost, 0m, reference) { ReasonCode = reasonCode });
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             return 0m;
         }
@@ -381,6 +389,7 @@ public sealed class InventoryService : IInventoryService
         _db.Set<StockMovement>().Add(new StockMovement(companyId, itemId, warehouseId, date, StockMovementType.Adjustment, variance, shortage?.UnitCost ?? unitCost, variance > 0m ? value : -value, reference)
         {
             JournalEntryId = posting.Value.JournalId,
+            ReasonCode = reasonCode,
         });
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 

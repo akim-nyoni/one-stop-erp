@@ -140,9 +140,11 @@ public interface IInventoryService
     /// <param name="countedQuantity">The physically counted quantity (the new on-hand).</param>
     /// <param name="adjustmentAccountCode">The stock-adjustment / shrinkage account for the variance.</param>
     /// <param name="reference">An optional reference (e.g. the stocktake number).</param>
+    /// <param name="reasonCode">An optional active reason code (damaged, expired, theft…) the adjustment is analysed by.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The signed variance value (+ surplus, − shortage), or an error.</returns>
-    Task<Result<decimal>> AdjustAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, string adjustmentAccountCode, string? reference = null, CancellationToken ct = default);
+    Task<Result<decimal>> AdjustAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, string adjustmentAccountCode, string? reference = null, string? reasonCode = null,
+        CancellationToken ct = default);
 
     /// <summary>Produces the stock valuation for a company (optionally a single warehouse).</summary>
     /// <param name="companyId">The company.</param>

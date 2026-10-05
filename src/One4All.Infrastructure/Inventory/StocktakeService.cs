@@ -91,7 +91,7 @@ public sealed class StocktakeService : IStocktakeService
         foreach (StocktakeLine line in session.Lines.Where(l => l.IsCounted))
         {
             Result<decimal> adjustment = await _inventory.AdjustAsync(
-                companyId, line.ItemId, session.WarehouseId, date, line.CountedQuantity!.Value, adjustmentAccountCode, session.Reference, ct)
+                companyId, line.ItemId, session.WarehouseId, date, line.CountedQuantity!.Value, adjustmentAccountCode, session.Reference, ct: ct)
                 .ConfigureAwait(false);
             if (adjustment.IsFailure)
             {

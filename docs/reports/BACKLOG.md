@@ -33,7 +33,8 @@ missing domain data. Items are struck through as they ship (with the report code
 ## E. Inventory
 - ~~78 Valuation vs GL (INV78)~~, ~~79 Stock on Hand & Availability (INV79)~~, ~~81 Stocktake Variance (INV81)~~, ~~86 Overstock (INV86)~~, ~~87 Negative Stock (INV87)~~, ~~92 Turnover & Days Cover (INV92)~~, ~~93 Gross Margin by Item (INV93)~~, ~~96 Cost Change History (INV96)~~, ~~97 Landed Cost Analysis (INV97)~~
 - Data exists: 94 (labels, a print layout), 100 (partly)
-- Needs new data: 82 reason codes, 88 batches, 89 serials, 90 expiry, 91 in-transit, 98 BOM, 99 yield, 101 consignment
+- ~~82 Adjustments by Reason (INV82)~~, ~~88 Batch Stock (INV88)~~, ~~89 Serial Register (INV89)~~, ~~90 Expiry (INV90)~~
+- Needs new data: 91 in-transit, 98 BOM, 99 yield, 101 consignment
 
 ## F. POS / Retail
 - ~~103 Daily Sales Summary (POS103)~~, ~~104 Cashier Performance (POS104)~~, ~~105 Till Variance & Cash-up (POS105)~~, ~~112 Hourly Heatmap & Basket (POS112)~~, ~~113 Product Mix (POS113)~~, ~~114 Promotion Effectiveness (POS114)~~, ~~117 Tender Analysis (POS117)~~, ~~120 Offline Sync Log (POS120)~~

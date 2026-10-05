@@ -53,6 +53,7 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
     {
         b.ToTable("item", Schemas.Inventory);
         b.HasKey(x => x.Id);
+        b.Property(x => x.Tracking).HasConversion<int>();
         b.Property(x => x.Code).HasMaxLength(40);
         b.Property(x => x.Description).HasMaxLength(300);
         b.Property(x => x.ShortDescription).HasMaxLength(80);
@@ -108,11 +109,37 @@ internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<Stoc
     {
         b.ToTable("stock_movement", Schemas.Inventory);
         b.HasKey(x => x.Id);
+        b.Property(x => x.ReasonCode).HasMaxLength(20);
         b.Property(x => x.Type).HasConversion<int>();
         b.Property(x => x.Quantity).HasPrecision(19, 4);
         b.Property(x => x.UnitCost).HasPrecision(19, 6);
         b.Property(x => x.Value).HasPrecision(19, 4);
         b.Property(x => x.Reference).HasMaxLength(60);
         b.HasIndex(x => new { x.CompanyId, x.ItemId, x.WarehouseId, x.Date });
+    }
+}
+
+internal sealed class StockReasonCodeConfiguration : IEntityTypeConfiguration<StockReasonCode>
+{
+    public void Configure(EntityTypeBuilder<StockReasonCode> b)
+    {
+        b.ToTable("reason_code", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class StockLotMovementConfiguration : IEntityTypeConfiguration<StockLotMovement>
+{
+    public void Configure(EntityTypeBuilder<StockLotMovement> b)
+    {
+        b.ToTable("lot_movement", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.LotNumber).HasMaxLength(60);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.ItemId, x.LotNumber });
+        b.HasIndex(x => x.StockMovementId);
     }
 }
