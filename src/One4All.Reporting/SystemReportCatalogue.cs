@@ -100,6 +100,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Budgeting, planning & commitment control (brief §14 A-B, the B codes).
+        foreach (ReportDefinition definition in BudgetingReports.All())
+        {
+            yield return definition;
+        }
+
         // Schools, job costing and sales order additions (brief §14 J, K, H).
         foreach (ReportDefinition definition in OperationsReports.All())
         {

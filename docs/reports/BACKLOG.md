@@ -14,7 +14,8 @@ missing domain data. Items are struck through as they ship (with the report code
 - 25 Hyperinflation working papers — data exists
 
 ## A-B. Budgeting (B codes)
-- Data exists: B2, B12, B15–B18, B20, B24–B26, B28, B33, B34, B36, B37, B44, B45; partly B14, B19, B21, B27, B42
+- ~~B2~~, ~~B12~~, ~~B15~~, ~~B16 / B17 (one register with seal check)~~, ~~B18~~, ~~B20~~, ~~B24~~, ~~B25~~, ~~B26~~, ~~B28~~, ~~B33~~, ~~B34~~, ~~B36~~, ~~B37~~, ~~B44~~, ~~B45~~
+- Data exists, partly: B14, B19, B21, B27, B42
 - Needs new data: B1, B3–B10 (workflow, targets, hierarchy, drivers, establishment, capital projects), B13 (stage snapshots), B22, B23, B29, B30, B32 (budget holders), B35, B38–B41 (forecasts, cash budget)
 
 ## B. Accounts Receivable
