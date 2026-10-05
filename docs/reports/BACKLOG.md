@@ -32,7 +32,8 @@ missing domain data. Items are struck through as they ship (with the report code
 - Needs new data: 75 cheque register, 76 wallet statements
 
 ## E. Inventory
-- Data exists: 78, 79, 81, 86, 87, 92, 93, 94 (labels), 96, 97, 100 (partly)
+- ~~78 Valuation vs GL (INV78)~~, ~~79 Stock on Hand & Availability (INV79)~~, ~~81 Stocktake Variance (INV81)~~, ~~86 Overstock (INV86)~~, ~~87 Negative Stock (INV87)~~, ~~92 Turnover & Days Cover (INV92)~~, ~~93 Gross Margin by Item (INV93)~~, ~~96 Cost Change History (INV96)~~, ~~97 Landed Cost Analysis (INV97)~~
+- Data exists: 94 (labels, a print layout), 100 (partly)
 - Needs new data: 82 reason codes, 88 batches, 89 serials, 90 expiry, 91 in-transit, 98 BOM, 99 yield, 101 consignment
 
 ## F. POS / Retail

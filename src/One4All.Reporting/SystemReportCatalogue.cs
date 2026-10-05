@@ -100,6 +100,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Inventory additions (brief §14 E, INV + item number).
+        foreach (ReportDefinition definition in InventoryReports.All())
+        {
+            yield return definition;
+        }
+
         // Cash book & treasury additions (brief §14 D, CB + item number).
         foreach (ReportDefinition definition in CashBookReports.All())
         {
