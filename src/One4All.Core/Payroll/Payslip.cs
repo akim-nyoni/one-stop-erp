@@ -2,6 +2,22 @@ using One4All.Core.Common;
 
 namespace One4All.Core.Payroll;
 
+/// <summary>What kind of run produced a payslip (brief §4.15.6: corrections after commit are visible runs, never edits).</summary>
+public enum PayRunKind
+{
+    /// <summary>The period's regular run.</summary>
+    Regular = 0,
+
+    /// <summary>A supplementary / adjustment run correcting a committed period.</summary>
+    Supplementary = 1,
+
+    /// <summary>A formally approved reversal of a committed run (negative payslips).</summary>
+    Reversal = 2,
+
+    /// <summary>Backpay for a retrospective change, paid in a later period.</summary>
+    Backpay = 3,
+}
+
 /// <summary>
 /// A payslip produced by a payroll run (brief §4.15.6, <c>pay.payslip</c>). Immutable once the run is
 /// committed; holds the resolved earning/deduction lines and the gross/deduction/net totals.
@@ -18,12 +34,16 @@ public sealed class Payslip : AuditableEntity, ICompanyScoped
     /// <param name="employeeId">The employee.</param>
     /// <param name="periodLabel">The pay period label.</param>
     /// <param name="payDate">The pay date.</param>
-    public Payslip(long companyId, long employeeId, string periodLabel, DateOnly payDate)
+    /// <param name="kind">The kind of run.</param>
+    /// <param name="runReference">The run's document number (links the payslip to its run).</param>
+    public Payslip(long companyId, long employeeId, string periodLabel, DateOnly payDate, PayRunKind kind = PayRunKind.Regular, string runReference = "")
     {
         CompanyId = companyId;
         EmployeeId = employeeId;
         PeriodLabel = periodLabel;
         PayDate = payDate;
+        RunKind = kind;
+        RunReference = runReference;
     }
 
     /// <inheritdoc />
@@ -37,6 +57,12 @@ public sealed class Payslip : AuditableEntity, ICompanyScoped
 
     /// <summary>The pay date.</summary>
     public DateOnly PayDate { get; private set; }
+
+    /// <summary>The kind of run that produced it.</summary>
+    public PayRunKind RunKind { get; private set; }
+
+    /// <summary>The run's document number (blank for runs made before runs were referenced).</summary>
+    public string RunReference { get; private set; } = string.Empty;
 
     /// <summary>The gross earnings.</summary>
     public decimal GrossEarnings { get; private set; }

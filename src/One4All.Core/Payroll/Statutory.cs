@@ -268,8 +268,15 @@ public sealed class PayrollRunRecord : AuditableEntity, ICompanyScoped
     /// <param name="deductions">Deductions.</param>
     /// <param name="net">Net pay.</param>
     /// <param name="journalNumber">The journal.</param>
-    public PayrollRunRecord(long companyId, string periodLabel, DateOnly payDate, int employees, decimal gross, decimal deductions, decimal net, string journalNumber)
+    /// <param name="kind">The kind of run.</param>
+    /// <param name="documentNumber">The run's document number.</param>
+    /// <param name="reason">Why a supplementary, backpay or reversal run was made.</param>
+    public PayrollRunRecord(long companyId, string periodLabel, DateOnly payDate, int employees, decimal gross, decimal deductions, decimal net, string journalNumber,
+        PayRunKind kind = PayRunKind.Regular, string documentNumber = "", string? reason = null)
     {
+        Kind = kind;
+        DocumentNumber = documentNumber;
+        Reason = reason;
         CompanyId = companyId;
         PeriodLabel = periodLabel;
         PayDate = payDate;
@@ -303,4 +310,36 @@ public sealed class PayrollRunRecord : AuditableEntity, ICompanyScoped
 
     /// <summary>The journal.</summary>
     public string JournalNumber { get; private set; }
+
+    /// <summary>The kind of run.</summary>
+    public PayRunKind Kind { get; private set; }
+
+    /// <summary>The run's document number (the payslips' run reference).</summary>
+    public string DocumentNumber { get; private set; } = string.Empty;
+
+    /// <summary>Why a supplementary, backpay or reversal run was made.</summary>
+    public string? Reason { get; private set; }
+
+    /// <summary>When the run was reversed, if it was.</summary>
+    public DateOnly? ReversedOn { get; private set; }
+
+    /// <summary>The reversal run's document number.</summary>
+    public string? ReversedBy { get; private set; }
+
+    /// <summary>Who approved the reversal.</summary>
+    public long? ReversalApprovedByUserId { get; private set; }
+
+    /// <summary>Gets a value indicating whether the run has been reversed.</summary>
+    public bool IsReversed => ReversedOn is not null;
+
+    /// <summary>Marks the run reversed by an approved reversal run.</summary>
+    /// <param name="date">The reversal date.</param>
+    /// <param name="reversalDocument">The reversal run's document number.</param>
+    /// <param name="approvedByUserId">Who approved it.</param>
+    public void MarkReversed(DateOnly date, string reversalDocument, long approvedByUserId)
+    {
+        ReversedOn = date;
+        ReversedBy = reversalDocument;
+        ReversalApprovedByUserId = approvedByUserId;
+    }
 }

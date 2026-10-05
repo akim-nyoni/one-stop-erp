@@ -75,8 +75,10 @@ internal sealed class PayslipConfiguration : IEntityTypeConfiguration<Payslip>
         b.Property(x => x.PeriodLabel).HasMaxLength(40);
         b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.PayslipId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
-        // One payslip per employee per period: the database backstop to the run's PeriodAlreadyRun check.
-        b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.PeriodLabel }).IsUnique();
+        b.Property(x => x.RunKind).HasConversion<int>();
+        b.Property(x => x.RunReference).HasMaxLength(40).HasDefaultValue(string.Empty);
+        // One payslip per employee per run; one live regular run per period is enforced on the run register.
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.PeriodLabel, x.RunReference }).IsUnique();
     }
 }
 
@@ -203,7 +205,13 @@ internal sealed class PayrollRunRecordConfiguration : IEntityTypeConfiguration<P
         b.Property(x => x.Gross).HasPrecision(19, 4);
         b.Property(x => x.Deductions).HasPrecision(19, 4);
         b.Property(x => x.Net).HasPrecision(19, 4);
-        b.HasIndex(x => new { x.CompanyId, x.PeriodLabel }).IsUnique();
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.DocumentNumber).HasMaxLength(40).HasDefaultValue(string.Empty);
+        b.Property(x => x.Reason).HasMaxLength(300);
+        b.Property(x => x.ReversedBy).HasMaxLength(40);
+        b.Ignore(x => x.IsReversed);
+        // A period is paid once: one regular run that has not been reversed (the backstop to Payroll.PeriodAlreadyRun).
+        b.HasIndex(x => new { x.CompanyId, x.PeriodLabel }).IsUnique().HasFilter("kind = 0 AND reversed_on IS NULL");
     }
 }
 
@@ -330,5 +338,36 @@ internal sealed class PayslipPrintConfiguration : IEntityTypeConfiguration<Paysl
         b.HasKey(x => x.Id);
         b.Property(x => x.PeriodLabel).HasMaxLength(20);
         b.HasIndex(x => new { x.EmployeeId, x.PeriodLabel });
+    }
+}
+
+internal sealed class LegacyPayslipLineConfiguration : IEntityTypeConfiguration<LegacyPayslipLine>
+{
+    public void Configure(EntityTypeBuilder<LegacyPayslipLine> b)
+    {
+        b.ToTable("legacy_payslip_line", Schemas.Payroll);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PeriodLabel).HasMaxLength(40);
+        b.Property(x => x.EmployeeNumber).HasMaxLength(30);
+        b.Property(x => x.ElementCode).HasMaxLength(30);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.PeriodLabel });
+    }
+}
+
+internal sealed class BackpayLineConfiguration : IEntityTypeConfiguration<BackpayLine>
+{
+    public void Configure(EntityTypeBuilder<BackpayLine> b)
+    {
+        b.ToTable("backpay_line", Schemas.Payroll);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ForPeriod).HasMaxLength(40);
+        b.Property(x => x.ElementCode).HasMaxLength(30);
+        b.Property(x => x.RunReference).HasMaxLength(40);
+        b.Property(x => x.Reason).HasMaxLength(300);
+        b.Property(x => x.Paid).HasPrecision(19, 4);
+        b.Property(x => x.Due).HasPrecision(19, 4);
+        b.Ignore(x => x.Difference);
+        b.HasIndex(x => new { x.CompanyId, x.PaidOn });
     }
 }

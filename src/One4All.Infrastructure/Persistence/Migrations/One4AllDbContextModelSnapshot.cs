@@ -13841,6 +13841,76 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("attendance", "hr");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.BackpayLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("Due")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("due");
+
+                    b.Property<string>("ElementCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("element_code");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<string>("ForPeriod")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("for_period");
+
+                    b.Property<decimal>("Paid")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("paid");
+
+                    b.Property<DateOnly>("PaidOn")
+                        .HasColumnType("date")
+                        .HasColumnName("paid_on");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("RunReference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("run_reference");
+
+                    b.HasKey("Id")
+                        .HasName("pk_backpay_line");
+
+                    b.HasIndex("CompanyId", "PaidOn")
+                        .HasDatabaseName("ix_backpay_line_company_id_paid_on");
+
+                    b.ToTable("backpay_line", "pay");
+                });
+
             modelBuilder.Entity("One4All.Core.Payroll.DisciplinaryRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -14593,6 +14663,57 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("leave_record", "hr");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.LegacyPayslipLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("ElementCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("element_code");
+
+                    b.Property<string>("EmployeeNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("employee_number");
+
+                    b.Property<string>("PeriodLabel")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("period_label");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_legacy_payslip_line");
+
+                    b.HasIndex("CompanyId", "PeriodLabel")
+                        .HasDatabaseName("ix_legacy_payslip_line_company_id_period_label");
+
+                    b.ToTable("legacy_payslip_line", "pay");
+                });
+
             modelBuilder.Entity("One4All.Core.Payroll.PayElement", b =>
                 {
                     b.Property<long>("Id")
@@ -14736,6 +14857,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("deductions");
 
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasDefaultValue("")
+                        .HasColumnName("document_number");
+
                     b.Property<int>("Employees")
                         .HasColumnType("integer")
                         .HasColumnName("employees");
@@ -14750,6 +14879,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("journal_number");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
@@ -14774,6 +14907,24 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("period_label");
 
+                    b.Property<string>("Reason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<long?>("ReversalApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reversal_approved_by_user_id");
+
+                    b.Property<string>("ReversedBy")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("reversed_by");
+
+                    b.Property<DateOnly?>("ReversedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("reversed_on");
+
                     b.Property<long>("RowVersion")
                         .HasColumnType("bigint")
                         .HasColumnName("row_version");
@@ -14783,7 +14934,8 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CompanyId", "PeriodLabel")
                         .IsUnique()
-                        .HasDatabaseName("ix_payroll_run_company_id_period_label");
+                        .HasDatabaseName("ix_payroll_run_company_id_period_label")
+                        .HasFilter("kind = 0 AND reversed_on IS NULL");
 
                     b.ToTable("payroll_run", "hr");
                 });
@@ -14847,6 +14999,18 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<int>("RunKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("run_kind");
+
+                    b.Property<string>("RunReference")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasDefaultValue("")
+                        .HasColumnName("run_reference");
+
                     b.Property<decimal>("TotalDeductions")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -14855,9 +15019,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_payslip");
 
-                    b.HasIndex("CompanyId", "EmployeeId", "PeriodLabel")
+                    b.HasIndex("CompanyId", "EmployeeId", "PeriodLabel", "RunReference")
                         .IsUnique()
-                        .HasDatabaseName("ix_payslip_company_id_employee_id_period_label");
+                        .HasDatabaseName("ix_payslip_company_id_employee_id_period_label_run_reference");
 
                     b.ToTable("payslip", "pay");
                 });

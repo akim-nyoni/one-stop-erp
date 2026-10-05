@@ -16,7 +16,7 @@ namespace One4All.Infrastructure.Payroll;
 /// payslip, and commits a run as one balanced GL journal (Dr earning expenses, Cr deduction/statutory
 /// liabilities, Cr net pay) through the central engine.
 /// </summary>
-public sealed class PayrollService : IPayrollService
+public sealed partial class PayrollService : IPayrollService, IPayrollAdjustmentService
 {
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _posting;
@@ -112,8 +112,8 @@ public sealed class PayrollService : IPayrollService
             return Error.Validation("Payroll.PeriodRequired", "A payroll run needs a period label (e.g. 2026-01).");
         }
 
-        // A period is paid once: a second run would pay every employee again.
-        if (await _db.Set<Payslip>().AnyAsync(p => p.CompanyId == companyId && p.PeriodLabel == periodLabel, ct).ConfigureAwait(false))
+        // A period is paid once: a second run would pay every employee again (unless the first was formally reversed).
+        if (await RegularRunIsLiveAsync(companyId, periodLabel, ct).ConfigureAwait(false))
         {
             return Error.Conflict("Payroll.PeriodAlreadyRun", $"Payroll for period {periodLabel} has already been run.");
         }
@@ -129,22 +129,44 @@ public sealed class PayrollService : IPayrollService
             return Error.Rule("Payroll.NoEmployees", "There are no active employees to pay.");
         }
 
-        // Aggregate GL effects across payslips so one balanced journal represents the run.
+        List<Payslip> slips = [];
+        foreach (Employee employee in employees)
+        {
+            Result<Payslip> slip = BuildPayslip(companyId, employee, elements, periodLabel, payDate, documentNumber: documentNumber);
+            if (slip.IsFailure)
+            {
+                return slip.Error;
+            }
+
+            slips.Add(slip.Value);
+        }
+
+        return await PostRunAsync(company, periodLabel, payDate, netPayAccountCode, documentNumber, slips, elements, PayRunKind.Regular, null, ct).ConfigureAwait(false);
+    }
+
+    // Whether the period has a regular run that has not been reversed. Runs from before the run register are known by their payslips.
+    private async Task<bool> RegularRunIsLiveAsync(long companyId, string periodLabel, CancellationToken ct)
+    {
+        List<PayrollRunRecord> runs = await _db.Set<PayrollRunRecord>().Where(r => r.CompanyId == companyId && r.PeriodLabel == periodLabel && r.Kind == PayRunKind.Regular)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return runs.Count > 0
+            ? runs.Exists(r => !r.IsReversed)
+            : await _db.Set<Payslip>().AnyAsync(p => p.CompanyId == companyId && p.PeriodLabel == periodLabel && p.RunKind == PayRunKind.Regular, ct).ConfigureAwait(false);
+    }
+
+    // Saves a run's payslips, posts its one balanced journal (Dr earnings and employer costs, Cr deductions, scheme liabilities and
+    // net pay; a negative amount swaps its side) and records the run in the register.
+    private async Task<Result<PayrollRunResult>> PostRunAsync(Company company, string periodLabel, DateOnly payDate, string netPayAccountCode, string documentNumber, IReadOnlyList<Payslip> slips,
+        Dictionary<long, PayElement> elements, PayRunKind kind, string? reason, CancellationToken ct)
+    {
         Dictionary<string, decimal> debitsByAccount = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, decimal> creditsByAccount = new(StringComparer.OrdinalIgnoreCase);
         decimal totalGross = 0m;
         decimal totalDeductions = 0m;
         decimal totalNet = 0m;
 
-        foreach (Employee employee in employees)
+        foreach (Payslip payslip in slips)
         {
-            Result<Payslip> slip = BuildPayslip(companyId, employee, elements, periodLabel, payDate);
-            if (slip.IsFailure)
-            {
-                return slip.Error;
-            }
-
-            Payslip payslip = slip.Value;
             _db.Set<Payslip>().Add(payslip);
 
             foreach (PayslipLine line in payslip.Lines)
@@ -183,19 +205,20 @@ public sealed class PayrollService : IPayrollService
 
         Add(creditsByAccount, netPayAccountCode, totalNet);
 
-        List<JournalLineRequest> lines = [];
-        lines.AddRange(debitsByAccount.Select(kv => new JournalLineRequest { AccountCode = kv.Key, Side = JournalSide.Debit, TransactionAmount = kv.Value }));
-        lines.AddRange(creditsByAccount.Select(kv => new JournalLineRequest { AccountCode = kv.Key, Side = JournalSide.Credit, TransactionAmount = kv.Value }));
+        static JournalSide Flip(JournalSide side) => side == JournalSide.Debit ? JournalSide.Credit : JournalSide.Debit;
+        List<JournalLineRequest> lines = [.. debitsByAccount.Select(kv => (kv, JournalSide.Debit)).Concat(creditsByAccount.Select(kv => (kv, JournalSide.Credit)))
+            .Where(x => x.kv.Value != 0m)
+            .Select(x => new JournalLineRequest { AccountCode = x.kv.Key, Side = x.kv.Value > 0m ? x.Item2 : Flip(x.Item2), TransactionAmount = Math.Abs(x.kv.Value) })];
 
         Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
         {
-            CompanyId = companyId,
+            CompanyId = company.Id,
             SourceModule = "GL",
             PostingDate = payDate,
             TransactionCurrency = company.BaseCurrency,
             DocumentType = "PAYROLL",
             DocumentNumber = documentNumber,
-            Narrative = $"Payroll {periodLabel}",
+            Narrative = kind == PayRunKind.Regular ? $"Payroll {periodLabel}" : $"Payroll {periodLabel} {kind.ToString().ToLowerInvariant()}: {reason}",
             Lines = lines,
         }, ct).ConfigureAwait(false);
 
@@ -204,23 +227,24 @@ public sealed class PayrollService : IPayrollService
             return posted.Error;
         }
 
-        _db.Set<PayrollRunRecord>().Add(new PayrollRunRecord(companyId, periodLabel, payDate, employees.Count, totalGross, totalDeductions, totalNet, posted.Value.JournalNumber));
+        _db.Set<PayrollRunRecord>().Add(new PayrollRunRecord(company.Id, periodLabel, payDate, slips.Count, totalGross, totalDeductions, totalNet, posted.Value.JournalNumber, kind, documentNumber, reason));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new PayrollRunResult(employees.Count, totalGross, totalDeductions, totalNet, posted.Value.JournalNumber);
+        return new PayrollRunResult(slips.Count, totalGross, totalDeductions, totalNet, posted.Value.JournalNumber);
     }
 
     private async Task<Dictionary<long, PayElement>> LoadElementsAsync(long companyId, CancellationToken ct) =>
         await _db.Set<PayElement>().Where(e => e.CompanyId == companyId)
             .ToDictionaryAsync(e => e.Id, ct).ConfigureAwait(false);
 
-    private Result<Payslip> BuildPayslip(long companyId, Employee employee, IReadOnlyDictionary<long, PayElement> elements, string periodLabel, DateOnly payDate)
+    private Result<Payslip> BuildPayslip(long companyId, Employee employee, IReadOnlyDictionary<long, PayElement> elements, string periodLabel, DateOnly payDate,
+        decimal? basicSalary = null, string documentNumber = "")
     {
-        Payslip payslip = new(companyId, employee.Id, periodLabel, payDate);
+        Payslip payslip = new(companyId, employee.Id, periodLabel, payDate, PayRunKind.Regular, documentNumber);
 
         // Variables the formulas evaluate against; updated as each element resolves.
         Dictionary<string, object?> vars = new(StringComparer.Ordinal)
         {
-            ["BASIC"] = employee.BasicSalary,
+            ["BASIC"] = basicSalary ?? employee.BasicSalary,
             ["GROSS"] = 0m,
             ["TAXABLE"] = 0m,
             ["DEDUCTIONS"] = 0m,

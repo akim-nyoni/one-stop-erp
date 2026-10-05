@@ -97,6 +97,15 @@ public static class PayrollReports
         yield return Listing("PR7", "Payroll Run Control Register", "Payroll", "Every payroll run in the period: employees, gross, deductions, net, the journal and who ran it.",
             "PyrlRuns", [new Column("Period", "Period", 70), new Column("PayDate", "Pay date", 75), new Column("Employees", "Employees", 65), new Column("Gross", "Gross", 95), new Column("Deductions", "Deductions", 95),
              new Column("Journal", "Journal", 100), new Column("RunBy", "Run by", 90), new Column("Net", "Net", 100, true)], Period);
+        yield return Listing("PR8", "Parallel Run Comparison", "Payroll", "Go-live parallel run: One4All's payslips against the imported legacy payroll, per period, employee and element (NET for net pay).",
+            "PyrlParallel", [new Column("Period", "Period", 70), new Column("Employee", "Employee", 160), new Column("Element", "Element", 70), new Column("One4All", "One4All", 95), new Column("Legacy", "Legacy", 95),
+             new Column("Status", "Status", 110), new Column("Difference", "Difference", 95, true)], Period);
+        yield return Listing("PR9", "Supplementary Runs & Reversal Register", "Payroll", "Every supplementary, backpay and reversal run in the period, and every run reversed: reason, approval and journals.",
+            "PyrlAdjustments", [new Column("Run", "Run", 100), new Column("Period", "Period", 70), new Column("Kind", "Kind", 85), new Column("PayDate", "Date", 75), new Column("Reason", "Reason", 180),
+             new Column("Employees", "Employees", 65), new Column("Journal", "Journal", 100), new Column("Reversal", "Reversed", 200), new Column("Net", "Net", 100, true)], Period);
+        yield return Listing("PR10", "Backpay & Retrospective Adjustments", "Payroll", "Backpay paid in the period: per employee, the period corrected and each element's paid, due and difference.",
+            "PyrlBackpay", [new Column("Employee", "Employee", 160), new Column("ForPeriod", "For period", 70), new Column("Element", "Element", 70), new Column("Paid", "Paid", 95), new Column("Due", "Due", 95),
+             new Column("Run", "Paid in run", 100), new Column("PaidOn", "Paid on", 75), new Column("Reason", "Reason", 160), new Column("Difference", "Difference", 95, true)], Period);
         yield return Listing("PR19", "Third-Party Remittance Schedules", "Payroll", "Per scheme and member for the period: the employee's deduction and the employer's contribution — the schedule each provider needs.",
             "PyrlSchemes", [new Column("Scheme", "Scheme", 110), new Column("Employee", "Employee", 160), new Column("Member", "Member no.", 90), new Column("EmployeePart", "Employee", 90),
              new Column("EmployerPart", "Employer", 90), new Column("Total", "Total", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("SchemeCode", ParameterType.String)]);

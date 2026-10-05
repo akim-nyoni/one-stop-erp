@@ -100,7 +100,83 @@ public static partial class OperationCatalogue
             Run = async (c, i) => Check(await c.Get<IHrRecordsService>().RegisterGarnisheeAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Reference"), i.Text("Creditor"),
                 i.Whole("Priority"), i.Number("Instalment"), i.Number("Total"), i.Text("Element"), i.Date("Issued")).ConfigureAwait(true), "Garnishee registered."),
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Supplementary payroll run", ListTitle = "Payroll runs", Description = "Corrects a committed period with extra (or negative) element amounts — a visible run with its own payslips and journal.",
+            Fields = [Req("Period", "Committed period"), Today(), Req("Document", "Run document number"), Req("Reason", "Reason"), Req("NetPay", "Net pay control account", "2420"),
+                Req("Lines", "Lines: EMPLOYEE:ELEMENT:amount; …")],
+            Run = async (c, i) =>
+            {
+                List<SupplementaryLine> lines = [];
+                foreach (string part in i.Text("Lines").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                    if (bits.Length != 3 || !decimal.TryParse(bits[2], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal amount))
+                    {
+                        throw new OperationException($"'{part}' should look like EMPLOYEE:ELEMENT:amount.");
+                    }
+
+                    lines.Add(new SupplementaryLine(await EmployeeAsync(c, bits[0]).ConfigureAwait(true), bits[1], amount));
+                }
+
+                PayrollRunResult run = Check(await c.Get<IPayrollAdjustmentService>().RunSupplementaryAsync(new SupplementaryRunRequest
+                {
+                    CompanyId = c.CompanyId, PeriodLabel = i.Text("Period"), PayDate = i.Date("Date"), NetPayAccountCode = i.Text("NetPay"), DocumentNumber = i.Text("Document"), Reason = i.Text("Reason"), Lines = lines,
+                }).ConfigureAwait(true));
+                return $"{run.PayslipCount} payslip(s), net {M(run.TotalNet)}, journal {run.JournalNumber}.";
+            },
+            List = PayrollRunsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Reverse a payroll run", ListTitle = "Payroll runs", Description = "A formally approved reversal: reversing journal and negative payslips. The approver cannot be whoever ran the payroll.",
+            Fields = [Req("Run", "Run document or journal number"), Today(), Req("Reason", "Reason"), Req("Approver", "Approved by (user name)")],
+            Run = async (c, i) =>
+            {
+                PayrollRunResult run = Check(await c.Get<IPayrollAdjustmentService>().ReverseRunAsync(c.CompanyId, i.Text("Run"), i.Date("Date"), i.Text("Reason"),
+                    await UserAsync(c, i.Text("Approver")).ConfigureAwait(true)).ConfigureAwait(true));
+                return $"Reversed {run.PayslipCount} payslip(s), net {M(run.TotalNet)}, journal {run.JournalNumber}.";
+            },
+            List = PayrollRunsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Backpay for a salary change", ListTitle = "Payroll runs",
+            Description = "Recalculates every period paid since the effective date at the new basic salary and pays the difference. Untick 'Pay now' to preview.",
+            Fields = [Req("Employee", "Employee number"), Num("Basic", "New basic salary"), Today("From", "Effective from"), Tick("Pay", "Pay now"), Req("Period", "Pay in period"), Today("PayDate", "Pay date"),
+                Opt("Document", "Run document number"), Opt("Reason", "Reason"), Req("NetPay", "Net pay control account", "2420")],
+            Run = async (c, i) =>
+            {
+                IPayrollAdjustmentService service = c.Get<IPayrollAdjustmentService>();
+                long employee = await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true);
+                IReadOnlyList<BackpayPreviewLine> lines = Check(await service.CalculateBackpayAsync(c.CompanyId, employee, i.Number("Basic"), i.Date("From")).ConfigureAwait(true));
+                string preview = lines.Count == 0 ? "Nothing owed." : string.Join(Environment.NewLine, lines.Select(l => $"{l.ForPeriod,-10} {l.ElementCode,-12} paid {M(l.Paid),12}  due {M(l.Due),12}  diff {M(l.Difference),12}"));
+                if (!i.Flag("Pay"))
+                {
+                    return preview;
+                }
+
+                PayrollRunResult run = Check(await service.PayBackpayAsync(new BackpayRequest
+                {
+                    CompanyId = c.CompanyId, EmployeeId = employee, NewBasicSalary = i.Number("Basic"), EffectiveFrom = i.Date("From"), PeriodLabel = i.Text("Period"), PayDate = i.Date("PayDate"),
+                    NetPayAccountCode = i.Text("NetPay"), DocumentNumber = i.Text("Document"), Reason = i.Text("Reason"),
+                }).ConfigureAwait(true));
+                return $"{preview}{Environment.NewLine}{Environment.NewLine}Backpay net {M(run.TotalNet)} paid, journal {run.JournalNumber}; basic salary updated.";
+            },
+            List = PayrollRunsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Import legacy payroll (parallel run)", Description = "The old system's figures for a period, compared line by line in report PR8. Replaces an earlier import of the period.",
+            Fields = [Req("Period", "Period"), Req("Lines", "Lines: EMPLOYEE,ELEMENT,amount; … (NET for net pay)")],
+            Run = async (c, i) => $"{Check(await c.Get<IPayrollAdjustmentService>().ImportLegacyPayrollAsync(c.CompanyId, i.Text("Period"), i.Text("Lines").Replace(';', '\n')).ConfigureAwait(true))} line(s) imported — run report PR8.",
+        };
     }
+
+    private static async Task<DataTable> PayrollRunsAsync(OperationContext c)
+        => Table(await c.Db.Set<PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Take(50).ToListAsync().ConfigureAwait(true),
+            ("Run", r => r.DocumentNumber.Length > 0 ? r.DocumentNumber : r.JournalNumber), ("Period", r => r.PeriodLabel), ("Kind", r => r.Kind), ("Date", r => D(r.PayDate)), ("Payslips", r => r.Employees),
+            ("Net", r => M(r.Net)), ("Journal", r => r.JournalNumber), ("Reversed", r => r.ReversedBy ?? string.Empty));
 
     private static TimeOnly? Time(OperationInput i, string name)
         => i.Optional(name) is not string text ? null

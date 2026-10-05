@@ -65,6 +65,9 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLEXPIRIES" => await ExpiriesAsync(companyId, asAt, ct).ConfigureAwait(false),
             "PYRLGHOSTS" => await GhostsAsync(companyId, asAt, ct).ConfigureAwait(false),
             "PYRLRUNS" => await RunsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLPARALLEL" => await ParallelAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLADJUSTMENTS" => await AdjustmentsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLBACKPAY" => await BackpayAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLSCHEMES" => await SchemeScheduleAsync(companyId, fromDate, toDate, _ => true, Text(parameters, "SchemeCode"), ct).ConfigureAwait(false),
             "PYRLSCHEMESOCIAL" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.SocialSecurity, null, ct).ConfigureAwait(false),
             "PYRLSCHEMEPENSION" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.Pension, null, ct).ConfigureAwait(false),
@@ -489,6 +492,69 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         return [.. (await _db.Set<PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == companyId && r.PayDate >= fromDate && r.PayDate <= toDate).OrderBy(r => r.PayDate).ToListAsync(ct).ConfigureAwait(false))
             .Select(r => Row(("Period", r.PeriodLabel), ("PayDate", Date(r.PayDate)), ("Employees", r.Employees), ("Gross", Money(r.Gross)), ("Deductions", Money(r.Deductions)), ("Journal", r.JournalNumber),
                 ("RunBy", r.CreatedByUserId == 0 ? "system" : users.GetValueOrDefault(r.CreatedByUserId, $"user {r.CreatedByUserId}")), ("Net", r.Net)))];
+    }
+
+    // PR8: per period paid in the range, One4All's net amount per employee and element (all runs) against the legacy import.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ParallelAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<Payslip> slips = await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
+        List<string> periods = [.. slips.Select(p => p.PeriodLabel).Distinct()];
+        List<LegacyPayslipLine> legacy = await _db.LegacyPayslipLines.AsNoTracking().Where(l => l.CompanyId == companyId && periods.Contains(l.PeriodLabel)).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<string, Employee> byNumber = employees.Values.GroupBy(e => e.EmployeeNumber).ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        Dictionary<(string Period, string Employee, string Element), decimal> ours = [];
+        static void Add(Dictionary<(string Period, string Employee, string Element), decimal> map, (string, string, string) key, decimal amount) => map[key] = map.GetValueOrDefault(key) + amount;
+        foreach (Payslip slip in slips)
+        {
+            string number = employees.TryGetValue(slip.EmployeeId, out Employee? e) ? e.EmployeeNumber : $"#{slip.EmployeeId}";
+            foreach (PayslipLine line in slip.Lines)
+            {
+                Add(ours, (slip.PeriodLabel, number, line.ElementCode.ToUpperInvariant()), line.Amount);
+            }
+
+            Add(ours, (slip.PeriodLabel, number, "NET"), slip.NetPay);
+        }
+
+        Dictionary<(string Period, string Employee, string Element), decimal> theirs = [];
+        foreach (LegacyPayslipLine line in legacy)
+        {
+            Add(theirs, (line.PeriodLabel, line.EmployeeNumber, line.ElementCode), line.Amount);
+        }
+
+        HashSet<string> imported = [.. legacy.Select(l => l.PeriodLabel)];
+        string Who(string number) => byNumber.TryGetValue(number, out Employee? e) ? $"{e.EmployeeNumber} {e.FullName}" : number;
+        return [.. ours.Keys.Union(theirs.Keys).Where(k => imported.Contains(k.Period)).OrderBy(k => k.Period, StringComparer.Ordinal).ThenBy(k => k.Employee, StringComparer.Ordinal)
+            .ThenBy(k => k.Element == "NET" ? 1 : 0).ThenBy(k => k.Element, StringComparer.Ordinal)
+            .Select(k =>
+            {
+                bool inOurs = ours.TryGetValue(k, out decimal a);
+                bool inTheirs = theirs.TryGetValue(k, out decimal b);
+                string status = !inTheirs ? "Not in legacy" : !inOurs ? "Not in One4All" : a == b ? "Match" : "Differs";
+                return Row(("Period", k.Period), ("Employee", Who(k.Employee)), ("Element", k.Element), ("One4All", inOurs ? Money(a) : "-"), ("Legacy", inTheirs ? Money(b) : "-"), ("Status", status),
+                    ("Difference", a - b));
+            })];
+    }
+
+    // PR9: correction runs (supplementary, backpay, reversal) and runs that were reversed.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AdjustmentsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        return [.. (await _db.Set<PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == companyId && r.PayDate >= fromDate && r.PayDate <= toDate && (r.Kind != PayRunKind.Regular || r.ReversedOn != null))
+                .OrderBy(r => r.PayDate).ThenBy(r => r.Id).ToListAsync(ct).ConfigureAwait(false))
+            .Select(r => Row(("Run", r.DocumentNumber.Length > 0 ? r.DocumentNumber : r.JournalNumber), ("Period", r.PeriodLabel), ("Kind", r.Kind.ToString()), ("PayDate", Date(r.PayDate)), ("Reason", r.Reason ?? "-"),
+                ("Employees", r.Employees), ("Journal", r.JournalNumber),
+                ("Reversal", r.ReversedOn is DateOnly on ? $"{r.ReversedBy} on {Date(on)}, approved by {users.GetValueOrDefault(r.ReversalApprovedByUserId ?? 0, "?")}" : "-"), ("Net", r.Net)))];
+    }
+
+    // PR10: the backpay calculations settled in the period.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BackpayAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        return [.. (await _db.BackpayLines.AsNoTracking().Where(b => b.CompanyId == companyId && b.PaidOn >= fromDate && b.PaidOn <= toDate).ToListAsync(ct).ConfigureAwait(false))
+            .OrderBy(b => Name(employees, b.EmployeeId), StringComparer.Ordinal).ThenBy(b => b.ForPeriod, StringComparer.Ordinal).ThenBy(b => b.ElementCode, StringComparer.Ordinal)
+            .Select(b => Row(("Employee", Name(employees, b.EmployeeId)), ("ForPeriod", b.ForPeriod), ("Element", b.ElementCode), ("Paid", Money(b.Paid)), ("Due", Money(b.Due)), ("Run", b.RunReference),
+                ("PaidOn", Date(b.PaidOn)), ("Reason", b.Reason), ("Difference", b.Difference)))];
     }
 
     // Each member's lines on the scheme's employee and employer elements in the period.

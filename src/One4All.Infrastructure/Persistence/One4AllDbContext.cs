@@ -335,6 +335,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the payslip print log.</summary>
     public DbSet<Core.Payroll.PayslipPrint> PayslipPrints => Set<Core.Payroll.PayslipPrint>();
 
+    /// <summary>Legacy payroll lines imported for the parallel run.</summary>
+    public DbSet<Core.Payroll.LegacyPayslipLine> LegacyPayslipLines => Set<Core.Payroll.LegacyPayslipLine>();
+
+    /// <summary>Backpay calculation lines.</summary>
+    public DbSet<Core.Payroll.BackpayLine> BackpayLines => Set<Core.Payroll.BackpayLine>();
+
     /// <summary>Payslips.</summary>
     public DbSet<Core.Payroll.Payslip> Payslips => Set<Core.Payroll.Payslip>();
 
