@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-485 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+486 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -546,6 +546,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | SC182 | Student Balances Listing | Every student with guardian, grade, enrolment and what is owed on their fee invoices at the date. | AsAtDate (Date, optional) | Admission, Student, Grade, Guardian, Status, Balance | — | Sum(Balance) |
 | SC183 | Transport Route Billing & Utilisation | Per route: seats, enrolled riders, utilisation, the fee and what was billed for transport in the period. | FromDate (Date, optional), ToDate (Date, optional) | Route, Name, Seats, Riders, Utilisation, Fee, Billed | — | Sum(Billed) |
 | SC184 | Boarding / Hostel Occupancy & Billing | Per hostel: beds, enrolled boarders, occupancy, the fee and what was billed for boarding in the period. | FromDate (Date, optional), ToDate (Date, optional) | Hostel, Name, Beds, Boarders, Occupancy, Fee, Billed | — | Sum(Billed) |
+| SC185 | Tuck Shop Sales & Student Account Spend | Per student over the period: wallet balance brought forward, top-ups, tuck-shop spend and the balance carried forward. | FromDate (Date, optional), ToDate (Date, optional) | Student, Grade, Opening, TopUps, Spend, Days, Closing | — | Sum(Closing) |
 | SCH-STU | Student Register | Enrolled students with grade, boarding status and bursary. | — | AdmissionNumber, FullName, Grade, Boarder, BursaryValue | — | Sum(BursaryValue) |
 
 ## System

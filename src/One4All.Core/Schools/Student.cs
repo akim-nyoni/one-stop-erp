@@ -75,6 +75,9 @@ public sealed class Student : SoftDeletableEntity, ICompanyScoped
     /// <summary>Gets or sets the hostel a boarder lives in.</summary>
     public long? HostelId { get; set; }
 
+    /// <summary>Gets or sets the most the student may spend from their wallet in a day (null: no limit).</summary>
+    public decimal? DailySpendLimit { get; set; }
+
     /// <summary>Gets the account the student's fees are billed to: the sponsor when there is one, otherwise the guardian.</summary>
     public long PayerCustomerId => SponsorCustomerId ?? GuardianCustomerId;
 

@@ -93,3 +93,48 @@ public sealed class Hostel : Entity, ICompanyScoped
     /// <summary>Gets the revenue account.</summary>
     public string RevenueAccountCode { get; private set; }
 }
+
+/// <summary>A movement on a student's spending wallet (<c>sch.wallet_entry</c>): a top-up (+) or a tuck-shop spend (−).</summary>
+public sealed class StudentWalletEntry : Entity, ICompanyScoped
+{
+    private StudentWalletEntry()
+    {
+        Description = string.Empty;
+        JournalNumber = string.Empty;
+    }
+
+    /// <summary>Records a movement.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="studentId">The student.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="amount">The signed amount (+ top-up, − spend).</param>
+    /// <param name="description">What it was.</param>
+    /// <param name="journalNumber">The journal that posted it.</param>
+    public StudentWalletEntry(long companyId, long studentId, DateOnly date, decimal amount, string description, string journalNumber)
+    {
+        CompanyId = companyId;
+        StudentId = studentId;
+        Date = date;
+        Amount = amount;
+        Description = description;
+        JournalNumber = journalNumber;
+    }
+
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; private set; }
+
+    /// <summary>Gets the student.</summary>
+    public long StudentId { get; private set; }
+
+    /// <summary>Gets the date.</summary>
+    public DateOnly Date { get; private set; }
+
+    /// <summary>Gets the signed amount.</summary>
+    public decimal Amount { get; private set; }
+
+    /// <summary>Gets what it was.</summary>
+    public string Description { get; private set; }
+
+    /// <summary>Gets the journal.</summary>
+    public string JournalNumber { get; private set; }
+}

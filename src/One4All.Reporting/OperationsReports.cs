@@ -47,6 +47,9 @@ public static class OperationsReports
         yield return Listing("SC184", "Boarding / Hostel Occupancy & Billing", "School", "Per hostel: beds, enrolled boarders, occupancy, the fee and what was billed for boarding in the period.",
             "OpsBoarding", [new Column("Hostel", "Hostel", 70), new Column("Name", "Name", 140), new Column("Beds", "Beds", 50), new Column("Boarders", "Boarders", 60), new Column("Occupancy", "Occupancy", 70),
              new Column("Fee", "Fee / term", 80), new Column("Billed", "Billed", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        yield return Listing("SC185", "Tuck Shop Sales & Student Account Spend", "School", "Per student over the period: wallet balance brought forward, top-ups, tuck-shop spend and the balance carried forward.",
+            "OpsWallets", [new Column("Student", "Student", 170), new Column("Grade", "Grade", 60), new Column("Opening", "B/f", 85), new Column("TopUps", "Top-ups", 85), new Column("Spend", "Spend", 85),
+             new Column("Days", "Days spent", 60), new Column("Closing", "C/f", 90, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
         yield return Listing("JC186", "Job Cost Report by Cost Head", "JobCosting", "Per contract and cost head: cost to date and share of the contract's cost, against its budget.",
             "OpsJobCosts", [new Column("Contract", "Contract", 90), new Column("Name", "Name", 150), new Column("CostHead", "Cost head", 110), new Column("Source", "Source", 90), new Column("Share", "Share", 60),
              new Column("Cost", "Cost to date", 100, true)], []);

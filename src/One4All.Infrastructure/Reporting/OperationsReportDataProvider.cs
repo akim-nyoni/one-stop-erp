@@ -38,6 +38,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             "OPSDEFERREDFEES" => await DeferredFeesAsync(companyId, ct).ConfigureAwait(false),
             "OPSTRANSPORT" => await ExtrasAsync(companyId, fromDate, toDate, transport: true, ct).ConfigureAwait(false),
             "OPSBOARDING" => await ExtrasAsync(companyId, fromDate, toDate, transport: false, ct).ConfigureAwait(false),
+            "OPSWALLETS" => await WalletsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "OPSFEEARREARS" => await FeeArrearsAsync(companyId, asAt, ct).ConfigureAwait(false),
             "OPSFEECOLLECTIONS" => await FeeCollectionsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "OPSBURSARIES" => await BursariesAsync(companyId, ct).ConfigureAwait(false),
@@ -371,6 +372,21 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             int boarders = enrolled.Count(s => s.IsBoarder && s.HostelId == h.Id);
             return Row(("Hostel", h.Code), ("Name", h.Name), ("Beds", h.Capacity), ("Boarders", boarders), ("Occupancy", Share(boarders, h.Capacity)), ("Fee", Money(h.FeePerTerm)), ("Billed", Billed(h.Code)));
         })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> WalletsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Student> students = (await StudentsAsync(companyId, ct).ConfigureAwait(false)).Values.ToDictionary(s => s.Id);
+        List<StudentWalletEntry> entries = await _db.StudentWalletEntries.AsNoTracking().Where(w => w.CompanyId == companyId && w.Date <= toDate).ToListAsync(ct).ConfigureAwait(false);
+        return [.. entries.GroupBy(w => w.StudentId).Select(g => (Student: students.GetValueOrDefault(g.Key), Entries: g.ToList()))
+            .OrderBy(x => x.Student?.Grade ?? string.Empty, StringComparer.Ordinal).ThenBy(x => x.Student?.FullName ?? string.Empty, StringComparer.Ordinal).Select(x =>
+            {
+                List<StudentWalletEntry> inPeriod = [.. x.Entries.Where(w => w.Date >= fromDate)];
+                decimal opening = x.Entries.Where(w => w.Date < fromDate).Sum(w => w.Amount);
+                return Row(("Student", x.Student is null ? "?" : $"{x.Student.FullName} ({x.Student.AdmissionNumber})"), ("Grade", x.Student?.Grade ?? "?"), ("Opening", Money(opening)),
+                    ("TopUps", Money(inPeriod.Where(w => w.Amount > 0m).Sum(w => w.Amount))), ("Spend", Money(-inPeriod.Where(w => w.Amount < 0m).Sum(w => w.Amount))),
+                    ("Days", inPeriod.Where(w => w.Amount < 0m).Select(w => w.Date).Distinct().Count()), ("Closing", opening + inPeriod.Sum(w => w.Amount)));
+            })];
     }
 
     private Task<Dictionary<string, Student>> StudentsAsync(long companyId, CancellationToken ct)

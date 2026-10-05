@@ -42,6 +42,7 @@ internal sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
         b.ToTable("student", Schemas.School);
         b.HasKey(x => x.Id);
         b.Property(x => x.Stream).HasMaxLength(20);
+        b.Property(x => x.DailySpendLimit).HasPrecision(19, 4);
         b.Ignore(x => x.PayerCustomerId);
         b.Property(x => x.AdmissionNumber).HasMaxLength(40);
         b.Property(x => x.FullName).HasMaxLength(200);
@@ -78,5 +79,18 @@ internal sealed class HostelConfiguration : IEntityTypeConfiguration<Hostel>
         b.Property(x => x.FeePerTerm).HasPrecision(19, 4);
         b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class StudentWalletEntryConfiguration : IEntityTypeConfiguration<StudentWalletEntry>
+{
+    public void Configure(EntityTypeBuilder<StudentWalletEntry> b)
+    {
+        b.ToTable("wallet_entry", Schemas.School);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Description).HasMaxLength(160);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+        b.HasIndex(x => new { x.StudentId, x.Date });
     }
 }
