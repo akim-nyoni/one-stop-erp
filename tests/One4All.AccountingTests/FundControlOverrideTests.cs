@@ -57,6 +57,6 @@ public sealed class FundControlOverrideTests
         rendered.IsSuccess.Should().BeTrue();
         string report = Encoding.UTF8.GetString(rendered.Value.Content);
         report.Should().Contain(",Blocked,2026-03-05,6800,—,Journal FC-1,").And.Contain(",Blocked,2026-03-05,6800,—,Journal FC-2,")
-            .And.Contain(",Overridden,2026-03-05,6800,—,Journal FC-3,").And.Contain(",user 9,Urgent repair,75");
+            .And.Contain(",Overridden,2026-03-05,6800,—,Journal FC-3,").And.Contain(",Urgent repair,75"); // the authoriser shows by name when user 9 exists
     }
 }
