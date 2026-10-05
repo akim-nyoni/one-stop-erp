@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Reporting;
 using One4All.Core.Accounting;
 using One4All.Core.Budgeting;
@@ -16,10 +17,16 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
     private static readonly BudgetStatus[] InForce = [BudgetStatus.Approved, BudgetStatus.Active];
 
     private readonly One4AllDbContext _db;
+    private readonly IServiceProvider _services;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
-    public LedgerReportDataProvider(One4AllDbContext db) => _db = db;
+    /// <param name="services">Resolves the close checklist and IAS 29 services when those reports run.</param>
+    public LedgerReportDataProvider(One4AllDbContext db, IServiceProvider services)
+    {
+        _db = db;
+        _services = services;
+    }
 
     /// <inheritdoc />
     public bool CanHandle(string command) => command.StartsWith("Gled", StringComparison.OrdinalIgnoreCase);
@@ -42,6 +49,10 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             "GLEDSUSPENSE" => await SuspenseAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDRECURRINGDUE" => await RecurringDueAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDACCRUALS" => await AccrualsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "GLEDELIMINATIONS" => await EliminationsAsync(fromDate, toDate, ct).ConfigureAwait(false),
+            "GLEDCONTROLLEGS" => await ControlLegsAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "GLEDYEAREND" => await YearEndAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "GLEDHYPERINFLATION" => await HyperinflationAsync(companyId, asAt, parameters, ct).ConfigureAwait(false),
             "GLEDINTERCOMPANY" => await IntercompanyAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             _ => [],
         };
@@ -225,6 +236,101 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
                 ("Counterparty", mirror is null ? "—" : companies.GetValueOrDefault(mirror.CompanyId, "?")), ("Status", mirror is null ? "Unmatched" : mirror.Status == JournalStatus.Posted ? "Matched" : $"Mirror {mirror.Status}"),
                 ("Amount", j.Lines.Sum(l => l.BaseDebit)));
         })];
+    }
+
+    // Group-wide: each intercompany document's journals in every company; it eliminates when two companies hold equal postings.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EliminationsAsync(DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, string> companies = await _db.Companies.AsNoTracking().IgnoreQueryFilters().ToDictionaryAsync(c => c.Id, c => c.Code, ct).ConfigureAwait(false);
+        var journals = await _db.Journals.AsNoTracking().IgnoreQueryFilters().Include(j => j.Lines)
+            .Where(j => j.DocumentType == "Intercompany" && j.Status == JournalStatus.Posted && j.PostingDate >= fromDate && j.PostingDate <= toDate)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return [.. journals.GroupBy(j => j.DocumentNumber ?? j.JournalNumber).OrderBy(g => g.Min(j => j.PostingDate)).ThenBy(g => g.Key, StringComparer.Ordinal).Select(g =>
+        {
+            List<JournalEntry> sides = [.. g.OrderBy(j => j.Id)];
+            JournalEntry first = sides[0];
+            JournalEntry? second = sides.Skip(1).FirstOrDefault(j => j.CompanyId != first.CompanyId);
+            decimal a = first.Lines.Sum(l => l.BaseDebit), b = second?.Lines.Sum(l => l.BaseDebit) ?? 0m;
+            string status = second is null ? "Unmatched" : a == b ? "Eliminated" : "Amounts differ";
+            return Row(("Document", g.Key), ("Date", Date(first.PostingDate)), ("FromCompany", companies.GetValueOrDefault(first.CompanyId, "?")), ("FromAmount", Money(a)),
+                ("ToCompany", second is null ? "—" : companies.GetValueOrDefault(second.CompanyId, "?")), ("ToAmount", second is null ? "—" : Money(b)), ("Status", status), ("Eliminated", status == "Eliminated" ? a : 0m));
+        })];
+    }
+
+    private async Task<decimal> BalanceAsync(long companyId, string account, DateOnly asAt, CancellationToken ct)
+        => await PostedLines(companyId, DateOnly.MinValue, asAt).Where(l => l.AccountCode == account).SumAsync(l => l.BaseDebit - l.BaseCredit, ct).ConfigureAwait(false);
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ControlLegsAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        List<TaxCode> codes = await _db.TaxCodes.AsNoTracking().Where(t => t.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        foreach (string account in codes.SelectMany(c => new[] { c.OutputAccountCode, c.InputAccountCode }).Where(a => a != null).Select(a => a!).Distinct().Order(StringComparer.Ordinal))
+        {
+            decimal ledger = await BalanceAsync(companyId, account, asAt, ct).ConfigureAwait(false);
+            decimal coded = await PostedLines(companyId, DateOnly.MinValue, asAt).Where(l => l.AccountCode == account && l.TaxCode != null).SumAsync(l => l.BaseDebit - l.BaseCredit, ct).ConfigureAwait(false);
+            rows.Add(Row(("Control", "Tax"), ("Account", account), ("Ledger", Money(ledger)), ("Other", Money(coded)), ("Explained", "Tax-coded postings; the rest are settlements and manual entries"),
+                ("Difference", ledger - coded)));
+        }
+
+        foreach (Core.Banking.BankAccount bank in await _db.BankAccounts.AsNoTracking().Where(b => b.CompanyId == companyId).OrderBy(b => b.Code).ToListAsync(ct).ConfigureAwait(false))
+        {
+            decimal ledger = await PostedLines(companyId, DateOnly.MinValue, asAt).Where(l => l.AccountCode == bank.GlAccountCode).SumAsync(l => l.TransactionDebit - l.TransactionCredit, ct).ConfigureAwait(false);
+            decimal statement = await _db.BankStatementLines.AsNoTracking().Where(s => s.BankAccountId == bank.Id && s.StatementDate <= asAt).SumAsync(s => s.Amount, ct).ConfigureAwait(false);
+            List<long> matched = await _db.BankStatementLines.AsNoTracking().Where(s => s.CompanyId == companyId && s.MatchedJournalLineId != null).Select(s => s.MatchedJournalLineId!.Value).ToListAsync(ct).ConfigureAwait(false);
+            decimal unpresented = await PostedLines(companyId, DateOnly.MinValue, asAt).Where(l => l.AccountCode == bank.GlAccountCode && !matched.Contains(l.Id)).SumAsync(l => l.TransactionDebit - l.TransactionCredit, ct).ConfigureAwait(false);
+            decimal unrecorded = await _db.BankStatementLines.AsNoTracking().Where(s => s.BankAccountId == bank.Id && s.StatementDate <= asAt && !s.IsReconciled).SumAsync(s => s.Amount, ct).ConfigureAwait(false);
+            rows.Add(Row(("Control", $"Bank {bank.Code}"), ("Account", bank.GlAccountCode), ("Ledger", Money(ledger)), ("Other", Money(statement)),
+                ("Explained", $"unreconciled ledger {Money(unpresented)} less unreconciled statement {Money(unrecorded)}"), ("Difference", ledger - statement - (unpresented - unrecorded))));
+        }
+
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> YearEndAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        Core.System.FiscalYear? year = await _db.FiscalYears.AsNoTracking().FirstOrDefaultAsync(y => y.CompanyId == companyId && y.StartDate <= asAt && y.EndDate >= asAt, ct).ConfigureAwait(false);
+        if (year is null)
+        {
+            return [];
+        }
+
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        void Add(string section, string item, string value) => rows.Add(Row(("Section", section), ("Item", item), ("Value", value)));
+        Add("Year", $"{year.Code} ({Date(year.StartDate)} to {Date(year.EndDate)})", year.IsClosed ? "Closed" : "Open");
+        var checklist = await _services.GetRequiredService<Application.Abstractions.Accounting.IPeriodCloseService>().ChecklistAsync(companyId, year.EndDate, ct).ConfigureAwait(false);
+        foreach (var check in checklist.Checks)
+        {
+            Add("Close checklist", check.Name, check.Count == 0 ? "clear" : $"{check.Count} item(s), {Money(check.Value)}{(check.IsBlocking ? " — BLOCKING" : string.Empty)}");
+        }
+
+        List<LedgerAccount> accounts = await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        var balances = await PostedLines(companyId, DateOnly.MinValue, year.EndDate).GroupBy(l => l.AccountCode).Select(g => new { g.Key, Debit = g.Sum(l => l.BaseDebit), Credit = g.Sum(l => l.BaseCredit) })
+            .ToListAsync(ct).ConfigureAwait(false);
+        Add("Trial balance", "Total debits", Money(balances.Sum(b => Math.Max(0m, b.Debit - b.Credit))));
+        Add("Trial balance", "Total credits", Money(balances.Sum(b => Math.Max(0m, b.Credit - b.Debit))));
+        var movement = await PostedLines(companyId, year.StartDate, year.EndDate).GroupBy(l => l.AccountCode).Select(g => new { g.Key, Net = g.Sum(l => l.BaseDebit - l.BaseCredit) }).ToListAsync(ct).ConfigureAwait(false);
+        decimal Of(AccountType type) => movement.Where(m => accounts.Any(a => a.AccountCode == m.Key && a.Type == type)).Sum(m => m.Net);
+        decimal income = -Of(AccountType.Income), expense = Of(AccountType.Expense);
+        Add("Result", "Income", Money(income));
+        Add("Result", "Expenses", Money(expense));
+        Add("Result", "Net profit for the year", Money(income - expense));
+        foreach (var source in (await _db.Journals.AsNoTracking().Where(j => j.CompanyId == companyId && j.PostingDate >= year.StartDate && j.PostingDate <= year.EndDate)
+                     .GroupBy(j => new { j.SourceModule, j.Status }).Select(g => new { g.Key.SourceModule, g.Key.Status, Count = g.Count() }).ToListAsync(ct).ConfigureAwait(false))
+                     .OrderBy(s => s.SourceModule, StringComparer.Ordinal).ThenBy(s => s.Status))
+        {
+            Add("Journals", $"{source.SourceModule} {source.Status}", source.Count.ToString(CultureInfo.InvariantCulture));
+        }
+
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> HyperinflationAsync(long companyId, DateOnly asAt, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        string index = parameters.TryGetValue("IndexCode", out object? value) && value is string text && text.Trim().Length > 0 ? text.Trim() : "CPI";
+        var restated = await _services.GetRequiredService<Application.Abstractions.Accounting.IHyperinflationService>().RestatedTrialBalanceAsync(companyId, asAt, index, ct).ConfigureAwait(false);
+        return restated.IsFailure ? [] : [.. restated.Value.Rows.OrderBy(r => r.AccountCode, StringComparer.Ordinal)
+            .Select(r => Row(("Account", r.AccountCode), ("Name", r.Name), ("Type", r.Type.ToString()), ("Monetary", r.Monetary ? "Yes" : "No"), ("Historical", Money(r.Historical)), ("Restated", Money(r.Restated)),
+                ("Restatement", r.Restated - r.Historical)))];
     }
 
     private Task<Dictionary<string, string>> AccountNamesAsync(long companyId, CancellationToken ct)

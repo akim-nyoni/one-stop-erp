@@ -8,10 +8,7 @@ missing domain data. Items are struck through as they ship (with the report code
 - ~~2 Multi-currency TB (GL2)~~, ~~5 Journal Listing & Audit (GL5)~~, ~~8 Changes in Equity (GL8)~~, ~~12 Budget vs Actual vs Commitment (GL12)~~, ~~15 FX Revaluation (GL15)~~, ~~16 Realised FX (GL16)~~, ~~17 Suspense & Unallocated (GL17)~~, ~~22 Recurring Due / Missed (GL22)~~, ~~23 Accruals, Prepayments & Deferred Income (GL23)~~, ~~24 Intercompany (GL24)~~
 - 10 Notes-to-accounts schedules — needs account → note mapping
 - 11 Management Accounts Pack — data exists (forecast part needs forecasts)
-- 14 Consolidation elimination schedule — data exists
-- 18 VAT / bank control legs — data exists
-- 20 Year-End Pack — data exists
-- 25 Hyperinflation working papers — data exists
+- ~~14 Consolidation Elimination Schedule (GL14)~~, ~~18 VAT / bank control legs (GL18)~~, ~~20 Year-End Pack (GL20)~~, ~~25 Hyperinflation Working Papers (GL25)~~
 
 ## A-B. Budgeting (B codes)
 - ~~B2~~, ~~B12~~, ~~B15~~, ~~B16 / B17 (one register with seal check)~~, ~~B18~~, ~~B20~~, ~~B24~~, ~~B25~~, ~~B26~~, ~~B28~~, ~~B33~~, ~~B34~~, ~~B36~~, ~~B37~~, ~~B44~~, ~~B45~~

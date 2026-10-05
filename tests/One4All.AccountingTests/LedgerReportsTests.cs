@@ -44,6 +44,11 @@ public sealed class LedgerReportsTests
         (await scope.ServiceProvider.GetRequiredService<IAccrualService>().PostAccrualAsync(companyId, new DateOnly(2026, 3, 31), new DateOnly(2026, 4, 1), "6000", "2500", 80m, "ACC-1", "Audit fee"))
             .IsSuccess.Should().BeTrue();
 
+        IHyperinflationService ias29 = scope.ServiceProvider.GetRequiredService<IHyperinflationService>();
+        (await ias29.SetIndexAsync(companyId, "CPI", new DateOnly(2026, 2, 1), 100m)).IsSuccess.Should().BeTrue();
+        (await ias29.SetIndexAsync(companyId, "CPI", new DateOnly(2026, 3, 1), 100m)).IsSuccess.Should().BeTrue();
+        (await ias29.SetIndexAsync(companyId, "CPI", new DateOnly(2026, 4, 1), 125m)).IsSuccess.Should().BeTrue();
+
         IReportRunner runner = scope.ServiceProvider.GetRequiredService<IReportRunner>();
         async Task<string> Render(string code)
         {
@@ -60,6 +65,9 @@ public sealed class LedgerReportsTests
         (await Render("GL17")).Should().Contain("Suspense: Suspense / Unallocated Control,2600,1,2026-03-01,-50");
         string accruals = await Render("GL23");
         accruals.Should().Contain("Accrual,ACC-1,2026-03-31,Audit fee,,80").And.Contain("Accrual reversal");
+
+        (await Render("GL20")).Should().Contain("Year,2026 (2026-01-01 to 2026-12-31),Open").And.Contain("Result,Net profit for the year,\"1,000.00\"").And.Contain("Journals,GL Posted,");
+        (await Render("GL25")).Should().Contain("No,\"-1,000.00\",\"-1,250.00\",-250").And.Contain("No,-200.00,-250.00,-50"); // sales and the reserve restated from 100 to 125
 
         foreach (string code in LedgerReports.All().Select(r => r.Code))
         {
