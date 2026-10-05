@@ -3112,6 +3112,79 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.ApplicantFee", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("ApplicantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("applicant_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<int>("FeeType")
+                        .HasColumnType("integer")
+                        .HasColumnName("fee_type");
+
+                    b.Property<string>("JournalNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("PaidOn")
+                        .HasColumnType("date")
+                        .HasColumnName("paid_on");
+
+                    b.Property<string>("ReceiptReference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("receipt_reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_applicant_fee");
+
+                    b.HasIndex("ApplicantId", "FeeType")
+                        .IsUnique()
+                        .HasDatabaseName("ix_applicant_fee_applicant_id_fee_type")
+                        .HasFilter("fee_type = 1");
+
+                    b.ToTable("applicant_fee", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.ApplicantNotice", b =>
                 {
                     b.Property<long>("Id")
@@ -7478,6 +7551,104 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_transfer_check_transfer_application_id_requirement");
 
                     b.ToTable("transfer_check", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.TransferDuty", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("Consideration")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("consideration");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("JournalNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<string>("LiabilityAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("liability_account_code");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("RatePercent")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)")
+                        .HasColumnName("rate_percent");
+
+                    b.Property<string>("ReceiptReference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("receipt_reference");
+
+                    b.Property<string>("RemittanceJournalNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("remittance_journal_number");
+
+                    b.Property<string>("RemittanceReference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("remittance_reference");
+
+                    b.Property<DateOnly?>("RemittedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("remitted_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("TransferApplicationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("transfer_application_id");
+
+                    b.Property<DateOnly>("WithheldOn")
+                        .HasColumnType("date")
+                        .HasColumnName("withheld_on");
+
+                    b.HasKey("Id")
+                        .HasName("pk_transfer_duty");
+
+                    b.HasIndex("TransferApplicationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_transfer_duty_transfer_application_id");
+
+                    b.ToTable("transfer_duty", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.UnitInspection", b =>
@@ -20480,6 +20651,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_allocation_quota_housing_schemes_scheme_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.ApplicantFee", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingApplicant", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_applicant_fee_housing_applicants_applicant_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.ApplicantNotice", b =>
                 {
                     b.HasOne("One4All.Core.Housing.HousingApplicant", null)
@@ -21146,6 +21327,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_transfer_check_transfer_application_transfer_application_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.TransferDuty", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.TransferApplication", null)
+                        .WithMany()
+                        .HasForeignKey("TransferApplicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_transfer_duty_transfer_application_transfer_application_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.UnitInspection", b =>

@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-219 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+222 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -80,6 +80,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H24 | Applicants Already Owning Property | Active applicants holding a council stand or owning rated property — disqualification candidates. | — | WaitingListNumber, Name, Holds | — | — |
 | H25 | Registration Renewal Compliance | Applicants by status with last confirmation, months since and the notices sent. | AsAtDate (Date, optional) | Status, WaitingListNumber, Applicant, LastConfirmed, MonthsSince, Notices, LastNotice | — | — |
 | H26 | Registration Date Change Audit | Every requested change to a seniority date: who asked, who decided, why. | — | WaitingListNumber, OldDate, NewDate, Reason, Status, RequestedBy, DecidedBy | — | — |
+| H27 | Registration Fee Collection Report | Waiting-list fees received, and applicants registered without paying the registration fee. | — | Date, WaitingListNumber, Applicant, Type, Receipt, Amount | — | Sum(Amount) |
 | H28 | New Registrations & Removals Movement | Month by month for the year to date: opening list, registered, removed, allocated, closing. | AsAtDate (Date, optional) | Month, Opening, Registered, Removed, Allocated, Closing | — | — |
 | H29 | Demand vs Supply (the Housing Gap) | Active applicants by category against stands and rental units available for it. | — | Category, Demand, Supply, Gap | — | — |
 | H3 | Land Acquisition Cost Build-up per Parcel | Each acquisition's cost by element with the total and cost per m². | — | Acquisition, Parcel, Element, PerM2, Amount | — | Sum(Amount) |
@@ -101,6 +102,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H44 | Instalment Amortisation Schedule | Each instalment's capital, interest and balance — for one agreement or all. | AgreementNumber (String, optional) | Agreement, Number, Due, Interest, Principal, Balance, State, Amount | — | Sum(Amount) |
 | H45 | Housing Debtors Age Analysis | Instalment-sale debtors aged 30/60/90/120+ by scheme, as at any date. | AsAtDate (Date, optional) | Scheme, Debtor, Current, D30, D60, D90, D120, Over120, Total | — | Sum(Total) |
 | H46 | Instalment Arrears & Default Report | Active instalment sales with overdue instalments, amount owing and last payment. | AsAtDate (Date, optional) | Agreement, Stand, Buyer, Overdue, LastPaid, Owing | — | Sum(Owing) |
+| H47 | Payment Arrangements Register | Arrangements with housing debtors and tenants: terms, status and standing as at the date. | AsAtDate (Date, optional) | Scheme, Debtor, Started, Total, Instalment, Status, DueToDate, Paid, Missed, NextDue, Shortfall | — | Sum(Shortfall) |
 | H48 | Collections Report | Receipts from housing debtors and tenants in the month, by scheme or tenancy, day, method, currency and officer. | AsAtDate (Date, optional) | Scheme, Day, Method, Currency, Officer, Receipts, Amount | — | Sum(Amount) |
 | H49 | Fully Paid / Ready for Transfer | Sold stands whose holders owe nothing and have no title application — the most actionable list. | — | Stand, Holder, Status, SoldOn, Price | — | Sum(Price) |
 | H5 | Compulsory Acquisition Compensation Register | Compensation claims with provision, settlement and status. | — | Claim, Parcel, Claimant, Lodged, Status, Provision, Settled | — | Sum(Settled) |
@@ -116,6 +118,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H60 | Transfer Checklist Exception Report | Open transfer applications and the mandatory documents still missing. | — | Application, Stand, Type, Status, Lodged, Missing | — | — |
 | H61 | Deceased Estate Transfers Register | Inheritance and deceased-joint-holder transfers with the estate documents relied on. | — | Application, Stand, Type, Deceased, Beneficiary, Status, Documents | — | — |
 | H62 | Development Levy & Transfer Fee Collection | Levies and fees raised, by levy, with the event they were raised on. | — | Levy, Event, Stand, Customer, ChargedOn, Invoice, Amount | — | Sum(Amount) |
+| H63 | Transfer Duty Deducted and Remitted | Duty collected as agent on each transfer, and whether it has been paid over. | — | Application, Stand, Consideration, Rate, Withheld, Receipt, Remitted, Acknowledgement, Amount | — | Sum(Amount) |
 | H64 | Title Deed Pipeline Report | Open title applications with stage, days at the stage, days since applied and conveyancer. | AsAtDate (Date, optional) | Application, Stand, Stage, DaysAtStage, DaysSinceApplied, Conveyancer | — | — |
 | H65 | Title Deeds Held but Uncollected | Deeds in council custody not yet handed over, aged, with the owner's contact — the chase list. | AsAtDate (Date, optional) | Application, Stand, Deed, Owner, Contact, DaysHeld | — | — |
 | H66 | Deeds Register | Registered deeds with registration date and current custody. | — | Deed, Stand, Registered, Custody | — | — |

@@ -148,6 +148,9 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             "HOUSINGCOLLECTIONS" => await CollectionsAsync(companyId, asAt, ct).ConfigureAwait(false),
             "HOUSINGREVENUESUMMARY" => await RevenueSummaryAsync(companyId, asAt, ct).ConfigureAwait(false),
             "HOUSINGWARDPACK" => await WardPackAsync(companyId, parameters, asAt, ct).ConfigureAwait(false),
+            "HOUSINGREGISTRATIONFEES" => await RegistrationFeesAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGARRANGEMENTS" => await ArrangementsAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "HOUSINGTRANSFERDUTY" => await TransferDutyAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -1775,6 +1778,53 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         Add("Council-wide", "Applicants on the waiting list (applicants are not held by ward)", waiting.ToString(CultureInfo.InvariantCulture));
         Add("Council-wide", "Rental units vacant", (await _db.Set<RentalUnit>().CountAsync(u => u.CompanyId == companyId && u.VacantSince != null, ct).ConfigureAwait(false)).ToString(CultureInfo.InvariantCulture));
         return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RegistrationFeesAsync(long companyId, CancellationToken ct)
+    {
+        var applicants = await _db.HousingApplicants.AsNoTracking().Where(a => a.CompanyId == companyId && a.WaitingListNumber != null)
+            .ToDictionaryAsync(a => a.Id, a => new { a.WaitingListNumber, a.FullName, a.RegistrationDate }, ct).ConfigureAwait(false);
+        List<ApplicantFee> fees = await _db.Set<ApplicantFee>().AsNoTracking().Where(f => f.CompanyId == companyId).OrderBy(f => f.PaidOn).ThenBy(f => f.Id).ToListAsync(ct).ConfigureAwait(false);
+        HashSet<long> registered = [.. fees.Where(f => f.FeeType == ApplicantFeeType.Registration).Select(f => f.ApplicantId)];
+        List<IReadOnlyDictionary<string, object?>> rows = [.. fees.Where(f => applicants.ContainsKey(f.ApplicantId)).Select(f => Row(("Date", Date(f.PaidOn)),
+            ("WaitingListNumber", applicants[f.ApplicantId].WaitingListNumber), ("Applicant", applicants[f.ApplicantId].FullName), ("Type", f.FeeType.ToString()),
+            ("Receipt", f.ReceiptReference), ("Amount", f.Amount)))];
+        rows.AddRange(applicants.Where(a => !registered.Contains(a.Key)).OrderBy(a => a.Value.WaitingListNumber, StringComparer.Ordinal).Select(a => Row(("Date", Date(a.Value.RegistrationDate)),
+            ("WaitingListNumber", a.Value.WaitingListNumber), ("Applicant", a.Value.FullName), ("Type", "Registration fee not paid"), ("Receipt", "—"), ("Amount", 0m))));
+        return rows;
+    }
+
+    // Standing measured as the arrangement monitor does (receipts from the start month against the schedule), without changing any status.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ArrangementsAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        Dictionary<long, string> groups = await HousingDebtorGroupsAsync(companyId, ct).ConfigureAwait(false);
+        List<long> debtors = [.. groups.Keys];
+        List<Core.Receipting.PaymentArrangement> arrangements = await _db.Set<Core.Receipting.PaymentArrangement>().AsNoTracking()
+            .Where(a => a.CompanyId == companyId && debtors.Contains(a.CustomerId) && a.StartDate <= asAt).OrderBy(a => a.StartDate).ThenBy(a => a.Id).ToListAsync(ct).ConfigureAwait(false);
+        List<long> customers = [.. arrangements.Select(a => a.CustomerId).Distinct()];
+        var receipts = await _db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsReceivable
+            && i.ItemType == Core.Trading.OpenItemType.Receipt && customers.Contains(i.TraderId) && i.DocumentDate <= asAt)
+            .Select(i => new { i.TraderId, i.DocumentDate, i.OriginalBase }).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> names = await CustomerNamesAsync(companyId, ct).ConfigureAwait(false);
+        return [.. arrangements.Select(a =>
+        {
+            DateOnly from = new(a.StartDate.Year, a.StartDate.Month, 1);
+            decimal paid = receipts.Where(r => r.TraderId == a.CustomerId && r.DocumentDate >= from).Sum(r => r.OriginalBase);
+            var standing = Application.Trading.InstalmentSchedule.Assess(Application.Trading.InstalmentSchedule.Build(a.TotalAmount, a.InstalmentAmount, a.StartDate), paid, asAt, 0, int.MaxValue);
+            return Row(("Scheme", groups[a.CustomerId]), ("Debtor", names.GetValueOrDefault(a.CustomerId, "?")), ("Started", Date(a.StartDate)), ("Total", Money(a.TotalAmount)),
+                ("Instalment", Money(a.InstalmentAmount)), ("Status", a.Status.ToString()), ("DueToDate", Money(standing.DueToDate)), ("Paid", Money(standing.Paid)),
+                ("Missed", standing.InstalmentsMissed), ("NextDue", standing.NextDue is { } next ? Date(next.DueDate) : "—"), ("Shortfall", standing.Shortfall));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TransferDutyAsync(long companyId, CancellationToken ct)
+    {
+        Dictionary<long, string> stands = await StandNumbersAsync(companyId, ct).ConfigureAwait(false);
+        var duties = await (from d in _db.Set<TransferDuty>().AsNoTracking() join t in _db.Set<TransferApplication>().AsNoTracking() on d.TransferApplicationId equals t.Id
+                            where d.CompanyId == companyId orderby d.WithheldOn, t.ApplicationNumber select new { t.ApplicationNumber, t.StandId, Duty = d }).ToListAsync(ct).ConfigureAwait(false);
+        return [.. duties.Select(x => Row(("Application", x.ApplicationNumber), ("Stand", stands.GetValueOrDefault(x.StandId, "?")), ("Consideration", Money(x.Duty.Consideration)),
+            ("Rate", x.Duty.RatePercent.ToString("0.##", CultureInfo.InvariantCulture)), ("Withheld", Date(x.Duty.WithheldOn)), ("Receipt", x.Duty.ReceiptReference),
+            ("Remitted", x.Duty.RemittedOn is DateOnly r ? Date(r) : "Held"), ("Acknowledgement", x.Duty.RemittanceReference ?? "—"), ("Amount", x.Duty.Amount)))];
     }
 
     private Task<Dictionary<long, string>> ParcelNumbersAsync(long companyId, CancellationToken ct)

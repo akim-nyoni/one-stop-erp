@@ -143,6 +143,10 @@ public static class HousingReports
              new Column("InterestRebated", "Interest rebated", 100, true)], []);
         yield return Listing("H52", "Expected Credit Loss (IFRS 9) Provision Working", "Housing", "Housing debtors' exposure and provision by portfolio and arrears band, with the allowance booked.", "HousingEcl",
             [new Column("Portfolio", "Portfolio", 140), new Column("Band", "Arrears band", 110), new Column("Exposure", "Exposure", 100), new Column("Provision", "Provision", 100, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H47", "Payment Arrangements Register", "Housing", "Arrangements with housing debtors and tenants: terms, status and standing as at the date.",
+            "HousingArrangements", [new Column("Scheme", "Scheme / type", 90), new Column("Debtor", "Debtor", 150), new Column("Started", "Started", 75), new Column("Total", "Total", 85),
+             new Column("Instalment", "Instalment", 80), new Column("Status", "Status", 70), new Column("DueToDate", "Due to date", 85), new Column("Paid", "Paid", 85), new Column("Missed", "Missed", 50),
+             new Column("NextDue", "Next due", 75), new Column("Shortfall", "Shortfall", 90, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("H48", "Collections Report", "Housing", "Receipts from housing debtors and tenants in the month, by scheme or tenancy, day, method, currency and officer.",
             "HousingCollections", [new Column("Scheme", "Scheme / type", 90), new Column("Day", "Day", 75), new Column("Method", "Method", 85), new Column("Currency", "Currency", 55),
              new Column("Officer", "Officer", 90), new Column("Receipts", "Receipts", 55), new Column("Amount", "Amount", 95, true)], [("AsAtDate", ParameterType.Date)]);
@@ -175,6 +179,10 @@ public static class HousingReports
         yield return Listing("H62", "Development Levy & Transfer Fee Collection", "Housing", "Levies and fees raised, by levy, with the event they were raised on.", "HousingLevies",
             [new Column("Levy", "Levy", 90), new Column("Event", "Raised on", 110), new Column("Stand", "Stand", 70), new Column("Customer", "Charged to", 150), new Column("ChargedOn", "Date", 80),
              new Column("Invoice", "Invoice", 100), new Column("Amount", "Amount", 90, true)], []);
+        yield return Listing("H63", "Transfer Duty Deducted and Remitted", "Housing", "Duty collected as agent on each transfer, and whether it has been paid over.",
+            "HousingTransferDuty", [new Column("Application", "Application", 90), new Column("Stand", "Stand", 70), new Column("Consideration", "Consideration", 95), new Column("Rate", "Rate %", 55),
+             new Column("Withheld", "Received", 75), new Column("Receipt", "Receipt", 90), new Column("Remitted", "Remitted", 75), new Column("Acknowledgement", "Acknowledgement", 100),
+             new Column("Amount", "Duty", 90, true)], []);
         yield return Listing("H64","Title Deed Pipeline Report", "Housing", "Open title applications with stage, days at the stage, days since applied and conveyancer.", "HousingTitlePipeline",
             [new Column("Application", "Application", 90), new Column("Stand", "Stand", 80), new Column("Stage", "Stage", 110), new Column("DaysAtStage", "Days at stage", 80),
              new Column("DaysSinceApplied", "Since applied", 80), new Column("Conveyancer", "Conveyancer", 160)], [("AsAtDate", ParameterType.Date)]);
@@ -273,6 +281,9 @@ public static class HousingReports
         yield return Listing("H25", "Registration Renewal Compliance", "Housing", "Applicants by status with last confirmation, months since and the notices sent.", "HousingRenewals",
             [new Column("Status", "Status", 70), new Column("WaitingListNumber", "WL number", 80), new Column("Applicant", "Applicant", 150), new Column("LastConfirmed", "Last confirmed", 85),
              new Column("MonthsSince", "Months since", 60), new Column("Notices", "Notices", 50), new Column("LastNotice", "Last notice", 150)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H27", "Registration Fee Collection Report", "Housing", "Waiting-list fees received, and applicants registered without paying the registration fee.",
+            "HousingRegistrationFees", [new Column("Date", "Date", 75), new Column("WaitingListNumber", "WL number", 80), new Column("Applicant", "Applicant", 150), new Column("Type", "Fee", 120),
+             new Column("Receipt", "Receipt", 90), new Column("Amount", "Amount", 90, true)], []);
         yield return Listing("H28", "New Registrations & Removals Movement", "Housing", "Month by month for the year to date: opening list, registered, removed, allocated, closing.",
             "HousingRegistrationMovement", [new Column("Month", "Month", 70), new Column("Opening", "Opening", 60), new Column("Registered", "Registered", 70), new Column("Removed", "Removed", 60),
              new Column("Allocated", "Allocated", 60), new Column("Closing", "Closing", 60)], [("AsAtDate", ParameterType.Date)]);

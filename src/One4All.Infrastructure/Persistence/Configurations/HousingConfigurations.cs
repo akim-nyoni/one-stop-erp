@@ -1143,3 +1143,39 @@ internal sealed class AllocationQuotaConfiguration : IEntityTypeConfiguration<Al
         b.HasIndex(x => new { x.CompanyId, x.Group }).IsUnique().HasFilter("scheme_id IS NULL");
     }
 }
+
+internal sealed class ApplicantFeeConfiguration : IEntityTypeConfiguration<ApplicantFee>
+{
+    public void Configure(EntityTypeBuilder<ApplicantFee> b)
+    {
+        b.ToTable("applicant_fee", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.FeeType).HasConversion<int>();
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.ReceiptReference).HasMaxLength(60);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+        b.HasOne<HousingApplicant>().WithMany().HasForeignKey(x => x.ApplicantId).OnDelete(DeleteBehavior.Restrict);
+
+        // The registration fee is paid once.
+        b.HasIndex(x => new { x.ApplicantId, x.FeeType }).IsUnique().HasFilter("fee_type = 1");
+    }
+}
+
+internal sealed class TransferDutyConfiguration : IEntityTypeConfiguration<TransferDuty>
+{
+    public void Configure(EntityTypeBuilder<TransferDuty> b)
+    {
+        b.ToTable("transfer_duty", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Consideration).HasPrecision(19, 4);
+        b.Property(x => x.RatePercent).HasPrecision(7, 4);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.ReceiptReference).HasMaxLength(60);
+        b.Property(x => x.LiabilityAccountCode).HasMaxLength(20);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+        b.Property(x => x.RemittanceReference).HasMaxLength(60);
+        b.Property(x => x.RemittanceJournalNumber).HasMaxLength(40);
+        b.HasOne<TransferApplication>().WithMany().HasForeignKey(x => x.TransferApplicationId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.TransferApplicationId).IsUnique();
+    }
+}

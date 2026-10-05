@@ -1313,6 +1313,21 @@ app.MapPost("/api/housing/applicants/{waitingListNumber}/groups", async (string 
 .RequireAuthorization()
 .WithName("DeclareBeneficiaryGroups");
 
+app.MapPost("/api/housing/applicant-fees", async (One4All.Application.Abstractions.Housing.ApplicantFeeReceipt receipt, One4All.Application.Abstractions.Housing.IHousingFeeService fees, CancellationToken ct) =>
+    ValueResponse(await fees.RecordApplicantFeeAsync(receipt, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RecordApplicantFee");
+
+app.MapPost("/api/housing/transfers/duty", async (One4All.Application.Abstractions.Housing.TransferDutyReceipt receipt, One4All.Application.Abstractions.Housing.IHousingFeeService fees, CancellationToken ct) =>
+    ValueResponse(await fees.WithholdTransferDutyAsync(receipt, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("WithholdTransferDuty");
+
+app.MapPost("/api/housing/transfers/{applicationNumber}/duty/remit", async (string applicationNumber, long companyId, DateOnly date, string reference, string bankAccountCode, One4All.Application.Abstractions.Housing.IHousingFeeService fees, CancellationToken ct) =>
+    ValueResponse(await fees.RemitTransferDutyAsync(companyId, applicationNumber, date, reference, bankAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RemitTransferDuty");
+
 app.MapPost("/api/housing/titles", async (long companyId, long standId, DateOnly date, One4All.Application.Abstractions.Housing.ITitleDeedService titles, CancellationToken ct) =>
     ValueResponse(await titles.ApplyAsync(companyId, standId, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()
