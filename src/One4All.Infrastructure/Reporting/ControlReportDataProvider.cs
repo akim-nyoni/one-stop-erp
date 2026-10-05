@@ -20,6 +20,39 @@ namespace One4All.Infrastructure.Reporting;
 public sealed class ControlReportDataProvider : IReportDataProvider
 {
     // The records whose changes the master-data report follows (CLR class names, as the audit trail records them).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> UserActivityAsync(long companyId, DateTimeOffset start, DateTimeOffset end, CancellationToken ct)
+    {
+        List<LoginEvent> events = await _db.LoginEvents.AsNoTracking().Where(l => l.OccurredOnUtc >= start && l.OccurredOnUtc <= end).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, int> reportRuns = await _db.Set<ReportRun>().AsNoTracking().Where(r => r.CompanyId == companyId && r.RunAt >= start && r.RunAt <= end && r.UserId != null)
+            .GroupBy(r => r.UserId!.Value).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Key, g => g.Count, ct).ConfigureAwait(false);
+        return [.. events.GroupBy(l => l.UserId is null ? $"(unknown) {l.Username}" : l.Username).OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase).Select(g =>
+        {
+            List<LoginEvent> ok = [.. g.Where(l => l.Outcome == "Success")];
+            double hours = ok.Where(l => l.EndedOnUtc is not null).Sum(l => (l.EndedOnUtc!.Value - l.OccurredOnUtc).TotalHours);
+            long? userId = g.Select(l => l.UserId).FirstOrDefault(id => id is not null);
+            return Row(("User", g.Key), ("Logins", ok.Count), ("Failed", g.Count(l => l.Outcome == "InvalidCredentials")), ("Lockouts", g.Count(l => l.Outcome == "LockedOut")),
+                ("First", ok.Count == 0 ? "—" : ok.Min(l => l.OccurredOnUtc).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)),
+                ("Last", ok.Count == 0 ? "—" : ok.Max(l => l.OccurredOnUtc).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Hours", hours.ToString("0.0", CultureInfo.InvariantCulture)),
+                ("Terminals", string.Join(", ", g.Select(l => l.Terminal ?? "—").Distinct().Order(StringComparer.Ordinal))), ("Reports", userId is long u ? reportRuns.GetValueOrDefault(u) : 0));
+        })];
+    }
+
+    // A session still open is treated as running to the end of the report window.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SessionsAsync(DateTimeOffset start, DateTimeOffset end, CancellationToken ct)
+    {
+        List<LoginEvent> sessions = await _db.LoginEvents.AsNoTracking().Where(l => l.Outcome == "Success" && l.OccurredOnUtc >= start && l.OccurredOnUtc <= end).OrderBy(l => l.OccurredOnUtc)
+            .ToListAsync(ct).ConfigureAwait(false);
+        DateTimeOffset Finish(LoginEvent l) => l.EndedOnUtc ?? end;
+        return [.. sessions.Select(s =>
+        {
+            List<string> overlapping = [.. sessions.Where(o => o.Id != s.Id && o.UserId == s.UserId && !string.Equals(o.Terminal, s.Terminal, StringComparison.OrdinalIgnoreCase)
+                    && o.OccurredOnUtc < Finish(s) && s.OccurredOnUtc < Finish(o)).Select(o => o.Terminal ?? "—").Distinct()];
+            return Row(("User", s.Username), ("Terminal", s.Terminal ?? "—"), ("Method", s.Method), ("Start", s.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)),
+                ("End", s.EndedOnUtc?.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "open"),
+                ("Minutes", s.EndedOnUtc is DateTimeOffset e ? ((int)(e - s.OccurredOnUtc).TotalMinutes).ToString(CultureInfo.InvariantCulture) : "—"), ("Concurrent", overlapping.Count == 0 ? "—" : string.Join(", ", overlapping)));
+        })];
+    }
+
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> OverridesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
@@ -100,6 +133,8 @@ public sealed class ControlReportDataProvider : IReportDataProvider
             "SYSRMEMBERSHIP" => await MembershipAsync(ct).ConfigureAwait(false),
             "SYSRSOD" => await SodAsync(ct).ConfigureAwait(false),
             "SYSRMASTERCHANGES" => await MasterChangesAsync(companyId, start, end, ct).ConfigureAwait(false),
+            "SYSRUSERACTIVITY" => await UserActivityAsync(companyId, start, end, ct).ConfigureAwait(false),
+            "SYSRSESSIONS" => await SessionsAsync(start, end, ct).ConfigureAwait(false),
             "SYSROVERRIDES" => await OverridesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "SYSRHASHCHAIN" => await HashChainAsync(companyId, ct).ConfigureAwait(false),
             "SYSRBACKDATED" => await BackdatedAsync(companyId, start, end, parameters, ct).ConfigureAwait(false),

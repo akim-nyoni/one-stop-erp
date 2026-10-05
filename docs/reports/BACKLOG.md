@@ -93,8 +93,7 @@ missing domain data. Items are struck through as they ship (with the report code
 ## P. Audit, Security & Compliance
 - ~~237 Permission Matrix (SYS237)~~, ~~238 Membership (SYS238)~~, ~~239 SoD all modules (SYS239)~~, ~~240 Master Data Changes (SYS240)~~, ~~242 Back-dated (SYS242)~~, ~~243 Deleted & Voided (SYS243)~~, ~~244 Numbering Gaps (SYS244, journals)~~, ~~245 Unposted (SYS245)~~, ~~248 Licences (SYS248)~~, ~~250 Report Run Log (SYS250)~~
 - ~~241 Supervisor Overrides (SYS241)~~, ~~247 Hash-Chain Verification (SYS247)~~
-- Data exists: partly 236 (no login history)
-- Needs new data: 249 login sessions
+- ~~236 User Activity (SYS236)~~, ~~249 Login Sessions & Concurrency (SYS249)~~
 
 ## Q. Executive / BI Dashboards
 - ~~251 Executive Dashboard (DB251)~~, ~~252 Daily Flash (DB252)~~, ~~253 KPI Scorecard (DB253)~~, ~~254 Branch League (DB254)~~, ~~255 Trend & Seasonality (DB255)~~, ~~256 Municipal Executive Dashboard (DB256, without water losses)~~

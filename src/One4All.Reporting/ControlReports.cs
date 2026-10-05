@@ -17,6 +17,9 @@ public static class ControlReports
     public static IEnumerable<ReportDefinition> All()
     {
         // Audit, security & compliance.
+        yield return Listing("SYS236", "User Activity Report", "System", "Per user over the period: sign-ins, failed attempts, lockouts, first and last sign-in, hours in closed sessions, terminals used and reports run.",
+            "SysrUserActivity", [new Column("User", "User", 100), new Column("Logins", "Sign-ins", 55), new Column("Failed", "Failed", 50), new Column("Lockouts", "Lockouts", 55), new Column("First", "First", 115),
+             new Column("Last", "Last", 115), new Column("Hours", "Hours active", 70), new Column("Terminals", "Terminals", 150), new Column("Reports", "Reports run", 65)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
         yield return Listing("SYS237", "Permission Matrix", "System", "Every role with each permission it grants and the operations allowed.",
             "SysrPermissionMatrix", [new Column("Role", "Role", 120), new Column("Module", "Module", 90), new Column("Permission", "Permission", 170), new Column("Name", "Name", 180),
              new Column("Operations", "Operations", 200)], []);
@@ -48,6 +51,9 @@ public static class ControlReports
              new Column("Message", "Result", 300)], []);
         yield return Listing("SYS248", "Licence Installation History", "System", "Licences installed, when and by whom, and which is active (token fingerprint only).",
             "SysrLicences", [new Column("Installed", "Installed", 115), new Column("By", "By", 90), new Column("Active", "Active", 50), new Column("Fingerprint", "Token fingerprint", 140)], []);
+        yield return Listing("SYS249", "Login Session & Concurrency Report", "System", "Every session opened in the period: user, terminal, start, end and duration, flagging sessions open at the same time as another of the same user on a different terminal.",
+            "SysrSessions", [new Column("User", "User", 100), new Column("Terminal", "Terminal", 110), new Column("Method", "Method", 60), new Column("Start", "Start", 115), new Column("End", "End", 115),
+             new Column("Minutes", "Minutes", 55), new Column("Concurrent", "Concurrent with", 160)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
         yield return Listing("SYS250", "Report Print & Export Log", "System", "Every report run in the period: who, what, format, size and copy number.",
             "SysrReportRuns", [new Column("When", "When", 115), new Column("Report", "Report", 80), new Column("User", "User", 90), new Column("Purpose", "Purpose", 70), new Column("Format", "Format", 55),
              new Column("Bytes", "Bytes", 70), new Column("Copy", "Copy", 45), new Column("Parameters", "Parameters", 220)], Period);

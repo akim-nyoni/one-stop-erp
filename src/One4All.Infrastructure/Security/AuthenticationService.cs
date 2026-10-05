@@ -50,34 +50,42 @@ public sealed class AuthenticationService : IAuthenticationService
 
     /// <inheritdoc />
     public Task<AuthenticationResult> AuthenticateAsync(string username, string password, string? terminal = null, CancellationToken ct = default) =>
-        AuthenticateCoreAsync(username, password, usePin: false, ct);
+        AuthenticateCoreAsync(username, password, usePin: false, terminal, ct);
 
     /// <inheritdoc />
     public Task<AuthenticationResult> AuthenticateByPinAsync(string username, string pin, string? terminal = null, CancellationToken ct = default) =>
-        AuthenticateCoreAsync(username, pin, usePin: true, ct);
+        AuthenticateCoreAsync(username, pin, usePin: true, terminal, ct);
 
-    private async Task<AuthenticationResult> AuthenticateCoreAsync(string username, string secret, bool usePin, CancellationToken ct)
+    // Every attempt is logged (SYS236 / SYS249); a success opens a session.
+    private async Task<AuthenticationResult> AuthenticateCoreAsync(string username, string secret, bool usePin, string? terminal, CancellationToken ct)
     {
         string normalized = username.Trim().ToUpperInvariant();
         User? user = await _db.Users
             .FirstOrDefaultAsync(u => u.NormalizedUsername == normalized, ct)
             .ConfigureAwait(false);
+        DateTimeOffset now = _clock.UtcNow;
+        string method = usePin ? "PIN" : "Password";
+        async Task<AuthenticationResult> LogAsync(AuthenticationResult result, string? sessionId = null)
+        {
+            _db.LoginEvents.Add(new LoginEvent(user?.Id, username.Trim(), now, terminal, method, result.Outcome.ToString(), sessionId));
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return result;
+        }
 
         if (user is null)
         {
-            return AuthenticationResult.Failure(AuthenticationOutcome.InvalidCredentials, "Invalid username or password.");
+            return await LogAsync(AuthenticationResult.Failure(AuthenticationOutcome.InvalidCredentials, "Invalid username or password.")).ConfigureAwait(false);
         }
 
         if (!user.IsActive)
         {
-            return AuthenticationResult.Failure(AuthenticationOutcome.Inactive, "This account is inactive.");
+            return await LogAsync(AuthenticationResult.Failure(AuthenticationOutcome.Inactive, "This account is inactive.")).ConfigureAwait(false);
         }
 
-        DateTimeOffset now = _clock.UtcNow;
         if (user.IsLockedOut(now))
         {
-            return AuthenticationResult.Failure(AuthenticationOutcome.LockedOut,
-                $"Account locked. Try again after {user.LockoutEndUtc:u}.");
+            return await LogAsync(AuthenticationResult.Failure(AuthenticationOutcome.LockedOut,
+                $"Account locked. Try again after {user.LockoutEndUtc:u}.")).ConfigureAwait(false);
         }
 
         string? storedHash = usePin ? user.PinHash : user.PasswordHash;
@@ -86,20 +94,27 @@ public sealed class AuthenticationService : IAuthenticationService
         if (!ok)
         {
             user.RegisterFailedLogin(now, _options.MaxFailedAttempts, _options.LockoutDuration);
-            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-
-            return user.IsLockedOut(now)
+            return await LogAsync(user.IsLockedOut(now)
                 ? AuthenticationResult.Failure(AuthenticationOutcome.LockedOut, "Too many attempts; account locked.")
-                : AuthenticationResult.Failure(AuthenticationOutcome.InvalidCredentials, "Invalid username or password.");
+                : AuthenticationResult.Failure(AuthenticationOutcome.InvalidCredentials, "Invalid username or password.")).ConfigureAwait(false);
         }
 
         user.RegisterSuccessfulLogin(now);
-        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-
         EffectivePermissions permissions = await _permissions.ResolveAsync(user.Id, ct).ConfigureAwait(false);
+        string session = Guid.NewGuid().ToString("N");
+        return await LogAsync(AuthenticationResult.Success(
+            user.Id, user.Username, user.DisplayName, user.IsSystemAdministrator, user.MustChangePassword, permissions, session), session).ConfigureAwait(false);
+    }
 
-        return AuthenticationResult.Success(
-            user.Id, user.Username, user.DisplayName, user.IsSystemAdministrator, user.MustChangePassword, permissions);
+    /// <inheritdoc />
+    public async Task EndSessionAsync(string sessionId, CancellationToken ct = default)
+    {
+        LoginEvent? login = await _db.LoginEvents.FirstOrDefaultAsync(l => l.SessionId == sessionId, ct).ConfigureAwait(false);
+        if (login is not null)
+        {
+            login.End(_clock.UtcNow);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />

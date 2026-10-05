@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-476 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+478 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -554,6 +554,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | DB254 | Branch Comparison League Table | Branches ranked by POS net sales in the period, with transactions, average basket and share. | FromDate (Date, optional), ToDate (Date, optional) | Rank, Branch, Transactions, AverageBasket, Share, Sales | — | Sum(Sales) |
 | DB255 | Trend & Seasonality Analysis | Revenue, expenses and profit month by month for the 24 months to the date, with each month against the same month a year before. | AsAtDate (Date, optional) | Month, Revenue, Expenses, LastYear, YearOnYear, Profit | — | Sum(Profit) |
 | SYS-PERIOD | Period Status | Accounting periods with their open/closed status for the key ledgers (GL, AR, AP) — a month-end close aid. | — | Period, Start, End, GL, AR, AP | — | — |
+| SYS236 | User Activity Report | Per user over the period: sign-ins, failed attempts, lockouts, first and last sign-in, hours in closed sessions, terminals used and reports run. | FromDate (Date, optional), ToDate (Date, optional) | User, Logins, Failed, Lockouts, First, Last, Hours, Terminals, Reports | — | — |
 | SYS237 | Permission Matrix | Every role with each permission it grants and the operations allowed. | — | Role, Module, Permission, Name, Operations | — | — |
 | SYS238 | User, Role & Group Membership | Every user with direct roles, groups, roles held through groups and individual overrides. | — | User, Name, Status, Roles, Groups, GroupRoles, Overrides | — | — |
 | SYS239 | Segregation of Duties Violations (all modules) | Every active user whose combined permissions break a separation-of-duties rule. | — | User, Rule, Conflict, Severity | — | — |
@@ -565,6 +566,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | SYS245 | Unposted & Deferred Batches | Journals still draft, deferred or awaiting approval, with who prepared them. | — | Journal, Posting, Status, Source, Document, PreparedBy, Narrative | — | — |
 | SYS247 | Audit Trail Hash-Chain Verification | Recomputes the audit trail's hash chain for the company and for system-wide entries and says whether it is intact or where it first breaks. | — | Scope, Checked, Intact, FirstBroken, Message | — | — |
 | SYS248 | Licence Installation History | Licences installed, when and by whom, and which is active (token fingerprint only). | — | Installed, By, Active, Fingerprint | — | — |
+| SYS249 | Login Session & Concurrency Report | Every session opened in the period: user, terminal, start, end and duration, flagging sessions open at the same time as another of the same user on a different terminal. | FromDate (Date, optional), ToDate (Date, optional) | User, Terminal, Method, Start, End, Minutes, Concurrent | — | — |
 | SYS250 | Report Print & Export Log | Every report run in the period: who, what, format, size and copy number. | FromDate (Date, optional), ToDate (Date, optional) | When, Report, User, Purpose, Format, Bytes, Copy, Parameters | — | — |
 | SYS258 | Price List Listing | Every price list with its items, quantity breaks and prices. | — | PriceList, Currency, Status, Item, MinimumQuantity, UnitPrice | — | — |
 | SYS259 | Exchange Rate History | Every exchange rate captured, by currency pair and type, with its effective date. | — | From, To, Type, Effective, Quotation, Rate | — | — |

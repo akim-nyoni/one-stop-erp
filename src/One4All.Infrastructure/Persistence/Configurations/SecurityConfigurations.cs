@@ -165,3 +165,19 @@ internal sealed class UserPermissionOverrideConfiguration : IEntityTypeConfigura
         b.HasIndex(x => new { x.UserId, x.PermissionCode, x.IsGrant }).IsUnique();
     }
 }
+
+internal sealed class LoginEventConfiguration : IEntityTypeConfiguration<LoginEvent>
+{
+    public void Configure(EntityTypeBuilder<LoginEvent> b)
+    {
+        b.ToTable("login_event", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Username).HasMaxLength(100);
+        b.Property(x => x.Terminal).HasMaxLength(100);
+        b.Property(x => x.Method).HasMaxLength(20);
+        b.Property(x => x.Outcome).HasMaxLength(40);
+        b.Property(x => x.SessionId).HasMaxLength(40);
+        b.HasIndex(x => x.SessionId);
+        b.HasIndex(x => new { x.UserId, x.OccurredOnUtc });
+    }
+}

@@ -20064,6 +20064,73 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("group_role", "sec");
                 });
 
+            modelBuilder.Entity("One4All.Core.Security.LoginEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset?>("EndedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ended_on_utc");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("method");
+
+                    b.Property<DateTimeOffset>("OccurredOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_on_utc");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("outcome");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("SessionId")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("session_id");
+
+                    b.Property<string>("Terminal")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("terminal");
+
+                    b.Property<long?>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("username");
+
+                    b.HasKey("Id")
+                        .HasName("pk_login_event");
+
+                    b.HasIndex("SessionId")
+                        .HasDatabaseName("ix_login_event_session_id");
+
+                    b.HasIndex("UserId", "OccurredOnUtc")
+                        .HasDatabaseName("ix_login_event_user_id_occurred_on_utc");
+
+                    b.ToTable("login_event", "sec");
+                });
+
             modelBuilder.Entity("One4All.Core.Security.Permission", b =>
                 {
                     b.Property<long>("Id")

@@ -132,6 +132,20 @@ public partial class App : System.Windows.Application
     /// <inheritdoc />
     protected override void OnExit(ExitEventArgs e)
     {
+        // Close the sign-in session so the login report shows how long it ran.
+        if (_services?.GetService<DesktopSession>()?.SessionId is string session)
+        {
+            try
+            {
+                using IServiceScope scope = _services.CreateScope();
+                scope.ServiceProvider.GetRequiredService<IAuthenticationService>().EndSessionAsync(session).GetAwaiter().GetResult();
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                // Closing must not fail because the database is unreachable; the session stays open in the log.
+            }
+        }
+
         _services?.Dispose();
         base.OnExit(e);
     }

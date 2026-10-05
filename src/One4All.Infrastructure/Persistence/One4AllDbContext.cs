@@ -50,6 +50,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Users.</summary>
     public DbSet<User> Users => Set<User>();
 
+    /// <summary>Gets the sign-in attempts and sessions.</summary>
+    public DbSet<LoginEvent> LoginEvents => Set<LoginEvent>();
+
     /// <summary>Roles.</summary>
     public DbSet<Role> Roles => Set<Role>();
 

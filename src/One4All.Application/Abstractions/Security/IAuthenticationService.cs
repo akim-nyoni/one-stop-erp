@@ -54,6 +54,9 @@ public sealed class AuthenticationResult
     /// <summary>The resolved permissions (on success).</summary>
     public EffectivePermissions Permissions { get; private init; }
 
+    /// <summary>Gets the session opened by a successful sign-in, to end on sign-out.</summary>
+    public string? SessionId { get; private init; }
+
     /// <summary>True when authentication succeeded.</summary>
     public bool Succeeded => Outcome == AuthenticationOutcome.Success;
 
@@ -67,7 +70,7 @@ public sealed class AuthenticationResult
     /// <returns>The result.</returns>
     public static AuthenticationResult Success(
         long userId, string userName, string displayName, bool isSystemAdministrator,
-        bool mustChangePassword, EffectivePermissions permissions) =>
+        bool mustChangePassword, EffectivePermissions permissions, string? sessionId = null) =>
         new(AuthenticationOutcome.Success, mustChangePassword ? "Password change required." : "Signed in.")
         {
             UserId = userId,
@@ -76,6 +79,7 @@ public sealed class AuthenticationResult
             IsSystemAdministrator = isSystemAdministrator,
             MustChangePassword = mustChangePassword,
             Permissions = permissions,
+            SessionId = sessionId,
         };
 
     /// <summary>Creates a failure result.</summary>
@@ -111,4 +115,10 @@ public interface IAuthenticationService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>True when the change succeeded.</returns>
     Task<bool> ChangePasswordAsync(long userId, string currentPassword, string newPassword, CancellationToken ct = default);
+
+    /// <summary>Ends a session opened by a successful sign-in (sign-out); ending it again changes nothing.</summary>
+    /// <param name="sessionId">The session.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task.</returns>
+    Task EndSessionAsync(string sessionId, CancellationToken ct = default);
 }
