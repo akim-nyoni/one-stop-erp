@@ -108,3 +108,50 @@ internal sealed class HaulageZoneConfiguration : IEntityTypeConfiguration<Haulag
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
     }
 }
+
+internal sealed class VariationOrderConfiguration : IEntityTypeConfiguration<VariationOrder>
+{
+    public void Configure(EntityTypeBuilder<VariationOrder> b)
+    {
+        b.ToTable("variation_order", Schemas.JobCosting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Number).HasMaxLength(40);
+        b.Property(x => x.Description).HasMaxLength(300);
+        b.Property(x => x.ValueImpact).HasPrecision(19, 4);
+        b.Property(x => x.CostImpact).HasPrecision(19, 4);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.DecisionNote).HasMaxLength(300);
+        b.HasIndex(x => new { x.JobContractId, x.Number }).IsUnique();
+    }
+}
+
+internal sealed class BoqItemConfiguration : IEntityTypeConfiguration<BoqItem>
+{
+    public void Configure(EntityTypeBuilder<BoqItem> b)
+    {
+        b.ToTable("boq_item", Schemas.JobCosting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ItemCode).HasMaxLength(40);
+        b.Property(x => x.Description).HasMaxLength(300);
+        b.Property(x => x.Unit).HasMaxLength(20);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.Property(x => x.Rate).HasPrecision(19, 4);
+        b.Property(x => x.MeasuredQuantity).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.JobContractId, x.ItemCode }).IsUnique();
+    }
+}
+
+internal sealed class JobTimesheetConfiguration : IEntityTypeConfiguration<JobTimesheet>
+{
+    public void Configure(EntityTypeBuilder<JobTimesheet> b)
+    {
+        b.ToTable("timesheet", Schemas.JobCosting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Hours).HasPrecision(9, 2);
+        b.Property(x => x.HourlyCost).HasPrecision(19, 4);
+        b.Property(x => x.CostHead).HasMaxLength(60);
+        b.Ignore(x => x.Cost);
+        b.HasIndex(x => new { x.EmployeeId, x.Date });
+        b.HasIndex(x => x.JobContractId);
+    }
+}

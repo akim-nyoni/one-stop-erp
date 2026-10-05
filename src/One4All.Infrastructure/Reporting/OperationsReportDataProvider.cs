@@ -42,6 +42,9 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             "OPSJOBCOSTS" => await JobCostsAsync(companyId, ct).ConfigureAwait(false),
             "OPSCOSTTOCOMPLETE" => await CostToCompleteAsync(companyId, ct).ConfigureAwait(false),
             "OPSRETENTION" => await RetentionAsync(companyId, ct).ConfigureAwait(false),
+            "OPSVARIATIONS" => await VariationsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "OPSTIMESHEETS" => await TimesheetsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "OPSBOQ" => await BoqAsync(companyId, ct).ConfigureAwait(false),
             "OPSCONTRACTCASH" => await ContractCashAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "OPSOPENORDERS" => await OpenOrdersAsync(companyId, ct).ConfigureAwait(false),
             "OPSQUOTECONVERSION" => await QuoteConversionAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -174,6 +177,45 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         return [.. (await _db.JobContracts.AsNoTracking().Where(c => c.CompanyId == companyId && c.RetentionHeld != 0m).OrderBy(c => c.ContractNumber).ToListAsync(ct).ConfigureAwait(false))
             .Select(c => Row(("Contract", c.ContractNumber), ("Name", c.Name), ("Customer", customers.GetValueOrDefault(c.CustomerId, "?")), ("Status", c.Status.ToString()),
                 ("Rate", c.RetentionPercent.ToString("0.##", CultureInfo.InvariantCulture)), ("Certified", Money(c.CertifiedToDate)), ("Retention", c.RetentionHeld)))];
+    }
+
+    private Task<Dictionary<long, string>> ContractNumbersAsync(long companyId, CancellationToken ct)
+        => _db.JobContracts.AsNoTracking().IgnoreQueryFilters().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.ContractNumber, ct);
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VariationsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, string> contracts = await ContractNumbersAsync(companyId, ct).ConfigureAwait(false);
+        List<Core.JobCosting.VariationOrder> variations = await _db.VariationOrders.AsNoTracking().Where(v => v.CompanyId == companyId && v.SubmittedOn >= fromDate && v.SubmittedOn <= toDate)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return [.. variations.OrderBy(v => contracts.GetValueOrDefault(v.JobContractId), StringComparer.Ordinal).ThenBy(v => v.Number, StringComparer.Ordinal)
+            .Select(v => Row(("Contract", contracts.GetValueOrDefault(v.JobContractId, "?")), ("Number", v.Number), ("Description", v.Description), ("Submitted", Date(v.SubmittedOn)), ("Status", v.Status.ToString()),
+                ("Decided", v.DecidedOn is DateOnly d ? Date(d) : "—"), ("CostImpact", Money(v.CostImpact)), ("ValueImpact", v.ValueImpact)))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TimesheetsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, string> contracts = await ContractNumbersAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> employees = await _db.Set<Core.Payroll.Employee>().AsNoTracking().Where(e => e.CompanyId == companyId)
+            .ToDictionaryAsync(e => e.Id, e => e.EmployeeNumber + " " + e.FullName, ct).ConfigureAwait(false);
+        List<Core.JobCosting.JobTimesheet> sheets = await _db.JobTimesheets.AsNoTracking().Where(t => t.CompanyId == companyId && t.Date >= fromDate && t.Date <= toDate).ToListAsync(ct).ConfigureAwait(false);
+        return [.. sheets.GroupBy(t => (t.JobContractId, t.EmployeeId, t.CostHead)).OrderBy(g => contracts.GetValueOrDefault(g.Key.JobContractId), StringComparer.Ordinal)
+            .ThenBy(g => employees.GetValueOrDefault(g.Key.EmployeeId), StringComparer.Ordinal).Select(g =>
+            {
+                decimal hours = g.Sum(t => t.Hours), cost = g.Sum(t => t.Cost);
+                return Row(("Contract", contracts.GetValueOrDefault(g.Key.JobContractId, "?")), ("Employee", employees.GetValueOrDefault(g.Key.EmployeeId, "?")), ("CostHead", g.Key.CostHead),
+                    ("Days", g.Select(t => t.Date).Distinct().Count()), ("Hours", hours.ToString("0.##", CultureInfo.InvariantCulture)), ("Rate", hours == 0m ? "—" : Money(cost / hours)), ("Cost", cost));
+            })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BoqAsync(long companyId, CancellationToken ct)
+    {
+        Dictionary<long, string> contracts = await ContractNumbersAsync(companyId, ct).ConfigureAwait(false);
+        List<Core.JobCosting.BoqItem> items = await _db.BoqItems.AsNoTracking().Where(b => b.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        return [.. items.OrderBy(b => contracts.GetValueOrDefault(b.JobContractId), StringComparer.Ordinal).ThenBy(b => b.ItemCode, StringComparer.Ordinal)
+            .Select(b => Row(("Contract", contracts.GetValueOrDefault(b.JobContractId, "?")), ("Item", b.ItemCode), ("Description", b.Description), ("Unit", b.Unit),
+                ("Billed", b.Quantity.ToString("0.###", CultureInfo.InvariantCulture)), ("Measured", b.MeasuredQuantity.ToString("0.###", CultureInfo.InvariantCulture)),
+                ("Variance", (b.MeasuredQuantity - b.Quantity).ToString("0.###", CultureInfo.InvariantCulture)),
+                ("Complete", (b.MeasuredQuantity * 100m / b.Quantity).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Value", Math.Round(b.MeasuredQuantity * b.Rate, 2))))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ContractCashAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)

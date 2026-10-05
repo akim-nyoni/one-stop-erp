@@ -44,6 +44,15 @@ public static class OperationsReports
         yield return Listing("JC190", "Retention Held by Contract", "JobCosting", "Retention held on each contract's certificates, with the contract status.",
             "OpsRetention", [new Column("Contract", "Contract", 90), new Column("Name", "Name", 150), new Column("Customer", "Customer", 140), new Column("Status", "Status", 70), new Column("Rate", "Retention %", 70),
              new Column("Certified", "Certified", 100), new Column("Retention", "Retention held", 100, true)], []);
+        yield return Listing("JC191", "Variation Order Register", "JobCosting", "Every variation submitted in the period: contract, status, decision, and the value and cost impact (approved impacts move the contract).",
+            "OpsVariations", [new Column("Contract", "Contract", 85), new Column("Number", "VO", 70), new Column("Description", "Description", 180), new Column("Submitted", "Submitted", 75), new Column("Status", "Status", 70),
+             new Column("Decided", "Decided", 75), new Column("CostImpact", "Cost impact", 90), new Column("ValueImpact", "Value impact", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        yield return Listing("JC193", "Labour & Timesheet Cost by Job", "JobCosting", "Hours and labour cost booked to each contract in the period, per employee and cost head.",
+            "OpsTimesheets", [new Column("Contract", "Contract", 85), new Column("Employee", "Employee", 150), new Column("CostHead", "Cost head", 80), new Column("Days", "Days", 45), new Column("Hours", "Hours", 60),
+             new Column("Rate", "Avg rate", 70), new Column("Cost", "Cost", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        yield return Listing("JC196", "BOQ vs Measured Quantities", "JobCosting", "Each bill-of-quantities line: billed quantity, measured to date, the over / under measure and the value of work measured.",
+            "OpsBoq", [new Column("Contract", "Contract", 85), new Column("Item", "Item", 60), new Column("Description", "Description", 180), new Column("Unit", "Unit", 40), new Column("Billed", "BOQ qty", 65),
+             new Column("Measured", "Measured", 65), new Column("Variance", "Over / (under)", 75), new Column("Complete", "% measured", 65), new Column("Value", "Value measured", 95, true)], []);
         yield return Listing("JC197", "Contract Cash Flow", "JobCosting", "Per contract over the period: net certified (after retention) against costs incurred, and the net cash position.",
             "OpsContractCash", [new Column("Contract", "Contract", 90), new Column("Name", "Name", 150), new Column("Certified", "Net certified", 100), new Column("Costs", "Costs", 100), new Column("Net", "Net position", 100, true)], Period);
 

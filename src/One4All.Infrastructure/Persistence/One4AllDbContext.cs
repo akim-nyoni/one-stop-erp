@@ -221,6 +221,15 @@ public class One4AllDbContext : DbContext
     /// <summary>Construction contracts / jobs.</summary>
     public DbSet<Core.JobCosting.JobContract> JobContracts => Set<Core.JobCosting.JobContract>();
 
+    /// <summary>Gets the contract variation orders.</summary>
+    public DbSet<Core.JobCosting.VariationOrder> VariationOrders => Set<Core.JobCosting.VariationOrder>();
+
+    /// <summary>Gets the bill-of-quantities lines.</summary>
+    public DbSet<Core.JobCosting.BoqItem> BoqItems => Set<Core.JobCosting.BoqItem>();
+
+    /// <summary>Gets the job timesheets.</summary>
+    public DbSet<Core.JobCosting.JobTimesheet> JobTimesheets => Set<Core.JobCosting.JobTimesheet>();
+
     /// <summary>Interim payment certificates.</summary>
     public DbSet<Core.JobCosting.ProgressCertificate> ProgressCertificates => Set<Core.JobCosting.ProgressCertificate>();
 

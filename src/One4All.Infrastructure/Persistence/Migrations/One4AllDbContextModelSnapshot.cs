@@ -9857,6 +9857,76 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("warehouse", "inv");
                 });
 
+            modelBuilder.Entity("One4All.Core.JobCosting.BoqItem", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("ItemCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("item_code");
+
+                    b.Property<long>("JobContractId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("job_contract_id");
+
+                    b.Property<DateOnly?>("MeasuredOn")
+                        .HasColumnType("date")
+                        .HasColumnName("measured_on");
+
+                    b.Property<decimal>("MeasuredQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("measured_quantity");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<decimal>("Rate")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("rate");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("unit");
+
+                    b.HasKey("Id")
+                        .HasName("pk_boq_item");
+
+                    b.HasIndex("JobContractId", "ItemCode")
+                        .IsUnique()
+                        .HasDatabaseName("ix_boq_item_job_contract_id_item_code");
+
+                    b.ToTable("boq_item", "job");
+                });
+
             modelBuilder.Entity("One4All.Core.JobCosting.HaulageZone", b =>
                 {
                     b.Property<long>("Id")
@@ -10112,6 +10182,65 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("cost_entry", "job");
                 });
 
+            modelBuilder.Entity("One4All.Core.JobCosting.JobTimesheet", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("CostHead")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("cost_head");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<decimal>("HourlyCost")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("hourly_cost");
+
+                    b.Property<decimal>("Hours")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("hours");
+
+                    b.Property<long>("JobContractId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("job_contract_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_timesheet");
+
+                    b.HasIndex("JobContractId")
+                        .HasDatabaseName("ix_timesheet_job_contract_id");
+
+                    b.HasIndex("EmployeeId", "Date")
+                        .HasDatabaseName("ix_timesheet_employee_id_date");
+
+                    b.ToTable("timesheet", "job");
+                });
+
             modelBuilder.Entity("One4All.Core.JobCosting.ProgressCertificate", b =>
                 {
                     b.Property<long>("Id")
@@ -10199,6 +10328,98 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_progress_certificate_company_id_certificate_number");
 
                     b.ToTable("progress_certificate", "job");
+                });
+
+            modelBuilder.Entity("One4All.Core.JobCosting.VariationOrder", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("CostImpact")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("cost_impact");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DecidedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("decided_by_user_id");
+
+                    b.Property<DateOnly?>("DecidedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("decided_on");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("decision_note");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("description");
+
+                    b.Property<long>("JobContractId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("job_contract_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("number");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<DateOnly>("SubmittedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("submitted_on");
+
+                    b.Property<decimal>("ValueImpact")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("value_impact");
+
+                    b.HasKey("Id")
+                        .HasName("pk_variation_order");
+
+                    b.HasIndex("JobContractId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_variation_order_job_contract_id_number");
+
+                    b.ToTable("variation_order", "job");
                 });
 
             modelBuilder.Entity("One4All.Core.JobCosting.WeighbridgeTicket", b =>
