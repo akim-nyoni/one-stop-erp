@@ -40,6 +40,9 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
             "FATXVATDETAIL" => await VatDetailAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "FATXVATRECON" => await VatReconAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "FATXNONSTANDARD" => await NonStandardAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "FATXREVERSECHARGE" => await ReverseChargeAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "FATXAFS" => await AfsAsync(companyId, DateParameter(parameters, "AsAtDate") ?? toDate, ct).ConfigureAwait(false),
+            "FATXAUDITFILE" => await AuditFileAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "FATXWHTRETURN" => await WhtReturnAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             _ => [],
         };
@@ -146,6 +149,87 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
             .OrderBy(l => l.TaxCode, StringComparer.Ordinal).ThenBy(l => l.Date).ThenBy(l => l.Journal, StringComparer.Ordinal)
             .Select(l => Row(("Date", Date(l.Date)), ("Journal", l.Journal), ("Document", $"{l.DocumentType} {l.DocumentNumber}".Trim()), ("TaxCode", l.TaxCode), ("Account", l.AccountCode),
                 ("Narrative", l.Narrative ?? string.Empty), ("Amount", l.Credit - l.Debit)))];
+
+    // Self-assessed output tax increases what is payable; the matching input claim reduces it; base lines carry no effect.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReverseChargeAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<string, TaxCode> codes = await _db.TaxCodes.AsNoTracking().Where(t => t.CompanyId == companyId && (t.Type == TaxType.ReverseCharge || t.Type == TaxType.Deemed))
+            .ToDictionaryAsync(t => t.Code, ct).ConfigureAwait(false);
+        List<string> keys = [.. codes.Keys];
+        return [.. (await Posted(companyId, fromDate, toDate).Where(l => l.TaxCode != null && keys.Contains(l.TaxCode)).ToListAsync(ct).ConfigureAwait(false))
+            .OrderBy(l => l.Date).ThenBy(l => l.Journal, StringComparer.Ordinal).Select(l =>
+            {
+                TaxCode code = codes[l.TaxCode!];
+                string side = l.AccountCode == code.OutputAccountCode ? "Output" : l.AccountCode == code.InputAccountCode ? "Input" : "Base";
+                decimal effect = side == "Output" ? l.Credit - l.Debit : side == "Input" ? -(l.Debit - l.Credit) : 0m;
+                return Row(("Date", Date(l.Date)), ("Journal", l.Journal), ("Document", $"{l.DocumentType} {l.DocumentNumber}".Trim()), ("TaxCode", l.TaxCode), ("Account", l.AccountCode), ("Side", side),
+                    ("Amount", effect));
+            })];
+    }
+
+    // Balance-sheet lines are closing balances; profit-or-loss lines are the year's movement; each year runs from the fiscal year containing its date.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AfsAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<LedgerAccount> accounts = await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        List<Core.System.FiscalYear> years = await _db.FiscalYears.AsNoTracking().Where(y => y.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        DateOnly priorAsAt = asAt.AddYears(-1);
+        DateOnly YearStart(DateOnly d) => years.FirstOrDefault(y => y.StartDate <= d && y.EndDate >= d)?.StartDate ?? new DateOnly(d.Year, 1, 1);
+        async Task<Dictionary<string, decimal>> Net(DateOnly from, DateOnly to)
+            => (await Posted(companyId, from, to).GroupBy(l => l.AccountCode).Select(g => new { g.Key, Net = g.Sum(l => l.Debit - l.Credit) }).ToListAsync(ct).ConfigureAwait(false))
+                .ToDictionary(g => g.Key, g => g.Net);
+        Dictionary<string, decimal> closing = await Net(DateOnly.MinValue, asAt).ConfigureAwait(false), priorClosing = await Net(DateOnly.MinValue, priorAsAt).ConfigureAwait(false);
+        Dictionary<string, decimal> year = await Net(YearStart(asAt), asAt).ConfigureAwait(false), priorYear = await Net(YearStart(priorAsAt), priorAsAt).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        void Section(string statement, IEnumerable<AccountType> types, Dictionary<string, decimal> current, Dictionary<string, decimal> prior, bool creditNatural)
+        {
+            decimal sign = creditNatural ? -1m : 1m;
+            foreach (var line in accounts.Where(a => types.Contains(a.Type)).GroupBy(a => (a.Type, a.ReportCategory)).OrderBy(g => g.Key.Type).ThenBy(g => g.Key.ReportCategory, StringComparer.Ordinal))
+            {
+                decimal c = sign * line.Sum(a => current.GetValueOrDefault(a.AccountCode)), p = sign * line.Sum(a => prior.GetValueOrDefault(a.AccountCode));
+                if (c != 0m || p != 0m)
+                {
+                    string notes = string.Join(", ", line.Select(a => a.NoteReference).Where(n => n != null).Distinct().Order(StringComparer.Ordinal));
+                    rows.Add(Row(("Statement", statement), ("Line", $"{line.Key.Type}: {line.Key.ReportCategory}"), ("Note", notes.Length == 0 ? "—" : notes), ("Prior", Money(p)), ("Current", c)));
+                }
+            }
+        }
+
+        Section("Financial position — assets", [AccountType.Asset], closing, priorClosing, creditNatural: false);
+        Section("Financial position — liabilities", [AccountType.Liability], closing, priorClosing, creditNatural: true);
+        Section("Financial position — equity", [AccountType.Equity], closing, priorClosing, creditNatural: true);
+        decimal Earnings(Dictionary<string, decimal> balances) => -accounts.Where(a => a.Type is AccountType.Income or AccountType.Expense).Sum(a => balances.GetValueOrDefault(a.AccountCode));
+        rows.Add(Row(("Statement", "Financial position — equity"), ("Line", "Retained earnings not yet closed"), ("Note", "—"), ("Prior", Money(Earnings(priorClosing))), ("Current", Earnings(closing))));
+        Section("Profit or loss — income", [AccountType.Income], year, priorYear, creditNatural: true);
+        Section("Profit or loss — expenses", [AccountType.Expense], year, priorYear, creditNatural: false);
+        rows.Add(Row(("Statement", "Profit or loss"), ("Line", "Profit for the year"), ("Note", "—"), ("Prior", Money(Earnings(priorYear))), ("Current", Earnings(year))));
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AuditFileAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        var lines = await (from l in _db.Set<JournalLine>().AsNoTracking()
+                           join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
+                           where j.CompanyId == companyId && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed) && j.PostingDate >= fromDate && j.PostingDate <= toDate
+                           orderby j.PostingDate, j.JournalNumber, l.Id
+                           select new { j.Id, j.JournalNumber, j.PostingDate, j.FiscalPeriodId, j.SourceModule, j.DocumentType, j.DocumentNumber, j.TransactionCurrency, l.AccountCode, l.TaxCode, l.Narrative,
+                               l.TransactionDebit, l.TransactionCredit, l.BaseDebit, l.BaseCredit }).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> periods = await _db.Set<Core.System.FiscalPeriod>().AsNoTracking().ToDictionaryAsync(p => p.Id, p => $"{p.StartDate:yyyy-MM}", ct).ConfigureAwait(false);
+        List<long> journalIds = [.. lines.Select(l => l.Id).Distinct()];
+        var parties = await (from o in _db.OpenItems.AsNoTracking()
+                             where o.CompanyId == companyId && o.JournalEntryId != null && journalIds.Contains(o.JournalEntryId.Value)
+                             select new { JournalId = o.JournalEntryId!.Value, o.Ledger, o.TraderId }).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> customers = await _db.Customers.AsNoTracking().IgnoreQueryFilters().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.Code, ct).ConfigureAwait(false);
+        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Code, ct).ConfigureAwait(false);
+        Dictionary<long, string> party = parties.GroupBy(p => p.JournalId).ToDictionary(g => g.Key, g =>
+        {
+            var first = g.First();
+            return first.Ledger == Core.Trading.TradingLedger.AccountsReceivable ? $"C:{customers.GetValueOrDefault(first.TraderId, "?")}" : $"S:{suppliers.GetValueOrDefault(first.TraderId, "?")}";
+        });
+        return [.. lines.Select(l => Row(("Journal", l.JournalNumber), ("Date", Date(l.PostingDate)), ("Period", periods.GetValueOrDefault(l.FiscalPeriodId, "?")), ("Source", l.SourceModule),
+            ("Document", $"{l.DocumentType} {l.DocumentNumber}".Trim()), ("Account", l.AccountCode), ("TaxCode", l.TaxCode ?? string.Empty), ("Party", party.GetValueOrDefault(l.Id, string.Empty)),
+            ("Currency", l.TransactionCurrency.ToString()), ("Transaction", (l.TransactionDebit - l.TransactionCredit).ToString("0.00", CultureInfo.InvariantCulture)),
+            ("Debit", l.BaseDebit.ToString("0.00", CultureInfo.InvariantCulture)), ("Credit", l.BaseCredit.ToString("0.00", CultureInfo.InvariantCulture)), ("Narrative", l.Narrative ?? string.Empty)))];
+    }
 
     // Output tax is credit-natural, input tax debit-natural; coded lines on those accounts should account for all of their movement.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VatReconAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)

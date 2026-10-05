@@ -1,5 +1,7 @@
 using System.Text;
 using FluentAssertions;
+using One4All.Core.Accounting;
+using One4All.Application.Abstractions.Accounting;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.FixedAssets;
 using One4All.Application.Abstractions.Reporting;
@@ -44,6 +46,21 @@ public sealed class AssetTaxReportsTests
         (await fa.RunDepreciationAsync(companyId, new DateOnly(2026, 2, 28), "DEP-ATR-02")).IsSuccess.Should().BeTrue();
         (await fa.TransferAsync(companyId, truck, "Depot B", "J. Moyo")).IsSuccess.Should().BeTrue();
 
+        db.Accounts.Add(new LedgerAccount(companyId, "1415", "VAT Input", AccountType.Asset));
+        db.TaxCodes.Add(new TaxCode(companyId, "RC15", "Imported services 15%", TaxType.ReverseCharge) { OutputAccountCode = "2200", InputAccountCode = "1415" });
+        await db.SaveChangesAsync();
+        (await scope.ServiceProvider.GetRequiredService<IPostingEngine>().PostAsync(new JournalRequest
+        {
+            CompanyId = companyId, SourceModule = "GL", PostingDate = new DateOnly(2026, 2, 10), TransactionCurrency = Scenario.Usd, DocumentType = "Journal", DocumentNumber = "RC-1", Narrative = "Imported consultancy",
+            Lines =
+            [
+                new JournalLineRequest { AccountCode = "6000", Side = JournalSide.Debit, TransactionAmount = 1000m, TaxCode = "RC15" },
+                new JournalLineRequest { AccountCode = "1415", Side = JournalSide.Debit, TransactionAmount = 150m, TaxCode = "RC15" },
+                new JournalLineRequest { AccountCode = "1100", Side = JournalSide.Credit, TransactionAmount = 1000m },
+                new JournalLineRequest { AccountCode = "2200", Side = JournalSide.Credit, TransactionAmount = 150m, TaxCode = "RC15" },
+            ],
+        })).IsSuccess.Should().BeTrue();
+
         IReportRunner runner = scope.ServiceProvider.GetRequiredService<IReportRunner>();
         async Task<string> Render(string code)
         {
@@ -56,6 +73,11 @@ public sealed class AssetTaxReportsTests
         (await Render("FA207")).Should().Contain("2026-01,ATR-VEH,Truck,Vehicles,1000").And.Contain("2026-02,ATR-VEH,Truck,Vehicles,1000");
         (await Render("FA208")).Should().Contain("Addition,ATR-VEH,Truck,Vehicles,2026-01-01").And.Contain("Transfer,ATR-VEH,Truck,Vehicles");
         (await Render("FA209")).Should().Contain("Vehicles,0.00,\"12,000.00\",0.00,\"12,000.00\",0.00,\"2,000.00\",0.00,\"2,000.00\",10000");
+
+        string reverse = await Render("TX219");
+        reverse.Should().Contain("2026-02-10,").And.Contain(",Journal RC-1,RC15,2200,Output,150").And.Contain(",Journal RC-1,RC15,1415,Input,-150").And.Contain(",Journal RC-1,RC15,6000,Base,0");
+        (await Render("TX224")).Should().Contain("Financial position — assets,").And.Contain("Profit or loss,Profit for the year,—,0.00,-3000");
+        (await Render("TX225")).Should().Contain(",GL,Journal RC-1,2200,RC15,,USD,-150.00,0.00,150.00,").And.Contain(",1600,,,USD,12000.00,12000.00,0.00,");
 
         foreach (string code in AssetTaxReports.All().Select(r => r.Code))
         {

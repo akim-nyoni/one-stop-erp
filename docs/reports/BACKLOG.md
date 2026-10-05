@@ -77,8 +77,7 @@ missing domain data. Items are struck through as they ship (with the report code
 
 ## N. Tax & Statutory
 - ~~216 VAT Detail (TX216)~~, ~~217 VAT Reconciliation (TX217)~~, ~~218 Exempt / Zero / Out-of-scope (TX218)~~, ~~220 WHT Return (TX220)~~
-- Data exists: 224 AFS pack, 225 SAF-T export; partly 219, 221, 222
-- Needs new data: tax tables
+- ~~219 Reverse Charge & Import VAT (TX219)~~, ~~224 AFS Pack (TX224)~~, ~~225 Audit File Export (TX225)~~; 221 and 222 are the payroll returns and schedules (PR27, PR19, PR31–PR33)
 
 ## O. Payroll & HR (PR codes)
 - ~~PR2, PR3, PR5, PR6, PR12, PR16, PR17, PR29, PR38, PR49, PR59, PR60, PR61, PR64, PR65, PR67, PR70~~

@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-478 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+481 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -582,7 +582,10 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | TX216 | VAT Detail / Audit Report | Every posted line carrying a tax code in the period, by code, with its journal and document. | FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Document, TaxCode, Account, Narrative, Amount | — | Sum(Amount) |
 | TX217 | VAT Reconciliation | Per tax code: movement on its output and input tax accounts in the period against the tax-coded lines, with the difference. | FromDate (Date, optional), ToDate (Date, optional) | TaxCode, Name, Output, Input, Coded, Difference | — | Sum(Difference) |
 | TX218 | Exempt, Zero-rated & Out-of-scope Supplies | Lines in the period under zero-rated, exempt and out-of-scope tax codes, totalled per code. | FromDate (Date, optional), ToDate (Date, optional) | TaxCode, Name, Type, Lines, Amount | — | Sum(Amount) |
+| TX219 | Reverse Charge & Import VAT | Lines in the period under reverse-charge and deemed (import) tax codes: the output tax self-assessed, the input tax claimed and what is left payable. | FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Document, TaxCode, Account, Side, Amount | — | Sum(Amount) |
 | TX220 | Withholding Tax Return | Withholding certificates by month and tax code: count, gross paid, tax withheld and how much has been remitted. | FromDate (Date, optional), ToDate (Date, optional) | Month, TaxCode, Certificates, Gross, Remitted, Withheld | — | Sum(Withheld) |
+| TX224 | Annual Financial Statements Pack | Statement of financial position and profit or loss by report category for the year to the date, with the prior year's comparatives and the note each line is disclosed in. | AsAtDate (Date, optional) | Statement, Line, Note, Prior, Current | — | Sum(Current) |
+| TX225 | Audit File Export (SAF-T style) | Every posted journal line in the period with its period, source, document, account, tax code, trading party, currency amounts and base debit / credit — the GL audit file. | FromDate (Date, optional), ToDate (Date, optional) | Journal, Date, Period, Source, Document, Account, TaxCode, Party, Currency, Transaction, Debit, Credit, Narrative | — | — |
 
 ## Weighbridge
 
