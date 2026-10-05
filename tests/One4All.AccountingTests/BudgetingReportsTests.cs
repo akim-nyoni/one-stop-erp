@@ -107,6 +107,25 @@ public sealed class BudgetingReportsTests
         cashFlow.Should().Contain("1,2026-01,-100.00,-150.00,-50").And.Contain("3,2026-03,-100.00,-350.00,-250");
         (await Render("B42")).Should().Contain("CP1,Plant upgrade,In progress,\"10,000.00\",\"2,500.00\",0.00,25.0%,7500");
 
+        Budget capex = new(companyId, yearId, "CAPEX", BudgetType.Capital, null, 1);
+        capex.AddLine("1600", 2, 3_000m);
+        capex.AddLine("1600", 6, 7_000m);
+        capex.Approve();
+        Budget maint1 = new(companyId, yearId, "MAINT", BudgetType.DraftSubmission, null, 1), maint2 = new(companyId, yearId, "MAINT", BudgetType.DraftSubmission, null, 2);
+        maint1.AddLine("6200", 1, 600m);
+        maint2.AddLine("6200", 1, 200m);
+        maint2.AddLine("6200", 2, 400m);
+        db.AddRange(capex, maint1, maint2);
+        await db.SaveChangesAsync();
+
+        string phasing = await Render("B9");
+        phasing.Should().Contain("CAPEX v1,1600,2,2026-02,\"3,000.00\",30.0%,3000").And.Contain("CAPEX v1,1600,6,2026-06,\"10,000.00\",100.0%,7000");
+        (await Render("B14")).Should().Contain(",OPEX v2,");
+        (await Render("B23")).Should().Contain("MAINT,v1 → v2,6200,600.00,\"P1 -400.00, P2 +400.00\",400");
+        (await Render("B30")).Should().Contain("1600,").And.Contain("\"10,000.00\",0.00,0.0%,10000");
+        string rolling = await Render("B40");
+        rolling.Should().Contain("6000,").And.Contain(",2026-04,Reforecast,150").And.Contain(",2026-06,Reforecast,150").And.NotContain("2026-07");
+
         foreach (string code in BudgetingReports.All().Select(r => r.Code))
         {
             await Render(code);

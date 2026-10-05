@@ -38,6 +38,9 @@ public static class BudgetingReports
             "BgtStaff", [new Column("Department", "Department", 110), new Column("Posts", "Posts", 50), new Column("Filled", "Filled", 50), new Column("Establishment", "Establishment cost", 105), new Column("Vacancy", "Vacancy factor", 80),
              new Column("Expected", "Expected cost", 100), new Column("Budgeted", "Staff budget", 100), new Column("Difference", "Budget less expected", 100, true)],
             [("AsAtDate", ParameterType.Date), ("StaffAccount", ParameterType.String), ("VacancyPercent", ParameterType.Decimal)]);
+        yield return Listing("B9", "Capital Budget Submission & Phasing", "Budget", "The year's capital budgets per vote by month, with the cumulative share spent of the year — the S-curve.",
+            "BgtCapitalPhasing", [new Column("Budget", "Budget", 110), new Column("Account", "Vote", 70), new Column("Period", "Period", 50), new Column("Month", "Month", 65), new Column("Cumulative", "Cumulative", 95),
+             new Column("Share", "Cumulative %", 75), new Column("Amount", "Phased", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("B10", "Revenue Budget Build-up", "Budget", "Driver-based revenue lines: the volume each is built on, the implied rate and the amount.",
             "BgtRevenueBuild", [new Column("Budget", "Budget", 110), new Column("Account", "Account", 70), new Column("Name", "Name", 140), new Column("Driver", "Driver", 70), new Column("Volume", "Volume", 80),
              new Column("Rate", "Rate", 80), new Column("Amount", "Amount", 100, true)], [("AsAtDate", ParameterType.Date)]);
@@ -47,6 +50,8 @@ public static class BudgetingReports
         yield return Listing("B13", "Original vs Recommended vs Approved", "Budget", "Per department and account: what was first requested, the last draft recommended, what was approved, and the cut.",
             "BgtCutsTrail", [new Column("Department", "Department", 110), new Column("Account", "Account", 70), new Column("Name", "Name", 150), new Column("Requested", "Requested", 95), new Column("Recommended", "Recommended", 95),
              new Column("Approved", "Approved", 95), new Column("Cut", "Cut", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("B14", "Budget Approval Audit", "Budget", "Every status change of the year's budgets — submitted, approved, activated, superseded — with who made it and the days since the previous step.",
+            "BgtApprovalAudit", [new Column("When", "When", 115), new Column("Budget", "Budget", 140), new Column("Status", "New status", 90), new Column("User", "By", 90), new Column("Days", "Days since last step", 100)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("B15", "Multi-Year Budget & Actual Comparison", "Budget", "Each budgeted account's budget and actual for this year and the two before.",
             "BgtMultiYear", [new Column("Account", "Account", 65), new Column("Name", "Name", 150), new Column("Budget2", "Budget Y-2", 90), new Column("Actual2", "Actual Y-2", 90), new Column("Budget1", "Budget Y-1", 90),
              new Column("Actual1", "Actual Y-1", 90), new Column("Budget0", "Budget this year", 95), new Column("Actual0", "Actual to date", 95, true)], AsAt);
@@ -67,6 +72,9 @@ public static class BudgetingReports
         yield return Listing("B22", "Supplementary Appropriation Schedule", "Budget", "Each supplementary or revised budget of the year: per vote, the amount against the original approved, the change, and the reason.",
             "BgtSupplementary", [new Column("Budget", "Budget", 140), new Column("Status", "Status", 70), new Column("Account", "Vote", 70), new Column("Original", "Original", 95), new Column("Revised", "Revised", 95),
              new Column("Reason", "Reason", 180), new Column("Change", "Change", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("B23", "Rephasing Report", "Budget", "Between consecutive versions of a budget: votes whose annual total is unchanged but whose months moved, with the value moved.",
+            "BgtRephasing", [new Column("Budget", "Budget", 120), new Column("Versions", "Versions", 70), new Column("Account", "Vote", 70), new Column("Annual", "Annual (unchanged)", 100), new Column("Detail", "Months moved", 220),
+             new Column("Moved", "Value moved", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("B24", "Vote Book", "Budget", "Per budgeted account and department: the year's budget, actual to date, open commitments and what remains.",
             "BgtVoteBook", [new Column("Account", "Account", 65), new Column("Name", "Name", 150), new Column("Department", "Department", 85), new Column("Budget", "Annual budget", 100), new Column("Actual", "Actual", 95),
              new Column("Committed", "Committed", 95), new Column("Remaining", "Remaining", 100, true)], AsAt);
@@ -84,6 +92,9 @@ public static class BudgetingReports
         yield return Listing("B32", "Budget Holder Statement", "Budget", "Per budget holder: their department's votes — budget, spent and committed to date, available and utilisation.",
             "BgtHolders", [new Column("Holder", "Budget holder", 130), new Column("Department", "Department", 100), new Column("Account", "Vote", 70), new Column("Budget", "Budget", 95), new Column("Actual", "Spent", 95),
              new Column("Committed", "Committed", 90), new Column("Used", "Used %", 60), new Column("Available", "Available", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("B30", "Unspent Capital Carry-Forward Schedule", "Budget", "Per capital vote: the year's capital budget, spent to the date, and the unspent balance proposed to carry forward.",
+            "BgtCapitalUnspent", [new Column("Account", "Vote", 70), new Column("Name", "Name", 150), new Column("Budget", "Capital budget", 100), new Column("Spent", "Spent", 95), new Column("Used", "Used %", 60),
+             new Column("Unspent", "Unspent to carry", 100, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("B33", "Budget Utilisation (RAG)", "Budget", "Year-to-date use of each budgeted account's year-to-date budget: green under 90%, amber to 100%, red over.",
             "BgtUtilisation", [new Column("Account", "Account", 65), new Column("Name", "Name", 160), new Column("Budget", "Budget YTD", 95), new Column("Used", "Used %", 60), new Column("Rag", "RAG", 55),
              new Column("Actual", "Actual YTD", 100, true)], AsAt);
@@ -102,6 +113,9 @@ public static class BudgetingReports
         yield return Listing("B39", "Forecast vs Forecast Movement", "Budget", "Between the last two reforecast rounds of the year: each vote's forecast before and after, the movement and the reason given.",
             "BgtForecastMovement", [new Column("Account", "Vote", 70), new Column("Name", "Name", 150), new Column("Previous", "Previous round", 100), new Column("Latest", "Latest round", 100), new Column("Reason", "Reason", 200),
              new Column("Movement", "Movement", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("B40", "Rolling Forecast", "Budget", "The next N months from the date: per vote, the latest reforecast (else the budget) month by month.",
+            "BgtRolling", [new Column("Account", "Vote", 70), new Column("Name", "Name", 150), new Column("Month", "Month", 65), new Column("Source", "Source", 80), new Column("Amount", "Forecast", 95, true)],
+            [("AsAtDate", ParameterType.Date), ("Months", ParameterType.Integer)]);
         yield return Listing("B41", "Cash Budget vs Actual Cash Flow", "Budget", "Month by month to the date: the cash budget's net flow against the actual net movement on the bank accounts, and the variance.",
             "BgtCash", [new Column("Period", "Period", 60), new Column("Month", "Month", 70), new Column("Budget", "Budgeted net cash", 110), new Column("Actual", "Actual net cash", 110), new Column("Variance", "Variance", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("B42", "Capital Project Budget vs Actual vs Commitment", "Budget", "Each capital project: budget, cost to date, commitments, the share spent and the cost to complete.",

@@ -44,6 +44,12 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         Context context = new(companyId, asAt, year, PeriodOf(year, asAt));
         return command.ToUpperInvariant() switch
         {
+            "BGTCAPITALPHASING" => await CapitalPhasingAsync(context, ct).ConfigureAwait(false),
+            "BGTAPPROVALAUDIT" => await ApprovalAuditAsync(context, ct).ConfigureAwait(false),
+            "BGTREPHASING" => await RephasingAsync(context, ct).ConfigureAwait(false),
+            "BGTCAPITALUNSPENT" => await CapitalUnspentAsync(context, ct).ConfigureAwait(false),
+            "BGTROLLING" => await RollingAsync(context, parameters.TryGetValue("Months", out object? months) && months is not null and not "" ? Convert.ToInt32(months, CultureInfo.InvariantCulture) : 3, ct)
+                .ConfigureAwait(false),
             "BGTCEILINGGAP" => await CeilingGapAsync(context, ct).ConfigureAwait(false),
             "BGTHIERARCHY" => await HierarchyAsync(context, parameters.TryGetValue("Level", out object? level) && level is string l && l.Length > 0 ? l : "Directorate", ct).ConfigureAwait(false),
             "BGTDRIVERS" => await DriversAsync(context, ct).ConfigureAwait(false),
@@ -602,6 +608,123 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
             decimal actual = ActualFor(actuals, b.Key), committed = commitments.Where(x => x.AccountCode == b.Key.Account && x.Department == h.Department).Sum(x => x.Amount);
             return Row(("Holder", h.BudgetHolder), ("Department", h.Department), ("Account", b.Key.Account), ("Budget", Money(b.Value)), ("Actual", Money(actual)), ("Committed", Money(committed)),
                 ("Used", b.Value == 0m ? "—" : ((actual + committed) * 100m / b.Value).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Available", b.Value - actual - committed));
+        }))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CapitalPhasingAsync(Context c, CancellationToken ct)
+    {
+        List<Budget> capital = [.. (await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false)).Where(b => b.Type == BudgetType.Capital && b.Status != BudgetStatus.Superseded)];
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (Budget b in capital.OrderBy(b => b.Label, StringComparer.Ordinal))
+        {
+            foreach (IGrouping<string, BudgetLine> vote in b.Lines.GroupBy(l => l.AccountCode).OrderBy(g => g.Key, StringComparer.Ordinal))
+            {
+                decimal total = vote.Sum(l => l.Amount), running = 0m;
+                foreach (IGrouping<int, BudgetLine> month in vote.GroupBy(l => l.Period).OrderBy(g => g.Key))
+                {
+                    decimal amount = month.Sum(l => l.Amount);
+                    running += amount;
+                    rows.Add(Row(("Budget", $"{b.Label} v{b.VersionNumber}"), ("Account", vote.Key), ("Period", month.Key), ("Month", c.Year.StartDate.AddMonths(month.Key - 1).ToString("yyyy-MM", CultureInfo.InvariantCulture)),
+                        ("Cumulative", Money(running)), ("Share", total == 0m ? "—" : (running * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Amount", amount)));
+                }
+            }
+        }
+
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ApprovalAuditAsync(Context c, CancellationToken ct)
+    {
+        Dictionary<string, string> labels = (await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false))
+            .ToDictionary(b => b.Id.ToString(CultureInfo.InvariantCulture), b => $"{b.Label} v{b.VersionNumber}" + (b.Department is null ? string.Empty : $" ({b.Department})"));
+        // The year's budgets bound the report; their changes are taken whenever they were made.
+        List<Core.Audit.ChangeLogEntry> changes = [.. (await _db.ChangeLog.AsNoTracking().Where(l => l.CompanyId == c.CompanyId && l.EntityType == "Budget").OrderBy(l => l.Id)
+                .ToListAsync(ct).ConfigureAwait(false)).Where(l => l.EntityId != null && labels.ContainsKey(l.EntityId) && (l.Action == Core.Audit.AuditAction.Insert || l.ChangedFields.Contains("Status")))];
+        static string Status(string? json)
+        {
+            if (json is null)
+            {
+                return "—";
+            }
+
+            using System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("Status", out System.Text.Json.JsonElement v) ? (v.ValueKind == System.Text.Json.JsonValueKind.Number ? ((BudgetStatus)v.GetInt32()).ToString() : v.ToString()) : "—";
+        }
+
+        Dictionary<string, DateTimeOffset> last = [];
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (Core.Audit.ChangeLogEntry change in changes)
+        {
+            string days = last.TryGetValue(change.EntityId!, out DateTimeOffset previous) ? ((int)(change.OccurredOnUtc - previous).TotalDays).ToString(CultureInfo.InvariantCulture) : "—";
+            last[change.EntityId!] = change.OccurredOnUtc;
+            rows.Add(Row(("When", change.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Budget", labels[change.EntityId!]), ("Status", Status(change.NewValues)), ("User", change.UserName), ("Days", days)));
+        }
+
+        return rows;
+    }
+
+    // Rephasing: a vote whose annual total is the same in two consecutive versions but whose monthly amounts differ.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RephasingAsync(Context c, CancellationToken ct)
+    {
+        List<Budget> budgets = await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (IGrouping<(string Label, string? Department), Budget> chain in budgets.GroupBy(b => (b.Label, b.Department)).OrderBy(g => g.Key.Label, StringComparer.Ordinal))
+        {
+            List<Budget> versions = [.. chain.OrderBy(b => b.VersionNumber)];
+            for (int i = 1; i < versions.Count; i++)
+            {
+                Budget before = versions[i - 1], after = versions[i];
+                foreach (string account in before.Lines.Select(l => l.AccountCode).Intersect(after.Lines.Select(l => l.AccountCode)).Order(StringComparer.Ordinal))
+                {
+                    Dictionary<int, decimal> was = before.Lines.Where(l => l.AccountCode == account).GroupBy(l => l.Period).ToDictionary(g => g.Key, g => g.Sum(l => l.Amount));
+                    Dictionary<int, decimal> now = after.Lines.Where(l => l.AccountCode == account).GroupBy(l => l.Period).ToDictionary(g => g.Key, g => g.Sum(l => l.Amount));
+                    if (was.Values.Sum() != now.Values.Sum())
+                    {
+                        continue;
+                    }
+
+                    List<(int Period, decimal Delta)> moves = [.. was.Keys.Union(now.Keys).Order().Select(p => (p, now.GetValueOrDefault(p) - was.GetValueOrDefault(p))).Where(x => x.Item2 != 0m)];
+                    if (moves.Count > 0)
+                    {
+                        rows.Add(Row(("Budget", chain.Key.Label + (chain.Key.Department is null ? string.Empty : $" ({chain.Key.Department})")), ("Versions", $"v{before.VersionNumber} → v{after.VersionNumber}"), ("Account", account),
+                            ("Annual", Money(now.Values.Sum())), ("Detail", string.Join(", ", moves.Select(m => $"P{m.Period} {(m.Delta > 0m ? "+" : string.Empty)}{m.Delta.ToString("0.00", CultureInfo.InvariantCulture)}"))),
+                            ("Moved", moves.Where(m => m.Delta > 0m).Sum(m => m.Delta))));
+                    }
+                }
+            }
+        }
+
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CapitalUnspentAsync(Context c, CancellationToken ct)
+    {
+        Dictionary<string, string> names = await NamesAsync(c.CompanyId, ct).ConfigureAwait(false);
+        List<Budget> capital = [.. (await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false)).Where(b => b.Type == BudgetType.Capital && b.Status is BudgetStatus.Approved or BudgetStatus.Active)];
+        var actuals = await ActualsAsync(c.CompanyId, c.Year.StartDate, c.AsAt, ct).ConfigureAwait(false);
+        return [.. capital.SelectMany(b => b.Lines).GroupBy(l => l.AccountCode).OrderBy(g => g.Key, StringComparer.Ordinal).Select(g =>
+        {
+            decimal budget = g.Sum(l => l.Amount), spent = actuals.Where(a => a.Key.Account == g.Key).Sum(a => a.Value.Amount);
+            return Row(("Account", g.Key), ("Name", names.GetValueOrDefault(g.Key, "?")), ("Budget", Money(budget)), ("Spent", Money(spent)),
+                ("Used", budget == 0m ? "—" : (spent * 100m / budget).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Unspent", Math.Max(0m, budget - spent)));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RollingAsync(Context c, int months, CancellationToken ct)
+    {
+        Dictionary<string, string> names = await NamesAsync(c.CompanyId, ct).ConfigureAwait(false);
+        List<Budget> budgets = await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false);
+        Budget? reforecast = budgets.Where(b => b.Type == BudgetType.Reforecast).OrderBy(b => b.VersionNumber).LastOrDefault();
+        List<BudgetLine> inForce = [.. budgets.Where(b => b.Type is BudgetType.OriginalApproved or BudgetType.SupplementaryRevised && b.IsActive && InForce.Contains(b.Status)).SelectMany(b => b.Lines)];
+        IEnumerable<string> accounts = inForce.Select(l => l.AccountCode).Concat(reforecast?.Lines.Select(l => l.AccountCode) ?? []).Distinct().Order(StringComparer.Ordinal);
+        List<int> ahead = [.. Enumerable.Range(c.Period + 1, Math.Max(0, months)).Where(p => p <= 12)];
+        return [.. accounts.SelectMany(a => ahead.Select(p =>
+        {
+            List<BudgetLine> fromForecast = [.. reforecast?.Lines.Where(l => l.AccountCode == a && l.Period == p) ?? []];
+            bool forecast = fromForecast.Count > 0;
+            decimal amount = forecast ? fromForecast.Sum(l => l.Amount) : inForce.Where(l => l.AccountCode == a && l.Period == p).Sum(l => l.Amount);
+            return Row(("Account", a), ("Name", names.GetValueOrDefault(a, "?")), ("Month", c.Year.StartDate.AddMonths(p - 1).ToString("yyyy-MM", CultureInfo.InvariantCulture)), ("Source", forecast ? "Reforecast" : "Budget"),
+                ("Amount", amount));
         }))];
     }
 
