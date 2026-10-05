@@ -97,6 +97,8 @@ public sealed class PayrollReportsTests
         (await Render("PR31")).Should().Contain("PEN Pension Fund,PR-EMP Pat Payee,PF-77,100.00,0.00,100");
         (await Render("PR36")).Should().Contain("TAX26,2026-01-01,0.00,\"1,000.00\",0,0.00").And.Contain("and above");
 
+        (await Render("PR58")).Should().Contain("PR-EMP Pat Payee,—,1,\"2,000.00\",0.00,\"24,000.00\",2000");
+
         foreach (string code in PayrollReports.All().Select(r => r.Code))
         {
             await Render(code);

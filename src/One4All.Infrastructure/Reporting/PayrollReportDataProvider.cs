@@ -42,6 +42,8 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLDENOMINATIONS" => await DenominationsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLNETCONTROL" => await NetControlAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLEARNINGS" => await EarningsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLALLOWANCES" => await AllowancesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLCOSTTOCOMPANY" => await CostToCompanyAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLTAX" => await TaxAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLLEAVE" => await LeaveAsync(companyId, ct).ConfigureAwait(false),
             "PYRLSALARYCHANGES" => await SalaryChangesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -547,6 +549,29 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
 
     private static string? Text(IReadOnlyDictionary<string, object?> parameters, string name)
         => parameters.TryGetValue(name, out object? value) && value is string text && text.Trim().Length > 0 ? text.Trim() : null;
+
+    // Allowances are the earning lines other than the BASIC element.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AllowancesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        return [.. (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false))
+            .SelectMany(p => p.Lines.Where(l => l.Type == PayElementType.Earning && !l.ElementCode.Equals("BASIC", StringComparison.OrdinalIgnoreCase) && l.Amount != 0m).Select(l => (p.EmployeeId, Line: l)))
+            .GroupBy(x => (x.EmployeeId, x.Line.ElementCode)).OrderBy(g => Name(employees, g.Key.EmployeeId), StringComparer.Ordinal).ThenBy(g => g.Key.ElementCode, StringComparer.Ordinal)
+            .Select(g => Row(("Employee", Name(employees, g.Key.EmployeeId)), ("Department", employees.GetValueOrDefault(g.Key.EmployeeId)?.Department ?? "—"), ("Element", g.Key.ElementCode),
+                ("Description", g.First().Line.Description), ("Taxable", g.First().Line.Taxable ? "Yes" : "No"), ("Amount", g.Sum(x => x.Line.Amount))))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CostToCompanyAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        return [.. (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).GroupBy(p => p.EmployeeId).OrderBy(g => Name(employees, g.Key), StringComparer.Ordinal).Select(g =>
+        {
+            int months = g.Select(p => p.PeriodLabel).Distinct().Count();
+            decimal gross = g.Sum(p => p.GrossEarnings), employer = g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.EmployerContribution).Sum(l => l.Amount);
+            return Row(("Employee", Name(employees, g.Key)), ("Department", employees.GetValueOrDefault(g.Key)?.Department ?? "—"), ("Months", months), ("Gross", Money(gross)), ("Employer", Money(employer)),
+                ("Annualised", Money(Math.Round((gross + employer) / months * 12m, 2, MidpointRounding.AwayFromZero))), ("Cost", gross + employer));
+        })];
+    }
 
     private Task<Dictionary<string, string>> AccountNamesAsync(long companyId, CancellationToken ct)
         => _db.Accounts.AsNoTracking().IgnoreQueryFilters().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AccountCode, a => a.Name, ct);

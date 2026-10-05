@@ -33,6 +33,8 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
             "RECVAGEDBYREP" => await AgedByRepAsync(companyId, asAt, ct).ConfigureAwait(false),
             "RECVLEDGER" => await LedgerAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RECVDAYBOOK" => await DayBookAsync(companyId, from, to, ct).ConfigureAwait(false),
+            "RECVSALESANALYSIS" => await SalesAnalysisAsync(companyId, from, to, ct).ConfigureAwait(false),
+            "RECVSALESTREND" => await SalesTrendAsync(companyId, asAt, ct).ConfigureAwait(false),
             "RECVTOPCUSTOMERS" => await TopCustomersAsync(companyId, from, to, ct).ConfigureAwait(false),
             "RECVUNALLOCATED" => await UnallocatedAsync(companyId, asAt, ct).ConfigureAwait(false),
             "RECVDSO" => await DsoAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -228,6 +230,45 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
             .Select(h => (Status: h.First >= from ? "New" : "Dormant", h))
             .OrderBy(x => x.Status, StringComparer.Ordinal).ThenBy(x => customers[x.h.Key].Name, StringComparer.Ordinal)
             .Select(x => Row(("Status", x.Status), ("Customer", customers[x.h.Key].Name), ("First", Date(x.h.First)), ("Last", Date(x.h.Last)), ("Lifetime", x.h.Total)))];
+    }
+
+    // Invoiced sales-order lines (orders dated in the period) and completed POS sales (as cash sales), costed at the item's current average cost.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SalesAnalysisAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Customer> customers = await CustomersAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await _db.Items.AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
+        Dictionary<long, decimal> averageCost = (await _db.StockBalances.AsNoTracking().Where(b => b.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(b => b.ItemId).ToDictionary(g => g.Key, g => g.Sum(b => b.QuantityOnHand) == 0m ? g.Average(b => b.AverageCost) : g.Sum(b => b.TotalValue) / g.Sum(b => b.QuantityOnHand));
+        var orders = await (from l in _db.Set<Core.SalesOrders.SalesOrderLine>().AsNoTracking() join o in _db.SalesOrders.AsNoTracking() on l.SalesOrderId equals o.Id
+                            where o.CompanyId == companyId && o.OrderDate >= fromDate && o.OrderDate <= toDate && l.InvoicedQuantity > 0m
+                            select new { o.CustomerId, l.ItemId, Quantity = l.InvoicedQuantity, Net = l.InvoicedQuantity * l.UnitPrice }).ToListAsync(ct).ConfigureAwait(false);
+        var pos = await (from l in _db.Set<Core.Pos.SaleLine>().AsNoTracking() join s in _db.Sales.AsNoTracking() on l.SaleId equals s.Id
+                         where s.CompanyId == companyId && s.Status == Core.Pos.SaleStatus.Completed && s.SaleDate >= fromDate && s.SaleDate <= toDate
+                         select new { l.ItemId, l.Quantity, Net = l.LineNet }).ToListAsync(ct).ConfigureAwait(false);
+        return [.. orders.Select(o => (Customer: customers.GetValueOrDefault(o.CustomerId)?.Name ?? "?", o.ItemId, o.Quantity, o.Net))
+            .Concat(pos.Select(p => (Customer: "Cash sales (POS)", p.ItemId, p.Quantity, p.Net)))
+            .GroupBy(x => (x.Customer, x.ItemId)).Select(g => (g.Key.Customer, g.Key.ItemId, Quantity: g.Sum(x => x.Quantity), Net: Math.Round(g.Sum(x => x.Net), 2, MidpointRounding.AwayFromZero)))
+            .Select(x => (x.Customer, x.ItemId, x.Quantity, x.Net, Cost: Math.Round(x.Quantity * averageCost.GetValueOrDefault(x.ItemId), 2, MidpointRounding.AwayFromZero)))
+            .OrderBy(x => x.Customer, StringComparer.Ordinal).ThenByDescending(x => x.Net)
+            .Select(x => Row(("Customer", x.Customer), ("Item", items.GetValueOrDefault(x.ItemId, "?")), ("Quantity", x.Quantity.ToString("0.###", CultureInfo.InvariantCulture)), ("Sales", Money(x.Net)),
+                ("Cost", Money(x.Cost)), ("MarginPercent", Percent(x.Net - x.Cost, x.Net)), ("Margin", x.Net - x.Cost)))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SalesTrendAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        Dictionary<long, Customer> customers = await CustomersAsync(companyId, ct).ConfigureAwait(false);
+        DateOnly earliest = new DateOnly(asAt.Year - 1, 1, 1) < asAt.AddMonths(-6) ? new DateOnly(asAt.Year - 1, 1, 1) : asAt.AddMonths(-6);
+        var sales = await _db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && SalesTypes.Contains(i.ItemType) && i.DocumentDate >= earliest && i.DocumentDate <= asAt)
+            .Select(i => new { i.TraderId, i.DocumentDate, Net = i.ItemType == OpenItemType.CreditNote ? -i.OriginalBase : i.OriginalBase }).ToListAsync(ct).ConfigureAwait(false);
+        DateOnly yearStart = new(asAt.Year, 1, 1), lastYearStart = yearStart.AddYears(-1), lastYearTo = asAt.AddYears(-1), threeAgo = asAt.AddMonths(-3), sixAgo = asAt.AddMonths(-6);
+        return [.. sales.GroupBy(s => s.TraderId).Where(g => customers.ContainsKey(g.Key)).Select(g =>
+            {
+                decimal Sum(DateOnly start, DateOnly end) => g.Where(s => s.DocumentDate >= start && s.DocumentDate <= end).Sum(s => s.Net);
+                return (Customer: customers[g.Key].Name, This: Sum(yearStart, asAt), Last: Sum(lastYearStart, lastYearTo), Last3: Sum(threeAgo.AddDays(1), asAt), Prior3: Sum(sixAgo.AddDays(1), threeAgo));
+            })
+            .OrderByDescending(x => x.This).ThenBy(x => x.Customer, StringComparer.Ordinal)
+            .Select(x => Row(("Customer", x.Customer), ("LastYear", Money(x.Last)), ("Change", x.Last == 0m ? "—" : ((x.This - x.Last) * 100m / x.Last).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"),
+                ("Last3", Money(x.Last3)), ("Prior3", Money(x.Prior3)), ("Trend", x.Last3 > x.Prior3 ? "▲" : x.Last3 < x.Prior3 ? "▼" : "→"), ("ThisYear", x.This)))];
     }
 
     private Task<Dictionary<long, Customer>> CustomersAsync(long companyId, CancellationToken ct)

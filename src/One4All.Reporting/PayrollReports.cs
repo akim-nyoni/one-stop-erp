@@ -34,6 +34,9 @@ public static class PayrollReports
         yield return Listing("PR17", "Earnings Analysis", "Payroll", "Earnings in the period by department and element.",
             "PyrlEarnings", [new Column("Department", "Department", 100), new Column("Element", "Element", 80), new Column("Description", "Description", 160), new Column("Employees", "Employees", 70),
              new Column("Amount", "Amount", 100, true)], Period);
+        yield return Listing("PR26", "Allowance Analysis", "Payroll", "Earnings other than basic salary in the period, per employee and allowance.",
+            "PyrlAllowances", [new Column("Employee", "Employee", 160), new Column("Department", "Department", 90), new Column("Element", "Allowance", 80), new Column("Description", "Description", 150),
+             new Column("Taxable", "Taxable", 55), new Column("Amount", "Amount", 95, true)], Period);
         yield return Listing("PR29", "Tax Reconciliation", "Payroll", "Per employee over the period: taxable earnings, PAYE deducted and the effective rate.",
             "PyrlTax", [new Column("Employee", "Employee", 160), new Column("Taxable", "Taxable earnings", 100), new Column("Rate", "Effective rate", 80), new Column("Tax", "Tax deducted", 100, true)], Period);
         yield return Listing("PR38", "Leave Liability (IAS 19)", "Payroll", "Leave days owed at the date per employee and type, valued at the daily rate of basic salary (annual ÷ 260).",
@@ -41,6 +44,9 @@ public static class PayrollReports
              new Column("DailyRate", "Daily rate", 80), new Column("Liability", "Liability", 100, true)], []);
         yield return Listing("PR49", "Salary Change Audit", "Payroll", "Every change to an employee's basic salary in the period, with who changed it.",
             "PyrlSalaryChanges", [new Column("When", "When", 115), new Column("Employee", "Employee", 160), new Column("User", "Changed by", 90), new Column("Old", "From", 95), new Column("New", "To", 95)], Period);
+        yield return Listing("PR58", "Total Cost to Company", "Payroll", "Per employee over the period: gross pay plus employer contributions, and the annualised cost.",
+            "PyrlCostToCompany", [new Column("Employee", "Employee", 160), new Column("Department", "Department", 90), new Column("Months", "Months paid", 65), new Column("Gross", "Gross", 95),
+             new Column("Employer", "Employer contributions", 110), new Column("Annualised", "Annualised", 100), new Column("Cost", "Cost in period", 100, true)], Period);
         yield return Listing("PR59", "Labour Cost by Department & Cost Centre", "Payroll", "Gross pay plus employer contributions in the period by department and cost centre.",
             "PyrlLabourCost", [new Column("Department", "Department", 100), new Column("CostCentre", "Cost centre", 90), new Column("Employees", "Employees", 70), new Column("Gross", "Gross", 95),
              new Column("Employer", "Employer contributions", 110), new Column("Cost", "Total cost", 100, true)], Period);

@@ -47,6 +47,9 @@ public static class ControlReports
              new Column("Bytes", "Bytes", 70), new Column("Copy", "Copy", 45), new Column("Parameters", "Parameters", 220)], Period);
 
         // Master data & system listings.
+        yield return Listing("SYS258", "Price List Listing", "System", "Every price list with its items, quantity breaks and prices.",
+            "SysrPriceLists", [new Column("PriceList", "Price list", 120), new Column("Currency", "Currency", 55), new Column("Status", "Status", 80), new Column("Item", "Item", 170), new Column("MinimumQuantity", "From qty", 65),
+             new Column("UnitPrice", "Unit price", 90)], []);
         yield return Listing("SYS259", "Exchange Rate History", "System", "Every exchange rate captured, by currency pair and type, with its effective date.",
             "SysrRates", [new Column("From", "From", 50), new Column("To", "To", 50), new Column("Type", "Type", 70), new Column("Effective", "Effective", 80), new Column("Quotation", "Quotation", 80),
              new Column("Rate", "Rate", 100)], []);

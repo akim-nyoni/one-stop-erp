@@ -20,12 +20,14 @@ missing domain data. Items are struck through as they ship (with the report code
 
 ## B. Accounts Receivable
 - ~~29 Aged detail (AR29)~~, ~~30 by rep / currency (AR30)~~, ~~31 Customer Ledger (AR31)~~, ~~33 Sales Day Book (AR33)~~, ~~35 Top Customers (AR35)~~, ~~39 / 44 Unallocated & advances (AR39)~~, ~~40 DSO (AR40)~~, ~~41 Promise-to-Pay (AR41)~~, ~~43 Write-offs (AR43)~~, ~~45 Lay-byes (AR45)~~, ~~47 Exposure by Currency (AR47)~~, ~~48 New & Dormant (AR48)~~
-- Data exists: 34 / 36 sales analysis and history (needs item-level sales from SO / POS lines), 38 collections (all receipts), 49 price list, 50 layouts (quotation, SO confirmation, delivery note, remittance slip)
+- ~~34 Sales Analysis with Margin (AR34)~~, ~~36 Sales History & Trend (AR36)~~, ~~49 price lists (SYS258)~~
+- Data exists: 38 collections (all receipts), 50 layouts (quotation, SO confirmation, delivery note, remittance slip)
 - Needs new data: 28 (parent / child customers), 37 reason codes
 
 ## C. Accounts Payable
 - ~~53 Supplier Ledger (AP53)~~, ~~54 Purchase Day Book (AP54)~~, ~~57 / 58 Payments Made incl. runs (AP58)~~, ~~59 GRNI (AP59)~~, ~~60 Matching Exceptions (AP60)~~, ~~62 WHT Deducted (AP62)~~, ~~63 Scorecard (AP63)~~, ~~64 Balances with debit flags (AP64)~~, ~~65 Bank Detail Change Audit (AP65)~~, ~~66 Top Suppliers (AP66)~~
-- Data exists: 55 purchase analysis by item, 67 layouts (requisition, GRN, debit note)
+- ~~55 Purchase Analysis (AP55)~~
+- Data exists: 67 layouts (requisition, GRN, debit note)
 - Needs new data: 61 (supplier's own statement capture), cheque entity
 
 ## D. Cash Book / Treasury
@@ -95,4 +97,4 @@ missing domain data. Items are struck through as they ship (with the report code
 
 ## R. Master Data & System Listings
 - ~~259 Exchange Rates (SYS259)~~, ~~260 Number Sequences (SYS260)~~, ~~261 Company Configuration (SYS261)~~, ~~262 Report Inventory (SYS262)~~, ~~263 Jobs & Deliveries (SYS263)~~
-- Data exists: 258 price list listing
+- ~~258 Price List Listing (SYS258)~~

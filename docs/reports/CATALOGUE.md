@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-406 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+412 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -282,6 +282,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | PR19 | Third-Party Remittance Schedules | Per scheme and member for the period: the employee's deduction and the employer's contribution — the schedule each provider needs. | FromDate (Date, optional), ToDate (Date, optional), SchemeCode (String, optional) | Scheme, Employee, Member, EmployeePart, EmployerPart, Total | — | Sum(Total) |
 | PR2 | Payroll Summary by Element | Totals for the period by earning, deduction and employer contribution, with how many employees each. | FromDate (Date, optional), ToDate (Date, optional) | Type, Element, Description, Employees, Amount | — | Sum(Amount) |
 | PR20 | Deductions vs Remittances | Per scheme and period: what the payroll deducted and contributed against what was paid over, with the gap. | FromDate (Date, optional), ToDate (Date, optional) | Scheme, Period, Deducted, Remitted, Status, Outstanding | — | Sum(Outstanding) |
+| PR26 | Allowance Analysis | Earnings other than basic salary in the period, per employee and allowance. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Department, Element, Description, Taxable, Amount | — | Sum(Amount) |
 | PR27 | PAYE Remittance Return | Per month: employees, taxable earnings, PAYE deducted and PAYE by the tax table in force, with any difference. | FromDate (Date, optional), ToDate (Date, optional) | Month, Employees, Taxable, ByTable, Difference, Deducted | — | Sum(Deducted) |
 | PR28 | Annual Tax Certificates | Per employee for the year: ID and tax numbers, gross, taxable, pension contributions and PAYE — the certificate data. | FromDate (Date, optional), ToDate (Date, optional) | Employee, NationalId, TaxNumber, Gross, Taxable, Pension, Paye | — | Sum(Paye) |
 | PR29 | Tax Reconciliation | Per employee over the period: taxable earnings, PAYE deducted and the effective rate. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Taxable, Rate, Tax | — | Sum(Tax) |
@@ -300,6 +301,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | PR5 | Payroll Variance / Movement | Each employee's net pay this pay month against last, with starters, leavers and changes over 10% flagged. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Department, Previous, Current, Flag, Change | — | Sum(Change) |
 | PR50 | Employee Bank Detail Change Audit | Every change to how or where an employee is paid, with who changed it (account numbers masked). | FromDate (Date, optional), ToDate (Date, optional) | When, Employee, User, Changed, New | — | — |
 | PR51 | Contract, Probation & Permit Expiry | Fixed-term contracts, probations and work permits ending within 90 days of the date, or already passed. | AsAtDate (Date, optional) | Kind, Employee, Department, Date, Due | — | — |
+| PR58 | Total Cost to Company | Per employee over the period: gross pay plus employer contributions, and the annualised cost. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Department, Months, Gross, Employer, Annualised, Cost | — | Sum(Cost) |
 | PR59 | Labour Cost by Department & Cost Centre | Gross pay plus employer contributions in the period by department and cost centre. | FromDate (Date, optional), ToDate (Date, optional) | Department, CostCentre, Employees, Gross, Employer, Cost | — | Sum(Cost) |
 | PR6 | Payroll Calculation Trace | Every payslip line in the period with how its element is calculated and the employee's basic salary. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Period, Element, Basis, Rule, Basic, Amount | — | Sum(Amount) |
 | PR60 | Payroll Cost vs Budget | Year to date on each payroll expense account: budget, actual and the variance. | AsAtDate (Date, optional) | Account, Name, Budget, Actual, Variance | — | Sum(Variance) |
@@ -335,6 +337,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | AP-SUP | Supplier Register | Supplier master: code, name, currency, payment terms and on-hold flag. | — | Code, Name, Currency, TermsDays, OnHold | — | Sum(TermsDays) |
 | AP53 | Supplier Ledger | One supplier's documents in date order with running balance and what is still outstanding on each. | SupplierCode (String, optional) | Date, Type, Document, Due, Debit, Credit, Balance, Outstanding | — | Sum(Outstanding) |
 | AP54 | Purchase Day Book | Supplier invoices, credit notes and debit notes posted in the period, in transaction and base currency. | FromDate (Date, optional), ToDate (Date, optional) | Date, Document, Type, Supplier, Currency, Transaction, Base | — | Sum(Base) |
+| AP55 | Purchase Analysis by Supplier and Item | Order lines placed in the period (cancelled orders excluded) by supplier and item: quantity, average price and value. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Item, Orders, Quantity, AveragePrice, Currency, Value | — | Sum(Value) |
 | AP58 | Payments Made | Payments to suppliers in the period (payment runs and single payments) with tax withheld. | FromDate (Date, optional), ToDate (Date, optional) | Date, Document, Supplier, Currency, Transaction, Withheld, Base | — | Sum(Base) |
 | AP59 | Goods Received Not Invoiced (GRNI) | Order lines received but not yet invoiced: the GRNI accrual by order and item, with its age. | AsAtDate (Date, optional) | Order, Supplier, Item, Received, Invoiced, Price, LastReceipt, Days, Value | — | Sum(Value) |
 | AP60 | Invoice Matching Exceptions | Supplier invoices disputed against their order: reason, status and resolution. | — | Invoice, Date, Supplier, Order, Reason, Status, Resolution, Value | — | Sum(Value) |
@@ -450,7 +453,9 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | AR30 | Aged Debtors by Sales Rep and Currency | Debtors aged as at the date, grouped by sales rep (or agent) and currency, in base. | AsAtDate (Date, optional) | Rep, Currency, Customers, Current, D30, D60, D90, D120, Over120, Total | — | Sum(Total) |
 | AR31 | Customer Ledger | One customer's documents in date order with running balance and what is still outstanding on each. | CustomerCode (String, optional) | Date, Type, Document, Due, Debit, Credit, Balance, Outstanding | — | Sum(Outstanding) |
 | AR33 | Sales Day Book | Invoices, credit notes and debit notes raised in the period, in transaction and base currency. | FromDate (Date, optional), ToDate (Date, optional) | Date, Document, Type, Customer, Currency, Transaction, Base | — | Sum(Base) |
+| AR34 | Sales Analysis with Margin | Invoiced order lines and POS sales in the period by customer and item, against current average cost. | FromDate (Date, optional), ToDate (Date, optional) | Customer, Item, Quantity, Sales, Cost, MarginPercent, Margin | — | Sum(Margin) |
 | AR35 | Top Customers (Pareto) | Customers ranked by net sales in the period, with share and cumulative share. | FromDate (Date, optional), ToDate (Date, optional) | Rank, Customer, Documents, Share, Cumulative, Sales | — | Sum(Sales) |
+| AR36 | Customer Sales History & Trend | Per customer: net sales this year to date against the same period last year, and the last three months against the three before. | AsAtDate (Date, optional) | Customer, LastYear, Change, Last3, Prior3, Trend, ThisYear | — | Sum(ThisYear) |
 | AR39 | Unallocated Receipts, Credits & Advances | Receipts, credit notes and advances not yet allocated to invoices at the date, with how long they have been unallocated. | AsAtDate (Date, optional) | Customer, Document, Type, Date, Days, Unallocated | — | Sum(Unallocated) |
 | AR40 | Debtor Days (DSO) | Per customer: what is owed at the date against sales over the 90 days to it, as days of sales outstanding. | AsAtDate (Date, optional) | Customer, Sales90, Dso, Terms, Owing | — | Sum(Owing) |
 | AR41 | Promise-to-Pay Diary | Promises recorded by credit control: amount, date promised and whether kept, broken or still open at the date. | AsAtDate (Date, optional) | PayBy, Customer, Made, Status, Resolved, Note, Amount | — | Sum(Amount) |
@@ -500,6 +505,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | SYS245 | Unposted & Deferred Batches | Journals still draft, deferred or awaiting approval, with who prepared them. | — | Journal, Posting, Status, Source, Document, PreparedBy, Narrative | — | — |
 | SYS248 | Licence Installation History | Licences installed, when and by whom, and which is active (token fingerprint only). | — | Installed, By, Active, Fingerprint | — | — |
 | SYS250 | Report Print & Export Log | Every report run in the period: who, what, format, size and copy number. | FromDate (Date, optional), ToDate (Date, optional) | When, Report, User, Purpose, Format, Bytes, Copy, Parameters | — | — |
+| SYS258 | Price List Listing | Every price list with its items, quantity breaks and prices. | — | PriceList, Currency, Status, Item, MinimumQuantity, UnitPrice | — | — |
 | SYS259 | Exchange Rate History | Every exchange rate captured, by currency pair and type, with its effective date. | — | From, To, Type, Effective, Quotation, Rate | — | — |
 | SYS260 | Number Sequence Status | Every document sequence: prefix, padding, yearly reset, gapless flag and the next number per year. | — | Document, Prefix, Branch, Padding, Yearly, Gapless, Next | — | — |
 | SYS261 | Company Configuration Listing | Every setting of the company record. | — | Setting, Value | — | — |

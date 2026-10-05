@@ -21,6 +21,9 @@ public static class PayablesReports
         yield return Listing("AP54", "Purchase Day Book", "Purchasing", "Supplier invoices, credit notes and debit notes posted in the period, in transaction and base currency.",
             "PaybDayBook", [new Column("Date", "Date", 75), new Column("Document", "Document", 110), new Column("Type", "Type", 80), new Column("Supplier", "Supplier", 150), new Column("Currency", "Currency", 55),
              new Column("Transaction", "Transaction", 95), new Column("Base", "Base", 95, true)], Period);
+        yield return Listing("AP55", "Purchase Analysis by Supplier and Item", "Purchasing", "Order lines placed in the period (cancelled orders excluded) by supplier and item: quantity, average price and value.",
+            "PaybPurchaseAnalysis", [new Column("Supplier", "Supplier", 150), new Column("Item", "Item", 150), new Column("Orders", "Orders", 50), new Column("Quantity", "Qty", 65), new Column("AveragePrice", "Avg price", 85),
+             new Column("Currency", "Currency", 55), new Column("Value", "Value", 100, true)], Period);
         yield return Listing("AP58", "Payments Made", "Purchasing", "Payments to suppliers in the period (payment runs and single payments) with tax withheld.",
             "PaybPayments", [new Column("Date", "Date", 75), new Column("Document", "Document", 120), new Column("Supplier", "Supplier", 150), new Column("Currency", "Currency", 55),
              new Column("Transaction", "Transaction", 95), new Column("Withheld", "Tax withheld", 85), new Column("Base", "Base", 95, true)], Period);

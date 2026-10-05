@@ -41,6 +41,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
         {
             "PAYBLEDGER" => await LedgerAsync(companyId, parameters, ct).ConfigureAwait(false),
             "PAYBDAYBOOK" => await DayBookAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PAYBPURCHASEANALYSIS" => await PurchaseAnalysisAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PAYBPAYMENTS" => await PaymentsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PAYBGRNI" => await GrniAsync(companyId, asAt, ct).ConfigureAwait(false),
             "PAYBDISPUTES" => await DisputesAsync(companyId, ct).ConfigureAwait(false),
@@ -184,6 +185,20 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
             return Row(("Rank", ++rank), ("Supplier", suppliers.GetValueOrDefault(p.Key, "?")), ("Documents", p.Count), ("Share", Percent(p.Net, total)), ("Cumulative", Percent(running, total)),
                 ("Purchases", p.Net));
         })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PurchaseAnalysisAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, string> suppliers = await SuppliersAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await _db.Set<Item>().AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
+        var lines = await (from l in _db.Set<PurchaseOrderLine>().AsNoTracking() join o in _db.Set<PurchaseOrder>().AsNoTracking() on l.PurchaseOrderId equals o.Id
+                           where o.CompanyId == companyId && o.Status != PurchaseOrderStatus.Cancelled && o.OrderDate >= fromDate && o.OrderDate <= toDate
+                           select new { o.Id, o.SupplierId, Currency = o.Currency.Value, l.ItemId, l.OrderedQuantity, l.UnitPrice }).ToListAsync(ct).ConfigureAwait(false);
+        return [.. lines.GroupBy(l => (l.SupplierId, l.ItemId, l.Currency)).Select(g => (g.Key, Orders: g.Select(l => l.Id).Distinct().Count(), Quantity: g.Sum(l => l.OrderedQuantity),
+                Value: g.Sum(l => Math.Round(l.OrderedQuantity * l.UnitPrice, 2, MidpointRounding.AwayFromZero))))
+            .OrderBy(x => suppliers.GetValueOrDefault(x.Key.SupplierId), StringComparer.Ordinal).ThenByDescending(x => x.Value)
+            .Select(x => Row(("Supplier", suppliers.GetValueOrDefault(x.Key.SupplierId, "?")), ("Item", items.GetValueOrDefault(x.Key.ItemId, "?")), ("Orders", x.Orders), ("Quantity", Qty(x.Quantity)),
+                ("AveragePrice", x.Quantity == 0m ? "—" : Money(x.Value / x.Quantity)), ("Currency", x.Key.Currency), ("Value", x.Value)))];
     }
 
     private Task<Dictionary<long, string>> SuppliersAsync(long companyId, CancellationToken ct)
