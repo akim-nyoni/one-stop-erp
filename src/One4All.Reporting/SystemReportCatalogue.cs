@@ -136,6 +136,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Weighbridge / bulk materials (brief §14 L, WB + item number).
+        foreach (ReportDefinition definition in WeighbridgeReports.All())
+        {
+            yield return definition;
+        }
+
         // Inventory additions (brief §14 E, INV + item number).
         foreach (ReportDefinition definition in InventoryReports.All())
         {

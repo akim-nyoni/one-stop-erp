@@ -177,6 +177,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.CashBookReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.InventoryReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.RetailReportDataProvider>();
+        services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.WeighbridgeReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.AssetTaxReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.DashboardReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.OperationsReportDataProvider>();
@@ -250,6 +251,7 @@ public static class DependencyInjection
 
         // Construction / Job Costing.
         services.AddScoped<Application.Abstractions.JobCosting.IJobCostingService, JobCosting.JobCostingService>();
+        services.AddScoped<Application.Abstractions.JobCosting.IWeighbridgeService, JobCosting.WeighbridgeService>();
 
         // Fixed Assets.
         services.AddScoped<Application.Abstractions.FixedAssets.IFixedAssetService, FixedAssets.FixedAssetService>();

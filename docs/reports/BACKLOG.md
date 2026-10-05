@@ -66,8 +66,7 @@ missing domain data. Items are struck through as they ship (with the report code
 - Needs new data: 191 variations, 192 subcontractors, 193 timesheets, 194 plant, 196 BOQ
 
 ## L. Weighbridge
-- Data exists (thin): 198, 199
-- Needs new data: customer / driver / time in-out / overrides / stockpiles / mixes / haulage (200–205)
+- ~~198 Weighbridge Ticket (WB198)~~, ~~199 Daily Register & Tonnage (WB199)~~, ~~200 Vehicle Turnaround (WB200)~~, ~~201 Deliveries by Customer / Site (WB201)~~, ~~202 Manual Weight Overrides (WB202)~~, ~~203 Stockpile Reconciliation (WB203)~~, ~~204 Concrete Batch Report (WB204)~~, ~~205 Haulage Charge Analysis (WB205)~~
 
 ## M. Fixed Assets
 - ~~207 Depreciation Schedule (FA207)~~, ~~208 Additions & Transfers (FA208)~~, ~~209 Movement Schedule (FA209)~~, ~~212 Fully Depreciated in Use (FA212)~~

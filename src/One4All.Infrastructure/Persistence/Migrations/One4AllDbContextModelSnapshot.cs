@@ -9531,6 +9531,67 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("warehouse", "inv");
                 });
 
+            modelBuilder.Entity("One4All.Core.JobCosting.HaulageZone", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("FromKm")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("from_km");
+
+                    b.Property<decimal>("MinimumCharge")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("minimum_charge");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<decimal>("RatePerTonne")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("rate_per_tonne");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<decimal>("ToKm")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("to_km");
+
+                    b.HasKey("Id")
+                        .HasName("pk_haulage_zone");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_haulage_zone_company_id_code");
+
+                    b.ToTable("haulage_zone", "job");
+                });
+
             modelBuilder.Entity("One4All.Core.JobCosting.JobContract", b =>
                 {
                     b.Property<long>("Id")
@@ -9823,6 +9884,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("BatchRunNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("batch_run_number");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -9840,6 +9906,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,6)")
                         .HasColumnName("cubic_metres_per_tonne");
 
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date")
                         .HasColumnName("date");
@@ -9849,14 +9919,55 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("deduction_kg");
 
+                    b.Property<int>("Direction")
+                        .HasColumnType("integer")
+                        .HasColumnName("direction");
+
+                    b.Property<decimal?>("DistanceKm")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("distance_km");
+
+                    b.Property<string>("DriverName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("driver_name");
+
                     b.Property<decimal>("GrossWeightKg")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("gross_weight_kg");
 
+                    b.Property<decimal>("HaulageCharge")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("haulage_charge");
+
+                    b.Property<string>("HaulageZoneCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("haulage_zone_code");
+
                     b.Property<bool>("IsComplete")
                         .HasColumnType("boolean")
                         .HasColumnName("is_complete");
+
+                    b.Property<bool>("IsManualWeight")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_manual_weight");
+
+                    b.Property<long?>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<long?>("ManualAuthorisedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("manual_authorised_by_user_id");
+
+                    b.Property<string>("ManualReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("manual_reason");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
@@ -9865,6 +9976,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
+
+                    b.Property<long?>("OperatorUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("operator_user_id");
 
                     b.Property<string>("Product")
                         .IsRequired()
@@ -9878,6 +9993,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<string>("SiteName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("site_name");
+
+                    b.Property<long?>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
                     b.Property<decimal>("TareWeightKg")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -9889,11 +10013,23 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("ticket_number");
 
+                    b.Property<DateTimeOffset?>("TimeInUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("time_in_utc");
+
+                    b.Property<DateTimeOffset?>("TimeOutUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("time_out_utc");
+
                     b.Property<string>("VehicleRegistration")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("vehicle_registration");
+
+                    b.Property<long?>("WarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("warehouse_id");
 
                     b.HasKey("Id")
                         .HasName("pk_weighbridge_ticket");
@@ -9903,6 +10039,60 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_weighbridge_ticket_company_id_ticket_number");
 
                     b.ToTable("weighbridge_ticket", "job");
+                });
+
+            modelBuilder.Entity("One4All.Core.JobCosting.WeighbridgeVehicle", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Haulier")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("haulier");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<decimal?>("MaxGrossKg")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("max_gross_kg");
+
+                    b.Property<string>("Registration")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("registration");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<decimal?>("StoredTareKg")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("stored_tare_kg");
+
+                    b.HasKey("Id")
+                        .HasName("pk_weighbridge_vehicle");
+
+                    b.HasIndex("CompanyId", "Registration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_weighbridge_vehicle_company_id_registration");
+
+                    b.ToTable("weighbridge_vehicle", "job");
                 });
 
             modelBuilder.Entity("One4All.Core.Licensing.InstalledLicence", b =>

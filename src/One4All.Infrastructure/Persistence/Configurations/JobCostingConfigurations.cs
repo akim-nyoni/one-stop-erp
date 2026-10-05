@@ -64,9 +64,47 @@ internal sealed class WeighbridgeTicketConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.TareWeightKg).HasPrecision(19, 4);
         b.Property(x => x.DeductionKg).HasPrecision(19, 4);
         b.Property(x => x.CubicMetresPerTonne).HasPrecision(19, 6);
+        b.Property(x => x.Direction).HasConversion<int>();
+        b.Property(x => x.DriverName).HasMaxLength(120);
+        b.Property(x => x.SiteName).HasMaxLength(120);
+        b.Property(x => x.ManualReason).HasMaxLength(200);
+        b.Property(x => x.DistanceKm).HasPrecision(19, 2);
+        b.Property(x => x.HaulageZoneCode).HasMaxLength(20);
+        b.Property(x => x.HaulageCharge).HasPrecision(19, 4);
+        b.Property(x => x.BatchRunNumber).HasMaxLength(40);
         b.Ignore(x => x.NetWeightKg);
         b.Ignore(x => x.NetTonnes);
         b.Ignore(x => x.NetCubicMetres);
         b.HasIndex(x => new { x.CompanyId, x.TicketNumber }).IsUnique();
+    }
+}
+
+internal sealed class WeighbridgeVehicleConfiguration : IEntityTypeConfiguration<WeighbridgeVehicle>
+{
+    public void Configure(EntityTypeBuilder<WeighbridgeVehicle> b)
+    {
+        b.ToTable("weighbridge_vehicle", Schemas.JobCosting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Registration).HasMaxLength(20);
+        b.Property(x => x.Haulier).HasMaxLength(120);
+        b.Property(x => x.StoredTareKg).HasPrecision(19, 4);
+        b.Property(x => x.MaxGrossKg).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.Registration }).IsUnique();
+    }
+}
+
+internal sealed class HaulageZoneConfiguration : IEntityTypeConfiguration<HaulageZone>
+{
+    public void Configure(EntityTypeBuilder<HaulageZone> b)
+    {
+        b.ToTable("haulage_zone", Schemas.JobCosting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.FromKm).HasPrecision(19, 2);
+        b.Property(x => x.ToKm).HasPrecision(19, 2);
+        b.Property(x => x.RatePerTonne).HasPrecision(19, 4);
+        b.Property(x => x.MinimumCharge).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
     }
 }

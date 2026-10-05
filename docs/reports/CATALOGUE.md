@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-435 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+443 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -543,3 +543,16 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | TX217 | VAT Reconciliation | Per tax code: movement on its output and input tax accounts in the period against the tax-coded lines, with the difference. | FromDate (Date, optional), ToDate (Date, optional) | TaxCode, Name, Output, Input, Coded, Difference | — | Sum(Difference) |
 | TX218 | Exempt, Zero-rated & Out-of-scope Supplies | Lines in the period under zero-rated, exempt and out-of-scope tax codes, totalled per code. | FromDate (Date, optional), ToDate (Date, optional) | TaxCode, Name, Type, Lines, Amount | — | Sum(Amount) |
 | TX220 | Withholding Tax Return | Withholding certificates by month and tax code: count, gross paid, tax withheld and how much has been remitted. | FromDate (Date, optional), ToDate (Date, optional) | Month, TaxCode, Certificates, Gross, Remitted, Withheld | — | Sum(Withheld) |
+
+## Weighbridge
+
+| Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
+|---|---|---|---|---|---|---|
+| WB198 | Weighbridge Ticket | Each ticket in the period: vehicle, driver, customer or supplier, product, time in and out, gross, tare, deduction and net. | FromDate (Date, optional), ToDate (Date, optional) | Ticket, Date, Vehicle, Driver, Party, Product, In, Out, Gross, Tare, Deduction, Cubic, Net | — | Sum(Net) |
+| WB199 | Daily Weighbridge Register & Tonnage Summary | Completed loads per day, product, customer, vehicle and driver: loads, tonnes and m³. | FromDate (Date, optional), ToDate (Date, optional) | Date, Product, Customer, Vehicle, Driver, Loads, Cubic, Tonnes | — | Sum(Tonnes) |
+| WB200 | Vehicle Movement & Turnaround | Per vehicle: loads, average and longest time between weighs, open tickets and overloads against its legal maximum. | FromDate (Date, optional), ToDate (Date, optional) | Vehicle, Haulier, Loads, Average, Longest, Open, Overloads, Tonnes | — | Sum(Tonnes) |
+| WB201 | Deliveries by Customer / Site | Outbound loads per customer and site: loads, tonnes, m³ and the haulage charged. | FromDate (Date, optional), ToDate (Date, optional) | Customer, Site, Loads, Tonnes, Cubic, Haulage | — | Sum(Haulage) |
+| WB202 | Manual Weight Override Report | Tickets where a weight was keyed by hand: operator, authorising supervisor, reason and the net recorded. | FromDate (Date, optional), ToDate (Date, optional) | Ticket, Date, Vehicle, Operator, AuthorisedBy, Reason, Net | — | Sum(Net) |
+| WB203 | Stockpile Reconciliation | Per weighed product and stockpile: opening, produced, received, sold over the weighbridge, adjusted and closing tonnes. | FromDate (Date, optional), ToDate (Date, optional) | Product, Stockpile, Opening, Produced, Received, Sold, Adjusted, Closing | — | Sum(Closing) |
+| WB204 | Concrete Batch Report | Each batch run in the period: mix, m³ produced and delivered over the weighbridge, materials cost and the variance to the recipe. | FromDate (Date, optional), ToDate (Date, optional) | Run, Date, Mix, Produced, Delivered, Loads, Cost, Variance | — | Sum(Variance) |
+| WB205 | Haulage Charge Analysis | Haulage charged in the period per zone: loads, tonnes, kilometres and the charge, with the rate achieved per tonne-km. | FromDate (Date, optional), ToDate (Date, optional) | Zone, Name, Loads, Tonnes, Km, PerTonneKm, Charge | — | Sum(Charge) |

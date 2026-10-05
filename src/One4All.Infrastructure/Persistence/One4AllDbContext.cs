@@ -227,6 +227,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Weighbridge tickets.</summary>
     public DbSet<Core.JobCosting.WeighbridgeTicket> WeighbridgeTickets => Set<Core.JobCosting.WeighbridgeTicket>();
 
+    /// <summary>Gets the weighbridge vehicle register.</summary>
+    public DbSet<Core.JobCosting.WeighbridgeVehicle> WeighbridgeVehicles => Set<Core.JobCosting.WeighbridgeVehicle>();
+
+    /// <summary>Gets the haulage charging zones.</summary>
+    public DbSet<Core.JobCosting.HaulageZone> HaulageZones => Set<Core.JobCosting.HaulageZone>();
+
     /// <summary>Fixed assets.</summary>
     public DbSet<Core.FixedAssets.FixedAsset> FixedAssets => Set<Core.FixedAssets.FixedAsset>();
 
