@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-280 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+295 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -383,3 +383,18 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
 | SYS-PERIOD | Period Status | Accounting periods with their open/closed status for the key ledgers (GL, AR, AP) — a month-end close aid. | — | Period, Start, End, GL, AR, AP | — | — |
+| SYS237 | Permission Matrix | Every role with each permission it grants and the operations allowed. | — | Role, Module, Permission, Name, Operations | — | — |
+| SYS238 | User, Role & Group Membership | Every user with direct roles, groups, roles held through groups and individual overrides. | — | User, Name, Status, Roles, Groups, GroupRoles, Overrides | — | — |
+| SYS239 | Segregation of Duties Violations (all modules) | Every active user whose combined permissions break a separation-of-duties rule. | — | User, Rule, Conflict, Severity | — | — |
+| SYS240 | Master Data Change Report | Changes in the period to customers, suppliers, items, accounts, tariffs, properties, employees, price lists, users and roles. | FromDate (Date, optional), ToDate (Date, optional) | When, User, Entity, Id, Action, Changed | — | — |
+| SYS242 | Back-dated Transactions | Journals entered in the period with a posting date more than the given number of days before they were entered. | FromDate (Date, optional), ToDate (Date, optional), Days (Integer, optional) | Journal, Posting, Entered, DaysBack, Source, Document, PreparedBy, Narrative | — | — |
+| SYS243 | Deleted & Voided Documents | Records deleted or retired in the period, and journals reversed or cancelled, with who and why. | FromDate (Date, optional), ToDate (Date, optional) | When, Kind, Entity, Id, User, Reason | — | — |
+| SYS244 | Document Numbering Gaps | Missing runs in each year's journal numbering. | — | Year, From, To, Missing, Description | — | — |
+| SYS245 | Unposted & Deferred Batches | Journals still draft, deferred or awaiting approval, with who prepared them. | — | Journal, Posting, Status, Source, Document, PreparedBy, Narrative | — | — |
+| SYS248 | Licence Installation History | Licences installed, when and by whom, and which is active (token fingerprint only). | — | Installed, By, Active, Fingerprint | — | — |
+| SYS250 | Report Print & Export Log | Every report run in the period: who, what, format, size and copy number. | FromDate (Date, optional), ToDate (Date, optional) | When, Report, User, Purpose, Format, Bytes, Copy, Parameters | — | — |
+| SYS259 | Exchange Rate History | Every exchange rate captured, by currency pair and type, with its effective date. | — | From, To, Type, Effective, Quotation, Rate | — | — |
+| SYS260 | Number Sequence Status | Every document sequence: prefix, padding, yearly reset, gapless flag and the next number per year. | — | Document, Prefix, Branch, Padding, Yearly, Gapless, Next | — | — |
+| SYS261 | Company Configuration Listing | Every setting of the company record. | — | Setting, Value | — | — |
+| SYS262 | Report Definition Inventory | Every report definition held — system and custom — with scope, version and last change. | — | Code, Name, Module, Scope, Version, Changed | — | — |
+| SYS263 | Scheduled Job Status & Delivery Log | Each scheduled job's state and last result, then report deliveries in the period. | FromDate (Date, optional), ToDate (Date, optional) | Kind, Name, When, Status, Detail | — | — |

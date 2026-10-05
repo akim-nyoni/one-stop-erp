@@ -100,6 +100,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Audit, security & system listings (brief §14 P and R, SYS + item number).
+        foreach (ReportDefinition definition in ControlReports.All())
+        {
+            yield return definition;
+        }
+
         // Accounts Payable additions (brief §14 C, AP + item number).
         foreach (ReportDefinition definition in PayablesReports.All())
         {

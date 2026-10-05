@@ -81,11 +81,13 @@ missing domain data. Items are struck through as they ship (with the report code
 - Needs new data: payroll runs and approvals, employee bank / tax / ID details, schemes and members, tax tables, timesheets, grades and establishment, HR records (PR7–PR11, PR13–PR15, PR19–PR23, PR25, PR30–PR33, PR35, PR36, PR40–PR43, PR47, PR48, PR50–PR57, PR62, PR68, PR69)
 
 ## P. Audit, Security & Compliance
-- Data exists: 237–240, 242–245, 248, 250; partly 236, 241, 247
+- ~~237 Permission Matrix (SYS237)~~, ~~238 Membership (SYS238)~~, ~~239 SoD all modules (SYS239)~~, ~~240 Master Data Changes (SYS240)~~, ~~242 Back-dated (SYS242)~~, ~~243 Deleted & Voided (SYS243)~~, ~~244 Numbering Gaps (SYS244, journals)~~, ~~245 Unposted (SYS245)~~, ~~248 Licences (SYS248)~~, ~~250 Report Run Log (SYS250)~~
+- Data exists: partly 236 (no login history), 241 (overrides), 247 (hash-chain verification is in the audit service)
 - Needs new data: 249 login sessions
 
 ## Q. Executive / BI Dashboards
 - Data exists: 251–255; 256 except water losses
 
 ## R. Master Data & System Listings
-- Data exists: 258–263
+- ~~259 Exchange Rates (SYS259)~~, ~~260 Number Sequences (SYS260)~~, ~~261 Company Configuration (SYS261)~~, ~~262 Report Inventory (SYS262)~~, ~~263 Jobs & Deliveries (SYS263)~~
+- Data exists: 258 price list listing
