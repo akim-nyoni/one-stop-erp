@@ -43,5 +43,35 @@ public static class MunicipalReports
             "MuniReadingExceptions", [new Column("Date", "Date", 75), new Column("Meter", "Meter", 90), new Column("Stand", "Stand", 80), new Column("Kind", "Kind", 70), new Column("Flags", "Flags", 170),
              new Column("Previous", "Previous", 80), new Column("Reading", "Reading", 80), new Column("Accepted", "Accepted", 60), new Column("Consumption", "Consumption", 90, true)],
             [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("M156", "Consumption Analysis", "Municipal", "Metered consumption for the twelve months to the date against the twelve before, per meter with its category.",
+            "MuniConsumption", [new Column("Stand", "Stand", 80), new Column("Meter", "Meter", 90), new Column("Service", "Service", 80), new Column("Category", "Category", 90),
+             new Column("Readings", "Readings", 60), new Column("PriorYear", "Prior 12 months", 95), new Column("Change", "Change", 70), new Column("Consumption", "Last 12 months", 100, true)],
+            [("AsAtDate", ParameterType.Date)]);
+
+        // Meters, credit control and social relief.
+        yield return Listing("M159", "Meter Register & Replacement History", "Municipal", "Every meter with stand, service, installation and removal, what replaced it, last actual reading and units estimated since.",
+            "MuniMeters", [new Column("Meter", "Meter", 90), new Column("Stand", "Stand", 80), new Column("Service", "Service", 80), new Column("Installed", "Installed", 75), new Column("Removed", "Removed", 75),
+             new Column("ReplacedBy", "Replaced by", 90), new Column("LastActual", "Last actual", 90), new Column("Status", "Status", 70), new Column("EstimatedSinceActual", "Estimated since actual", 110, true)], []);
+        yield return Listing("M160", "Disconnection & Reconnection Lists", "Municipal", "Service orders to disconnect for arrears or reconnect after payment, with status, execution and the fee raised.",
+            "MuniServiceOrders", [new Column("Order", "Order", 90), new Column("Kind", "Kind", 80), new Column("Stand", "Stand", 80), new Column("Ward", "Ward", 60), new Column("Service", "Service", 80),
+             new Column("Raised", "Raised", 75), new Column("Status", "Status", 70), new Column("Executed", "Executed", 75), new Column("Fee", "Fee invoice", 90), new Column("Arrears", "Arrears", 95, true)], []);
+        yield return Listing("M161", "Payment Arrangements Register (all debtors)", "Municipal", "Every payment arrangement: terms, status and standing as at the date.",
+            "MuniArrangements", [new Column("Ward", "Ward", 60), new Column("Debtor", "Debtor", 150), new Column("Started", "Started", 75), new Column("Total", "Total", 85),
+             new Column("Instalment", "Instalment", 80), new Column("Status", "Status", 70), new Column("DueToDate", "Due to date", 85), new Column("Paid", "Paid", 85), new Column("Missed", "Missed", 50),
+             new Column("Shortfall", "Shortfall", 90, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("M162", "Indigent Register & Subsidy Cost", "Municipal", "Registered indigent households with income, subsidy rate, review date and the subsidy credited in the year to the date.",
+            "MuniIndigent", [new Column("Stand", "Stand", 80), new Column("Ward", "Ward", 60), new Column("Income", "Household income", 95), new Column("Rate", "Subsidy %", 60),
+             new Column("ApprovedFrom", "From", 75), new Column("ReviewDue", "Review due", 75), new Column("Status", "Status", 70), new Column("Subsidy", "Subsidy YTD", 95, true)], [("AsAtDate", ParameterType.Date)]);
+
+        // Licensing, service delivery and tariffs.
+        yield return Listing("M166", "Licences & Permits Register and Renewals Due", "Municipal", "Every licence with holder, expiry, days to expiry at the date, renewals and the latest inspection.",
+            "MuniLicences", [new Column("Licence", "Licence", 90), new Column("Kind", "Kind", 80), new Column("Holder", "Holder", 140), new Column("Expires", "Expires", 75), new Column("Due", "Days to expiry", 75),
+             new Column("Status", "Status", 70), new Column("Renewals", "Renewals", 55), new Column("Inspection", "Last inspection", 150), new Column("Fee", "Fee", 85, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("M167", "Service Request / Fault Ticket SLA", "Municipal", "Every ticket with category, priority, response and resolution against their SLA deadlines.",
+            "MuniTicketSla", [new Column("Ticket", "Ticket", 90), new Column("Category", "Category", 90), new Column("Priority", "Priority", 60), new Column("Reported", "Reported", 110),
+             new Column("Status", "Status", 70), new Column("Response", "Response", 110), new Column("Resolution", "Resolution", 110), new Column("Hours", "Hours open", 70)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("M168", "Tariff Schedule", "Municipal", "Every tariff with its type, category, ward, effective date, charges, blocks and seasonal rates.",
+            "MuniTariffs", [new Column("Tariff", "Tariff", 80), new Column("Name", "Name", 140), new Column("Service", "Service", 80), new Column("Type", "Type", 90), new Column("Category", "Category", 85),
+             new Column("Ward", "Ward", 55), new Column("Effective", "Effective", 75), new Column("Charges", "Charges", 220), new Column("Blocks", "Blocks / seasons", 200), new Column("Active", "Active", 50)], []);
     }
 }

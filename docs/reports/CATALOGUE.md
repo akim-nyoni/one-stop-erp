@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-233 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+241 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -199,6 +199,14 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | M153 | Rates Clearance Certificate Register | Certificates issued with property, validity, advance held and who issued them, and whether still valid at the date. | AsAtDate (Date, optional) | Certificate, Stand, Issued, ValidUntil, State, IssuedBy, AdvanceHeld | — | Sum(AdvanceHeld) |
 | M154 | Meter Reading Sheets / Route Books | Each reading route in walking order: meter, stand, last reading and date, blank for the new reading. | RouteCode (String, optional) | Route, Reader, Sequence, Meter, Stand, Address, LastReading, LastDate, NewReading | — | — |
 | M155 | Meter Reading Exceptions | Readings flagged high or low consumption, rollover, negative or tampered, and estimates, with whether they were accepted. | AsAtDate (Date, optional) | Date, Meter, Stand, Kind, Flags, Previous, Reading, Accepted, Consumption | — | Sum(Consumption) |
+| M156 | Consumption Analysis | Metered consumption for the twelve months to the date against the twelve before, per meter with its category. | AsAtDate (Date, optional) | Stand, Meter, Service, Category, Readings, PriorYear, Change, Consumption | — | Sum(Consumption) |
+| M159 | Meter Register & Replacement History | Every meter with stand, service, installation and removal, what replaced it, last actual reading and units estimated since. | — | Meter, Stand, Service, Installed, Removed, ReplacedBy, LastActual, Status, EstimatedSinceActual | — | Sum(EstimatedSinceActual) |
+| M160 | Disconnection & Reconnection Lists | Service orders to disconnect for arrears or reconnect after payment, with status, execution and the fee raised. | — | Order, Kind, Stand, Ward, Service, Raised, Status, Executed, Fee, Arrears | — | Sum(Arrears) |
+| M161 | Payment Arrangements Register (all debtors) | Every payment arrangement: terms, status and standing as at the date. | AsAtDate (Date, optional) | Ward, Debtor, Started, Total, Instalment, Status, DueToDate, Paid, Missed, Shortfall | — | Sum(Shortfall) |
+| M162 | Indigent Register & Subsidy Cost | Registered indigent households with income, subsidy rate, review date and the subsidy credited in the year to the date. | AsAtDate (Date, optional) | Stand, Ward, Income, Rate, ApprovedFrom, ReviewDue, Status, Subsidy | — | Sum(Subsidy) |
+| M166 | Licences & Permits Register and Renewals Due | Every licence with holder, expiry, days to expiry at the date, renewals and the latest inspection. | AsAtDate (Date, optional) | Licence, Kind, Holder, Expires, Due, Status, Renewals, Inspection, Fee | — | Sum(Fee) |
+| M167 | Service Request / Fault Ticket SLA | Every ticket with category, priority, response and resolution against their SLA deadlines. | AsAtDate (Date, optional) | Ticket, Category, Priority, Reported, Status, Response, Resolution, Hours | — | — |
+| M168 | Tariff Schedule | Every tariff with its type, category, ward, effective date, charges, blocks and seasonal rates. | — | Tariff, Name, Service, Type, Category, Ward, Effective, Charges, Blocks, Active | — | — |
 | MUN-PROP | Property Register | Stands on the municipal register with ward, valuation and ratepayer. | — | StandNumber, Ward, Ratepayer, Valuation | — | Sum(Valuation) |
 
 ## Payroll

@@ -36,7 +36,10 @@ public sealed class MunicipalReportsTests
         await scope.ServiceProvider.GetRequiredService<ReportCatalogueSeeder>().SeedAsync();
         Tariff refuse = new(companyId, "REF-MR", "Refuse Removal", ServiceType.Refuse, TariffType.Flat, new DateOnly(2026, 1, 1), "4000") { FixedCharge = 30m };
         Tariff free = new(companyId, "REF-MRF", "Refuse Exempt", ServiceType.Refuse, TariffType.Flat, new DateOnly(2026, 1, 1), "4000") { FixedCharge = 0m };
-        db.Tariffs.AddRange(refuse, free);
+        Tariff water = new(companyId, "WAT-MR", "Water Stepped", ServiceType.Water, TariffType.Stepped, new DateOnly(2026, 1, 1), "4000");
+        water.AddBlock(0m, 10m, 1.5m);
+        water.AddBlock(10m, null, 2.25m);
+        db.Tariffs.AddRange(refuse, free, water);
         Customer owner = new(companyId, "MR-OWN", "Rates Payer", Scenario.Usd);
         db.Customers.Add(owner);
         await db.SaveChangesAsync();
@@ -74,6 +77,9 @@ public sealed class MunicipalReportsTests
         exceptions.Should().Contain($"{proposed.RunNumber},MR3,AlreadyBilled").And.Contain($"{proposed.RunNumber},MR5,NothingToBill");
         (await Render("M148")).Should().Contain("Ward 1,Domestic,Refuse,1,");
         (await Render("M152")).Should().Contain("MR1,Ward 1,—,—,Rates Payer,Refuse (REF-MR),—,0").And.Contain("Refuse (REF-MRF)");
+
+        (await Render("M168")).Should().Contain("REF-MR,Refuse Removal,Refuse,Flat,Domestic,All,2026-01-01,fixed 30,—,Yes")
+            .And.Contain("WAT-MR,Water Stepped,Water,Stepped,Domestic,All,2026-01-01,—,0–10 @ 1.5; 10–∞ @ 2.25,Yes");
 
         foreach (string code in MunicipalReports.All().Select(r => r.Code))
         {
