@@ -45,6 +45,13 @@ public partial class ShellWindow : Window
         terminal.Show();
     }
 
+    private void OpenOperations_Click(object sender, RoutedEventArgs e)
+    {
+        ShellViewModel vm = (ShellViewModel)DataContext;
+        OperationsWindow operations = new(_services, vm.UserId, (string)((FrameworkElement)sender).Tag) { Owner = this };
+        operations.Show();
+    }
+
     private void OpenAccountEnquiry_Click(object sender, RoutedEventArgs e)
     {
         AccountEnquiryWindow enquiry = new(_services) { Owner = this };

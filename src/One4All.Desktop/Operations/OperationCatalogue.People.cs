@@ -1,0 +1,265 @@
+using System.Data;
+using System.Globalization;
+using Microsoft.EntityFrameworkCore;
+using One4All.Application.Abstractions.Banking;
+using One4All.Application.Abstractions.Documents;
+using One4All.Application.Abstractions.Payroll;
+using One4All.Application.Abstractions.SalesOrders;
+using One4All.Application.Abstractions.Schools;
+using One4All.Core.Banking;
+using One4All.Core.Payroll;
+using static One4All.Desktop.Operations.Ops;
+
+namespace One4All.Desktop.Operations;
+
+/// <content>HR and attendance, banking, sales and schools operations, and the document printer.</content>
+public static partial class OperationCatalogue
+{
+    private static IEnumerable<Operation> People()
+    {
+        const string module = "HR & Attendance";
+        yield return new Operation
+        {
+            Module = module, Title = "Record an attendance day", ListTitle = "Overtime awaiting approval", Description = "One record per employee per day: status, clock times, lateness and overtime.",
+            Fields = [Req("Employee", "Employee number"), Today(), Pick("Status", "Status", Enum.GetNames<AttendanceStatus>()), Opt("In", "Clock in (HH:mm)"), Opt("Out", "Clock out (HH:mm)"),
+                Num("Late", "Minutes late", "0"), Num("Overtime", "Overtime hours", "0"), Num("Multiplier", "Overtime multiplier", "1.5")],
+            Run = async (c, i) => Check(await c.Get<IAttendanceService>().RecordDayAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Date("Date"),
+                Enum.Parse<AttendanceStatus>(i.Text("Status")), Time(i, "In"), Time(i, "Out"), i.Whole("Late"), i.Number("Overtime"), i.Number("Multiplier")).ConfigureAwait(true), id => $"Day recorded (attendance {id})."),
+            List = PendingOvertimeAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Approve overtime", ListTitle = "Overtime awaiting approval", Description = "Overtime only reaches payroll once approved.",
+            Fields = [Num("Attendance", "Attendance id (from the list)")],
+            Run = async (c, i) => Check(await c.Get<IAttendanceService>().ApproveOvertimeAsync(c.CompanyId, (long)i.Number("Attendance"), c.UserId).ConfigureAwait(true), "Overtime approved."),
+            List = PendingOvertimeAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Accrue leave", ListTitle = "Leave balances", Description = "Adds days to an employee's leave balance.",
+            Fields = [Req("Employee", "Employee number"), Req("Type", "Leave type", "ANNUAL"), Num("Days", "Days")],
+            Run = async (c, i) => $"Balance now {Q(Check(await c.Get<ILeaveService>().AccrueAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Type"), i.Number("Days")).ConfigureAwait(true)))} days.",
+            List = LeaveBalancesAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Take leave", ListTitle = "Leave balances", Description = "Records leave taken over a period (never more than the balance).",
+            Fields = [Req("Employee", "Employee number"), Req("Type", "Leave type", "ANNUAL"), Today("From", "From"), Today("To", "To"), Num("Days", "Days")],
+            Run = async (c, i) => Check(await c.Get<IAttendanceService>().TakeLeaveAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Type"), i.Date("From"), i.Date("To"),
+                i.Number("Days")).ConfigureAwait(true), "Leave recorded."),
+            List = LeaveBalancesAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Encash leave", ListTitle = "Leave balances", Description = "Pays out leave days at a daily rate.",
+            Fields = [Req("Employee", "Employee number"), Req("Type", "Leave type", "ANNUAL"), Today(), Num("Days", "Days"), Num("Rate", "Daily rate")],
+            Run = async (c, i) => Check(await c.Get<IAttendanceService>().EncashLeaveAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Type"), i.Date("Date"),
+                i.Number("Days"), i.Number("Rate")).ConfigureAwait(true), $"Encashed {M(i.Number("Days") * i.Number("Rate"))}."),
+            List = LeaveBalancesAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Set the establishment", Description = "Approved posts and annual cost per post for a department and grade.",
+            Fields = [Req("Department", "Department"), Req("Grade", "Grade"), Num("Posts", "Approved posts"), Num("Cost", "Annual cost per post")],
+            Run = async (c, i) => Check(await c.Get<IHrRecordsService>().SetEstablishmentAsync(c.CompanyId, i.Text("Department"), i.Text("Grade"), i.Whole("Posts"), i.Number("Cost")).ConfigureAwait(true), "Establishment saved."),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "File an employee document", ListTitle = "Documents expiring in 90 days", Description = "A contract, permit, licence or certificate on the employee's file.",
+            Fields = [Req("Employee", "Employee number"), Req("Type", "Document type"), Opt("Reference", "Reference"), new("Expires", "Expires on", FieldKind.Date, Required: false)],
+            Run = async (c, i) => Check(await c.Get<IHrRecordsService>().FileDocumentAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Type"), i.Optional("Reference"),
+                i.OptionalDate("Expires")).ConfigureAwait(true), "Document filed."),
+            List = ExpiringDocumentsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Record a disciplinary action", Description = "The offence and the sanction issued.",
+            Fields = [Req("Employee", "Employee number"), Today(), Req("Offence", "Offence"), Pick("Sanction", "Sanction", Enum.GetNames<DisciplinarySanction>())],
+            Run = async (c, i) => Check(await c.Get<IHrRecordsService>().RecordDisciplinaryAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Date("Date"), i.Text("Offence"),
+                Enum.Parse<DisciplinarySanction>(i.Text("Sanction")), c.UserId).ConfigureAwait(true), "Recorded."),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Record training", Description = "A completed course, its cost and when it must be renewed.",
+            Fields = [Req("Employee", "Employee number"), Req("Course", "Course"), Today("Completed", "Completed on"), new("Expires", "Expires on", FieldKind.Date, Required: false), Opt("Provider", "Provider"), Num("Cost", "Cost", "0")],
+            Run = async (c, i) => Check(await c.Get<IHrRecordsService>().RecordTrainingAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Course"), i.Date("Completed"),
+                i.OptionalDate("Expires"), i.Optional("Provider"), i.Number("Cost")).ConfigureAwait(true), "Training recorded."),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Record an appraisal", Description = "Rating 1–5 and the next appraisal date.",
+            Fields = [Req("Employee", "Employee number"), Today(), Num("Rating", "Rating (1–5)", "3"), Today("Next", "Next due")],
+            Run = async (c, i) => Check(await c.Get<IHrRecordsService>().RecordAppraisalAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Date("Date"), i.Whole("Rating"),
+                i.Date("Next")).ConfigureAwait(true), "Appraisal recorded."),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Register a garnishee order", Description = "A court order deducted from pay through a deduction element until the total is settled.",
+            Fields = [Req("Employee", "Employee number"), Req("Reference", "Order reference"), Req("Creditor", "Creditor"), Num("Priority", "Priority", "1"), Num("Instalment", "Instalment per period"),
+                Num("Total", "Total amount"), Req("Element", "Deduction element code"), Today("Issued", "Issued on")],
+            Run = async (c, i) => Check(await c.Get<IHrRecordsService>().RegisterGarnisheeAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Reference"), i.Text("Creditor"),
+                i.Whole("Priority"), i.Number("Instalment"), i.Number("Total"), i.Text("Element"), i.Date("Issued")).ConfigureAwait(true), "Garnishee registered."),
+        };
+    }
+
+    private static TimeOnly? Time(OperationInput i, string name)
+        => i.Optional(name) is not string text ? null
+            : TimeOnly.TryParse(text, CultureInfo.InvariantCulture, out TimeOnly t) ? t : throw new OperationException($"'{text}' is not a time (HH:mm).");
+
+    private static async Task<Dictionary<long, string>> EmployeeNamesAsync(OperationContext c)
+        => await c.Db.Employees.Where(e => e.CompanyId == c.CompanyId).ToDictionaryAsync(e => e.Id, e => $"{e.EmployeeNumber} {e.FullName}").ConfigureAwait(true);
+
+    private static async Task<DataTable> PendingOvertimeAsync(OperationContext c)
+    {
+        Dictionary<long, string> names = await EmployeeNamesAsync(c).ConfigureAwait(true);
+        return Table(await c.Db.AttendanceRecords.AsNoTracking().Where(a => a.CompanyId == c.CompanyId && a.OvertimeHours > 0 && a.OvertimeApprovedByUserId == null).OrderBy(a => a.Date).ToListAsync().ConfigureAwait(true),
+            ("Attendance", a => a.Id), ("Employee", a => names.GetValueOrDefault(a.EmployeeId)), ("Date", a => D(a.Date)), ("Status", a => a.Status), ("Overtime hours", a => Q(a.OvertimeHours)),
+            ("Multiplier", a => Q(a.OvertimeMultiplier)));
+    }
+
+    private static async Task<DataTable> LeaveBalancesAsync(OperationContext c)
+    {
+        Dictionary<long, string> names = await EmployeeNamesAsync(c).ConfigureAwait(true);
+        return Table((await c.Db.EmployeeLeaveBalances.AsNoTracking().Where(b => b.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true)).OrderBy(b => names.GetValueOrDefault(b.EmployeeId)).ThenBy(b => b.LeaveType),
+            ("Employee", b => names.GetValueOrDefault(b.EmployeeId)), ("Leave type", b => b.LeaveType), ("Accrued", b => Q(b.AccruedDays)), ("Taken", b => Q(b.TakenDays)), ("Balance", b => Q(b.BalanceDays)));
+    }
+
+    private static async Task<DataTable> ExpiringDocumentsAsync(OperationContext c)
+    {
+        Dictionary<long, string> names = await EmployeeNamesAsync(c).ConfigureAwait(true);
+        DateOnly horizon = DateOnly.FromDateTime(DateTime.Today).AddDays(90);
+        return Table(await c.Db.EmployeeDocuments.AsNoTracking().Where(d => d.CompanyId == c.CompanyId && d.ExpiresOn != null && d.ExpiresOn <= horizon).OrderBy(d => d.ExpiresOn).ToListAsync().ConfigureAwait(true),
+            ("Employee", d => names.GetValueOrDefault(d.EmployeeId)), ("Document", d => d.DocumentType), ("Reference", d => d.Reference), ("Expires", d => D(d.ExpiresOn!.Value)));
+    }
+
+    private static IEnumerable<Operation> Banking()
+    {
+        const string module = "Banking";
+        yield return new Operation
+        {
+            Module = module, Title = "Issue a cheque", ListTitle = "Cheque register (latest 100)", Description = "Records a cheque leaf written out of the cheque book (numbers are unique per bank account).",
+            Fields = [Req("Bank", "Bank account code"), Req("Number", "Cheque number"), Today(), Req("Payee", "Payee"), Num("Amount", "Amount"), Opt("Document", "Payment document number")],
+            Run = async (c, i) => Check(await c.Get<IChequeService>().IssueAsync(c.CompanyId, await BankAsync(c, i.Text("Bank")).ConfigureAwait(true), i.Text("Number"), i.Date("Date"), i.Text("Payee"),
+                i.Number("Amount"), i.Optional("Document")).ConfigureAwait(true), $"Cheque {i.Text("Number")} issued."),
+            List = ChequesAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Void a cheque leaf", ListTitle = "Cheque register (latest 100)", Description = "A spoilt or lost leaf that was never issued — kept in the register so the number sequence has no gaps.",
+            Fields = [Req("Bank", "Bank account code"), Req("Number", "Cheque number"), Today(), Req("Reason", "Reason")],
+            Run = async (c, i) => Check(await c.Get<IChequeService>().VoidLeafAsync(c.CompanyId, await BankAsync(c, i.Text("Bank")).ConfigureAwait(true), i.Text("Number"), i.Date("Date"), i.Text("Reason"))
+                .ConfigureAwait(true), $"Leaf {i.Text("Number")} voided."),
+            List = ChequesAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Mark a cheque presented / cancelled", ListTitle = "Cheque register (latest 100)", Description = "Presented when it clears the bank; cancelled (with a reason) when stopped.",
+            Fields = [Req("Bank", "Bank account code"), Req("Number", "Cheque number"), Pick("Action", "Action", "Presented", "Cancelled"), Today(), Opt("Reason", "Reason (cancel)")],
+            Run = async (c, i) =>
+            {
+                long bank = await BankAsync(c, i.Text("Bank")).ConfigureAwait(true);
+                long cheque = await FindAsync(c.Db.Cheques, x => x.CompanyId == c.CompanyId && x.BankAccountId == bank && x.ChequeNumber == i.Text("Number"), x => x.Id, "cheque", i.Text("Number")).ConfigureAwait(true);
+                IChequeService service = c.Get<IChequeService>();
+                return i.Text("Action") == "Presented"
+                    ? Check(await service.PresentAsync(c.CompanyId, cheque, i.Date("Date")).ConfigureAwait(true), "Cheque presented.")
+                    : Check(await service.CancelAsync(c.CompanyId, cheque, i.Date("Date"), i.Text("Reason")).ConfigureAwait(true), "Cheque cancelled.");
+            },
+            List = ChequesAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Capture a supplier statement", Description = "The supplier's closing balance and lines, for reconciliation against the ledger (report AP statement reconciliation).",
+            Fields = [Req("Supplier", "Supplier code"), Today(), Num("Closing", "Closing balance"), Req("Lines", "Lines: DOC:amount:yyyy-MM-dd; …")],
+            Run = async (c, i) =>
+            {
+                List<StatementLineInput> lines = [.. i.Pairs("Lines").Select(p => new StatementLineInput(p.Code, p.Date ?? i.Date("Date"), p.Quantity))];
+                long id = Check(await c.Get<IChequeService>().CaptureSupplierStatementAsync(c.CompanyId, await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true), i.Date("Date"), i.Number("Closing"), lines)
+                    .ConfigureAwait(true));
+                return $"Statement {id} captured with {lines.Count} line(s).";
+            },
+        };
+    }
+
+    private static Task<long> BankAsync(OperationContext c, string code)
+        => FindAsync(c.Db.BankAccounts, b => b.CompanyId == c.CompanyId && b.Code.ToUpper() == code.ToUpper(), b => b.Id, "bank account", code);
+
+    private static async Task<DataTable> ChequesAsync(OperationContext c)
+    {
+        Dictionary<long, string> banks = await c.Db.BankAccounts.Where(b => b.CompanyId == c.CompanyId).ToDictionaryAsync(b => b.Id, b => b.Code).ConfigureAwait(true);
+        return Table(await c.Db.Cheques.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.Id).Take(100).ToListAsync().ConfigureAwait(true),
+            ("Bank", x => banks.GetValueOrDefault(x.BankAccountId)), ("Cheque", x => x.ChequeNumber), ("Issued", x => D(x.IssuedOn)), ("Payee", x => x.Payee), ("Status", x => x.Status),
+            ("Status date", x => D(x.StatusDate)), ("Reason", x => x.Reason), ("Amount", x => x.Status == ChequeStatus.Voided ? string.Empty : M(x.Amount)));
+    }
+
+    private static IEnumerable<Operation> SalesAndSchools()
+    {
+        yield return new Operation
+        {
+            Module = "Sales & Schools", Title = "Confirm a delivery (proof of delivery)", ListTitle = "Deliveries not yet confirmed",
+            Description = "Records who received a despatched delivery, when, and the signed POD reference.",
+            Fields = [Req("Delivery", "Delivery reference"), Today(), Req("ReceivedBy", "Received by"), Opt("Pod", "POD reference")],
+            Run = async (c, i) => Check(await c.Get<ISalesOrderService>().ConfirmDeliveryAsync(c.CompanyId, i.Text("Delivery"), i.Date("Date"), i.Text("ReceivedBy"), i.Optional("Pod")).ConfigureAwait(true),
+                "Delivery confirmed."),
+            List = async c => Table(await c.Db.SalesDeliveries.AsNoTracking().Where(d => d.CompanyId == c.CompanyId && d.DeliveredOn == null).OrderBy(d => d.DespatchedOn).ToListAsync().ConfigureAwait(true),
+                ("Delivery", d => d.Reference), ("Despatched", d => D(d.DespatchedOn)), ("Planned", d => d.PlannedFor is DateOnly p ? D(p) : string.Empty), ("Vehicle", d => d.Vehicle), ("Route", d => d.Route),
+                ("Driver", d => d.Driver)),
+        };
+        yield return new Operation
+        {
+            Module = "Sales & Schools", Title = "Top up / spend a student wallet", ListTitle = "Wallet balances",
+            Description = "A top-up is paid into the bank; a spend (tuck shop) is limited to the balance and the student's daily limit.",
+            Fields = [Req("Student", "Admission number"), Pick("Action", "Action", "Top up", "Spend"), Today(), Num("Amount", "Amount"), Req("Wallet", "Wallet liability account"),
+                Opt("Bank", "Bank account (top up)"), Opt("Sales", "Sales account (spend)"), Opt("Description", "What was bought", "Tuck shop")],
+            Run = async (c, i) =>
+            {
+                long student = await FindAsync(c.Db.Students, s => s.CompanyId == c.CompanyId && s.AdmissionNumber.ToUpper() == i.Text("Student").ToUpper(), s => s.Id, "student", i.Text("Student")).ConfigureAwait(true);
+                IStudentWalletService wallet = c.Get<IStudentWalletService>();
+                decimal balance = i.Text("Action") == "Top up"
+                    ? Check(await wallet.TopUpAsync(c.CompanyId, student, i.Date("Date"), i.Number("Amount"), i.Text("Bank"), i.Text("Wallet")).ConfigureAwait(true))
+                    : Check(await wallet.SpendAsync(c.CompanyId, student, i.Date("Date"), i.Number("Amount"), i.Text("Description"), i.Text("Wallet"), i.Text("Sales")).ConfigureAwait(true));
+                return $"Wallet balance now {M(balance)}.";
+            },
+            List = async c =>
+            {
+                var balances = await c.Db.StudentWalletEntries.Where(w => w.CompanyId == c.CompanyId).GroupBy(w => w.StudentId).Select(g => new { g.Key, Balance = g.Sum(w => w.Amount) }).ToListAsync().ConfigureAwait(true);
+                Dictionary<long, (string, string)> students = await c.Db.Students.Where(s => s.CompanyId == c.CompanyId).ToDictionaryAsync(s => s.Id, s => (s.AdmissionNumber, s.FullName)).ConfigureAwait(true);
+                return Table(balances.OrderBy(b => students.GetValueOrDefault(b.Key).Item1), ("Student", b => students.GetValueOrDefault(b.Key).Item1), ("Name", b => students.GetValueOrDefault(b.Key).Item2),
+                    ("Balance", b => M(b.Balance)));
+            },
+        };
+    }
+
+    private static IEnumerable<Operation> Documents()
+    {
+        const string module = "Documents";
+        Operation Doc(string title, string label, Func<IDocumentLayoutService, long, string, Task<One4All.Core.Common.Result<string>>> print) => new()
+        {
+            Module = module, Title = title, Description = $"Prints the {title.ToLowerInvariant()} in the standard business document layout.", IsDocument = true,
+            Fields = [Req("Number", label)],
+            Run = async (c, i) => Check(await print(c.Get<IDocumentLayoutService>(), c.CompanyId, i.Text("Number")).ConfigureAwait(true)),
+        };
+
+        yield return Doc("Quotation", "Quote number", (s, co, n) => s.QuotationAsync(co, n));
+        yield return Doc("Order confirmation", "Sales order number", (s, co, n) => s.OrderConfirmationAsync(co, n));
+        yield return Doc("Delivery note", "Delivery reference", (s, co, n) => s.DeliveryNoteAsync(co, n));
+        yield return Doc("Packing slip", "Delivery reference", (s, co, n) => s.DeliveryNoteAsync(co, n, packing: true));
+        yield return Doc("Purchase requisition", "Requisition number", (s, co, n) => s.RequisitionAsync(co, n));
+        yield return Doc("Goods received note", "GRN number", (s, co, n) => s.GoodsReceivedNoteAsync(co, n));
+        yield return Doc("Supplier debit note", "Debit note number", (s, co, n) => s.SupplierDebitNoteAsync(co, n));
+        yield return Doc("Fee invoice", "Invoice number", (s, co, n) => s.FeeInvoiceAsync(co, n));
+        yield return Doc("Payment certificate", "Certificate number", (s, co, n) => s.PaymentCertificateAsync(co, n));
+        yield return new Operation
+        {
+            Module = module, Title = "Municipal bill", Description = "Prints a stand's monthly municipal bill.", IsDocument = true,
+            Fields = [Req("Stand", "Stand number"), Today("Month", "Any day in the month")],
+            Run = async (c, i) => Check(await c.Get<IDocumentLayoutService>().MunicipalBillAsync(c.CompanyId, i.Text("Stand"), i.Date("Month")).ConfigureAwait(true)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Shelf labels", Description = "Prints shelf labels at a price list's prices (all items, or a comma-separated list).", IsDocument = true,
+            Fields = [Req("PriceList", "Price list code"), Opt("Items", "Item codes (comma-separated)"), Num("PerRow", "Labels per row", "2")],
+            Run = async (c, i) => Check(await c.Get<IDocumentLayoutService>().ShelfLabelsAsync(c.CompanyId, i.Text("PriceList"),
+                i.Optional("Items")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), i.Whole("PerRow")).ConfigureAwait(true)),
+        };
+    }
+}
