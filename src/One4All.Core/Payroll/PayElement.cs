@@ -98,6 +98,12 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the element is taxable (earnings) or pre-tax (deductions).</summary>
     public bool Taxable { get; set; }
 
-    /// <summary>The GL account (expense for earnings, liability for deductions).</summary>
+    /// <summary>The GL account (expense for earnings, liability for deductions and employer contributions).</summary>
     public string AccountCode { get; private set; }
+
+    /// <summary>
+    /// For an employer contribution, the expense account its cost is charged to (the contribution is owed on
+    /// <see cref="AccountCode"/>). A run refuses a non-zero contribution without one rather than leave it off the ledger.
+    /// </summary>
+    public string? ContributionExpenseAccountCode { get; set; }
 }

@@ -59,6 +59,7 @@ internal sealed class PayElementConfiguration : IEntityTypeConfiguration<PayElem
         b.Property(x => x.Rate).HasPrecision(19, 6);
         b.Property(x => x.Formula).HasMaxLength(1000);
         b.Property(x => x.AccountCode).HasMaxLength(8);
+        b.Property(x => x.ContributionExpenseAccountCode).HasMaxLength(8);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);
     }

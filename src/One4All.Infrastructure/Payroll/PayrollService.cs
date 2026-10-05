@@ -160,6 +160,17 @@ public sealed class PayrollService : IPayrollService
                 {
                     Add(creditsByAccount, element.AccountCode, line.Amount);
                 }
+                else if (line.Type == PayElementType.EmployerContribution)
+                {
+                    // The employer's cost: Dr its expense account, Cr the liability to the scheme.
+                    if (string.IsNullOrWhiteSpace(element.ContributionExpenseAccountCode))
+                    {
+                        return Error.Validation("Payroll.ContributionAccount", $"Employer contribution {element.Code} needs an expense account before it can be posted.");
+                    }
+
+                    Add(debitsByAccount, element.ContributionExpenseAccountCode, line.Amount);
+                    Add(creditsByAccount, element.AccountCode, line.Amount);
+                }
             }
 
             totalGross += payslip.GrossEarnings;
