@@ -94,6 +94,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Accounts Receivable additions (brief §14 B, AR + item number).
+        foreach (ReportDefinition definition in ReceivablesReports.All())
+        {
+            yield return definition;
+        }
+
         // Municipality / Council catalogue (brief §14 I, the M series).
         foreach (ReportDefinition definition in MunicipalReports.All())
         {

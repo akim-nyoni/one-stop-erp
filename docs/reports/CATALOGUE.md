@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-248 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+260 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -332,6 +332,18 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | AR-CUST | Customer Register | Customer master: code, name, currency, credit limit, payment terms and on-hold flag. | — | Code, Name, Currency, CreditLimit, TermsDays, OnHold | — | Sum(TermsDays) |
 | AR-RECUR | Recurring Invoices | Standing recurring-invoice templates with amount, tax, interval, next run date and active flag. | — | Reference, Customer, NetAmount, TaxAmount, IntervalMonths, NextRunDate, Active | — | Sum(IntervalMonths) |
 | AR-STMT | Customer Statement | Outstanding items for a customer, with the closing balance. | — | Date, Type, Number, Due, Outstanding | — | Sum(Outstanding) |
+| AR29 | Aged Debtors Detail | Every open item as at the date with its age from due date (or invoice date for customers aged that way) and band. | AsAtDate (Date, optional) | Customer, Document, Type, Date, Due, Days, Band, Outstanding | — | Sum(Outstanding) |
+| AR30 | Aged Debtors by Sales Rep and Currency | Debtors aged as at the date, grouped by sales rep (or agent) and currency, in base. | AsAtDate (Date, optional) | Rep, Currency, Customers, Current, D30, D60, D90, D120, Over120, Total | — | Sum(Total) |
+| AR31 | Customer Ledger | One customer's documents in date order with running balance and what is still outstanding on each. | CustomerCode (String, optional) | Date, Type, Document, Due, Debit, Credit, Balance, Outstanding | — | Sum(Outstanding) |
+| AR33 | Sales Day Book | Invoices, credit notes and debit notes raised in the period, in transaction and base currency. | FromDate (Date, optional), ToDate (Date, optional) | Date, Document, Type, Customer, Currency, Transaction, Base | — | Sum(Base) |
+| AR35 | Top Customers (Pareto) | Customers ranked by net sales in the period, with share and cumulative share. | FromDate (Date, optional), ToDate (Date, optional) | Rank, Customer, Documents, Share, Cumulative, Sales | — | Sum(Sales) |
+| AR39 | Unallocated Receipts, Credits & Advances | Receipts, credit notes and advances not yet allocated to invoices at the date, with how long they have been unallocated. | AsAtDate (Date, optional) | Customer, Document, Type, Date, Days, Unallocated | — | Sum(Unallocated) |
+| AR40 | Debtor Days (DSO) | Per customer: what is owed at the date against sales over the 90 days to it, as days of sales outstanding. | AsAtDate (Date, optional) | Customer, Sales90, Dso, Terms, Owing | — | Sum(Owing) |
+| AR41 | Promise-to-Pay Diary | Promises recorded by credit control: amount, date promised and whether kept, broken or still open at the date. | AsAtDate (Date, optional) | PayBy, Customer, Made, Status, Resolved, Note, Amount | — | Sum(Amount) |
+| AR43 | Bad Debt Write-off Listing | Write-offs in the period with the customer, document and the debt case that approved it. | FromDate (Date, optional), ToDate (Date, optional) | Date, Customer, Document, Case, Amount | — | Sum(Amount) |
+| AR45 | Lay-bye Status & Arrears | Every lay-bye plan with price, paid, balance and days to (or past) its final date. | AsAtDate (Date, optional) | Plan, Customer, Opened, Final, Status, Price, Paid, Due, Balance | — | Sum(Balance) |
+| AR47 | Debtor Exposure by Currency | What customers owe at the date in each currency, in transaction and base, with each currency's share. | AsAtDate (Date, optional) | Currency, Customers, Transaction, Share, Base | — | Sum(Base) |
+| AR48 | New & Dormant Customers | Customers first invoiced in the period, and customers not invoiced for 90 days to its end. | FromDate (Date, optional), ToDate (Date, optional) | Status, Customer, First, Last, Lifetime | — | Sum(Lifetime) |
 
 ## SalesOrders
 

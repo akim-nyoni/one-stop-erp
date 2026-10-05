@@ -22,7 +22,8 @@ missing domain data. Items are struck through as they ship (with the report code
 - Needs new data: B1, B3–B10 (workflow, targets, hierarchy, drivers, establishment, capital projects), B13 (stage snapshots), B22, B23, B29, B30, B32 (budget holders), B35, B38–B41 (forecasts, cash budget)
 
 ## B. Accounts Receivable
-- Data exists: 29 detail / configurable buckets, 30, 31, 33–36, 38–41, 43 write-offs, 44, 45, 47–49, 50 layouts (quotation, SO confirmation, delivery note, remittance slip)
+- ~~29 Aged detail (AR29)~~, ~~30 by rep / currency (AR30)~~, ~~31 Customer Ledger (AR31)~~, ~~33 Sales Day Book (AR33)~~, ~~35 Top Customers (AR35)~~, ~~39 / 44 Unallocated & advances (AR39)~~, ~~40 DSO (AR40)~~, ~~41 Promise-to-Pay (AR41)~~, ~~43 Write-offs (AR43)~~, ~~45 Lay-byes (AR45)~~, ~~47 Exposure by Currency (AR47)~~, ~~48 New & Dormant (AR48)~~
+- Data exists: 34 / 36 sales analysis and history (needs item-level sales from SO / POS lines), 38 collections (all receipts), 49 price list, 50 layouts (quotation, SO confirmation, delivery note, remittance slip)
 - Needs new data: 28 (parent / child customers), 37 reason codes
 
 ## C. Accounts Payable
