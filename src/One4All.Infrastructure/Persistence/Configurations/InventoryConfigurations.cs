@@ -158,3 +158,56 @@ internal sealed class StockTransferConfiguration : IEntityTypeConfiguration<Stoc
         b.HasIndex(x => new { x.CompanyId, x.TransferNumber }).IsUnique();
     }
 }
+
+internal sealed class BillOfMaterialsConfiguration : IEntityTypeConfiguration<BillOfMaterials>
+{
+    public void Configure(EntityTypeBuilder<BillOfMaterials> b)
+    {
+        b.ToTable("bom", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(40);
+        b.Property(x => x.OutputQuantity).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.BillOfMaterialsId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class BomLineConfiguration : IEntityTypeConfiguration<BomLine>
+{
+    public void Configure(EntityTypeBuilder<BomLine> b)
+    {
+        b.ToTable("bom_line", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.Property(x => x.ScrapPercent).HasPrecision(9, 4);
+    }
+}
+
+internal sealed class AssemblyRunConfiguration : IEntityTypeConfiguration<AssemblyRun>
+{
+    public void Configure(EntityTypeBuilder<AssemblyRun> b)
+    {
+        b.ToTable("assembly_run", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.RunNumber).HasMaxLength(40);
+        b.Property(x => x.PlannedOutput).HasPrecision(19, 4);
+        b.Property(x => x.ActualOutput).HasPrecision(19, 4);
+        b.Property(x => x.TotalCost).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.RunNumber }).IsUnique();
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.AssemblyRunId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class AssemblyRunLineConfiguration : IEntityTypeConfiguration<AssemblyRunLine>
+{
+    public void Configure(EntityTypeBuilder<AssemblyRunLine> b)
+    {
+        b.ToTable("assembly_run_line", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.StandardQuantity).HasPrecision(19, 4);
+        b.Property(x => x.ActualQuantity).HasPrecision(19, 4);
+        b.Property(x => x.Cost).HasPrecision(19, 4);
+    }
+}

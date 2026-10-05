@@ -152,6 +152,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the two-step inter-warehouse transfers.</summary>
     public DbSet<Core.Inventory.StockTransfer> StockTransfers => Set<Core.Inventory.StockTransfer>();
 
+    /// <summary>Gets the bills of materials.</summary>
+    public DbSet<Core.Inventory.BillOfMaterials> BillsOfMaterials => Set<Core.Inventory.BillOfMaterials>();
+
+    /// <summary>Gets the assembly runs.</summary>
+    public DbSet<Core.Inventory.AssemblyRun> AssemblyRuns => Set<Core.Inventory.AssemblyRun>();
+
     /// <summary>Purchase orders.</summary>
     public DbSet<Core.Procurement.PurchaseOrder> PurchaseOrders => Set<Core.Procurement.PurchaseOrder>();
 

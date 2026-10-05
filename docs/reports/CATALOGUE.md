@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-433 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+435 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -234,6 +234,8 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | INV93 | Gross Margin by Item | Per item over the period: net sales (POS and invoiced orders), cost of issues and the margin. | FromDate (Date, optional), ToDate (Date, optional) | Item, Category, Quantity, Sales, Cost, MarginPercent, Margin | — | Sum(Margin) |
 | INV96 | Cost Change History | Each receipt at a unit cost different from the item's previous receipt, with the change. | FromDate (Date, optional), ToDate (Date, optional) | Item, Date, Reference, Previous, Cost, Change, Quantity | — | — |
 | INV97 | Landed Cost Analysis | Landed costs added to stock in the period, per item and reference, against the goods' own receipt value. | FromDate (Date, optional), ToDate (Date, optional) | Date, Reference, Item, Goods, Uplift, Landed | — | Sum(Landed) |
+| INV98 | Bill of Materials Costing | Each BOM's components with scrap allowance and current average cost, rolled up to a cost per finished unit. | — | Bom, Parent, Component, PerBatch, Scrap, PerUnit, UnitCost, Extended | — | Sum(Extended) |
+| INV99 | Production Yield & Usage Variance | Assembly runs in the period: planned and actual output, yield, and each component's standard against actual usage and cost. | FromDate (Date, optional), ToDate (Date, optional) | Run, Date, Item, Yield, Component, Standard, Actual, StandardCost, ActualCost, Variance | — | Sum(Variance) |
 
 ## JobCosting
 

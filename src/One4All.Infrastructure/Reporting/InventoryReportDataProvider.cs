@@ -47,6 +47,8 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
                 .ConfigureAwait(false),
             "STKINTRANSIT" => await InTransitAsync(companyId, asAt, ct).ConfigureAwait(false),
             "STKCONSIGNMENT" => await ConsignmentAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "STKBOM" => await BomAsync(companyId, ct).ConfigureAwait(false),
+            "STKYIELD" => await YieldAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "STKOVERSTOCK" => await OverstockAsync(companyId, asAt, ct).ConfigureAwait(false),
             "STKNEGATIVE" => await NegativeAsync(companyId, ct).ConfigureAwait(false),
             "STKTURNOVER" => await TurnoverAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -289,6 +291,47 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
             .Select(l => Row(("Item", items.GetValueOrDefault(l.ItemId, "?")), ("Warehouse", warehouses.GetValueOrDefault(l.WarehouseId, "?")), ("Batch", l.Lot), ("Expiry", Date(l.Expiry!.Value)),
                 ("Days", l.Expiry!.Value.DayNumber - asAt.DayNumber), ("Status", LotRules.ExpiryStatus(l.Expiry!.Value, asAt, windowDays)), ("OnHand", Qty(l.OnHand)),
                 ("Value", Math.Round(l.OnHand * costs.GetValueOrDefault((l.ItemId, l.WarehouseId)), 2))))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BomAsync(long companyId, CancellationToken ct)
+    {
+        List<BillOfMaterials> boms = await _db.BillsOfMaterials.AsNoTracking().Include(b => b.Lines).Where(b => b.CompanyId == companyId && b.IsActive).OrderBy(b => b.Code).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await ItemsAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, decimal> costs = (await _db.StockBalances.AsNoTracking().Where(b => b.CompanyId == companyId).GroupBy(b => b.ItemId)
+                .Select(g => new { g.Key, Quantity = g.Sum(b => b.QuantityOnHand), Value = g.Sum(b => b.TotalValue) }).ToListAsync(ct).ConfigureAwait(false))
+            .Where(g => g.Quantity != 0m).ToDictionary(g => g.Key, g => g.Value / g.Quantity);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (BillOfMaterials bom in boms)
+        {
+            foreach (BomLine line in bom.Lines.OrderBy(l => items.GetValueOrDefault(l.ComponentItemId), StringComparer.Ordinal))
+            {
+                decimal perUnit = BomRules.Requirement(line.Quantity, line.ScrapPercent, bom.OutputQuantity, 1m), unitCost = costs.GetValueOrDefault(line.ComponentItemId);
+                rows.Add(Row(("Bom", bom.Code), ("Parent", items.GetValueOrDefault(bom.ParentItemId, "?")), ("Component", items.GetValueOrDefault(line.ComponentItemId, "?")), ("PerBatch", Qty(line.Quantity)),
+                    ("Scrap", Qty(line.ScrapPercent)), ("PerUnit", Qty(perUnit)), ("UnitCost", Money(unitCost)), ("Extended", Math.Round(perUnit * unitCost, 4))));
+            }
+
+            decimal rolled = BomRules.UnitCost(bom.Lines.Select(l => (l.Quantity, l.ScrapPercent, costs.GetValueOrDefault(l.ComponentItemId))), bom.OutputQuantity);
+            rows.Add(Row(("Bom", bom.Code), ("Parent", items.GetValueOrDefault(bom.ParentItemId, "?")), ("Component", $"Rolled-up cost per unit: {Money(rolled)} (batch of {Qty(bom.OutputQuantity)})"),
+                ("PerBatch", string.Empty), ("Scrap", string.Empty), ("PerUnit", string.Empty), ("UnitCost", string.Empty), ("Extended", 0m)));
+        }
+
+        return rows;
+    }
+
+    // Standard cost prices the standard quantity at the cost the component was actually consumed at; the variance is usage only.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> YieldAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<AssemblyRun> runs = await _db.AssemblyRuns.AsNoTracking().Include(r => r.Lines).Where(r => r.CompanyId == companyId && r.Date >= fromDate && r.Date <= toDate)
+            .OrderBy(r => r.Date).ThenBy(r => r.RunNumber).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await ItemsAsync(companyId, ct).ConfigureAwait(false);
+        return [.. runs.SelectMany(r => r.Lines.OrderBy(l => items.GetValueOrDefault(l.ComponentItemId), StringComparer.Ordinal).Select(l =>
+        {
+            decimal unit = l.ActualQuantity == 0m ? 0m : l.Cost / l.ActualQuantity, standardCost = Math.Round(l.StandardQuantity * unit, 2);
+            return Row(("Run", r.RunNumber), ("Date", Date(r.Date)), ("Item", items.GetValueOrDefault(r.ParentItemId, "?")),
+                ("Yield", $"{Qty(r.PlannedOutput)} → {Qty(r.ActualOutput)} ({BomRules.Yield(r.PlannedOutput, r.ActualOutput)?.ToString("0.0", CultureInfo.InvariantCulture) ?? "—"}%)"),
+                ("Component", items.GetValueOrDefault(l.ComponentItemId, "?")), ("Standard", Qty(l.StandardQuantity)), ("Actual", Qty(l.ActualQuantity)), ("StandardCost", Money(standardCost)),
+                ("ActualCost", Money(l.Cost)), ("Variance", Math.Round(l.Cost, 2) - standardCost));
+        }))];
     }
 
     // In transit at the date: dispatched by then and not received by then.

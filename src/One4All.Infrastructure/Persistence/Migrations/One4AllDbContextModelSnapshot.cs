@@ -8291,6 +8291,241 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("waiting_list_policy", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.AssemblyRun", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("ActualOutput")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("actual_output");
+
+                    b.Property<long>("BillOfMaterialsId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("bill_of_materials_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("ParentItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("parent_item_id");
+
+                    b.Property<decimal>("PlannedOutput")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("planned_output");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("RunNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("run_number");
+
+                    b.Property<decimal>("TotalCost")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("total_cost");
+
+                    b.Property<long>("WarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_assembly_run");
+
+                    b.HasIndex("CompanyId", "RunNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_assembly_run_company_id_run_number");
+
+                    b.ToTable("assembly_run", "inv");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.AssemblyRunLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("ActualQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("actual_quantity");
+
+                    b.Property<long>("AssemblyRunId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("assembly_run_id");
+
+                    b.Property<long>("ComponentItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("component_item_id");
+
+                    b.Property<decimal>("Cost")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("cost");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<decimal>("StandardQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("standard_quantity");
+
+                    b.HasKey("Id")
+                        .HasName("pk_assembly_run_line");
+
+                    b.HasIndex("AssemblyRunId")
+                        .HasDatabaseName("ix_assembly_run_line_assembly_run_id");
+
+                    b.ToTable("assembly_run_line", "inv");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.BillOfMaterials", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("OutputQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("output_quantity");
+
+                    b.Property<long>("ParentItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("parent_item_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bom");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_bom_company_id_code");
+
+                    b.ToTable("bom", "inv");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.BomLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("BillOfMaterialsId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("bill_of_materials_id");
+
+                    b.Property<long>("ComponentItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("component_item_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<decimal>("ScrapPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("scrap_percent");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bom_line");
+
+                    b.HasIndex("BillOfMaterialsId")
+                        .HasDatabaseName("ix_bom_line_bill_of_materials_id");
+
+                    b.ToTable("bom_line", "inv");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.Item", b =>
                 {
                     b.Property<long>("Id")
@@ -22544,6 +22779,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_unit_repair_rental_unit_unit_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.AssemblyRunLine", b =>
+                {
+                    b.HasOne("One4All.Core.Inventory.AssemblyRun", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("AssemblyRunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_assembly_run_line_assembly_runs_assembly_run_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.BomLine", b =>
+                {
+                    b.HasOne("One4All.Core.Inventory.BillOfMaterials", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("BillOfMaterialsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_bom_line_bills_of_materials_bill_of_materials_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.PriceListLine", b =>
                 {
                     b.HasOne("One4All.Core.Inventory.PriceList", null)
@@ -23374,6 +23629,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Navigation("Approvals");
 
                     b.Navigation("Checks");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.AssemblyRun", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.BillOfMaterials", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("One4All.Core.Inventory.PriceList", b =>

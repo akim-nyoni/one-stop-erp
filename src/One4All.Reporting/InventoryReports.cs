@@ -55,6 +55,13 @@ public static class InventoryReports
         yield return Listing("INV97", "Landed Cost Analysis", "Inventory", "Landed costs added to stock in the period, per item and reference, against the goods' own receipt value.",
             "StkLandedCost", [new Column("Date", "Date", 75), new Column("Reference", "Reference", 110), new Column("Item", "Item", 150), new Column("Goods", "Goods value", 95), new Column("Uplift", "Uplift %", 60),
              new Column("Landed", "Landed cost", 95, true)], Period);
+        yield return Listing("INV98", "Bill of Materials Costing", "Inventory", "Each BOM's components with scrap allowance and current average cost, rolled up to a cost per finished unit.",
+            "StkBom", [new Column("Bom", "BOM", 80), new Column("Parent", "Finished item", 150), new Column("Component", "Component", 150), new Column("PerBatch", "Per batch", 65), new Column("Scrap", "Scrap %", 55),
+             new Column("PerUnit", "Per unit", 65), new Column("UnitCost", "Unit cost", 75), new Column("Extended", "Cost per unit", 90, true)], []);
+        yield return Listing("INV99", "Production Yield & Usage Variance", "Inventory", "Assembly runs in the period: planned and actual output, yield, and each component's standard against actual usage and cost.",
+            "StkYield", [new Column("Run", "Run", 90), new Column("Date", "Date", 75), new Column("Item", "Item", 140), new Column("Yield", "Output (planned → actual, yield)", 160), new Column("Component", "Component", 140),
+             new Column("Standard", "Std qty", 60), new Column("Actual", "Actual qty", 65), new Column("StandardCost", "Std cost", 80), new Column("ActualCost", "Actual cost", 80),
+             new Column("Variance", "Usage variance", 90, true)], Period);
         yield return Listing("INV101", "Consignment Stock", "Inventory", "Our stock held at customers' sites on consignment, per customer and item, with the last movement and value at average cost.",
             "StkConsignment", [new Column("Customer", "Customer", 150), new Column("Warehouse", "Location", 80), new Column("Item", "Item", 150), new Column("OnHand", "On hand", 70),
              new Column("LastMovement", "Last movement", 80), new Column("Value", "Value", 95, true)], [("AsAtDate", ParameterType.Date)]);
