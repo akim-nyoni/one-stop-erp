@@ -44,6 +44,16 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         Context context = new(companyId, asAt, year, PeriodOf(year, asAt));
         return command.ToUpperInvariant() switch
         {
+            "BGTPREPSTATUS" => await PrepStatusAsync(context, parameters.TryGetValue("Deadline", out object? deadline) && deadline is DateOnly d ? d : null, ct).ConfigureAwait(false),
+            "BGTCUTSTRAIL" => await CutsTrailAsync(context, ct).ConfigureAwait(false),
+            "BGTAPPROVED" => await ApprovedAsync(context, ct).ConfigureAwait(false),
+            "BGTRECONCILIATION" => await ReconciliationAsync(context, ct).ConfigureAwait(false),
+            "BGTSUPPLEMENTARY" => await SupplementaryAsync(context, ct).ConfigureAwait(false),
+            "BGTCARRYFORWARD" => await CarryForwardAsync(context, ct).ConfigureAwait(false),
+            "BGTOUTTURN" => await OutturnAsync(context, ct).ConfigureAwait(false),
+            "BGTFORECASTMOVEMENT" => await ForecastMovementAsync(context, ct).ConfigureAwait(false),
+            "BGTCASH" => await CashAsync(context, ct).ConfigureAwait(false),
+            "BGTCAPITALPROJECTS" => await CapitalProjectsAsync(context, ct).ConfigureAwait(false),
             "BGTSUBMISSION" => await SubmissionAsync(context, ct).ConfigureAwait(false),
             "BGTVERSIONS" => await VersionsAsync(context, ct).ConfigureAwait(false),
             "BGTMULTIYEAR" => await MultiYearAsync(context, ct).ConfigureAwait(false),
@@ -320,6 +330,158 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
 
     private Task<Dictionary<string, string>> NamesAsync(long companyId, CancellationToken ct)
         => _db.Accounts.AsNoTracking().IgnoreQueryFilters().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AccountCode, a => a.Name, ct);
+
+    // A department's status is its latest draft submission's; approved once an in-force budget exists for it.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PrepStatusAsync(Context c, DateOnly? deadline, CancellationToken ct)
+    {
+        List<Budget> budgets = await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false);
+        List<string> establishment = await _db.EstablishmentPosts.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).Select(p => p.Department).Distinct().ToListAsync(ct).ConfigureAwait(false);
+        IEnumerable<string> departments = budgets.Where(b => b.Department != null).Select(b => b.Department!).Concat(establishment).Distinct().Order(StringComparer.Ordinal);
+        return [.. departments.Select(d =>
+        {
+            Budget? draft = budgets.Where(b => b.Department == d && b.Type == BudgetType.DraftSubmission).OrderBy(b => b.VersionNumber).LastOrDefault();
+            bool approved = budgets.Any(b => b.Department == d && b.Type != BudgetType.DraftSubmission && InForce.Contains(b.Status));
+            string status = approved ? "Approved" : draft is null ? "Not started" : draft.Status switch
+            {
+                BudgetStatus.Draft => "In progress",
+                BudgetStatus.Submitted => "Submitted",
+                _ => draft.Status.ToString(),
+            };
+            DateTimeOffset? changed = draft is null ? null : (draft.ModifiedOnUtc ?? draft.CreatedOnUtc);
+            bool done = status is "Submitted" or "Approved";
+            return Row(("Department", d), ("Status", status), ("Version", draft?.VersionNumber.ToString(CultureInfo.InvariantCulture) ?? "—"),
+                ("Updated", changed?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—"), ("Deadline", deadline?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—"),
+                ("Days", deadline is DateOnly due && !done ? (due.DayNumber - c.AsAt.DayNumber).ToString(CultureInfo.InvariantCulture) : "—"), ("Requested", draft?.Lines.Sum(l => l.Amount) ?? 0m));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CutsTrailAsync(Context c, CancellationToken ct)
+    {
+        Dictionary<string, string> names = await NamesAsync(c.CompanyId, ct).ConfigureAwait(false);
+        List<Budget> budgets = await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false);
+        List<Budget> drafts = [.. budgets.Where(b => b.Type == BudgetType.DraftSubmission)];
+        List<Budget> approved = [.. budgets.Where(b => b.Type != BudgetType.DraftSubmission && b.IsActive && InForce.Contains(b.Status))];
+        var keys = drafts.SelectMany(b => b.Lines.Select(l => (Department: b.Department ?? string.Empty, l.AccountCode))).Distinct().OrderBy(k => k.Department, StringComparer.Ordinal).ThenBy(k => k.AccountCode, StringComparer.Ordinal);
+        decimal Total(Budget? b, string account) => b?.Lines.Where(l => l.AccountCode == account).Sum(l => l.Amount) ?? 0m;
+        return [.. keys.Select(k =>
+        {
+            List<Budget> own = [.. drafts.Where(b => (b.Department ?? string.Empty) == k.Department).OrderBy(b => b.VersionNumber)];
+            decimal requested = Total(own.FirstOrDefault(), k.AccountCode), recommended = Total(own.LastOrDefault(), k.AccountCode);
+            decimal granted = approved.Where(b => (b.Department ?? string.Empty) == k.Department).Sum(b => Total(b, k.AccountCode));
+            return Row(("Department", k.Department.Length == 0 ? "All" : k.Department), ("Account", k.AccountCode), ("Name", names.GetValueOrDefault(k.AccountCode, "?")), ("Requested", Money(requested)),
+                ("Recommended", Money(recommended)), ("Approved", Money(granted)), ("Cut", requested - granted));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ApprovedAsync(Context c, CancellationToken ct)
+    {
+        Dictionary<string, string> names = await NamesAsync(c.CompanyId, ct).ConfigureAwait(false);
+        List<Budget> budgets = await BudgetsAsync(c.CompanyId, c.Year.Id, true, ct).ConfigureAwait(false);
+        decimal Quarter(IEnumerable<BudgetLine> lines, int q) => lines.Where(l => (l.Period - 1) / 3 == q).Sum(l => l.Amount);
+        return [.. budgets.Where(b => b.Type != BudgetType.DraftSubmission).SelectMany(b => b.Lines.Select(l => (Department: b.Department ?? "All", Line: l)))
+            .GroupBy(x => (x.Line.AccountCode, x.Department)).OrderBy(g => g.Key.AccountCode, StringComparer.Ordinal).ThenBy(g => g.Key.Department, StringComparer.Ordinal)
+            .Select(g =>
+            {
+                List<BudgetLine> lines = [.. g.Select(x => x.Line)];
+                return Row(("Account", g.Key.AccountCode), ("Name", names.GetValueOrDefault(g.Key.AccountCode, "?")), ("Department", g.Key.Department), ("Q1", Money(Quarter(lines, 0))), ("Q2", Money(Quarter(lines, 1))),
+                    ("Q3", Money(Quarter(lines, 2))), ("Q4", Money(Quarter(lines, 3))), ("Total", lines.Sum(l => l.Amount)));
+            })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReconciliationAsync(Context c, CancellationToken ct)
+        => [.. (await _control.VoteBookAsync(c.CompanyId, c.Year.Id, 12, ct).ConfigureAwait(false)).OrderBy(v => v.AccountCode, StringComparer.Ordinal)
+            .Select(v => Row(("Account", v.AccountCode), ("Name", v.Name), ("Original", Money(v.Original)), ("Supplementary", Money(v.Supplementary)), ("Virements", Money(v.Virements)), ("Rephasing", "—"),
+                ("Current", v.Appropriation)))];
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SupplementaryAsync(Context c, CancellationToken ct)
+    {
+        List<Budget> budgets = await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false);
+        Dictionary<string, decimal> original = budgets.Where(b => b.Type == BudgetType.OriginalApproved && b.Status != BudgetStatus.Draft && b.Status != BudgetStatus.Submitted)
+            .OrderBy(b => b.VersionNumber).Take(1).SelectMany(b => b.Lines).Where(l => l.VirementId == null).GroupBy(l => l.AccountCode).ToDictionary(g => g.Key, g => g.Sum(l => l.Amount));
+        return [.. budgets.Where(b => b.Type == BudgetType.SupplementaryRevised).OrderBy(b => b.VersionNumber).SelectMany(b => b.Lines.Where(l => l.VirementId == null).GroupBy(l => l.AccountCode)
+            .OrderBy(g => g.Key, StringComparer.Ordinal).Select(g =>
+            {
+                decimal was = original.GetValueOrDefault(g.Key), now = g.Sum(l => l.Amount);
+                return Row(("Budget", $"{b.Label} v{b.VersionNumber}"), ("Status", b.Status.ToString()), ("Account", g.Key), ("Original", Money(was)), ("Revised", Money(now)), ("Reason", b.Reason ?? string.Empty), ("Change", now - was));
+            }))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CarryForwardAsync(Context c, CancellationToken ct)
+    {
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        List<BudgetCommitment> closed = await _db.BudgetCommitments.AsNoTracking()
+            .Where(x => x.CompanyId == c.CompanyId && x.FiscalYearId == c.Year.Id && (x.Status == CommitmentStatus.Lapsed || x.Status == CommitmentStatus.CarriedForward)).OrderBy(x => x.Reference).ToListAsync(ct).ConfigureAwait(false);
+        return [.. closed.Select(x => Row(("Reference", x.Reference), ("Account", x.AccountCode), ("Department", x.Department ?? "All"), ("Period", x.Period), ("Outcome", x.Status == CommitmentStatus.Lapsed ? "Lapsed" : "Carried forward"),
+            ("ApprovedBy", x.YearEndApprovedByUserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "—"), ("Amount", x.Amount)))];
+    }
+
+    // The forecast for the remaining periods comes from the latest reforecast round when there is one, else from the budget itself.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> OutturnAsync(Context c, CancellationToken ct)
+    {
+        Dictionary<string, string> names = await NamesAsync(c.CompanyId, ct).ConfigureAwait(false);
+        List<Budget> budgets = await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false);
+        List<Budget> approved = [.. budgets.Where(b => b.Type is BudgetType.OriginalApproved or BudgetType.SupplementaryRevised && b.IsActive && InForce.Contains(b.Status))];
+        Budget? reforecast = budgets.Where(b => b.Type == BudgetType.Reforecast).OrderBy(b => b.VersionNumber).LastOrDefault();
+        var actuals = await ActualsAsync(c.CompanyId, c.Year.StartDate, c.AsAt, ct).ConfigureAwait(false);
+        var keys = approved.SelectMany(b => b.Lines.Select(l => (l.AccountCode, Department: b.Department ?? string.Empty))).Distinct().OrderBy(k => k.AccountCode, StringComparer.Ordinal).ThenBy(k => k.Department, StringComparer.Ordinal);
+        return [.. keys.Select(k =>
+        {
+            List<BudgetLine> lines = [.. approved.Where(b => (b.Department ?? string.Empty) == k.Department).SelectMany(b => b.Lines).Where(l => l.AccountCode == k.AccountCode)];
+            decimal budget = lines.Sum(l => l.Amount), actual = ActualFor(actuals, (k.AccountCode, k.Department));
+            List<BudgetLine> forecastLines = [.. (reforecast?.Lines.Where(l => l.AccountCode == k.AccountCode && l.Period > c.Period) ?? []).Where(_ => (reforecast!.Department ?? string.Empty) == k.Department || reforecast!.Department == null)];
+            decimal forecast = forecastLines.Count > 0 ? forecastLines.Sum(l => l.Amount) : lines.Where(l => l.Period > c.Period).Sum(l => l.Amount);
+            return Row(("Account", k.AccountCode), ("Name", names.GetValueOrDefault(k.AccountCode, "?")), ("Department", k.Department.Length == 0 ? "All" : k.Department), ("Budget", Money(budget)), ("Actual", Money(actual)),
+                ("Forecast", Money(forecast)), ("Outturn", Money(actual + forecast)), ("Variance", budget - actual - forecast));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ForecastMovementAsync(Context c, CancellationToken ct)
+    {
+        Dictionary<string, string> names = await NamesAsync(c.CompanyId, ct).ConfigureAwait(false);
+        List<Budget> rounds = [.. (await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false)).Where(b => b.Type == BudgetType.Reforecast).OrderBy(b => b.VersionNumber)];
+        if (rounds.Count < 2)
+        {
+            return [];
+        }
+
+        Budget previous = rounds[^2], latest = rounds[^1];
+        decimal Total(Budget b, string account) => b.Lines.Where(l => l.AccountCode == account).Sum(l => l.Amount);
+        return [.. previous.Lines.Select(l => l.AccountCode).Concat(latest.Lines.Select(l => l.AccountCode)).Distinct().Order(StringComparer.Ordinal).Select(a => Row(("Account", a),
+            ("Name", names.GetValueOrDefault(a, "?")), ("Previous", Money(Total(previous, a))), ("Latest", Money(Total(latest, a))), ("Reason", latest.Reason ?? string.Empty), ("Movement", Total(latest, a) - Total(previous, a))))];
+    }
+
+    // Cash budget lines carry the planned net cash per period; actual is the net movement on the bank accounts' ledger accounts.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CashAsync(Context c, CancellationToken ct)
+    {
+        Budget? cash = (await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false)).Where(b => b.Type == BudgetType.Cash).OrderBy(b => b.VersionNumber).LastOrDefault();
+        List<string> banks = [.. (await _db.BankAccounts.AsNoTracking().Where(b => b.CompanyId == c.CompanyId).Select(b => b.GlAccountCode).ToListAsync(ct).ConfigureAwait(false))
+            .Concat(cash?.Lines.Select(l => l.AccountCode) ?? []).Distinct()];
+        var movements = await (from l in _db.Set<JournalLine>().AsNoTracking()
+                               join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
+                               where j.CompanyId == c.CompanyId && j.Status == JournalStatus.Posted && j.PostingDate >= c.Year.StartDate && j.PostingDate <= c.AsAt && banks.Contains(l.AccountCode)
+                               select new { j.PostingDate, Net = l.BaseDebit - l.BaseCredit }).ToListAsync(ct).ConfigureAwait(false);
+        return [.. Enumerable.Range(1, c.Period).Select(p =>
+        {
+            DateOnly month = c.Year.StartDate.AddMonths(p - 1);
+            decimal budget = cash?.Lines.Where(l => l.Period == p).Sum(l => l.Amount) ?? 0m;
+            decimal actual = movements.Where(m => PeriodOf(c.Year, m.PostingDate) == p).Sum(m => m.Net);
+            return Row(("Period", p), ("Month", month.ToString("yyyy-MM", CultureInfo.InvariantCulture)), ("Budget", Money(budget)), ("Actual", Money(actual)), ("Variance", Math.Round(actual - budget, 2)));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CapitalProjectsAsync(Context c, CancellationToken ct)
+    {
+        List<Core.FixedAssets.CapitalProject> projects = await _db.CapitalProjects.AsNoTracking().Include(p => p.Costs).Where(p => p.CompanyId == c.CompanyId && p.OpenedOn <= c.AsAt).OrderBy(p => p.Code)
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<BudgetCommitment> commitments = await OpenCommitmentsAsync(c, ct).ConfigureAwait(false);
+        return [.. projects.Select(p =>
+        {
+            decimal actual = p.Costs.Where(x => x.Date <= c.AsAt).Sum(x => x.Amount);
+            decimal committed = commitments.Where(x => x.AccountCode == p.CwipAccountCode && x.Reference.StartsWith(p.Code, StringComparison.OrdinalIgnoreCase)).Sum(x => x.Amount);
+            return Row(("Project", p.Code), ("Name", p.Name), ("Status", p.CapitalisedOn is DateOnly on && on <= c.AsAt ? "Capitalised" : "In progress"), ("Budget", Money(p.Budget)), ("Actual", Money(actual)),
+                ("Committed", Money(committed)), ("Spent", p.Budget == 0m ? "—" : (actual * 100m / p.Budget).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("ToComplete", Math.Max(0m, p.Budget - actual - committed)));
+        })];
+    }
 
     private static string Money(decimal amount) => amount.ToString("N2", CultureInfo.InvariantCulture);
 

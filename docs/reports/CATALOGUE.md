@@ -2,26 +2,36 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-498 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+508 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
+| B1 | Budget Preparation Status Board | Every department's budget preparation for the year of the date: not started, in progress, submitted or approved, against the deadline. | AsAtDate (Date, optional), Deadline (Date, optional) | Department, Status, Version, Updated, Deadline, Days, Requested | — | Sum(Requested) |
 | B12 | Budget Version Comparison | For each budget with more than one version: the latest against the one before, per account. | AsAtDate (Date, optional) | Budget, Versions, Account, Name, Previous, Current, Percent, Change | — | Sum(Change) |
+| B13 | Original vs Recommended vs Approved | Per department and account: what was first requested, the last draft recommended, what was approved, and the cut. | AsAtDate (Date, optional) | Department, Account, Name, Requested, Recommended, Approved, Cut | — | Sum(Cut) |
 | B15 | Multi-Year Budget & Actual Comparison | Each budgeted account's budget and actual for this year and the two before. | AsAtDate (Date, optional) | Account, Name, Budget2, Actual2, Budget1, Actual1, Budget0, Actual0 | — | Sum(Actual0) |
 | B17 | Budget Versions, Seals & Superseded Budgets | Every budget held: type, version, status, why it was revised, and whether its seal still verifies. | AsAtDate (Date, optional) | Budget, Year, Type, Version, Status, Active, Reason, Seal, Total | — | Sum(Total) |
 | B18 | Budget Line Change Log | Every recorded change to budget lines in the year, with who made it and the fields changed. | AsAtDate (Date, optional) | When, User, Id, Action, Changed | — | — |
+| B19 | Approved Budget Register by Vote & Department | The appropriation of record: every in-force budget line for the year by account and department, by quarter. | AsAtDate (Date, optional) | Account, Name, Department, Q1, Q2, Q3, Q4, Total | — | Sum(Total) |
 | B2 | Departmental Budget Submission | Every budget of the year by department and version: each account's quarters and annual total. | AsAtDate (Date, optional) | Budget, Version, Status, Department, Account, Name, Q1, Q2, Q3, Q4, Total | — | Sum(Total) |
 | B20 | Virement Register | Transfers between budget lines in the year: from, to, period, amount, justification, who asked and who reviewed. | AsAtDate (Date, optional) | Requested, From, To, Period, Justification, Status, RequestedBy, ReviewedBy, Amount | — | Sum(Amount) |
+| B21 | Budget Reconciliation (Original to Current) | Per vote: original appropriation, plus supplementary, plus or minus virements and rephasing, equals the current approved budget. | AsAtDate (Date, optional) | Account, Name, Original, Supplementary, Virements, Rephasing, Current | — | Sum(Current) |
+| B22 | Supplementary Appropriation Schedule | Each supplementary or revised budget of the year: per vote, the amount against the original approved, the change, and the reason. | AsAtDate (Date, optional) | Budget, Status, Account, Original, Revised, Reason, Change | — | Sum(Change) |
 | B24 | Vote Book | Per budgeted account and department: the year's budget, actual to date, open commitments and what remains. | AsAtDate (Date, optional) | Account, Name, Department, Budget, Actual, Committed, Remaining | — | Sum(Remaining) |
 | B25 | Commitment / Encumbrance Register | Every commitment of the year with reference, account, department, period and status. | AsAtDate (Date, optional) | Reference, Account, Department, Period, Type, Status, Amount | — | Sum(Amount) |
 | B26 | Commitments vs Open Purchase Orders | Open commitments against the open value of the purchase order they reference, with any difference. | AsAtDate (Date, optional) | Reference, Order, OpenValue, Committed, Difference | — | Sum(Difference) |
 | B28 | Expenditure Against Unappropriated Votes | Expense accounts with spending this year but no line in an approved budget. | AsAtDate (Date, optional) | Account, Name, Postings, Actual | — | Sum(Actual) |
+| B29 | Year-End Commitment Carry-Forward Schedule | Commitments of the year that lapsed or were carried into the next year at year end, with who approved the carry-forward. | AsAtDate (Date, optional) | Reference, Account, Department, Period, Outcome, ApprovedBy, Amount | — | Sum(Amount) |
 | B33 | Budget Utilisation (RAG) | Year-to-date use of each budgeted account's year-to-date budget: green under 90%, amber to 100%, red over. | AsAtDate (Date, optional) | Account, Name, Budget, Used, Rag, Actual | — | Sum(Actual) |
 | B34 | Over-Budget & Threshold Exceptions | Only the budgeted accounts at amber or red, worst first. | AsAtDate (Date, optional) | Account, Name, Budget, Used, Rag, Over | — | Sum(Over) |
 | B36 | Variance Commentary Pack | The year's variance explanations by period and account, beside the budget and actual they explain. | AsAtDate (Date, optional) | Period, Account, Name, Budget, Actual, Author, Comment | — | — |
 | B37 | Departmental Management Accounts | Per department, year to date: income and expenditure against budget, and the surplus or deficit. | AsAtDate (Date, optional) | Department, IncomeBudget, Income, ExpenseBudget, Expense, Surplus | — | Sum(Surplus) |
+| B38 | Full-Year Forecast / Outturn Projection | Per vote: the approved budget, actual to date, the forecast for the rest of the year (latest reforecast, else the remaining budget) and the projected outturn against budget. | AsAtDate (Date, optional) | Account, Name, Department, Budget, Actual, Forecast, Outturn, Variance | — | Sum(Variance) |
+| B39 | Forecast vs Forecast Movement | Between the last two reforecast rounds of the year: each vote's forecast before and after, the movement and the reason given. | AsAtDate (Date, optional) | Account, Name, Previous, Latest, Reason, Movement | — | Sum(Movement) |
+| B41 | Cash Budget vs Actual Cash Flow | Month by month to the date: the cash budget's net flow against the actual net movement on the bank accounts, and the variance. | AsAtDate (Date, optional) | Period, Month, Budget, Actual, Variance | — | Sum(Variance) |
+| B42 | Capital Project Budget vs Actual vs Commitment | Each capital project: budget, cost to date, commitments, the share spent and the cost to complete. | AsAtDate (Date, optional) | Project, Name, Status, Budget, Actual, Committed, Spent, ToComplete | — | Sum(ToComplete) |
 | B44 | Budget Accuracy Review | For the year before the as-at date's year: each account's full-year budget against actual, the variance and how accurate the budget was. | AsAtDate (Date, optional) | Account, Name, Budget, Actual, Percent, Accuracy, Variance | — | Sum(Variance) |
 | B45 | Budget Audit Trail | Every recorded change in the year to budgets, lines, virements, commitments and variance comments. | AsAtDate (Date, optional) | When, User, Entity, Id, Action, Changed | — | — |
 | BUD-BVA | Budget vs Actual | Active budget compared to GL actuals by account, with the variance. | FiscalYearId (Integer, optional), Department (String, optional), Period (Integer, optional) | AccountCode, Budget, Actual, Variance | — | Sum(Variance) |

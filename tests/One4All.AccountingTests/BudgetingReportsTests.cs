@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Reporting;
+using One4All.Core.Accounting;
 using One4All.Core.Budgeting;
 using One4All.Infrastructure.Persistence;
 using One4All.Infrastructure.Persistence.Seeding;
@@ -76,6 +77,35 @@ public sealed class BudgetingReportsTests
         (await Render("B28")).Should().Contain("6100,Salaries & Wages,1,200");
         (await Render("B33")).Should().Contain("6000,").And.Contain("360.00,125.0%,Red,450");
         (await Render("B34")).Should().Contain("360.00,125.0%,Red,90");
+
+        Budget ask = new(companyId, yearId, "WORKS", BudgetType.DraftSubmission, "Works", 1), trimmed = new(companyId, yearId, "WORKS", BudgetType.DraftSubmission, "Works", 2);
+        Budget roundOne = new(companyId, yearId, "RF", BudgetType.Reforecast, null, 1), roundTwo = new(companyId, yearId, "RF", BudgetType.Reforecast, null, 2) { Reason = "Fuel prices" };
+        Budget cash = new(companyId, yearId, "CASH", BudgetType.Cash, null, 1);
+        for (int period = 1; period <= 12; period++)
+        {
+            ask.AddLine("6000", period, 150m);
+            trimmed.AddLine("6000", period, 125m);
+            roundOne.AddLine("6000", period, 130m);
+            roundTwo.AddLine("6000", period, 150m);
+            cash.AddLine("1100", period, -100m);
+        }
+
+        db.Accounts.Add(new LedgerAccount(companyId, "1695", "Capital WIP", AccountType.Asset));
+        One4All.Core.FixedAssets.CapitalProject plant = new(companyId, "cp1", "Plant upgrade", "1695", 10_000m, new DateOnly(2026, 1, 5));
+        plant.AddCost(new One4All.Core.FixedAssets.CapitalProjectCost(new DateOnly(2026, 2, 1), "Deposit", 2_500m, "J-CP1"));
+        db.AddRange(ask, trimmed, roundOne, roundTwo, cash, plant);
+        await db.SaveChangesAsync();
+
+        (await Render("B1")).Should().Contain("Works,In progress,2,");
+        (await Render("B13")).Should().Contain("Works,6000,").And.Contain("\"1,800.00\",\"1,500.00\",0.00,1800");
+        (await Render("B19")).Should().Contain(",All,360.00,360.00,360.00,360.00,1440");
+        (await Render("B21")).Should().Contain("6000,").And.Contain(",—,1440");
+        (await Render("B22")).Should().Contain("OPEX v2,Active,6000,\"1,200.00\",\"1,440.00\",,240");
+        (await Render("B38")).Should().Contain(",All,\"1,440.00\",450.00,\"1,350.00\",\"1,800.00\",-360");
+        (await Render("B39")).Should().Contain("\"1,560.00\",\"1,800.00\",Fuel prices,240");
+        string cashFlow = await Render("B41");
+        cashFlow.Should().Contain("1,2026-01,-100.00,-150.00,-50").And.Contain("3,2026-03,-100.00,-350.00,-250");
+        (await Render("B42")).Should().Contain("CP1,Plant upgrade,In progress,\"10,000.00\",\"2,500.00\",0.00,25.0%,7500");
 
         foreach (string code in BudgetingReports.All().Select(r => r.Code))
         {
