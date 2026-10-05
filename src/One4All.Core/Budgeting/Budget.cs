@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using One4All.Core.Accounting;
 using One4All.Core.Common;
 
 namespace One4All.Core.Budgeting;
@@ -226,4 +227,62 @@ public sealed class BudgetLine : Entity
 
     /// <summary>Gets or sets the driver the line is built from (driver-based lines).</summary>
     public string? DriverCode { get; set; }
+
+    /// <summary>Gets or sets the budgeted volume behind the amount (units, tonnes, hours…), for the volume / price split (B35).</summary>
+    public decimal? Quantity { get; set; }
+
+    /// <summary>Gets or sets the currency the line was planned in, when it is bought or sold in a foreign currency.</summary>
+    public CurrencyCode? Currency { get; set; }
+
+    /// <summary>Gets or sets the planned rate (base per unit of <see cref="Currency"/>) the amount was budgeted at.</summary>
+    public decimal? PlannedRate { get; set; }
+}
+
+/// <summary>
+/// An actual volume against a budgeted account (<c>bud.actual_volume</c>): units sold, tonnes hauled, hours worked — what the volume
+/// variance (B35) compares with the budget lines' quantities.
+/// </summary>
+public sealed class ActualVolume : Entity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private ActualVolume()
+    {
+        AccountCode = string.Empty;
+        Reference = string.Empty;
+    }
+
+    /// <summary>Creates the record.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="accountCode">The budgeted account.</param>
+    /// <param name="department">The department, if the budget is departmental.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="quantity">The volume.</param>
+    /// <param name="reference">Where the figure came from.</param>
+    public ActualVolume(long companyId, string accountCode, string? department, DateOnly date, decimal quantity, string reference)
+    {
+        CompanyId = companyId;
+        AccountCode = accountCode;
+        Department = department;
+        Date = date;
+        Quantity = quantity;
+        Reference = reference;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The budgeted account.</summary>
+    public string AccountCode { get; private set; }
+
+    /// <summary>The department, if any.</summary>
+    public string? Department { get; private set; }
+
+    /// <summary>The date.</summary>
+    public DateOnly Date { get; private set; }
+
+    /// <summary>The volume.</summary>
+    public decimal Quantity { get; private set; }
+
+    /// <summary>Where the figure came from.</summary>
+    public string Reference { get; private set; }
 }

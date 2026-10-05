@@ -1715,6 +1715,60 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("supplier_statement_line", "cb");
                 });
 
+            modelBuilder.Entity("One4All.Core.Budgeting.ActualVolume", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("account_code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("Department")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("department");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_actual_volume");
+
+                    b.HasIndex("CompanyId", "AccountCode", "Date")
+                        .HasDatabaseName("ix_actual_volume_company_id_account_code_date");
+
+                    b.ToTable("actual_volume", "bud");
+                });
+
             modelBuilder.Entity("One4All.Core.Budgeting.Budget", b =>
                 {
                     b.Property<long>("Id")
@@ -2116,6 +2170,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("cost_centre");
 
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
                     b.Property<string>("DriverCode")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -2124,6 +2183,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("Period")
                         .HasColumnType("integer")
                         .HasColumnName("period");
+
+                    b.Property<decimal?>("PlannedRate")
+                        .HasPrecision(19, 8)
+                        .HasColumnType("numeric(19,8)")
+                        .HasColumnName("planned_rate");
+
+                    b.Property<decimal?>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()

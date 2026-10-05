@@ -26,6 +26,10 @@ public static class BudgetingReports
         yield return Listing("B4", "Consolidated Draft Budget by Hierarchy", "Budget", "The latest drafts rolled up department → division → directorate → company, at the level asked for.",
             "BgtHierarchy", [new Column("Level", "Level", 80), new Column("Unit", "Unit", 160), new Column("Departments", "Departments", 70), new Column("Requested", "Requested", 110, true)],
             [("AsAtDate", ParameterType.Date), ("Level", ParameterType.String)]);
+        yield return Listing("B35", "Variance Decomposition", "Budget", "Year-to-date variance per budget line split into volume (actual vs budgeted quantity at budget price), FX (foreign amounts at actual vs planned rate) and price / rate.",
+            "BgtDecomposition", [new Column("Account", "Account", 60), new Column("Name", "Name", 140), new Column("Department", "Dept", 55), new Column("Budget", "Budget YTD", 90), new Column("Actual", "Actual YTD", 90),
+             new Column("BudgetQty", "Budget qty", 65), new Column("ActualQty", "Actual qty", 65), new Column("Volume", "Volume", 85), new Column("Price", "Price / rate", 85), new Column("Fx", "FX", 80),
+             new Column("Variance", "Variance", 90, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("B5", "Assumption & Driver Register", "Budget", "The year's planning drivers with their value and the budget lines each one feeds.",
             "BgtDrivers", [new Column("Driver", "Driver", 80), new Column("Name", "Name", 160), new Column("Unit", "Unit", 50), new Column("Value", "Value", 80), new Column("Lines", "Lines fed", 60), new Column("Amount", "Amount fed", 100, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("B6", "Assumption Sensitivity / What-If", "Budget", "Change one driver: each dependent line scaled to the new value, the change per line and on the total.",

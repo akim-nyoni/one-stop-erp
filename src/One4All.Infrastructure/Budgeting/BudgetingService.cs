@@ -29,15 +29,51 @@ public sealed class BudgetingService : IBudgetingService
             .Select(b => (int?)b.VersionNumber)
             .MaxAsync(ct).ConfigureAwait(false) ?? 0;
 
+        foreach (NewBudgetLine line in lines)
+        {
+            if (line.Quantity is <= 0m)
+            {
+                return Error.Validation("Budget.LineQuantity", $"The budgeted quantity on {line.AccountCode} period {line.Period} must be positive.");
+            }
+
+            if (line.Currency is not null && line.PlannedRate is not > 0m)
+            {
+                return Error.Validation("Budget.PlannedRate", $"A line planned in {line.Currency} needs a positive planned rate.");
+            }
+        }
+
         Budget budget = new(companyId, fiscalYearId, label, type, department, lastVersion + 1);
         foreach (NewBudgetLine line in lines)
         {
-            budget.AddLine(line.AccountCode, line.Period, line.Amount, line.CostCentre);
+            BudgetLine added = budget.AddLine(line.AccountCode, line.Period, line.Amount, line.CostCentre);
+            added.Quantity = line.Quantity;
+            added.Currency = line.Currency;
+            added.PlannedRate = line.Currency is null ? null : line.PlannedRate;
         }
 
         _db.Set<Budget>().Add(budget);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return budget.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> RecordActualVolumeAsync(long companyId, string accountCode, string? department, DateOnly date, decimal quantity, string reference, CancellationToken ct = default)
+    {
+        string account = (accountCode ?? string.Empty).Trim();
+        if (!await _db.Accounts.AnyAsync(a => a.CompanyId == companyId && a.AccountCode == account, ct).ConfigureAwait(false))
+        {
+            return Error.NotFound("Budget.AccountNotFound", $"Account {account} not found.");
+        }
+
+        if (quantity == 0m)
+        {
+            return Error.Validation("Budget.VolumeZero", "An actual volume cannot be zero.");
+        }
+
+        ActualVolume volume = new(companyId, account, string.IsNullOrWhiteSpace(department) ? null : department.Trim(), date, quantity, (reference ?? string.Empty).Trim());
+        _db.Set<ActualVolume>().Add(volume);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return volume.Id;
     }
 
     /// <inheritdoc />

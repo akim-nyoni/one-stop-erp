@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-530 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+531 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -33,6 +33,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | B32 | Budget Holder Statement | Per budget holder: their department's votes — budget, spent and committed to date, available and utilisation. | AsAtDate (Date, optional) | Holder, Department, Account, Budget, Actual, Committed, Used, Available | — | Sum(Available) |
 | B33 | Budget Utilisation (RAG) | Year-to-date use of each budgeted account's year-to-date budget: green under 90%, amber to 100%, red over. | AsAtDate (Date, optional) | Account, Name, Budget, Used, Rag, Actual | — | Sum(Actual) |
 | B34 | Over-Budget & Threshold Exceptions | Only the budgeted accounts at amber or red, worst first. | AsAtDate (Date, optional) | Account, Name, Budget, Used, Rag, Over | — | Sum(Over) |
+| B35 | Variance Decomposition | Year-to-date variance per budget line split into volume (actual vs budgeted quantity at budget price), FX (foreign amounts at actual vs planned rate) and price / rate. | AsAtDate (Date, optional) | Account, Name, Department, Budget, Actual, BudgetQty, ActualQty, Volume, Price, Fx, Variance | — | Sum(Variance) |
 | B36 | Variance Commentary Pack | The year's variance explanations by period and account, beside the budget and actual they explain. | AsAtDate (Date, optional) | Period, Account, Name, Budget, Actual, Author, Comment | — | — |
 | B37 | Departmental Management Accounts | Per department, year to date: income and expenditure against budget, and the surplus or deficit. | AsAtDate (Date, optional) | Department, IncomeBudget, Income, ExpenseBudget, Expense, Surplus | — | Sum(Surplus) |
 | B38 | Full-Year Forecast / Outturn Projection | Per vote: the approved budget, actual to date, the forecast for the rest of the year (latest reforecast, else the remaining budget) and the projected outturn against budget. | AsAtDate (Date, optional) | Account, Name, Department, Budget, Actual, Forecast, Outturn, Variance | — | Sum(Variance) |

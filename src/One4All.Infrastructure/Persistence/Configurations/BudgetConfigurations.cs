@@ -35,6 +35,8 @@ internal sealed class BudgetLineConfiguration : IEntityTypeConfiguration<BudgetL
         b.Property(x => x.CostCentre).HasMaxLength(20);
         b.Property(x => x.Basis).HasConversion<int>();
         b.Property(x => x.DriverCode).HasMaxLength(20);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.Property(x => x.PlannedRate).HasPrecision(19, 8);
         b.HasIndex(x => new { x.BudgetId, x.AccountCode, x.Period });
     }
 }
@@ -138,5 +140,19 @@ internal sealed class BudgetControlEventConfiguration : IEntityTypeConfiguration
         b.Property(x => x.Document).HasMaxLength(80);
         b.Property(x => x.Reason).HasMaxLength(200);
         b.HasIndex(x => new { x.CompanyId, x.PostingDate });
+    }
+}
+
+internal sealed class ActualVolumeConfiguration : IEntityTypeConfiguration<ActualVolume>
+{
+    public void Configure(EntityTypeBuilder<ActualVolume> b)
+    {
+        b.ToTable("actual_volume", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AccountCode).HasMaxLength(8);
+        b.Property(x => x.Department).HasMaxLength(20);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.AccountCode, x.Date });
     }
 }

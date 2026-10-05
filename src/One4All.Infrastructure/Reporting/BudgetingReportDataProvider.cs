@@ -54,6 +54,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
             "BGTCEILINGGAP" => await CeilingGapAsync(context, ct).ConfigureAwait(false),
             "BGTHIERARCHY" => await HierarchyAsync(context, parameters.TryGetValue("Level", out object? level) && level is string l && l.Length > 0 ? l : "Directorate", ct).ConfigureAwait(false),
             "BGTDRIVERS" => await DriversAsync(context, ct).ConfigureAwait(false),
+            "BGTDECOMPOSITION" => await DecompositionAsync(context, ct).ConfigureAwait(false),
             "BGTWHATIF" => await WhatIfAsync(context, parameters.TryGetValue("DriverCode", out object? code) ? code as string : null,
                 parameters.TryGetValue("NewValue", out object? nv) && nv is not null and not "" ? Convert.ToDecimal(nv, CultureInfo.InvariantCulture) : null, ct).ConfigureAwait(false),
             "BGTBASIS" => await BasisAsync(context, ct).ConfigureAwait(false),
@@ -92,6 +93,50 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
     }
 
     private sealed record Context(long CompanyId, DateOnly AsAt, FiscalYear Year, int Period);
+
+    // B35: year-to-date variance per budget key split into volume ((actual − budget volume) × budget price), FX (actual foreign-currency
+    // amount × (actual − planned rate)) and price / rate (the rest), so the three always add up to the total variance.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DecompositionAsync(Context c, CancellationToken ct)
+    {
+        Dictionary<string, string> names = await NamesAsync(c.CompanyId, ct).ConfigureAwait(false);
+        List<(string Account, string Department, BudgetLine Line)> lines = [.. (await BudgetsAsync(c.CompanyId, c.Year.Id, true, ct).ConfigureAwait(false))
+            .SelectMany(b => b.Lines.Where(l => l.Period <= c.Period).Select(l => (l.AccountCode, b.Department ?? string.Empty, l)))];
+        var actuals = await ActualsAsync(c.CompanyId, c.Year.StartDate, c.AsAt, ct).ConfigureAwait(false);
+        List<ActualVolume> volumes = await _db.ActualVolumes.AsNoTracking().Where(v => v.CompanyId == c.CompanyId && v.Date >= c.Year.StartDate && v.Date <= c.AsAt).ToListAsync(ct).ConfigureAwait(false);
+        var foreign = await (from l in _db.Set<JournalLine>().AsNoTracking()
+                             join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
+                             join a in _db.Accounts.AsNoTracking() on new { j.CompanyId, l.AccountCode } equals new { a.CompanyId, a.AccountCode }
+                             where j.CompanyId == c.CompanyId && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed) && j.PostingDate >= c.Year.StartDate && j.PostingDate <= c.AsAt
+                             select new { l.AccountCode, l.Department, l.TransactionCurrency, a.Type, Transaction = l.TransactionDebit - l.TransactionCredit, Base = l.BaseDebit - l.BaseCredit })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return [.. lines.GroupBy(x => (x.Account, x.Department)).OrderBy(g => g.Key.Account, StringComparer.Ordinal).ThenBy(g => g.Key.Department, StringComparer.Ordinal).Select(g =>
+        {
+            decimal budget = g.Sum(x => x.Line.Amount);
+            decimal actual = ActualFor(actuals, g.Key);
+            bool hasVolume = g.All(x => x.Line.Quantity is not null);
+            decimal budgetQty = hasVolume ? g.Sum(x => x.Line.Quantity!.Value) : 0m;
+            decimal actualQty = volumes.Where(v => v.AccountCode == g.Key.Account && (g.Key.Department.Length == 0 || v.Department == g.Key.Department)).Sum(v => v.Quantity);
+            decimal volume = hasVolume && budgetQty != 0m ? decimal.Round((actualQty - budgetQty) * (budget / budgetQty), 2, MidpointRounding.ToEven) : 0m;
+
+            decimal fx = 0m;
+            if (g.Select(x => x.Line.Currency).FirstOrDefault(cy => cy is not null) is CurrencyCode currency)
+            {
+                decimal budgetForeign = g.Where(x => x.Line.Currency == currency).Sum(x => x.Line.Amount / x.Line.PlannedRate!.Value);
+                decimal plannedRate = budgetForeign == 0m ? 0m : g.Where(x => x.Line.Currency == currency).Sum(x => x.Line.Amount) / budgetForeign;
+                var posted = foreign.Where(f => f.AccountCode == g.Key.Account && f.TransactionCurrency == currency && (g.Key.Department.Length == 0 || f.Department == g.Key.Department)).ToList();
+                decimal sign = posted.Count > 0 && posted[0].Type is AccountType.Income or AccountType.Liability or AccountType.Equity ? -1m : 1m;
+                decimal actualForeign = sign * posted.Sum(f => f.Transaction);
+                decimal actualForeignBase = sign * posted.Sum(f => f.Base);
+                fx = actualForeign == 0m ? 0m : decimal.Round(actualForeignBase - (actualForeign * plannedRate), 2, MidpointRounding.ToEven);
+            }
+
+            decimal variance = actual - budget;
+            return Row(("Account", g.Key.Account), ("Name", names.GetValueOrDefault(g.Key.Account, "?")), ("Department", g.Key.Department.Length == 0 ? "All" : g.Key.Department), ("Budget", Money(budget)),
+                ("Actual", Money(actual)), ("BudgetQty", hasVolume ? budgetQty.ToString("0.##", CultureInfo.InvariantCulture) : "-"), ("ActualQty", hasVolume ? actualQty.ToString("0.##", CultureInfo.InvariantCulture) : "-"),
+                ("Volume", Money(volume)), ("Price", Money(variance - volume - fx)), ("Fx", Money(fx)), ("Variance", variance));
+        })];
+    }
 
     private Task<FiscalYear?> YearAsync(long companyId, DateOnly date, CancellationToken ct)
         => _db.FiscalYears.AsNoTracking().FirstOrDefaultAsync(y => y.CompanyId == companyId && y.StartDate <= date && y.EndDate >= date, ct);

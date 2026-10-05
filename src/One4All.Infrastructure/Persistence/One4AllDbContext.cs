@@ -356,6 +356,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Budgets.</summary>
     public DbSet<Core.Budgeting.Budget> Budgets => Set<Core.Budgeting.Budget>();
 
+    /// <summary>Actual volumes against budgeted accounts.</summary>
+    public DbSet<Core.Budgeting.ActualVolume> ActualVolumes => Set<Core.Budgeting.ActualVolume>();
+
     /// <summary>Gets the planning drivers.</summary>
     public DbSet<Core.Budgeting.BudgetDriver> BudgetDrivers => Set<Core.Budgeting.BudgetDriver>();
 

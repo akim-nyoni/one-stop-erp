@@ -1,3 +1,4 @@
+using One4All.Core.Accounting;
 using One4All.Core.Budgeting;
 using One4All.Core.Common;
 
@@ -8,7 +9,10 @@ namespace One4All.Application.Abstractions.Budgeting;
 /// <param name="Period">The period (month 1–12).</param>
 /// <param name="Amount">The budgeted amount.</param>
 /// <param name="CostCentre">The cost centre, if any.</param>
-public readonly record struct NewBudgetLine(string AccountCode, int Period, decimal Amount, string? CostCentre = null);
+/// <param name="Quantity">The budgeted volume behind the amount, for the volume / price split.</param>
+/// <param name="Currency">The currency the line was planned in, if foreign.</param>
+/// <param name="PlannedRate">The planned rate (base per unit of the currency).</param>
+public readonly record struct NewBudgetLine(string AccountCode, int Period, decimal Amount, string? CostCentre = null, decimal? Quantity = null, CurrencyCode? Currency = null, decimal? PlannedRate = null);
 
 /// <summary>One row of a budget-vs-actual comparison.</summary>
 /// <param name="AccountCode">The account.</param>
@@ -62,6 +66,20 @@ public interface IBudgetingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The created budget id.</returns>
     Task<Result<long>> CreateBudgetAsync(long companyId, long fiscalYearId, string label, BudgetType type, string? department, IReadOnlyList<NewBudgetLine> lines, CancellationToken ct = default);
+
+    /// <summary>
+    /// Records an actual volume against a budgeted account (units sold, tonnes, hours) for the volume variance. Refused for an unknown
+    /// account (<c>Budget.AccountNotFound</c>) or a zero quantity (<c>Budget.VolumeZero</c>).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="accountCode">The account.</param>
+    /// <param name="department">The department, for a departmental budget.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="quantity">The volume.</param>
+    /// <param name="reference">Where the figure came from.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The record id.</returns>
+    Task<Result<long>> RecordActualVolumeAsync(long companyId, string accountCode, string? department, DateOnly date, decimal quantity, string reference, CancellationToken ct = default);
 
     /// <summary>Activates a budget version, superseding the prior active one for the same year/type/department.</summary>
     /// <param name="companyId">The company.</param>
