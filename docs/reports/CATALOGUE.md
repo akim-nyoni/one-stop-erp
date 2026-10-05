@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-241 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+248 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -194,6 +194,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | M146 | Billing Run Summary & Control | Each billing run: service, period, ward, lines billed and excluded, total billed against the previous run, proposer and approver. | — | Run, Service, Period, Ward, Status, Lines, Excluded, Previous, Approver, Billed | — | Sum(Billed) |
 | M147 | Billing Exceptions Report | Lines of every billing run flagged as already billed, nothing to bill, failed or a large change on last time. | — | Run, Stand, Exceptions, Message, Included, Previous, Charge | — | Sum(Charge) |
 | M148 | Aged Debtors by Ward, Category and Service | Ratepayers' open items as at the date, aged 30/60/90/120+, grouped by ward, consumer category and service. | AsAtDate (Date, optional) | Ward, Category, Service, Accounts, Current, D30, D60, D90, D120, Over120, Total | — | Sum(Total) |
+| M149 | Arrears Listing | Ratepayers with amounts past due at the date: overdue, total owing, last payment and arrangement status. | AsAtDate (Date, optional) | Debtor, Ward, Properties, Overdue, LastPayment, Arrangement, Owing | — | Sum(Owing) |
 | M151 | Valuation Roll & Supplementary Roll | Every valuation entry (general, supplementary, objection) with its effective date, and objections with their outcome. | — | Stand, Ward, Kind, Reference, EffectiveFrom, Objection, Value | — | Sum(Value) |
 | M152 | Property Register (full) | Every property with owner(s), ratepayer, services and tariffs, meters, valuation and ward. | — | Stand, Ward, Address, Owners, Ratepayer, Services, Meters, Valuation | — | Sum(Valuation) |
 | M153 | Rates Clearance Certificate Register | Certificates issued with property, validity, advance held and who issued them, and whether still valid at the date. | AsAtDate (Date, optional) | Certificate, Stand, Issued, ValidUntil, State, IssuedBy, AdvanceHeld | — | Sum(AdvanceHeld) |
@@ -204,9 +205,15 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | M160 | Disconnection & Reconnection Lists | Service orders to disconnect for arrears or reconnect after payment, with status, execution and the fee raised. | — | Order, Kind, Stand, Ward, Service, Raised, Status, Executed, Fee, Arrears | — | Sum(Arrears) |
 | M161 | Payment Arrangements Register (all debtors) | Every payment arrangement: terms, status and standing as at the date. | AsAtDate (Date, optional) | Ward, Debtor, Started, Total, Instalment, Status, DueToDate, Paid, Missed, Shortfall | — | Sum(Shortfall) |
 | M162 | Indigent Register & Subsidy Cost | Registered indigent households with income, subsidy rate, review date and the subsidy credited in the year to the date. | AsAtDate (Date, optional) | Stand, Ward, Income, Rate, ApprovedFrom, ReviewDue, Status, Subsidy | — | Sum(Subsidy) |
+| M163 | Interest & Penalties Charged | Interest raised on ratepayers' overdue accounts in the year to the date. | AsAtDate (Date, optional) | Date, Debtor, Ward, Document, Amount | — | Sum(Amount) |
+| M164 | Write-offs & Adjustments | Bad debts written off (with the debt case and who approved it) and credit adjustments on ratepayers' accounts in the year. | AsAtDate (Date, optional) | Date, Debtor, Ward, Type, Document, Approval, Amount | — | Sum(Amount) |
 | M166 | Licences & Permits Register and Renewals Due | Every licence with holder, expiry, days to expiry at the date, renewals and the latest inspection. | AsAtDate (Date, optional) | Licence, Kind, Holder, Expires, Due, Status, Renewals, Inspection, Fee | — | Sum(Fee) |
 | M167 | Service Request / Fault Ticket SLA | Every ticket with category, priority, response and resolution against their SLA deadlines. | AsAtDate (Date, optional) | Ticket, Category, Priority, Reported, Status, Response, Resolution, Hours | — | — |
 | M168 | Tariff Schedule | Every tariff with its type, category, ward, effective date, charges, blocks and seasonal rates. | — | Tariff, Name, Service, Type, Category, Ward, Effective, Charges, Blocks, Active | — | — |
+| M169 | Revenue by Source / Vote | Year to date: billed charges by service and revenue account, prepaid sales and licence fees. | AsAtDate (Date, optional) | Source, Vote, Documents, Amount | — | Sum(Amount) |
+| M170 | Ward Councillor Pack | One ward: properties, billing, debtors, arrangements, disconnections, indigent households, open faults and licences. | Ward (String, optional), AsAtDate (Date, optional) | Section, Item, Value | — | — |
+| M171 | Statutory Debtors Age Analysis | Debtors by consumer category aged 30/60/90/120+ as at the date, with a grand total — the statutory return layout. | AsAtDate (Date, optional) | Category, Accounts, Current, D30, D60, D90, D120, Over120, Total | — | Sum(Total) |
+| M172 | Prepaid vs Conventional | Month by month for the year: prepaid sales (vends, units, amount, recovered to arrears) against conventional billing, per service. | AsAtDate (Date, optional) | Month, Service, Vends, Units, ToArrears, Conventional, Share, Prepaid | — | Sum(Prepaid) |
 | MUN-PROP | Property Register | Stands on the municipal register with ward, valuation and ratepayer. | — | StandNumber, Ward, Ratepayer, Valuation | — | Sum(Valuation) |
 
 ## Payroll

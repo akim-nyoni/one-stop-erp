@@ -73,5 +73,28 @@ public static class MunicipalReports
         yield return Listing("M168", "Tariff Schedule", "Municipal", "Every tariff with its type, category, ward, effective date, charges, blocks and seasonal rates.",
             "MuniTariffs", [new Column("Tariff", "Tariff", 80), new Column("Name", "Name", 140), new Column("Service", "Service", 80), new Column("Type", "Type", 90), new Column("Category", "Category", 85),
              new Column("Ward", "Ward", 55), new Column("Effective", "Effective", 75), new Column("Charges", "Charges", 220), new Column("Blocks", "Blocks / seasons", 200), new Column("Active", "Active", 50)], []);
+
+        // Debt, revenue and the councillor's view.
+        yield return Listing("M149", "Arrears Listing", "Municipal", "Ratepayers with amounts past due at the date: overdue, total owing, last payment and arrangement status.",
+            "MuniArrears", [new Column("Debtor", "Debtor", 150), new Column("Ward", "Ward", 60), new Column("Properties", "Properties", 60), new Column("Overdue", "Overdue", 95),
+             new Column("LastPayment", "Last payment", 80), new Column("Arrangement", "Arrangement", 90), new Column("Owing", "Owing", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("M163", "Interest & Penalties Charged", "Municipal", "Interest raised on ratepayers' overdue accounts in the year to the date.",
+            "MuniInterest", [new Column("Date", "Date", 75), new Column("Debtor", "Debtor", 150), new Column("Ward", "Ward", 60), new Column("Document", "Document", 110), new Column("Amount", "Amount", 90, true)],
+            [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("M164", "Write-offs & Adjustments", "Municipal", "Bad debts written off (with the debt case and who approved it) and credit adjustments on ratepayers' accounts in the year.",
+            "MuniWriteOffs", [new Column("Date", "Date", 75), new Column("Debtor", "Debtor", 150), new Column("Ward", "Ward", 60), new Column("Type", "Type", 80), new Column("Document", "Document", 110),
+             new Column("Approval", "Approval", 160), new Column("Amount", "Amount", 90, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("M169", "Revenue by Source / Vote", "Municipal", "Year to date: billed charges by service and revenue account, prepaid sales and licence fees.",
+            "MuniRevenue", [new Column("Source", "Source", 160), new Column("Vote", "Vote (account)", 90), new Column("Documents", "Documents", 70), new Column("Amount", "Amount", 100, true)],
+            [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("M170", "Ward Councillor Pack", "Municipal", "One ward: properties, billing, debtors, arrangements, disconnections, indigent households, open faults and licences.",
+            "MuniWardPack", [new Column("Section", "Section", 100), new Column("Item", "Item", 220), new Column("Value", "Value", 140)], [("Ward", ParameterType.String), ("AsAtDate", ParameterType.Date)]);
+        yield return Listing("M171", "Statutory Debtors Age Analysis", "Municipal", "Debtors by consumer category aged 30/60/90/120+ as at the date, with a grand total — the statutory return layout.",
+            "MuniStatutoryAgeing", [new Column("Category", "Category", 100), new Column("Accounts", "Accounts", 60), new Column("Current", "Current", 90), new Column("D30", "1–30", 90),
+             new Column("D60", "31–60", 90), new Column("D90", "61–90", 90), new Column("D120", "91–120", 90), new Column("Over120", "120+", 90), new Column("Total", "Total", 100, true)],
+            [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("M172", "Prepaid vs Conventional", "Municipal", "Month by month for the year: prepaid sales (vends, units, amount, recovered to arrears) against conventional billing, per service.",
+            "MuniPrepaid", [new Column("Month", "Month", 70), new Column("Service", "Service", 80), new Column("Vends", "Vends", 55), new Column("Units", "Units", 80), new Column("ToArrears", "To arrears", 85),
+             new Column("Conventional", "Conventional billed", 110), new Column("Share", "Prepaid share", 80), new Column("Prepaid", "Prepaid", 95, true)], [("AsAtDate", ParameterType.Date)]);
     }
 }

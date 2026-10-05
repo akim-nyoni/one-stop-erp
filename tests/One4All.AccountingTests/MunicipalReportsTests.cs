@@ -81,6 +81,11 @@ public sealed class MunicipalReportsTests
         (await Render("M168")).Should().Contain("REF-MR,Refuse Removal,Refuse,Flat,Domestic,All,2026-01-01,fixed 30,—,Yes")
             .And.Contain("WAT-MR,Water Stepped,Water,Stepped,Domestic,All,2026-01-01,—,0–10 @ 1.5; 10–∞ @ 2.25,Yes");
 
+        (await Render("M169")).Should().Contain("Billed: Refuse,4000,2,60");
+        (await Render("M170")).Should().Contain("Ward Ward 1,Properties,4").And.Contain("Ward Ward 1,Billed 2026 to date,60.00");
+        string statutory = await Render("M171");
+        statutory.Should().Contain("Domestic,1,").And.Contain("Total,1,");
+
         foreach (string code in MunicipalReports.All().Select(r => r.Code))
         {
             await Render(code);
