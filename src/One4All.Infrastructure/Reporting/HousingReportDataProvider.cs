@@ -151,6 +151,8 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             "HOUSINGREGISTRATIONFEES" => await RegistrationFeesAsync(companyId, ct).ConfigureAwait(false),
             "HOUSINGARRANGEMENTS" => await ArrangementsAsync(companyId, asAt, ct).ConfigureAwait(false),
             "HOUSINGTRANSFERDUTY" => await TransferDutyAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGDEPOSITSHELD" => await DepositsHeldAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "HOUSINGCANCELLATIONS" => await CancellationsAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -1825,6 +1827,36 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         return [.. duties.Select(x => Row(("Application", x.ApplicationNumber), ("Stand", stands.GetValueOrDefault(x.StandId, "?")), ("Consideration", Money(x.Duty.Consideration)),
             ("Rate", x.Duty.RatePercent.ToString("0.##", CultureInfo.InvariantCulture)), ("Withheld", Date(x.Duty.WithheldOn)), ("Receipt", x.Duty.ReceiptReference),
             ("Remitted", x.Duty.RemittedOn is DateOnly r ? Date(r) : "Held"), ("Acknowledgement", x.Duty.RemittanceReference ?? "—"), ("Amount", x.Duty.Amount)))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DepositsHeldAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        Dictionary<long, string> names = await CustomerNamesAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> schemes = await _db.HousingSchemes.AsNoTracking().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Code, ct).ConfigureAwait(false);
+        var purchase = await (from d in _db.Set<StandDeposit>().AsNoTracking()
+                              join a in _db.Set<StandAllocation>().AsNoTracking() on d.AllocationId equals a.Id
+                              join st in _db.HousingStands.AsNoTracking() on d.StandId equals st.Id
+                              where d.CompanyId == companyId && d.ReceivedOn <= asAt && (d.ClearedOn == null || d.ClearedOn > asAt)
+                              select new { st.SchemeId, d.CustomerId, a.CertificateNumber, d.ReceivedOn, d.Amount }).ToListAsync(ct).ConfigureAwait(false);
+        var tenancy = await (from t in _db.Set<Tenancy>().AsNoTracking()
+                             join u in _db.Set<RentalUnit>().AsNoTracking() on t.UnitId equals u.Id
+                             where t.CompanyId == companyId && t.Deposit > 0m && t.StartDate <= asAt && (t.EndDate == null || t.EndDate > asAt)
+                             select new { u.UnitType, t.TenantCustomerId, t.TenancyNumber, t.StartDate, t.Deposit }).ToListAsync(ct).ConfigureAwait(false);
+        return [.. purchase.Select(p => (Scheme: p.SchemeId is long s ? schemes.GetValueOrDefault(s, "?") : "(no scheme)", Customer: p.CustomerId, Type: "Purchase deposit", Reference: p.CertificateNumber ?? "?", Date: p.ReceivedOn, p.Amount))
+            .Concat(tenancy.Select(t => (Scheme: $"Rental: {t.UnitType}", Customer: t.TenantCustomerId, Type: "Tenancy deposit", Reference: t.TenancyNumber, Date: t.StartDate, Amount: t.Deposit)))
+            .OrderBy(x => x.Scheme, StringComparer.Ordinal).ThenBy(x => names.GetValueOrDefault(x.Customer), StringComparer.Ordinal)
+            .Select(x => Row(("Scheme", x.Scheme), ("Beneficiary", names.GetValueOrDefault(x.Customer, "?")), ("Type", x.Type), ("Reference", x.Reference), ("Received", Date(x.Date)), ("Amount", x.Amount)))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CancellationsAsync(long companyId, CancellationToken ct)
+    {
+        Dictionary<long, string> names = await CustomerNamesAsync(companyId, ct).ConfigureAwait(false);
+        var cancellations = await (from c in _db.Set<AgreementCancellation>().AsNoTracking()
+                                   join a in _db.Set<InstalmentAgreement>().AsNoTracking() on new { c.CompanyId, c.AgreementNumber } equals new { a.CompanyId, a.AgreementNumber }
+                                   where c.CompanyId == companyId orderby c.Date, c.AgreementNumber select new { Cancellation = c, a.BuyerCustomerId }).ToListAsync(ct).ConfigureAwait(false);
+        return [.. cancellations.Select(x => Row(("Agreement", x.Cancellation.AgreementNumber), ("Buyer", names.GetValueOrDefault(x.BuyerCustomerId, "?")), ("Date", Date(x.Cancellation.Date)),
+            ("Paid", Money(x.Cancellation.Paid)), ("Months", x.Cancellation.MonthsOccupied), ("Rental", Money(x.Cancellation.OccupationRental)), ("Admin", Money(x.Cancellation.AdminCharge)),
+            ("Arrears", Money(x.Cancellation.Arrears)), ("Repossession", x.Cancellation.RepossessionReference), ("Refund", x.Cancellation.Refund)))];
     }
 
     private Task<Dictionary<long, string>> ParcelNumbersAsync(long companyId, CancellationToken ct)

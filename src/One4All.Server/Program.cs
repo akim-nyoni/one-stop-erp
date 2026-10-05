@@ -1328,6 +1328,26 @@ app.MapPost("/api/housing/transfers/{applicationNumber}/duty/remit", async (stri
 .RequireAuthorization()
 .WithName("RemitTransferDuty");
 
+app.MapPost("/api/housing/deposits", async (One4All.Application.Abstractions.Housing.StandDepositReceipt receipt, One4All.Application.Abstractions.Housing.IHousingDepositService deposits, CancellationToken ct) =>
+    ValueResponse(await deposits.TakeDepositAsync(receipt, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("TakeStandDeposit");
+
+app.MapPost("/api/housing/deposits/{certificateNumber}/apply", async (string certificateNumber, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.IHousingDepositService deposits, CancellationToken ct) =>
+    ValueResponse(await deposits.ApplyDepositAsync(companyId, certificateNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApplyStandDeposit");
+
+app.MapPost("/api/housing/deposits/{certificateNumber}/refund", async (string certificateNumber, long companyId, DateOnly date, string bankAccountCode, One4All.Application.Abstractions.Housing.IHousingDepositService deposits, CancellationToken ct) =>
+    ValueResponse(await deposits.RefundDepositAsync(companyId, certificateNumber, date, bankAccountCode, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RefundStandDeposit");
+
+app.MapPost("/api/housing/agreements/cancel", async (One4All.Application.Abstractions.Housing.AgreementCancellationRequest request, One4All.Application.Abstractions.Housing.IHousingDepositService deposits, CancellationToken ct) =>
+    ValueResponse(await deposits.CancelAgreementAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CancelInstalmentAgreement");
+
 app.MapPost("/api/housing/titles", async (long companyId, long standId, DateOnly date, One4All.Application.Abstractions.Housing.ITitleDeedService titles, CancellationToken ct) =>
     ValueResponse(await titles.ApplyAsync(companyId, standId, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

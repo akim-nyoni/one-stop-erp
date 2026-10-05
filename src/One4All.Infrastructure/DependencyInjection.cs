@@ -111,6 +111,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Housing.ISchemeProgressService, Housing.SchemeProgressService>();
         services.AddScoped<Application.Abstractions.Housing.IAllocationQuotaService, Housing.AllocationQuotaService>();
         services.AddScoped<Application.Abstractions.Housing.IHousingFeeService, Housing.HousingFeeService>();
+        services.AddScoped<Application.Abstractions.Housing.IHousingDepositService, Housing.HousingDepositService>();
         services.AddScoped<Application.Abstractions.Housing.ITitleDeedService, Housing.TitleDeedService>();
         services.AddScoped<Application.Abstractions.Housing.ITransferApplicationService, Housing.TransferApplicationService>();
         services.AddScoped<Application.Abstractions.Housing.ILandAcquisitionService, Housing.LandAcquisitionService>();

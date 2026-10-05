@@ -141,6 +141,13 @@ public static class HousingReports
         yield return Listing("H50", "Early Settlement & Rebate Report", "Housing", "Instalment sales settled early with the interest rebated.", "HousingEarlySettlements",
             [new Column("Agreement", "Agreement", 90), new Column("Stand", "Stand", 70), new Column("Buyer", "Buyer", 150), new Column("SettledOn", "Settled", 80), new Column("Rebated", "Instalments rebated", 110),
              new Column("InterestRebated", "Interest rebated", 100, true)], []);
+        yield return Listing("H51", "Deposits Held Register", "Housing", "Liability listing as at the date: purchase deposits against accepted offers and tenancy deposits, by scheme and beneficiary.",
+            "HousingDepositsHeld", [new Column("Scheme", "Scheme / type", 90), new Column("Beneficiary", "Beneficiary", 150), new Column("Type", "Deposit", 100), new Column("Reference", "Reference", 90),
+             new Column("Received", "Received", 75), new Column("Amount", "Amount", 90, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H53", "Cancellations & Refund Computation", "Housing", "Agreements cancelled at the buyer's request: paid, less occupation rental, admin charge and arrears, the refund.",
+            "HousingCancellations", [new Column("Agreement", "Agreement", 85), new Column("Buyer", "Buyer", 140), new Column("Date", "Cancelled", 75), new Column("Paid", "Paid", 85),
+             new Column("Months", "Months", 50), new Column("Rental", "Occupation rental", 90), new Column("Admin", "Admin charge", 85), new Column("Arrears", "Arrears", 85),
+             new Column("Repossession", "Repossession", 80), new Column("Refund", "Refund", 90, true)], []);
         yield return Listing("H52", "Expected Credit Loss (IFRS 9) Provision Working", "Housing", "Housing debtors' exposure and provision by portfolio and arrears band, with the allowance booked.", "HousingEcl",
             [new Column("Portfolio", "Portfolio", 140), new Column("Band", "Arrears band", 110), new Column("Exposure", "Exposure", 100), new Column("Provision", "Provision", 100, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("H47", "Payment Arrangements Register", "Housing", "Arrangements with housing debtors and tenants: terms, status and standing as at the date.",

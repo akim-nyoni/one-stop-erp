@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-222 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+224 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -107,7 +107,9 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H49 | Fully Paid / Ready for Transfer | Sold stands whose holders owe nothing and have no title application — the most actionable list. | — | Stand, Holder, Status, SoldOn, Price | — | Sum(Price) |
 | H5 | Compulsory Acquisition Compensation Register | Compensation claims with provision, settlement and status. | — | Claim, Parcel, Claimant, Lodged, Status, Provision, Settled | — | Sum(Settled) |
 | H50 | Early Settlement & Rebate Report | Instalment sales settled early with the interest rebated. | — | Agreement, Stand, Buyer, SettledOn, Rebated, InterestRebated | — | Sum(InterestRebated) |
+| H51 | Deposits Held Register | Liability listing as at the date: purchase deposits against accepted offers and tenancy deposits, by scheme and beneficiary. | AsAtDate (Date, optional) | Scheme, Beneficiary, Type, Reference, Received, Amount | — | Sum(Amount) |
 | H52 | Expected Credit Loss (IFRS 9) Provision Working | Housing debtors' exposure and provision by portfolio and arrears band, with the allowance booked. | AsAtDate (Date, optional) | Portfolio, Band, Exposure, Provision | — | Sum(Provision) |
+| H53 | Cancellations & Refund Computation | Agreements cancelled at the buyer's request: paid, less occupation rental, admin charge and arrears, the refund. | — | Agreement, Buyer, Date, Paid, Months, Rental, Admin, Arrears, Repossession, Refund | — | Sum(Refund) |
 | H54 | Development Covenant Compliance | Covenants with the latest milestone, deadline, extensions and breach status. | AsAtDate (Date, optional) | Covenant, Stand, Holder, Deadline, Milestone, Extensions, Status, DaysLeft | — | — |
 | H55 | Repossession Register | Stands repossessed with the receivable derecognised, NRV, inventory recognised and gain or loss. | — | Reference, Stand, Date, Reason, Receivable, Nrv, Inventory, GainOrLoss | — | Sum(GainOrLoss) |
 | H56 | Ownership History / Chain of Title per Stand | Every holder of a stand in sequence with the change type, date and consideration, and whether the hash chain verifies. | StandNumber (String, optional) | Stand, Sequence, ChangeType, Holder, Effective, ChainVerified, Consideration | — | Sum(Consideration) |

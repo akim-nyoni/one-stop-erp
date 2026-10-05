@@ -1179,3 +1179,40 @@ internal sealed class TransferDutyConfiguration : IEntityTypeConfiguration<Trans
         b.HasIndex(x => x.TransferApplicationId).IsUnique();
     }
 }
+
+internal sealed class StandDepositConfiguration : IEntityTypeConfiguration<StandDeposit>
+{
+    public void Configure(EntityTypeBuilder<StandDeposit> b)
+    {
+        b.ToTable("stand_deposit", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.ReceiptReference).HasMaxLength(60);
+        b.Property(x => x.LiabilityAccountCode).HasMaxLength(20);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+        b.Property(x => x.ClearingJournalNumber).HasMaxLength(40);
+        b.HasOne<StandAllocation>().WithMany().HasForeignKey(x => x.AllocationId).OnDelete(DeleteBehavior.Restrict);
+
+        // One deposit held per allocation.
+        b.HasIndex(x => x.AllocationId).IsUnique().HasFilter("cleared_on IS NULL");
+    }
+}
+
+internal sealed class AgreementCancellationConfiguration : IEntityTypeConfiguration<AgreementCancellation>
+{
+    public void Configure(EntityTypeBuilder<AgreementCancellation> b)
+    {
+        b.ToTable("agreement_cancellation", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AgreementNumber).HasMaxLength(40);
+        b.Property(x => x.Reason).HasMaxLength(500);
+        b.Property(x => x.RepossessionReference).HasMaxLength(40);
+        b.Property(x => x.RefundJournalNumber).HasMaxLength(40);
+        b.Property(x => x.Paid).HasPrecision(19, 4);
+        b.Property(x => x.OccupationRental).HasPrecision(19, 4);
+        b.Property(x => x.AdminCharge).HasPrecision(19, 4);
+        b.Property(x => x.Arrears).HasPrecision(19, 4);
+        b.Property(x => x.Refund).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.AgreementNumber }).IsUnique();
+    }
+}

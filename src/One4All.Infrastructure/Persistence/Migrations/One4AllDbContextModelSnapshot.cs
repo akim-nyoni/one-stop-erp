@@ -2739,6 +2739,105 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("acquisition_cost", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.AgreementCancellation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("AdminCharge")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("admin_charge");
+
+                    b.Property<string>("AgreementNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("agreement_number");
+
+                    b.Property<decimal>("Arrears")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("arrears");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<int>("MonthsOccupied")
+                        .HasColumnType("integer")
+                        .HasColumnName("months_occupied");
+
+                    b.Property<decimal>("OccupationRental")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("occupation_rental");
+
+                    b.Property<decimal>("Paid")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("paid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<decimal>("Refund")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("refund");
+
+                    b.Property<string>("RefundJournalNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("refund_journal_number");
+
+                    b.Property<string>("RepossessionReference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("repossession_reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_agreement_cancellation");
+
+                    b.HasIndex("CompanyId", "AgreementNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_agreement_cancellation_company_id_agreement_number");
+
+                    b.ToTable("agreement_cancellation", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.AgreementVersion", b =>
                 {
                     b.Property<long>("Id")
@@ -6772,6 +6871,102 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_stand_co_ownership_stand_id");
 
                     b.ToTable("stand_co_ownership", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandDeposit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AllocationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("allocation_id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateOnly?>("ClearedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("cleared_on");
+
+                    b.Property<string>("ClearingJournalNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("clearing_journal_number");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("JournalNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<string>("LiabilityAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("liability_account_code");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("ReceiptReference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("receipt_reference");
+
+                    b.Property<DateOnly>("ReceivedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("received_on");
+
+                    b.Property<bool>("Refunded")
+                        .HasColumnType("boolean")
+                        .HasColumnName("refunded");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stand_deposit");
+
+                    b.HasIndex("AllocationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stand_deposit_allocation_id")
+                        .HasFilter("cleared_on IS NULL");
+
+                    b.ToTable("stand_deposit", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.StandHolding", b =>
@@ -21212,6 +21407,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_stand_co_ownership_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandDeposit", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.StandAllocation", null)
+                        .WithMany()
+                        .HasForeignKey("AllocationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stand_deposit_stand_allocation_allocation_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.StandHolding", b =>
