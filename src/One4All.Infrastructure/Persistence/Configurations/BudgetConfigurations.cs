@@ -124,3 +124,19 @@ internal sealed class DepartmentUnitConfiguration : IEntityTypeConfiguration<Dep
         b.HasIndex(x => new { x.CompanyId, x.Department }).IsUnique();
     }
 }
+
+internal sealed class BudgetControlEventConfiguration : IEntityTypeConfiguration<BudgetControlEvent>
+{
+    public void Configure(EntityTypeBuilder<BudgetControlEvent> b)
+    {
+        b.ToTable("control_event", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Outcome).HasConversion<int>();
+        b.Property(x => x.AccountCode).HasMaxLength(8);
+        b.Property(x => x.Department).HasMaxLength(20);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Document).HasMaxLength(80);
+        b.Property(x => x.Reason).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.PostingDate });
+    }
+}

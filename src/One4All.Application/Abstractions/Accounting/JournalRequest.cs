@@ -64,6 +64,12 @@ public sealed class JournalRequest
 
     /// <summary>The posting lines.</summary>
     public IReadOnlyList<JournalLineRequest> Lines { get; init; } = [];
+
+    /// <summary>Gets why fund control may be overridden for this posting (with <see cref="BudgetOverrideAuthorisedByUserId"/>).</summary>
+    public string? BudgetOverrideReason { get; init; }
+
+    /// <summary>Gets the supervisor authorising a fund-control override (never the preparer).</summary>
+    public long? BudgetOverrideAuthorisedByUserId { get; init; }
 }
 
 /// <summary>One line of a <see cref="JournalRequest"/>.</summary>

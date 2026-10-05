@@ -84,6 +84,9 @@ public static class BudgetingReports
         yield return Listing("B26", "Commitments vs Open Purchase Orders", "Budget", "Open commitments against the open value of the purchase order they reference, with any difference.",
             "BgtCommitmentVsPo", [new Column("Reference", "Reference", 110), new Column("Order", "Order status", 100), new Column("OpenValue", "PO open value", 100), new Column("Committed", "Committed", 100),
              new Column("Difference", "Difference", 95, true)], AsAt);
+        yield return Listing("B27", "Budget Block & Override Report", "Budget", "Postings fund control refused for want of an appropriation, and those let through on a supervisor's override with the stated reason.",
+            "BgtBlocks", [new Column("When", "When", 115), new Column("Outcome", "Outcome", 80), new Column("Date", "Posting date", 75), new Column("Account", "Vote", 70), new Column("Department", "Department", 80),
+             new Column("Document", "Document", 120), new Column("User", "By", 80), new Column("AuthorisedBy", "Authorised by", 90), new Column("Reason", "Reason", 180), new Column("Amount", "Amount", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("B28", "Expenditure Against Unappropriated Votes", "Budget", "Expense accounts with spending this year but no line in an approved budget.",
             "BgtUnappropriated", [new Column("Account", "Account", 65), new Column("Name", "Name", 180), new Column("Postings", "Postings", 60), new Column("Actual", "Actual to date", 100, true)], AsAt);
         yield return Listing("B29", "Year-End Commitment Carry-Forward Schedule", "Budget", "Commitments of the year that lapsed or were carried into the next year at year end, with who approved the carry-forward.",

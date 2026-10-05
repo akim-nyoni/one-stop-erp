@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-521 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+522 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -25,6 +25,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | B24 | Vote Book | Per budgeted account and department: the year's budget, actual to date, open commitments and what remains. | AsAtDate (Date, optional) | Account, Name, Department, Budget, Actual, Committed, Remaining | — | Sum(Remaining) |
 | B25 | Commitment / Encumbrance Register | Every commitment of the year with reference, account, department, period and status. | AsAtDate (Date, optional) | Reference, Account, Department, Period, Type, Status, Amount | — | Sum(Amount) |
 | B26 | Commitments vs Open Purchase Orders | Open commitments against the open value of the purchase order they reference, with any difference. | AsAtDate (Date, optional) | Reference, Order, OpenValue, Committed, Difference | — | Sum(Difference) |
+| B27 | Budget Block & Override Report | Postings fund control refused for want of an appropriation, and those let through on a supervisor's override with the stated reason. | AsAtDate (Date, optional) | When, Outcome, Date, Account, Department, Document, User, AuthorisedBy, Reason, Amount | — | Sum(Amount) |
 | B28 | Expenditure Against Unappropriated Votes | Expense accounts with spending this year but no line in an approved budget. | AsAtDate (Date, optional) | Account, Name, Postings, Actual | — | Sum(Actual) |
 | B29 | Year-End Commitment Carry-Forward Schedule | Commitments of the year that lapsed or were carried into the next year at year end, with who approved the carry-forward. | AsAtDate (Date, optional) | Reference, Account, Department, Period, Outcome, ApprovedBy, Amount | — | Sum(Amount) |
 | B3 | Target vs Submission Gap | Per department: the ceiling issued, what its latest draft requests, and the gap still to reconcile. | AsAtDate (Date, optional) | Department, Ceiling, Requested, Status, Gap | — | Sum(Gap) |

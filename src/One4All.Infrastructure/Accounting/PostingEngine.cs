@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using One4All.Core.Budgeting;
+using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
@@ -19,10 +21,16 @@ public sealed class PostingEngine : IPostingEngine
     private const decimal BalanceTolerance = 0m;
 
     private readonly One4AllDbContext _db;
+    private readonly IServiceScopeFactory? _scopes;
 
     /// <summary>Creates the engine.</summary>
     /// <param name="db">The database context.</param>
-    public PostingEngine(One4AllDbContext db) => _db = db;
+    /// <param name="scopes">Opens a separate unit of work to record a fund-control block that outlives the refused posting.</param>
+    public PostingEngine(One4AllDbContext db, IServiceScopeFactory? scopes = null)
+    {
+        _db = db;
+        _scopes = scopes;
+    }
 
     /// <inheritdoc />
     public Task<Result<PostingReceipt>> PostAsync(JournalRequest request, CancellationToken ct = default)
@@ -126,7 +134,21 @@ public sealed class PostingEngine : IPostingEngine
         // Fund control: no expenditure against a vote without an appropriation.
         if (company.FundControlEnabled && await CheckAppropriationAsync(request.CompanyId, fiscalYear.Id, journal, ct).ConfigureAwait(false) is { } unappropriated)
         {
-            return unappropriated;
+            JournalLine refused = journal.Lines.First(l => l.AccountCode == unappropriated.Account && l.BaseDebit > 0m);
+            BudgetControlEvent decision = new(request.CompanyId, BudgetControlOutcome.Blocked, request.PostingDate, refused.AccountCode, refused.Department, refused.BaseDebit,
+                $"{request.DocumentType} {request.DocumentNumber}".Trim());
+            bool overridden = !string.IsNullOrWhiteSpace(request.BudgetOverrideReason) && request.BudgetOverrideAuthorisedByUserId is long by && by != request.SubmittedByUserId;
+            if (!overridden)
+            {
+                await RecordBlockAsync(decision, ct).ConfigureAwait(false);
+                return unappropriated.Error;
+            }
+
+            BudgetControlEvent overrideEvent = new(request.CompanyId, BudgetControlOutcome.Overridden, request.PostingDate, refused.AccountCode, refused.Department, refused.BaseDebit, decision.Document)
+            {
+                Reason = request.BudgetOverrideReason!.Trim(), AuthorisedByUserId = request.BudgetOverrideAuthorisedByUserId,
+            };
+            _db.Set<BudgetControlEvent>().Add(overrideEvent);
         }
 
         // Allocate the gapless journal number (increment persists in this transaction).
@@ -366,7 +388,21 @@ public sealed class PostingEngine : IPostingEngine
     // A debit to a budget-enabled expense account (a vote) needs an appropriation: a positive amount for the account
     // (and the line's cost centre, where the budget names one) in the year's active approved or supplementary budget,
     // company-wide or for the line's department.
-    private async Task<Error?> CheckAppropriationAsync(long companyId, long fiscalYearId, JournalEntry journal, CancellationToken ct)
+    // A block is recorded in its own unit of work, because the refused posting's transaction rolls back.
+    private async Task RecordBlockAsync(BudgetControlEvent decision, CancellationToken ct)
+    {
+        if (_scopes is null)
+        {
+            return;
+        }
+
+        await using AsyncServiceScope scope = _scopes.CreateAsyncScope();
+        One4AllDbContext log = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        log.Set<BudgetControlEvent>().Add(decision);
+        await log.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    private async Task<(Error Error, string Account)?> CheckAppropriationAsync(long companyId, long fiscalYearId, JournalEntry journal, CancellationToken ct)
     {
         List<JournalLine> debits = [.. journal.Lines.Where(l => l.BaseDebit > 0m)];
         List<string> codes = [.. debits.Select(l => l.AccountCode).Distinct()];
@@ -386,8 +422,8 @@ public sealed class PostingEngine : IPostingEngine
                 .SumAsync(l => (decimal?)l.Amount, ct).ConfigureAwait(false) ?? 0m;
             if (appropriated <= 0m)
             {
-                return Error.Rule("Posting.NoAppropriation",
-                    $"Account '{line.AccountCode}' has no appropriation in this year's active budget; fund control does not allow expenditure against it.");
+                return (Error.Rule("Posting.NoAppropriation",
+                    $"Account '{line.AccountCode}' has no appropriation in this year's active budget; fund control does not allow expenditure against it."), line.AccountCode);
             }
         }
 

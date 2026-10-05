@@ -139,3 +139,68 @@ public sealed class DepartmentUnit : Entity, ICompanyScoped
     /// <summary>Gets or sets where the holder's monthly statement is sent.</summary>
     public string? BudgetHolderEmail { get; set; }
 }
+
+/// <summary>What fund control did with a posting.</summary>
+public enum BudgetControlOutcome
+{
+    /// <summary>Refused: no appropriation and no override.</summary>
+    Blocked = 1,
+
+    /// <summary>Let through on a supervisor's override.</summary>
+    Overridden = 2,
+}
+
+/// <summary>A fund-control decision on a posting (<c>bgt.control_event</c>): blocked for want of an appropriation, or overridden.</summary>
+public sealed class BudgetControlEvent : AuditableEntity, ICompanyScoped
+{
+    private BudgetControlEvent()
+    {
+        AccountCode = string.Empty;
+    }
+
+    /// <summary>Records a decision.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="outcome">Blocked or overridden.</param>
+    /// <param name="postingDate">The posting date.</param>
+    /// <param name="accountCode">The vote.</param>
+    /// <param name="department">The department.</param>
+    /// <param name="amount">The amount.</param>
+    /// <param name="document">The document.</param>
+    public BudgetControlEvent(long companyId, BudgetControlOutcome outcome, DateOnly postingDate, string accountCode, string? department, decimal amount, string? document)
+    {
+        CompanyId = companyId;
+        Outcome = outcome;
+        PostingDate = postingDate;
+        AccountCode = accountCode;
+        Department = department;
+        Amount = amount;
+        Document = document;
+    }
+
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; private set; }
+
+    /// <summary>Gets what fund control did.</summary>
+    public BudgetControlOutcome Outcome { get; private set; }
+
+    /// <summary>Gets the posting date.</summary>
+    public DateOnly PostingDate { get; private set; }
+
+    /// <summary>Gets the vote.</summary>
+    public string AccountCode { get; private set; }
+
+    /// <summary>Gets the department.</summary>
+    public string? Department { get; private set; }
+
+    /// <summary>Gets the amount.</summary>
+    public decimal Amount { get; private set; }
+
+    /// <summary>Gets the document.</summary>
+    public string? Document { get; private set; }
+
+    /// <summary>Gets or sets why it was overridden.</summary>
+    public string? Reason { get; set; }
+
+    /// <summary>Gets or sets the supervisor who overrode.</summary>
+    public long? AuthorisedByUserId { get; set; }
+}

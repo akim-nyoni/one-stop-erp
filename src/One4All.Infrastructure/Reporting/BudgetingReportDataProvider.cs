@@ -44,6 +44,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         Context context = new(companyId, asAt, year, PeriodOf(year, asAt));
         return command.ToUpperInvariant() switch
         {
+            "BGTBLOCKS" => await BlocksAsync(context, ct).ConfigureAwait(false),
             "BGTCAPITALPHASING" => await CapitalPhasingAsync(context, ct).ConfigureAwait(false),
             "BGTAPPROVALAUDIT" => await ApprovalAuditAsync(context, ct).ConfigureAwait(false),
             "BGTREPHASING" => await RephasingAsync(context, ct).ConfigureAwait(false),
@@ -726,6 +727,17 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
             return Row(("Account", a), ("Name", names.GetValueOrDefault(a, "?")), ("Month", c.Year.StartDate.AddMonths(p - 1).ToString("yyyy-MM", CultureInfo.InvariantCulture)), ("Source", forecast ? "Reforecast" : "Budget"),
                 ("Amount", amount));
         }))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BlocksAsync(Context c, CancellationToken ct)
+    {
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        string User(long? id) => id is long u && u != 0 ? users.GetValueOrDefault(u, $"user {u}") : "system";
+        List<BudgetControlEvent> events = await _db.Set<BudgetControlEvent>().AsNoTracking()
+            .Where(e => e.CompanyId == c.CompanyId && e.PostingDate >= c.Year.StartDate && e.PostingDate <= c.Year.EndDate).OrderBy(e => e.CreatedOnUtc).ToListAsync(ct).ConfigureAwait(false);
+        return [.. events.Select(e => Row(("When", e.CreatedOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Outcome", e.Outcome.ToString()), ("Date", e.PostingDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+            ("Account", e.AccountCode), ("Department", string.IsNullOrEmpty(e.Department) ? "—" : e.Department), ("Document", e.Document ?? "—"), ("User", User(e.CreatedByUserId)), ("AuthorisedBy", e.AuthorisedByUserId is null ? "—" : User(e.AuthorisedByUserId)),
+            ("Reason", e.Reason ?? string.Empty), ("Amount", Math.Round(e.Amount, 2))))];
     }
 
     private static string Money(decimal amount) => amount.ToString("N2", CultureInfo.InvariantCulture);

@@ -13,7 +13,8 @@ missing domain data. Items are struck through as they ship (with the report code
 - ~~B2~~, ~~B12~~, ~~B15~~, ~~B16 / B17 (one register with seal check)~~, ~~B18~~, ~~B20~~, ~~B24~~, ~~B25~~, ~~B26~~, ~~B28~~, ~~B33~~, ~~B34~~, ~~B36~~, ~~B37~~, ~~B44~~, ~~B45~~
 - ~~B1 Preparation Status (B1)~~, ~~B13 Requested vs Approved~~, ~~B19 Approved Register~~, ~~B21 Reconciliation~~, ~~B22 Supplementary Schedule~~, ~~B29 Commitment Carry-Forward~~, ~~B38 Outturn~~, ~~B39 Forecast Movement~~, ~~B41 Cash Budget~~, ~~B42 Capital Projects~~
 - ~~B9 Capital Phasing~~, ~~B14 Approval Audit~~, ~~B23 Rephasing~~, ~~B30 Unspent Capital~~, ~~B40 Rolling Forecast~~
-- Needs new data: B27 (budget blocks / overrides at posting), B35 (actual volumes / prices for the decomposition)
+- ~~B27 Budget Block & Override (B27)~~
+- Needs new data: B35 (actual volumes / prices for the decomposition)
 - ~~B3 Ceiling Gap~~, ~~B4 Hierarchy Roll-up~~, ~~B5 Drivers~~, ~~B6 What-If~~, ~~B7 Basis~~, ~~B8 Staff Budget~~, ~~B10 Revenue Build-up~~, ~~B32 Budget Holder Statement~~
 
 ## B. Accounts Receivable
