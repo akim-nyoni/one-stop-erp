@@ -100,6 +100,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Fixed asset and tax additions (brief §14 M and N, FA / TX + item number).
+        foreach (ReportDefinition definition in AssetTaxReports.All())
+        {
+            yield return definition;
+        }
+
         // POS / retail additions (brief §14 F, POS + item number).
         foreach (ReportDefinition definition in RetailReports.All())
         {

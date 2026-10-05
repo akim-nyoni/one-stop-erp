@@ -1,0 +1,42 @@
+using One4All.Reporting.Model;
+using static One4All.Reporting.SystemReports;
+
+namespace One4All.Reporting;
+
+/// <summary>
+/// Fixed asset (brief §14 M, codes FA + item number) and tax &amp; statutory (§14 N, codes TX + item number) reports not
+/// already in the core catalogue, over <c>Fatx*</c> data commands served by the asset and tax report data provider.
+/// </summary>
+public static class AssetTaxReports
+{
+    private static readonly (string, ParameterType)[] Period = [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)];
+
+    /// <summary>Every FA- and TX-numbered definition shipped.</summary>
+    /// <returns>The definitions, in brief order.</returns>
+    public static IEnumerable<ReportDefinition> All()
+    {
+        yield return Listing("FA207", "Depreciation Schedule (actual)", "FixedAssets", "Depreciation charged in the period, by month and asset, from the posted depreciation runs.",
+            "FatxDepreciation", [new Column("Month", "Month", 70), new Column("Asset", "Asset", 90), new Column("Description", "Description", 180), new Column("Class", "Class", 90),
+             new Column("Charge", "Charge", 95, true)], Period);
+        yield return Listing("FA208", "Asset Additions & Transfers", "FixedAssets", "Assets acquired in the period, and changes of location or custodian recorded in the audit trail.",
+            "FatxAdditions", [new Column("Kind", "Kind", 80), new Column("Asset", "Asset", 90), new Column("Description", "Description", 180), new Column("Class", "Class", 90), new Column("Date", "Date", 115),
+             new Column("Detail", "Detail", 200), new Column("Cost", "Cost", 95, true)], Period);
+        yield return Listing("FA209", "Asset Movement Schedule (note)", "FixedAssets", "Per asset class: cost and accumulated depreciation brought forward, additions, disposals, charge and carried forward, and the net book value.",
+            "FatxMovement", [new Column("Class", "Class", 100), new Column("CostOpening", "Cost b/f", 90), new Column("Additions", "Additions", 85), new Column("Disposals", "Disposals", 85), new Column("CostClosing", "Cost c/f", 90),
+             new Column("DepOpening", "Dep b/f", 90), new Column("Charge", "Charge", 85), new Column("DepDisposals", "On disposals", 85), new Column("DepClosing", "Dep c/f", 90), new Column("Nbv", "NBV", 95, true)], Period);
+        yield return Listing("FA212", "Fully Depreciated Assets Still in Use", "FixedAssets", "Assets written down to residual value that are still held, with where they are and who holds them.",
+            "FatxFullyDepreciated", [new Column("Asset", "Asset", 90), new Column("Description", "Description", 180), new Column("Class", "Class", 90), new Column("Acquired", "Acquired", 75),
+             new Column("Location", "Location", 100), new Column("Custodian", "Custodian", 100), new Column("Cost", "Cost", 95, true)], []);
+        yield return Listing("TX216", "VAT Detail / Audit Report", "Tax", "Every posted line carrying a tax code in the period, by code, with its journal and document.",
+            "FatxVatDetail", [new Column("Date", "Date", 75), new Column("Journal", "Journal", 100), new Column("Document", "Document", 130), new Column("TaxCode", "Tax code", 65), new Column("Account", "Account", 70),
+             new Column("Narrative", "Narrative", 180), new Column("Amount", "Amount (Cr +)", 95, true)], Period);
+        yield return Listing("TX217", "VAT Reconciliation", "Tax", "Per tax code: movement on its output and input tax accounts in the period against the tax-coded lines, with the difference.",
+            "FatxVatRecon", [new Column("TaxCode", "Tax code", 70), new Column("Name", "Name", 140), new Column("Output", "Output account", 100), new Column("Input", "Input account", 100), new Column("Coded", "Coded lines", 100),
+             new Column("Difference", "Difference", 95, true)], Period);
+        yield return Listing("TX218", "Exempt, Zero-rated & Out-of-scope Supplies", "Tax", "Lines in the period under zero-rated, exempt and out-of-scope tax codes, totalled per code.",
+            "FatxNonStandard", [new Column("TaxCode", "Tax code", 70), new Column("Name", "Name", 160), new Column("Type", "Type", 90), new Column("Lines", "Lines", 55), new Column("Amount", "Amount", 100, true)], Period);
+        yield return Listing("TX220", "Withholding Tax Return", "Tax", "Withholding certificates by month and tax code: count, gross paid, tax withheld and how much has been remitted.",
+            "FatxWhtReturn", [new Column("Month", "Month", 70), new Column("TaxCode", "Tax code", 70), new Column("Certificates", "Certificates", 75), new Column("Gross", "Gross", 100), new Column("Remitted", "Remitted", 100),
+             new Column("Withheld", "Withheld", 100, true)], Period);
+    }
+}

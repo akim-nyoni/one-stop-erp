@@ -66,11 +66,12 @@ missing domain data. Items are struck through as they ship (with the report code
 - Needs new data: customer / driver / time in-out / overrides / stockpiles / mixes / haulage (200–205)
 
 ## M. Fixed Assets
-- Data exists: 207, 208, 209, 212
+- ~~207 Depreciation Schedule (FA207)~~, ~~208 Additions & Transfers (FA208)~~, ~~209 Movement Schedule (FA209)~~, ~~212 Fully Depreciated in Use (FA212)~~
 - Needs new data: 210 counts, 211 CWIP, 213 insurance / warranty, 214 planned maintenance
 
 ## N. Tax & Statutory
-- Data exists: 216–218, 220, 224, 225; partly 219, 221, 222
+- ~~216 VAT Detail (TX216)~~, ~~217 VAT Reconciliation (TX217)~~, ~~218 Exempt / Zero / Out-of-scope (TX218)~~, ~~220 WHT Return (TX220)~~
+- Data exists: 224 AFS pack, 225 SAF-T export; partly 219, 221, 222
 - Needs new data: tax tables
 
 ## O. Payroll & HR (PR codes)

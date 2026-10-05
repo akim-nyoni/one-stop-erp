@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-327 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+335 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -42,6 +42,10 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | FA-FCST | Depreciation Forecast | Projected monthly depreciation across active assets and the aggregate closing net book value. | StartMonth (Date, optional), Months (Integer, optional) | Period, Charge, ClosingNetBookValue | — | Sum(ClosingNetBookValue) |
 | FA-MAINT | Asset Maintenance Log | Maintenance and service events logged against assets, newest first, with the informational cost. | — | AssetNumber, Asset, Date, Work, Provider, Cost | — | Sum(Cost) |
 | FA-REG | Fixed Asset Register | Assets with cost, accumulated depreciation and net book value. | AsAtDate (Date, optional) | AssetNumber, Description, Cost, AccumulatedDepreciation, NetBookValue | — | Sum(NetBookValue) |
+| FA207 | Depreciation Schedule (actual) | Depreciation charged in the period, by month and asset, from the posted depreciation runs. | FromDate (Date, optional), ToDate (Date, optional) | Month, Asset, Description, Class, Charge | — | Sum(Charge) |
+| FA208 | Asset Additions & Transfers | Assets acquired in the period, and changes of location or custodian recorded in the audit trail. | FromDate (Date, optional), ToDate (Date, optional) | Kind, Asset, Description, Class, Date, Detail, Cost | — | Sum(Cost) |
+| FA209 | Asset Movement Schedule (note) | Per asset class: cost and accumulated depreciation brought forward, additions, disposals, charge and carried forward, and the net book value. | FromDate (Date, optional), ToDate (Date, optional) | Class, CostOpening, Additions, Disposals, CostClosing, DepOpening, Charge, DepDisposals, DepClosing, Nbv | — | Sum(Nbv) |
+| FA212 | Fully Depreciated Assets Still in Use | Assets written down to residual value that are still held, with where they are and who holds them. | — | Asset, Description, Class, Acquired, Location, Custodian, Cost | — | Sum(Cost) |
 
 ## GeneralLedger
 
@@ -430,3 +434,12 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | SYS261 | Company Configuration Listing | Every setting of the company record. | — | Setting, Value | — | — |
 | SYS262 | Report Definition Inventory | Every report definition held — system and custom — with scope, version and last change. | — | Code, Name, Module, Scope, Version, Changed | — | — |
 | SYS263 | Scheduled Job Status & Delivery Log | Each scheduled job's state and last result, then report deliveries in the period. | FromDate (Date, optional), ToDate (Date, optional) | Kind, Name, When, Status, Detail | — | — |
+
+## Tax
+
+| Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
+|---|---|---|---|---|---|---|
+| TX216 | VAT Detail / Audit Report | Every posted line carrying a tax code in the period, by code, with its journal and document. | FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Document, TaxCode, Account, Narrative, Amount | — | Sum(Amount) |
+| TX217 | VAT Reconciliation | Per tax code: movement on its output and input tax accounts in the period against the tax-coded lines, with the difference. | FromDate (Date, optional), ToDate (Date, optional) | TaxCode, Name, Output, Input, Coded, Difference | — | Sum(Difference) |
+| TX218 | Exempt, Zero-rated & Out-of-scope Supplies | Lines in the period under zero-rated, exempt and out-of-scope tax codes, totalled per code. | FromDate (Date, optional), ToDate (Date, optional) | TaxCode, Name, Type, Lines, Amount | — | Sum(Amount) |
+| TX220 | Withholding Tax Return | Withholding certificates by month and tax code: count, gross paid, tax withheld and how much has been remitted. | FromDate (Date, optional), ToDate (Date, optional) | Month, TaxCode, Certificates, Gross, Remitted, Withheld | — | Sum(Withheld) |
