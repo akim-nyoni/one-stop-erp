@@ -50,6 +50,28 @@ public sealed class ProcurementService : IProcurementService
             return Error.Rule("Pop.SupplierBlacklisted", $"Supplier {supplier.Code} is blacklisted; no new orders can be placed.");
         }
 
+        if (request.FrameworkAgreementId is long agreementId)
+        {
+            FrameworkAgreement? agreement = await _db.FrameworkAgreements.AsNoTracking().FirstOrDefaultAsync(a => a.Id == agreementId && a.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
+            if (agreement is null || agreement.SupplierId != request.SupplierId)
+            {
+                return Error.Validation("Pop.FrameworkSupplier", "The framework agreement does not exist or is with a different supplier.");
+            }
+
+            if (request.OrderDate < agreement.StartDate || request.OrderDate > agreement.EndDate)
+            {
+                return Error.Rule("Pop.FrameworkOutOfTerm", $"Agreement {agreement.Reference} runs {agreement.StartDate:yyyy-MM-dd} to {agreement.EndDate:yyyy-MM-dd}.");
+            }
+
+            decimal called = (await _db.Set<PurchaseOrder>().AsNoTracking().Include(o => o.Lines).Where(o => o.FrameworkAgreementId == agreementId && o.Status != PurchaseOrderStatus.Cancelled)
+                .ToListAsync(ct).ConfigureAwait(false)).Sum(o => o.TotalNet);
+            decimal thisOrder = request.Lines.Sum(l => l.Quantity * l.UnitPrice);
+            if (called + thisOrder > agreement.CeilingValue)
+            {
+                return Error.Rule("Pop.FrameworkExceeded", $"Agreement {agreement.Reference} has {agreement.CeilingValue - called:0.00} left; this order is {thisOrder:0.00}.");
+            }
+        }
+
         // A blank order number means "allocate the next one" from the PO sequence.
         string orderNumber = request.OrderNumber.Trim();
         if (orderNumber.Length == 0)
@@ -63,7 +85,7 @@ public sealed class ProcurementService : IProcurementService
             orderNumber = allocated.Value;
         }
 
-        PurchaseOrder order = new(request.CompanyId, request.SupplierId, orderNumber, request.OrderDate, request.Currency) { RequiredBy = request.RequiredBy };
+        PurchaseOrder order = new(request.CompanyId, request.SupplierId, orderNumber, request.OrderDate, request.Currency) { RequiredBy = request.RequiredBy, FrameworkAgreementId = request.FrameworkAgreementId };
         foreach (PurchaseOrderLineRequest line in request.Lines)
         {
             order.AddLine(line.ItemId, line.Description, line.Quantity, line.UnitPrice);

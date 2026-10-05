@@ -45,7 +45,7 @@ missing domain data. Items are struck through as they ship (with the report code
 ## G. Procurement
 - ~~124 Requisition turnaround (PO124)~~, ~~125 Approval history (PO125)~~, ~~126 / 127 PO listing with overdue (PO126)~~, ~~128 Committed cost (PO128)~~, ~~129 GRN & variance (PO129)~~, ~~130 Rejected goods (PO130)~~, ~~131 RFQ comparison (PO131)~~, ~~132 Price variance (PO132)~~, ~~134 Spend analysis (PO134)~~, ~~135 Lead times (PO135)~~
 - ~~136 Budget Availability at Requisition (PO136)~~
-- Needs new data: 133 framework contracts
+- ~~133 Framework Agreement Utilisation (PO133)~~
 
 ## H. Sales Order Processing
 - ~~137 Open Orders & Allocation (SO137)~~, ~~143 Quotation Conversion (SO143)~~

@@ -27,6 +27,9 @@ public sealed class CreatePurchaseOrderRequest
     /// <summary>When the goods are required, if a date is set; used to judge on-time delivery.</summary>
     public DateOnly? RequiredBy { get; init; }
 
+    /// <summary>Gets the framework agreement the order is called off against: same supplier, within its term and its ceiling.</summary>
+    public long? FrameworkAgreementId { get; init; }
+
     /// <summary>The currency.</summary>
     public Core.Accounting.CurrencyCode Currency { get; init; }
 

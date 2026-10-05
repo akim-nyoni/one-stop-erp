@@ -229,3 +229,16 @@ internal sealed class PurchaseRequisitionLineConfiguration : IEntityTypeConfigur
         b.HasIndex(x => x.PurchaseRequisitionId);
     }
 }
+
+internal sealed class FrameworkAgreementConfiguration : IEntityTypeConfiguration<FrameworkAgreement>
+{
+    public void Configure(EntityTypeBuilder<FrameworkAgreement> b)
+    {
+        b.ToTable("framework_agreement", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(40);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.Property(x => x.CeilingValue).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.Reference }).IsUnique();
+    }
+}

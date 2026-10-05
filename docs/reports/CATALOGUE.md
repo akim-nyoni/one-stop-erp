@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-497 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+498 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -412,6 +412,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | PO130 | Rejected Goods / Returns | Quality inspections in the period that rejected goods, with the reason and the value rejected. | FromDate (Date, optional), ToDate (Date, optional) | Grn, Inspected, Supplier, Item, Passed, Rejected, Reason, Value | — | Sum(Value) |
 | PO131 | RFQ Comparison & Award | Every quote received on each RFQ, ranked by total price, with lead time and the award and its reason. | — | Rfq, Supplier, Received, LeadDays, Rank, Awarded, Reason, Total | — | Sum(Total) |
 | PO132 | Purchase Price Variance | Each item ordered in the period at a different price from the order before it, with the variance on the quantity ordered. | FromDate (Date, optional), ToDate (Date, optional) | Item, Order, Date, Supplier, Previous, Price, Change, Quantity, Variance | — | Sum(Variance) |
+| PO133 | Contract / Framework Agreement Utilisation | Each framework agreement: supplier, term, ceiling, orders called off and their value, how much is used and left, and whether it is live at the date. | AsAtDate (Date, optional) | Agreement, Supplier, Term, Ceiling, Orders, Called, Used, Status, Remaining | — | Sum(Remaining) |
 | PO134 | Procurement Spend Analysis | Order value in the period by supplier and currency, with lines, items and share. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Currency, Orders, Lines, Items, Share, Spend | — | Sum(Spend) |
 | PO135 | Supplier Lead Time Analysis | Per supplier: days from order to first receipt (average, fastest, slowest) and orders received by their required date. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Orders, Average, Fastest, Slowest, OnTime | — | — |
 | PO136 | Budget Availability at Requisition | Open requisition lines charged to a budgeted expense account: the vote's appropriation, spent and committed to date, available before the line and after it. | AsAtDate (Date, optional) | Requisition, Date, Account, Line, Appropriation, Spent, Committed, Before, Status, After | — | Sum(After) |

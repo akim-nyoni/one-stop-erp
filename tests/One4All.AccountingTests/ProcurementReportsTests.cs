@@ -6,6 +6,7 @@ using One4All.Application.Abstractions.Inventory;
 using One4All.Application.Abstractions.Procurement;
 using One4All.Application.Abstractions.Reporting;
 using One4All.Core.Accounting;
+using One4All.Core.Common;
 using One4All.Core.Inventory;
 using One4All.Core.Procurement;
 using One4All.Core.Trading;
@@ -82,6 +83,19 @@ public sealed class ProcurementReportsTests
         (await Render("PO136")).Should().Contain("PR-RQ1,2026-03-25,6000 (no budget),21.00,0.00,0.00,0.00,0.00,No budget,-21");
         (await Render("PO134")).Should().Contain("Gadget Co,USD,2,2,1,100.0%,110");
         (await Render("PO135")).Should().Contain("Gadget Co,1,4.0,4,4,—");
+
+        FrameworkAgreement framework = new(companyId, supplier.Id, "fa-1", "Gadgets 2026", new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), 150m);
+        db.Add(framework);
+        await db.SaveChangesAsync();
+        async Task<Result<PurchaseOrderResult>> CallOff(string number, DateOnly date, decimal quantity) => await pop.CreatePurchaseOrderAsync(new CreatePurchaseOrderRequest
+        {
+            CompanyId = companyId, SupplierId = supplier.Id, OrderNumber = number, OrderDate = date, Currency = Scenario.Usd, FrameworkAgreementId = framework.Id,
+            Lines = [new PurchaseOrderLineRequest(gadget.Id, "Gadget", quantity, 10m)],
+        });
+        (await CallOff("PR-PO3", new DateOnly(2026, 3, 25), 10m)).IsSuccess.Should().BeTrue();
+        (await CallOff("PR-PO4", new DateOnly(2026, 3, 26), 6m)).Error.Code.Should().Be("Pop.FrameworkExceeded");
+        (await CallOff("PR-PO5", new DateOnly(2027, 1, 5), 1m)).Error.Code.Should().Be("Pop.FrameworkOutOfTerm");
+        (await Render("PO133")).Should().Contain("FA-1,Gadget Co,2026-01-01 to 2026-12-31,150.00,1,100.00,66.7%,Live,50");
 
         foreach (string code in ProcurementReports.All().Select(r => r.Code))
         {

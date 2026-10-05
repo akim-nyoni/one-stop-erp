@@ -12,6 +12,24 @@ namespace One4All.Infrastructure.Reporting;
 /// <summary>Serves the PO-numbered procurement reports (brief §14 G): every data command whose name starts with <c>Proc</c>.</summary>
 public sealed class ProcurementReportDataProvider : IReportDataProvider
 {
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> FrameworksAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<FrameworkAgreement> agreements = await _db.FrameworkAgreements.AsNoTracking().Where(a => a.CompanyId == companyId).OrderBy(a => a.Reference).ToListAsync(ct).ConfigureAwait(false);
+        List<long> ids = [.. agreements.Select(a => a.Id)];
+        List<PurchaseOrder> orders = await _db.Set<PurchaseOrder>().AsNoTracking().Include(o => o.Lines)
+            .Where(o => o.FrameworkAgreementId != null && ids.Contains(o.FrameworkAgreementId.Value) && o.Status != PurchaseOrderStatus.Cancelled && o.OrderDate <= asAt).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
+        return [.. agreements.Select(a =>
+        {
+            List<PurchaseOrder> own = [.. orders.Where(o => o.FrameworkAgreementId == a.Id)];
+            decimal called = own.Sum(o => o.TotalNet), remaining = a.CeilingValue - called;
+            string status = asAt < a.StartDate ? "Not started" : asAt > a.EndDate ? "Expired" : remaining <= 0m ? "Exhausted" : "Live";
+            return Row(("Agreement", a.Reference), ("Supplier", suppliers.GetValueOrDefault(a.SupplierId, "?")),
+                ("Term", $"{a.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)} to {a.EndDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}"), ("Ceiling", Money(a.CeilingValue)), ("Orders", own.Count),
+                ("Called", Money(called)), ("Used", a.CeilingValue == 0m ? "—" : (called * 100m / a.CeilingValue).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Status", status), ("Remaining", remaining));
+        })];
+    }
+
     // Lines are checked in requisition order, each against what is left after the lines before it on the same vote.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BudgetCheckAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {
@@ -76,6 +94,7 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
         DateOnly asAt = DateParameter(parameters, "AsAtDate") ?? to;
         return command.ToUpperInvariant() switch
         {
+            "PROCFRAMEWORKS" => await FrameworksAsync(companyId, DateParameter(parameters, "AsAtDate") ?? DateOnly.FromDateTime(DateTime.Today), ct).ConfigureAwait(false),
             "PROCBUDGETCHECK" => await BudgetCheckAsync(companyId, DateParameter(parameters, "AsAtDate") ?? DateOnly.FromDateTime(DateTime.Today), ct).ConfigureAwait(false),
             "PROCREQUISITIONTURNAROUND" => await RequisitionTurnaroundAsync(companyId, fromDate, to, ct).ConfigureAwait(false),
             "PROCAPPROVALHISTORY" => await ApprovalHistoryAsync(companyId, fromDate, to, ct).ConfigureAwait(false),

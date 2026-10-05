@@ -170,6 +170,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Purchase orders.</summary>
     public DbSet<Core.Procurement.PurchaseOrder> PurchaseOrders => Set<Core.Procurement.PurchaseOrder>();
 
+    /// <summary>Gets the framework agreements.</summary>
+    public DbSet<Core.Procurement.FrameworkAgreement> FrameworkAgreements => Set<Core.Procurement.FrameworkAgreement>();
+
     /// <summary>Purchase requisitions.</summary>
     public DbSet<Core.Procurement.PurchaseRequisition> PurchaseRequisitions => Set<Core.Procurement.PurchaseRequisition>();
 
