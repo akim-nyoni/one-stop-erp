@@ -100,6 +100,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Procurement additions (brief §14 G, PO + item number).
+        foreach (ReportDefinition definition in ProcurementReports.All())
+        {
+            yield return definition;
+        }
+
         // Municipality / Council catalogue (brief §14 I, the M series).
         foreach (ReportDefinition definition in MunicipalReports.All())
         {

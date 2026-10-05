@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-260 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+270 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -239,6 +239,16 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | AP-DUE | Payments Due | Outstanding supplier invoices ordered by due date, with days until due (negative when overdue). | AsAtDate (Date, optional) | SupplierCode, SupplierName, DocumentNumber, DueDate, DaysUntilDue, Outstanding | — | Sum(Outstanding) |
 | AP-RECUR | Recurring Purchases | Standing recurring supplier-invoice templates with amount, tax, interval, next run date and active flag. | — | Reference, Supplier, NetAmount, TaxAmount, IntervalMonths, NextRunDate, Active | — | Sum(IntervalMonths) |
 | AP-SUP | Supplier Register | Supplier master: code, name, currency, payment terms and on-hold flag. | — | Code, Name, Currency, TermsDays, OnHold | — | Sum(TermsDays) |
+| PO124 | Requisition Approval Turnaround | Requisitions in the period with who approved them and how many days it took. | FromDate (Date, optional), ToDate (Date, optional) | Requisition, Supplier, Requested, Status, Approver, Approved, Days, Value | — | Sum(Value) |
+| PO125 | Approval History / Authorisation Audit | Every workflow action in the period: document, stage, who, what and when, with the document value. | FromDate (Date, optional), ToDate (Date, optional) | When, Document, Reference, Stage, User, Action, Comment, Value | — | Sum(Value) |
+| PO126 | Purchase Order Listing | Every order in the period with status, required-by date, overdue flag and the value still to be received. | FromDate (Date, optional), ToDate (Date, optional), AsAtDate (Date, optional) | Order, Date, Supplier, Status, RequiredBy, Overdue, Currency, Ordered, Received, Outstanding | — | Sum(Outstanding) |
+| PO128 | Committed Cost by Budget Line | Commitments raised against the budget, by account and department, with their status. | — | Account, Department, Period, Reference, Type, Status, Amount | — | Sum(Amount) |
+| PO129 | Goods Received Listing & Variance | Goods received in the period against what was ordered, with quantity and price variances. | FromDate (Date, optional), ToDate (Date, optional) | Grn, Date, Order, Supplier, Item, Ordered, Received, QuantityVariance, PriceVariance, Value | — | Sum(Value) |
+| PO130 | Rejected Goods / Returns | Quality inspections in the period that rejected goods, with the reason and the value rejected. | FromDate (Date, optional), ToDate (Date, optional) | Grn, Inspected, Supplier, Item, Passed, Rejected, Reason, Value | — | Sum(Value) |
+| PO131 | RFQ Comparison & Award | Every quote received on each RFQ, ranked by total price, with lead time and the award and its reason. | — | Rfq, Supplier, Received, LeadDays, Rank, Awarded, Reason, Total | — | Sum(Total) |
+| PO132 | Purchase Price Variance | Each item ordered in the period at a different price from the order before it, with the variance on the quantity ordered. | FromDate (Date, optional), ToDate (Date, optional) | Item, Order, Date, Supplier, Previous, Price, Change, Quantity, Variance | — | Sum(Variance) |
+| PO134 | Procurement Spend Analysis | Order value in the period by supplier and currency, with lines, items and share. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Currency, Orders, Lines, Items, Share, Spend | — | Sum(Spend) |
+| PO135 | Supplier Lead Time Analysis | Per supplier: days from order to first receipt (average, fastest, slowest) and orders received by their required date. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Orders, Average, Fastest, Slowest, OnTime | — | — |
 | POP-OPEN | Open Purchase Orders | Purchase orders not yet fully received/invoiced, with their order value. | — | OrderNumber, OrderDate, Supplier, Status, TotalNet | — | Sum(TotalNet) |
 | POP-REQ | Purchase Requisitions | Requisitions with supplier, date, estimated value and status, newest first. | — | RequisitionNumber, Supplier, RequestedDate, Total, Status | — | Sum(Total) |
 

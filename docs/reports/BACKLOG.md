@@ -43,7 +43,8 @@ missing domain data. Items are struck through as they ship (with the report code
 - Needs new data: 106 void reasons, 107 refunds, 108 line discounts, 109 overrides, 110 no-sale, 111 parked sales, 115 loyalty, 116 POS reprint log, 121 fiscal submission log
 
 ## G. Procurement
-- Data exists: 124–126, 128–132, 134–136; partly 127, 133
+- ~~124 Requisition turnaround (PO124)~~, ~~125 Approval history (PO125)~~, ~~126 / 127 PO listing with overdue (PO126)~~, ~~128 Committed cost (PO128)~~, ~~129 GRN & variance (PO129)~~, ~~130 Rejected goods (PO130)~~, ~~131 RFQ comparison (PO131)~~, ~~132 Price variance (PO132)~~, ~~134 Spend analysis (PO134)~~, ~~135 Lead times (PO135)~~
+- Data exists: 136 budget availability at requisition (needs an expense account on requisition lines); partly 133 (no framework contracts)
 
 ## H. Sales Order Processing
 - Data exists: 137, 139 packing / despatch notes, 143
