@@ -278,6 +278,24 @@ public class One4AllDbContext : DbContext
     /// <summary>Pay elements.</summary>
     public DbSet<Core.Payroll.PayElement> PayElements => Set<Core.Payroll.PayElement>();
 
+    /// <summary>Gets the approved establishment.</summary>
+    public DbSet<Core.Payroll.EstablishmentPost> EstablishmentPosts => Set<Core.Payroll.EstablishmentPost>();
+
+    /// <summary>Gets the documents on employee files.</summary>
+    public DbSet<Core.Payroll.EmployeeDocument> EmployeeDocuments => Set<Core.Payroll.EmployeeDocument>();
+
+    /// <summary>Gets the disciplinary records.</summary>
+    public DbSet<Core.Payroll.DisciplinaryRecord> DisciplinaryRecords => Set<Core.Payroll.DisciplinaryRecord>();
+
+    /// <summary>Gets the training and qualification records.</summary>
+    public DbSet<Core.Payroll.TrainingRecord> TrainingRecords => Set<Core.Payroll.TrainingRecord>();
+
+    /// <summary>Gets the appraisals.</summary>
+    public DbSet<Core.Payroll.EmployeeAppraisal> EmployeeAppraisals => Set<Core.Payroll.EmployeeAppraisal>();
+
+    /// <summary>Gets the garnishee / court orders.</summary>
+    public DbSet<Core.Payroll.GarnisheeOrder> GarnisheeOrders => Set<Core.Payroll.GarnisheeOrder>();
+
     /// <summary>Payslips.</summary>
     public DbSet<Core.Payroll.Payslip> Payslips => Set<Core.Payroll.Payslip>();
 

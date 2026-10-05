@@ -73,6 +73,11 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLREMITTANCES" => await RemittancesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLPAYERETURN" => await PayeReturnAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLCERTIFICATES" => await CertificatesAsync(companyId, toDate, ct).ConfigureAwait(false),
+            "PYRLGARNISHEES" => await GarnisheesAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "PYRLESTABLISHMENT" => await EstablishmentAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "PYRLDOCUMENTS" => await DocumentsAsync(companyId, asAt, Days(parameters), Text(parameters, "RequiredTypes"), ct).ConfigureAwait(false),
+            "PYRLDISCIPLINARY" => await DisciplinaryAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "PYRLTRAINING" => await TrainingAsync(companyId, asAt, Days(parameters), ct).ConfigureAwait(false),
             "PYRLLOANS" => await LoansAsync(companyId, ct).ConfigureAwait(false),
             "PYRLJOBALLOCATION" => await JobAllocationAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLCLEARANCE" => await ClearanceAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -509,6 +514,87 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
 
     private async Task<List<TaxTable>> TaxTablesAsync(long companyId, CancellationToken ct)
         => await _db.Set<TaxTable>().AsNoTracking().Include(t => t.Bands).Where(t => t.CompanyId == companyId).OrderBy(t => t.EffectiveFrom).ToListAsync(ct).ConfigureAwait(false);
+
+    private static int Days(IReadOnlyDictionary<string, object?> parameters)
+        => parameters.TryGetValue("Days", out object? days) && days is not null and not "" ? Convert.ToInt32(days, CultureInfo.InvariantCulture) : 30;
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GarnisheesAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        List<GarnisheeOrder> orders = await _db.GarnisheeOrders.AsNoTracking().Where(g => g.CompanyId == companyId && g.IssuedOn <= asAt).ToListAsync(ct).ConfigureAwait(false);
+        List<string> codes = [.. orders.Select(o => o.ElementCode).Distinct()];
+        List<long> ids = [.. orders.Select(o => o.EmployeeId).Distinct()];
+        var deducted = await (from p in _db.Set<Payslip>().AsNoTracking()
+                              from l in p.Lines
+                              where p.CompanyId == companyId && ids.Contains(p.EmployeeId) && codes.Contains(l.ElementCode) && p.PayDate <= asAt
+                              select new { p.EmployeeId, l.ElementCode, p.PayDate, l.Amount }).ToListAsync(ct).ConfigureAwait(false);
+        return [.. orders.OrderBy(o => Name(employees, o.EmployeeId), StringComparer.Ordinal).ThenBy(o => o.Priority).Select(o =>
+        {
+            decimal taken = Math.Min(o.TotalAmount, deducted.Where(d => d.EmployeeId == o.EmployeeId && d.ElementCode == o.ElementCode && d.PayDate >= o.IssuedOn).Sum(d => d.Amount));
+            return Row(("Employee", Name(employees, o.EmployeeId)), ("Reference", o.Reference), ("Creditor", o.Creditor), ("Priority", o.Priority), ("Issued", Date(o.IssuedOn)), ("Instalment", Money(o.Instalment)),
+                ("Total", Money(o.TotalAmount)), ("Deducted", Money(taken)), ("Balance", o.TotalAmount - taken));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EstablishmentAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<Employee> inService = [.. (await EmployeesAsync(companyId, ct).ConfigureAwait(false)).Values.Where(e => EmployedOn(e, asAt))];
+        List<EstablishmentPost> posts = await _db.EstablishmentPosts.AsNoTracking().Where(p => p.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        var keys = posts.Select(p => (p.Department, p.Grade)).Concat(inService.Select(e => (Department: e.Department ?? "—", Grade: e.Grade ?? "—"))).Distinct()
+            .OrderBy(k => k.Department, StringComparer.Ordinal).ThenBy(k => k.Grade, StringComparer.Ordinal);
+        return [.. keys.Select(k =>
+        {
+            EstablishmentPost? post = posts.FirstOrDefault(p => p.Department == k.Department && p.Grade == k.Grade);
+            int approved = post?.ApprovedPosts ?? 0, filled = inService.Count(e => (e.Department ?? "—") == k.Department && (e.Grade ?? "—") == k.Grade);
+            int vacant = Math.Max(0, approved - filled), over = Math.Max(0, filled - approved);
+            return Row(("Department", k.Department), ("Grade", k.Grade), ("Approved", approved), ("Filled", filled), ("Vacant", vacant), ("Over", over), ("Saving", vacant * (post?.AnnualCostPerPost ?? 0m)));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DocumentsAsync(long companyId, DateOnly asAt, int windowDays, string? requiredTypes, CancellationToken ct)
+    {
+        List<Employee> inService = [.. (await EmployeesAsync(companyId, ct).ConfigureAwait(false)).Values.Where(e => EmployedOn(e, asAt)).OrderBy(e => e.EmployeeNumber, StringComparer.Ordinal)];
+        List<EmployeeDocument> documents = await _db.EmployeeDocuments.AsNoTracking().Where(d => d.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        IReadOnlyList<string> required = HrRules.RequiredTypes(requiredTypes);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (Employee e in inService)
+        {
+            List<EmployeeDocument> own = [.. documents.Where(d => d.EmployeeId == e.Id)];
+            foreach (string missing in required.Where(t => own.All(d => d.DocumentType != t)))
+            {
+                rows.Add(Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Type", missing), ("Reference", "—"), ("Expires", "—"), ("Status", "Missing")));
+            }
+
+            foreach (EmployeeDocument d in own.Where(d => HrRules.Status(d.ExpiresOn, asAt, windowDays) != "Valid").OrderBy(d => d.ExpiresOn))
+            {
+                rows.Add(Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Type", d.DocumentType), ("Reference", d.Reference ?? "—"), ("Expires", Date(d.ExpiresOn!.Value)),
+                    ("Status", HrRules.Status(d.ExpiresOn, asAt, windowDays))));
+            }
+        }
+
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DisciplinaryAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        List<DisciplinaryRecord> records = await _db.DisciplinaryRecords.AsNoTracking().Where(d => d.CompanyId == companyId && d.Date <= asAt).OrderBy(d => d.Date).ToListAsync(ct).ConfigureAwait(false);
+        return [.. records.Select(d => Row(("Employee", Name(employees, d.EmployeeId)), ("Date", Date(d.Date)), ("Offence", d.Offence), ("Sanction", d.Sanction.ToString()),
+            ("Expires", d.ExpiresOn is DateOnly e ? Date(e) : "—"), ("Status", d.ExpiresOn is DateOnly lapse && lapse < asAt ? "Lapsed" : "Live")))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TrainingAsync(long companyId, DateOnly asAt, int windowDays, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        List<TrainingRecord> training = await _db.TrainingRecords.AsNoTracking().Where(t => t.CompanyId == companyId && t.CompletedOn <= asAt).ToListAsync(ct).ConfigureAwait(false);
+        List<EmployeeAppraisal> appraisals = await _db.EmployeeAppraisals.AsNoTracking().Where(a => a.CompanyId == companyId && a.Date <= asAt).ToListAsync(ct).ConfigureAwait(false);
+        return [.. training.OrderBy(t => Name(employees, t.EmployeeId), StringComparer.Ordinal).ThenBy(t => t.CompletedOn).Select(t => Row(("Section", "Training"), ("Employee", Name(employees, t.EmployeeId)),
+                ("Item", t.Provider is null ? t.Course : $"{t.Course} ({t.Provider})"), ("Date", Date(t.CompletedOn)), ("Due", t.ExpiresOn is DateOnly e ? Date(e) : "—"),
+                ("Status", HrRules.Status(t.ExpiresOn, asAt, windowDays)), ("Cost", t.Cost))),
+            .. appraisals.GroupBy(a => a.EmployeeId).Select(g => g.OrderBy(a => a.Date).Last()).Where(a => employees.TryGetValue(a.EmployeeId, out Employee? e) && EmployedOn(e, asAt))
+                .OrderBy(a => a.NextDue).Select(a => Row(("Section", "Appraisal"), ("Employee", Name(employees, a.EmployeeId)), ("Item", $"Rated {a.Rating}"), ("Date", Date(a.Date)), ("Due", Date(a.NextDue)),
+                    ("Status", a.NextDue < asAt ? "Overdue" : a.NextDue.DayNumber - asAt.DayNumber <= windowDays ? "Due soon" : "Planned"), ("Cost", 0m)))];
+    }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LoansAsync(long companyId, CancellationToken ct)
     {

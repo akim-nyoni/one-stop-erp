@@ -124,15 +124,30 @@ public static class PayrollReports
         yield return Listing("PR36", "Tax Table in Force", "Payroll", "The PAYE bands that apply at the date, with the tax at the top of each band.",
             "PyrlTaxTable", [new Column("Table", "Table", 80), new Column("Effective", "Effective", 75), new Column("From", "From", 90), new Column("To", "To", 90), new Column("Rate", "Rate %", 60),
              new Column("Cumulative", "Tax at band top", 100)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("PR21", "Garnishee & Court Order Register", "Payroll", "Every court order by employee and priority: creditor, instalment, total ordered, deducted through payroll to the date and the balance still to collect.",
+            "PyrlGarnishees", [new Column("Employee", "Employee", 150), new Column("Reference", "Order", 90), new Column("Creditor", "Creditor", 130), new Column("Priority", "Priority", 50), new Column("Issued", "Issued", 75),
+             new Column("Instalment", "Instalment", 80), new Column("Total", "Ordered", 90), new Column("Deducted", "Deducted", 90), new Column("Balance", "Balance", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("PR22", "Loan & Advance Register and Balances", "Payroll", "Every employee loan and advance: granted, principal, instalment, repaid, instalments left, status and the balance outstanding.",
             "PyrlLoans", [new Column("Employee", "Employee", 160), new Column("Reference", "Reference", 90), new Column("Granted", "Granted", 75), new Column("Principal", "Principal", 90),
              new Column("Instalment", "Instalment", 80), new Column("Repaid", "Repaid", 90), new Column("Left", "Instalments left", 70), new Column("Status", "Status", 70), new Column("Outstanding", "Outstanding", 95, true)], []);
         yield return Listing("PR42", "Timesheet Hours & Labour Cost Allocated to Jobs", "Payroll", "Per employee over the period: hours and cost booked to jobs against gross pay, and the pay left unallocated.",
             "PyrlJobAllocation", [new Column("Employee", "Employee", 160), new Column("Jobs", "Jobs", 140), new Column("Hours", "Hours", 55), new Column("Allocated", "Allocated", 90), new Column("Gross", "Gross pay", 90),
              new Column("Share", "Allocated %", 70), new Column("Unallocated", "Unallocated", 95, true)], Period);
+        yield return Listing("PR47", "Establishment vs Actual", "Payroll", "Per department and grade at the date: approved posts, filled, vacant and over establishment, with the annual saving on vacant posts.",
+            "PyrlEstablishment", [new Column("Department", "Department", 110), new Column("Grade", "Grade", 60), new Column("Approved", "Approved", 60), new Column("Filled", "Filled", 50), new Column("Vacant", "Vacant", 50),
+             new Column("Over", "Over", 45), new Column("Saving", "Vacancy saving", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("PR53", "Clearance Checklist Outstanding", "Payroll", "Leavers by the date who still hold company assets, owe on loans or have leave not yet settled.",
             "PyrlClearance", [new Column("Employee", "Employee", 160), new Column("Left", "Left", 75), new Column("Reason", "Reason", 110), new Column("Assets", "Assets held", 170), new Column("Leave", "Leave days", 60),
              new Column("Items", "Outstanding", 60), new Column("Loans", "Loans owed", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("PR55", "Employee Documents Expiring / Missing", "Payroll", "Employees in service whose documents have expired or expire within the window, or who lack a required document type.",
+            "PyrlDocuments", [new Column("Employee", "Employee", 160), new Column("Type", "Document", 90), new Column("Reference", "Number", 100), new Column("Expires", "Expires", 75), new Column("Status", "Status", 80)],
+            [("AsAtDate", ParameterType.Date), ("Days", ParameterType.Integer), ("RequiredTypes", ParameterType.String)]);
+        yield return Listing("PR56", "Disciplinary & Warning Register", "Payroll", "Disciplinary records with the sanction, when warnings lapse and whether they are still live at the date.",
+            "PyrlDisciplinary", [new Column("Employee", "Employee", 160), new Column("Date", "Date", 75), new Column("Offence", "Offence", 180), new Column("Sanction", "Sanction", 100), new Column("Expires", "Lapses", 75),
+             new Column("Status", "Status", 60)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("PR57", "Training & Qualification Register; Appraisal Due", "Payroll", "Training and qualifications held with renewal status, then each employee's last appraisal and when the next is due.",
+            "PyrlTraining", [new Column("Section", "Section", 70), new Column("Employee", "Employee", 160), new Column("Item", "Course / rating", 160), new Column("Date", "Completed / held", 80),
+             new Column("Due", "Renew / next due", 80), new Column("Status", "Status", 70), new Column("Cost", "Cost", 85, true)], [("AsAtDate", ParameterType.Date), ("Days", ParameterType.Integer)]);
         yield return Listing("PR63", "Payroll Accrual Schedule", "Payroll", "Employees in service at the period end not yet paid for that month (including salaries on hold), with the basic salary to accrue.",
             "PyrlAccrual", [new Column("Employee", "Employee", 160), new Column("Department", "Department", 100), new Column("LastPaid", "Last paid", 75), new Column("Status", "Status", 140),
              new Column("Accrual", "Accrual", 95, true)], [("AsAtDate", ParameterType.Date)]);

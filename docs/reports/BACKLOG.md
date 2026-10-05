@@ -84,7 +84,8 @@ missing domain data. Items are struck through as they ship (with the report code
 - ~~PR4, PR11, PR13, PR15, PR45, PR46, PR48, PR50, PR51, PR68~~ (after employee master data)
 - ~~PR7, PR19, PR20, PR27, PR28, PR30, PR31, PR32, PR33, PR36~~ (after schemes, tax tables and the run register)
 - ~~PR22, PR42, PR53, PR63, PR66~~ (loans, job timesheets, clearance, accrual, payroll SoD)
-- Still open: PR8–PR10, PR14, PR21, PR23–PR25, PR34, PR35, PR39–PR41, PR43, PR47, PR52, PR54–PR57, PR62, PR69
+- ~~PR21, PR47, PR55, PR56, PR57~~ (HR records: court orders, establishment, documents, discipline, training and appraisals)
+- Still open: PR8–PR10, PR14, PR23–PR25, PR34, PR35, PR39–PR41, PR43, PR52, PR54, PR62, PR69
 - Data exists, partly: PR4, PR24, PR26–PR28, PR34, PR39, PR45, PR46, PR58, PR63, PR66
 - Needs new data: payroll runs and approvals, employee bank / tax / ID details, schemes and members, tax tables, timesheets, grades and establishment, HR records (PR7–PR11, PR13–PR15, PR19–PR23, PR25, PR30–PR33, PR35, PR36, PR40–PR43, PR47, PR48, PR50–PR57, PR62, PR68, PR69)
 

@@ -205,3 +205,78 @@ internal sealed class PayrollRunRecordConfiguration : IEntityTypeConfiguration<P
         b.HasIndex(x => new { x.CompanyId, x.PeriodLabel }).IsUnique();
     }
 }
+
+internal sealed class EstablishmentPostConfiguration : IEntityTypeConfiguration<EstablishmentPost>
+{
+    public void Configure(EntityTypeBuilder<EstablishmentPost> b)
+    {
+        b.ToTable("establishment_post", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Department).HasMaxLength(80);
+        b.Property(x => x.Grade).HasMaxLength(40);
+        b.Property(x => x.AnnualCostPerPost).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.Department, x.Grade }).IsUnique();
+    }
+}
+
+internal sealed class EmployeeDocumentConfiguration : IEntityTypeConfiguration<EmployeeDocument>
+{
+    public void Configure(EntityTypeBuilder<EmployeeDocument> b)
+    {
+        b.ToTable("employee_document", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.DocumentType).HasMaxLength(40);
+        b.Property(x => x.Reference).HasMaxLength(80);
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId });
+    }
+}
+
+internal sealed class DisciplinaryRecordConfiguration : IEntityTypeConfiguration<DisciplinaryRecord>
+{
+    public void Configure(EntityTypeBuilder<DisciplinaryRecord> b)
+    {
+        b.ToTable("disciplinary", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Offence).HasMaxLength(200);
+        b.Property(x => x.Sanction).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId });
+    }
+}
+
+internal sealed class TrainingRecordConfiguration : IEntityTypeConfiguration<TrainingRecord>
+{
+    public void Configure(EntityTypeBuilder<TrainingRecord> b)
+    {
+        b.ToTable("training", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Course).HasMaxLength(160);
+        b.Property(x => x.Provider).HasMaxLength(120);
+        b.Property(x => x.Cost).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId });
+    }
+}
+
+internal sealed class EmployeeAppraisalConfiguration : IEntityTypeConfiguration<EmployeeAppraisal>
+{
+    public void Configure(EntityTypeBuilder<EmployeeAppraisal> b)
+    {
+        b.ToTable("appraisal", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId });
+    }
+}
+
+internal sealed class GarnisheeOrderConfiguration : IEntityTypeConfiguration<GarnisheeOrder>
+{
+    public void Configure(EntityTypeBuilder<GarnisheeOrder> b)
+    {
+        b.ToTable("garnishee_order", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.Property(x => x.Creditor).HasMaxLength(160);
+        b.Property(x => x.ElementCode).HasMaxLength(20);
+        b.Property(x => x.Instalment).HasPrecision(19, 4);
+        b.Property(x => x.TotalAmount).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.Reference }).IsUnique();
+    }
+}
