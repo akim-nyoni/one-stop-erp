@@ -65,6 +65,17 @@ public sealed class ContractControlTests
         (await control.RecordTimeAsync(companyId, contract, ann.Id, new DateOnly(2026, 3, 2), 20m, 10m)).Error.Code.Should().Be("Job.TimeOverbooked");
         (await db.JobContracts.AsNoTracking().Include(c => c.Costs).SingleAsync(c => c.Id == contract)).ActualCost.Should().Be(236m);
 
+        One4All.Core.Inventory.Item cement = new(companyId, "JC-CEM", "Cement");
+        One4All.Core.Inventory.Warehouse yard = new(companyId, "JC-WH", "Site store");
+        db.AddRange(cement, yard, new One4All.Core.Accounting.LedgerAccount(companyId, "1685", "Contract WIP", One4All.Core.Accounting.AccountType.Asset));
+        await db.SaveChangesAsync();
+        (await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Inventory.IInventoryService>().ReceiveAsync(new One4All.Application.Abstractions.Inventory.ReceiveStockRequest
+        {
+            CompanyId = companyId, ItemId = cement.Id, WarehouseId = yard.Id, Date = new DateOnly(2026, 3, 1), Quantity = 10m, UnitCost = 8m, CreditAccountCode = "1100",
+        })).IsSuccess.Should().BeTrue();
+        (await control.IssueMaterialsAsync(companyId, contract, cement.Id, yard.Id, new DateOnly(2026, 3, 4), 3m, "1685")).Value.Should().Be(24m);
+        (await db.JobContracts.AsNoTracking().Include(c => c.Costs).SingleAsync(c => c.Id == contract)).ActualCost.Should().Be(260m);
+
         IReportRunner runner = scope.ServiceProvider.GetRequiredService<IReportRunner>();
         async Task<string> Render(string code)
         {
@@ -76,6 +87,7 @@ public sealed class ContractControlTests
         (await Render("JC191")).Should().Contain("CC-1,VO-1,Extra room,2026-03-01,Approved,2026-03-05,\"6,000.00\",10000").And.Contain("CC-1,VO-2,Canopy,2026-03-02,Rejected,2026-03-06,\"3,000.00\",5000")
             .And.Contain("CC-1,VO-3,Paving,2026-03-10,Submitted,—,\"1,000.00\",2000");
         (await Render("JC193")).Should().Contain("CC-1,JC-E1 Ann Mason,Labour,2,14,10.00,140").And.Contain("CC-1,JC-E2 Ben Fixer,Labour,1,8,12.00,96");
+        (await Render("JC195")).Should().Contain("CC-1,2026-03-04,JC-CEM Cement,JC-WH,3,8.00,24");
         (await Render("JC196")).Should().Contain("CC-1,B1,Excavation,m3,100,110,10,110.0%,2200").And.Contain("CC-1,B2,Concrete,m3,40,0,-40,0.0%,0");
     }
 }

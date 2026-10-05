@@ -62,6 +62,9 @@ public static class InventoryReports
             "StkYield", [new Column("Run", "Run", 90), new Column("Date", "Date", 75), new Column("Item", "Item", 140), new Column("Yield", "Output (planned → actual, yield)", 160), new Column("Component", "Component", 140),
              new Column("Standard", "Std qty", 60), new Column("Actual", "Actual qty", 65), new Column("StandardCost", "Std cost", 80), new Column("ActualCost", "Actual cost", 80),
              new Column("Variance", "Usage variance", 90, true)], Period);
+        yield return Listing("INV100", "Wastage / Shrinkage Report", "Inventory", "Stock written down in the period through adjustments, by department (item category) and reason, against the department's sales.",
+            "StkShrinkage", [new Column("Department", "Department", 110), new Column("Reason", "Reason", 120), new Column("Units", "Units lost", 70), new Column("Sales", "Department sales", 100),
+             new Column("Share", "% of sales", 65), new Column("Value", "Value lost", 95, true)], Period);
         yield return Listing("INV101", "Consignment Stock", "Inventory", "Our stock held at customers' sites on consignment, per customer and item, with the last movement and value at average cost.",
             "StkConsignment", [new Column("Customer", "Customer", 150), new Column("Warehouse", "Location", 80), new Column("Item", "Item", 150), new Column("OnHand", "On hand", 70),
              new Column("LastMovement", "Last movement", 80), new Column("Value", "Value", 95, true)], [("AsAtDate", ParameterType.Date)]);

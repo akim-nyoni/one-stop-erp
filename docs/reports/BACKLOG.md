@@ -36,7 +36,8 @@ missing domain data. Items are struck through as they ship (with the report code
 
 ## E. Inventory
 - ~~78 Valuation vs GL (INV78)~~, ~~79 Stock on Hand & Availability (INV79)~~, ~~81 Stocktake Variance (INV81)~~, ~~86 Overstock (INV86)~~, ~~87 Negative Stock (INV87)~~, ~~92 Turnover & Days Cover (INV92)~~, ~~93 Gross Margin by Item (INV93)~~, ~~96 Cost Change History (INV96)~~, ~~97 Landed Cost Analysis (INV97)~~
-- Data exists: 94 (labels, a print layout), 100 (partly)
+- ~~100 Wastage / Shrinkage (INV100)~~
+- Data exists: 94 (labels, a print layout)
 - ~~82 Adjustments by Reason (INV82)~~, ~~88 Batch Stock (INV88)~~, ~~89 Serial Register (INV89)~~, ~~90 Expiry (INV90)~~
 - ~~91 Goods in Transit (INV91)~~, ~~101 Consignment Stock (INV101)~~
 - ~~98 Bill of Materials Costing (INV98)~~, ~~99 Production Yield & Usage Variance (INV99)~~
@@ -68,7 +69,8 @@ missing domain data. Items are struck through as they ship (with the report code
 
 ## K. Construction / Job Costing
 - ~~186 Job Cost by Head (JC186)~~, ~~189 Cost to Complete (JC189)~~, ~~190 Retention (JC190, no defects date)~~, ~~197 Contract Cash Flow (JC197)~~
-- Data exists: 188 IPC layout; partly 195
+- ~~195 Materials Issued to Job (JC195)~~
+- Data exists: 188 IPC layout
 - ~~191 Variation Order Register (JC191)~~, ~~193 Labour & Timesheet Cost (JC193)~~, ~~196 BOQ vs Measured (JC196)~~
 - ~~192 Subcontractor Ledger & Retention (JC192)~~, ~~194 Plant Utilisation & Hire Recovery (JC194)~~
 

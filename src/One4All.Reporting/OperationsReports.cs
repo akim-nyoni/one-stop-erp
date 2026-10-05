@@ -73,6 +73,9 @@ public static class OperationsReports
             "OpsPlant", [new Column("Plant", "Plant", 70), new Column("Name", "Name", 140), new Column("Hours", "Hours", 55), new Column("Available", "Available", 65), new Column("Utilisation", "Utilisation", 70),
              new Column("Recovered", "Hire recovered", 90), new Column("Running", "Running cost", 90), new Column("PerHour", "Cost / hour", 75), new Column("Net", "Net recovery", 95, true)],
             [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("HoursPerDay", ParameterType.Decimal)]);
+        yield return Listing("JC195", "Materials Issued to Job", "JobCosting", "Stock issued to each contract in the period: date, item, quantity and cost, from the stock movements referenced to the contract.",
+            "OpsJobMaterials", [new Column("Contract", "Contract", 85), new Column("Date", "Date", 75), new Column("Item", "Item", 170), new Column("Warehouse", "From", 70), new Column("Quantity", "Qty", 60),
+             new Column("UnitCost", "Unit cost", 80), new Column("Cost", "Cost", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
         yield return Listing("JC196", "BOQ vs Measured Quantities", "JobCosting", "Each bill-of-quantities line: billed quantity, measured to date, the over / under measure and the value of work measured.",
             "OpsBoq", [new Column("Contract", "Contract", 85), new Column("Item", "Item", 60), new Column("Description", "Description", 180), new Column("Unit", "Unit", 40), new Column("Billed", "BOQ qty", 65),
              new Column("Measured", "Measured", 65), new Column("Variance", "Over / (under)", 75), new Column("Complete", "% measured", 65), new Column("Value", "Value measured", 95, true)], []);

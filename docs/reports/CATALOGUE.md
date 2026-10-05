@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-522 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+524 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -249,6 +249,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | INV-REORDER | Reorder Report | Items at or below their reorder level, with the suggested reorder quantity — a purchasing aid. | — | ItemCode, Description, OnHand, ReorderLevel, Suggested | — | Sum(Suggested) |
 | INV-SLOW | Slow-moving Stock | Items on hand with no movement since the given date — capital tied up in dead stock. | SinceDate (Date, optional) | ItemCode, Description, Warehouse, Quantity, Value, LastMovement | — | Sum(Value) |
 | INV-VAL | Stock Valuation | Quantity on hand and value at moving average cost, per item and warehouse. | AsAtDate (Date, optional) | ItemCode, Description, WarehouseCode, Quantity, AverageCost, Value | — | Sum(Value) |
+| INV100 | Wastage / Shrinkage Report | Stock written down in the period through adjustments, by department (item category) and reason, against the department's sales. | FromDate (Date, optional), ToDate (Date, optional) | Department, Reason, Units, Sales, Share, Value | — | Sum(Value) |
 | INV101 | Consignment Stock | Our stock held at customers' sites on consignment, per customer and item, with the last movement and value at average cost. | AsAtDate (Date, optional) | Customer, Warehouse, Item, OnHand, LastMovement, Value | — | Sum(Value) |
 | INV78 | Stock Valuation vs GL Stock Control | The stock register's value at the date by warehouse against the stock control accounts, with the difference. | AsAtDate (Date, optional) | Line, Items, Quantity, Value | — | Sum(Value) |
 | INV79 | Stock on Hand & Availability | Per item and warehouse: on hand, committed to orders, on order, free and available to promise. | — | Item, Warehouse, OnHand, Committed, OnOrder, Free, Atp, Value | — | Sum(Value) |
@@ -278,6 +279,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | JC192 | Subcontractor Ledger, Certificates & Retention | Each subcontract's certificates in the period (gross, retention, payable) and retention released, with value, certified to date and retention held. | FromDate (Date, optional), ToDate (Date, optional) | Contract, Subcontractor, Subcontract, Document, Date, Gross, Retention, Position, Payable | — | Sum(Payable) |
 | JC193 | Labour & Timesheet Cost by Job | Hours and labour cost booked to each contract in the period, per employee and cost head. | FromDate (Date, optional), ToDate (Date, optional) | Contract, Employee, CostHead, Days, Hours, Rate, Cost | — | Sum(Cost) |
 | JC194 | Plant Utilisation & Hire Recovery | Per item of plant over the period: hours worked against hours available, hire recovered from jobs, running costs, cost per hour and the net recovery. | FromDate (Date, optional), ToDate (Date, optional), HoursPerDay (Decimal, optional) | Plant, Name, Hours, Available, Utilisation, Recovered, Running, PerHour, Net | — | Sum(Net) |
+| JC195 | Materials Issued to Job | Stock issued to each contract in the period: date, item, quantity and cost, from the stock movements referenced to the contract. | FromDate (Date, optional), ToDate (Date, optional) | Contract, Date, Item, Warehouse, Quantity, UnitCost, Cost | — | Sum(Cost) |
 | JC196 | BOQ vs Measured Quantities | Each bill-of-quantities line: billed quantity, measured to date, the over / under measure and the value of work measured. | — | Contract, Item, Description, Unit, Billed, Measured, Variance, Complete, Value | — | Sum(Value) |
 | JC197 | Contract Cash Flow | Per contract over the period: net certified (after retention) against costs incurred, and the net cash position. | FromDate (Date, optional), ToDate (Date, optional) | Contract, Name, Certified, Costs, Net | — | Sum(Net) |
 | JOB-IPC | Progress Certificates | Interim payment certificates with gross, retention and net payable for a period. | FromDate (Date, optional), ToDate (Date, optional) | CertificateNumber, Date, Gross, Retention, Net | — | Sum(Net) |

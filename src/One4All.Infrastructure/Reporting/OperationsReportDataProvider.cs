@@ -52,6 +52,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             "OPSSUBCONTRACTS" => await SubcontractsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "OPSPLANT" => await PlantAsync(companyId, fromDate, toDate,
                 parameters.TryGetValue("HoursPerDay", out object? perDay) && perDay is not null and not "" ? Convert.ToDecimal(perDay, CultureInfo.InvariantCulture) : 8m, ct).ConfigureAwait(false),
+            "OPSJOBMATERIALS" => await JobMaterialsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "OPSBOQ" => await BoqAsync(companyId, ct).ConfigureAwait(false),
             "OPSCONTRACTCASH" => await ContractCashAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "OPSOTIF" => await OtifAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -259,6 +260,18 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
                 ("Utilisation", available == 0m ? "—" : (hours * 100m / available).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Recovered", Money(recovered)), ("Running", Money(running)),
                 ("PerHour", hours == 0m ? "—" : Money(running / hours)), ("Net", recovered - running));
         })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> JobMaterialsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<string> contracts = [.. (await ContractNumbersAsync(companyId, ct).ConfigureAwait(false)).Values];
+        Dictionary<long, string> items = await _db.Items.AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
+        Dictionary<long, string> warehouses = await _db.Warehouses.AsNoTracking().IgnoreQueryFilters().Where(w => w.CompanyId == companyId).ToDictionaryAsync(w => w.Id, w => w.Code, ct).ConfigureAwait(false);
+        List<Core.Inventory.StockMovement> issues = await _db.StockMovements.AsNoTracking()
+            .Where(m => m.CompanyId == companyId && m.Type == Core.Inventory.StockMovementType.Issue && m.Reference != null && contracts.Contains(m.Reference) && m.Date >= fromDate && m.Date <= toDate)
+            .OrderBy(m => m.Reference).ThenBy(m => m.Date).ToListAsync(ct).ConfigureAwait(false);
+        return [.. issues.Select(m => Row(("Contract", m.Reference), ("Date", Date(m.Date)), ("Item", items.GetValueOrDefault(m.ItemId, "?")), ("Warehouse", warehouses.GetValueOrDefault(m.WarehouseId, "?")),
+            ("Quantity", Qty(-m.Quantity)), ("UnitCost", Money(m.UnitCost)), ("Cost", Math.Round(-m.Value, 2))))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BoqAsync(long companyId, CancellationToken ct)

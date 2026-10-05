@@ -49,6 +49,18 @@ public interface IContractControlService
     /// <returns>Success, or an error.</returns>
     Task<Result> MeasureAsync(long companyId, long boqItemId, decimal quantityToDate, DateOnly date, CancellationToken ct = default);
 
+    /// <summary>Issues stock to a contract: the goods leave the warehouse charged to work in progress, and the job's materials head takes their cost.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="contractId">The contract.</param>
+    /// <param name="itemId">The item.</param>
+    /// <param name="warehouseId">The warehouse or site store.</param>
+    /// <param name="date">The issue date.</param>
+    /// <param name="quantity">The quantity.</param>
+    /// <param name="workInProgressAccountCode">The contract WIP account charged.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The cost issued, or an error.</returns>
+    Task<Result<decimal>> IssueMaterialsAsync(long companyId, long contractId, long itemId, long warehouseId, DateOnly date, decimal quantity, string workInProgressAccountCode, CancellationToken ct = default);
+
     /// <summary>Records an employee's hours on a contract and charges their cost to the job's labour cost head.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="contractId">The contract.</param>

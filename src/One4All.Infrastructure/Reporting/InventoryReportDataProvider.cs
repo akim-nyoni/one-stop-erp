@@ -45,6 +45,7 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
             "STKSERIALS" => await SerialsAsync(companyId, asAt, ct).ConfigureAwait(false),
             "STKEXPIRY" => await ExpiryAsync(companyId, asAt, parameters.TryGetValue("Days", out object? days) && days is not null and not "" ? Convert.ToInt32(days, CultureInfo.InvariantCulture) : 30, ct)
                 .ConfigureAwait(false),
+            "STKSHRINKAGE" => await ShrinkageAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "STKINTRANSIT" => await InTransitAsync(companyId, asAt, ct).ConfigureAwait(false),
             "STKCONSIGNMENT" => await ConsignmentAsync(companyId, asAt, ct).ConfigureAwait(false),
             "STKBOM" => await BomAsync(companyId, ct).ConfigureAwait(false),
@@ -181,6 +182,31 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
             .Select(x => Row(("Item", items.TryGetValue(x.Id, out Item? i) ? $"{i.Code} {i.Description}" : "?"), ("Category", items.GetValueOrDefault(x.Id)?.Category ?? "—"), ("Quantity", Qty(x.Quantity)),
                 ("Sales", Money(x.Sales)), ("Cost", Money(x.Cost)), ("MarginPercent", x.Sales == 0m ? "—" : ((x.Sales - x.Cost) * 100m / x.Sales).ToString("0.0", CultureInfo.InvariantCulture) + "%"),
                 ("Margin", x.Sales - x.Cost)))];
+    }
+
+    // Shrinkage is every downward adjustment; sales are POS and invoiced order lines; departments are item categories.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ShrinkageAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, string> category = await _db.Items.AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Category ?? "Uncategorised", ct).ConfigureAwait(false);
+        Dictionary<string, string> reasons = await _db.StockReasonCodes.AsNoTracking().Where(r => r.CompanyId == companyId).ToDictionaryAsync(r => r.Code, r => r.Name, ct).ConfigureAwait(false);
+        List<StockMovement> losses = await _db.StockMovements.AsNoTracking()
+            .Where(m => m.CompanyId == companyId && m.Type == StockMovementType.Adjustment && m.Quantity < 0m && m.Date >= fromDate && m.Date <= toDate).ToListAsync(ct).ConfigureAwait(false);
+        var pos = await (from l in _db.Set<SaleLine>().AsNoTracking() join s in _db.Sales.AsNoTracking() on l.SaleId equals s.Id
+                         where s.CompanyId == companyId && s.Status == SaleStatus.Completed && s.SaleDate >= fromDate && s.SaleDate <= toDate
+                         select new { l.ItemId, l.LineNet }).ToListAsync(ct).ConfigureAwait(false);
+        var orders = await (from l in _db.Set<Core.SalesOrders.SalesOrderLine>().AsNoTracking() join o in _db.Set<Core.SalesOrders.SalesOrder>().AsNoTracking() on l.SalesOrderId equals o.Id
+                            where o.CompanyId == companyId && o.OrderDate >= fromDate && o.OrderDate <= toDate && l.InvoicedQuantity > 0m
+                            select new { l.ItemId, LineNet = l.InvoicedQuantity * l.UnitPrice }).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<string, decimal> sales = pos.Select(p => (p.ItemId, p.LineNet)).Concat(orders.Select(o => (o.ItemId, o.LineNet)))
+            .GroupBy(x => category.GetValueOrDefault(x.ItemId, "Uncategorised")).ToDictionary(g => g.Key, g => g.Sum(x => x.LineNet));
+        return [.. losses.GroupBy(m => (Department: category.GetValueOrDefault(m.ItemId, "Uncategorised"), Reason: m.ReasonCode ?? string.Empty))
+            .OrderBy(g => g.Key.Department, StringComparer.Ordinal).ThenBy(g => g.Key.Reason, StringComparer.Ordinal).Select(g =>
+            {
+                decimal value = -g.Sum(m => m.Value), departmentSales = sales.GetValueOrDefault(g.Key.Department);
+                return Row(("Department", g.Key.Department), ("Reason", g.Key.Reason.Length == 0 ? "Unspecified / stocktake" : $"{g.Key.Reason} {reasons.GetValueOrDefault(g.Key.Reason, string.Empty)}".Trim()),
+                    ("Units", Qty(-g.Sum(m => m.Quantity))), ("Sales", Money(departmentSales)),
+                    ("Share", departmentSales == 0m ? "—" : (value * 100m / departmentSales).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Value", Math.Round(value, 2)));
+            })];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CostChangesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)

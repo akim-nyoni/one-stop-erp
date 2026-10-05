@@ -11,10 +11,16 @@ namespace One4All.Infrastructure.JobCosting;
 public sealed class ContractControlService : IContractControlService
 {
     private readonly One4AllDbContext _db;
+    private readonly Application.Abstractions.Inventory.IInventoryService _inventory;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
-    public ContractControlService(One4AllDbContext db) => _db = db;
+    /// <param name="inventory">Issues materials to jobs.</param>
+    public ContractControlService(One4AllDbContext db, Application.Abstractions.Inventory.IInventoryService inventory)
+    {
+        _db = db;
+        _inventory = inventory;
+    }
 
     private Task<JobContract?> ContractAsync(long companyId, long contractId, CancellationToken ct, bool withCosts = false)
         => (withCosts ? _db.JobContracts.Include(c => c.Costs) : _db.JobContracts.AsQueryable()).FirstOrDefaultAsync(c => c.Id == contractId && c.CompanyId == companyId, ct);
@@ -142,6 +148,44 @@ public sealed class ContractControlService : IContractControlService
         item.Measure(quantityToDate, date);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public Task<Result<decimal>> IssueMaterialsAsync(long companyId, long contractId, long itemId, long warehouseId, DateOnly date, decimal quantity, string workInProgressAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => IssueMaterialsCoreAsync(companyId, contractId, itemId, warehouseId, date, quantity, workInProgressAccountCode, ct), ct);
+
+    // One unit of work: the stock issue to WIP and the job's materials cost commit together.
+    private async Task<Result<decimal>> IssueMaterialsCoreAsync(long companyId, long contractId, long itemId, long warehouseId, DateOnly date, decimal quantity, string workInProgressAccountCode, CancellationToken ct)
+    {
+        if (quantity <= 0m || string.IsNullOrWhiteSpace(workInProgressAccountCode))
+        {
+            return Error.Validation("Job.MaterialsInvalid", "A materials issue needs a positive quantity and the contract's WIP account.");
+        }
+
+        JobContract? contract = await ContractAsync(companyId, contractId, ct, withCosts: true).ConfigureAwait(false);
+        if (contract is null)
+        {
+            return Error.NotFound("Job.ContractNotFound", $"Contract {contractId} not found.");
+        }
+
+        if (contract.Status != JobStatus.Open)
+        {
+            return Error.Rule("Job.ContractNotOpen", $"Contract {contract.ContractNumber} is not open.");
+        }
+
+        Result<Application.Abstractions.Inventory.StockMovementResult> issue = await _inventory.IssueAsync(new Application.Abstractions.Inventory.IssueStockRequest
+        {
+            CompanyId = companyId, ItemId = itemId, WarehouseId = warehouseId, Date = date, Quantity = quantity, Reference = contract.ContractNumber, ChargeAccountCode = workInProgressAccountCode,
+        }, ct).ConfigureAwait(false);
+        if (issue.IsFailure)
+        {
+            return issue.Error;
+        }
+
+        string itemCode = await _db.Items.Where(i => i.Id == itemId).Select(i => i.Code).SingleAsync(ct).ConfigureAwait(false);
+        contract.CaptureCost("Materials", JobCostSource.StockIssue, issue.Value.Value, date, $"{itemCode} × {quantity:0.###}");
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return issue.Value.Value;
     }
 
     /// <inheritdoc />
