@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-305 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+310 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -22,6 +22,11 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
 | CB-FLOW | Cash-Flow Forecast | Expected receipts and payments from open receivables and payables, bucketed by due date, with the running net. | AsAtDate (Date, optional) | Bucket, Inflow, Outflow, Net, RunningNet | — | Sum(RunningNet) |
+| CB68 | Cash Book Listing | Every posting to a bank account's ledger in the period with running balance and whether it is reconciled. | BankCode (String, optional), FromDate (Date, optional), ToDate (Date, optional) | Bank, Date, Journal, Document, Narrative, Receipts, Payments, Balance, Reconciled | — | — |
+| CB70 | Unpresented & Uncleared Items Ageing | Ledger postings not yet on a bank statement and statement lines not yet on the ledger, aged at the date. | AsAtDate (Date, optional) | Bank, Kind, Date, Reference, Days, Band, Amount | — | Sum(Amount) |
+| CB72 | 13-Week Cash Flow Forecast by Currency | From today's bank balances, week by week: customer receipts and supplier payments falling due, and the closing cash, per currency. | AsAtDate (Date, optional) | Week, Currency, Opening, Receipts, Payments, Closing | — | — |
+| CB73 | Petty Cash & Imprest Report | Disbursements and top-ups on the petty cash account in the period with its running balance. | AccountCode (String, optional), FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Document, Narrative, In, Out, Balance | — | — |
+| CB74 | Inter-account Transfers | Transfers between bank accounts in the period, with the amount out, the amount in and any exchange difference. | FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Document, From, To, Out, In, Difference | — | Sum(Difference) |
 
 ## Expenses
 

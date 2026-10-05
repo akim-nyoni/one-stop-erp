@@ -28,7 +28,7 @@ missing domain data. Items are struck through as they ship (with the report code
 - Needs new data: 61 (supplier's own statement capture), cheque entity
 
 ## D. Cash Book / Treasury
-- Data exists: 68, 70, 72 (13-week, by currency), 73, 74
+- ~~68 Cash Book Listing (CB68)~~, ~~70 Unpresented & Uncleared (CB70)~~, ~~72 13-week forecast by currency (CB72)~~, ~~73 Petty Cash & Imprest (CB73)~~, ~~74 Inter-account Transfers (CB74)~~
 - Needs new data: 75 cheque register, 76 wallet statements
 
 ## E. Inventory

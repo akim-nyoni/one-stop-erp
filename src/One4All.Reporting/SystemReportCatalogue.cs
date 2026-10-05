@@ -100,6 +100,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Cash book & treasury additions (brief §14 D, CB + item number).
+        foreach (ReportDefinition definition in CashBookReports.All())
+        {
+            yield return definition;
+        }
+
         // General ledger additions (brief §14 A, GL + item number).
         foreach (ReportDefinition definition in LedgerReports.All())
         {
