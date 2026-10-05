@@ -1,3 +1,4 @@
+using One4All.Core.Accounting;
 using One4All.Core.Common;
 
 namespace One4All.Core.Payroll;
@@ -115,6 +116,12 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
     /// (formula variable STAFFPURCHASES) or council / employer housing rent (HOUSINGRENT, receipted to the tenancy's account).
     /// </summary>
     public PayRecovery Recovers { get; set; }
+
+    /// <summary>
+    /// Gets or sets the currency the element is paid in for a split-currency payroll (null = the base currency). Amounts stay in base;
+    /// the multi-currency tax split (PR35) converts them at the pay date's rate.
+    /// </summary>
+    public CurrencyCode? PaidInCurrency { get; set; }
 }
 
 /// <summary>A balance a payroll deduction recovers from the employee (brief §4.15.4).</summary>

@@ -1,3 +1,4 @@
+using One4All.Core.Accounting;
 using One4All.Core.Common;
 
 namespace One4All.Core.Payroll;
@@ -191,8 +192,10 @@ public sealed class TaxTable : AuditableEntity, ICompanyScoped
     /// <param name="companyId">The company.</param>
     /// <param name="code">Its code.</param>
     /// <param name="effectiveFrom">When it applies from.</param>
-    public TaxTable(long companyId, string code, DateOnly effectiveFrom)
+    /// <param name="currency">The currency the table applies to in a split-currency assessment (null = the base table).</param>
+    public TaxTable(long companyId, string code, DateOnly effectiveFrom, CurrencyCode? currency = null)
     {
+        Currency = currency;
         CompanyId = companyId;
         Code = code.Trim().ToUpperInvariant();
         EffectiveFrom = effectiveFrom;
@@ -206,6 +209,9 @@ public sealed class TaxTable : AuditableEntity, ICompanyScoped
 
     /// <summary>When it applies from.</summary>
     public DateOnly EffectiveFrom { get; private set; }
+
+    /// <summary>The currency the table applies to (null for the base-currency table every other report uses).</summary>
+    public CurrencyCode? Currency { get; private set; }
 
     /// <summary>The bands, lowest first.</summary>
     public IReadOnlyList<TaxBand> Bands => [.. _bands.OrderBy(b => b.From)];

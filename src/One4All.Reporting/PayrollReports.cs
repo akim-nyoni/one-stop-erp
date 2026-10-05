@@ -112,6 +112,10 @@ public static class PayrollReports
         yield return Listing("PR24", "Housing Rent Deduction Reconciliation", "Payroll", "Per employee tenant: rent billed, rent deducted from pay and receipted to the tenancy account, the account balance, and any deduction not receipted.",
             "PyrlHousingRent", [new Column("Employee", "Employee", 160), new Column("Tenancy", "Tenancy", 80), new Column("Unit", "Unit", 70), new Column("Rent", "Monthly rent", 85), new Column("Billed", "Billed", 90),
              new Column("Deducted", "Deducted", 90), new Column("Receipted", "Receipted", 90), new Column("Balance", "Account balance", 95), new Column("Difference", "Not receipted", 90, true)], Period);
+        yield return Listing("PR35", "Multi-Currency Tax Split", "Payroll", "Split-currency working paper: per employee and period, each currency's taxable earnings and share, and the tax attributable to it (own currency table, or the base table apportioned), with the tax deducted apportioned.",
+            "PyrlCurrencySplit", [new Column("Employee", "Employee", 150), new Column("Period", "Period", 65), new Column("Currency", "Ccy", 40), new Column("Earnings", "Earnings (ccy)", 90), new Column("Rate", "Rate", 60),
+             new Column("EarningsBase", "Earnings (base)", 90), new Column("Share", "Share", 50), new Column("Method", "Bands applied", 190), new Column("TaxCurrency", "Tax (ccy)", 80),
+             new Column("Deducted", "Deducted (base)", 85), new Column("TaxBase", "Tax (base)", 85, true)], Period);
         yield return Listing("PR19", "Third-Party Remittance Schedules", "Payroll", "Per scheme and member for the period: the employee's deduction and the employer's contribution — the schedule each provider needs.",
             "PyrlSchemes", [new Column("Scheme", "Scheme", 110), new Column("Employee", "Employee", 160), new Column("Member", "Member no.", 90), new Column("EmployeePart", "Employee", 90),
              new Column("EmployerPart", "Employer", 90), new Column("Total", "Total", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("SchemeCode", ParameterType.String)]);

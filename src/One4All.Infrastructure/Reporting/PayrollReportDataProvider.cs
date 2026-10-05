@@ -70,6 +70,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLBACKPAY" => await BackpayAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLSTAFFPURCHASES" => await StaffPurchasesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLHOUSINGRENT" => await HousingRentAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLCURRENCYSPLIT" => await CurrencySplitAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLSCHEMES" => await SchemeScheduleAsync(companyId, fromDate, toDate, _ => true, Text(parameters, "SchemeCode"), ct).ConfigureAwait(false),
             "PYRLSCHEMESOCIAL" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.SocialSecurity, null, ct).ConfigureAwait(false),
             "PYRLSCHEMEPENSION" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.Pension, null, ct).ConfigureAwait(false),
@@ -617,6 +618,88 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         })];
     }
 
+    // PR35: per employee and period with earnings paid in more than the base currency, each currency's taxable earnings, its share,
+    // and the tax attributable to it — on the currency's own table when one is in force, otherwise the base table's tax on the
+    // whole remuneration apportioned by share — with the tax deducted apportioned the same way.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CurrencySplitAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        CurrencyCode baseCurrency = await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+        Dictionary<string, CurrencyCode> paidIn = (await _db.PayElements.AsNoTracking().Where(e => e.CompanyId == companyId && e.PaidInCurrency != null).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(e => e.Code, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().PaidInCurrency!.Value, StringComparer.OrdinalIgnoreCase);
+        List<TaxTable> tables = await TaxTablesAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<(CurrencyCode, DateOnly), decimal?> rates = [];
+        async Task<decimal?> RateAsync(CurrencyCode currency, DateOnly date)
+        {
+            if (currency == baseCurrency)
+            {
+                return 1m;
+            }
+
+            if (!rates.TryGetValue((currency, date), out decimal? rate))
+            {
+                rate = await Accounting.ExchangeRateResolver.FindAsync(_db, currency, baseCurrency, ExchangeRateType.Daily, date, ct).ConfigureAwait(false);
+                rates[(currency, date)] = rate;
+            }
+
+            return rate;
+        }
+
+        static string Marginal(TaxTable table, decimal amount)
+        {
+            TaxBand? band = table.Bands.LastOrDefault(b => amount > b.From) ?? table.Bands.FirstOrDefault();
+            return band is null ? "-" : $"{table.Code} {band.RatePercent.ToString("0.##", CultureInfo.InvariantCulture)}% from {Money(band.From)}";
+        }
+
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (IGrouping<(long EmployeeId, string Period), Payslip> group in (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false))
+            .GroupBy(p => (p.EmployeeId, p.PeriodLabel)).OrderBy(g => Name(employees, g.Key.EmployeeId), StringComparer.Ordinal).ThenBy(g => g.Key.PeriodLabel, StringComparer.Ordinal))
+        {
+            List<PayslipLine> taxable = [.. group.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.Earning && l.Taxable)];
+            if (!taxable.Any(l => paidIn.ContainsKey(l.ElementCode)))
+            {
+                continue;
+            }
+
+            DateOnly payDate = group.Min(p => p.PayDate);
+            decimal totalBase = taxable.Sum(l => l.Amount);
+            decimal deducted = group.SelectMany(p => p.Lines).Where(IsTax).Sum(l => l.Amount);
+            TaxTable? baseTable = InForce(tables, payDate);
+            decimal baseTax = baseTable is null ? 0m : PayeTable.Tax(baseTable.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), totalBase);
+            foreach (IGrouping<CurrencyCode, PayslipLine> currency in taxable.GroupBy(l => paidIn.TryGetValue(l.ElementCode, out CurrencyCode c) ? c : baseCurrency).OrderBy(g => g.Key == baseCurrency ? 0 : 1)
+                .ThenBy(g => g.Key.ToString(), StringComparer.Ordinal))
+            {
+                decimal earningsBase = currency.Sum(l => l.Amount);
+                decimal share = totalBase == 0m ? 0m : earningsBase / totalBase;
+                decimal? rate = await RateAsync(currency.Key, payDate).ConfigureAwait(false);
+                decimal? earnings = rate is decimal r && r != 0m ? decimal.Round(earningsBase / r, 2, MidpointRounding.ToEven) : null;
+                TaxTable? own = tables.LastOrDefault(t => t.Currency == currency.Key && t.EffectiveFrom <= payDate);
+                string method;
+                decimal taxBase;
+                decimal? taxCurrency;
+                if (own is not null && earnings is decimal amount)
+                {
+                    taxCurrency = PayeTable.Tax(own.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), amount);
+                    taxBase = decimal.Round(taxCurrency.Value * rate!.Value, 2, MidpointRounding.ToEven);
+                    method = $"Own table, {Marginal(own, amount)}";
+                }
+                else
+                {
+                    taxBase = decimal.Round(baseTax * share, 2, MidpointRounding.ToEven);
+                    taxCurrency = rate is decimal r2 && r2 != 0m ? decimal.Round(taxBase / r2, 2, MidpointRounding.ToEven) : null;
+                    method = baseTable is null ? "No tax table" : $"Apportioned, {Marginal(baseTable, totalBase)}";
+                }
+
+                rows.Add(Row(("Employee", Name(employees, group.Key.EmployeeId)), ("Period", group.Key.Period), ("Currency", currency.Key.ToString()),
+                    ("Earnings", earnings is decimal e ? Money(e) : "no rate"), ("Rate", rate is decimal x ? x.ToString("0.####", CultureInfo.InvariantCulture) : "no rate"), ("EarningsBase", Money(earningsBase)),
+                    ("Share", (share * 100m).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Method", method), ("TaxCurrency", taxCurrency is decimal t ? Money(t) : "no rate"),
+                    ("Deducted", Money(decimal.Round(deducted * share, 2, MidpointRounding.ToEven))), ("TaxBase", taxBase)));
+            }
+        }
+
+        return rows;
+    }
+
     // Each member's lines on the scheme's employee and employer elements in the period.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SchemeScheduleAsync(long companyId, DateOnly fromDate, DateOnly toDate, Func<SchemeKind, bool> kind, string? schemeCode, CancellationToken ct)
     {
@@ -1026,7 +1109,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         return rows;
     }
 
-    private static TaxTable? InForce(List<TaxTable> tables, DateOnly date) => tables.LastOrDefault(t => t.EffectiveFrom <= date);
+    private static TaxTable? InForce(List<TaxTable> tables, DateOnly date) => tables.LastOrDefault(t => t.Currency == null && t.EffectiveFrom <= date);
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PayeReturnAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {

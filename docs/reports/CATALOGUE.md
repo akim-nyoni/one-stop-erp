@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-529 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+530 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -352,6 +352,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | PR32 | Medical Aid Contribution Schedule | Medical aid members with the period's employee and employer contributions. | FromDate (Date, optional), ToDate (Date, optional) | Scheme, Employee, Member, EmployeePart, EmployerPart, Total | — | Sum(Total) |
 | PR33 | Workers' Compensation & Skills Levy Schedule | Workers' compensation and skills levy contributions for the period by member. | FromDate (Date, optional), ToDate (Date, optional) | Scheme, Employee, Member, EmployeePart, EmployerPart, Total | — | Sum(Total) |
 | PR34 | Taxable Benefits Schedule | Benefits in kind paid in the period per employee: category, value and the PAYE they add at the table in force. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Category, Element, Value, TaxEffect | — | Sum(TaxEffect) |
+| PR35 | Multi-Currency Tax Split | Split-currency working paper: per employee and period, each currency's taxable earnings and share, and the tax attributable to it (own currency table, or the base table apportioned), with the tax deducted apportioned. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Period, Currency, Earnings, Rate, EarningsBase, Share, Method, TaxCurrency, Deducted, TaxBase | — | Sum(TaxBase) |
 | PR36 | Tax Table in Force | The PAYE bands that apply at the date, with the tax at the top of each band. | AsAtDate (Date, optional) | Table, Effective, From, To, Rate, Cumulative | — | — |
 | PR38 | Leave Liability (IAS 19) | Leave days owed at the date per employee and type, valued at the daily rate of basic salary (annual ÷ 260). | — | Employee, LeaveType, Accrued, Taken, Balance, DailyRate, Liability | — | Sum(Liability) |
 | PR39 | Leave Taken Analysis | Leave taken in the period by type, department and month: employees and days. | FromDate (Date, optional), ToDate (Date, optional) | Type, Department, Month, Employees, Records, Days | — | Sum(Days) |
