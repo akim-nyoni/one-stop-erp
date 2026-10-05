@@ -100,6 +100,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Schools, job costing and sales order additions (brief §14 J, K, H).
+        foreach (ReportDefinition definition in OperationsReports.All())
+        {
+            yield return definition;
+        }
+
         // Executive dashboards (brief §14 Q, DB + item number).
         foreach (ReportDefinition definition in DashboardReports.All())
         {

@@ -45,7 +45,8 @@ missing domain data. Items are struck through as they ship (with the report code
 - Data exists: 136 budget availability at requisition (needs an expense account on requisition lines); partly 133 (no framework contracts)
 
 ## H. Sales Order Processing
-- Data exists: 137, 139 packing / despatch notes, 143
+- ~~137 Open Orders & Allocation (SO137)~~, ~~143 Quotation Conversion (SO143)~~
+- Data exists: 139 packing / despatch notes (layouts)
 - Needs new data: 140 OTIF dates, 141 POD, 142 vehicles / routes
 
 ## I. Municipality (the M series)
@@ -54,11 +55,13 @@ missing domain data. Items are struck through as they ship (with the report code
 - Needs new data: 157 water balance (bulk supply readings)
 
 ## J. Schools
-- Data exists: 174–178, 181, 182; partly 180, 184
+- ~~175 Fee Billing Summary (SC175)~~, ~~176 Arrears by Grade (SC176)~~, ~~177 Collections (SC177)~~, ~~178 Bursaries (SC178)~~, ~~180 Enrolment (SC180, no gender)~~, ~~182 Student Balances (SC182)~~
+- Data exists: 174 fee invoice layout, 181 deferred fee income; partly 184
 - Needs new data: 179 sponsors, 183 transport, 185 student wallet, streams
 
 ## K. Construction / Job Costing
-- Data exists: 186, 188 IPC layout, 197; partly 189, 190, 195
+- ~~186 Job Cost by Head (JC186)~~, ~~189 Cost to Complete (JC189)~~, ~~190 Retention (JC190, no defects date)~~, ~~197 Contract Cash Flow (JC197)~~
+- Data exists: 188 IPC layout; partly 195
 - Needs new data: 191 variations, 192 subcontractors, 193 timesheets, 194 plant, 196 BOQ
 
 ## L. Weighbridge

@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-341 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+353 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -211,6 +211,10 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
+| JC186 | Job Cost Report by Cost Head | Per contract and cost head: cost to date and share of the contract's cost, against its budget. | — | Contract, Name, CostHead, Source, Share, Cost | — | Sum(Cost) |
+| JC189 | Cost to Complete & Forecast Final Cost | Per contract: value, budget, cost to date, % complete by certification, forecast final cost and the variance to budget. | — | Contract, Name, Value, Budget, Actual, Complete, Forecast, Variance | — | Sum(Variance) |
+| JC190 | Retention Held by Contract | Retention held on each contract's certificates, with the contract status. | — | Contract, Name, Customer, Status, Rate, Certified, Retention | — | Sum(Retention) |
+| JC197 | Contract Cash Flow | Per contract over the period: net certified (after retention) against costs incurred, and the net cash position. | FromDate (Date, optional), ToDate (Date, optional) | Contract, Name, Certified, Costs, Net | — | Sum(Net) |
 | JOB-IPC | Progress Certificates | Interim payment certificates with gross, retention and net payable for a period. | FromDate (Date, optional), ToDate (Date, optional) | CertificateNumber, Date, Gross, Retention, Net | — | Sum(Net) |
 | JOB-PROF | Job Profitability | Contract value, budget, actual cost, certified-to-date and percentage complete per contract. | — | ContractNumber, Name, ContractValue, BudgetCost, ActualCost, CertifiedToDate, PercentComplete | — | Sum(CertifiedToDate) |
 | JOB-WIP | Job WIP | Per contract: revenue recognised on cost-to-cost completion versus certified-to-date, giving the WIP position (contract asset if positive, liability if negative). | — | ContractNumber, Name, ContractValue, PercentComplete, RevenueRecognised, CertifiedToDate, WipPosition | — | Sum(WipPosition) |
@@ -406,6 +410,8 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
+| SO137 | Open Sales Orders & Allocation | Open order lines with what is outstanding to despatch and the free stock that can cover it. | — | Order, Date, Customer, Item, Ordered, Despatched, Outstanding, Free, Cover, Value | — | Sum(Value) |
+| SO143 | Quotation Conversion Rate | Quotations by month: count, converted to orders, value quoted, value converted and the conversion rate. | FromDate (Date, optional), ToDate (Date, optional) | Month, Quotes, Converted, Rate, Quoted, ConvertedValue | — | Sum(ConvertedValue) |
 | SOP-BO | Sales Back-Orders | Order lines not yet fully despatched, with the ordered, despatched and outstanding quantities. | — | OrderNumber, Customer, OrderDate, Description, Ordered, Despatched, Outstanding | — | Sum(Outstanding) |
 | SOP-QUOTE | Sales Quotations | Quotations with customer, dates, value and status, newest first. | — | QuoteNumber, Customer, QuoteDate, ValidUntil, Total, Status | — | Sum(Total) |
 
@@ -413,6 +419,12 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
+| SC175 | Fee Billing Run Summary | Fees billed in the period by term and grade: students billed and the amount. | FromDate (Date, optional), ToDate (Date, optional) | Term, Grade, Students, Boarders, Billed | — | Sum(Billed) |
+| SC176 | Fee Arrears by Grade | Unpaid fee invoices as at the date per student, aged, grouped by grade. | AsAtDate (Date, optional) | Grade, Student, Guardian, Invoices, Oldest, Band, Outstanding | — | Sum(Outstanding) |
+| SC177 | Fee Collection Report | Receipts from guardians in the period, with the students they pay for. | FromDate (Date, optional), ToDate (Date, optional) | Date, Receipt, Guardian, Students, Amount | — | Sum(Amount) |
+| SC178 | Bursary & Discount Report | Students on bursaries with type and value, and what that is worth against their grade's fees. | — | Student, Grade, Type, Rate, Fees, Worth | — | Sum(Worth) |
+| SC180 | Enrolment & Headcount | Per grade: enrolled, boarders, day scholars, bursary holders and students no longer enrolled. | — | Grade, Enrolled, Boarders, Day, Bursary, Left | — | — |
+| SC182 | Student Balances Listing | Every student with guardian, grade, enrolment and what is owed on their fee invoices at the date. | AsAtDate (Date, optional) | Admission, Student, Grade, Guardian, Status, Balance | — | Sum(Balance) |
 | SCH-STU | Student Register | Enrolled students with grade, boarding status and bursary. | — | AdmissionNumber, FullName, Grade, Boarder, BursaryValue | — | Sum(BursaryValue) |
 
 ## System

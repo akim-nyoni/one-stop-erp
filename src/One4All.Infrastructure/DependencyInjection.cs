@@ -179,6 +179,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.RetailReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.AssetTaxReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.DashboardReportDataProvider>();
+        services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.OperationsReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.VerticalReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.PosJobReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.RegistersReportDataProvider>();
