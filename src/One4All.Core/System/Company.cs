@@ -85,6 +85,12 @@ public sealed class Company : SoftDeletableEntity
     public decimal? PayrollSecondApprovalVariancePercent { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether committing a regular payroll run also raises the AP invoices for its third parties —
+    /// schemes and garnishee creditors with a supplier (brief §4.15.5).
+    /// </summary>
+    public bool RaisePayrollRemittances { get; set; }
+
+    /// <summary>
     /// Whether fund control is on (brief §4.4 / §4.18.5): expenditure cannot be posted to a budget-enabled expense account
     /// (a vote) that has no appropriation in the year's active approved or supplementary budget.
     /// </summary>

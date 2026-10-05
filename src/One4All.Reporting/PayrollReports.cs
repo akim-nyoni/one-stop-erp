@@ -123,6 +123,9 @@ public static class PayrollReports
         yield return Listing("PR72", "Variable Input Register", "Payroll", "Overtime, absences and once-off earnings and deductions keyed or imported for each period, and what each was paid at.",
             "PyrlVariables", [new Column("Period", "Period", 70), new Column("Employee", "Employee", 160), new Column("Element", "Element", 80), new Column("Units", "Units", 60), new Column("Amount", "Amount", 85),
              new Column("Source", "Source", 60), new Column("Status", "Status", 80), new Column("Paid", "Paid", 90, true)], Period);
+        yield return Listing("PR73", "Third-Party Invoices Raised", "Payroll", "The AP invoices raised for the tax authority, schemes and garnishee creditors from payroll runs, with what is still outstanding on each.",
+            "PyrlRemittanceInvoices", [new Column("Run", "Run", 90), new Column("Period", "Period", 70), new Column("Payee", "Payee", 90), new Column("Supplier", "Supplier", 80), new Column("Account", "Account", 65),
+             new Column("Invoice", "AP invoice", 110), new Column("Outstanding", "Outstanding", 90), new Column("Amount", "Amount", 95, true)], Period);
         yield return Listing("PR19", "Third-Party Remittance Schedules", "Payroll", "Per scheme and member for the period: the employee's deduction and the employer's contribution — the schedule each provider needs.",
             "PyrlSchemes", [new Column("Scheme", "Scheme", 110), new Column("Employee", "Employee", 160), new Column("Member", "Member no.", 90), new Column("EmployeePart", "Employee", 90),
              new Column("EmployerPart", "Employer", 90), new Column("Total", "Total", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("SchemeCode", ParameterType.String)]);

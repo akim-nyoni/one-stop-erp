@@ -186,3 +186,70 @@ public sealed class DeductionArrear : Entity, ICompanyScoped
     /// <summary>Why.</summary>
     public string Reason { get; private set; }
 }
+
+/// <summary>
+/// An AP invoice raised for a payroll third party (<c>pay.remittance_invoice</c>, brief §4.15.5): the tax authority, a pension or
+/// medical scheme, or a garnishee creditor, for what a run deducted (and the employer contributed) on its elements.
+/// </summary>
+public sealed class RemittanceInvoice : Entity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private RemittanceInvoice()
+    {
+        RunReference = string.Empty;
+        PeriodLabel = string.Empty;
+        Payee = string.Empty;
+        AccountCode = string.Empty;
+        DocumentNumber = string.Empty;
+    }
+
+    /// <summary>Creates the record.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="runReference">The run.</param>
+    /// <param name="periodLabel">The period.</param>
+    /// <param name="payee">The scheme code or garnishee order reference.</param>
+    /// <param name="supplierId">The AP supplier.</param>
+    /// <param name="accountCode">The payroll liability cleared.</param>
+    /// <param name="amount">The amount.</param>
+    /// <param name="documentNumber">The AP invoice number.</param>
+    /// <param name="raisedOn">The invoice date.</param>
+    public RemittanceInvoice(long companyId, string runReference, string periodLabel, string payee, long supplierId, string accountCode, decimal amount, string documentNumber, DateOnly raisedOn)
+    {
+        CompanyId = companyId;
+        RunReference = runReference;
+        PeriodLabel = periodLabel;
+        Payee = payee;
+        SupplierId = supplierId;
+        AccountCode = accountCode;
+        Amount = amount;
+        DocumentNumber = documentNumber;
+        RaisedOn = raisedOn;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The run.</summary>
+    public string RunReference { get; private set; }
+
+    /// <summary>The period.</summary>
+    public string PeriodLabel { get; private set; }
+
+    /// <summary>The scheme code or garnishee order reference.</summary>
+    public string Payee { get; private set; }
+
+    /// <summary>The AP supplier.</summary>
+    public long SupplierId { get; private set; }
+
+    /// <summary>The payroll liability cleared into AP.</summary>
+    public string AccountCode { get; private set; }
+
+    /// <summary>The amount.</summary>
+    public decimal Amount { get; private set; }
+
+    /// <summary>The AP invoice number.</summary>
+    public string DocumentNumber { get; private set; }
+
+    /// <summary>The invoice date.</summary>
+    public DateOnly RaisedOn { get; private set; }
+}

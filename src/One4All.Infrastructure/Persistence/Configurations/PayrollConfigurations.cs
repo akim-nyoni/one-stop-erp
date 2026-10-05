@@ -429,3 +429,19 @@ internal sealed class PayrollVariableConfiguration : IEntityTypeConfiguration<Pa
         b.HasIndex(x => new { x.CompanyId, x.PeriodLabel, x.EmployeeId });
     }
 }
+
+internal sealed class RemittanceInvoiceConfiguration : IEntityTypeConfiguration<RemittanceInvoice>
+{
+    public void Configure(EntityTypeBuilder<RemittanceInvoice> b)
+    {
+        b.ToTable("remittance_invoice", Schemas.Payroll);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.RunReference).HasMaxLength(40);
+        b.Property(x => x.PeriodLabel).HasMaxLength(40);
+        b.Property(x => x.Payee).HasMaxLength(40);
+        b.Property(x => x.AccountCode).HasMaxLength(8);
+        b.Property(x => x.DocumentNumber).HasMaxLength(40);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.RunReference });
+    }
+}

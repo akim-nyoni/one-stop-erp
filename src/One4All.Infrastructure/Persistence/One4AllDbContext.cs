@@ -341,6 +341,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Deductions suspended by net-pay protection and arrears recovered.</summary>
     public DbSet<Core.Payroll.DeductionArrear> DeductionArrears => Set<Core.Payroll.DeductionArrear>();
 
+    /// <summary>AP invoices raised for payroll third parties.</summary>
+    public DbSet<Core.Payroll.RemittanceInvoice> RemittanceInvoices => Set<Core.Payroll.RemittanceInvoice>();
+
     /// <summary>Variable input for pay periods.</summary>
     public DbSet<Core.Payroll.PayrollVariable> PayrollVariables => Set<Core.Payroll.PayrollVariable>();
 

@@ -293,6 +293,9 @@ public sealed class GarnisheeOrder : Entity, ICompanyScoped
     /// <summary>Gets the deduction element.</summary>
     public string ElementCode { get; private set; }
 
+    /// <summary>Gets or sets the AP supplier the creditor is paid through (§4.15.5); runs raise its invoice when set.</summary>
+    public long? SupplierId { get; set; }
+
     /// <summary>Gets when it was issued.</summary>
     public DateOnly IssuedOn { get; private set; }
 }

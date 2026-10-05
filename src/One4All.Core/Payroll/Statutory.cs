@@ -24,6 +24,9 @@ public enum SchemeKind
     /// <summary>A skills / training levy.</summary>
     SkillsLevy = 6,
 
+    /// <summary>The tax authority, for PAYE remitted through payables.</summary>
+    TaxAuthority = 7,
+
     /// <summary>Anything else deducted for a third party.</summary>
     Other = 9,
 }
@@ -82,6 +85,9 @@ public sealed class StatutoryScheme : AuditableEntity, ICompanyScoped
 
     /// <summary>The pay element carrying the employer's contribution.</summary>
     public string? EmployerElementCode { get; set; }
+
+    /// <summary>Gets or sets the AP supplier the scheme is paid through (§4.15.5); runs raise its invoice when set.</summary>
+    public long? SupplierId { get; set; }
 
     /// <summary>Whether it is in use.</summary>
     public bool IsActive { get; set; }

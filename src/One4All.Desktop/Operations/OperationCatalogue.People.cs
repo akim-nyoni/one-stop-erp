@@ -238,6 +238,18 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Raise third-party invoices", ListTitle = "Payroll runs",
+            Description = "Raises a run's AP invoices for the tax authority, schemes and garnishee creditors that have a supplier — clearing the payroll liabilities into payables.",
+            Fields = [Req("Run", "Run document or journal number")],
+            Run = async (c, i) =>
+            {
+                IReadOnlyList<RemittanceRaised> raised = Check(await c.Get<IPayrollRemittanceService>().RaiseRemittancesAsync(c.CompanyId, i.Text("Run")).ConfigureAwait(true));
+                return string.Join(Environment.NewLine, raised.Select(r => $"{r.DocumentNumber,-24} {r.Payee,-12} Dr {r.AccountCode,-8} {M(r.Amount),12}"));
+            },
+            List = PayrollRunsAsync,
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set an employee's pay group", Description = "Moves an employee to a pay group (MONTHLY, WEEKLY, CASUAL…); blank returns them to the default payroll.",
             Fields = [Req("Employee", "Employee number"), Opt("Group", "Pay group")],
             Run = async (c, i) =>

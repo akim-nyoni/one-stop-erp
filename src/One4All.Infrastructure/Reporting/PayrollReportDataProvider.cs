@@ -73,6 +73,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLCURRENCYSPLIT" => await CurrencySplitAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLARREARS" => await ArrearsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLVARIABLES" => await VariablesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLREMITTANCEINVOICES" => await RemittanceInvoicesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLSCHEMES" => await SchemeScheduleAsync(companyId, fromDate, toDate, _ => true, Text(parameters, "SchemeCode"), ct).ConfigureAwait(false),
             "PYRLSCHEMESOCIAL" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.SocialSecurity, null, ct).ConfigureAwait(false),
             "PYRLSCHEMEPENSION" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.Pension, null, ct).ConfigureAwait(false),
@@ -750,6 +751,21 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
                 return Row(("Period", v.PeriodLabel), ("Employee", Name(employees, v.EmployeeId)), ("Element", v.ElementCode), ("Units", v.Units is decimal u ? u.ToString("0.##", CultureInfo.InvariantCulture) : "-"),
                     ("Amount", v.Amount is decimal a ? Money(a) : "-"), ("Source", v.Source), ("Status", paid is null ? "Not yet paid" : "Paid"), ("Paid", paid?.Amount ?? 0m));
             })];
+    }
+
+    // PR73: the AP invoices raised for payroll third parties in the period, with whether each has been paid.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RemittanceInvoicesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<RemittanceInvoice> invoices = await _db.RemittanceInvoices.AsNoTracking().Where(r => r.CompanyId == companyId && r.RaisedOn >= fromDate && r.RaisedOn <= toDate)
+            .OrderBy(r => r.RaisedOn).ThenBy(r => r.DocumentNumber).ToListAsync(ct).ConfigureAwait(false);
+        List<long> supplierIds = [.. invoices.Select(r => r.SupplierId).Distinct()];
+        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().Where(s => supplierIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => s.Code, ct).ConfigureAwait(false);
+        List<string> documents = [.. invoices.Select(r => r.DocumentNumber)];
+        Dictionary<(long, string), decimal> outstanding = (await _db.OpenItems.AsNoTracking()
+                .Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsPayable && supplierIds.Contains(i.TraderId) && documents.Contains(i.DocumentNumber)).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(i => (i.TraderId, i.DocumentNumber)).ToDictionary(g => g.Key, g => g.Sum(i => i.OutstandingBase));
+        return [.. invoices.Select(r => Row(("Run", r.RunReference), ("Period", r.PeriodLabel), ("Payee", r.Payee), ("Supplier", suppliers.GetValueOrDefault(r.SupplierId, "?")), ("Account", r.AccountCode),
+            ("Invoice", r.DocumentNumber), ("Outstanding", Money(outstanding.GetValueOrDefault((r.SupplierId, r.DocumentNumber)))), ("Amount", r.Amount)))];
     }
 
     // Each member's lines on the scheme's employee and employer elements in the period.

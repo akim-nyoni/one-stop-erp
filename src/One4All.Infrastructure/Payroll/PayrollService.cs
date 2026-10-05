@@ -22,15 +22,18 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _posting;
     private readonly ISalesLedgerService _sales;
+    private readonly IPurchaseLedgerService _purchases;
     private readonly ReportExpressionEngine _expressions = new();
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="posting">The central posting engine.</param>
     /// <param name="sales">The sales ledger (rent deducted from pay is receipted to the tenancy's account).</param>
-    public PayrollService(One4AllDbContext db, IPostingEngine posting, ISalesLedgerService sales)
+    /// <param name="purchases">The purchase ledger (third-party remittances are raised as supplier invoices).</param>
+    public PayrollService(One4AllDbContext db, IPostingEngine posting, ISalesLedgerService sales, IPurchaseLedgerService purchases)
     {
         _sales = sales;
+        _purchases = purchases;
         _db = db;
         _posting = posting;
     }
@@ -206,6 +209,16 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         {
             _db.DeductionArrears.AddRange(prepared.Arrears);
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
+        // Third parties are invoiced with the run when the company asks for it (a run with nothing to remit is fine).
+        if (run.IsSuccess && prepared.Company.RaisePayrollRemittances)
+        {
+            Result<IReadOnlyList<RemittanceRaised>> remitted = await RaiseRemittancesCoreAsync(prepared.Company.Id, documentNumber, ct).ConfigureAwait(false);
+            if (remitted.IsFailure && remitted.Error.Code != "Payroll.NothingToRemit")
+            {
+                return remitted.Error;
+            }
         }
 
         return run;

@@ -14744,6 +14744,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<long?>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
                     b.Property<decimal>("TotalAmount")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -15509,6 +15513,77 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("payslip_print", "hr");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.RemittanceInvoice", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("account_code");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("document_number");
+
+                    b.Property<string>("Payee")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("payee");
+
+                    b.Property<string>("PeriodLabel")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("period_label");
+
+                    b.Property<DateOnly>("RaisedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("raised_on");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("RunReference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("run_reference");
+
+                    b.Property<long>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_remittance_invoice");
+
+                    b.HasIndex("CompanyId", "RunReference")
+                        .HasDatabaseName("ix_remittance_invoice_company_id_run_reference");
+
+                    b.ToTable("remittance_invoice", "pay");
+                });
+
             modelBuilder.Entity("One4All.Core.Payroll.SchemeMembership", b =>
                 {
                     b.Property<long>("Id")
@@ -15713,6 +15788,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("RowVersion")
                         .HasColumnType("bigint")
                         .HasColumnName("row_version");
+
+                    b.Property<long?>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
 
                     b.HasKey("Id")
                         .HasName("pk_statutory_scheme");
@@ -22159,6 +22238,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("payroll_second_approval_variance_percent");
+
+                    b.Property<bool>("RaisePayrollRemittances")
+                        .HasColumnType("boolean")
+                        .HasColumnName("raise_payroll_remittances");
 
                     b.Property<string>("RegistrationNumber")
                         .HasMaxLength(60)
