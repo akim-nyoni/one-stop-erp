@@ -250,6 +250,23 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Decide self-service requests", ListTitle = "Requests awaiting HR",
+            Description = "Leave applications and payment-detail changes employees made through self-service. Approving takes the leave or applies the change; nobody decides their own.",
+            Fields = [Pick("Kind", "Kind", "Leave", "Detail"), Num("Id", "Request id (from the list)"), Pick("Decision", "Decision", "Approve", "Reject"), Opt("Note", "Note")],
+            Run = async (c, i) =>
+            {
+                IEmployeeSelfService ess = c.Get<IEmployeeSelfService>();
+                bool approve = i.Text("Decision") == "Approve";
+                SelfServiceStatus status = Check(i.Text("Kind") == "Leave"
+                    ? await ess.DecideLeaveAsync(c.CompanyId, (long)i.Number("Id"), approve, c.UserId, i.Optional("Note")).ConfigureAwait(true)
+                    : await ess.DecideDetailChangeAsync(c.CompanyId, (long)i.Number("Id"), approve, c.UserId, i.Optional("Note")).ConfigureAwait(true));
+                return $"{i.Text("Kind")} request {(long)i.Number("Id")}: {status}.";
+            },
+            List = async c => Table(await c.Get<IEmployeeSelfService>().PendingAsync(c.CompanyId).ConfigureAwait(true),
+                ("Kind", r => r.Kind), ("Id", r => r.Id), ("Employee", r => $"{r.EmployeeNumber} {r.FullName}"), ("Request", r => r.Summary)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set an employee's pay group", Description = "Moves an employee to a pay group (MONTHLY, WEEKLY, CASUAL…); blank returns them to the default payroll.",
             Fields = [Req("Employee", "Employee number"), Opt("Group", "Pay group")],
             Run = async (c, i) =>

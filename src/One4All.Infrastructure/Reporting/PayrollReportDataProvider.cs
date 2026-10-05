@@ -229,8 +229,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     }
 
     // PAYE is any deduction whose code or description names tax.
-    private static bool IsTax(PayslipLine line) => line.Type == PayElementType.Deduction
-        && (line.ElementCode.Contains("PAYE", StringComparison.OrdinalIgnoreCase) || line.ElementCode.Contains("TAX", StringComparison.OrdinalIgnoreCase) || line.Description.Contains("tax", StringComparison.OrdinalIgnoreCase));
+    private static bool IsTax(PayslipLine line) => TaxLines.IsTax(line.Type, line.ElementCode, line.Description);
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TaxAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {

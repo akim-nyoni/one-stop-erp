@@ -445,3 +445,32 @@ internal sealed class RemittanceInvoiceConfiguration : IEntityTypeConfiguration<
         b.HasIndex(x => new { x.CompanyId, x.RunReference });
     }
 }
+
+internal sealed class LeaveApplicationConfiguration : IEntityTypeConfiguration<LeaveApplication>
+{
+    public void Configure(EntityTypeBuilder<LeaveApplication> b)
+    {
+        b.ToTable("leave_application", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.LeaveType).HasMaxLength(20);
+        b.Property(x => x.Days).HasPrecision(9, 2);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Note).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}
+
+internal sealed class DetailChangeRequestConfiguration : IEntityTypeConfiguration<DetailChangeRequest>
+{
+    public void Configure(EntityTypeBuilder<DetailChangeRequest> b)
+    {
+        b.ToTable("detail_change_request", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Field).HasMaxLength(40);
+        b.Property(x => x.OldValue).HasMaxLength(100);
+        b.Property(x => x.NewValue).HasMaxLength(100);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Note).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}

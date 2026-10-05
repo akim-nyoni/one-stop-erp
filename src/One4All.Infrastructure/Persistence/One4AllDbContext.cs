@@ -344,6 +344,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Deductions suspended by net-pay protection and arrears recovered.</summary>
     public DbSet<Core.Payroll.DeductionArrear> DeductionArrears => Set<Core.Payroll.DeductionArrear>();
 
+    /// <summary>Leave applications made through self-service.</summary>
+    public DbSet<Core.Payroll.LeaveApplication> LeaveApplications => Set<Core.Payroll.LeaveApplication>();
+
+    /// <summary>Detail changes asked for through self-service.</summary>
+    public DbSet<Core.Payroll.DetailChangeRequest> DetailChangeRequests => Set<Core.Payroll.DetailChangeRequest>();
+
     /// <summary>AP invoices raised for payroll third parties.</summary>
     public DbSet<Core.Payroll.RemittanceInvoice> RemittanceInvoices => Set<Core.Payroll.RemittanceInvoice>();
 

@@ -2186,9 +2186,66 @@ app.MapPost("/api/jobs/{contractId:long}/revise-budget", async (long companyId, 
 .RequireAuthorization()
 .WithName("JobReviseBudget");
 
+// Employee self-service (brief §4.15.7): everything is the signed-in user's own record, found through their login.
+app.MapGet("/api/ess/me", async (ClaimsPrincipal user, One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess, CancellationToken ct) =>
+    SignedInUser(user) is long id ? ValueResponse(await ess.ProfileAsync(id, ct).ConfigureAwait(false)) : Results.Unauthorized())
+.RequireAuthorization()
+.WithName("EssProfile");
+
+app.MapGet("/api/ess/payslips", async (ClaimsPrincipal user, One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess, CancellationToken ct) =>
+    SignedInUser(user) is long id ? ValueResponse(await ess.PayslipsAsync(id, ct).ConfigureAwait(false)) : Results.Unauthorized())
+.RequireAuthorization()
+.WithName("EssPayslips");
+
+app.MapGet("/api/ess/payslips/{period}", async (string period, ClaimsPrincipal user, One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess, CancellationToken ct) =>
+    SignedInUser(user) is long id ? TextResponse(await ess.PayslipTextAsync(id, period, ct).ConfigureAwait(false)) : Results.Unauthorized())
+.RequireAuthorization()
+.WithName("EssPayslip");
+
+app.MapGet("/api/ess/tax-certificate", async (int year, ClaimsPrincipal user, One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess, CancellationToken ct) =>
+    SignedInUser(user) is long id ? ValueResponse(await ess.TaxCertificateAsync(id, year, ct).ConfigureAwait(false)) : Results.Unauthorized())
+.RequireAuthorization()
+.WithName("EssTaxCertificate");
+
+app.MapGet("/api/ess/leave", async (ClaimsPrincipal user, One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess, CancellationToken ct) =>
+    SignedInUser(user) is long id ? ValueResponse(await ess.LeaveBalancesAsync(id, ct).ConfigureAwait(false)) : Results.Unauthorized())
+.RequireAuthorization()
+.WithName("EssLeave");
+
+app.MapPost("/api/ess/leave", async (string leaveType, DateOnly fromDate, DateOnly toDate, decimal days, ClaimsPrincipal user, One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess, CancellationToken ct) =>
+    SignedInUser(user) is long id ? ValueResponse(await ess.ApplyForLeaveAsync(id, leaveType, fromDate, toDate, days, ct).ConfigureAwait(false)) : Results.Unauthorized())
+.RequireAuthorization()
+.WithName("EssApplyForLeave");
+
+app.MapPost("/api/ess/detail-change", async (string field, string newValue, ClaimsPrincipal user, One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess, CancellationToken ct) =>
+    SignedInUser(user) is long id ? ValueResponse(await ess.RequestDetailChangeAsync(id, field, newValue, ct).ConfigureAwait(false)) : Results.Unauthorized())
+.RequireAuthorization()
+.WithName("EssDetailChange");
+
+app.MapGet("/api/hr/self-service/pending", async (long companyId, One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess, CancellationToken ct) =>
+    Results.Ok(await ess.PendingAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("EssPending");
+
+app.MapPost("/api/hr/self-service/leave/{applicationId:long}/decide", async (long applicationId, long companyId, bool approve, string? note, ClaimsPrincipal user,
+    One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess, CancellationToken ct) =>
+    SignedInUser(user) is long id ? ValueResponse(await ess.DecideLeaveAsync(companyId, applicationId, approve, id, note, ct).ConfigureAwait(false)) : Results.Unauthorized())
+.RequireAuthorization()
+.WithName("EssDecideLeave");
+
+app.MapPost("/api/hr/self-service/detail/{requestId:long}/decide", async (long requestId, long companyId, bool approve, string? note, ClaimsPrincipal user,
+    One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess, CancellationToken ct) =>
+    SignedInUser(user) is long id ? ValueResponse(await ess.DecideDetailChangeAsync(companyId, requestId, approve, id, note, ct).ConfigureAwait(false)) : Results.Unauthorized())
+.RequireAuthorization()
+.WithName("EssDecideDetail");
+
 app.Run();
 
 // Maps a text-bearing Result to a plain-text response (200), or 404 / 409 / 400 by error type.
+// The signed-in user's id from the token's subject, or null.
+static long? SignedInUser(ClaimsPrincipal user)
+    => long.TryParse(user.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long id) ? id : null;
+
 static IResult TextResponse(Result<string> result)
 {
     if (result.IsSuccess)
