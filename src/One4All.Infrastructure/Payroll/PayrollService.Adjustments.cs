@@ -54,7 +54,8 @@ public sealed partial class PayrollService
         List<BackpayPreviewLine> lines = [];
         foreach (IGrouping<string, Payslip> period in periods)
         {
-            Result<Payslip> due = BuildPayslip(companyId, employee, elements, period.Key, period.Min(p => p.PayDate), newBasicSalary);
+            Dictionary<long, Dictionary<string, PayrollVariable>> variables = await VariablesAsync(companyId, period.Key, [employee], ct).ConfigureAwait(false);
+            Result<Payslip> due = BuildPayslip(companyId, employee, elements, period.Key, period.Min(p => p.PayDate), newBasicSalary, variables: variables[employee.Id]);
             if (due.IsFailure)
             {
                 return due.Error;

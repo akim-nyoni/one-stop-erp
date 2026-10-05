@@ -74,7 +74,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         Dictionary<long, Dictionary<string, object?>> recoveries = await RecoveryVariablesAsync(companyId, [employee], elements, payDate, ct).ConfigureAwait(false);
         Dictionary<long, Dictionary<string, decimal>> arrears = await ArrearsAsync(companyId, [employee], ct).ConfigureAwait(false);
         Company payer = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
-        Result<Payslip> slip = BuildProtected(payer, employee, elements, periodLabel, payDate, recoveries[employee.Id], arrears[employee.Id]).Slip;
+        Dictionary<long, Dictionary<string, PayrollVariable>> variables = await VariablesAsync(companyId, periodLabel, [employee], ct).ConfigureAwait(false);
+        Result<Payslip> slip = BuildProtected(payer, employee, elements, periodLabel, payDate, recoveries[employee.Id], arrears[employee.Id], variables: variables[employee.Id]).Slip;
         if (slip.IsFailure)
         {
             return slip.Error;
@@ -174,13 +175,14 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
         Dictionary<long, Dictionary<string, object?>> recoveries = await RecoveryVariablesAsync(companyId, employees, elements, payDate, ct).ConfigureAwait(false);
         Dictionary<long, Dictionary<string, decimal>> arrears = await ArrearsAsync(companyId, employees, ct).ConfigureAwait(false);
+        Dictionary<long, Dictionary<string, PayrollVariable>> variables = await VariablesAsync(companyId, periodLabel, employees, ct).ConfigureAwait(false);
         HashSet<string> recoveryCodes = new(elements.Values.Where(e => e.Recovers != PayRecovery.None).Select(e => e.Code), StringComparer.OrdinalIgnoreCase);
         List<Payslip> slips = [];
         List<DeductionArrear> arrearEntries = [];
         foreach (Employee employee in employees)
         {
             (Result<Payslip> slip, IReadOnlyList<DeductionOutcome> outcomes, decimal floor) = BuildProtected(company, employee, elements, periodLabel, payDate, recoveries[employee.Id], arrears[employee.Id],
-                documentNumber);
+                documentNumber, variables[employee.Id]);
             if (slip.IsFailure)
             {
                 return slip.Error;
@@ -313,7 +315,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
     private Result<Payslip> BuildPayslip(long companyId, Employee employee, IReadOnlyDictionary<long, PayElement> elements, string periodLabel, DateOnly payDate,
         decimal? basicSalary = null, string documentNumber = "", IReadOnlyDictionary<string, object?>? recoveries = null, IReadOnlyDictionary<string, decimal>? arrears = null,
-        IReadOnlyDictionary<string, decimal>? caps = null)
+        IReadOnlyDictionary<string, decimal>? caps = null, IReadOnlyDictionary<string, PayrollVariable>? variables = null)
     {
         Payslip payslip = new(companyId, employee.Id, periodLabel, payDate, PayRunKind.Regular, documentNumber, PayGroupKey(employee.PayGroup));
 
@@ -333,18 +335,36 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             vars[name] = value;
         }
 
-        IEnumerable<(PayElement Element, EmployeePayElement Assignment)> ordered = employee.PayElements
+        List<(PayElement Element, EmployeePayElement Assignment)> assigned = [.. employee.PayElements
             .Where(a => a.IsActive && elements.ContainsKey(a.PayElementId))
-            .Select(a => (elements[a.PayElementId], a))
-            .OrderBy(x => x.Item1.Sequence);
+            .Select(a => (elements[a.PayElementId], a))];
+
+        // The period's variables: units or an amount for an assigned element, or a once-off element the employee does not normally have.
+        foreach (PayrollVariable variable in variables?.Values ?? [])
+        {
+            if (!assigned.Exists(x => string.Equals(x.Element.Code, variable.ElementCode, StringComparison.OrdinalIgnoreCase))
+                && elements.Values.FirstOrDefault(e => string.Equals(e.Code, variable.ElementCode, StringComparison.OrdinalIgnoreCase)) is PayElement onceOff)
+            {
+                assigned.Add((onceOff, new EmployeePayElement(onceOff.Id, null, null, null)));
+            }
+        }
+
+        IEnumerable<(PayElement Element, EmployeePayElement Assignment)> ordered = assigned.OrderBy(x => x.Element.Sequence);
 
         decimal gross = 0m;
         decimal taxable = 0m;
         decimal deductions = 0m;
 
-        foreach ((PayElement element, EmployeePayElement assignment) in ordered)
+        foreach ((PayElement element, EmployeePayElement assigned1) in ordered)
         {
-            Result<decimal> resolved = Resolve(element, assignment, vars);
+            EmployeePayElement assignment = assigned1;
+            PayrollVariable? variable = variables?.GetValueOrDefault(element.Code);
+            if (variable?.Units is decimal units)
+            {
+                assignment = new EmployeePayElement(element.Id, assignment.OverrideAmount, assignment.OverrideRate, units);
+            }
+
+            Result<decimal> resolved = variable?.Amount is decimal fixedAmount ? fixedAmount : Resolve(element, assignment, vars);
             if (resolved.IsFailure)
             {
                 return resolved.Error;

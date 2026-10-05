@@ -15244,6 +15244,66 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("payroll_run", "hr");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.PayrollVariable", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal?>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("ElementCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("element_code");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<string>("PeriodLabel")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("period_label");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("source");
+
+                    b.Property<decimal?>("Units")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("units");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payroll_variable");
+
+                    b.HasIndex("CompanyId", "PeriodLabel", "EmployeeId")
+                        .HasDatabaseName("ix_payroll_variable_company_id_period_label_employee_id");
+
+                    b.ToTable("payroll_variable", "pay");
+                });
+
             modelBuilder.Entity("One4All.Core.Payroll.Payslip", b =>
                 {
                     b.Property<long>("Id")

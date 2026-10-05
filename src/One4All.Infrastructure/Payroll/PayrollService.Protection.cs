@@ -31,9 +31,10 @@ public sealed partial class PayrollService
     // Builds the payslip with arrears brought forward; when net pay would fall below the company's minimum take-home, the suspendable
     // deductions are cut — highest suspension priority first — until it does not (or nothing suspendable is left).
     private (Result<Payslip> Slip, IReadOnlyList<DeductionOutcome> Outcomes, decimal Floor) BuildProtected(Company company, Employee employee, IReadOnlyDictionary<long, PayElement> elements,
-        string periodLabel, DateOnly payDate, IReadOnlyDictionary<string, object?> recoveries, IReadOnlyDictionary<string, decimal> arrears, string documentNumber = "")
+        string periodLabel, DateOnly payDate, IReadOnlyDictionary<string, object?> recoveries, IReadOnlyDictionary<string, decimal> arrears, string documentNumber = "",
+        IReadOnlyDictionary<string, PayrollVariable>? variables = null)
     {
-        Result<Payslip> first = BuildPayslip(company.Id, employee, elements, periodLabel, payDate, documentNumber: documentNumber, recoveries: recoveries, arrears: arrears);
+        Result<Payslip> first = BuildPayslip(company.Id, employee, elements, periodLabel, payDate, documentNumber: documentNumber, recoveries: recoveries, arrears: arrears, variables: variables);
         if (first.IsFailure)
         {
             return (first, [], 0m);
@@ -62,7 +63,8 @@ public sealed partial class PayrollService
 
             if (caps.Count > 0)
             {
-                Result<Payslip> protectedSlip = BuildPayslip(company.Id, employee, elements, periodLabel, payDate, documentNumber: documentNumber, recoveries: recoveries, arrears: arrears, caps: caps);
+                Result<Payslip> protectedSlip = BuildPayslip(company.Id, employee, elements, periodLabel, payDate, documentNumber: documentNumber, recoveries: recoveries, arrears: arrears, caps: caps,
+                    variables: variables);
                 if (protectedSlip.IsFailure)
                 {
                     return (protectedSlip, [], floor);

@@ -414,3 +414,18 @@ internal sealed class PayrollDraftConfiguration : IEntityTypeConfiguration<Payro
         b.HasIndex(x => new { x.CompanyId, x.PayGroup, x.PeriodLabel });
     }
 }
+
+internal sealed class PayrollVariableConfiguration : IEntityTypeConfiguration<PayrollVariable>
+{
+    public void Configure(EntityTypeBuilder<PayrollVariable> b)
+    {
+        b.ToTable("payroll_variable", Schemas.Payroll);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ElementCode).HasMaxLength(30);
+        b.Property(x => x.PeriodLabel).HasMaxLength(40);
+        b.Property(x => x.Source).HasMaxLength(10);
+        b.Property(x => x.Units).HasPrecision(19, 4);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.PeriodLabel, x.EmployeeId });
+    }
+}

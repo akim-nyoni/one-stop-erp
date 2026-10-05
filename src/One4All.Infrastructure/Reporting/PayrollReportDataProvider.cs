@@ -72,6 +72,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLHOUSINGRENT" => await HousingRentAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLCURRENCYSPLIT" => await CurrencySplitAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLARREARS" => await ArrearsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLVARIABLES" => await VariablesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLSCHEMES" => await SchemeScheduleAsync(companyId, fromDate, toDate, _ => true, Text(parameters, "SchemeCode"), ct).ConfigureAwait(false),
             "PYRLSCHEMESOCIAL" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.SocialSecurity, null, ct).ConfigureAwait(false),
             "PYRLSCHEMEPENSION" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.Pension, null, ct).ConfigureAwait(false),
@@ -731,6 +732,24 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         }
 
         return rows;
+    }
+
+    // PR72: the variable input of every period paid in the range and of every period not yet paid, with what each variable was paid at.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VariablesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        List<Payslip> slips = await _db.Payslips.AsNoTracking().Include(p => p.Lines).Where(p => p.CompanyId == companyId && p.RunKind == PayRunKind.Regular).ToListAsync(ct).ConfigureAwait(false);
+        HashSet<string> paidInRange = [.. slips.Where(p => p.PayDate >= fromDate && p.PayDate <= toDate).Select(p => p.PeriodLabel)];
+        HashSet<string> paidEver = [.. slips.Select(p => p.PeriodLabel)];
+        return [.. (await _db.PayrollVariables.AsNoTracking().Where(v => v.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false))
+            .Where(v => paidInRange.Contains(v.PeriodLabel) || !paidEver.Contains(v.PeriodLabel))
+            .OrderBy(v => v.PeriodLabel, StringComparer.Ordinal).ThenBy(v => Name(employees, v.EmployeeId), StringComparer.Ordinal).ThenBy(v => v.ElementCode, StringComparer.Ordinal)
+            .Select(v =>
+            {
+                PayslipLine? paid = slips.Where(p => p.EmployeeId == v.EmployeeId && p.PeriodLabel == v.PeriodLabel).SelectMany(p => p.Lines).FirstOrDefault(l => l.ElementCode == v.ElementCode);
+                return Row(("Period", v.PeriodLabel), ("Employee", Name(employees, v.EmployeeId)), ("Element", v.ElementCode), ("Units", v.Units is decimal u ? u.ToString("0.##", CultureInfo.InvariantCulture) : "-"),
+                    ("Amount", v.Amount is decimal a ? Money(a) : "-"), ("Source", v.Source), ("Status", paid is null ? "Not yet paid" : "Paid"), ("Paid", paid?.Amount ?? 0m));
+            })];
     }
 
     // Each member's lines on the scheme's employee and employer elements in the period.

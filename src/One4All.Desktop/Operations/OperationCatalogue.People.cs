@@ -181,6 +181,32 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Key a pay variable", Description = "Overtime hours (units on a rate-per-unit element) or a once-off amount for one employee and period.",
+            Fields = [Req("Employee", "Employee number"), Req("Element", "Element code"), Req("Period", "Period", DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture)), OptNum("Units", "Units"),
+                OptNum("Amount", "Amount")],
+            Run = async (c, i) => Check(await c.Get<IPayrollVariableService>().SetAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Element"), i.Text("Period"),
+                i.OptionalNumber("Units"), i.OptionalNumber("Amount")).ConfigureAwait(true), id => $"Variable {id} saved for {i.Text("Period")}."),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Import pay variables", Description = "Lines 'employee, element, units, amount' separated by ';'. Untick 'Import' to preview the errors first; any error stops the import.",
+            Fields = [Req("Period", "Period", DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture)), Req("Lines", "Lines: EMP,ELEMENT,units,amount; …"), Tick("Import", "Import (otherwise preview)")],
+            Run = async (c, i) =>
+            {
+                IPayrollVariableService service = c.Get<IPayrollVariableService>();
+                string csv = i.Text("Lines").Replace(';', '\n');
+                if (i.Flag("Import"))
+                {
+                    return $"{Check(await service.ImportAsync(c.CompanyId, i.Text("Period"), csv).ConfigureAwait(true))} variable(s) imported for {i.Text("Period")}.";
+                }
+
+                VariableImportPreview preview = Check(await service.PreviewImportAsync(c.CompanyId, i.Text("Period"), csv).ConfigureAwait(true));
+                return $"{preview.Lines.Count} line(s), {preview.ErrorCount} with errors:" + Environment.NewLine + string.Join(Environment.NewLine, preview.Lines.Select(l =>
+                    $"{l.Line,4}  {l.EmployeeNumber,-10} {l.EmployeeName ?? "?",-24} {l.ElementCode,-10} {(l.Units is decimal u ? Q(u) : "-"),8} {(l.Amount is decimal a ? M(a) : "-"),12}  {l.Error ?? "OK"}"));
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Calculate payroll for approval", ListTitle = "Payroll drafts",
             Description = "Calculates a pay group's payroll without posting it, for someone else to approve. Recalculating replaces the earlier draft.",
             Fields = [Opt("Group", "Pay group (blank = default)"), Req("Period", "Period", DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture)), Today(), Req("Document", "Run document number"),
