@@ -37,7 +37,7 @@ missing domain data. Items are struck through as they ship (with the report code
 - Needs new data: 82 reason codes, 88 batches, 89 serials, 90 expiry, 91 in-transit, 98 BOM, 99 yield, 101 consignment
 
 ## F. POS / Retail
-- Data exists: 103, 104, 105, 112–114, 117, 120
+- ~~103 Daily Sales Summary (POS103)~~, ~~104 Cashier Performance (POS104)~~, ~~105 Till Variance & Cash-up (POS105)~~, ~~112 Hourly Heatmap & Basket (POS112)~~, ~~113 Product Mix (POS113)~~, ~~114 Promotion Effectiveness (POS114)~~, ~~117 Tender Analysis (POS117)~~, ~~120 Offline Sync Log (POS120)~~
 - Needs new data: 106 void reasons, 107 refunds, 108 line discounts, 109 overrides, 110 no-sale, 111 parked sales, 115 loyalty, 116 POS reprint log, 121 fiscal submission log
 
 ## G. Procurement

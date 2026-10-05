@@ -100,6 +100,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // POS / retail additions (brief §14 F, POS + item number).
+        foreach (ReportDefinition definition in RetailReports.All())
+        {
+            yield return definition;
+        }
+
         // Inventory additions (brief §14 E, INV + item number).
         foreach (ReportDefinition definition in InventoryReports.All())
         {

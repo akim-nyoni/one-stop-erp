@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-319 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+327 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -254,6 +254,14 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
 | POS-SUM | POS Sales Summary | Point-of-sale transactions with net, tax and gross for a period. | FromDate (Date, optional), ToDate (Date, optional) | SaleNumber, SaleDate, TotalNet, TotalTax, TotalGross | — | Sum(TotalGross) |
+| POS103 | Daily Sales Summary | Per day, till and cashier: sales, voids, net, tax, the tender split and gross takings. | FromDate (Date, optional), ToDate (Date, optional) | Date, Till, Cashier, Sales, Voided, Net, Tax, Tenders, Gross | — | Sum(Gross) |
+| POS104 | Cashier Performance | Per cashier over the period: sessions, sales, items, average basket, voids, cash-up variance and net sales. | FromDate (Date, optional), ToDate (Date, optional) | Cashier, Sessions, Sales, Items, AverageBasket, Voids, Variance, Net | — | Sum(Net) |
+| POS105 | Till Variance & Cash-up Report | Each closed till session: float, cash taken, change given, expected, counted and the over or short. | FromDate (Date, optional), ToDate (Date, optional) | Session, Till, Cashier, Closed, Float, CashIn, Change, Expected, Counted, Variance | — | Sum(Variance) |
+| POS112 | Hourly Sales Heatmap & Basket Analysis | Sales by weekday and hour: count, items per basket, average basket and net. | FromDate (Date, optional), ToDate (Date, optional) | Weekday, Hour, Sales, ItemsPerBasket, AverageBasket, Net | — | Sum(Net) |
+| POS113 | Product Mix Ranking | Items ranked by POS net sales in the period, with quantity, share and cumulative share. | FromDate (Date, optional), ToDate (Date, optional) | Rank, Item, Quantity, Share, Cumulative, Net | — | Sum(Net) |
+| POS114 | Promotion Effectiveness | Each promotion's redemptions in the period, the spend they drove and the discount given. | FromDate (Date, optional), ToDate (Date, optional) | Campaign, Name, Valid, Redemptions, Spend, AverageSpend, DiscountRate, Discount | — | Sum(Discount) |
+| POS117 | Tender & Multi-currency Tender Analysis | Tenders taken in the period by type and currency, in currency and base, net of change. | FromDate (Date, optional), ToDate (Date, optional) | Tender, Currency, Count, Amount, Share, Base | — | Sum(Base) |
+| POS120 | Offline Sync Log | Operations captured offline in the period: kind, status, attempts, when synced and any error. | FromDate (Date, optional), ToDate (Date, optional) | Created, Kind, Status, Attempts, Synced, Error | — | — |
 
 ## Purchasing
 
