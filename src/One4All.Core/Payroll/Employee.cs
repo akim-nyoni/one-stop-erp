@@ -84,6 +84,9 @@ public sealed class Employee : SoftDeletableEntity, ICompanyScoped
     /// <summary>The basic salary per period.</summary>
     public decimal BasicSalary { get; set; }
 
+    /// <summary>Gets or sets the system login that belongs to this employee, so payroll can spot anyone processing their own pay.</summary>
+    public long? UserId { get; set; }
+
     /// <summary>The engagement date.</summary>
     public DateOnly EngagementDate { get; private set; }
 

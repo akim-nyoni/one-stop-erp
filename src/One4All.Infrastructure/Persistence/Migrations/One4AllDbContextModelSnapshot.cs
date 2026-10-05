@@ -13443,6 +13443,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("termination_reason");
 
+                    b.Property<long?>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
                     b.Property<DateOnly?>("WorkPermitExpiry")
                         .HasColumnType("date")
                         .HasColumnName("work_permit_expiry");

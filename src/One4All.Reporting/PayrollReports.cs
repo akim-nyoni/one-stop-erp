@@ -124,5 +124,19 @@ public static class PayrollReports
         yield return Listing("PR36", "Tax Table in Force", "Payroll", "The PAYE bands that apply at the date, with the tax at the top of each band.",
             "PyrlTaxTable", [new Column("Table", "Table", 80), new Column("Effective", "Effective", 75), new Column("From", "From", 90), new Column("To", "To", 90), new Column("Rate", "Rate %", 60),
              new Column("Cumulative", "Tax at band top", 100)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("PR22", "Loan & Advance Register and Balances", "Payroll", "Every employee loan and advance: granted, principal, instalment, repaid, instalments left, status and the balance outstanding.",
+            "PyrlLoans", [new Column("Employee", "Employee", 160), new Column("Reference", "Reference", 90), new Column("Granted", "Granted", 75), new Column("Principal", "Principal", 90),
+             new Column("Instalment", "Instalment", 80), new Column("Repaid", "Repaid", 90), new Column("Left", "Instalments left", 70), new Column("Status", "Status", 70), new Column("Outstanding", "Outstanding", 95, true)], []);
+        yield return Listing("PR42", "Timesheet Hours & Labour Cost Allocated to Jobs", "Payroll", "Per employee over the period: hours and cost booked to jobs against gross pay, and the pay left unallocated.",
+            "PyrlJobAllocation", [new Column("Employee", "Employee", 160), new Column("Jobs", "Jobs", 140), new Column("Hours", "Hours", 55), new Column("Allocated", "Allocated", 90), new Column("Gross", "Gross pay", 90),
+             new Column("Share", "Allocated %", 70), new Column("Unallocated", "Unallocated", 95, true)], Period);
+        yield return Listing("PR53", "Clearance Checklist Outstanding", "Payroll", "Leavers by the date who still hold company assets, owe on loans or have leave not yet settled.",
+            "PyrlClearance", [new Column("Employee", "Employee", 160), new Column("Left", "Left", 75), new Column("Reason", "Reason", 110), new Column("Assets", "Assets held", 170), new Column("Leave", "Leave days", 60),
+             new Column("Items", "Outstanding", 60), new Column("Loans", "Loans owed", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("PR63", "Payroll Accrual Schedule", "Payroll", "Employees in service at the period end not yet paid for that month (including salaries on hold), with the basic salary to accrue.",
+            "PyrlAccrual", [new Column("Employee", "Employee", 160), new Column("Department", "Department", 100), new Column("LastPaid", "Last paid", 75), new Column("Status", "Status", 140),
+             new Column("Accrual", "Accrual", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("PR66", "Segregation of Duties Violations — Payroll", "Payroll", "Users who processed a payroll run in the period after changing employee pay or payment details, and anyone who processed a run that paid themselves.",
+            "PyrlSod", [new Column("User", "User", 100), new Column("Violation", "Violation", 200), new Column("Detail", "Detail", 260), new Column("Run", "Run", 100), new Column("When", "When", 110)], Period);
     }
 }
