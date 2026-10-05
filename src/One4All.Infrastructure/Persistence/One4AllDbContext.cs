@@ -296,6 +296,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the garnishee / court orders.</summary>
     public DbSet<Core.Payroll.GarnisheeOrder> GarnisheeOrders => Set<Core.Payroll.GarnisheeOrder>();
 
+    /// <summary>Gets the dated leave records.</summary>
+    public DbSet<Core.Payroll.LeaveRecord> LeaveRecords => Set<Core.Payroll.LeaveRecord>();
+
+    /// <summary>Gets the daily attendance.</summary>
+    public DbSet<Core.Payroll.AttendanceRecord> AttendanceRecords => Set<Core.Payroll.AttendanceRecord>();
+
     /// <summary>Payslips.</summary>
     public DbSet<Core.Payroll.Payslip> Payslips => Set<Core.Payroll.Payslip>();
 

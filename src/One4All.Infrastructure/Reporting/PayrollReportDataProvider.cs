@@ -78,6 +78,11 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLDOCUMENTS" => await DocumentsAsync(companyId, asAt, Days(parameters), Text(parameters, "RequiredTypes"), ct).ConfigureAwait(false),
             "PYRLDISCIPLINARY" => await DisciplinaryAsync(companyId, asAt, ct).ConfigureAwait(false),
             "PYRLTRAINING" => await TrainingAsync(companyId, asAt, Days(parameters), ct).ConfigureAwait(false),
+            "PYRLOVERTIME" => await OvertimeAsync(companyId, fromDate, toDate, Number(parameters, "HoursPerMonth", 173.33m), ct).ConfigureAwait(false),
+            "PYRLLEAVETAKEN" => await LeaveTakenAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLABSENCE" => await AbsenceAsync(companyId, fromDate, toDate, Number(parameters, "FullPayDays", 90m), Number(parameters, "HalfPayDays", 90m), ct).ConfigureAwait(false),
+            "PYRLENCASHMENT" => await EncashmentAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLATTENDANCEEXCEPTIONS" => await AttendanceExceptionsAsync(companyId, fromDate, toDate, Number(parameters, "MaxHours", 12m), ct).ConfigureAwait(false),
             "PYRLLOANS" => await LoansAsync(companyId, ct).ConfigureAwait(false),
             "PYRLJOBALLOCATION" => await JobAllocationAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLCLEARANCE" => await ClearanceAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -514,6 +519,106 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
 
     private async Task<List<TaxTable>> TaxTablesAsync(long companyId, CancellationToken ct)
         => await _db.Set<TaxTable>().AsNoTracking().Include(t => t.Bands).Where(t => t.CompanyId == companyId).OrderBy(t => t.EffectiveFrom).ToListAsync(ct).ConfigureAwait(false);
+
+    private static decimal Number(IReadOnlyDictionary<string, object?> parameters, string name, decimal fallback)
+        => parameters.TryGetValue(name, out object? value) && value is not null and not "" ? Convert.ToDecimal(value, CultureInfo.InvariantCulture) : fallback;
+
+    private Task<List<AttendanceRecord>> AttendanceAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+        => _db.AttendanceRecords.AsNoTracking().Where(a => a.CompanyId == companyId && a.Date >= fromDate && a.Date <= toDate).OrderBy(a => a.Date).ToListAsync(ct);
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> OvertimeAsync(long companyId, DateOnly fromDate, DateOnly toDate, decimal hoursPerMonth, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        List<AttendanceRecord> days = [.. (await AttendanceAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).Where(a => a.OvertimeHours > 0m)];
+        return [.. days.GroupBy(a => (a.EmployeeId, a.OvertimeMultiplier)).Select(g => (g, e: employees.GetValueOrDefault(g.Key.EmployeeId)))
+            .OrderBy(x => x.e?.Department ?? "—", StringComparer.Ordinal).ThenBy(x => Name(employees, x.g.Key.EmployeeId), StringComparer.Ordinal).ThenBy(x => x.g.Key.OvertimeMultiplier)
+            .Select(x =>
+            {
+                decimal hours = x.g.Sum(a => a.OvertimeHours), approved = x.g.Where(a => a.OvertimeApprovedByUserId != null).Sum(a => a.OvertimeHours);
+                return Row(("Department", x.e?.Department ?? "—"), ("Employee", Name(employees, x.g.Key.EmployeeId)), ("Multiplier", Qty(x.g.Key.OvertimeMultiplier)), ("Hours", Qty(hours)),
+                    ("Approved", Qty(approved)), ("Unapproved", Qty(hours - approved)), ("Cost", AttendanceRules.OvertimeCost(hours, x.e?.BasicSalary ?? 0m, hoursPerMonth, x.g.Key.OvertimeMultiplier)));
+            })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LeaveTakenAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        List<LeaveRecord> taken = await _db.LeaveRecords.AsNoTracking().Where(l => l.CompanyId == companyId && l.Kind == LeaveRecordKind.Taken && l.FromDate >= fromDate && l.FromDate <= toDate)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return [.. taken.GroupBy(l => (l.LeaveType, Department: employees.GetValueOrDefault(l.EmployeeId)?.Department ?? "—", Month: l.FromDate.ToString("yyyy-MM", CultureInfo.InvariantCulture)))
+            .OrderBy(g => g.Key.LeaveType, StringComparer.Ordinal).ThenBy(g => g.Key.Department, StringComparer.Ordinal).ThenBy(g => g.Key.Month, StringComparer.Ordinal)
+            .Select(g => Row(("Type", g.Key.LeaveType), ("Department", g.Key.Department), ("Month", g.Key.Month), ("Employees", g.Select(l => l.EmployeeId).Distinct().Count()), ("Records", g.Count()),
+                ("Days", g.Sum(l => l.Days))))];
+    }
+
+    // Sick days come from attendance marked sick and sick leave taken; the pattern counts those falling on a Monday or Friday.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AbsenceAsync(long companyId, DateOnly fromDate, DateOnly toDate, decimal fullPayDays, decimal halfPayDays, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        DateOnly yearBack = toDate.AddMonths(-12).AddDays(1);
+        List<AttendanceRecord> days = await AttendanceAsync(companyId, yearBack < fromDate ? yearBack : fromDate, toDate, ct).ConfigureAwait(false);
+        List<LeaveRecord> sickLeave = await _db.LeaveRecords.AsNoTracking().Where(l => l.CompanyId == companyId && l.Kind == LeaveRecordKind.Taken && l.LeaveType.ToUpper() == "SICK" && l.ToDate >= yearBack && l.FromDate <= toDate)
+            .ToListAsync(ct).ConfigureAwait(false);
+        static bool MonFri(DateOnly d) => d.DayOfWeek is DayOfWeek.Monday or DayOfWeek.Friday;
+        return [.. days.Where(a => a.Date >= fromDate).Select(a => a.EmployeeId).Concat(sickLeave.Where(l => l.ToDate >= fromDate).Select(l => l.EmployeeId)).Distinct()
+            .OrderBy(id => Name(employees, id), StringComparer.Ordinal).Select(id =>
+            {
+                List<AttendanceRecord> own = [.. days.Where(a => a.EmployeeId == id)], inPeriod = [.. own.Where(a => a.Date >= fromDate)];
+                List<LeaveRecord> leave = [.. sickLeave.Where(l => l.EmployeeId == id)];
+                decimal sickPeriod = inPeriod.Count(a => a.Status == AttendanceStatus.Sick) + leave.Where(l => l.FromDate >= fromDate).Sum(l => l.Days);
+                decimal rolling = own.Count(a => a.Status == AttendanceStatus.Sick) + leave.Sum(l => l.Days);
+                int monFri = inPeriod.Count(a => a.Status == AttendanceStatus.Sick && MonFri(a.Date)) + leave.Count(l => l.FromDate >= fromDate && MonFri(l.FromDate));
+                return Row(("Employee", Name(employees, id)), ("Absent", inPeriod.Count(a => a.Status == AttendanceStatus.Absent)), ("Late", inPeriod.Count(a => a.LateMinutes > 0)),
+                    ("LateMinutes", inPeriod.Sum(a => a.LateMinutes)), ("Sick", Qty(sickPeriod)), ("MonFri", monFri), ("Rolling", Qty(rolling)), ("Tier", AttendanceRules.SickTier(rolling, fullPayDays, halfPayDays)));
+            })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EncashmentAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        List<LeaveRecord> paid = await _db.LeaveRecords.AsNoTracking().Where(l => l.CompanyId == companyId && l.Kind == LeaveRecordKind.Encashed && l.FromDate >= fromDate && l.FromDate <= toDate)
+            .OrderBy(l => l.FromDate).ToListAsync(ct).ConfigureAwait(false);
+        return [.. paid.Select(l => Row(("Date", Date(l.FromDate)), ("Employee", Name(employees, l.EmployeeId)), ("Type", l.LeaveType), ("Days", Qty(l.Days)), ("Rate", Money(l.Days == 0m ? 0m : l.Amount / l.Days)),
+            ("Amount", l.Amount)))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AttendanceExceptionsAsync(long companyId, DateOnly fromDate, DateOnly toDate, decimal maxHours, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (AttendanceRecord a in (await AttendanceAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).Where(a => a.Status == AttendanceStatus.Present))
+        {
+            decimal? hours = AttendanceRules.HoursWorked(a.ClockIn, a.ClockOut);
+            List<string> issues = [];
+            if (a.ClockIn is null)
+            {
+                issues.Add("No clock-in");
+            }
+
+            if (a.ClockOut is null)
+            {
+                issues.Add("No clock-out");
+            }
+
+            if (a.OvertimeHours > 0m && a.OvertimeApprovedByUserId is null)
+            {
+                issues.Add($"Unapproved overtime {Qty(a.OvertimeHours)} h");
+            }
+
+            if (hours > maxHours)
+            {
+                issues.Add($"Over {Qty(maxHours)} hours");
+            }
+
+            if (issues.Count > 0)
+            {
+                rows.Add(Row(("Date", Date(a.Date)), ("Employee", Name(employees, a.EmployeeId)), ("In", a.ClockIn?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "—"),
+                    ("Out", a.ClockOut?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "—"), ("Hours", hours is decimal h ? Qty(h) : "—"), ("Exception", string.Join("; ", issues))));
+            }
+        }
+
+        return rows;
+    }
 
     private static int Days(IReadOnlyDictionary<string, object?> parameters)
         => parameters.TryGetValue("Days", out object? days) && days is not null and not "" ? Convert.ToInt32(days, CultureInfo.InvariantCulture) : 30;

@@ -13284,6 +13284,73 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("offline_operation", "sync");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.AttendanceRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<TimeOnly?>("ClockIn")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("clock_in");
+
+                    b.Property<TimeOnly?>("ClockOut")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("clock_out");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<int>("LateMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("late_minutes");
+
+                    b.Property<long?>("OvertimeApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("overtime_approved_by_user_id");
+
+                    b.Property<decimal>("OvertimeHours")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("overtime_hours");
+
+                    b.Property<decimal>("OvertimeMultiplier")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("overtime_multiplier");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attendance");
+
+                    b.HasIndex("EmployeeId", "Date")
+                        .IsUnique()
+                        .HasDatabaseName("ix_attendance_employee_id_date");
+
+                    b.ToTable("attendance", "hr");
+                });
+
             modelBuilder.Entity("One4All.Core.Payroll.DisciplinaryRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -13923,6 +13990,66 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_garnishee_order_company_id_reference");
 
                     b.ToTable("garnishee_order", "hr");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.LeaveRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("Days")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("days");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date")
+                        .HasColumnName("from_date");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("LeaveType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("leave_type");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date")
+                        .HasColumnName("to_date");
+
+                    b.HasKey("Id")
+                        .HasName("pk_leave_record");
+
+                    b.HasIndex("EmployeeId", "FromDate")
+                        .HasDatabaseName("ix_leave_record_employee_id_from_date");
+
+                    b.ToTable("leave_record", "hr");
                 });
 
             modelBuilder.Entity("One4All.Core.Payroll.PayElement", b =>

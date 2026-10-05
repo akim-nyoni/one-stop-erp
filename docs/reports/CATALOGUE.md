@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-462 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+467 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -307,6 +307,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | PR20 | Deductions vs Remittances | Per scheme and period: what the payroll deducted and contributed against what was paid over, with the gap. | FromDate (Date, optional), ToDate (Date, optional) | Scheme, Period, Deducted, Remitted, Status, Outstanding | — | Sum(Outstanding) |
 | PR21 | Garnishee & Court Order Register | Every court order by employee and priority: creditor, instalment, total ordered, deducted through payroll to the date and the balance still to collect. | AsAtDate (Date, optional) | Employee, Reference, Creditor, Priority, Issued, Instalment, Total, Deducted, Balance | — | Sum(Balance) |
 | PR22 | Loan & Advance Register and Balances | Every employee loan and advance: granted, principal, instalment, repaid, instalments left, status and the balance outstanding. | — | Employee, Reference, Granted, Principal, Instalment, Repaid, Left, Status, Outstanding | — | Sum(Outstanding) |
+| PR25 | Overtime Analysis | Overtime in the period by department, employee and multiplier: hours, approved and unapproved hours, and the cost at the basic hourly rate. | FromDate (Date, optional), ToDate (Date, optional), HoursPerMonth (Decimal, optional) | Department, Employee, Multiplier, Hours, Approved, Unapproved, Cost | — | Sum(Cost) |
 | PR26 | Allowance Analysis | Earnings other than basic salary in the period, per employee and allowance. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Department, Element, Description, Taxable, Amount | — | Sum(Amount) |
 | PR27 | PAYE Remittance Return | Per month: employees, taxable earnings, PAYE deducted and PAYE by the tax table in force, with any difference. | FromDate (Date, optional), ToDate (Date, optional) | Month, Employees, Taxable, ByTable, Difference, Deducted | — | Sum(Deducted) |
 | PR28 | Annual Tax Certificates | Per employee for the year: ID and tax numbers, gross, taxable, pension contributions and PAYE — the certificate data. | FromDate (Date, optional), ToDate (Date, optional) | Employee, NationalId, TaxNumber, Gross, Taxable, Pension, Paye | — | Sum(Paye) |
@@ -318,8 +319,12 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | PR33 | Workers' Compensation & Skills Levy Schedule | Workers' compensation and skills levy contributions for the period by member. | FromDate (Date, optional), ToDate (Date, optional) | Scheme, Employee, Member, EmployeePart, EmployerPart, Total | — | Sum(Total) |
 | PR36 | Tax Table in Force | The PAYE bands that apply at the date, with the tax at the top of each band. | AsAtDate (Date, optional) | Table, Effective, From, To, Rate, Cumulative | — | — |
 | PR38 | Leave Liability (IAS 19) | Leave days owed at the date per employee and type, valued at the daily rate of basic salary (annual ÷ 260). | — | Employee, LeaveType, Accrued, Taken, Balance, DailyRate, Liability | — | Sum(Liability) |
+| PR39 | Leave Taken Analysis | Leave taken in the period by type, department and month: employees and days. | FromDate (Date, optional), ToDate (Date, optional) | Type, Department, Month, Employees, Records, Days | — | Sum(Days) |
 | PR4 | Pre-Payroll Validation | Active employees whose records would stop a clean payment or return: missing ID, tax number, bank or wallet details, date of birth. | AsAtDate (Date, optional) | Employee, Department, Method, Issues | — | — |
+| PR40 | Absence, Lateness & Sick Leave Pattern | Per employee over the period: absent days, late days and minutes, sick days (Mondays / Fridays) and where they stand on sick pay over the last 12 months. | FromDate (Date, optional), ToDate (Date, optional), FullPayDays (Decimal, optional), HalfPayDays (Decimal, optional) | Employee, Absent, Late, LateMinutes, Sick, MonFri, Rolling, Tier | — | — |
+| PR41 | Leave Encashment Report | Leave paid out in the period instead of taken: employee, type, days and amount. | FromDate (Date, optional), ToDate (Date, optional) | Date, Employee, Type, Days, Rate, Amount | — | Sum(Amount) |
 | PR42 | Timesheet Hours & Labour Cost Allocated to Jobs | Per employee over the period: hours and cost booked to jobs against gross pay, and the pay left unallocated. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Jobs, Hours, Allocated, Gross, Share, Unallocated | — | Sum(Unallocated) |
+| PR43 | Attendance Exception Report | Days in the period with no clock-in or clock-out, unapproved overtime, or hours over the daily maximum. | FromDate (Date, optional), ToDate (Date, optional), MaxHours (Decimal, optional) | Date, Employee, In, Out, Hours, Exception | — | — |
 | PR45 | Headcount Reconciliation | Per department over the period: opening headcount, starters, leavers and closing. | FromDate (Date, optional), ToDate (Date, optional) | Department, Opening, Starters, Leavers, Closing | — | — |
 | PR46 | Starters & Leavers | Employees engaged or leaving in the period, with the date and the reason for leaving. | FromDate (Date, optional), ToDate (Date, optional) | Kind, Employee, Department, Date, Reason, Basic | — | Sum(Basic) |
 | PR47 | Establishment vs Actual | Per department and grade at the date: approved posts, filled, vacant and over establishment, with the annual saving on vacant posts. | AsAtDate (Date, optional) | Department, Grade, Approved, Filled, Vacant, Over, Saving | — | Sum(Saving) |

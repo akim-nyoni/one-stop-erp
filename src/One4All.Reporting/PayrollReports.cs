@@ -130,9 +130,25 @@ public static class PayrollReports
         yield return Listing("PR22", "Loan & Advance Register and Balances", "Payroll", "Every employee loan and advance: granted, principal, instalment, repaid, instalments left, status and the balance outstanding.",
             "PyrlLoans", [new Column("Employee", "Employee", 160), new Column("Reference", "Reference", 90), new Column("Granted", "Granted", 75), new Column("Principal", "Principal", 90),
              new Column("Instalment", "Instalment", 80), new Column("Repaid", "Repaid", 90), new Column("Left", "Instalments left", 70), new Column("Status", "Status", 70), new Column("Outstanding", "Outstanding", 95, true)], []);
+        yield return Listing("PR25", "Overtime Analysis", "Payroll", "Overtime in the period by department, employee and multiplier: hours, approved and unapproved hours, and the cost at the basic hourly rate.",
+            "PyrlOvertime", [new Column("Department", "Department", 100), new Column("Employee", "Employee", 150), new Column("Multiplier", "Rate ×", 50), new Column("Hours", "Hours", 55), new Column("Approved", "Approved", 60),
+             new Column("Unapproved", "Unapproved", 70), new Column("Cost", "Cost", 90, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("HoursPerMonth", ParameterType.Decimal)]);
+        yield return Listing("PR39", "Leave Taken Analysis", "Payroll", "Leave taken in the period by type, department and month: employees and days.",
+            "PyrlLeaveTaken", [new Column("Type", "Type", 80), new Column("Department", "Department", 110), new Column("Month", "Month", 65), new Column("Employees", "Employees", 65), new Column("Records", "Absences", 60),
+             new Column("Days", "Days", 70, true)], Period);
+        yield return Listing("PR40", "Absence, Lateness & Sick Leave Pattern", "Payroll", "Per employee over the period: absent days, late days and minutes, sick days (Mondays / Fridays) and where they stand on sick pay over the last 12 months.",
+            "PyrlAbsence", [new Column("Employee", "Employee", 150), new Column("Absent", "Absent", 50), new Column("Late", "Late days", 55), new Column("LateMinutes", "Late min", 55), new Column("Sick", "Sick", 45),
+             new Column("MonFri", "Mon / Fri sick", 70), new Column("Rolling", "Sick (12 mo)", 70), new Column("Tier", "Sick pay", 70)],
+            [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("FullPayDays", ParameterType.Decimal), ("HalfPayDays", ParameterType.Decimal)]);
+        yield return Listing("PR41", "Leave Encashment Report", "Payroll", "Leave paid out in the period instead of taken: employee, type, days and amount.",
+            "PyrlEncashment", [new Column("Date", "Date", 75), new Column("Employee", "Employee", 160), new Column("Type", "Type", 80), new Column("Days", "Days", 50), new Column("Rate", "Daily rate", 80),
+             new Column("Amount", "Amount", 95, true)], Period);
         yield return Listing("PR42", "Timesheet Hours & Labour Cost Allocated to Jobs", "Payroll", "Per employee over the period: hours and cost booked to jobs against gross pay, and the pay left unallocated.",
             "PyrlJobAllocation", [new Column("Employee", "Employee", 160), new Column("Jobs", "Jobs", 140), new Column("Hours", "Hours", 55), new Column("Allocated", "Allocated", 90), new Column("Gross", "Gross pay", 90),
              new Column("Share", "Allocated %", 70), new Column("Unallocated", "Unallocated", 95, true)], Period);
+        yield return Listing("PR43", "Attendance Exception Report", "Payroll", "Days in the period with no clock-in or clock-out, unapproved overtime, or hours over the daily maximum.",
+            "PyrlAttendanceExceptions", [new Column("Date", "Date", 75), new Column("Employee", "Employee", 160), new Column("In", "In", 50), new Column("Out", "Out", 50), new Column("Hours", "Hours", 50),
+             new Column("Exception", "Exception", 240)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("MaxHours", ParameterType.Decimal)]);
         yield return Listing("PR47", "Establishment vs Actual", "Payroll", "Per department and grade at the date: approved posts, filled, vacant and over establishment, with the annual saving on vacant posts.",
             "PyrlEstablishment", [new Column("Department", "Department", 110), new Column("Grade", "Grade", 60), new Column("Approved", "Approved", 60), new Column("Filled", "Filled", 50), new Column("Vacant", "Vacant", 50),
              new Column("Over", "Over", 45), new Column("Saving", "Vacancy saving", 95, true)], [("AsAtDate", ParameterType.Date)]);

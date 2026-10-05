@@ -280,3 +280,30 @@ internal sealed class GarnisheeOrderConfiguration : IEntityTypeConfiguration<Gar
         b.HasIndex(x => new { x.CompanyId, x.Reference }).IsUnique();
     }
 }
+
+internal sealed class LeaveRecordConfiguration : IEntityTypeConfiguration<LeaveRecord>
+{
+    public void Configure(EntityTypeBuilder<LeaveRecord> b)
+    {
+        b.ToTable("leave_record", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.LeaveType).HasMaxLength(40);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Days).HasPrecision(9, 2);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.EmployeeId, x.FromDate });
+    }
+}
+
+internal sealed class AttendanceRecordConfiguration : IEntityTypeConfiguration<AttendanceRecord>
+{
+    public void Configure(EntityTypeBuilder<AttendanceRecord> b)
+    {
+        b.ToTable("attendance", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.OvertimeHours).HasPrecision(9, 2);
+        b.Property(x => x.OvertimeMultiplier).HasPrecision(5, 2);
+        b.HasIndex(x => new { x.EmployeeId, x.Date }).IsUnique();
+    }
+}
