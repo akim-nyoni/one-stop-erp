@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-486 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+489 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -528,6 +528,9 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
 | SO137 | Open Sales Orders & Allocation | Open order lines with what is outstanding to despatch and the free stock that can cover it. | — | Order, Date, Customer, Item, Ordered, Despatched, Outstanding, Free, Cover, Value | — | Sum(Value) |
+| SO140 | Despatch / Delivery Performance (OTIF) | Orders due in the period: requested date, what was ordered and what was signed for by then — on time, in full and OTIF. | FromDate (Date, optional), ToDate (Date, optional) | Order, Customer, Requested, Ordered, OnTimeQty, LastDelivered, OnTime, InFull, Otif | — | — |
+| SO141 | Proof of Delivery Outstanding | Delivery notes despatched by the date that have not been signed for, oldest first. | AsAtDate (Date, optional) | Delivery, Order, Customer, Despatched, Days, Vehicle, Driver, Quantity | — | — |
+| SO142 | Delivery Schedule / Load Sheet | Deliveries planned in the period by date, vehicle and route: what is on each load and its weight. | FromDate (Date, optional), ToDate (Date, optional) | Date, Vehicle, Route, Driver, Delivery, Order, Customer, Items, Weight | — | Sum(Weight) |
 | SO143 | Quotation Conversion Rate | Quotations by month: count, converted to orders, value quoted, value converted and the conversion rate. | FromDate (Date, optional), ToDate (Date, optional) | Month, Quotes, Converted, Rate, Quoted, ConvertedValue | — | Sum(ConvertedValue) |
 | SOP-BO | Sales Back-Orders | Order lines not yet fully despatched, with the ordered, despatched and outstanding quantities. | — | OrderNumber, Customer, OrderDate, Description, Ordered, Despatched, Outstanding | — | Sum(Outstanding) |
 | SOP-QUOTE | Sales Quotations | Quotations with customer, dates, value and status, newest first. | — | QuoteNumber, Customer, QuoteDate, ValidUntil, Total, Status | — | Sum(Total) |

@@ -32,6 +32,9 @@ public sealed class CreateSalesOrderRequest
 
     /// <summary>The order lines.</summary>
     public IReadOnlyList<SalesOrderLineRequest> Lines { get; init; } = [];
+
+    /// <summary>Gets the date the customer wants the goods.</summary>
+    public DateOnly? RequestedDeliveryDate { get; init; }
 }
 
 /// <summary>A despatched line.</summary>
@@ -59,6 +62,18 @@ public sealed class DespatchRequest
 
     /// <summary>The despatched lines.</summary>
     public IReadOnlyList<DespatchLine> Lines { get; init; } = [];
+
+    /// <summary>Gets the date the delivery is planned for.</summary>
+    public DateOnly? PlannedFor { get; init; }
+
+    /// <summary>Gets the vehicle.</summary>
+    public string? Vehicle { get; init; }
+
+    /// <summary>Gets the route.</summary>
+    public string? Route { get; init; }
+
+    /// <summary>Gets the driver.</summary>
+    public string? Driver { get; init; }
 }
 
 /// <summary>An invoiced line.</summary>
@@ -152,4 +167,14 @@ public interface ISalesOrderService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The invoice result.</returns>
     Task<Result<InvoiceOrderResult>> InvoiceAsync(InvoiceOrderRequest request, CancellationToken ct = default);
+
+    /// <summary>Records proof of delivery on a delivery note: when it arrived and who signed (not before it was despatched, and only once).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="deliveryReference">The despatch reference.</param>
+    /// <param name="deliveredOn">When it arrived.</param>
+    /// <param name="receivedBy">Who signed.</param>
+    /// <param name="podReference">The signed POD reference.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or an error.</returns>
+    Task<Result> ConfirmDeliveryAsync(long companyId, string deliveryReference, DateOnly deliveredOn, string receivedBy, string? podReference, CancellationToken ct = default);
 }

@@ -65,3 +65,31 @@ internal sealed class QuotationLineConfiguration : IEntityTypeConfiguration<Quot
         b.HasIndex(x => x.QuotationId);
     }
 }
+
+internal sealed class SalesDeliveryConfiguration : IEntityTypeConfiguration<SalesDelivery>
+{
+    public void Configure(EntityTypeBuilder<SalesDelivery> b)
+    {
+        b.ToTable("delivery", Schemas.SalesOrders);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(40);
+        b.Property(x => x.Vehicle).HasMaxLength(20);
+        b.Property(x => x.Route).HasMaxLength(60);
+        b.Property(x => x.Driver).HasMaxLength(120);
+        b.Property(x => x.ReceivedBy).HasMaxLength(120);
+        b.Property(x => x.PodReference).HasMaxLength(60);
+        b.HasIndex(x => new { x.CompanyId, x.Reference });
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.SalesDeliveryId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class SalesDeliveryLineConfiguration : IEntityTypeConfiguration<SalesDeliveryLine>
+{
+    public void Configure(EntityTypeBuilder<SalesDeliveryLine> b)
+    {
+        b.ToTable("delivery_line", Schemas.SalesOrders);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+    }
+}

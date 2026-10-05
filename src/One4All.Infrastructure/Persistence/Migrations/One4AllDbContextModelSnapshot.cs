@@ -19541,6 +19541,138 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("quotation_line", "sop");
                 });
 
+            modelBuilder.Entity("One4All.Core.SalesOrders.SalesDelivery", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly?>("DeliveredOn")
+                        .HasColumnType("date")
+                        .HasColumnName("delivered_on");
+
+                    b.Property<DateOnly>("DespatchedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("despatched_on");
+
+                    b.Property<string>("Driver")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("driver");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly?>("PlannedFor")
+                        .HasColumnType("date")
+                        .HasColumnName("planned_for");
+
+                    b.Property<string>("PodReference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("pod_reference");
+
+                    b.Property<string>("ReceivedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("received_by");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("reference");
+
+                    b.Property<string>("Route")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("route");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("SalesOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sales_order_id");
+
+                    b.Property<string>("Vehicle")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("vehicle");
+
+                    b.HasKey("Id")
+                        .HasName("pk_delivery");
+
+                    b.HasIndex("CompanyId", "Reference")
+                        .HasDatabaseName("ix_delivery_company_id_reference");
+
+                    b.ToTable("delivery", "sop");
+                });
+
+            modelBuilder.Entity("One4All.Core.SalesOrders.SalesDeliveryLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("SalesDeliveryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sales_delivery_id");
+
+                    b.Property<long>("SalesOrderLineId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sales_order_line_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_delivery_line");
+
+                    b.HasIndex("SalesDeliveryId")
+                        .HasDatabaseName("ix_delivery_line_sales_delivery_id");
+
+                    b.ToTable("delivery_line", "sop");
+                });
+
             modelBuilder.Entity("One4All.Core.SalesOrders.SalesOrder", b =>
                 {
                     b.Property<long>("Id")
@@ -19589,6 +19721,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("order_number");
+
+                    b.Property<DateOnly?>("RequestedDeliveryDate")
+                        .HasColumnType("date")
+                        .HasColumnName("requested_delivery_date");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
@@ -25149,6 +25285,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_quotation_line_quotations_quotation_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.SalesOrders.SalesDeliveryLine", b =>
+                {
+                    b.HasOne("One4All.Core.SalesOrders.SalesDelivery", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("SalesDeliveryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_delivery_line_delivery_sales_delivery_id");
+                });
+
             modelBuilder.Entity("One4All.Core.SalesOrders.SalesOrderLine", b =>
                 {
                     b.HasOne("One4All.Core.SalesOrders.SalesOrder", null)
@@ -25664,6 +25810,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("One4All.Core.SalesOrders.Quotation", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.SalesOrders.SalesDelivery", b =>
                 {
                     b.Navigation("Lines");
                 });

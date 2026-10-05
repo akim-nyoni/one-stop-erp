@@ -188,6 +188,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Sales orders.</summary>
     public DbSet<Core.SalesOrders.SalesOrder> SalesOrders => Set<Core.SalesOrders.SalesOrder>();
 
+    /// <summary>Gets the delivery notes.</summary>
+    public DbSet<Core.SalesOrders.SalesDelivery> SalesDeliveries => Set<Core.SalesOrders.SalesDelivery>();
+
     /// <summary>Sales quotations.</summary>
     public DbSet<Core.SalesOrders.Quotation> Quotations => Set<Core.SalesOrders.Quotation>();
 

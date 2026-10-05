@@ -68,6 +68,9 @@ public sealed class SalesOrder : AuditableEntity, ICompanyScoped
     /// <summary>The status.</summary>
     public SalesOrderStatus Status { get; private set; }
 
+    /// <summary>Gets or sets the date the customer asked to receive the goods (for on-time-in-full measurement).</summary>
+    public DateOnly? RequestedDeliveryDate { get; set; }
+
     /// <summary>The order lines.</summary>
     public IReadOnlyList<SalesOrderLine> Lines => _lines.AsReadOnly();
 

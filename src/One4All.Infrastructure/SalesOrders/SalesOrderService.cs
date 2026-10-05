@@ -67,7 +67,7 @@ public sealed class SalesOrderService : ISalesOrderService
             orderNumber = allocated.Value;
         }
 
-        SalesOrder order = new(request.CompanyId, request.CustomerId, orderNumber, request.OrderDate, request.Currency);
+        SalesOrder order = new(request.CompanyId, request.CustomerId, orderNumber, request.OrderDate, request.Currency) { RequestedDeliveryDate = request.RequestedDeliveryDate };
         foreach (SalesOrderLineRequest line in request.Lines)
         {
             decimal unitPrice;
@@ -197,8 +197,43 @@ public sealed class SalesOrderService : ISalesOrderService
         }
 
         order.RecomputeStatus();
+        SalesDelivery delivery = new(request.CompanyId, order.Id, request.Reference, request.Date)
+        {
+            PlannedFor = request.PlannedFor ?? request.Date, Vehicle = request.Vehicle?.Trim().ToUpperInvariant(), Route = request.Route?.Trim(), Driver = request.Driver?.Trim(),
+        };
+        despatches.ForEach(d => delivery.AddLine(d.Line.Id, d.Line.ItemId, d.Quantity));
+        _db.SalesDeliveries.Add(delivery);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new DespatchResult(costOfSales);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> ConfirmDeliveryAsync(long companyId, string deliveryReference, DateOnly deliveredOn, string receivedBy, string? podReference, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(receivedBy))
+        {
+            return Result.Failure(Error.Validation("Sop.PodSignature", "Proof of delivery needs the name of whoever received the goods."));
+        }
+
+        SalesDelivery? delivery = await _db.SalesDeliveries.FirstOrDefaultAsync(d => d.CompanyId == companyId && d.Reference == deliveryReference, ct).ConfigureAwait(false);
+        if (delivery is null)
+        {
+            return Result.Failure(Error.NotFound("Sop.DeliveryNotFound", $"No delivery {deliveryReference}."));
+        }
+
+        if (delivery.DeliveredOn is not null)
+        {
+            return Result.Failure(Error.Rule("Sop.DeliveryConfirmed", $"Delivery {deliveryReference} was already signed for on {delivery.DeliveredOn:yyyy-MM-dd}."));
+        }
+
+        if (deliveredOn < delivery.DespatchedOn)
+        {
+            return Result.Failure(Error.Validation("Sop.DeliveredBeforeDespatch", "Goods cannot arrive before they were despatched."));
+        }
+
+        delivery.ConfirmDelivery(deliveredOn, receivedBy.Trim(), podReference?.Trim());
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 
     /// <inheritdoc />

@@ -54,6 +54,9 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
                 parameters.TryGetValue("HoursPerDay", out object? perDay) && perDay is not null and not "" ? Convert.ToDecimal(perDay, CultureInfo.InvariantCulture) : 8m, ct).ConfigureAwait(false),
             "OPSBOQ" => await BoqAsync(companyId, ct).ConfigureAwait(false),
             "OPSCONTRACTCASH" => await ContractCashAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "OPSOTIF" => await OtifAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "OPSPODOUTSTANDING" => await PodOutstandingAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "OPSLOADSHEET" => await LoadSheetAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "OPSOPENORDERS" => await OpenOrdersAsync(companyId, ct).ConfigureAwait(false),
             "OPSQUOTECONVERSION" => await QuoteConversionAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             _ => [],
@@ -387,6 +390,49 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
                     ("TopUps", Money(inPeriod.Where(w => w.Amount > 0m).Sum(w => w.Amount))), ("Spend", Money(-inPeriod.Where(w => w.Amount < 0m).Sum(w => w.Amount))),
                     ("Days", inPeriod.Where(w => w.Amount < 0m).Select(w => w.Date).Distinct().Count()), ("Closing", opening + inPeriod.Sum(w => w.Amount)));
             })];
+    }
+
+    // On time: something was signed for and nothing after the requested date; in full: the quantity signed for by then covers the order.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> OtifAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<SalesOrder> orders = await _db.SalesOrders.AsNoTracking().Include(o => o.Lines).Where(o => o.CompanyId == companyId && o.RequestedDeliveryDate >= fromDate && o.RequestedDeliveryDate <= toDate)
+            .OrderBy(o => o.RequestedDeliveryDate).ThenBy(o => o.OrderNumber).ToListAsync(ct).ConfigureAwait(false);
+        List<long> ids = [.. orders.Select(o => o.Id)];
+        List<SalesDelivery> deliveries = await _db.SalesDeliveries.AsNoTracking().Include(d => d.Lines).Where(d => ids.Contains(d.SalesOrderId)).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> customers = await GuardiansAsync(companyId, ct).ConfigureAwait(false);
+        return [.. orders.Select(o =>
+        {
+            DateOnly due = o.RequestedDeliveryDate!.Value;
+            List<SalesDelivery> own = [.. deliveries.Where(d => d.SalesOrderId == o.Id && d.DeliveredOn != null)];
+            decimal ordered = o.Lines.Sum(l => l.OrderedQuantity), byDue = own.Where(d => d.DeliveredOn <= due).SelectMany(d => d.Lines).Sum(l => l.Quantity);
+            bool onTime = own.Count > 0 && own.All(d => d.DeliveredOn <= due), inFull = byDue >= ordered;
+            return Row(("Order", o.OrderNumber), ("Customer", customers.GetValueOrDefault(o.CustomerId, "?")), ("Requested", Date(due)), ("Ordered", Qty(ordered)), ("OnTimeQty", Qty(byDue)),
+                ("LastDelivered", own.Count == 0 ? "—" : Date(own.Max(d => d.DeliveredOn!.Value))), ("OnTime", onTime ? "Yes" : "No"), ("InFull", inFull ? "Yes" : "No"), ("Otif", onTime && inFull ? "Yes" : "No"));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PodOutstandingAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<SalesDelivery> open = await _db.SalesDeliveries.AsNoTracking().Include(d => d.Lines).Where(d => d.CompanyId == companyId && d.DeliveredOn == null && d.DespatchedOn <= asAt)
+            .OrderBy(d => d.DespatchedOn).ThenBy(d => d.Reference).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, (string Number, long CustomerId)> orders = await _db.SalesOrders.AsNoTracking().Where(o => o.CompanyId == companyId).ToDictionaryAsync(o => o.Id, o => (o.OrderNumber, o.CustomerId), ct).ConfigureAwait(false);
+        Dictionary<long, string> customers = await GuardiansAsync(companyId, ct).ConfigureAwait(false);
+        return [.. open.Select(d => Row(("Delivery", d.Reference), ("Order", orders.GetValueOrDefault(d.SalesOrderId).Number ?? "?"), ("Customer", customers.GetValueOrDefault(orders.GetValueOrDefault(d.SalesOrderId).CustomerId, "?")),
+            ("Despatched", Date(d.DespatchedOn)), ("Days", asAt.DayNumber - d.DespatchedOn.DayNumber), ("Vehicle", d.Vehicle ?? "—"), ("Driver", d.Driver ?? "—"), ("Quantity", Qty(d.Lines.Sum(l => l.Quantity)))))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LoadSheetAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<SalesDelivery> planned = await _db.SalesDeliveries.AsNoTracking().Include(d => d.Lines).Where(d => d.CompanyId == companyId && d.PlannedFor >= fromDate && d.PlannedFor <= toDate)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, (string Number, long CustomerId)> orders = await _db.SalesOrders.AsNoTracking().Where(o => o.CompanyId == companyId).ToDictionaryAsync(o => o.Id, o => (o.OrderNumber, o.CustomerId), ct).ConfigureAwait(false);
+        Dictionary<long, string> customers = await GuardiansAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, (string Code, decimal? Weight)> items = await _db.Items.AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => (i.Code, i.UnitWeightKg), ct).ConfigureAwait(false);
+        return [.. planned.OrderBy(d => d.PlannedFor).ThenBy(d => d.Vehicle ?? "~", StringComparer.Ordinal).ThenBy(d => d.Route ?? string.Empty, StringComparer.Ordinal).ThenBy(d => d.Reference, StringComparer.Ordinal)
+            .Select(d => Row(("Date", Date(d.PlannedFor!.Value)), ("Vehicle", d.Vehicle ?? "Unassigned"), ("Route", d.Route ?? "—"), ("Driver", d.Driver ?? "—"), ("Delivery", d.Reference),
+                ("Order", orders.GetValueOrDefault(d.SalesOrderId).Number ?? "?"), ("Customer", customers.GetValueOrDefault(orders.GetValueOrDefault(d.SalesOrderId).CustomerId, "?")),
+                ("Items", string.Join(", ", d.Lines.Select(l => $"{Qty(l.Quantity)} × {items.GetValueOrDefault(l.ItemId).Code ?? "?"}"))),
+                ("Weight", d.Lines.Sum(l => l.Quantity * (items.GetValueOrDefault(l.ItemId).Weight ?? 0m)))))];
     }
 
     private Task<Dictionary<string, Student>> StudentsAsync(long companyId, CancellationToken ct)
