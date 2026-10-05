@@ -148,4 +148,7 @@ public sealed class PurchaseRequisitionLine : Entity
 
     /// <summary>The estimated unit price.</summary>
     public decimal UnitPrice { get; private set; }
+
+    /// <summary>Gets or sets the expense account the line will be charged to, for the budget check at requisition.</summary>
+    public string? ExpenseAccountCode { get; set; }
 }

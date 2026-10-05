@@ -15,6 +15,9 @@ public static class ReceivablesReports
     /// <returns>The definitions, in brief order.</returns>
     public static IEnumerable<ReportDefinition> All()
     {
+        yield return Listing("AR28", "Customer Statement — Consolidated Group", "Receivables", "Per group (parent account and its branches): each account's opening balance, debits and credits in the period and closing balance, with the group total.",
+            "RecvGroupStatement", [new Column("Group", "Group", 140), new Column("Account", "Account", 180), new Column("Opening", "Opening", 95), new Column("Debits", "Debits", 95), new Column("Credits", "Credits", 95),
+             new Column("Closing", "Closing", 100, true)], Period);
         yield return Listing("AR29", "Aged Debtors Detail", "Sales", "Every open item as at the date with its age from due date (or invoice date for customers aged that way) and band.",
             "RecvAgedDetail", [new Column("Customer", "Customer", 150), new Column("Document", "Document", 100), new Column("Type", "Type", 80), new Column("Date", "Date", 75), new Column("Due", "Due", 75),
              new Column("Days", "Days", 50), new Column("Band", "Band", 60), new Column("Outstanding", "Outstanding", 95, true)], [("AsAtDate", ParameterType.Date)]);
@@ -37,6 +40,9 @@ public static class ReceivablesReports
         yield return Listing("AR36", "Customer Sales History & Trend", "Sales", "Per customer: net sales this year to date against the same period last year, and the last three months against the three before.",
             "RecvSalesTrend", [new Column("Customer", "Customer", 160), new Column("LastYear", "Same period last year", 110), new Column("Change", "Change", 65), new Column("Last3", "Last 3 months", 95),
              new Column("Prior3", "Prior 3 months", 95), new Column("Trend", "Trend", 60), new Column("ThisYear", "This year to date", 105, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("AR37", "Credit Notes & Returns Analysis", "Receivables", "Credit notes raised in the period by reason code, with customer and narrative.",
+            "RecvCreditNotes", [new Column("Reason", "Reason", 80), new Column("Date", "Date", 75), new Column("Number", "Credit note", 100), new Column("Customer", "Customer", 150), new Column("Narrative", "Narrative", 200),
+             new Column("Amount", "Amount", 95, true)], Period);
         yield return Listing("AR38", "Receipts / Collections Report", "Receivables", "Customer receipts in the period by day, bank account (method), currency and the user who posted them.",
             "RecvCollections", [new Column("Date", "Date", 75), new Column("Method", "Bank / method", 150), new Column("Currency", "Currency", 55), new Column("User", "Posted by", 90), new Column("Count", "Receipts", 55),
              new Column("Amount", "In currency", 95), new Column("Base", "Base", 95, true)], Period);

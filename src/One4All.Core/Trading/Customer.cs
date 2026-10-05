@@ -44,6 +44,9 @@ public sealed class Customer : SoftDeletableEntity, ICompanyScoped
     /// <summary>The customer name.</summary>
     public string Name { get; set; }
 
+    /// <summary>Gets or sets the group / head-office account this customer reports under on consolidated statements.</summary>
+    public long? ParentCustomerId { get; set; }
+
     /// <summary>The trading currency.</summary>
     public CurrencyCode Currency { get; private set; }
 

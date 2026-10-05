@@ -19,7 +19,7 @@ missing domain data. Items are struck through as they ship (with the report code
 - ~~34 Sales Analysis with Margin (AR34)~~, ~~36 Sales History & Trend (AR36)~~, ~~49 price lists (SYS258)~~
 - ~~38 Receipts / Collections (AR38)~~
 - Data exists: 50 layouts (quotation, SO confirmation, delivery note, remittance slip)
-- Needs new data: 28 (parent / child customers), 37 reason codes
+- ~~28 Consolidated Group Statement (AR28)~~, ~~37 Credit Notes by Reason (AR37)~~
 
 ## C. Accounts Payable
 - ~~53 Supplier Ledger (AP53)~~, ~~54 Purchase Day Book (AP54)~~, ~~57 / 58 Payments Made incl. runs (AP58)~~, ~~59 GRNI (AP59)~~, ~~60 Matching Exceptions (AP60)~~, ~~62 WHT Deducted (AP62)~~, ~~63 Scorecard (AP63)~~, ~~64 Balances with debit flags (AP64)~~, ~~65 Bank Detail Change Audit (AP65)~~, ~~66 Top Suppliers (AP66)~~
@@ -44,7 +44,8 @@ missing domain data. Items are struck through as they ship (with the report code
 
 ## G. Procurement
 - ~~124 Requisition turnaround (PO124)~~, ~~125 Approval history (PO125)~~, ~~126 / 127 PO listing with overdue (PO126)~~, ~~128 Committed cost (PO128)~~, ~~129 GRN & variance (PO129)~~, ~~130 Rejected goods (PO130)~~, ~~131 RFQ comparison (PO131)~~, ~~132 Price variance (PO132)~~, ~~134 Spend analysis (PO134)~~, ~~135 Lead times (PO135)~~
-- Data exists: 136 budget availability at requisition (needs an expense account on requisition lines); partly 133 (no framework contracts)
+- ~~136 Budget Availability at Requisition (PO136)~~
+- Needs new data: 133 framework contracts
 
 ## H. Sales Order Processing
 - ~~137 Open Orders & Allocation (SO137)~~, ~~143 Quotation Conversion (SO143)~~

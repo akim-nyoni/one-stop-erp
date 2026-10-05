@@ -522,9 +522,17 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             lines.Add(Line(request.TaxAccountCode, JournalSide.Debit, request.TaxAmount, rate, baseTax));
         }
 
-        return await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.CreditNote,
+        Result<TradingPostingResult> posted = await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.CreditNote,
             LedgerSign.Credit, request.DocumentNumber, request.DocumentDate, request.DocumentDate, request.Currency, rate,
             gross, baseGross, request.Narrative, lines, ct).ConfigureAwait(false);
+        if (posted.IsSuccess && !string.IsNullOrWhiteSpace(request.ReasonCode))
+        {
+            OpenItem item = await _db.OpenItems.SingleAsync(i => i.Id == posted.Value.OpenItemId, ct).ConfigureAwait(false);
+            item.ReasonCode = request.ReasonCode.Trim().ToUpperInvariant();
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
+        return posted;
     }
 
     /// <inheritdoc />

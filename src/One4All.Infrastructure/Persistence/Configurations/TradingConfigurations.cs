@@ -182,6 +182,7 @@ internal sealed class OpenItemConfiguration : IEntityTypeConfiguration<OpenItem>
     {
         b.ToTable("open_item", Schemas.Trading);
         b.HasKey(x => x.Id);
+        b.Property(x => x.ReasonCode).HasMaxLength(20);
         b.Property(x => x.Ledger).HasConversion<int>();
         b.Property(x => x.ItemType).HasConversion<int>();
         b.Property(x => x.Sign).HasConversion<int>();

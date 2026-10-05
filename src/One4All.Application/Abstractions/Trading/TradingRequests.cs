@@ -134,6 +134,9 @@ public sealed class PurchaseInvoiceRequest
 /// <summary>A request to post a credit note to a customer (AR) — reduces the debtor balance.</summary>
 public sealed class SalesCreditNoteRequest
 {
+    /// <summary>Gets why the credit was given (RETURN, PRICE, DAMAGED…), for the credit notes analysis.</summary>
+    public string? ReasonCode { get; init; }
+
     /// <summary>The company.</summary>
     public long CompanyId { get; init; }
 

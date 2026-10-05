@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-489 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+492 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -409,6 +409,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | PO132 | Purchase Price Variance | Each item ordered in the period at a different price from the order before it, with the variance on the quantity ordered. | FromDate (Date, optional), ToDate (Date, optional) | Item, Order, Date, Supplier, Previous, Price, Change, Quantity, Variance | — | Sum(Variance) |
 | PO134 | Procurement Spend Analysis | Order value in the period by supplier and currency, with lines, items and share. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Currency, Orders, Lines, Items, Share, Spend | — | Sum(Spend) |
 | PO135 | Supplier Lead Time Analysis | Per supplier: days from order to first receipt (average, fastest, slowest) and orders received by their required date. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Orders, Average, Fastest, Slowest, OnTime | — | — |
+| PO136 | Budget Availability at Requisition | Open requisition lines charged to a budgeted expense account: the vote's appropriation, spent and committed to date, available before the line and after it. | AsAtDate (Date, optional) | Requisition, Date, Account, Line, Appropriation, Spent, Committed, Before, Status, After | — | Sum(After) |
 | POP-OPEN | Open Purchase Orders | Purchase orders not yet fully received/invoiced, with their order value. | — | OrderNumber, OrderDate, Supplier, Status, TotalNet | — | Sum(TotalNet) |
 | POP-REQ | Purchase Requisitions | Requisitions with supplier, date, estimated value and status, newest first. | — | RequisitionNumber, Supplier, RequestedDate, Total, Status | — | Sum(Total) |
 
@@ -474,6 +475,8 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
+| AR28 | Customer Statement — Consolidated Group | Per group (parent account and its branches): each account's opening balance, debits and credits in the period and closing balance, with the group total. | FromDate (Date, optional), ToDate (Date, optional) | Group, Account, Opening, Debits, Credits, Closing | — | Sum(Closing) |
+| AR37 | Credit Notes & Returns Analysis | Credit notes raised in the period by reason code, with customer and narrative. | FromDate (Date, optional), ToDate (Date, optional) | Reason, Date, Number, Customer, Narrative, Amount | — | Sum(Amount) |
 | AR38 | Receipts / Collections Report | Customer receipts in the period by day, bank account (method), currency and the user who posted them. | FromDate (Date, optional), ToDate (Date, optional) | Date, Method, Currency, User, Count, Amount, Base | — | Sum(Base) |
 
 ## Restaurant

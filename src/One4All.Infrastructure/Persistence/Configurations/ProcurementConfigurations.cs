@@ -222,6 +222,7 @@ internal sealed class PurchaseRequisitionLineConfiguration : IEntityTypeConfigur
     {
         b.ToTable("requisition_line", Schemas.Purchasing);
         b.HasKey(x => x.Id);
+        b.Property(x => x.ExpenseAccountCode).HasMaxLength(20);
         b.Property(x => x.Description).HasMaxLength(300);
         b.Property(x => x.Quantity).HasPrecision(19, 4);
         b.Property(x => x.UnitPrice).HasPrecision(19, 6);

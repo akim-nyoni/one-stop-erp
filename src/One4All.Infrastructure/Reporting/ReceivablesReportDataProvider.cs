@@ -30,6 +30,8 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
         DateOnly from = DateParameter(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
         return command.ToUpperInvariant() switch
         {
+            "RECVGROUPSTATEMENT" => await GroupStatementAsync(companyId, from, to, ct).ConfigureAwait(false),
+            "RECVCREDITNOTES" => await CreditNotesAsync(companyId, from, to, ct).ConfigureAwait(false),
             "RECVCOLLECTIONS" => await CollectionsAsync(companyId, from, to, ct).ConfigureAwait(false),
             "RECVAGEDDETAIL" => await AgedDetailAsync(companyId, asAt, ct).ConfigureAwait(false),
             "RECVAGEDBYREP" => await AgedByRepAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -109,6 +111,45 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
         }
 
         return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GroupStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<Customer> customers = await _db.Customers.AsNoTracking().IgnoreQueryFilters().Where(c => c.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        List<long> parents = [.. customers.Where(c => c.ParentCustomerId != null).Select(c => c.ParentCustomerId!.Value).Distinct()];
+        List<long> members = [.. customers.Where(c => parents.Contains(c.Id) || (c.ParentCustomerId is long p && parents.Contains(p))).Select(c => c.Id)];
+        List<OpenItemAsAt> opening = [.. (await OpenItemsAsAt.LoadAsync(_db, companyId, TradingLedger.AccountsReceivable, fromDate.AddDays(-1), ct).ConfigureAwait(false)).Where(o => members.Contains(o.Item.TraderId))];
+        List<OpenItemAsAt> closing = [.. (await OpenItemsAsAt.LoadAsync(_db, companyId, TradingLedger.AccountsReceivable, toDate, ct).ConfigureAwait(false)).Where(o => members.Contains(o.Item.TraderId))];
+        List<OpenItem> movements = await _db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && members.Contains(i.TraderId)
+            && i.DocumentDate >= fromDate && i.DocumentDate <= toDate).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, Customer> byId = customers.ToDictionary(c => c.Id);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (long parent in parents.OrderBy(p => byId[p].Name, StringComparer.Ordinal))
+        {
+            decimal total = 0m;
+            foreach (Customer c in customers.Where(c => c.Id == parent || c.ParentCustomerId == parent).OrderBy(c => c.Id != parent).ThenBy(c => c.Name, StringComparer.Ordinal))
+            {
+                decimal open = opening.Where(o => o.Item.TraderId == c.Id).Sum(o => o.Signed(LedgerSign.Debit)), close = closing.Where(o => o.Item.TraderId == c.Id).Sum(o => o.Signed(LedgerSign.Debit));
+                List<OpenItem> own = [.. movements.Where(i => i.TraderId == c.Id)];
+                total += close;
+                rows.Add(Row(("Group", byId[parent].Name), ("Account", $"{c.Code} {c.Name}"), ("Opening", Money(open)), ("Debits", Money(own.Where(i => i.Sign == LedgerSign.Debit).Sum(i => i.OriginalBase))),
+                    ("Credits", Money(own.Where(i => i.Sign == LedgerSign.Credit).Sum(i => Math.Abs(i.OriginalBase)))), ("Closing", close)));
+            }
+
+            rows.Add(Row(("Group", byId[parent].Name), ("Account", $"Group total: {Money(total)}"), ("Opening", string.Empty), ("Debits", string.Empty), ("Credits", string.Empty), ("Closing", 0m)));
+        }
+
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CreditNotesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, string> customers = await _db.Customers.AsNoTracking().IgnoreQueryFilters().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.Name, ct).ConfigureAwait(false);
+        List<OpenItem> notes = await _db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.ItemType == OpenItemType.CreditNote
+            && i.DocumentDate >= fromDate && i.DocumentDate <= toDate).ToListAsync(ct).ConfigureAwait(false);
+        return [.. notes.OrderBy(n => n.ReasonCode ?? "~", StringComparer.Ordinal).ThenBy(n => n.DocumentDate).ThenBy(n => n.DocumentNumber, StringComparer.Ordinal)
+            .Select(n => Row(("Reason", n.ReasonCode ?? "—"), ("Date", Date(n.DocumentDate)), ("Number", n.DocumentNumber), ("Customer", customers.GetValueOrDefault(n.TraderId, "?")), ("Narrative", n.Narrative ?? string.Empty),
+                ("Amount", Math.Abs(n.OriginalBase))))];
     }
 
     // Each receipt's journal gives the bank account debited (the method) and who posted it.

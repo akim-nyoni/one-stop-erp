@@ -38,6 +38,8 @@ public sealed class ReceivablesReportsTests
         Customer small = new(companyId, "AR-SML", "Small Buyer", Scenario.Usd);
         db.Customers.AddRange(big, small);
         await db.SaveChangesAsync();
+        small.ParentCustomerId = big.Id;
+        await db.SaveChangesAsync();
 
         ISalesLedgerService ar = scope.ServiceProvider.GetRequiredService<ISalesLedgerService>();
         async Task Invoice(Customer customer, string number, DateOnly date, decimal amount)
@@ -77,6 +79,15 @@ public sealed class ReceivablesReportsTests
         (await Render("AR48")).Should().Contain("New,Big Buyer,2026-01-10").And.Contain("New,Small Buyer,2026-04-01");
 
         (await Render("AR36")).Should().Contain("Big Buyer,0.00,—,0.00,\"1,000.00\",▼,1000").And.Contain("Small Buyer,0.00,—,250.00,0.00,▲,250");
+
+        (await ar.PostCreditNoteAsync(new One4All.Application.Abstractions.Trading.SalesCreditNoteRequest
+        {
+            CompanyId = companyId, CustomerId = small.Id, DocumentNumber = "CN-AR-1", DocumentDate = new DateOnly(2026, 4, 2), Currency = Scenario.Usd, NetAmount = 50m, SalesAccountCode = "4000",
+            Narrative = "Two damaged units", ReasonCode = "damaged",
+        })).IsSuccess.Should().BeTrue();
+        (await Render("AR37")).Should().Contain("DAMAGED,2026-04-02,CN-AR-1,Small Buyer,Two damaged units,50");
+        (await Render("AR28")).Should().Contain("Big Buyer,AR-BIG Big Buyer,0.00,\"1,000.00\",300.00,700").And.Contain("Big Buyer,AR-SML Small Buyer,0.00,250.00,50.00,200")
+            .And.Contain("Group total: 900.00");
 
         foreach (string code in ReceivablesReports.All().Select(r => r.Code))
         {

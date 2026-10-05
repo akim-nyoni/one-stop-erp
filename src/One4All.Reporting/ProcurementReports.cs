@@ -41,6 +41,9 @@ public static class ProcurementReports
         yield return Listing("PO132", "Purchase Price Variance", "Purchasing", "Each item ordered in the period at a different price from the order before it, with the variance on the quantity ordered.",
             "ProcPriceVariance", [new Column("Item", "Item", 140), new Column("Order", "Order", 85), new Column("Date", "Date", 75), new Column("Supplier", "Supplier", 130), new Column("Previous", "Previous price", 85),
              new Column("Price", "Price", 80), new Column("Change", "Change", 60), new Column("Quantity", "Qty", 55), new Column("Variance", "Variance", 90, true)], Period);
+        yield return Listing("PO136", "Budget Availability at Requisition", "Purchasing", "Open requisition lines charged to a budgeted expense account: the vote's appropriation, spent and committed to date, available before the line and after it.",
+            "ProcBudgetCheck", [new Column("Requisition", "Requisition", 95), new Column("Date", "Date", 75), new Column("Account", "Account", 140), new Column("Line", "Line value", 85), new Column("Appropriation", "Appropriation", 95),
+             new Column("Spent", "Spent", 90), new Column("Committed", "Committed", 90), new Column("Before", "Available", 90), new Column("Status", "Status", 90), new Column("After", "After line", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("PO134", "Procurement Spend Analysis", "Purchasing", "Order value in the period by supplier and currency, with lines, items and share.",
             "ProcSpend", [new Column("Supplier", "Supplier", 150), new Column("Currency", "Currency", 55), new Column("Orders", "Orders", 50), new Column("Lines", "Lines", 50), new Column("Items", "Items", 50),
              new Column("Share", "Share", 60), new Column("Spend", "Spend", 100, true)], Period);

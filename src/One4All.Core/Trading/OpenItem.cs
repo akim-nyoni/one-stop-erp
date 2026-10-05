@@ -109,6 +109,9 @@ public sealed class OpenItem : AuditableEntity, ICompanyScoped
     /// <summary>Optional narrative.</summary>
     public string? Narrative { get; set; }
 
+    /// <summary>Gets or sets the reason code a credit note was raised under.</summary>
+    public string? ReasonCode { get; set; }
+
     /// <summary>
     /// The date finance charges on this item have been raised up to, or null when none have. The next run
     /// charges only the days after it, so a period is never charged twice.

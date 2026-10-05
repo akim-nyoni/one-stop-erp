@@ -12,13 +12,57 @@ namespace One4All.Infrastructure.Reporting;
 /// <summary>Serves the PO-numbered procurement reports (brief §14 G): every data command whose name starts with <c>Proc</c>.</summary>
 public sealed class ProcurementReportDataProvider : IReportDataProvider
 {
+    // Lines are checked in requisition order, each against what is left after the lines before it on the same vote.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BudgetCheckAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        Core.System.FiscalPeriod? period = await (from p in _db.Set<Core.System.FiscalPeriod>().AsNoTracking()
+                                                  join y in _db.FiscalYears.AsNoTracking() on p.FiscalYearId equals y.Id
+                                                  where y.CompanyId == companyId && p.StartDate <= asAt && p.EndDate >= asAt
+                                                  select p).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (period is null)
+        {
+            return [];
+        }
+
+        Dictionary<string, Application.Abstractions.Budgeting.VoteBookRow> votes = (await _budgets.VoteBookAsync(companyId, period.FiscalYearId, period.PeriodNumber, ct).ConfigureAwait(false))
+            .GroupBy(v => v.AccountCode).ToDictionary(g => g.Key, g => g.First());
+        PurchaseRequisitionStatus[] open = [PurchaseRequisitionStatus.Draft, PurchaseRequisitionStatus.Submitted, PurchaseRequisitionStatus.Approved];
+        List<PurchaseRequisition> requisitions = await _db.Set<PurchaseRequisition>().AsNoTracking().Include(r => r.Lines)
+            .Where(r => r.CompanyId == companyId && open.Contains(r.Status) && r.PurchaseOrderId == null && r.RequestedDate <= asAt).OrderBy(r => r.RequestedDate).ThenBy(r => r.RequisitionNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<string, decimal> used = [];
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (PurchaseRequisition r in requisitions)
+        {
+            foreach (PurchaseRequisitionLine line in r.Lines.Where(l => l.ExpenseAccountCode != null))
+            {
+                string account = line.ExpenseAccountCode!;
+                decimal value = line.Quantity * line.UnitPrice;
+                Application.Abstractions.Budgeting.VoteBookRow? vote = votes.GetValueOrDefault(account);
+                decimal before = (vote?.Unexpended ?? 0m) - used.GetValueOrDefault(account), after = before - value;
+                used[account] = used.GetValueOrDefault(account) + value;
+                rows.Add(Row(("Requisition", r.RequisitionNumber), ("Date", r.RequestedDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+                    ("Account", vote is null ? $"{account} (no budget)" : $"{account} {vote.Name}"), ("Line", Money(value)), ("Appropriation", Money(vote?.Appropriation ?? 0m)), ("Spent", Money(vote?.Expenditure ?? 0m)),
+                    ("Committed", Money(vote?.Commitments ?? 0m)), ("Before", Money(before)), ("Status", vote is null ? "No budget" : after >= 0m ? "Within budget" : "Exceeds budget"), ("After", after)));
+            }
+        }
+
+        return rows;
+    }
+
     private static readonly PurchaseOrderStatus[] Done = [PurchaseOrderStatus.Received, PurchaseOrderStatus.Closed, PurchaseOrderStatus.Cancelled];
 
     private readonly One4AllDbContext _db;
+    private readonly Application.Abstractions.Budgeting.IBudgetControlService _budgets;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
-    public ProcurementReportDataProvider(One4AllDbContext db) => _db = db;
+    /// <param name="budgets">The vote book, for the budget check at requisition.</param>
+    public ProcurementReportDataProvider(One4AllDbContext db, Application.Abstractions.Budgeting.IBudgetControlService budgets)
+    {
+        _db = db;
+        _budgets = budgets;
+    }
 
     /// <inheritdoc />
     public bool CanHandle(string command) => command.StartsWith("Proc", StringComparison.OrdinalIgnoreCase);
@@ -32,6 +76,7 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
         DateOnly asAt = DateParameter(parameters, "AsAtDate") ?? to;
         return command.ToUpperInvariant() switch
         {
+            "PROCBUDGETCHECK" => await BudgetCheckAsync(companyId, DateParameter(parameters, "AsAtDate") ?? DateOnly.FromDateTime(DateTime.Today), ct).ConfigureAwait(false),
             "PROCREQUISITIONTURNAROUND" => await RequisitionTurnaroundAsync(companyId, fromDate, to, ct).ConfigureAwait(false),
             "PROCAPPROVALHISTORY" => await ApprovalHistoryAsync(companyId, fromDate, to, ct).ConfigureAwait(false),
             "PROCORDERS" => await OrdersAsync(companyId, fromDate, to, asAt, ct).ConfigureAwait(false),

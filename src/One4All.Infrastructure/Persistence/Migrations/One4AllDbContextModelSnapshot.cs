@@ -15980,6 +15980,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("description");
 
+                    b.Property<string>("ExpenseAccountCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("expense_account_code");
+
                     b.Property<long>("ItemId")
                         .HasColumnType("bigint")
                         .HasColumnName("item_id");
@@ -21941,6 +21946,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("on_hold");
 
+                    b.Property<long?>("ParentCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("parent_customer_id");
+
                     b.Property<int>("PaymentTermsDays")
                         .HasColumnType("integer")
                         .HasColumnName("payment_terms_days");
@@ -22353,6 +22362,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("outstanding_transaction");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("reason_code");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
