@@ -74,6 +74,9 @@ public sealed class LedgerAccount : SoftDeletableEntity, ICompanyScoped
     /// <summary>How the account is treated when restating for hyperinflation (IAS 29); by account type unless set.</summary>
     public Ias29Classification Ias29 { get; set; }
 
+    /// <summary>The notes-to-the-accounts reference the balance is disclosed under (for example "7" or "7.2"); null when not mapped.</summary>
+    public string? NoteReference { get; set; }
+
     /// <summary>The normal balance side, derived from the account type.</summary>
     public NormalBalance NormalBalance => Type.NormalBalance();
 

@@ -13,6 +13,7 @@ internal sealed class LedgerAccountConfiguration : IEntityTypeConfiguration<Ledg
         b.Property(x => x.AccountCode).HasMaxLength(8);
         b.Property(x => x.Name).HasMaxLength(200);
         b.Property(x => x.ReportCategory).HasMaxLength(80);
+        b.Property(x => x.NoteReference).HasMaxLength(20);
         b.Property(x => x.Type).HasConversion<int>();
         b.Property(x => x.ControlAccountType).HasConversion<int>();
         b.Property(x => x.CashFlowCategory).HasConversion<int>();

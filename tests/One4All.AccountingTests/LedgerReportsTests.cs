@@ -1,5 +1,6 @@
 using System.Text;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Reporting;
@@ -44,6 +45,13 @@ public sealed class LedgerReportsTests
         (await scope.ServiceProvider.GetRequiredService<IAccrualService>().PostAccrualAsync(companyId, new DateOnly(2026, 3, 31), new DateOnly(2026, 4, 1), "6000", "2500", 80m, "ACC-1", "Audit fee"))
             .IsSuccess.Should().BeTrue();
 
+        foreach ((string code, string note) in new[] { ("1100", "10"), ("4000", "2"), ("3300", "2.1") })
+        {
+            (await db.Accounts.SingleAsync(a => a.CompanyId == companyId && a.AccountCode == code)).NoteReference = note;
+        }
+
+        await db.SaveChangesAsync();
+
         IHyperinflationService ias29 = scope.ServiceProvider.GetRequiredService<IHyperinflationService>();
         (await ias29.SetIndexAsync(companyId, "CPI", new DateOnly(2026, 2, 1), 100m)).IsSuccess.Should().BeTrue();
         (await ias29.SetIndexAsync(companyId, "CPI", new DateOnly(2026, 3, 1), 100m)).IsSuccess.Should().BeTrue();
@@ -66,6 +74,12 @@ public sealed class LedgerReportsTests
         string accruals = await Render("GL23");
         accruals.Should().Contain("Accrual,ACC-1,2026-03-31,Audit fee,,80").And.Contain("Accrual reversal");
 
+        string notes = await Render("GL10");
+        notes.Should().Contain(",0.00,\"-1,000.00\",-1000").And.Contain("Total note 2.1: -200.00").And.Contain("Total note 10: 1,250.00");
+        notes.IndexOf("Total note 2:", StringComparison.Ordinal).Should().BeLessThan(notes.IndexOf("Total note 2.1", StringComparison.Ordinal));
+        notes.IndexOf("Total note 2.1", StringComparison.Ordinal).Should().BeLessThan(notes.IndexOf("Total note 10", StringComparison.Ordinal));
+        (await Render("GL11")).Should().Contain("Results,Net profit / (loss),\"1,000.00\",\"1,000.00\"").And.Contain("Results,Net margin,100.0%,100.0%")
+            .And.Contain("Financial position,Total liabilities,,");
         (await Render("GL20")).Should().Contain("Year,2026 (2026-01-01 to 2026-12-31),Open").And.Contain("Result,Net profit for the year,\"1,000.00\"").And.Contain("Journals,GL Posted,");
         (await Render("GL25")).Should().Contain("No,\"-1,000.00\",\"-1,250.00\",-250").And.Contain("No,-200.00,-250.00,-50"); // sales and the reserve restated from 100 to 125
 

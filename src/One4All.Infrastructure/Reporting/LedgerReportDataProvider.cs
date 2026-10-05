@@ -49,6 +49,8 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             "GLEDSUSPENSE" => await SuspenseAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDRECURRINGDUE" => await RecurringDueAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDACCRUALS" => await AccrualsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "GLEDNOTES" => await NotesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "GLEDMANAGEMENTPACK" => await ManagementPackAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDELIMINATIONS" => await EliminationsAsync(fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDCONTROLLEGS" => await ControlLegsAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDYEAREND" => await YearEndAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -237,6 +239,96 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
                 ("Amount", j.Lines.Sum(l => l.BaseDebit)));
         })];
     }
+
+    private async Task<Dictionary<string, decimal>> NetByAccountAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+        => await PostedLines(companyId, fromDate, toDate).GroupBy(l => l.AccountCode).Select(g => new { g.Key, Net = g.Sum(l => l.BaseDebit - l.BaseCredit) })
+            .ToDictionaryAsync(g => g.Key, g => g.Net, ct).ConfigureAwait(false);
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> NotesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<LedgerAccount> mapped = await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId && a.NoteReference != null).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<string, decimal> opening = await NetByAccountAsync(companyId, DateOnly.MinValue, fromDate.AddDays(-1), ct).ConfigureAwait(false);
+        Dictionary<string, decimal> movement = await NetByAccountAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (IGrouping<string, LedgerAccount> note in mapped.GroupBy(a => a.NoteReference!).OrderBy(g => g.Key, NoteOrder.Instance))
+        {
+            decimal noteOpening = 0m, noteMovement = 0m;
+            foreach (LedgerAccount account in note.OrderBy(a => a.AccountCode, StringComparer.Ordinal))
+            {
+                decimal o = opening.GetValueOrDefault(account.AccountCode), m = movement.GetValueOrDefault(account.AccountCode);
+                noteOpening += o;
+                noteMovement += m;
+                rows.Add(Row(("Note", note.Key), ("Account", account.AccountCode), ("Name", account.Name), ("Opening", Money(o)), ("Movement", Money(m)), ("Closing", o + m)));
+            }
+
+            rows.Add(Row(("Note", note.Key), ("Account", string.Empty), ("Name", $"Total note {note.Key}: {Money(noteOpening + noteMovement)}"), ("Opening", Money(noteOpening)), ("Movement", Money(noteMovement)),
+                ("Closing", 0m)));
+        }
+
+        return rows;
+    }
+
+    // Orders note references numerically by part ("2" before "10", "7.2" before "7.10"), falling back to text.
+    private sealed class NoteOrder : IComparer<string>
+    {
+        public static readonly NoteOrder Instance = new();
+
+        public int Compare(string? x, string? y)
+        {
+            string[] a = (x ?? string.Empty).Split('.'), b = (y ?? string.Empty).Split('.');
+            for (int i = 0; i < Math.Min(a.Length, b.Length); i++)
+            {
+                int c = int.TryParse(a[i], CultureInfo.InvariantCulture, out int m) && int.TryParse(b[i], CultureInfo.InvariantCulture, out int n) ? m.CompareTo(n) : string.CompareOrdinal(a[i], b[i]);
+                if (c != 0)
+                {
+                    return c;
+                }
+            }
+
+            return a.Length.CompareTo(b.Length);
+        }
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ManagementPackAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Core.System.FiscalYear? year = await _db.FiscalYears.AsNoTracking().FirstOrDefaultAsync(y => y.CompanyId == companyId && y.StartDate <= toDate && y.EndDate >= toDate, ct).ConfigureAwait(false);
+        DateOnly yearStart = year?.StartDate ?? new DateOnly(toDate.Year, 1, 1);
+        List<LedgerAccount> accounts = await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<string, decimal> period = await NetByAccountAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
+        Dictionary<string, decimal> ytd = await NetByAccountAsync(companyId, yearStart, toDate, ct).ConfigureAwait(false);
+        Dictionary<string, decimal> closing = await NetByAccountAsync(companyId, DateOnly.MinValue, toDate, ct).ConfigureAwait(false);
+        decimal Sum(Dictionary<string, decimal> balances, Func<LedgerAccount, bool> filter) => accounts.Where(filter).Sum(a => balances.GetValueOrDefault(a.AccountCode));
+
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        void Add(string section, string item, string periodValue, string atValue) => rows.Add(Row(("Section", section), ("Item", item), ("Period", periodValue), ("YearToDate", atValue)));
+        decimal incomeP = -Sum(period, a => a.Type == AccountType.Income), incomeY = -Sum(ytd, a => a.Type == AccountType.Income);
+        decimal expenseP = Sum(period, a => a.Type == AccountType.Expense), expenseY = Sum(ytd, a => a.Type == AccountType.Expense);
+        Add("Results", "Income", Money(incomeP), Money(incomeY));
+        foreach (string category in accounts.Where(a => a.Type == AccountType.Expense).Select(a => a.ReportCategory).Distinct().Order(StringComparer.Ordinal))
+        {
+            decimal p = Sum(period, a => a.Type == AccountType.Expense && a.ReportCategory == category), y = Sum(ytd, a => a.Type == AccountType.Expense && a.ReportCategory == category);
+            if (p != 0m || y != 0m)
+            {
+                Add("Results", $"Expenses — {(category.Length == 0 ? "other" : category)}", Money(p), Money(y));
+            }
+        }
+
+        Add("Results", "Net profit / (loss)", Money(incomeP - expenseP), Money(incomeY - expenseY));
+        Add("Results", "Net margin", Margin(incomeP, expenseP), Margin(incomeY, expenseY));
+        decimal assets = Sum(closing, a => a.Type == AccountType.Asset), liabilities = -Sum(closing, a => a.Type == AccountType.Liability);
+        decimal equity = -Sum(closing, a => a.Type is AccountType.Equity or AccountType.Income or AccountType.Expense);
+        Add("Financial position", "Total assets", string.Empty, Money(assets));
+        Add("Financial position", "Total liabilities", string.Empty, Money(liabilities));
+        Add("Financial position", "Equity (including unclosed profit)", string.Empty, Money(equity));
+        List<string> banks = await _db.BankAccounts.AsNoTracking().Where(b => b.CompanyId == companyId).Select(b => b.GlAccountCode).ToListAsync(ct).ConfigureAwait(false);
+        Add("Working capital", "Trade receivables", string.Empty, Money(Sum(closing, a => a.ControlAccountType == ControlAccountType.AccountsReceivable)));
+        Add("Working capital", "Trade payables", string.Empty, Money(-Sum(closing, a => a.ControlAccountType == ControlAccountType.AccountsPayable)));
+        Add("Working capital", "Cash at bank (movement / balance)", Money(Sum(period, a => banks.Contains(a.AccountCode))), Money(Sum(closing, a => banks.Contains(a.AccountCode))));
+        return rows;
+    }
+
+    private static string Margin(decimal income, decimal expense)
+        => income == 0m ? "—" : ((income - expense) / income * 100m).ToString("0.0", CultureInfo.InvariantCulture) + "%";
 
     // Group-wide: each intercompany document's journals in every company; it eliminates when two companies hold equal postings.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EliminationsAsync(DateOnly fromDate, DateOnly toDate, CancellationToken ct)

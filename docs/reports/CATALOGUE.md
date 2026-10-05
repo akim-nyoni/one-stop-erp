@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-416 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+418 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -81,6 +81,8 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | GL-TBTYPE | Trial Balance by Type | The trial balance summarised to one line per account type, with debit and credit totals that balance. | AsAtDate (Date, optional) | Type, Debit, Credit | — | Sum(Credit) |
 | GL-VAT | VAT Return | Output tax on sales less input tax on purchases for a period, giving the net VAT payable. | FromDate (Date, optional), ToDate (Date, optional) | Metric, Amount | — | Sum(Amount) |
 | GL-VATC | VAT Return by Code | Output and input tax by tax code for a period, with the net per code — the multi-rate VAT breakdown. | FromDate (Date, optional), ToDate (Date, optional) | TaxCode, OutputTax, InputTax, Net | — | Sum(Net) |
+| GL10 | Notes to the Accounts Schedules | Accounts grouped by their note reference: opening balance, the period's movement and closing balance, with a total per note. | FromDate (Date, optional), ToDate (Date, optional) | Note, Account, Name, Opening, Movement, Closing | — | Sum(Closing) |
+| GL11 | Management Accounts Pack | Results for the period and the year to date, the financial position at the end date and the working-capital balances. | FromDate (Date, optional), ToDate (Date, optional) | Section, Item, Period, YearToDate | — | — |
 | GL12 | Budget vs Actual vs Commitment | Year to date per budgeted account and department: budget, actual, open commitments, what is still available and the share used. | AsAtDate (Date, optional) | Account, Name, Department, Budget, Actual, Committed, Used, Available | — | Sum(Available) |
 | GL14 | Consolidation Elimination Schedule | Every intercompany document across the group in the period: each side's amount, and whether it eliminates or is unmatched. | FromDate (Date, optional), ToDate (Date, optional) | Document, Date, FromCompany, FromAmount, ToCompany, ToAmount, Status, Eliminated | — | Sum(Eliminated) |
 | GL15 | FX Revaluation Report | Unrealised revaluations of foreign-currency balances (ledger and trading) in the period, by account. | FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Type, Narrative, Account, Amount | — | Sum(Amount) |

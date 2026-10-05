@@ -789,6 +789,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<string>("NoteReference")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("note_reference");
+
                     b.Property<string>("ReportCategory")
                         .IsRequired()
                         .HasMaxLength(80)

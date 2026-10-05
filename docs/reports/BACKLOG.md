@@ -6,8 +6,7 @@ missing domain data. Items are struck through as they ship (with the report code
 
 ## A. General Ledger / Financial
 - ~~2 Multi-currency TB (GL2)~~, ~~5 Journal Listing & Audit (GL5)~~, ~~8 Changes in Equity (GL8)~~, ~~12 Budget vs Actual vs Commitment (GL12)~~, ~~15 FX Revaluation (GL15)~~, ~~16 Realised FX (GL16)~~, ~~17 Suspense & Unallocated (GL17)~~, ~~22 Recurring Due / Missed (GL22)~~, ~~23 Accruals, Prepayments & Deferred Income (GL23)~~, ~~24 Intercompany (GL24)~~
-- 10 Notes-to-accounts schedules — needs account → note mapping
-- 11 Management Accounts Pack — data exists (forecast part needs forecasts)
+- ~~10 Notes-to-Accounts Schedules (GL10)~~, ~~11 Management Accounts Pack (GL11)~~
 - ~~14 Consolidation Elimination Schedule (GL14)~~, ~~18 VAT / bank control legs (GL18)~~, ~~20 Year-End Pack (GL20)~~, ~~25 Hyperinflation Working Papers (GL25)~~
 
 ## A-B. Budgeting (B codes)

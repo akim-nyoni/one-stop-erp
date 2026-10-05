@@ -25,6 +25,11 @@ public static class LedgerReports
         yield return Listing("GL8", "Statement of Changes in Equity", "GeneralLedger", "Each equity account's opening balance, the period's profit and other movements, and closing balance.",
             "GledEquity", [new Column("Line", "Line", 200), new Column("Opening", "Opening", 100), new Column("Profit", "Profit for the period", 110), new Column("Movements", "Other movements", 110),
              new Column("Closing", "Closing", 110, true)], Period);
+        yield return Listing("GL10", "Notes to the Accounts Schedules", "GeneralLedger", "Accounts grouped by their note reference: opening balance, the period's movement and closing balance, with a total per note.",
+            "GledNotes", [new Column("Note", "Note", 50), new Column("Account", "Account", 70), new Column("Name", "Name", 200), new Column("Opening", "Opening", 100), new Column("Movement", "Movement", 100),
+             new Column("Closing", "Closing", 100, true)], Period);
+        yield return Listing("GL11", "Management Accounts Pack", "GeneralLedger", "Results for the period and the year to date, the financial position at the end date and the working-capital balances.",
+            "GledManagementPack", [new Column("Section", "Section", 120), new Column("Item", "Item", 220), new Column("Period", "Period", 110), new Column("YearToDate", "Year to date / at date", 120)], Period);
         yield return Listing("GL12", "Budget vs Actual vs Commitment", "GeneralLedger", "Year to date per budgeted account and department: budget, actual, open commitments, what is still available and the share used.",
             "GledBudgetCommitment", [new Column("Account", "Account", 70), new Column("Name", "Name", 160), new Column("Department", "Department", 85), new Column("Budget", "Budget YTD", 95),
              new Column("Actual", "Actual YTD", 95), new Column("Committed", "Committed", 95), new Column("Used", "Used %", 60), new Column("Available", "Available", 100, true)],
