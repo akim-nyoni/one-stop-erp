@@ -100,6 +100,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // General ledger additions (brief §14 A, GL + item number).
+        foreach (ReportDefinition definition in LedgerReports.All())
+        {
+            yield return definition;
+        }
+
         // Audit, security & system listings (brief §14 P and R, SYS + item number).
         foreach (ReportDefinition definition in ControlReports.All())
         {

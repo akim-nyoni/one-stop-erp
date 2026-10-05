@@ -5,17 +5,13 @@ omitted. **Data exists** = the entities / services to build the report are alrea
 missing domain data. Items are struck through as they ship (with the report code).
 
 ## A. General Ledger / Financial
-- 2 Trial Balance multi-currency — data exists
-- 5 Journal Listing & Audit (unposted / reversing / recurring) — data exists
-- 8 Statement of Changes in Equity — data exists
+- ~~2 Multi-currency TB (GL2)~~, ~~5 Journal Listing & Audit (GL5)~~, ~~8 Changes in Equity (GL8)~~, ~~12 Budget vs Actual vs Commitment (GL12)~~, ~~15 FX Revaluation (GL15)~~, ~~16 Realised FX (GL16)~~, ~~17 Suspense & Unallocated (GL17)~~, ~~22 Recurring Due / Missed (GL22)~~, ~~23 Accruals, Prepayments & Deferred Income (GL23)~~, ~~24 Intercompany (GL24)~~
 - 10 Notes-to-accounts schedules — needs account → note mapping
 - 11 Management Accounts Pack — data exists (forecast part needs forecasts)
-- 12 Budget vs Actual vs Commitment — data exists
 - 14 Consolidation elimination schedule — data exists
-- 15 FX Revaluation report; 16 Realised FX gain/loss — data exists
-- 17 Suspense & unallocated review; 18 VAT / bank control legs — data exists
-- 20 Year-End Pack; 22 Recurring journals due / missed; 23 Accruals & prepayments — data exists
-- 24 Intercompany balances & reconciliation; 25 Hyperinflation working papers — data exists
+- 18 VAT / bank control legs — data exists
+- 20 Year-End Pack — data exists
+- 25 Hyperinflation working papers — data exists
 
 ## A-B. Budgeting (B codes)
 - Data exists: B2, B12, B15–B18, B20, B24–B26, B28, B33, B34, B36, B37, B44, B45; partly B14, B19, B21, B27, B42

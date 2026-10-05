@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-295 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+305 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -56,6 +56,16 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | GL-TBTYPE | Trial Balance by Type | The trial balance summarised to one line per account type, with debit and credit totals that balance. | AsAtDate (Date, optional) | Type, Debit, Credit | — | Sum(Credit) |
 | GL-VAT | VAT Return | Output tax on sales less input tax on purchases for a period, giving the net VAT payable. | FromDate (Date, optional), ToDate (Date, optional) | Metric, Amount | — | Sum(Amount) |
 | GL-VATC | VAT Return by Code | Output and input tax by tax code for a period, with the net per code — the multi-rate VAT breakdown. | FromDate (Date, optional), ToDate (Date, optional) | TaxCode, OutputTax, InputTax, Net | — | Sum(Net) |
+| GL12 | Budget vs Actual vs Commitment | Year to date per budgeted account and department: budget, actual, open commitments, what is still available and the share used. | AsAtDate (Date, optional) | Account, Name, Department, Budget, Actual, Committed, Used, Available | — | Sum(Available) |
+| GL15 | FX Revaluation Report | Unrealised revaluations of foreign-currency balances (ledger and trading) in the period, by account. | FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Type, Narrative, Account, Amount | — | Sum(Amount) |
+| GL16 | Realised FX Gain / Loss | Exchange differences realised on settlement in the period. | FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Document, Narrative, Account, Amount | — | Sum(Amount) |
+| GL17 | Suspense & Unallocated Items Review | Balances on suspense accounts and unallocated receipts and payments on the trading ledgers at the date. | AsAtDate (Date, optional) | Item, Reference, Count, Oldest, Balance | — | Sum(Balance) |
+| GL2 | Trial Balance — Multi-currency | Posted balances as at the date per account and transaction currency, in transaction and base. | AsAtDate (Date, optional) | Account, Name, Currency, Transaction, Base | — | Sum(Base) |
+| GL22 | Recurring Journals Due & Missed | Each active recurring template's last posted month against the date: posted, due or missed. | AsAtDate (Date, optional) | Code, Description, LastPosted, Status, Value | — | Sum(Value) |
+| GL23 | Accruals, Prepayments & Deferred Income Schedule | Accrual and prepayment journals in the period, then deferred income schedules with what is left to recognise. | FromDate (Date, optional), ToDate (Date, optional) | Kind, Reference, Date, Detail, Recognised, Amount | — | Sum(Amount) |
+| GL24 | Intercompany Balances & Reconciliation | Intercompany journals in the period and whether the counterparty company holds the mirror entry. | FromDate (Date, optional), ToDate (Date, optional) | Document, Date, Narrative, Counterparty, Status, Amount | — | Sum(Amount) |
+| GL5 | Journal Listing & Journal Audit | Every journal in the period with status, source, manual flag, who prepared and approved it, reversals and value. | FromDate (Date, optional), ToDate (Date, optional) | Journal, Date, Status, Source, Document, Manual, PreparedBy, ApprovedBy, Reversal, Value | — | Sum(Value) |
+| GL8 | Statement of Changes in Equity | Each equity account's opening balance, the period's profit and other movements, and closing balance. | FromDate (Date, optional), ToDate (Date, optional) | Line, Opening, Profit, Movements, Closing | — | Sum(Closing) |
 
 ## Housing
 
