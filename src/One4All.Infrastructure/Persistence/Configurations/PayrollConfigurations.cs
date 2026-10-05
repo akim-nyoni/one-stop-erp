@@ -373,3 +373,20 @@ internal sealed class BackpayLineConfiguration : IEntityTypeConfiguration<Backpa
         b.HasIndex(x => new { x.CompanyId, x.PaidOn });
     }
 }
+
+internal sealed class DeductionArrearConfiguration : IEntityTypeConfiguration<DeductionArrear>
+{
+    public void Configure(EntityTypeBuilder<DeductionArrear> b)
+    {
+        b.ToTable("deduction_arrear", Schemas.Payroll);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ElementCode).HasMaxLength(30);
+        b.Property(x => x.PeriodLabel).HasMaxLength(40);
+        b.Property(x => x.RunReference).HasMaxLength(40);
+        b.Property(x => x.Reason).HasMaxLength(200);
+        b.Property(x => x.Attempted).HasPrecision(19, 4);
+        b.Property(x => x.Deducted).HasPrecision(19, 4);
+        b.Property(x => x.Movement).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.ElementCode });
+    }
+}

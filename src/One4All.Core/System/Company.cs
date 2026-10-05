@@ -63,6 +63,16 @@ public sealed class Company : SoftDeletableEntity
     public decimal? ManualJournalApprovalThreshold { get; set; }
 
     /// <summary>
+    /// Net-pay protection (brief §4.15.4): the minimum take-home pay as an amount. When deductions would take net pay below the floor
+    /// (the higher of this and <see cref="MinimumTakeHomePercent"/> of gross), the run suspends lower-priority deductions and
+    /// carries them forward as arrears. Null with a null percentage turns protection off.
+    /// </summary>
+    public decimal? MinimumTakeHomeAmount { get; set; }
+
+    /// <summary>Gets or sets the minimum take-home pay as a percentage of gross (see <see cref="MinimumTakeHomeAmount"/>).</summary>
+    public decimal? MinimumTakeHomePercent { get; set; }
+
+    /// <summary>
     /// Whether fund control is on (brief §4.4 / §4.18.5): expenditure cannot be posted to a budget-enabled expense account
     /// (a vote) that has no appropriation in the year's active approved or supplementary budget.
     /// </summary>

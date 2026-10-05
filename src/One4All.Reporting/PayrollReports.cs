@@ -116,6 +116,9 @@ public static class PayrollReports
             "PyrlCurrencySplit", [new Column("Employee", "Employee", 150), new Column("Period", "Period", 65), new Column("Currency", "Ccy", 40), new Column("Earnings", "Earnings (ccy)", 90), new Column("Rate", "Rate", 60),
              new Column("EarningsBase", "Earnings (base)", 90), new Column("Share", "Share", 50), new Column("Method", "Bands applied", 190), new Column("TaxCurrency", "Tax (ccy)", 80),
              new Column("Deducted", "Deducted (base)", 85), new Column("TaxBase", "Tax (base)", 85, true)], Period);
+        yield return Listing("PR71", "Net-Pay Protection & Deduction Arrears", "Payroll", "Deductions suspended to keep net pay at the minimum take-home, and arrears recovered later: attempted, deducted, why, and the arrears still carried forward.",
+            "PyrlArrears", [new Column("Employee", "Employee", 160), new Column("Period", "Period", 70), new Column("Element", "Deduction", 80), new Column("Attempted", "Attempted", 90), new Column("Deducted", "Deducted", 90),
+             new Column("Reason", "Reason", 260), new Column("Outstanding", "Arrears c/f", 90, true)], Period);
         yield return Listing("PR19", "Third-Party Remittance Schedules", "Payroll", "Per scheme and member for the period: the employee's deduction and the employer's contribution — the schedule each provider needs.",
             "PyrlSchemes", [new Column("Scheme", "Scheme", 110), new Column("Employee", "Employee", 160), new Column("Member", "Member no.", 90), new Column("EmployeePart", "Employee", 90),
              new Column("EmployerPart", "Employer", 90), new Column("Total", "Total", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("SchemeCode", ParameterType.String)]);

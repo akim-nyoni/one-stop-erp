@@ -338,6 +338,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Legacy payroll lines imported for the parallel run.</summary>
     public DbSet<Core.Payroll.LegacyPayslipLine> LegacyPayslipLines => Set<Core.Payroll.LegacyPayslipLine>();
 
+    /// <summary>Deductions suspended by net-pay protection and arrears recovered.</summary>
+    public DbSet<Core.Payroll.DeductionArrear> DeductionArrears => Set<Core.Payroll.DeductionArrear>();
+
     /// <summary>Backpay calculation lines.</summary>
     public DbSet<Core.Payroll.BackpayLine> BackpayLines => Set<Core.Payroll.BackpayLine>();
 

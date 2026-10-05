@@ -8,6 +8,7 @@ using One4All.Application.Abstractions.SalesOrders;
 using One4All.Application.Abstractions.Schools;
 using One4All.Core.Banking;
 using One4All.Core.Payroll;
+using One4All.Core.System;
 using static One4All.Desktop.Operations.Ops;
 
 namespace One4All.Desktop.Operations;
@@ -164,6 +165,29 @@ public static partial class OperationCatalogue
                 return $"{preview}{Environment.NewLine}{Environment.NewLine}Backpay net {M(run.TotalNet)} paid, journal {run.JournalNumber}; basic salary updated.";
             },
             List = PayrollRunsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Set net-pay protection", ListTitle = "Deductions and their suspension priority",
+            Description = "The minimum take-home (an amount and / or % of gross) and, optionally, one deduction's suspension priority (0 = never suspended; highest is suspended first).",
+            Fields = [OptNum("Amount", "Minimum take-home amount"), OptNum("Percent", "Minimum take-home % of gross"), Opt("Element", "Deduction code"), OptNum("Priority", "Its suspension priority")],
+            Run = async (c, i) =>
+            {
+                Company company = await c.Db.Companies.FirstAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                company.MinimumTakeHomeAmount = i.OptionalNumber("Amount");
+                company.MinimumTakeHomePercent = i.OptionalNumber("Percent");
+                if (i.Optional("Element") is string code)
+                {
+                    PayElement element = await c.Db.PayElements.FirstOrDefaultAsync(e => e.CompanyId == c.CompanyId && e.Code.ToUpper() == code.ToUpper() && e.Type == PayElementType.Deduction).ConfigureAwait(true)
+                        ?? throw new OperationException($"No deduction '{code}'.");
+                    element.SuspensionPriority = i.Whole("Priority");
+                }
+
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return company.MinimumTakeHomeAmount is null && company.MinimumTakeHomePercent is null ? "Net-pay protection is off." : "Net-pay protection saved; see PR71 after the next run.";
+            },
+            List = async c => Table(await c.Db.PayElements.AsNoTracking().Where(e => e.CompanyId == c.CompanyId && e.Type == PayElementType.Deduction).OrderBy(e => e.Sequence).ToListAsync().ConfigureAwait(true),
+                ("Deduction", e => e.Code), ("Name", e => e.Name), ("Sequence", e => e.Sequence), ("Suspension priority", e => e.SuspensionPriority == 0 ? "never" : e.SuspensionPriority.ToString(CultureInfo.InvariantCulture))),
         };
         yield return new Operation
         {

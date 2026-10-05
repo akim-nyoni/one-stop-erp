@@ -122,6 +122,12 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
     /// the multi-currency tax split (PR35) converts them at the pay date's rate.
     /// </summary>
     public CurrencyCode? PaidInCurrency { get; set; }
+
+    /// <summary>
+    /// Gets or sets the deduction's suspension priority under net-pay protection: 0 (the default — tax, pension, court orders) is never
+    /// suspended; otherwise the highest number is suspended first.
+    /// </summary>
+    public int SuspensionPriority { get; set; }
 }
 
 /// <summary>A balance a payroll deduction recovers from the employee (brief §4.15.4).</summary>

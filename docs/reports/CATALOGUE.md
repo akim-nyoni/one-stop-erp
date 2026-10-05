@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-531 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+532 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -391,6 +391,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | PR69 | Payslip Reprint Log | Payslips printed more than once: each print after the first with when and by whom. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Period, Print, When, User | — | — |
 | PR7 | Payroll Run Control Register | Every payroll run in the period: employees, gross, deductions, net, the journal and who ran it. | FromDate (Date, optional), ToDate (Date, optional) | Period, PayDate, Employees, Gross, Deductions, Journal, RunBy, Net | — | Sum(Net) |
 | PR70 | Year-to-Date Payroll Register | Per employee for the year to the end of the period: gross, taxable, deductions, employer contributions and net. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Department, Gross, Taxable, Deductions, Employer, Net | — | Sum(Net) |
+| PR71 | Net-Pay Protection & Deduction Arrears | Deductions suspended to keep net pay at the minimum take-home, and arrears recovered later: attempted, deducted, why, and the arrears still carried forward. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Period, Element, Attempted, Deducted, Reason, Outstanding | — | Sum(Outstanding) |
 | PR8 | Parallel Run Comparison | Go-live parallel run: One4All's payslips against the imported legacy payroll, per period, employee and element (NET for net pay). | FromDate (Date, optional), ToDate (Date, optional) | Period, Employee, Element, One4All, Legacy, Status, Difference | — | Sum(Difference) |
 | PR9 | Supplementary Runs & Reversal Register | Every supplementary, backpay and reversal run in the period, and every run reversed: reason, approval and journals. | FromDate (Date, optional), ToDate (Date, optional) | Run, Period, Kind, PayDate, Reason, Employees, Journal, Reversal, Net | — | Sum(Net) |
 

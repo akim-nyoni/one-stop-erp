@@ -115,3 +115,74 @@ public sealed class BackpayLine : Entity, ICompanyScoped
     /// <summary>The retrospective change.</summary>
     public string Reason { get; private set; }
 }
+
+/// <summary>
+/// A deduction suspended by net-pay protection, or arrears recovered later (<c>pay.deduction_arrear</c>): what the run tried to deduct
+/// (this period's amount plus arrears brought forward), what it deducted, and the movement in the arrears carried forward.
+/// </summary>
+public sealed class DeductionArrear : Entity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private DeductionArrear()
+    {
+        ElementCode = string.Empty;
+        PeriodLabel = string.Empty;
+        RunReference = string.Empty;
+        Reason = string.Empty;
+    }
+
+    /// <summary>Creates the entry.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="employeeId">The employee.</param>
+    /// <param name="elementCode">The deduction.</param>
+    /// <param name="periodLabel">The period.</param>
+    /// <param name="runReference">The run.</param>
+    /// <param name="payDate">The pay date.</param>
+    /// <param name="attempted">This period's amount plus arrears brought forward.</param>
+    /// <param name="deducted">What was deducted.</param>
+    /// <param name="movement">The change in the arrears carried forward (positive suspends, negative recovers).</param>
+    /// <param name="reason">Why.</param>
+    public DeductionArrear(long companyId, long employeeId, string elementCode, string periodLabel, string runReference, DateOnly payDate, decimal attempted, decimal deducted, decimal movement, string reason)
+    {
+        CompanyId = companyId;
+        EmployeeId = employeeId;
+        ElementCode = elementCode;
+        PeriodLabel = periodLabel;
+        RunReference = runReference;
+        PayDate = payDate;
+        Attempted = attempted;
+        Deducted = deducted;
+        Movement = movement;
+        Reason = reason;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The employee.</summary>
+    public long EmployeeId { get; private set; }
+
+    /// <summary>The deduction.</summary>
+    public string ElementCode { get; private set; }
+
+    /// <summary>The period.</summary>
+    public string PeriodLabel { get; private set; }
+
+    /// <summary>The run.</summary>
+    public string RunReference { get; private set; }
+
+    /// <summary>The pay date.</summary>
+    public DateOnly PayDate { get; private set; }
+
+    /// <summary>This period's amount plus arrears brought forward.</summary>
+    public decimal Attempted { get; private set; }
+
+    /// <summary>What was deducted.</summary>
+    public decimal Deducted { get; private set; }
+
+    /// <summary>The change in arrears carried forward.</summary>
+    public decimal Movement { get; private set; }
+
+    /// <summary>Why.</summary>
+    public string Reason { get; private set; }
+}

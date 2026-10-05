@@ -48,7 +48,9 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         Dictionary<long, PayElement> elements = await LoadElementsAsync(companyId, ct).ConfigureAwait(false);
         DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow);
         Dictionary<long, Dictionary<string, object?>> recoveries = await RecoveryVariablesAsync(companyId, [employee], elements, today, ct).ConfigureAwait(false);
-        Result<Payslip> slip = BuildPayslip(companyId, employee, elements, "PREVIEW", today, recoveries: recoveries[employee.Id]);
+        Dictionary<long, Dictionary<string, decimal>> arrears = await ArrearsAsync(companyId, [employee], ct).ConfigureAwait(false);
+        Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        Result<Payslip> slip = BuildProtected(company, employee, elements, "PREVIEW", today, recoveries[employee.Id], arrears[employee.Id]).Slip;
         if (slip.IsFailure)
         {
             return slip.Error;
@@ -70,7 +72,9 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
         Dictionary<long, PayElement> elements = await LoadElementsAsync(companyId, ct).ConfigureAwait(false);
         Dictionary<long, Dictionary<string, object?>> recoveries = await RecoveryVariablesAsync(companyId, [employee], elements, payDate, ct).ConfigureAwait(false);
-        Result<Payslip> slip = BuildPayslip(companyId, employee, elements, periodLabel, payDate, recoveries: recoveries[employee.Id]);
+        Dictionary<long, Dictionary<string, decimal>> arrears = await ArrearsAsync(companyId, [employee], ct).ConfigureAwait(false);
+        Company payer = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        Result<Payslip> slip = BuildProtected(payer, employee, elements, periodLabel, payDate, recoveries[employee.Id], arrears[employee.Id]).Slip;
         if (slip.IsFailure)
         {
             return slip.Error;
@@ -137,19 +141,33 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         }
 
         Dictionary<long, Dictionary<string, object?>> recoveries = await RecoveryVariablesAsync(companyId, employees, elements, payDate, ct).ConfigureAwait(false);
+        Dictionary<long, Dictionary<string, decimal>> arrears = await ArrearsAsync(companyId, employees, ct).ConfigureAwait(false);
+        HashSet<string> recoveryCodes = new(elements.Values.Where(e => e.Recovers != PayRecovery.None).Select(e => e.Code), StringComparer.OrdinalIgnoreCase);
         List<Payslip> slips = [];
+        List<DeductionArrear> arrearEntries = [];
         foreach (Employee employee in employees)
         {
-            Result<Payslip> slip = BuildPayslip(companyId, employee, elements, periodLabel, payDate, documentNumber: documentNumber, recoveries: recoveries[employee.Id]);
+            (Result<Payslip> slip, IReadOnlyList<DeductionOutcome> outcomes, decimal floor) = BuildProtected(company, employee, elements, periodLabel, payDate, recoveries[employee.Id], arrears[employee.Id],
+                documentNumber);
             if (slip.IsFailure)
             {
                 return slip.Error;
             }
 
             slips.Add(slip.Value);
+
+            // Recoveries (staff purchases, rent) carry their own balances, so only ordinary deductions build up arrears.
+            arrearEntries.AddRange(ArrearEntries(companyId, employee, periodLabel, documentNumber, payDate, [.. outcomes.Where(o => !recoveryCodes.Contains(o.Code))], arrears[employee.Id], floor));
         }
 
-        return await PostRunAsync(company, periodLabel, payDate, netPayAccountCode, documentNumber, slips, elements, PayRunKind.Regular, null, ct).ConfigureAwait(false);
+        Result<PayrollRunResult> run = await PostRunAsync(company, periodLabel, payDate, netPayAccountCode, documentNumber, slips, elements, PayRunKind.Regular, null, ct).ConfigureAwait(false);
+        if (run.IsSuccess && arrearEntries.Count > 0)
+        {
+            _db.DeductionArrears.AddRange(arrearEntries);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
+        return run;
     }
 
     // Whether the period has a regular run that has not been reversed. Runs from before the run register are known by their payslips.
@@ -251,7 +269,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             .ToDictionaryAsync(e => e.Id, ct).ConfigureAwait(false);
 
     private Result<Payslip> BuildPayslip(long companyId, Employee employee, IReadOnlyDictionary<long, PayElement> elements, string periodLabel, DateOnly payDate,
-        decimal? basicSalary = null, string documentNumber = "", IReadOnlyDictionary<string, object?>? recoveries = null)
+        decimal? basicSalary = null, string documentNumber = "", IReadOnlyDictionary<string, object?>? recoveries = null, IReadOnlyDictionary<string, decimal>? arrears = null,
+        IReadOnlyDictionary<string, decimal>? caps = null)
     {
         Payslip payslip = new(companyId, employee.Id, periodLabel, payDate, PayRunKind.Regular, documentNumber);
 
@@ -289,6 +308,18 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             }
 
             decimal amount = decimal.Round(resolved.Value, 2, MidpointRounding.ToEven);
+
+            // Net-pay protection: arrears suspended earlier are attempted again; a cap holds a suspended deduction down.
+            if (element.Type == PayElementType.Deduction && element.Recovers == PayRecovery.None)
+            {
+                amount += arrears?.GetValueOrDefault(element.Code) ?? 0m;
+            }
+
+            if (caps is not null && caps.TryGetValue(element.Code, out decimal cap))
+            {
+                amount = Math.Min(amount, cap);
+            }
+
             vars[element.Code] = amount;
 
             switch (element.Type)

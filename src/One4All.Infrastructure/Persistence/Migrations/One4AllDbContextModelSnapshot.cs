@@ -13980,6 +13980,81 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("backpay_line", "pay");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.DeductionArrear", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Attempted")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("attempted");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("Deducted")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("deducted");
+
+                    b.Property<string>("ElementCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("element_code");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<decimal>("Movement")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("movement");
+
+                    b.Property<DateOnly>("PayDate")
+                        .HasColumnType("date")
+                        .HasColumnName("pay_date");
+
+                    b.Property<string>("PeriodLabel")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("period_label");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reason");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("RunReference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("run_reference");
+
+                    b.HasKey("Id")
+                        .HasName("pk_deduction_arrear");
+
+                    b.HasIndex("CompanyId", "EmployeeId", "ElementCode")
+                        .HasDatabaseName("ix_deduction_arrear_company_id_employee_id_element_code");
+
+                    b.ToTable("deduction_arrear", "pay");
+                });
+
             modelBuilder.Entity("One4All.Core.Payroll.DisciplinaryRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -14896,6 +14971,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("Sequence")
                         .HasColumnType("integer")
                         .HasColumnName("sequence");
+
+                    b.Property<int>("SuspensionPriority")
+                        .HasColumnType("integer")
+                        .HasColumnName("suspension_priority");
 
                     b.Property<bool>("Taxable")
                         .HasColumnType("boolean")
@@ -21839,6 +21918,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("manual_journal_approval_threshold");
+
+                    b.Property<decimal?>("MinimumTakeHomeAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("minimum_take_home_amount");
+
+                    b.Property<decimal?>("MinimumTakeHomePercent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("minimum_take_home_percent");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")

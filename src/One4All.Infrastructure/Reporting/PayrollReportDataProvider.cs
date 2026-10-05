@@ -71,6 +71,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLSTAFFPURCHASES" => await StaffPurchasesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLHOUSINGRENT" => await HousingRentAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLCURRENCYSPLIT" => await CurrencySplitAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLARREARS" => await ArrearsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLSCHEMES" => await SchemeScheduleAsync(companyId, fromDate, toDate, _ => true, Text(parameters, "SchemeCode"), ct).ConfigureAwait(false),
             "PYRLSCHEMESOCIAL" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.SocialSecurity, null, ct).ConfigureAwait(false),
             "PYRLSCHEMEPENSION" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.Pension, null, ct).ConfigureAwait(false),
@@ -694,6 +695,30 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
                     ("Earnings", earnings is decimal e ? Money(e) : "no rate"), ("Rate", rate is decimal x ? x.ToString("0.####", CultureInfo.InvariantCulture) : "no rate"), ("EarningsBase", Money(earningsBase)),
                     ("Share", (share * 100m).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Method", method), ("TaxCurrency", taxCurrency is decimal t ? Money(t) : "no rate"),
                     ("Deducted", Money(decimal.Round(deducted * share, 2, MidpointRounding.ToEven))), ("TaxBase", taxBase)));
+            }
+        }
+
+        return rows;
+    }
+
+    // PR71: every deduction suspended by net-pay protection or recovered later in the period, with the arrears still carried forward.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ArrearsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        List<DeductionArrear> entries = await _db.DeductionArrears.AsNoTracking().Where(a => a.CompanyId == companyId && a.PayDate <= toDate).OrderBy(a => a.PayDate).ThenBy(a => a.Id).ToListAsync(ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (IGrouping<(long EmployeeId, string ElementCode), DeductionArrear> group in entries.GroupBy(a => (a.EmployeeId, a.ElementCode))
+                     .OrderBy(g => Name(employees, g.Key.EmployeeId), StringComparer.Ordinal).ThenBy(g => g.Key.ElementCode, StringComparer.Ordinal))
+        {
+            decimal outstanding = 0m;
+            foreach (DeductionArrear entry in group)
+            {
+                outstanding += entry.Movement;
+                if (entry.PayDate >= fromDate)
+                {
+                    rows.Add(Row(("Employee", Name(employees, entry.EmployeeId)), ("Period", entry.PeriodLabel), ("Element", entry.ElementCode), ("Attempted", Money(entry.Attempted)),
+                        ("Deducted", Money(entry.Deducted)), ("Reason", entry.Reason), ("Outstanding", outstanding)));
+                }
             }
         }
 

@@ -226,6 +226,7 @@ public sealed partial class PayrollService
             return rent.Error;
         }
 
+        await ReverseArrearsAsync(companyId, run.DocumentNumber, reversalDocument, date, ct).ConfigureAwait(false);
         run.MarkReversed(date, reversalDocument, approvedByUserId);
         _db.Set<PayrollRunRecord>().Add(new PayrollRunRecord(companyId, run.PeriodLabel, date, original.Count, gross, deductions, net, reversed.Value.JournalNumber, PayRunKind.Reversal,
             reversalDocument, reason.Trim()));
