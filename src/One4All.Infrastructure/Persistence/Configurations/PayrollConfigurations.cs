@@ -11,6 +11,7 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         b.ToTable("employee", Schemas.HumanResources);
         b.HasKey(x => x.Id);
         b.Property(x => x.EmployeeNumber).HasMaxLength(30);
+        b.Property(x => x.EmploymentType).HasConversion<int>();
         b.Property(x => x.FullName).HasMaxLength(200);
         b.Property(x => x.Department).HasMaxLength(30);
         b.Property(x => x.CostCentre).HasMaxLength(30);
@@ -305,5 +306,29 @@ internal sealed class AttendanceRecordConfiguration : IEntityTypeConfiguration<A
         b.Property(x => x.OvertimeHours).HasPrecision(9, 2);
         b.Property(x => x.OvertimeMultiplier).HasPrecision(5, 2);
         b.HasIndex(x => new { x.EmployeeId, x.Date }).IsUnique();
+    }
+}
+
+internal sealed class EmployeePaymentSplitConfiguration : IEntityTypeConfiguration<EmployeePaymentSplit>
+{
+    public void Configure(EntityTypeBuilder<EmployeePaymentSplit> b)
+    {
+        b.ToTable("payment_split", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Method).HasConversion<int>();
+        b.Property(x => x.Destination).HasMaxLength(80);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.HasIndex(x => x.EmployeeId);
+    }
+}
+
+internal sealed class PayslipPrintConfiguration : IEntityTypeConfiguration<PayslipPrint>
+{
+    public void Configure(EntityTypeBuilder<PayslipPrint> b)
+    {
+        b.ToTable("payslip_print", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PeriodLabel).HasMaxLength(20);
+        b.HasIndex(x => new { x.EmployeeId, x.PeriodLabel });
     }
 }

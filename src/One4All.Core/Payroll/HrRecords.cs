@@ -296,3 +296,76 @@ public sealed class GarnisheeOrder : Entity, ICompanyScoped
     /// <summary>Gets when it was issued.</summary>
     public DateOnly IssuedOn { get; private set; }
 }
+
+/// <summary>Part of an employee's net pay sent to a second account or method (<c>hr.payment_split</c>); the rest goes to the primary account.</summary>
+public sealed class EmployeePaymentSplit : Entity, ICompanyScoped
+{
+    private EmployeePaymentSplit()
+    {
+        Destination = string.Empty;
+    }
+
+    /// <summary>Creates a split.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="employeeId">The employee.</param>
+    /// <param name="method">How this part is paid.</param>
+    /// <param name="destination">The bank account or wallet.</param>
+    /// <param name="amount">The fixed amount sent there each period.</param>
+    public EmployeePaymentSplit(long companyId, long employeeId, PayMethod method, string destination, decimal amount)
+    {
+        CompanyId = companyId;
+        EmployeeId = employeeId;
+        Method = method;
+        Destination = destination;
+        Amount = amount;
+    }
+
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; private set; }
+
+    /// <summary>Gets the employee.</summary>
+    public long EmployeeId { get; private set; }
+
+    /// <summary>Gets how this part is paid.</summary>
+    public PayMethod Method { get; private set; }
+
+    /// <summary>Gets the account or wallet.</summary>
+    public string Destination { get; private set; }
+
+    /// <summary>Gets the fixed amount.</summary>
+    public decimal Amount { get; private set; }
+}
+
+/// <summary>A payslip printed or rendered (<c>hr.payslip_print</c>); the second and later prints of the same payslip are reprints.</summary>
+public sealed class PayslipPrint : AuditableEntity, ICompanyScoped
+{
+    private PayslipPrint()
+    {
+        PeriodLabel = string.Empty;
+    }
+
+    /// <summary>Logs a print.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="employeeId">The employee.</param>
+    /// <param name="periodLabel">The period.</param>
+    /// <param name="payDate">The pay date.</param>
+    public PayslipPrint(long companyId, long employeeId, string periodLabel, DateOnly payDate)
+    {
+        CompanyId = companyId;
+        EmployeeId = employeeId;
+        PeriodLabel = periodLabel;
+        PayDate = payDate;
+    }
+
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; private set; }
+
+    /// <summary>Gets the employee.</summary>
+    public long EmployeeId { get; private set; }
+
+    /// <summary>Gets the period.</summary>
+    public string PeriodLabel { get; private set; }
+
+    /// <summary>Gets the pay date.</summary>
+    public DateOnly PayDate { get; private set; }
+}

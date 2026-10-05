@@ -124,6 +124,9 @@ public static class PayrollReports
         yield return Listing("PR36", "Tax Table in Force", "Payroll", "The PAYE bands that apply at the date, with the tax at the top of each band.",
             "PyrlTaxTable", [new Column("Table", "Table", 80), new Column("Effective", "Effective", 75), new Column("From", "From", 90), new Column("To", "To", 90), new Column("Rate", "Rate %", 60),
              new Column("Cumulative", "Tax at band top", 100)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("PR14", "Split-Pay Report", "Payroll", "Employees whose net pay is split across accounts or methods: each fixed part and what is left for the primary account from the latest net pay in the period.",
+            "PyrlSplitPay", [new Column("Employee", "Employee", 160), new Column("Primary", "Primary", 140), new Column("Splits", "Other parts", 240), new Column("Net", "Net pay", 90),
+             new Column("Remainder", "To primary", 95, true)], Period);
         yield return Listing("PR21", "Garnishee & Court Order Register", "Payroll", "Every court order by employee and priority: creditor, instalment, total ordered, deducted through payroll to the date and the balance still to collect.",
             "PyrlGarnishees", [new Column("Employee", "Employee", 150), new Column("Reference", "Order", 90), new Column("Creditor", "Creditor", 130), new Column("Priority", "Priority", 50), new Column("Issued", "Issued", 75),
              new Column("Instalment", "Instalment", 80), new Column("Total", "Ordered", 90), new Column("Deducted", "Deducted", 90), new Column("Balance", "Balance", 95, true)], [("AsAtDate", ParameterType.Date)]);
@@ -133,6 +136,9 @@ public static class PayrollReports
         yield return Listing("PR25", "Overtime Analysis", "Payroll", "Overtime in the period by department, employee and multiplier: hours, approved and unapproved hours, and the cost at the basic hourly rate.",
             "PyrlOvertime", [new Column("Department", "Department", 100), new Column("Employee", "Employee", 150), new Column("Multiplier", "Rate ×", 50), new Column("Hours", "Hours", 55), new Column("Approved", "Approved", 60),
              new Column("Unapproved", "Unapproved", 70), new Column("Cost", "Cost", 90, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("HoursPerMonth", ParameterType.Decimal)]);
+        yield return Listing("PR34", "Taxable Benefits Schedule", "Payroll", "Benefits in kind paid in the period per employee: category, value and the PAYE they add at the table in force.",
+            "PyrlBenefits", [new Column("Employee", "Employee", 160), new Column("Category", "Category", 110), new Column("Element", "Element", 120), new Column("Value", "Value", 90),
+             new Column("TaxEffect", "Tax effect", 90, true)], Period);
         yield return Listing("PR39", "Leave Taken Analysis", "Payroll", "Leave taken in the period by type, department and month: employees and days.",
             "PyrlLeaveTaken", [new Column("Type", "Type", 80), new Column("Department", "Department", 110), new Column("Month", "Month", 65), new Column("Employees", "Employees", 65), new Column("Records", "Absences", 60),
              new Column("Days", "Days", 70, true)], Period);
@@ -152,9 +158,19 @@ public static class PayrollReports
         yield return Listing("PR47", "Establishment vs Actual", "Payroll", "Per department and grade at the date: approved posts, filled, vacant and over establishment, with the annual saving on vacant posts.",
             "PyrlEstablishment", [new Column("Department", "Department", 110), new Column("Grade", "Grade", 60), new Column("Approved", "Approved", 60), new Column("Filled", "Filled", 50), new Column("Vacant", "Vacant", 50),
              new Column("Over", "Over", 45), new Column("Saving", "Vacancy saving", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("PR52", "Termination & Final Settlement", "Payroll", "Leavers in the period with their final settlement computed: notice, leave, gratuity, severance (retrenchment), recoveries, tax on terminal benefits and the net.",
+            "PyrlFinalSettlement", [new Column("Employee", "Employee", 150), new Column("Left", "Left", 75), new Column("Reason", "Reason", 90), new Column("Years", "Years", 40), new Column("Notice", "Notice", 75),
+             new Column("Leave", "Leave", 75), new Column("Gratuity", "Gratuity", 75), new Column("Severance", "Severance", 75), new Column("Recoveries", "Recoveries", 75), new Column("Tax", "Tax", 65),
+             new Column("Net", "Net", 90, true)],
+            [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("NoticeMonths", ParameterType.Decimal), ("GratuityWeeksPerYear", ParameterType.Decimal), ("SeveranceWeeksPerYear", ParameterType.Decimal),
+             ("TerminalTaxRate", ParameterType.Decimal)]);
         yield return Listing("PR53", "Clearance Checklist Outstanding", "Payroll", "Leavers by the date who still hold company assets, owe on loans or have leave not yet settled.",
             "PyrlClearance", [new Column("Employee", "Employee", 160), new Column("Left", "Left", 75), new Column("Reason", "Reason", 110), new Column("Assets", "Assets held", 170), new Column("Leave", "Leave days", 60),
              new Column("Items", "Outstanding", 60), new Column("Loans", "Loans owed", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("PR54", "Gratuity & Long Service Provision", "Payroll", "Per employee in service: completed years, the gratuity earned to date and its value discounted from normal retirement (IAS 19 other long-term benefits).",
+            "PyrlGratuity", [new Column("Employee", "Employee", 160), new Column("Years", "Service years", 70), new Column("Accrued", "Earned to date", 95), new Column("ToRetirement", "Years to retirement", 90),
+             new Column("Provision", "Provision", 95, true)],
+            [("AsAtDate", ParameterType.Date), ("WeeksPerYear", ParameterType.Decimal), ("RetirementAge", ParameterType.Integer), ("DiscountRate", ParameterType.Decimal)]);
         yield return Listing("PR55", "Employee Documents Expiring / Missing", "Payroll", "Employees in service whose documents have expired or expire within the window, or who lack a required document type.",
             "PyrlDocuments", [new Column("Employee", "Employee", 160), new Column("Type", "Document", 90), new Column("Reference", "Number", 100), new Column("Expires", "Expires", 75), new Column("Status", "Status", 80)],
             [("AsAtDate", ParameterType.Date), ("Days", ParameterType.Integer), ("RequiredTypes", ParameterType.String)]);
@@ -164,10 +180,15 @@ public static class PayrollReports
         yield return Listing("PR57", "Training & Qualification Register; Appraisal Due", "Payroll", "Training and qualifications held with renewal status, then each employee's last appraisal and when the next is due.",
             "PyrlTraining", [new Column("Section", "Section", 70), new Column("Employee", "Employee", 160), new Column("Item", "Course / rating", 160), new Column("Date", "Completed / held", 80),
              new Column("Due", "Renew / next due", 80), new Column("Status", "Status", 70), new Column("Cost", "Cost", 85, true)], [("AsAtDate", ParameterType.Date), ("Days", ParameterType.Integer)]);
+        yield return Listing("PR62", "Overtime & Casual Labour vs Permanent Cost", "Payroll", "Per department over the period: pay to permanent and contract staff, to casuals, and overtime, with casual plus overtime as a share of the permanent cost.",
+            "PyrlLabourMix", [new Column("Department", "Department", 110), new Column("Permanent", "Permanent & contract", 110), new Column("Casual", "Casual", 90), new Column("Overtime", "Overtime", 90),
+             new Column("Share", "Casual + OT / permanent", 110), new Column("Total", "Total labour", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("HoursPerMonth", ParameterType.Decimal)]);
         yield return Listing("PR63", "Payroll Accrual Schedule", "Payroll", "Employees in service at the period end not yet paid for that month (including salaries on hold), with the basic salary to accrue.",
             "PyrlAccrual", [new Column("Employee", "Employee", 160), new Column("Department", "Department", 100), new Column("LastPaid", "Last paid", 75), new Column("Status", "Status", 140),
              new Column("Accrual", "Accrual", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("PR66", "Segregation of Duties Violations — Payroll", "Payroll", "Users who processed a payroll run in the period after changing employee pay or payment details, and anyone who processed a run that paid themselves.",
             "PyrlSod", [new Column("User", "User", 100), new Column("Violation", "Violation", 200), new Column("Detail", "Detail", 260), new Column("Run", "Run", 100), new Column("When", "When", 110)], Period);
+        yield return Listing("PR69", "Payslip Reprint Log", "Payroll", "Payslips printed more than once: each print after the first with when and by whom.",
+            "PyrlReprints", [new Column("Employee", "Employee", 160), new Column("Period", "Period", 70), new Column("Print", "Print no.", 55), new Column("When", "When", 115), new Column("User", "By", 100)], Period);
     }
 }

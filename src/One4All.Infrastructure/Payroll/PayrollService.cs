@@ -87,6 +87,9 @@ public sealed class PayrollService : IPayrollService
             NetPay = slip.Value.NetPay,
         };
 
+        // Every render is logged; the second and later of the same payslip are reprints (PR69).
+        _db.PayslipPrints.Add(new PayslipPrint(companyId, employeeId, periodLabel, payDate));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return PayslipFormatter.ToPlainText(document, width);
     }
 

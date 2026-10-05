@@ -83,6 +83,14 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLABSENCE" => await AbsenceAsync(companyId, fromDate, toDate, Number(parameters, "FullPayDays", 90m), Number(parameters, "HalfPayDays", 90m), ct).ConfigureAwait(false),
             "PYRLENCASHMENT" => await EncashmentAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLATTENDANCEEXCEPTIONS" => await AttendanceExceptionsAsync(companyId, fromDate, toDate, Number(parameters, "MaxHours", 12m), ct).ConfigureAwait(false),
+            "PYRLSPLITPAY" => await SplitPayAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLBENEFITS" => await BenefitsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLFINALSETTLEMENT" => await FinalSettlementAsync(companyId, fromDate, toDate, new TerminalPolicy(Number(parameters, "NoticeMonths", 1m), 21.67m,
+                Number(parameters, "GratuityWeeksPerYear", 2m), Number(parameters, "SeveranceWeeksPerYear", 4m), Number(parameters, "TerminalTaxRate", 0m)), ct).ConfigureAwait(false),
+            "PYRLGRATUITY" => await GratuityAsync(companyId, asAt, Number(parameters, "WeeksPerYear", 2m), (int)Number(parameters, "RetirementAge", 65m), Number(parameters, "DiscountRate", 10m), ct)
+                .ConfigureAwait(false),
+            "PYRLLABOURMIX" => await LabourMixAsync(companyId, fromDate, toDate, Number(parameters, "HoursPerMonth", 173.33m), ct).ConfigureAwait(false),
+            "PYRLREPRINTS" => await ReprintsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLLOANS" => await LoansAsync(companyId, ct).ConfigureAwait(false),
             "PYRLJOBALLOCATION" => await JobAllocationAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLCLEARANCE" => await ClearanceAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -618,6 +626,98 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         }
 
         return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SplitPayAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        List<EmployeePaymentSplit> splits = await _db.PaymentSplits.AsNoTracking().Where(s => s.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        List<Payslip> slips = await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
+        return [.. splits.GroupBy(s => s.EmployeeId).OrderBy(g => Name(employees, g.Key), StringComparer.Ordinal).Select(g =>
+        {
+            Employee? e = employees.GetValueOrDefault(g.Key);
+            decimal net = slips.Where(p => p.EmployeeId == g.Key).OrderBy(p => p.PayDate).Select(p => p.NetPay).LastOrDefault();
+            string primary = e is null ? "?" : e.PaymentMethod == PayMethod.MobileMoney ? $"MobileMoney {e.MobileMoneyNumber ?? "—"}" : $"{e.PaymentMethod} {e.BankAccountNumber ?? "—"}";
+            return Row(("Employee", Name(employees, g.Key)), ("Primary", primary), ("Splits", string.Join("; ", g.Select(s => $"{s.Method} {s.Destination} {Money(s.Amount)}"))), ("Net", Money(net)),
+                ("Remainder", Math.Max(0m, net - g.Sum(s => s.Amount))));
+        })];
+    }
+
+    // The tax effect of a benefit is the PAYE on the payslip's taxable pay less the PAYE without the benefit, at the table in force.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BenefitsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<string, PayElement> benefits = await _db.PayElements.AsNoTracking().Where(p => p.CompanyId == companyId && p.BenefitCategory != null).ToDictionaryAsync(p => p.Code, ct).ConfigureAwait(false);
+        List<TaxTable> tables = await _db.Set<TaxTable>().AsNoTracking().Include(t => t.Bands).Where(t => t.CompanyId == companyId).OrderBy(t => t.EffectiveFrom).ToListAsync(ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (Payslip slip in (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).OrderBy(p => Name(employees, p.EmployeeId), StringComparer.Ordinal).ThenBy(p => p.PayDate))
+        {
+            decimal taxable = slip.Lines.Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount);
+            List<PayeBand> bands = [.. (InForce(tables, slip.PayDate)?.Bands ?? []).Select(b => new PayeBand(b.From, b.To, b.RatePercent))];
+            foreach (PayslipLine line in slip.Lines.Where(l => benefits.ContainsKey(l.ElementCode)))
+            {
+                decimal effect = bands.Count == 0 || !line.Taxable ? 0m : PayeTable.Tax(bands, taxable) - PayeTable.Tax(bands, taxable - line.Amount);
+                rows.Add(Row(("Employee", Name(employees, slip.EmployeeId)), ("Category", benefits[line.ElementCode].BenefitCategory), ("Element", benefits[line.ElementCode].Name), ("Value", Money(line.Amount)),
+                    ("TaxEffect", effect)));
+            }
+        }
+
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> FinalSettlementAsync(long companyId, DateOnly fromDate, DateOnly toDate, TerminalPolicy policy, CancellationToken ct)
+    {
+        List<Employee> leavers = [.. (await EmployeesAsync(companyId, ct).ConfigureAwait(false)).Values.Where(e => e.TerminationDate is DateOnly left && left >= fromDate && left <= toDate)
+            .OrderBy(e => e.TerminationDate).ThenBy(e => e.EmployeeNumber, StringComparer.Ordinal)];
+        List<long> ids = [.. leavers.Select(e => e.Id)];
+        List<EmployeeLoan> loans = await _db.Set<EmployeeLoan>().AsNoTracking().Where(l => ids.Contains(l.EmployeeId) && l.Outstanding > 0m).ToListAsync(ct).ConfigureAwait(false);
+        List<EmployeeLeaveBalance> leave = await _db.Set<EmployeeLeaveBalance>().AsNoTracking().Where(l => ids.Contains(l.EmployeeId) && l.LeaveType.ToUpper() == "ANNUAL").ToListAsync(ct).ConfigureAwait(false);
+        return [.. leavers.Select(e =>
+        {
+            bool retrenched = (e.TerminationReason ?? string.Empty).Contains("retrench", StringComparison.OrdinalIgnoreCase);
+            FinalSettlement s = TerminalBenefits.Settle(e.BasicSalary, e.EngagementDate, e.TerminationDate!.Value, leave.Where(l => l.EmployeeId == e.Id).Sum(l => l.AccruedDays - l.TakenDays), retrenched,
+                loans.Where(l => l.EmployeeId == e.Id).Sum(l => l.Outstanding), policy);
+            return Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Left", Date(e.TerminationDate!.Value)), ("Reason", e.TerminationReason ?? "—"), ("Years", s.Years), ("Notice", Money(s.Notice)),
+                ("Leave", Money(s.Leave)), ("Gratuity", Money(s.Gratuity)), ("Severance", Money(s.Severance)), ("Recoveries", Money(s.Recoveries)), ("Tax", Money(s.Tax)), ("Net", s.Net));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GratuityAsync(long companyId, DateOnly asAt, decimal weeksPerYear, int retirementAge, decimal discountRate, CancellationToken ct)
+        => [.. (await EmployeesAsync(companyId, ct).ConfigureAwait(false)).Values.Where(e => EmployedOn(e, asAt)).OrderBy(e => e.EmployeeNumber, StringComparer.Ordinal).Select(e =>
+        {
+            var p = TerminalBenefits.Provision(e.BasicSalary, e.EngagementDate, asAt, e.DateOfBirth, weeksPerYear, retirementAge, discountRate);
+            return Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Years", TerminalBenefits.CompletedYears(e.EngagementDate, asAt)), ("Accrued", Money(p.Accrued)),
+                ("ToRetirement", e.DateOfBirth is null ? "—" : p.YearsToRetirement.ToString(CultureInfo.InvariantCulture)), ("Provision", p.Provision));
+        })];
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LabourMixAsync(long companyId, DateOnly fromDate, DateOnly toDate, decimal hoursPerMonth, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        List<Payslip> slips = await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
+        List<AttendanceRecord> overtime = [.. (await AttendanceAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).Where(a => a.OvertimeHours > 0m)];
+        string Department(long id) => employees.GetValueOrDefault(id)?.Department ?? "—";
+        bool Casual(long id) => employees.GetValueOrDefault(id)?.EmploymentType == EmploymentType.Casual;
+        return [.. slips.Select(p => Department(p.EmployeeId)).Concat(overtime.Select(a => Department(a.EmployeeId))).Distinct().Order(StringComparer.Ordinal).Select(d =>
+        {
+            decimal permanent = slips.Where(p => Department(p.EmployeeId) == d && !Casual(p.EmployeeId)).Sum(p => p.GrossEarnings);
+            decimal casual = slips.Where(p => Department(p.EmployeeId) == d && Casual(p.EmployeeId)).Sum(p => p.GrossEarnings);
+            decimal ot = overtime.Where(a => Department(a.EmployeeId) == d)
+                .Sum(a => AttendanceRules.OvertimeCost(a.OvertimeHours, employees.GetValueOrDefault(a.EmployeeId)?.BasicSalary ?? 0m, hoursPerMonth, a.OvertimeMultiplier));
+            return Row(("Department", d), ("Permanent", Money(permanent)), ("Casual", Money(casual)), ("Overtime", Money(ot)),
+                ("Share", permanent == 0m ? "—" : ((casual + ot) * 100m / permanent).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Total", permanent + casual + ot));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReprintsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        List<PayslipPrint> prints = await _db.PayslipPrints.AsNoTracking().Where(p => p.CompanyId == companyId).OrderBy(p => p.Id).ToListAsync(ct).ConfigureAwait(false);
+        DateTimeOffset start = Start(fromDate), end = End(toDate);
+        return [.. prints.GroupBy(p => (p.EmployeeId, p.PeriodLabel, p.PayDate)).SelectMany(g => g.Select((p, i) => (p, Number: i + 1)))
+            .Where(x => x.Number > 1 && x.p.CreatedOnUtc >= start && x.p.CreatedOnUtc <= end).OrderBy(x => x.p.CreatedOnUtc)
+            .Select(x => Row(("Employee", Name(employees, x.p.EmployeeId)), ("Period", x.p.PeriodLabel), ("Print", x.Number), ("When", x.p.CreatedOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)),
+                ("User", users.GetValueOrDefault(x.p.CreatedByUserId, x.p.CreatedByUserId == 0 ? "system" : $"user {x.p.CreatedByUserId}"))))];
     }
 
     private static int Days(IReadOnlyDictionary<string, object?> parameters)

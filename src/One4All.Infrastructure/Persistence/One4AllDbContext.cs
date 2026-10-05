@@ -302,6 +302,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the daily attendance.</summary>
     public DbSet<Core.Payroll.AttendanceRecord> AttendanceRecords => Set<Core.Payroll.AttendanceRecord>();
 
+    /// <summary>Gets the split-pay instructions.</summary>
+    public DbSet<Core.Payroll.EmployeePaymentSplit> PaymentSplits => Set<Core.Payroll.EmployeePaymentSplit>();
+
+    /// <summary>Gets the payslip print log.</summary>
+    public DbSet<Core.Payroll.PayslipPrint> PayslipPrints => Set<Core.Payroll.PayslipPrint>();
+
     /// <summary>Payslips.</summary>
     public DbSet<Core.Payroll.Payslip> Payslips => Set<Core.Payroll.Payslip>();
 

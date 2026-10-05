@@ -106,4 +106,7 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
     /// <see cref="AccountCode"/>). A run refuses a non-zero contribution without one rather than leave it off the ledger.
     /// </summary>
     public string? ContributionExpenseAccountCode { get; set; }
+
+    /// <summary>Gets or sets the taxable-benefit category (motor vehicle, housing, loan, school fees) when the earning is a benefit in kind.</summary>
+    public string? BenefitCategory { get; set; }
 }

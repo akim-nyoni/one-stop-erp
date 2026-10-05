@@ -15,6 +15,19 @@ public enum EmployeeStatus
     Terminated = 3,
 }
 
+/// <summary>The kind of employment (brief §14 PR62).</summary>
+public enum EmploymentType
+{
+    /// <summary>Permanent establishment.</summary>
+    Permanent = 0,
+
+    /// <summary>Fixed-term contract.</summary>
+    Contract = 1,
+
+    /// <summary>Casual / day labour.</summary>
+    Casual = 2,
+}
+
 /// <summary>How an employee's net pay is paid (brief §14 PR11–PR13).</summary>
 public enum PayMethod
 {
@@ -86,6 +99,9 @@ public sealed class Employee : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Gets or sets the system login that belongs to this employee, so payroll can spot anyone processing their own pay.</summary>
     public long? UserId { get; set; }
+
+    /// <summary>Gets or sets the kind of employment.</summary>
+    public EmploymentType EmploymentType { get; set; }
 
     /// <summary>The engagement date.</summary>
     public DateOnly EngagementDate { get; private set; }
