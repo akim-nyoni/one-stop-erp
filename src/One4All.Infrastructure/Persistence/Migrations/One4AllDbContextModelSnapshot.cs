@@ -1813,6 +1813,50 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("budget", "bud");
                 });
 
+            modelBuilder.Entity("One4All.Core.Budgeting.BudgetCeiling", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Department")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("department");
+
+                    b.Property<long>("FiscalYearId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fiscal_year_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ceiling");
+
+                    b.HasIndex("CompanyId", "FiscalYearId", "Department")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ceiling_company_id_fiscal_year_id_department");
+
+                    b.ToTable("ceiling", "bud");
+                });
+
             modelBuilder.Entity("One4All.Core.Budgeting.BudgetCommitment", b =>
                 {
                     b.Property<long>("Id")
@@ -1903,6 +1947,62 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("commitment", "bud");
                 });
 
+            modelBuilder.Entity("One4All.Core.Budgeting.BudgetDriver", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("FiscalYearId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fiscal_year_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("unit");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_driver");
+
+                    b.HasIndex("CompanyId", "FiscalYearId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_driver_company_id_fiscal_year_id_code");
+
+                    b.ToTable("driver", "bud");
+                });
+
             modelBuilder.Entity("One4All.Core.Budgeting.BudgetLine", b =>
                 {
                     b.Property<long>("Id")
@@ -1923,6 +2023,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("amount");
 
+                    b.Property<int>("Basis")
+                        .HasColumnType("integer")
+                        .HasColumnName("basis");
+
                     b.Property<long>("BudgetId")
                         .HasColumnType("bigint")
                         .HasColumnName("budget_id");
@@ -1931,6 +2035,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("cost_centre");
+
+                    b.Property<string>("DriverCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("driver_code");
 
                     b.Property<int>("Period")
                         .HasColumnType("integer")
@@ -2046,6 +2155,63 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_budget_virement_reviewer_not_requester", "status <> 1 OR reviewed_by_user_id <> requested_by_user_id");
                         });
+                });
+
+            modelBuilder.Entity("One4All.Core.Budgeting.DepartmentUnit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BudgetHolder")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("budget_holder");
+
+                    b.Property<string>("BudgetHolderEmail")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("budget_holder_email");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Department")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("department");
+
+                    b.Property<string>("Directorate")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("directorate");
+
+                    b.Property<string>("Division")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("division");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_department_unit");
+
+                    b.HasIndex("CompanyId", "Department")
+                        .IsUnique()
+                        .HasDatabaseName("ix_department_unit_company_id_department");
+
+                    b.ToTable("department_unit", "bud");
                 });
 
             modelBuilder.Entity("One4All.Core.Budgeting.VarianceComment", b =>

@@ -220,4 +220,10 @@ public sealed class BudgetLine : Entity
 
     /// <summary>The approved virement that added the line; null for the budget as approved.</summary>
     public long? VirementId { get; private set; }
+
+    /// <summary>Gets or sets how the amount was arrived at.</summary>
+    public BudgetBasis Basis { get; set; }
+
+    /// <summary>Gets or sets the driver the line is built from (driver-based lines).</summary>
+    public string? DriverCode { get; set; }
 }

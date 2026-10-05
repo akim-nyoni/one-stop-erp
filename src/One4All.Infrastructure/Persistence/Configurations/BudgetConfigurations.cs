@@ -33,6 +33,8 @@ internal sealed class BudgetLineConfiguration : IEntityTypeConfiguration<BudgetL
         b.HasKey(x => x.Id);
         b.Property(x => x.AccountCode).HasMaxLength(8);
         b.Property(x => x.CostCentre).HasMaxLength(20);
+        b.Property(x => x.Basis).HasConversion<int>();
+        b.Property(x => x.DriverCode).HasMaxLength(20);
         b.HasIndex(x => new { x.BudgetId, x.AccountCode, x.Period });
     }
 }
@@ -79,5 +81,46 @@ internal sealed class BudgetCommitmentConfiguration : IEntityTypeConfiguration<B
         b.Property(x => x.Reference).HasMaxLength(60);
         b.Property(x => x.Status).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.FiscalYearId, x.Type, x.Department, x.AccountCode, x.Status });
+    }
+}
+
+internal sealed class BudgetDriverConfiguration : IEntityTypeConfiguration<BudgetDriver>
+{
+    public void Configure(EntityTypeBuilder<BudgetDriver> b)
+    {
+        b.ToTable("driver", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.Unit).HasMaxLength(20);
+        b.Property(x => x.Value).HasPrecision(19, 6);
+        b.HasIndex(x => new { x.CompanyId, x.FiscalYearId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class BudgetCeilingConfiguration : IEntityTypeConfiguration<BudgetCeiling>
+{
+    public void Configure(EntityTypeBuilder<BudgetCeiling> b)
+    {
+        b.ToTable("ceiling", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Department).HasMaxLength(80);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.FiscalYearId, x.Department }).IsUnique();
+    }
+}
+
+internal sealed class DepartmentUnitConfiguration : IEntityTypeConfiguration<DepartmentUnit>
+{
+    public void Configure(EntityTypeBuilder<DepartmentUnit> b)
+    {
+        b.ToTable("department_unit", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Department).HasMaxLength(80);
+        b.Property(x => x.Division).HasMaxLength(80);
+        b.Property(x => x.Directorate).HasMaxLength(80);
+        b.Property(x => x.BudgetHolder).HasMaxLength(120);
+        b.Property(x => x.BudgetHolderEmail).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.Department }).IsUnique();
     }
 }

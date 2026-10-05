@@ -350,6 +350,15 @@ public class One4AllDbContext : DbContext
     /// <summary>Budgets.</summary>
     public DbSet<Core.Budgeting.Budget> Budgets => Set<Core.Budgeting.Budget>();
 
+    /// <summary>Gets the planning drivers.</summary>
+    public DbSet<Core.Budgeting.BudgetDriver> BudgetDrivers => Set<Core.Budgeting.BudgetDriver>();
+
+    /// <summary>Gets the departmental ceilings.</summary>
+    public DbSet<Core.Budgeting.BudgetCeiling> BudgetCeilings => Set<Core.Budgeting.BudgetCeiling>();
+
+    /// <summary>Gets the department hierarchy and budget holders.</summary>
+    public DbSet<Core.Budgeting.DepartmentUnit> DepartmentUnits => Set<Core.Budgeting.DepartmentUnit>();
+
     /// <summary>Cashiering stations.</summary>
     public DbSet<Core.Receipting.CashierStation> CashierStations => Set<Core.Receipting.CashierStation>();
 

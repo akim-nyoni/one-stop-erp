@@ -21,6 +21,26 @@ public static class BudgetingReports
         yield return Listing("B2", "Departmental Budget Submission", "Budget", "Every budget of the year by department and version: each account's quarters and annual total.",
             "BgtSubmission", [new Column("Budget", "Budget", 120), new Column("Version", "Ver", 40), new Column("Status", "Status", 75), new Column("Department", "Department", 85), new Column("Account", "Account", 65),
              new Column("Name", "Name", 140), new Column("Q1", "Q1", 80), new Column("Q2", "Q2", 80), new Column("Q3", "Q3", 80), new Column("Q4", "Q4", 80), new Column("Total", "Annual", 95, true)], AsAt);
+        yield return Listing("B3", "Target vs Submission Gap", "Budget", "Per department: the ceiling issued, what its latest draft requests, and the gap still to reconcile.",
+            "BgtCeilingGap", [new Column("Department", "Department", 120), new Column("Ceiling", "Ceiling", 100), new Column("Requested", "Requested", 100), new Column("Status", "Status", 90), new Column("Gap", "Over / (under)", 100, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("B4", "Consolidated Draft Budget by Hierarchy", "Budget", "The latest drafts rolled up department → division → directorate → company, at the level asked for.",
+            "BgtHierarchy", [new Column("Level", "Level", 80), new Column("Unit", "Unit", 160), new Column("Departments", "Departments", 70), new Column("Requested", "Requested", 110, true)],
+            [("AsAtDate", ParameterType.Date), ("Level", ParameterType.String)]);
+        yield return Listing("B5", "Assumption & Driver Register", "Budget", "The year's planning drivers with their value and the budget lines each one feeds.",
+            "BgtDrivers", [new Column("Driver", "Driver", 80), new Column("Name", "Name", 160), new Column("Unit", "Unit", 50), new Column("Value", "Value", 80), new Column("Lines", "Lines fed", 60), new Column("Amount", "Amount fed", 100, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("B6", "Assumption Sensitivity / What-If", "Budget", "Change one driver: each dependent line scaled to the new value, the change per line and on the total.",
+            "BgtWhatIf", [new Column("Budget", "Budget", 110), new Column("Account", "Account", 70), new Column("Department", "Department", 100), new Column("Current", "Current", 95), new Column("Revised", "Revised", 95),
+             new Column("Change", "Change", 95, true)], [("AsAtDate", ParameterType.Date), ("DriverCode", ParameterType.String), ("NewValue", ParameterType.Decimal)]);
+        yield return Listing("B7", "Budget Preparation Basis", "Budget", "How every line of the year's budgets was arrived at — zero-based, incremental, actuals-based or driver-based — with the driver.",
+            "BgtBasis", [new Column("Budget", "Budget", 120), new Column("Department", "Department", 100), new Column("Account", "Account", 70), new Column("Basis", "Basis", 90), new Column("Driver", "Driver", 70),
+             new Column("Amount", "Annual amount", 100, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("B8", "Establishment-Driven Staff Budget", "Budget", "Per department: approved posts at their annual cost less the vacancy factor, against the staff budget held for the department.",
+            "BgtStaff", [new Column("Department", "Department", 110), new Column("Posts", "Posts", 50), new Column("Filled", "Filled", 50), new Column("Establishment", "Establishment cost", 105), new Column("Vacancy", "Vacancy factor", 80),
+             new Column("Expected", "Expected cost", 100), new Column("Budgeted", "Staff budget", 100), new Column("Difference", "Budget less expected", 100, true)],
+            [("AsAtDate", ParameterType.Date), ("StaffAccount", ParameterType.String), ("VacancyPercent", ParameterType.Decimal)]);
+        yield return Listing("B10", "Revenue Budget Build-up", "Budget", "Driver-based revenue lines: the volume each is built on, the implied rate and the amount.",
+            "BgtRevenueBuild", [new Column("Budget", "Budget", 110), new Column("Account", "Account", 70), new Column("Name", "Name", 140), new Column("Driver", "Driver", 70), new Column("Volume", "Volume", 80),
+             new Column("Rate", "Rate", 80), new Column("Amount", "Amount", 100, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("B12", "Budget Version Comparison", "Budget", "For each budget with more than one version: the latest against the one before, per account.",
             "BgtVersions", [new Column("Budget", "Budget", 130), new Column("Versions", "Versions", 70), new Column("Account", "Account", 65), new Column("Name", "Name", 150), new Column("Previous", "Previous", 95),
              new Column("Current", "Current", 95), new Column("Percent", "Change %", 65), new Column("Change", "Change", 95, true)], AsAt);
@@ -61,6 +81,9 @@ public static class BudgetingReports
         yield return Listing("B29", "Year-End Commitment Carry-Forward Schedule", "Budget", "Commitments of the year that lapsed or were carried into the next year at year end, with who approved the carry-forward.",
             "BgtCarryForward", [new Column("Reference", "Reference", 100), new Column("Account", "Account", 70), new Column("Department", "Department", 100), new Column("Period", "Period", 50), new Column("Outcome", "Outcome", 100),
              new Column("ApprovedBy", "Approved by", 90), new Column("Amount", "Amount", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("B32", "Budget Holder Statement", "Budget", "Per budget holder: their department's votes — budget, spent and committed to date, available and utilisation.",
+            "BgtHolders", [new Column("Holder", "Budget holder", 130), new Column("Department", "Department", 100), new Column("Account", "Vote", 70), new Column("Budget", "Budget", 95), new Column("Actual", "Spent", 95),
+             new Column("Committed", "Committed", 90), new Column("Used", "Used %", 60), new Column("Available", "Available", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("B33", "Budget Utilisation (RAG)", "Budget", "Year-to-date use of each budgeted account's year-to-date budget: green under 90%, amber to 100%, red over.",
             "BgtUtilisation", [new Column("Account", "Account", 65), new Column("Name", "Name", 160), new Column("Budget", "Budget YTD", 95), new Column("Used", "Used %", 60), new Column("Rag", "RAG", 55),
              new Column("Actual", "Actual YTD", 100, true)], AsAt);

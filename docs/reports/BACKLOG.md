@@ -13,7 +13,8 @@ missing domain data. Items are struck through as they ship (with the report code
 - ~~B2~~, ~~B12~~, ~~B15~~, ~~B16 / B17 (one register with seal check)~~, ~~B18~~, ~~B20~~, ~~B24~~, ~~B25~~, ~~B26~~, ~~B28~~, ~~B33~~, ~~B34~~, ~~B36~~, ~~B37~~, ~~B44~~, ~~B45~~
 - ~~B1 Preparation Status (B1)~~, ~~B13 Requested vs Approved~~, ~~B19 Approved Register~~, ~~B21 Reconciliation~~, ~~B22 Supplementary Schedule~~, ~~B29 Commitment Carry-Forward~~, ~~B38 Outturn~~, ~~B39 Forecast Movement~~, ~~B41 Cash Budget~~, ~~B42 Capital Projects~~
 - Data exists, partly: B14 (approval rounds), B27 (blocks / overrides)
-- Needs new data: B3–B10 (targets, hierarchy, drivers, basis, establishment-driven staff budget, capital phasing, revenue build-up), B23 (rephasing), B30, B32 (budget holders), B35 (volume / price / FX), B40 (rolling forecast)
+- ~~B3 Ceiling Gap~~, ~~B4 Hierarchy Roll-up~~, ~~B5 Drivers~~, ~~B6 What-If~~, ~~B7 Basis~~, ~~B8 Staff Budget~~, ~~B10 Revenue Build-up~~, ~~B32 Budget Holder Statement~~
+- Needs new data: B9 (capital phasing / S-curve), B23 (rephasing), B30, B35 (volume / price / FX), B40 (rolling forecast)
 
 ## B. Accounts Receivable
 - ~~29 Aged detail (AR29)~~, ~~30 by rep / currency (AR30)~~, ~~31 Customer Ledger (AR31)~~, ~~33 Sales Day Book (AR33)~~, ~~35 Top Customers (AR35)~~, ~~39 / 44 Unallocated & advances (AR39)~~, ~~40 DSO (AR40)~~, ~~41 Promise-to-Pay (AR41)~~, ~~43 Write-offs (AR43)~~, ~~45 Lay-byes (AR45)~~, ~~47 Exposure by Currency (AR47)~~, ~~48 New & Dormant (AR48)~~
