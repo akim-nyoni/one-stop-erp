@@ -8884,6 +8884,100 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("reason_code", "inv");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.StockTransfer", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("DispatchedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("dispatched_on");
+
+                    b.Property<long>("FromWarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("from_warehouse_id");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<DateOnly?>("ReceivedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("received_on");
+
+                    b.Property<decimal?>("ReceivedQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("received_quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("ToWarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("to_warehouse_id");
+
+                    b.Property<string>("TransferNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("transfer_number");
+
+                    b.Property<long>("TransitWarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("transit_warehouse_id");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stock_transfer");
+
+                    b.HasIndex("CompanyId", "TransferNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stock_transfer_company_id_transfer_number");
+
+                    b.ToTable("stock_transfer", "inv");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.StocktakeLine", b =>
                 {
                     b.Property<long>("Id")
@@ -9135,6 +9229,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<long?>("ConsignmentCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("consignment_customer_id");
+
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("created_by_user_id");
@@ -9162,6 +9260,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsQuarantine")
                         .HasColumnType("boolean")
                         .HasColumnName("is_quarantine");
+
+                    b.Property<bool>("IsTransit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_transit");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")

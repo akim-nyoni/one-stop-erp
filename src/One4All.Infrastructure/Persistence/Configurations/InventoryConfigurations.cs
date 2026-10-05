@@ -143,3 +143,18 @@ internal sealed class StockLotMovementConfiguration : IEntityTypeConfiguration<S
         b.HasIndex(x => x.StockMovementId);
     }
 }
+
+internal sealed class StockTransferConfiguration : IEntityTypeConfiguration<StockTransfer>
+{
+    public void Configure(EntityTypeBuilder<StockTransfer> b)
+    {
+        b.ToTable("stock_transfer", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.TransferNumber).HasMaxLength(40);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.Property(x => x.Value).HasPrecision(19, 4);
+        b.Property(x => x.ReceivedQuantity).HasPrecision(19, 4);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.TransferNumber }).IsUnique();
+    }
+}

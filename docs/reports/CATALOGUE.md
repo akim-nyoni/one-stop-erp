@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-431 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+433 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -219,6 +219,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | INV-REORDER | Reorder Report | Items at or below their reorder level, with the suggested reorder quantity — a purchasing aid. | — | ItemCode, Description, OnHand, ReorderLevel, Suggested | — | Sum(Suggested) |
 | INV-SLOW | Slow-moving Stock | Items on hand with no movement since the given date — capital tied up in dead stock. | SinceDate (Date, optional) | ItemCode, Description, Warehouse, Quantity, Value, LastMovement | — | Sum(Value) |
 | INV-VAL | Stock Valuation | Quantity on hand and value at moving average cost, per item and warehouse. | AsAtDate (Date, optional) | ItemCode, Description, WarehouseCode, Quantity, AverageCost, Value | — | Sum(Value) |
+| INV101 | Consignment Stock | Our stock held at customers' sites on consignment, per customer and item, with the last movement and value at average cost. | AsAtDate (Date, optional) | Customer, Warehouse, Item, OnHand, LastMovement, Value | — | Sum(Value) |
 | INV78 | Stock Valuation vs GL Stock Control | The stock register's value at the date by warehouse against the stock control accounts, with the difference. | AsAtDate (Date, optional) | Line, Items, Quantity, Value | — | Sum(Value) |
 | INV79 | Stock on Hand & Availability | Per item and warehouse: on hand, committed to orders, on order, free and available to promise. | — | Item, Warehouse, OnHand, Committed, OnOrder, Free, Atp, Value | — | Sum(Value) |
 | INV81 | Stocktake Count Sheets & Variance | Each stocktake's lines: system quantity, counted, variance in quantity and value (uncounted lines flagged). | — | Stocktake, Date, Warehouse, Status, Item, System, Counted, Variance, Value | — | Sum(Value) |
@@ -228,6 +229,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | INV88 | Batch / Lot Stock Report | Batch-tracked stock on hand at the date per item, warehouse and batch, with first receipt, expiry and value at average cost. | AsAtDate (Date, optional) | Item, Warehouse, Batch, Received, Expiry, OnHand, Value | — | Sum(Value) |
 | INV89 | Serial Number Register | Every serial number: where it is, when it came in and when and how it last moved, and whether it is still in stock. | AsAtDate (Date, optional) | Item, Serial, Status, Warehouse, Received, LastMoved, LastMovement | — | — |
 | INV90 | Expiry Report | Batches on hand that have expired or expire within the window, soonest first, with the value at risk. | AsAtDate (Date, optional), Days (Integer, optional) | Item, Warehouse, Batch, Expiry, Days, Status, OnHand, Value | — | Sum(Value) |
+| INV91 | Goods in Transit | Transfers dispatched but not yet received at the date: from, to, days on the road, quantity and value. | AsAtDate (Date, optional) | Transfer, Item, From, To, Dispatched, Days, Quantity, Value | — | Sum(Value) |
 | INV92 | Stock Turnover & Days Cover | Per item over the period: cost of issues, average stock value, turnover and days of cover at the current rate. | FromDate (Date, optional), ToDate (Date, optional) | Item, Issued, AverageStock, Turns, DaysCover, Value | — | Sum(Value) |
 | INV93 | Gross Margin by Item | Per item over the period: net sales (POS and invoiced orders), cost of issues and the margin. | FromDate (Date, optional), ToDate (Date, optional) | Item, Category, Quantity, Sales, Cost, MarginPercent, Margin | — | Sum(Margin) |
 | INV96 | Cost Change History | Each receipt at a unit cost different from the item's previous receipt, with the change. | FromDate (Date, optional), ToDate (Date, optional) | Item, Date, Reference, Previous, Cost, Change, Quantity | — | — |

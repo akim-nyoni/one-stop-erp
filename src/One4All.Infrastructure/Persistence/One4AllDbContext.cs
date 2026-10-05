@@ -149,6 +149,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the stock adjustment reason codes.</summary>
     public DbSet<Core.Inventory.StockReasonCode> StockReasonCodes => Set<Core.Inventory.StockReasonCode>();
 
+    /// <summary>Gets the two-step inter-warehouse transfers.</summary>
+    public DbSet<Core.Inventory.StockTransfer> StockTransfers => Set<Core.Inventory.StockTransfer>();
+
     /// <summary>Purchase orders.</summary>
     public DbSet<Core.Procurement.PurchaseOrder> PurchaseOrders => Set<Core.Procurement.PurchaseOrder>();
 

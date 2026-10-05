@@ -141,6 +141,12 @@ public sealed class Warehouse : SoftDeletableEntity, ICompanyScoped
     /// </summary>
     public bool IsQuarantine { get; set; }
 
+    /// <summary>Gets or sets a value indicating whether this is a transit location holding goods between dispatch and receipt.</summary>
+    public bool IsTransit { get; set; }
+
+    /// <summary>Gets or sets the customer whose site this is when the warehouse holds stock on consignment (still ours until sold).</summary>
+    public long? ConsignmentCustomerId { get; set; }
+
     /// <summary>Whether the warehouse is active.</summary>
     public bool IsActive { get; set; }
 }

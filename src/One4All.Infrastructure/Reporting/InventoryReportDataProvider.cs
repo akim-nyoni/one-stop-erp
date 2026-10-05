@@ -45,6 +45,8 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
             "STKSERIALS" => await SerialsAsync(companyId, asAt, ct).ConfigureAwait(false),
             "STKEXPIRY" => await ExpiryAsync(companyId, asAt, parameters.TryGetValue("Days", out object? days) && days is not null and not "" ? Convert.ToInt32(days, CultureInfo.InvariantCulture) : 30, ct)
                 .ConfigureAwait(false),
+            "STKINTRANSIT" => await InTransitAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "STKCONSIGNMENT" => await ConsignmentAsync(companyId, asAt, ct).ConfigureAwait(false),
             "STKOVERSTOCK" => await OverstockAsync(companyId, asAt, ct).ConfigureAwait(false),
             "STKNEGATIVE" => await NegativeAsync(companyId, ct).ConfigureAwait(false),
             "STKTURNOVER" => await TurnoverAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -287,6 +289,35 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
             .Select(l => Row(("Item", items.GetValueOrDefault(l.ItemId, "?")), ("Warehouse", warehouses.GetValueOrDefault(l.WarehouseId, "?")), ("Batch", l.Lot), ("Expiry", Date(l.Expiry!.Value)),
                 ("Days", l.Expiry!.Value.DayNumber - asAt.DayNumber), ("Status", LotRules.ExpiryStatus(l.Expiry!.Value, asAt, windowDays)), ("OnHand", Qty(l.OnHand)),
                 ("Value", Math.Round(l.OnHand * costs.GetValueOrDefault((l.ItemId, l.WarehouseId)), 2))))];
+    }
+
+    // In transit at the date: dispatched by then and not received by then.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> InTransitAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<StockTransfer> transfers = await _db.StockTransfers.AsNoTracking()
+            .Where(t => t.CompanyId == companyId && t.DispatchedOn <= asAt && (t.ReceivedOn == null || t.ReceivedOn > asAt)).OrderBy(t => t.DispatchedOn).ThenBy(t => t.TransferNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await ItemsAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> warehouses = await WarehousesAsync(companyId, ct).ConfigureAwait(false);
+        return [.. transfers.Select(t => Row(("Transfer", t.TransferNumber), ("Item", items.GetValueOrDefault(t.ItemId, "?")), ("From", warehouses.GetValueOrDefault(t.FromWarehouseId, "?")),
+            ("To", warehouses.GetValueOrDefault(t.ToWarehouseId, "?")), ("Dispatched", Date(t.DispatchedOn)), ("Days", asAt.DayNumber - t.DispatchedOn.DayNumber), ("Quantity", Qty(t.Quantity)), ("Value", t.Value)))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ConsignmentAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        Dictionary<long, (string Code, long CustomerId)> sites = await _db.Warehouses.AsNoTracking().Where(w => w.CompanyId == companyId && w.ConsignmentCustomerId != null)
+            .ToDictionaryAsync(w => w.Id, w => (w.Code, w.ConsignmentCustomerId!.Value), ct).ConfigureAwait(false);
+        List<long> ids = [.. sites.Keys];
+        var held = await _db.StockMovements.AsNoTracking().Where(m => m.CompanyId == companyId && ids.Contains(m.WarehouseId) && m.Date <= asAt)
+            .GroupBy(m => new { m.WarehouseId, m.ItemId }).Select(g => new { g.Key.WarehouseId, g.Key.ItemId, OnHand = g.Sum(m => m.Quantity), Value = g.Sum(m => m.Value), Last = g.Max(m => m.Date) })
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<long> customerIds = [.. sites.Values.Select(s => s.CustomerId).Distinct()];
+        Dictionary<long, string> customers = await _db.Customers.AsNoTracking().IgnoreQueryFilters().Where(c => customerIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Name, ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await ItemsAsync(companyId, ct).ConfigureAwait(false);
+        return [.. held.Where(h => h.OnHand != 0m).Select(h => (h, Customer: customers.GetValueOrDefault(sites[h.WarehouseId].CustomerId, "?")))
+            .OrderBy(x => x.Customer, StringComparer.Ordinal).ThenBy(x => items.GetValueOrDefault(x.h.ItemId), StringComparer.Ordinal)
+            .Select(x => Row(("Customer", x.Customer), ("Warehouse", sites[x.h.WarehouseId].Code), ("Item", items.GetValueOrDefault(x.h.ItemId, "?")), ("OnHand", Qty(x.h.OnHand)),
+                ("LastMovement", Date(x.h.Last)), ("Value", Math.Round(x.h.Value, 2))))];
     }
 
     private Task<Dictionary<long, string>> ItemsAsync(long companyId, CancellationToken ct)
