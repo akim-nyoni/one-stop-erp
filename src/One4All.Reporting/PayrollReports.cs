@@ -15,8 +15,8 @@ public static class PayrollReports
     /// <returns>The definitions, in brief order.</returns>
     public static IEnumerable<ReportDefinition> All()
     {
-        yield return Listing("PR2", "Payroll Summary by Element", "Payroll", "Totals for the period by earning, deduction and employer contribution, with how many employees each.",
-            "PyrlSummary", [new Column("Type", "Type", 110), new Column("Element", "Element", 80), new Column("Description", "Description", 160), new Column("Employees", "Employees", 70), new Column("Amount", "Amount", 100, true)], Period);
+        yield return Listing("PR2", "Payroll Summary by Element", "Payroll", "Totals for the period per pay group by earning, deduction and employer contribution, with how many employees each.",
+            "PyrlSummary", [new Column("PayGroup", "Payroll", 80), new Column("Type", "Type", 110), new Column("Element", "Element", 80), new Column("Description", "Description", 160), new Column("Employees", "Employees", 70), new Column("Amount", "Amount", 100, true)], Period);
         yield return Listing("PR3", "Payroll Journal", "Payroll", "The payroll postings of the period by account, with debits and credits.",
             "PyrlJournal", [new Column("Journal", "Journal", 100), new Column("Date", "Date", 75), new Column("Account", "Account", 70), new Column("Name", "Name", 160), new Column("Debit", "Debit", 95),
              new Column("Credit", "Credit", 95), new Column("Net", "Net (Dr +)", 95, true)], Period);

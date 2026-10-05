@@ -97,6 +97,12 @@ public sealed class Employee : SoftDeletableEntity, ICompanyScoped
     /// <summary>The basic salary per period.</summary>
     public decimal BasicSalary { get; set; }
 
+    /// <summary>
+    /// Gets or sets the payroll the employee is paid in (e.g. MONTHLY, WEEKLY, CASUAL — brief §4.15.6); null for the company's default
+    /// payroll. Each pay group is run, guarded and reversed on its own.
+    /// </summary>
+    public string? PayGroup { get; set; }
+
     /// <summary>Gets or sets the council / employer housing tenancy whose rent is deducted from pay (§4.10.7).</summary>
     public long? HousingTenancyId { get; set; }
 

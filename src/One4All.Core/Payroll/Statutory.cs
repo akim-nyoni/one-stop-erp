@@ -277,9 +277,11 @@ public sealed class PayrollRunRecord : AuditableEntity, ICompanyScoped
     /// <param name="kind">The kind of run.</param>
     /// <param name="documentNumber">The run's document number.</param>
     /// <param name="reason">Why a supplementary, backpay or reversal run was made.</param>
+    /// <param name="payGroup">The pay group ("" for the default payroll).</param>
     public PayrollRunRecord(long companyId, string periodLabel, DateOnly payDate, int employees, decimal gross, decimal deductions, decimal net, string journalNumber,
-        PayRunKind kind = PayRunKind.Regular, string documentNumber = "", string? reason = null)
+        PayRunKind kind = PayRunKind.Regular, string documentNumber = "", string? reason = null, string payGroup = "")
     {
+        PayGroup = payGroup;
         Kind = kind;
         DocumentNumber = documentNumber;
         Reason = reason;
@@ -325,6 +327,9 @@ public sealed class PayrollRunRecord : AuditableEntity, ICompanyScoped
 
     /// <summary>Why a supplementary, backpay or reversal run was made.</summary>
     public string? Reason { get; private set; }
+
+    /// <summary>The pay group ("" for the default payroll).</summary>
+    public string PayGroup { get; private set; } = string.Empty;
 
     /// <summary>When the run was reversed, if it was.</summary>
     public DateOnly? ReversedOn { get; private set; }

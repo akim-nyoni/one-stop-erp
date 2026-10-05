@@ -14244,6 +14244,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("notch");
 
+                    b.Property<string>("PayGroup")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("pay_group");
+
                     b.Property<int>("PaymentMethod")
                         .HasColumnType("integer")
                         .HasColumnName("payment_method");
@@ -15065,6 +15070,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("pay_date");
 
+                    b.Property<string>("PayGroup")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("")
+                        .HasColumnName("pay_group");
+
                     b.Property<string>("PeriodLabel")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -15096,9 +15109,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_payroll_run");
 
-                    b.HasIndex("CompanyId", "PeriodLabel")
+                    b.HasIndex("CompanyId", "PayGroup", "PeriodLabel")
                         .IsUnique()
-                        .HasDatabaseName("ix_payroll_run_company_id_period_label")
+                        .HasDatabaseName("ix_payroll_run_company_id_pay_group_period_label")
                         .HasFilter("kind = 0 AND reversed_on IS NULL");
 
                     b.ToTable("payroll_run", "hr");
@@ -15150,6 +15163,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("PayDate")
                         .HasColumnType("date")
                         .HasColumnName("pay_date");
+
+                    b.Property<string>("PayGroup")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("")
+                        .HasColumnName("pay_group");
 
                     b.Property<string>("PeriodLabel")
                         .IsRequired()

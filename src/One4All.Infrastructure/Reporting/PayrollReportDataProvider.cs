@@ -117,9 +117,9 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     private static string Name(Dictionary<long, Employee> employees, long id) => employees.TryGetValue(id, out Employee? e) ? $"{e.EmployeeNumber} {e.FullName}" : "?";
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SummaryAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
-        => [.. (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).SelectMany(p => p.Lines.Select(l => (p.EmployeeId, Line: l)))
-            .GroupBy(x => (x.Line.Type, x.Line.ElementCode)).OrderBy(g => g.Key.Type).ThenBy(g => g.Key.ElementCode, StringComparer.Ordinal)
-            .Select(g => Row(("Type", g.Key.Type.ToString()), ("Element", g.Key.ElementCode), ("Description", g.First().Line.Description), ("Employees", g.Select(x => x.EmployeeId).Distinct().Count()),
+        => [.. (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).SelectMany(p => p.Lines.Select(l => (p.EmployeeId, p.PayGroup, Line: l)))
+            .GroupBy(x => (x.PayGroup, x.Line.Type, x.Line.ElementCode)).OrderBy(g => g.Key.PayGroup, StringComparer.Ordinal).ThenBy(g => g.Key.Type).ThenBy(g => g.Key.ElementCode, StringComparer.Ordinal)
+            .Select(g => Row(("PayGroup", g.Key.PayGroup.Length == 0 ? "Default" : g.Key.PayGroup), ("Type", g.Key.Type.ToString()), ("Element", g.Key.ElementCode), ("Description", g.First().Line.Description), ("Employees", g.Select(x => x.EmployeeId).Distinct().Count()),
                 ("Amount", g.Sum(x => x.Line.Amount))))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> JournalAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)

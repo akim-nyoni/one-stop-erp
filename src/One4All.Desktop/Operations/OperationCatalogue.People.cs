@@ -168,6 +168,32 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Run payroll", ListTitle = "Payroll runs",
+            Description = "Calculates and commits a pay group's payroll for the period (blank group = the default payroll): payslips and one balanced journal. A period is paid once per group.",
+            Fields = [Opt("Group", "Pay group (blank = default)"), Req("Period", "Period", DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture)), Today(), Req("Document", "Run document number"),
+                Req("NetPay", "Net pay control account", "2420")],
+            Run = async (c, i) =>
+            {
+                PayrollRunResult run = Check(await c.Get<IPayrollService>().RunGroupAsync(c.CompanyId, i.Optional("Group"), i.Text("Period"), i.Date("Date"), i.Text("NetPay"), i.Text("Document")).ConfigureAwait(true));
+                return $"{run.PayslipCount} payslip(s): gross {M(run.TotalGross)}, deductions {M(run.TotalDeductions)}, net {M(run.TotalNet)}; journal {run.JournalNumber}.";
+            },
+            List = PayrollRunsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Set an employee's pay group", Description = "Moves an employee to a pay group (MONTHLY, WEEKLY, CASUAL…); blank returns them to the default payroll.",
+            Fields = [Req("Employee", "Employee number"), Opt("Group", "Pay group")],
+            Run = async (c, i) =>
+            {
+                long id = await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true);
+                Employee employee = await c.Db.Employees.FirstAsync(e => e.Id == id).ConfigureAwait(true);
+                employee.PayGroup = i.Optional("Group")?.ToUpperInvariant();
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"{employee.EmployeeNumber} is now on the {employee.PayGroup ?? "default"} payroll.";
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set net-pay protection", ListTitle = "Deductions and their suspension priority",
             Description = "The minimum take-home (an amount and / or % of gross) and, optionally, one deduction's suspension priority (0 = never suspended; highest is suspended first).",
             Fields = [OptNum("Amount", "Minimum take-home amount"), OptNum("Percent", "Minimum take-home % of gross"), Opt("Element", "Deduction code"), OptNum("Priority", "Its suspension priority")],
@@ -199,7 +225,7 @@ public static partial class OperationCatalogue
 
     private static async Task<DataTable> PayrollRunsAsync(OperationContext c)
         => Table(await c.Db.Set<PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Take(50).ToListAsync().ConfigureAwait(true),
-            ("Run", r => r.DocumentNumber.Length > 0 ? r.DocumentNumber : r.JournalNumber), ("Period", r => r.PeriodLabel), ("Kind", r => r.Kind), ("Date", r => D(r.PayDate)), ("Payslips", r => r.Employees),
+            ("Run", r => r.DocumentNumber.Length > 0 ? r.DocumentNumber : r.JournalNumber), ("Group", r => r.PayGroup.Length == 0 ? "Default" : r.PayGroup), ("Period", r => r.PeriodLabel), ("Kind", r => r.Kind), ("Date", r => D(r.PayDate)), ("Payslips", r => r.Employees),
             ("Net", r => M(r.Net)), ("Journal", r => r.JournalNumber), ("Reversed", r => r.ReversedBy ?? string.Empty));
 
     private static TimeOnly? Time(OperationInput i, string name)

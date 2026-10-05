@@ -36,8 +36,10 @@ public sealed class Payslip : AuditableEntity, ICompanyScoped
     /// <param name="payDate">The pay date.</param>
     /// <param name="kind">The kind of run.</param>
     /// <param name="runReference">The run's document number (links the payslip to its run).</param>
-    public Payslip(long companyId, long employeeId, string periodLabel, DateOnly payDate, PayRunKind kind = PayRunKind.Regular, string runReference = "")
+    /// <param name="payGroup">The pay group the run was for ("" for the default payroll).</param>
+    public Payslip(long companyId, long employeeId, string periodLabel, DateOnly payDate, PayRunKind kind = PayRunKind.Regular, string runReference = "", string payGroup = "")
     {
+        PayGroup = payGroup;
         CompanyId = companyId;
         EmployeeId = employeeId;
         PeriodLabel = periodLabel;
@@ -63,6 +65,9 @@ public sealed class Payslip : AuditableEntity, ICompanyScoped
 
     /// <summary>The run's document number (blank for runs made before runs were referenced).</summary>
     public string RunReference { get; private set; } = string.Empty;
+
+    /// <summary>The pay group the run was for ("" for the default payroll).</summary>
+    public string PayGroup { get; private set; } = string.Empty;
 
     /// <summary>The gross earnings.</summary>
     public decimal GrossEarnings { get; private set; }

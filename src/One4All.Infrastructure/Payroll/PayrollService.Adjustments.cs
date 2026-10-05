@@ -107,7 +107,7 @@ public sealed partial class PayrollService
             return Error.Validation("Payroll.NoLines", "A supplementary run needs at least one line.");
         }
 
-        if (!await RegularRunIsLiveAsync(company.Id, period, ct).ConfigureAwait(false))
+        if (!await RegularRunIsLiveAsync(company.Id, period, null, ct).ConfigureAwait(false))
         {
             return Error.Rule("Payroll.PeriodNotRun", $"Period {period} has no committed run to correct.");
         }
@@ -144,7 +144,7 @@ public sealed partial class PayrollService
             slips.Add(slip);
         }
 
-        return await PostRunAsync(company, period, request.PayDate, request.NetPayAccountCode, document, slips, elements, PayRunKind.Supplementary, request.Reason.Trim(), ct).ConfigureAwait(false);
+        return await PostRunAsync(company, period, request.PayDate, request.NetPayAccountCode, document, slips, elements, PayRunKind.Supplementary, request.Reason.Trim(), string.Empty, ct).ConfigureAwait(false);
     }
 
     private async Task<Result<PayrollRunResult>> ReverseRunCoreAsync(long companyId, string runNumber, DateOnly date, string reason, long approvedByUserId, CancellationToken ct)
@@ -206,7 +206,7 @@ public sealed partial class PayrollService
         List<Payslip> negatives = [];
         foreach (Payslip slip in original)
         {
-            Payslip negative = new(companyId, slip.EmployeeId, slip.PeriodLabel, date, PayRunKind.Reversal, reversalDocument);
+            Payslip negative = new(companyId, slip.EmployeeId, slip.PeriodLabel, date, PayRunKind.Reversal, reversalDocument, slip.PayGroup);
             foreach (PayslipLine line in slip.Lines)
             {
                 negative.AddLine(line.ElementCode, line.Description, line.Type, -line.Amount, line.Taxable);
@@ -229,7 +229,7 @@ public sealed partial class PayrollService
         await ReverseArrearsAsync(companyId, run.DocumentNumber, reversalDocument, date, ct).ConfigureAwait(false);
         run.MarkReversed(date, reversalDocument, approvedByUserId);
         _db.Set<PayrollRunRecord>().Add(new PayrollRunRecord(companyId, run.PeriodLabel, date, original.Count, gross, deductions, net, reversed.Value.JournalNumber, PayRunKind.Reversal,
-            reversalDocument, reason.Trim()));
+            reversalDocument, reason.Trim(), run.PayGroup));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new PayrollRunResult(original.Count, gross, deductions, net, reversed.Value.JournalNumber);
     }
@@ -268,7 +268,7 @@ public sealed partial class PayrollService
             slip.AddLine(element.Code, element.Name, element.Type, code.Sum(l => l.Difference), element.Taxable);
         }
 
-        Result<PayrollRunResult> run = await PostRunAsync(company, period, request.PayDate, request.NetPayAccountCode, document, [slip], elements, PayRunKind.Backpay, request.Reason.Trim(), ct)
+        Result<PayrollRunResult> run = await PostRunAsync(company, period, request.PayDate, request.NetPayAccountCode, document, [slip], elements, PayRunKind.Backpay, request.Reason.Trim(), string.Empty, ct)
             .ConfigureAwait(false);
         if (run.IsFailure)
         {

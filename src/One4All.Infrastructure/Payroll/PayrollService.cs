@@ -106,10 +106,16 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
     /// <inheritdoc />
     public Task<Result<PayrollRunResult>> RunAsync(long companyId, string periodLabel, DateOnly payDate, string netPayAccountCode, string documentNumber, CancellationToken ct = default)
-        => _db.AtomicAsync(() => RunCoreAsync(companyId, periodLabel, payDate, netPayAccountCode, documentNumber, ct), ct);
+        => RunGroupAsync(companyId, null, periodLabel, payDate, netPayAccountCode, documentNumber, ct);
+
+    /// <inheritdoc />
+    public Task<Result<PayrollRunResult>> RunGroupAsync(long companyId, string? payGroup, string periodLabel, DateOnly payDate, string netPayAccountCode, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RunCoreAsync(companyId, PayGroupKey(payGroup), periodLabel, payDate, netPayAccountCode, documentNumber, ct), ct);
+
+    private static string PayGroupKey(string? payGroup) => (payGroup ?? string.Empty).Trim().ToUpperInvariant();
 
     // One unit of work: its postings and record changes commit together or not at all.
-    private async Task<Result<PayrollRunResult>> RunCoreAsync(long companyId, string periodLabel, DateOnly payDate, string netPayAccountCode, string documentNumber, CancellationToken ct)
+    private async Task<Result<PayrollRunResult>> RunCoreAsync(long companyId, string payGroup, string periodLabel, DateOnly payDate, string netPayAccountCode, string documentNumber, CancellationToken ct)
     {
         Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         if (company is null)
@@ -124,16 +130,16 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         }
 
         // A period is paid once: a second run would pay every employee again (unless the first was formally reversed).
-        if (await RegularRunIsLiveAsync(companyId, periodLabel, ct).ConfigureAwait(false))
+        if (await RegularRunIsLiveAsync(companyId, periodLabel, payGroup, ct).ConfigureAwait(false))
         {
-            return Error.Conflict("Payroll.PeriodAlreadyRun", $"Payroll for period {periodLabel} has already been run.");
+            return Error.Conflict("Payroll.PeriodAlreadyRun", payGroup.Length == 0 ? $"Payroll for period {periodLabel} has already been run." : $"The {payGroup} payroll for period {periodLabel} has already been run.");
         }
 
         Dictionary<long, PayElement> elements = await LoadElementsAsync(companyId, ct).ConfigureAwait(false);
-        List<Employee> employees = await _db.Set<Employee>().Include(e => e.PayElements)
+        List<Employee> employees = [.. (await _db.Set<Employee>().Include(e => e.PayElements)
             .Where(e => e.CompanyId == companyId && e.Status == EmployeeStatus.Active)
             .OrderBy(e => e.EmployeeNumber)
-            .ToListAsync(ct).ConfigureAwait(false);
+            .ToListAsync(ct).ConfigureAwait(false)).Where(e => PayGroupKey(e.PayGroup) == payGroup)];
 
         if (employees.Count == 0)
         {
@@ -160,7 +166,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             arrearEntries.AddRange(ArrearEntries(companyId, employee, periodLabel, documentNumber, payDate, [.. outcomes.Where(o => !recoveryCodes.Contains(o.Code))], arrears[employee.Id], floor));
         }
 
-        Result<PayrollRunResult> run = await PostRunAsync(company, periodLabel, payDate, netPayAccountCode, documentNumber, slips, elements, PayRunKind.Regular, null, ct).ConfigureAwait(false);
+        Result<PayrollRunResult> run = await PostRunAsync(company, periodLabel, payDate, netPayAccountCode, documentNumber, slips, elements, PayRunKind.Regular, null, payGroup, ct).ConfigureAwait(false);
         if (run.IsSuccess && arrearEntries.Count > 0)
         {
             _db.DeductionArrears.AddRange(arrearEntries);
@@ -170,20 +176,23 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         return run;
     }
 
-    // Whether the period has a regular run that has not been reversed. Runs from before the run register are known by their payslips.
-    private async Task<bool> RegularRunIsLiveAsync(long companyId, string periodLabel, CancellationToken ct)
+    // Whether the period has a regular run that has not been reversed — for the pay group, or any group when none is given. Runs from
+    // before the run register are known by their payslips.
+    private async Task<bool> RegularRunIsLiveAsync(long companyId, string periodLabel, string? payGroup, CancellationToken ct)
     {
-        List<PayrollRunRecord> runs = await _db.Set<PayrollRunRecord>().Where(r => r.CompanyId == companyId && r.PeriodLabel == periodLabel && r.Kind == PayRunKind.Regular)
+        List<PayrollRunRecord> runs = await _db.Set<PayrollRunRecord>()
+            .Where(r => r.CompanyId == companyId && r.PeriodLabel == periodLabel && r.Kind == PayRunKind.Regular && (payGroup == null || r.PayGroup == payGroup))
             .ToListAsync(ct).ConfigureAwait(false);
         return runs.Count > 0
             ? runs.Exists(r => !r.IsReversed)
-            : await _db.Set<Payslip>().AnyAsync(p => p.CompanyId == companyId && p.PeriodLabel == periodLabel && p.RunKind == PayRunKind.Regular, ct).ConfigureAwait(false);
+            : await _db.Set<Payslip>().AnyAsync(p => p.CompanyId == companyId && p.PeriodLabel == periodLabel && p.RunKind == PayRunKind.Regular && (payGroup == null || p.PayGroup == payGroup), ct)
+                .ConfigureAwait(false);
     }
 
     // Saves a run's payslips, posts its one balanced journal (Dr earnings and employer costs, Cr deductions, scheme liabilities and
     // net pay; a negative amount swaps its side) and records the run in the register.
     private async Task<Result<PayrollRunResult>> PostRunAsync(Company company, string periodLabel, DateOnly payDate, string netPayAccountCode, string documentNumber, IReadOnlyList<Payslip> slips,
-        Dictionary<long, PayElement> elements, PayRunKind kind, string? reason, CancellationToken ct)
+        Dictionary<long, PayElement> elements, PayRunKind kind, string? reason, string payGroup, CancellationToken ct)
     {
         Dictionary<string, decimal> debitsByAccount = new(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, decimal> creditsByAccount = new(StringComparer.OrdinalIgnoreCase);
@@ -259,7 +268,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             return rent.Error;
         }
 
-        _db.Set<PayrollRunRecord>().Add(new PayrollRunRecord(company.Id, periodLabel, payDate, slips.Count, totalGross, totalDeductions, totalNet, posted.Value.JournalNumber, kind, documentNumber, reason));
+        _db.Set<PayrollRunRecord>().Add(new PayrollRunRecord(company.Id, periodLabel, payDate, slips.Count, totalGross, totalDeductions, totalNet, posted.Value.JournalNumber, kind, documentNumber, reason,
+            payGroup));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new PayrollRunResult(slips.Count, totalGross, totalDeductions, totalNet, posted.Value.JournalNumber);
     }
@@ -272,7 +282,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         decimal? basicSalary = null, string documentNumber = "", IReadOnlyDictionary<string, object?>? recoveries = null, IReadOnlyDictionary<string, decimal>? arrears = null,
         IReadOnlyDictionary<string, decimal>? caps = null)
     {
-        Payslip payslip = new(companyId, employee.Id, periodLabel, payDate, PayRunKind.Regular, documentNumber);
+        Payslip payslip = new(companyId, employee.Id, periodLabel, payDate, PayRunKind.Regular, documentNumber, PayGroupKey(employee.PayGroup));
 
         // Variables the formulas evaluate against; updated as each element resolves.
         Dictionary<string, object?> vars = new(StringComparer.Ordinal)

@@ -52,6 +52,21 @@ public interface IPayrollService
     /// <returns>The run result.</returns>
     Task<Result<PayrollRunResult>> RunAsync(long companyId, string periodLabel, DateOnly payDate, string netPayAccountCode, string documentNumber, CancellationToken ct = default);
 
+    /// <summary>
+    /// Runs and commits one pay group's payroll (brief §4.15.6: monthly staff, weekly wages and casuals run independently): only active
+    /// employees in the group are paid, and the period guard applies per group. A blank group is the default payroll — employees with
+    /// no pay group — which is what <see cref="RunAsync"/> runs.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="payGroup">The pay group (blank for the default payroll).</param>
+    /// <param name="periodLabel">The pay-period label.</param>
+    /// <param name="payDate">The pay date.</param>
+    /// <param name="netPayAccountCode">The net-pay control account.</param>
+    /// <param name="documentNumber">The run document number.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The run result.</returns>
+    Task<Result<PayrollRunResult>> RunGroupAsync(long companyId, string? payGroup, string periodLabel, DateOnly payDate, string netPayAccountCode, string documentNumber, CancellationToken ct = default);
+
     /// <summary>Renders an employee's payslip (earnings, deductions, gross/net) to fixed-width plain text.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="employeeId">The employee.</param>

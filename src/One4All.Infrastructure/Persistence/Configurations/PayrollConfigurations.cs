@@ -12,6 +12,7 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         b.HasKey(x => x.Id);
         b.Property(x => x.EmployeeNumber).HasMaxLength(30);
         b.HasIndex(x => x.HousingTenancyId);
+        b.Property(x => x.PayGroup).HasMaxLength(20);
         b.Property(x => x.EmploymentType).HasConversion<int>();
         b.Property(x => x.FullName).HasMaxLength(200);
         b.Property(x => x.Department).HasMaxLength(30);
@@ -79,6 +80,7 @@ internal sealed class PayslipConfiguration : IEntityTypeConfiguration<Payslip>
         b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.Property(x => x.RunKind).HasConversion<int>();
         b.Property(x => x.RunReference).HasMaxLength(40).HasDefaultValue(string.Empty);
+        b.Property(x => x.PayGroup).HasMaxLength(20).HasDefaultValue(string.Empty);
         // One payslip per employee per run; one live regular run per period is enforced on the run register.
         b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.PeriodLabel, x.RunReference }).IsUnique();
     }
@@ -212,8 +214,9 @@ internal sealed class PayrollRunRecordConfiguration : IEntityTypeConfiguration<P
         b.Property(x => x.Reason).HasMaxLength(300);
         b.Property(x => x.ReversedBy).HasMaxLength(40);
         b.Ignore(x => x.IsReversed);
-        // A period is paid once: one regular run that has not been reversed (the backstop to Payroll.PeriodAlreadyRun).
-        b.HasIndex(x => new { x.CompanyId, x.PeriodLabel }).IsUnique().HasFilter("kind = 0 AND reversed_on IS NULL");
+        b.Property(x => x.PayGroup).HasMaxLength(20).HasDefaultValue(string.Empty);
+        // A period is paid once per pay group: one regular run that has not been reversed (the backstop to Payroll.PeriodAlreadyRun).
+        b.HasIndex(x => new { x.CompanyId, x.PayGroup, x.PeriodLabel }).IsUnique().HasFilter("kind = 0 AND reversed_on IS NULL");
     }
 }
 
