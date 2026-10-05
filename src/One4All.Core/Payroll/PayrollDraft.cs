@@ -173,3 +173,19 @@ public sealed class PayrollDraft : Entity, ICompanyScoped
     /// <summary>Marks the draft replaced by a recalculation.</summary>
     public void Supersede() => Status = PayrollDraftStatus.Superseded;
 }
+
+/// <summary>What opens an e-mailed payslip PDF (brief §4.15.7).</summary>
+public enum PayslipPasswordRule
+{
+    /// <summary>The employee's national ID number (letters and digits only).</summary>
+    NationalId = 0,
+
+    /// <summary>The employee's date of birth as yyyyMMdd.</summary>
+    DateOfBirth = 1,
+
+    /// <summary>The employee number.</summary>
+    EmployeeNumber = 2,
+
+    /// <summary>No password.</summary>
+    None = 3,
+}

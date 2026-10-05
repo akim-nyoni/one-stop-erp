@@ -14317,6 +14317,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("department");
 
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("email");
+
                     b.Property<string>("EmployeeNumber")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -22463,6 +22468,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("payroll_second_approval_variance_percent");
+
+                    b.Property<int>("PayslipPasswordRule")
+                        .HasColumnType("integer")
+                        .HasColumnName("payslip_password_rule");
 
                     b.Property<bool>("RaisePayrollRemittances")
                         .HasColumnType("boolean")

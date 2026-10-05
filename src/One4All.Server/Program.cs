@@ -2202,6 +2202,31 @@ app.MapGet("/api/ess/payslips/{period}", async (string period, ClaimsPrincipal u
 .RequireAuthorization()
 .WithName("EssPayslip");
 
+app.MapGet("/api/ess/payslips/{period}/pdf", async (string period, ClaimsPrincipal user, One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess,
+    One4All.Application.Abstractions.Payroll.IPayslipDistributionService payslips, CancellationToken ct) =>
+{
+    if (SignedInUser(user) is not long id)
+    {
+        return Results.Unauthorized();
+    }
+
+    var me = await ess.ProfileAsync(id, ct).ConfigureAwait(false);
+    if (me.IsFailure)
+    {
+        return ValueResponse(me);
+    }
+
+    var pdf = await payslips.PayslipPdfAsync(me.Value.CompanyId, me.Value.EmployeeId, period, ct).ConfigureAwait(false);
+    return pdf.IsSuccess ? Results.File(pdf.Value, "application/pdf", $"Payslip-{period}.pdf") : ValueResponse(pdf);
+})
+.RequireAuthorization()
+.WithName("EssPayslipPdf");
+
+app.MapPost("/api/payroll/runs/{runNumber}/email-payslips", async (string runNumber, long companyId, One4All.Application.Abstractions.Payroll.IPayslipDistributionService payslips, CancellationToken ct) =>
+    ValueResponse(await payslips.EmailRunAsync(companyId, runNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("EmailPayslips");
+
 app.MapGet("/api/ess/tax-certificate", async (int year, ClaimsPrincipal user, One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess, CancellationToken ct) =>
     SignedInUser(user) is long id ? ValueResponse(await ess.TaxCertificateAsync(id, year, ct).ConfigureAwait(false)) : Results.Unauthorized())
 .RequireAuthorization()

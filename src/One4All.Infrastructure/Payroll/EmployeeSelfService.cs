@@ -70,25 +70,16 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
 
         Employee employee = me.Value;
         string period = (periodLabel ?? string.Empty).Trim();
-        List<Payslip> slips = await _db.Payslips.AsNoTracking().Include(p => p.Lines).Where(p => p.CompanyId == employee.CompanyId && p.EmployeeId == employee.Id && p.PeriodLabel == period)
-            .ToListAsync(ct).ConfigureAwait(false);
-        if (slips.Count == 0)
+        string? text = await StoredPayslips.TextAsync(_db, employee, period, ct).ConfigureAwait(false);
+        if (text is null)
         {
             return Error.NotFound("Ess.NoPayslip", $"No payslip for {period}.");
         }
 
-        List<PayslipLine> lines = [.. slips.SelectMany(p => p.Lines)];
-        IReadOnlyList<PayslipItem> Items(PayElementType type) => [.. lines.Where(l => l.Type == type).GroupBy(l => l.ElementCode).Select(g => new PayslipItem(g.First().Description, g.Sum(l => l.Amount)))
-            .Where(i => i.Amount != 0m)];
-        string company = await _db.Companies.Where(c => c.Id == employee.CompanyId).Select(c => c.Name).FirstAsync(ct).ConfigureAwait(false);
-        _db.PayslipPrints.Add(new PayslipPrint(employee.CompanyId, employee.Id, period, slips.Min(p => p.PayDate)));
+        DateOnly payDate = await _db.Payslips.Where(p => p.EmployeeId == employee.Id && p.PeriodLabel == period).MinAsync(p => p.PayDate, ct).ConfigureAwait(false);
+        _db.PayslipPrints.Add(new PayslipPrint(employee.CompanyId, employee.Id, period, payDate));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return PayslipFormatter.ToPlainText(new PayslipDocument
-        {
-            CompanyName = company, EmployeeName = employee.FullName, EmployeeNumber = employee.EmployeeNumber, PeriodLabel = period, PayDate = slips.Min(p => p.PayDate),
-            Earnings = Items(PayElementType.Earning), Deductions = Items(PayElementType.Deduction), GrossEarnings = slips.Sum(p => p.GrossEarnings), TotalDeductions = slips.Sum(p => p.TotalDeductions),
-            NetPay = slips.Sum(p => p.NetPay),
-        });
+        return text;
     }
 
     /// <inheritdoc />

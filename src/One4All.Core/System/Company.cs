@@ -90,6 +90,9 @@ public sealed class Company : SoftDeletableEntity
     /// </summary>
     public bool RaisePayrollRemittances { get; set; }
 
+    /// <summary>Gets or sets what opens an e-mailed payslip PDF (the national ID by default).</summary>
+    public Payroll.PayslipPasswordRule PayslipPasswordRule { get; set; }
+
     /// <summary>
     /// Whether fund control is on (brief §4.4 / §4.18.5): expenditure cannot be posted to a budget-enabled expense account
     /// (a vote) that has no appropriation in the year's active approved or supplementary budget.

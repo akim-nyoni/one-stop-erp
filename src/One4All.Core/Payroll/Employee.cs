@@ -185,6 +185,9 @@ public sealed class Employee : SoftDeletableEntity, ICompanyScoped
     /// <summary>The wallet number, for mobile-money payment.</summary>
     public string? MobileMoneyNumber { get; set; }
 
+    /// <summary>Gets or sets the e-mail address payslips are sent to.</summary>
+    public string? Email { get; set; }
+
     /// <summary>When employment ended.</summary>
     public DateOnly? TerminationDate { get; private set; }
 
