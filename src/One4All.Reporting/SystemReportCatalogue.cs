@@ -100,6 +100,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Payroll & HR additions (brief §14 O, the PR codes).
+        foreach (ReportDefinition definition in PayrollReports.All())
+        {
+            yield return definition;
+        }
+
         // Budgeting, planning & commitment control (brief §14 A-B, the B codes).
         foreach (ReportDefinition definition in BudgetingReports.All())
         {
