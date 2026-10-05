@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-225 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+233 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -191,6 +191,14 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
+| M146 | Billing Run Summary & Control | Each billing run: service, period, ward, lines billed and excluded, total billed against the previous run, proposer and approver. | — | Run, Service, Period, Ward, Status, Lines, Excluded, Previous, Approver, Billed | — | Sum(Billed) |
+| M147 | Billing Exceptions Report | Lines of every billing run flagged as already billed, nothing to bill, failed or a large change on last time. | — | Run, Stand, Exceptions, Message, Included, Previous, Charge | — | Sum(Charge) |
+| M148 | Aged Debtors by Ward, Category and Service | Ratepayers' open items as at the date, aged 30/60/90/120+, grouped by ward, consumer category and service. | AsAtDate (Date, optional) | Ward, Category, Service, Accounts, Current, D30, D60, D90, D120, Over120, Total | — | Sum(Total) |
+| M151 | Valuation Roll & Supplementary Roll | Every valuation entry (general, supplementary, objection) with its effective date, and objections with their outcome. | — | Stand, Ward, Kind, Reference, EffectiveFrom, Objection, Value | — | Sum(Value) |
+| M152 | Property Register (full) | Every property with owner(s), ratepayer, services and tariffs, meters, valuation and ward. | — | Stand, Ward, Address, Owners, Ratepayer, Services, Meters, Valuation | — | Sum(Valuation) |
+| M153 | Rates Clearance Certificate Register | Certificates issued with property, validity, advance held and who issued them, and whether still valid at the date. | AsAtDate (Date, optional) | Certificate, Stand, Issued, ValidUntil, State, IssuedBy, AdvanceHeld | — | Sum(AdvanceHeld) |
+| M154 | Meter Reading Sheets / Route Books | Each reading route in walking order: meter, stand, last reading and date, blank for the new reading. | RouteCode (String, optional) | Route, Reader, Sequence, Meter, Stand, Address, LastReading, LastDate, NewReading | — | — |
+| M155 | Meter Reading Exceptions | Readings flagged high or low consumption, rollover, negative or tampered, and estimates, with whether they were accepted. | AsAtDate (Date, optional) | Date, Meter, Stand, Kind, Flags, Previous, Reading, Accepted, Consumption | — | Sum(Consumption) |
 | MUN-PROP | Property Register | Stands on the municipal register with ward, valuation and ratepayer. | — | StandNumber, Ward, Ratepayer, Valuation | — | Sum(Valuation) |
 
 ## Payroll

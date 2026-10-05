@@ -94,6 +94,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Municipality / Council catalogue (brief §14 I, the M series).
+        foreach (ReportDefinition definition in MunicipalReports.All())
+        {
+            yield return definition;
+        }
+
         // Cashiering & Receipting catalogue (brief §RCP-16, the RC series).
         foreach (ReportDefinition definition in ReceiptingReports.All())
         {
