@@ -1348,6 +1348,16 @@ app.MapPost("/api/housing/agreements/cancel", async (One4All.Application.Abstrac
 .RequireAuthorization()
 .WithName("CancelInstalmentAgreement");
 
+app.MapPost("/api/housing/schemes/{schemeCode}/budget", async (string schemeCode, long companyId, One4All.Core.Housing.SchemeCostElement element, decimal amount, One4All.Application.Abstractions.Housing.ISchemeBudgetService budgets, CancellationToken ct) =>
+    ActionResponse(await budgets.SetBudgetAsync(companyId, schemeCode, element, amount, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SetSchemeBudget");
+
+app.MapPost("/api/housing/schemes/costs", async (One4All.Application.Abstractions.Housing.SchemeCostRequest request, One4All.Application.Abstractions.Housing.ISchemeBudgetService budgets, CancellationToken ct) =>
+    ValueResponse(await budgets.RecordCostAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("CapitaliseSchemeCost");
+
 app.MapPost("/api/housing/titles", async (long companyId, long standId, DateOnly date, One4All.Application.Abstractions.Housing.ITitleDeedService titles, CancellationToken ct) =>
     ValueResponse(await titles.ApplyAsync(companyId, standId, date, ct).ConfigureAwait(false)))
 .RequireAuthorization()

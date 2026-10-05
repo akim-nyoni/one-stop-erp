@@ -6309,6 +6309,143 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.SchemeBudget", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<int>("Element")
+                        .HasColumnType("integer")
+                        .HasColumnName("element");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SchemeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("scheme_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_scheme_budget");
+
+                    b.HasIndex("SchemeId", "Element")
+                        .IsUnique()
+                        .HasDatabaseName("ix_scheme_budget_scheme_id_element");
+
+                    b.ToTable("scheme_budget", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.SchemeCost", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("Element")
+                        .HasColumnType("integer")
+                        .HasColumnName("element");
+
+                    b.Property<string>("JournalNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SchemeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("scheme_id");
+
+                    b.Property<int>("StandsCharged")
+                        .HasColumnType("integer")
+                        .HasColumnName("stands_charged");
+
+                    b.HasKey("Id")
+                        .HasName("pk_scheme_cost");
+
+                    b.HasIndex("SchemeId", "Date")
+                        .HasDatabaseName("ix_scheme_cost_scheme_id_date");
+
+                    b.ToTable("scheme_cost", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.SchemeServicingProgress", b =>
                 {
                     b.Property<long>("Id")
@@ -21289,6 +21426,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_repossession_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.SchemeBudget", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingScheme", null)
+                        .WithMany()
+                        .HasForeignKey("SchemeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_scheme_budget_scheme_scheme_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.SchemeCost", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingScheme", null)
+                        .WithMany()
+                        .HasForeignKey("SchemeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_scheme_cost_scheme_scheme_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.SchemeServicingProgress", b =>

@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-224 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+225 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -143,6 +143,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H81 | Straight-lined Rental Income Schedule (IFRS 16) | Each stand lease's contractual rent per year against the straight-line income recognised. | — | Lease, Year, Contractual, StraightLine, Difference | — | Sum(Difference) |
 | H82 | Scheme Delivery Dashboard | Per scheme: target, stands created, serviced, allocated, sold and titled, and % delivered. | — | Scheme, Target, Stands, Serviced, Allocated, Sold, Titled, Delivered | — | — |
 | H83 | Scheme Profitability & Cost Recovery | Per scheme: cost in (land and servicing), revenue from stands sold, cost recovered and margin. | — | Scheme, Stands, Sold, Cost, Revenue, Recovered, CostPerStand, Margin | — | Sum(Margin) |
+| H84 | Scheme Budget vs Actual | Per scheme and cost element (land, servicing, professional fees, overheads): budget, actual, variance and share used. | — | Scheme, Element, Budget, Actual, Used, Variance | — | Sum(Variance) |
 | H85 | Developer / Joint Venture Reconciliation | Stands contracted vs delivered per quota, overdue milestones and penalties. | AsAtDate (Date, optional) | Agreement, Quota, Contracted, HandedOver, Outstanding, OverdueMilestones, PenaltyAccrued | — | Sum(PenaltyAccrued) |
 | H86 | Housing Cooperative Register | Cooperatives with active members, stands held and stands sub-allocated. | — | Cooperative, Name, Registration, Members, Stands, SubAllocated | — | — |
 | H87 | Informal Settlement / Enumeration Register | Settlements with ward, cut-off date, households counted and eligible. | — | Settlement, Name, Ward, CutOff, Households, Eligible, Plan | — | — |

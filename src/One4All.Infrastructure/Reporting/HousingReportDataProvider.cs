@@ -153,6 +153,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             "HOUSINGTRANSFERDUTY" => await TransferDutyAsync(companyId, ct).ConfigureAwait(false),
             "HOUSINGDEPOSITSHELD" => await DepositsHeldAsync(companyId, asAt, ct).ConfigureAwait(false),
             "HOUSINGCANCELLATIONS" => await CancellationsAsync(companyId, ct).ConfigureAwait(false),
+            "HOUSINGSCHEMEBUDGET" => await SchemeBudgetAsync(companyId, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -1857,6 +1858,48 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         return [.. cancellations.Select(x => Row(("Agreement", x.Cancellation.AgreementNumber), ("Buyer", names.GetValueOrDefault(x.BuyerCustomerId, "?")), ("Date", Date(x.Cancellation.Date)),
             ("Paid", Money(x.Cancellation.Paid)), ("Months", x.Cancellation.MonthsOccupied), ("Rental", Money(x.Cancellation.OccupationRental)), ("Admin", Money(x.Cancellation.AdminCharge)),
             ("Arrears", Money(x.Cancellation.Arrears)), ("Repossession", x.Cancellation.RepossessionReference), ("Refund", x.Cancellation.Refund)))];
+    }
+
+    // Actuals: servicing from the apportioned charges, fees and overheads from the capitalised costs, land as the rest of the stands' carried cost.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SchemeBudgetAsync(long companyId, CancellationToken ct)
+    {
+        List<HousingScheme> schemes = await _db.HousingSchemes.AsNoTracking().Where(s => s.CompanyId == companyId).OrderBy(s => s.Code).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<(long, SchemeCostElement), decimal> budgets = await _db.Set<SchemeBudget>().AsNoTracking().Where(b => b.CompanyId == companyId)
+            .ToDictionaryAsync(b => (b.SchemeId, b.Element), b => b.Amount, ct).ConfigureAwait(false);
+        Dictionary<(long, SchemeCostElement), decimal> capitalised = (await _db.Set<SchemeCost>().AsNoTracking().Where(c => c.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(c => (c.SchemeId, c.Element)).ToDictionary(g => g.Key, g => g.Sum(c => c.Amount));
+        var stands = await _db.HousingStands.AsNoTracking().Where(s => s.CompanyId == companyId && s.SchemeId != null)
+            .Select(s => new { SchemeId = s.SchemeId!.Value, s.AllocatedCost, Servicing = _db.Set<ServicingCharge>().Where(c => c.StandId == s.Id).Sum(c => (decimal?)c.Amount) ?? 0m })
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (HousingScheme scheme in schemes)
+        {
+            var own = stands.Where(s => s.SchemeId == scheme.Id).ToList();
+            decimal servicing = own.Sum(s => s.Servicing);
+            decimal fees = capitalised.GetValueOrDefault((scheme.Id, SchemeCostElement.ProfessionalFees));
+            decimal overheads = capitalised.GetValueOrDefault((scheme.Id, SchemeCostElement.Overheads));
+            Dictionary<SchemeCostElement, decimal> actual = new()
+            {
+                [SchemeCostElement.Land] = own.Sum(s => s.AllocatedCost) - servicing - fees - overheads,
+                [SchemeCostElement.Servicing] = servicing,
+                [SchemeCostElement.ProfessionalFees] = fees,
+                [SchemeCostElement.Overheads] = overheads,
+            };
+            if (own.Count == 0 && !budgets.Keys.Any(k => k.Item1 == scheme.Id))
+            {
+                continue;
+            }
+
+            foreach (SchemeCostElement element in Enum.GetValues<SchemeCostElement>())
+            {
+                decimal budget = budgets.GetValueOrDefault((scheme.Id, element));
+                BudgetComparison comparison = SchemeCostRules.Compare(budget, actual[element]);
+                rows.Add(Row(("Scheme", scheme.Code), ("Element", element.ToString()), ("Budget", budgets.ContainsKey((scheme.Id, element)) ? Money(budget) : "—"), ("Actual", Money(actual[element])),
+                    ("Used", comparison.UsedPercent is decimal used ? used.ToString("0.0", CultureInfo.InvariantCulture) : "—"), ("Variance", comparison.Variance)));
+            }
+        }
+
+        return rows;
     }
 
     private Task<Dictionary<long, string>> ParcelNumbersAsync(long companyId, CancellationToken ct)

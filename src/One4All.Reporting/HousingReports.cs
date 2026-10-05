@@ -241,6 +241,9 @@ public static class HousingReports
              new Column("Difference", "Accrued / (released)", 120, true)], []);
 
         // Schemes, partners, cooperatives & settlements.
+        yield return Listing("H84", "Scheme Budget vs Actual", "Housing", "Per scheme and cost element (land, servicing, professional fees, overheads): budget, actual, variance and share used.",
+            "HousingSchemeBudget", [new Column("Scheme", "Scheme", 90), new Column("Element", "Element", 120), new Column("Budget", "Budget", 100), new Column("Actual", "Actual", 100),
+             new Column("Used", "Used %", 60), new Column("Variance", "Variance", 100, true)], []);
         yield return Listing("H85", "Developer / Joint Venture Reconciliation", "Housing", "Stands contracted vs delivered per quota, overdue milestones and penalties.", "HousingDevelopers",
             [new Column("Agreement", "Agreement", 90), new Column("Quota", "Quota", 80), new Column("Contracted", "Contracted", 70), new Column("HandedOver", "Delivered", 70), new Column("Outstanding", "Outstanding", 75),
              new Column("OverdueMilestones", "Overdue milestones", 200), new Column("PenaltyAccrued", "Penalty accrued", 100, true)], [("AsAtDate", ParameterType.Date)]);

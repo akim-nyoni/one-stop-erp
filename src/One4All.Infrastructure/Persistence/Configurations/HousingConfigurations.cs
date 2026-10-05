@@ -1216,3 +1216,32 @@ internal sealed class AgreementCancellationConfiguration : IEntityTypeConfigurat
         b.HasIndex(x => new { x.CompanyId, x.AgreementNumber }).IsUnique();
     }
 }
+
+internal sealed class SchemeBudgetConfiguration : IEntityTypeConfiguration<SchemeBudget>
+{
+    public void Configure(EntityTypeBuilder<SchemeBudget> b)
+    {
+        b.ToTable("scheme_budget", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Element).HasConversion<int>();
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.HasOne<HousingScheme>().WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.SchemeId, x.Element }).IsUnique();
+    }
+}
+
+internal sealed class SchemeCostConfiguration : IEntityTypeConfiguration<SchemeCost>
+{
+    public void Configure(EntityTypeBuilder<SchemeCost> b)
+    {
+        b.ToTable("scheme_cost", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Element).HasConversion<int>();
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.Property(x => x.Description).HasMaxLength(300);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+        b.HasOne<HousingScheme>().WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.SchemeId, x.Date });
+    }
+}
