@@ -73,3 +73,19 @@ internal sealed class SupplierStatementLineConfiguration : IEntityTypeConfigurat
         b.Property(x => x.Amount).HasPrecision(19, 4);
     }
 }
+
+internal sealed class BankFileLayoutConfiguration : IEntityTypeConfiguration<BankFileLayout>
+{
+    public void Configure(EntityTypeBuilder<BankFileLayout> b)
+    {
+        b.ToTable("bank_file_layout", Schemas.CashBook);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(100);
+        b.Property(x => x.HeaderTemplate).HasMaxLength(1000);
+        b.Property(x => x.DetailTemplate).HasMaxLength(1000);
+        b.Property(x => x.TrailerTemplate).HasMaxLength(1000);
+        b.Property(x => x.LineEnding).HasMaxLength(4);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}

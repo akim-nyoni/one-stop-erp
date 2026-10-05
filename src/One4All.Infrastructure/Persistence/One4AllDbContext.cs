@@ -128,6 +128,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the cheque register.</summary>
     public DbSet<Core.Banking.Cheque> Cheques => Set<Core.Banking.Cheque>();
 
+    /// <summary>Bank payment-file layouts.</summary>
+    public DbSet<Core.Banking.BankFileLayout> BankFileLayouts => Set<Core.Banking.BankFileLayout>();
+
     /// <summary>Gets the captured supplier statements.</summary>
     public DbSet<Core.Banking.SupplierStatement> SupplierStatements => Set<Core.Banking.SupplierStatement>();
 

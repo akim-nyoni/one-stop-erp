@@ -381,6 +381,24 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Save a bank file layout", ListTitle = "Bank file layouts",
+            Description = "A bank's EFT format as templates: {Field[,width][:format]} — header/trailer: Date, Originator, Currency, Count, Total, Hash; detail: Seq, Date, Reference, Name, Bank, Branch, Account, Currency, Amount (format 'cents' for whole cents; width 010 zero-pads).",
+            Fields = [Req("Code", "Layout code"), Req("Name", "Bank / format name"), Opt("Header", "Header template"), Req("Detail", "Detail template", "{Reference}|{Name}|{Bank}|{Account}|{Amount}"), Opt("Trailer", "Trailer template")],
+            Run = async (c, i) => Check(await c.Get<IBankFileService>().SaveLayoutAsync(new BankFileLayoutRequest(c.CompanyId, i.Text("Code"), i.Text("Name"), i.Optional("Header"), i.Text("Detail"), i.Optional("Trailer")))
+                .ConfigureAwait(true), id => $"Layout {i.Text("Code").ToUpperInvariant()} saved."),
+            List = async c => Table(await c.Db.BankFileLayouts.AsNoTracking().Where(l => l.CompanyId == c.CompanyId).OrderBy(l => l.Code).ToListAsync().ConfigureAwait(true),
+                ("Layout", l => l.Code), ("Name", l => l.Name), ("Header", l => l.HeaderTemplate), ("Detail", l => l.DetailTemplate), ("Trailer", l => l.TrailerTemplate)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Write payroll bank files", IsDocument = true,
+            Description = "A payroll run's net pay in a bank layout, one file per beneficiary bank, with control total and hash (split pay honoured, held salaries left out).",
+            Fields = [Req("Run", "Run document or journal number"), Req("Layout", "Layout code")],
+            Run = async (c, i) => string.Join(Environment.NewLine, Check(await c.Get<IBankFileService>().PayrollFilesAsync(c.CompanyId, i.Text("Run"), i.Text("Layout")).ConfigureAwait(true))
+                .Select(f => $"=== {f.FileName}: {f.Count} payment(s), total {M(f.Total)}, hash {f.Hash} ==={Environment.NewLine}{f.Content}")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Capture a supplier statement", Description = "The supplier's closing balance and lines, for reconciliation against the ledger (report AP statement reconciliation).",
             Fields = [Req("Supplier", "Supplier code"), Today(), Num("Closing", "Closing balance"), Req("Lines", "Lines: DOC:amount:yyyy-MM-dd; …")],
             Run = async (c, i) =>

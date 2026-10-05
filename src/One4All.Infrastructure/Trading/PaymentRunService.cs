@@ -34,6 +34,16 @@ public sealed class PaymentRunService : IPaymentRunService
     // One unit of work: every posting it makes commits together or not at all (joining a caller's transaction).
     private async Task<Result<PaymentRunResult>> RunCoreAsync(PaymentRunRequest request, CancellationToken ct)
     {
+        Core.Banking.BankFileLayout? layout = null;
+        if (!string.IsNullOrWhiteSpace(request.EftLayoutCode))
+        {
+            layout = await _db.BankFileLayouts.AsNoTracking().FirstOrDefaultAsync(l => l.CompanyId == request.CompanyId && l.Code == request.EftLayoutCode.Trim().ToUpper(), ct).ConfigureAwait(false);
+            if (layout is null)
+            {
+                return Error.NotFound("Bank.LayoutNotFound", $"No bank file layout '{request.EftLayoutCode}'.");
+            }
+        }
+
         (List<OpenItem> dueInvoices, List<OpenItem> credits, Dictionary<long, Supplier> suppliers) = await SelectAsync(request, ct).ConfigureAwait(false);
         HashSet<long> bankChanging = await BankChangingAsync(request.CompanyId, ct).ConfigureAwait(false);
 
@@ -136,7 +146,7 @@ public sealed class PaymentRunService : IPaymentRunService
             lines.Add(new PaymentRunLine(supplier.Id, supplier.Code, supplier.Name, currency.Value, toPay, paymentNumber, touched.Count, creditsApplied, withheld));
         }
 
-        byte[] eft = BuildEftFile(request, [.. lines.Where(l => l.Amount > 0m)], suppliers);
+        byte[] eft = layout is null ? BuildEftFile(request, [.. lines.Where(l => l.Amount > 0m)], suppliers) : LayoutEftFile(request, layout, [.. lines.Where(l => l.Amount > 0m)], suppliers);
         return new PaymentRunResult(lines, totalBase, eft);
     }
 
@@ -214,6 +224,16 @@ public sealed class PaymentRunService : IPaymentRunService
         Core.Accounting.TaxCode? tax = await _db.TaxCodes.Include(t => t.Rates)
             .FirstOrDefaultAsync(t => t.CompanyId == request.CompanyId && t.Code == code && t.IsActive, ct).ConfigureAwait(false);
         return tax is null ? 0m : decimal.Round(amount * tax.RateOn(request.PaymentDate) / 100m, 4, MidpointRounding.ToEven);
+    }
+
+    // The EFT file in the bank's own layout (brief §4.15.7): net amounts, with the control total and account hash.
+    private static byte[] LayoutEftFile(PaymentRunRequest request, Core.Banking.BankFileLayout layout, List<PaymentRunLine> lines, IReadOnlyDictionary<long, Supplier> suppliers)
+    {
+        List<Application.Banking.BankFileRow> rows = [.. lines.Select((l, i) => new Application.Banking.BankFileRow(i + 1, l.PaymentNumber, suppliers[l.SupplierId].Name, suppliers[l.SupplierId].BankName ?? string.Empty,
+            string.Empty, suppliers[l.SupplierId].BankAccountNumber ?? string.Empty, l.Currency.ToString(), l.NetPaid))];
+        Application.Banking.BankFileHeader header = new(request.PaymentDate, request.BankAccountCode, rows.Select(r => r.Currency).FirstOrDefault() ?? string.Empty, rows.Count, rows.Sum(r => r.Amount),
+            Application.Banking.BankFileFormatter.HashTotal(rows.Select(r => r.Account)));
+        return Encoding.UTF8.GetBytes(Application.Banking.BankFileFormatter.Render(layout.HeaderTemplate, layout.DetailTemplate, layout.TrailerTemplate, header, rows, layout.LineEnding));
     }
 
     private static byte[] BuildEftFile(PaymentRunRequest request, List<PaymentRunLine> lines, IReadOnlyDictionary<long, Supplier> suppliers)

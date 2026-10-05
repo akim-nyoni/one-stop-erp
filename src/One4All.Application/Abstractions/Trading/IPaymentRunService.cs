@@ -25,6 +25,9 @@ public sealed class PaymentRunRequest
     /// <see cref="PaymentRequest.WithholdingTaxCode"/>); the bank file then carries the net amount.
     /// </summary>
     public string? WithholdingTaxCode { get; init; }
+
+    /// <summary>Gets the bank file layout the EFT file is written in (the generic pipe-delimited file when null).</summary>
+    public string? EftLayoutCode { get; init; }
 }
 
 /// <summary>One supplier's line in a payment run.</summary>
