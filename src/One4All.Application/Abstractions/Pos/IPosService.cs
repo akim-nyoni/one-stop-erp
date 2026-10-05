@@ -21,7 +21,7 @@ public readonly record struct PosSaleLineRequest(long ItemId, string Description
 /// <param name="AccountCode">The GL account for the tender.</param>
 /// <param name="IsChange">True when this is change given.</param>
 /// <param name="ExchangeRate">Optional explicit rate (else the daily rate / 1 for base).</param>
-public readonly record struct PosTenderRequest(TenderType TenderType, CurrencyCode Currency, decimal Amount, string AccountCode, bool IsChange, decimal? ExchangeRate = null);
+public readonly record struct PosTenderRequest(TenderType TenderType, CurrencyCode Currency, decimal Amount, string AccountCode, bool IsChange, decimal? ExchangeRate = null, long? StaffEmployeeId = null);
 
 /// <summary>A request to complete a POS sale.</summary>
 public sealed class CompleteSaleRequest

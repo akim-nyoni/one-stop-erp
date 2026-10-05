@@ -69,9 +69,23 @@ public sealed class PosService : IPosService
                 return rateResult.Error;
             }
 
+            // A staff purchase goes on the employee's staff account (a credit tender), recovered through payroll.
+            if (tender.StaffEmployeeId is long staffId)
+            {
+                if (tender.TenderType != TenderType.Credit || tender.IsChange)
+                {
+                    return Error.Validation("Pos.StaffTender", "A staff purchase must be tendered on the staff account (a credit tender).");
+                }
+
+                if (!await _db.Employees.AnyAsync(e => e.Id == staffId && e.CompanyId == request.CompanyId && e.Status == One4All.Core.Payroll.EmployeeStatus.Active, ct).ConfigureAwait(false))
+                {
+                    return Error.Validation("Pos.StaffNotFound", "Staff purchases can only be charged to an active employee.");
+                }
+            }
+
             decimal rate = rateResult.Value;
             decimal baseAmount = decimal.Round(tender.Amount * rate, 4, MidpointRounding.ToEven);
-            sale.AddTender(new SaleTender(tender.TenderType, tender.Currency, tender.Amount, rate, baseAmount, tender.AccountCode, tender.IsChange));
+            sale.AddTender(new SaleTender(tender.TenderType, tender.Currency, tender.Amount, rate, baseAmount, tender.AccountCode, tender.IsChange, tender.StaffEmployeeId));
 
             journalLines.Add(new JournalLineRequest { AccountCode = tender.AccountCode, Side = tender.IsChange ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = baseAmount });
         }

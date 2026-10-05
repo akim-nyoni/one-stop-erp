@@ -166,8 +166,10 @@ public sealed class SaleTender : Entity
     /// <param name="baseAmount">The base-currency value.</param>
     /// <param name="accountCode">The GL account for the tender.</param>
     /// <param name="isChange">True when this tender is change given (money out).</param>
-    public SaleTender(TenderType tenderType, CurrencyCode currency, decimal amount, decimal exchangeRate, decimal baseAmount, string accountCode, bool isChange)
+    /// <param name="staffEmployeeId">The employee whose staff account is charged (a staff purchase).</param>
+    public SaleTender(TenderType tenderType, CurrencyCode currency, decimal amount, decimal exchangeRate, decimal baseAmount, string accountCode, bool isChange, long? staffEmployeeId = null)
     {
+        StaffEmployeeId = staffEmployeeId;
         TenderType = tenderType;
         Currency = currency;
         Amount = amount;
@@ -200,4 +202,7 @@ public sealed class SaleTender : Entity
 
     /// <summary>True when this tender is change given (money out).</summary>
     public bool IsChange { get; private set; }
+
+    /// <summary>The employee whose staff account is charged, for a staff purchase (recovered through payroll).</summary>
+    public long? StaffEmployeeId { get; private set; }
 }

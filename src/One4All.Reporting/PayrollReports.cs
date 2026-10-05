@@ -106,6 +106,12 @@ public static class PayrollReports
         yield return Listing("PR10", "Backpay & Retrospective Adjustments", "Payroll", "Backpay paid in the period: per employee, the period corrected and each element's paid, due and difference.",
             "PyrlBackpay", [new Column("Employee", "Employee", 160), new Column("ForPeriod", "For period", 70), new Column("Element", "Element", 70), new Column("Paid", "Paid", 95), new Column("Due", "Due", 95),
              new Column("Run", "Paid in run", 100), new Column("PaidOn", "Paid on", 75), new Column("Reason", "Reason", 160), new Column("Difference", "Difference", 95, true)], Period);
+        yield return Listing("PR23", "Staff Purchase Deductions Reconciliation", "Payroll", "Per employee: staff-account purchases at the till against the staff-purchase deductions from pay, with the balance still to recover.",
+            "PyrlStaffPurchases", [new Column("Employee", "Employee", 160), new Column("Opening", "Opening", 95), new Column("Purchases", "Purchases", 95), new Column("Deducted", "Deducted", 95),
+             new Column("Closing", "Closing", 95, true)], Period);
+        yield return Listing("PR24", "Housing Rent Deduction Reconciliation", "Payroll", "Per employee tenant: rent billed, rent deducted from pay and receipted to the tenancy account, the account balance, and any deduction not receipted.",
+            "PyrlHousingRent", [new Column("Employee", "Employee", 160), new Column("Tenancy", "Tenancy", 80), new Column("Unit", "Unit", 70), new Column("Rent", "Monthly rent", 85), new Column("Billed", "Billed", 90),
+             new Column("Deducted", "Deducted", 90), new Column("Receipted", "Receipted", 90), new Column("Balance", "Account balance", 95), new Column("Difference", "Not receipted", 90, true)], Period);
         yield return Listing("PR19", "Third-Party Remittance Schedules", "Payroll", "Per scheme and member for the period: the employee's deduction and the employer's contribution — the schedule each provider needs.",
             "PyrlSchemes", [new Column("Scheme", "Scheme", 110), new Column("Employee", "Employee", 160), new Column("Member", "Member no.", 90), new Column("EmployeePart", "Employee", 90),
              new Column("EmployerPart", "Employer", 90), new Column("Total", "Total", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("SchemeCode", ParameterType.String)]);

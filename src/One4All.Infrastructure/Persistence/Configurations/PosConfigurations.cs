@@ -71,6 +71,7 @@ internal sealed class SaleTenderConfiguration : IEntityTypeConfiguration<SaleTen
     public void Configure(EntityTypeBuilder<SaleTender> b)
     {
         b.ToTable("sale_tender", Schemas.PointOfSale);
+        b.HasIndex(x => x.StaffEmployeeId);
         b.HasKey(x => x.Id);
         b.Property(x => x.TenderType).HasConversion<int>();
         b.Property(x => x.Currency).HasMaxLength(3);

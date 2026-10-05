@@ -96,7 +96,8 @@ missing domain data. Items are struck through as they ship (with the report code
 - ~~PR25, PR39, PR40, PR41, PR43~~ (dated leave and attendance)
 - ~~PR14, PR34, PR52, PR54, PR62, PR69~~ (split pay, benefits in kind, terminal benefits, labour mix, reprints)
 - ~~PR8, PR9, PR10~~ (legacy parallel run, supplementary runs and reversals, backpay)
-- Still open: PR23 (staff purchases), PR24 (housing rent deductions), PR35 (multi-currency tax split)
+- ~~PR23, PR24~~ (staff purchases and housing rent recovered through payroll)
+- Still open: PR35 (multi-currency tax split)
 
 ## P. Audit, Security & Compliance
 - ~~237 Permission Matrix (SYS237)~~, ~~238 Membership (SYS238)~~, ~~239 SoD all modules (SYS239)~~, ~~240 Master Data Changes (SYS240)~~, ~~242 Back-dated (SYS242)~~, ~~243 Deleted & Voided (SYS243)~~, ~~244 Numbering Gaps (SYS244, journals)~~, ~~245 Unposted (SYS245)~~, ~~248 Licences (SYS248)~~, ~~250 Report Run Log (SYS250)~~

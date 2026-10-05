@@ -109,4 +109,23 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Gets or sets the taxable-benefit category (motor vehicle, housing, loan, school fees) when the earning is a benefit in kind.</summary>
     public string? BenefitCategory { get; set; }
+
+    /// <summary>
+    /// Gets or sets what the deduction recovers from the employee, if anything: staff purchases on the POS staff-account tender
+    /// (formula variable STAFFPURCHASES) or council / employer housing rent (HOUSINGRENT, receipted to the tenancy's account).
+    /// </summary>
+    public PayRecovery Recovers { get; set; }
+}
+
+/// <summary>A balance a payroll deduction recovers from the employee (brief §4.15.4).</summary>
+public enum PayRecovery
+{
+    /// <summary>Not a recovery.</summary>
+    None = 0,
+
+    /// <summary>Staff purchases charged to the employee's staff account at the till.</summary>
+    StaffPurchases = 1,
+
+    /// <summary>Rent on the employee's council / employer housing tenancy.</summary>
+    HousingRent = 2,
 }

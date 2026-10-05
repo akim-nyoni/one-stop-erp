@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-527 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+529 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -339,6 +339,8 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | PR20 | Deductions vs Remittances | Per scheme and period: what the payroll deducted and contributed against what was paid over, with the gap. | FromDate (Date, optional), ToDate (Date, optional) | Scheme, Period, Deducted, Remitted, Status, Outstanding | — | Sum(Outstanding) |
 | PR21 | Garnishee & Court Order Register | Every court order by employee and priority: creditor, instalment, total ordered, deducted through payroll to the date and the balance still to collect. | AsAtDate (Date, optional) | Employee, Reference, Creditor, Priority, Issued, Instalment, Total, Deducted, Balance | — | Sum(Balance) |
 | PR22 | Loan & Advance Register and Balances | Every employee loan and advance: granted, principal, instalment, repaid, instalments left, status and the balance outstanding. | — | Employee, Reference, Granted, Principal, Instalment, Repaid, Left, Status, Outstanding | — | Sum(Outstanding) |
+| PR23 | Staff Purchase Deductions Reconciliation | Per employee: staff-account purchases at the till against the staff-purchase deductions from pay, with the balance still to recover. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Opening, Purchases, Deducted, Closing | — | Sum(Closing) |
+| PR24 | Housing Rent Deduction Reconciliation | Per employee tenant: rent billed, rent deducted from pay and receipted to the tenancy account, the account balance, and any deduction not receipted. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Tenancy, Unit, Rent, Billed, Deducted, Receipted, Balance, Difference | — | Sum(Difference) |
 | PR25 | Overtime Analysis | Overtime in the period by department, employee and multiplier: hours, approved and unapproved hours, and the cost at the basic hourly rate. | FromDate (Date, optional), ToDate (Date, optional), HoursPerMonth (Decimal, optional) | Department, Employee, Multiplier, Hours, Approved, Unapproved, Cost | — | Sum(Cost) |
 | PR26 | Allowance Analysis | Earnings other than basic salary in the period, per employee and allowance. | FromDate (Date, optional), ToDate (Date, optional) | Employee, Department, Element, Description, Taxable, Amount | — | Sum(Amount) |
 | PR27 | PAYE Remittance Return | Per month: employees, taxable earnings, PAYE deducted and PAYE by the tax table in force, with any difference. | FromDate (Date, optional), ToDate (Date, optional) | Month, Employees, Taxable, ByTable, Difference, Deducted | — | Sum(Deducted) |

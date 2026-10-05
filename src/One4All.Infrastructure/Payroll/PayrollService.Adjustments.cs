@@ -48,7 +48,9 @@ public sealed partial class PayrollService
         List<BackpayLine> earlier = await _db.Set<BackpayLine>().AsNoTracking().Where(b => b.CompanyId == companyId && b.EmployeeId == employeeId && labels.Contains(b.ForPeriod))
             .ToListAsync(ct).ConfigureAwait(false);
 
+        // Recoveries (staff purchases, rent) follow balances, not pay, so backpay leaves them alone.
         Dictionary<long, PayElement> elements = await LoadElementsAsync(companyId, ct).ConfigureAwait(false);
+        HashSet<string> recoveryCodes = new(elements.Values.Where(e => e.Recovers != PayRecovery.None).Select(e => e.Code), StringComparer.OrdinalIgnoreCase);
         List<BackpayPreviewLine> lines = [];
         foreach (IGrouping<string, Payslip> period in periods)
         {
@@ -70,7 +72,7 @@ public sealed partial class PayrollService
             }
 
             Dictionary<string, decimal> owed = due.Value.Lines.GroupBy(l => l.ElementCode, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Sum(l => l.Amount), StringComparer.OrdinalIgnoreCase);
-            foreach (string code in paid.Keys.Union(owed.Keys, StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal))
+            foreach (string code in paid.Keys.Union(owed.Keys, StringComparer.OrdinalIgnoreCase).Where(c => !recoveryCodes.Contains(c)).Order(StringComparer.Ordinal))
             {
                 BackpayPreviewLine line = new(period.Key, code, paid.GetValueOrDefault(code), owed.GetValueOrDefault(code));
                 if (line.Difference != 0m)
@@ -201,6 +203,7 @@ public sealed partial class PayrollService
         string reversalDocument = "REV-" + (run.DocumentNumber.Length > 0 ? run.DocumentNumber : run.JournalNumber);
         reversalDocument = reversalDocument[..Math.Min(reversalDocument.Length, 40)];
         decimal gross = 0m, deductions = 0m, net = 0m;
+        List<Payslip> negatives = [];
         foreach (Payslip slip in original)
         {
             Payslip negative = new(companyId, slip.EmployeeId, slip.PeriodLabel, date, PayRunKind.Reversal, reversalDocument);
@@ -210,9 +213,17 @@ public sealed partial class PayrollService
             }
 
             _db.Set<Payslip>().Add(negative);
+            negatives.Add(negative);
             gross += negative.GrossEarnings;
             deductions += negative.TotalDeductions;
             net += negative.NetPay;
+        }
+
+        Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        Result rent = await SettleHousingRentAsync(company, negatives, await LoadElementsAsync(companyId, ct).ConfigureAwait(false), reversalDocument, date, ct).ConfigureAwait(false);
+        if (rent.IsFailure)
+        {
+            return rent.Error;
         }
 
         run.MarkReversed(date, reversalDocument, approvedByUserId);

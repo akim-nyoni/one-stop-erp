@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Payroll;
+using One4All.Application.Abstractions.Trading;
 using One4All.Application.Payroll;
 using One4All.Core.Common;
 using One4All.Core.Payroll;
@@ -20,13 +21,16 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 {
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _posting;
+    private readonly ISalesLedgerService _sales;
     private readonly ReportExpressionEngine _expressions = new();
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="posting">The central posting engine.</param>
-    public PayrollService(One4AllDbContext db, IPostingEngine posting)
+    /// <param name="sales">The sales ledger (rent deducted from pay is receipted to the tenancy's account).</param>
+    public PayrollService(One4AllDbContext db, IPostingEngine posting, ISalesLedgerService sales)
     {
+        _sales = sales;
         _db = db;
         _posting = posting;
     }
@@ -42,7 +46,9 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         }
 
         Dictionary<long, PayElement> elements = await LoadElementsAsync(companyId, ct).ConfigureAwait(false);
-        Result<Payslip> slip = BuildPayslip(companyId, employee, elements, "PREVIEW", DateOnly.FromDateTime(DateTime.UtcNow));
+        DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow);
+        Dictionary<long, Dictionary<string, object?>> recoveries = await RecoveryVariablesAsync(companyId, [employee], elements, today, ct).ConfigureAwait(false);
+        Result<Payslip> slip = BuildPayslip(companyId, employee, elements, "PREVIEW", today, recoveries: recoveries[employee.Id]);
         if (slip.IsFailure)
         {
             return slip.Error;
@@ -63,7 +69,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         }
 
         Dictionary<long, PayElement> elements = await LoadElementsAsync(companyId, ct).ConfigureAwait(false);
-        Result<Payslip> slip = BuildPayslip(companyId, employee, elements, periodLabel, payDate);
+        Dictionary<long, Dictionary<string, object?>> recoveries = await RecoveryVariablesAsync(companyId, [employee], elements, payDate, ct).ConfigureAwait(false);
+        Result<Payslip> slip = BuildPayslip(companyId, employee, elements, periodLabel, payDate, recoveries: recoveries[employee.Id]);
         if (slip.IsFailure)
         {
             return slip.Error;
@@ -129,10 +136,11 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             return Error.Rule("Payroll.NoEmployees", "There are no active employees to pay.");
         }
 
+        Dictionary<long, Dictionary<string, object?>> recoveries = await RecoveryVariablesAsync(companyId, employees, elements, payDate, ct).ConfigureAwait(false);
         List<Payslip> slips = [];
         foreach (Employee employee in employees)
         {
-            Result<Payslip> slip = BuildPayslip(companyId, employee, elements, periodLabel, payDate, documentNumber: documentNumber);
+            Result<Payslip> slip = BuildPayslip(companyId, employee, elements, periodLabel, payDate, documentNumber: documentNumber, recoveries: recoveries[employee.Id]);
             if (slip.IsFailure)
             {
                 return slip.Error;
@@ -227,6 +235,12 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             return posted.Error;
         }
 
+        Result rent = await SettleHousingRentAsync(company, slips, elements, documentNumber, payDate, ct).ConfigureAwait(false);
+        if (rent.IsFailure)
+        {
+            return rent.Error;
+        }
+
         _db.Set<PayrollRunRecord>().Add(new PayrollRunRecord(company.Id, periodLabel, payDate, slips.Count, totalGross, totalDeductions, totalNet, posted.Value.JournalNumber, kind, documentNumber, reason));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new PayrollRunResult(slips.Count, totalGross, totalDeductions, totalNet, posted.Value.JournalNumber);
@@ -237,7 +251,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             .ToDictionaryAsync(e => e.Id, ct).ConfigureAwait(false);
 
     private Result<Payslip> BuildPayslip(long companyId, Employee employee, IReadOnlyDictionary<long, PayElement> elements, string periodLabel, DateOnly payDate,
-        decimal? basicSalary = null, string documentNumber = "")
+        decimal? basicSalary = null, string documentNumber = "", IReadOnlyDictionary<string, object?>? recoveries = null)
     {
         Payslip payslip = new(companyId, employee.Id, periodLabel, payDate, PayRunKind.Regular, documentNumber);
 
@@ -249,7 +263,13 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             ["TAXABLE"] = 0m,
             ["DEDUCTIONS"] = 0m,
             ["NET"] = 0m,
+            [StaffPurchasesVariable] = 0m,
+            [HousingRentVariable] = 0m,
         };
+        foreach ((string name, object? value) in recoveries ?? new Dictionary<string, object?>())
+        {
+            vars[name] = value;
+        }
 
         IEnumerable<(PayElement Element, EmployeePayElement Assignment)> ordered = employee.PayElements
             .Where(a => a.IsActive && elements.ContainsKey(a.PayElementId))

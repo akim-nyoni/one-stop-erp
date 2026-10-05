@@ -68,6 +68,8 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLPARALLEL" => await ParallelAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLADJUSTMENTS" => await AdjustmentsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLBACKPAY" => await BackpayAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLSTAFFPURCHASES" => await StaffPurchasesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLHOUSINGRENT" => await HousingRentAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLSCHEMES" => await SchemeScheduleAsync(companyId, fromDate, toDate, _ => true, Text(parameters, "SchemeCode"), ct).ConfigureAwait(false),
             "PYRLSCHEMESOCIAL" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.SocialSecurity, null, ct).ConfigureAwait(false),
             "PYRLSCHEMEPENSION" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.Pension, null, ct).ConfigureAwait(false),
@@ -555,6 +557,64 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             .OrderBy(b => Name(employees, b.EmployeeId), StringComparer.Ordinal).ThenBy(b => b.ForPeriod, StringComparer.Ordinal).ThenBy(b => b.ElementCode, StringComparer.Ordinal)
             .Select(b => Row(("Employee", Name(employees, b.EmployeeId)), ("ForPeriod", b.ForPeriod), ("Element", b.ElementCode), ("Paid", Money(b.Paid)), ("Due", Money(b.Due)), ("Run", b.RunReference),
                 ("PaidOn", Date(b.PaidOn)), ("Reason", b.Reason), ("Difference", b.Difference)))];
+    }
+
+    // Every recovery deduction line (element code, employee, pay date, amount) for the kind.
+    private async Task<List<(long EmployeeId, DateOnly PayDate, decimal Amount)>> RecoveryLinesAsync(long companyId, PayRecovery kind, CancellationToken ct)
+    {
+        List<string> codes = await _db.PayElements.AsNoTracking().Where(e => e.CompanyId == companyId && e.Recovers == kind).Select(e => e.Code).ToListAsync(ct).ConfigureAwait(false);
+        var lines = await _db.Payslips.AsNoTracking().Where(p => p.CompanyId == companyId)
+            .SelectMany(p => p.Lines.Where(l => codes.Contains(l.ElementCode) && l.Amount != 0m).Select(l => new { p.EmployeeId, p.PayDate, l.Amount })).ToListAsync(ct).ConfigureAwait(false);
+        return [.. lines.Select(l => (l.EmployeeId, l.PayDate, l.Amount))];
+    }
+
+    // PR23: staff-account tenders against staff-purchase deductions, per employee.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> StaffPurchasesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        var tenders = await _db.Sales.AsNoTracking().Where(s => s.CompanyId == companyId && s.Status == Core.Pos.SaleStatus.Completed && s.SaleDate <= toDate)
+            .SelectMany(s => s.Tenders.Where(t => t.StaffEmployeeId != null).Select(t => new { EmployeeId = t.StaffEmployeeId!.Value, s.SaleDate, t.BaseAmount })).ToListAsync(ct).ConfigureAwait(false);
+        List<(long EmployeeId, DateOnly PayDate, decimal Amount)> deducted = [.. (await RecoveryLinesAsync(companyId, PayRecovery.StaffPurchases, ct).ConfigureAwait(false)).Where(l => l.PayDate <= toDate)];
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        return [.. tenders.Select(t => t.EmployeeId).Concat(deducted.Select(d => d.EmployeeId)).Distinct().OrderBy(id => Name(employees, id), StringComparer.Ordinal).Select(id =>
+        {
+            decimal opening = tenders.Where(t => t.EmployeeId == id && t.SaleDate < fromDate).Sum(t => t.BaseAmount) - deducted.Where(d => d.EmployeeId == id && d.PayDate < fromDate).Sum(d => d.Amount);
+            decimal purchases = tenders.Where(t => t.EmployeeId == id && t.SaleDate >= fromDate).Sum(t => t.BaseAmount);
+            decimal recovered = deducted.Where(d => d.EmployeeId == id && d.PayDate >= fromDate).Sum(d => d.Amount);
+            return Row(("Employee", Name(employees, id)), ("Opening", Money(opening)), ("Purchases", Money(purchases)), ("Deducted", Money(recovered)), ("Closing", decimal.Round(opening + purchases - recovered, 2, MidpointRounding.ToEven)));
+        })];
+    }
+
+    // PR24: per employee tenant, the tenancy account's rent billed and payroll receipts against the rent deducted from pay.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> HousingRentAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        List<(long EmployeeId, DateOnly PayDate, decimal Amount)> deducted = [.. (await RecoveryLinesAsync(companyId, PayRecovery.HousingRent, ct).ConfigureAwait(false))
+            .Where(l => l.PayDate >= fromDate && l.PayDate <= toDate)];
+        List<long> tenancyIds = [.. employees.Values.Where(e => e.HousingTenancyId != null).Select(e => e.HousingTenancyId!.Value)];
+        Dictionary<long, Core.Housing.Tenancy> tenancies = await _db.Set<Core.Housing.Tenancy>().AsNoTracking().Where(t => tenancyIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id, ct).ConfigureAwait(false);
+        List<long> unitIds = [.. tenancies.Values.Select(t => t.UnitId)];
+        Dictionary<long, string> units = await _db.Set<Core.Housing.RentalUnit>().AsNoTracking().Where(u => unitIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Code, ct).ConfigureAwait(false);
+        List<long> customers = [.. tenancies.Values.Select(t => t.TenantCustomerId)];
+        List<Core.Trading.OpenItem> items = await _db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsReceivable && customers.Contains(i.TraderId)
+            && i.DocumentDate <= toDate).ToListAsync(ct).ConfigureAwait(false);
+
+        // Payroll receipts are numbered "<run document>-<employee number>".
+        List<string> runs = await _db.Set<PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == companyId && r.DocumentNumber != string.Empty).Select(r => r.DocumentNumber).ToListAsync(ct).ConfigureAwait(false);
+        HashSet<string> ReceiptNumbers(Employee e) => [.. runs.Select(r => $"{r}-{e.EmployeeNumber}").Select(d => d.Length > 40 ? d[..40] : d)];
+
+        return [.. employees.Values.Where(e => (e.HousingTenancyId is long t && tenancies.ContainsKey(t)) || deducted.Any(d => d.EmployeeId == e.Id)).OrderBy(e => e.EmployeeNumber, StringComparer.Ordinal).Select(e =>
+        {
+            Core.Housing.Tenancy? tenancy = e.HousingTenancyId is long id ? tenancies.GetValueOrDefault(id) : null;
+            List<Core.Trading.OpenItem> account = tenancy is null ? [] : [.. items.Where(i => i.TraderId == tenancy.TenantCustomerId)];
+            HashSet<string> receipts = ReceiptNumbers(e);
+            decimal Signed(Core.Trading.OpenItem i) => i.Sign == Core.Trading.LedgerSign.Debit ? i.OriginalBase : -i.OriginalBase;
+            decimal billed = account.Where(i => i.DocumentDate >= fromDate && i.ItemType == Core.Trading.OpenItemType.Invoice).Sum(i => i.OriginalBase);
+            decimal receipted = -account.Where(i => i.DocumentDate >= fromDate && receipts.Contains(i.DocumentNumber)).Sum(Signed);
+            decimal recovered = deducted.Where(d => d.EmployeeId == e.Id).Sum(d => d.Amount);
+            return Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Tenancy", tenancy?.TenancyNumber ?? "-"), ("Unit", tenancy is null ? "-" : units.GetValueOrDefault(tenancy.UnitId, "?")),
+                ("Rent", Money(tenancy?.MonthlyRent ?? 0m)), ("Billed", Money(billed)), ("Deducted", Money(recovered)), ("Receipted", Money(receipted)), ("Balance", Money(account.Sum(Signed))),
+                ("Difference", recovered - receipted));
+        })];
     }
 
     // Each member's lines on the scheme's employee and employer elements in the period.

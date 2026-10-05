@@ -14066,6 +14066,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("hold_reason");
 
+                    b.Property<long?>("HousingTenancyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("housing_tenancy_id");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
@@ -14138,6 +14142,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_employee");
+
+                    b.HasIndex("HousingTenancyId")
+                        .HasDatabaseName("ix_employee_housing_tenancy_id");
 
                     b.HasIndex("CompanyId", "EmployeeNumber")
                         .IsUnique()
@@ -14801,6 +14808,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 6)
                         .HasColumnType("numeric(19,6)")
                         .HasColumnName("rate");
+
+                    b.Property<int>("Recovers")
+                        .HasColumnType("integer")
+                        .HasColumnName("recovers");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
@@ -15895,6 +15906,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("sale_id");
 
+                    b.Property<long?>("StaffEmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("staff_employee_id");
+
                     b.Property<int>("TenderType")
                         .HasColumnType("integer")
                         .HasColumnName("tender_type");
@@ -15904,6 +15919,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SaleId")
                         .HasDatabaseName("ix_sale_tender_sale_id");
+
+                    b.HasIndex("StaffEmployeeId")
+                        .HasDatabaseName("ix_sale_tender_staff_employee_id");
 
                     b.ToTable("sale_tender", "pos");
                 });

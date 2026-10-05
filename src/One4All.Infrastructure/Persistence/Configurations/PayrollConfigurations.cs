@@ -11,6 +11,7 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         b.ToTable("employee", Schemas.HumanResources);
         b.HasKey(x => x.Id);
         b.Property(x => x.EmployeeNumber).HasMaxLength(30);
+        b.HasIndex(x => x.HousingTenancyId);
         b.Property(x => x.EmploymentType).HasConversion<int>();
         b.Property(x => x.FullName).HasMaxLength(200);
         b.Property(x => x.Department).HasMaxLength(30);
@@ -52,6 +53,7 @@ internal sealed class PayElementConfiguration : IEntityTypeConfiguration<PayElem
     public void Configure(EntityTypeBuilder<PayElement> b)
     {
         b.ToTable("element", Schemas.Payroll);
+        b.Property(x => x.Recovers).HasConversion<int>();
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).HasMaxLength(30);
         b.Property(x => x.Name).HasMaxLength(120);

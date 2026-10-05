@@ -97,6 +97,9 @@ public sealed class Employee : SoftDeletableEntity, ICompanyScoped
     /// <summary>The basic salary per period.</summary>
     public decimal BasicSalary { get; set; }
 
+    /// <summary>Gets or sets the council / employer housing tenancy whose rent is deducted from pay (§4.10.7).</summary>
+    public long? HousingTenancyId { get; set; }
+
     /// <summary>Gets or sets the system login that belongs to this employee, so payroll can spot anyone processing their own pay.</summary>
     public long? UserId { get; set; }
 
