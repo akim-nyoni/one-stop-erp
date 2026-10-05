@@ -20,6 +20,49 @@ namespace One4All.Infrastructure.Reporting;
 public sealed class ControlReportDataProvider : IReportDataProvider
 {
     // The records whose changes the master-data report follows (CLR class names, as the audit trail records them).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> OverridesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        string User(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "—";
+        List<(DateTimeOffset When, IReadOnlyDictionary<string, object?> Row)> rows = [];
+        Core.Pos.PosEventKind[] kinds = [Core.Pos.PosEventKind.PriceOverride, Core.Pos.PosEventKind.Refund, Core.Pos.PosEventKind.NoSale];
+        foreach (Core.Pos.PosEvent e in await _db.PosEvents.AsNoTracking().Where(e => e.CompanyId == companyId && kinds.Contains(e.Kind) && e.AuthorisedByUserId != null && e.EventDate >= fromDate && e.EventDate <= toDate)
+                     .ToListAsync(ct).ConfigureAwait(false))
+        {
+            string detail = e.Kind switch
+            {
+                Core.Pos.PosEventKind.PriceOverride => $"{e.SaleNumber}: {e.Description} {e.OriginalAmount:0.00} → {e.Amount:0.00}",
+                Core.Pos.PosEventKind.Refund => $"{e.SaleNumber}: {e.Description} refunded {e.Amount:0.00}",
+                _ => "Drawer opened without a sale",
+            };
+            rows.Add((e.OccurredOnUtc, Row(("When", e.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Module", "POS"), ("Override", e.Kind.ToString()), ("Detail", detail),
+                ("Operator", User(e.CashierUserId)), ("AuthorisedBy", User(e.AuthorisedByUserId)), ("Reason", e.Reason ?? string.Empty))));
+        }
+
+        foreach (Core.JobCosting.WeighbridgeTicket t in await _db.WeighbridgeTickets.AsNoTracking().Where(t => t.CompanyId == companyId && t.IsManualWeight && t.Date >= fromDate && t.Date <= toDate)
+                     .ToListAsync(ct).ConfigureAwait(false))
+        {
+            DateTimeOffset when = t.TimeInUtc ?? new DateTimeOffset(t.Date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            rows.Add((when, Row(("When", when.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Module", "Weighbridge"), ("Override", "Manual weight"),
+                ("Detail", $"{t.TicketNumber} {t.VehicleRegistration} net {t.NetTonnes:0.###} t"), ("Operator", User(t.OperatorUserId)), ("AuthorisedBy", User(t.ManualAuthorisedByUserId)), ("Reason", t.ManualReason ?? string.Empty))));
+        }
+
+        return [.. rows.OrderBy(r => r.When).Select(r => r.Row)];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> HashChainAsync(long companyId, CancellationToken ct)
+    {
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach ((string scope, long? id) in new (string, long?)[] { ("This company", companyId), ("System-wide", null) })
+        {
+            AuditChainVerification check = await _audit.VerifyChainAsync(id, ct).ConfigureAwait(false);
+            rows.Add(Row(("Scope", scope), ("Checked", check.EntriesChecked), ("Intact", check.IsIntact ? "Yes" : "NO"), ("FirstBroken", check.FirstBrokenEntryId?.ToString(CultureInfo.InvariantCulture) ?? "—"),
+                ("Message", check.Message)));
+        }
+
+        return rows;
+    }
+
     private static readonly string[] MasterData =
     [
         "Customer", "Supplier", "Item", "LedgerAccount", "Tariff", "Property", "Employee", "PriceList", "PriceListLine", "BankAccount", "User", "Role", "RolePermission",
@@ -28,14 +71,17 @@ public sealed class ControlReportDataProvider : IReportDataProvider
 
     private readonly One4AllDbContext _db;
     private readonly IPermissionService _permissions;
+    private readonly IAuditService _audit;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="permissions">The permission resolver (for separation of duties).</param>
-    public ControlReportDataProvider(One4AllDbContext db, IPermissionService permissions)
+    /// <param name="audit">The audit trail (for hash-chain verification).</param>
+    public ControlReportDataProvider(One4AllDbContext db, IPermissionService permissions, IAuditService audit)
     {
         _db = db;
         _permissions = permissions;
+        _audit = audit;
     }
 
     /// <inheritdoc />
@@ -54,6 +100,8 @@ public sealed class ControlReportDataProvider : IReportDataProvider
             "SYSRMEMBERSHIP" => await MembershipAsync(ct).ConfigureAwait(false),
             "SYSRSOD" => await SodAsync(ct).ConfigureAwait(false),
             "SYSRMASTERCHANGES" => await MasterChangesAsync(companyId, start, end, ct).ConfigureAwait(false),
+            "SYSROVERRIDES" => await OverridesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "SYSRHASHCHAIN" => await HashChainAsync(companyId, ct).ConfigureAwait(false),
             "SYSRBACKDATED" => await BackdatedAsync(companyId, start, end, parameters, ct).ConfigureAwait(false),
             "SYSRDELETED" => await DeletedAsync(companyId, start, end, ct).ConfigureAwait(false),
             "SYSRGAPS" => await GapsAsync(companyId, ct).ConfigureAwait(false),

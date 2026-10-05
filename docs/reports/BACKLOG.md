@@ -17,7 +17,8 @@ missing domain data. Items are struck through as they ship (with the report code
 ## B. Accounts Receivable
 - ~~29 Aged detail (AR29)~~, ~~30 by rep / currency (AR30)~~, ~~31 Customer Ledger (AR31)~~, ~~33 Sales Day Book (AR33)~~, ~~35 Top Customers (AR35)~~, ~~39 / 44 Unallocated & advances (AR39)~~, ~~40 DSO (AR40)~~, ~~41 Promise-to-Pay (AR41)~~, ~~43 Write-offs (AR43)~~, ~~45 Lay-byes (AR45)~~, ~~47 Exposure by Currency (AR47)~~, ~~48 New & Dormant (AR48)~~
 - ~~34 Sales Analysis with Margin (AR34)~~, ~~36 Sales History & Trend (AR36)~~, ~~49 price lists (SYS258)~~
-- Data exists: 38 collections (all receipts), 50 layouts (quotation, SO confirmation, delivery note, remittance slip)
+- ~~38 Receipts / Collections (AR38)~~
+- Data exists: 50 layouts (quotation, SO confirmation, delivery note, remittance slip)
 - Needs new data: 28 (parent / child customers), 37 reason codes
 
 ## C. Accounts Payable
@@ -88,12 +89,11 @@ missing domain data. Items are struck through as they ship (with the report code
 - ~~PR25, PR39, PR40, PR41, PR43~~ (dated leave and attendance)
 - ~~PR14, PR34, PR52, PR54, PR62, PR69~~ (split pay, benefits in kind, terminal benefits, labour mix, reprints)
 - Still open: PR8–PR10 (parallel / supplementary runs, backpay), PR23 (staff purchases), PR24 (housing rent deductions), PR35 (multi-currency tax split)
-- Data exists, partly: PR4, PR24, PR26–PR28, PR34, PR39, PR45, PR46, PR58, PR63, PR66
-- Needs new data: payroll runs and approvals, employee bank / tax / ID details, schemes and members, tax tables, timesheets, grades and establishment, HR records (PR7–PR11, PR13–PR15, PR19–PR23, PR25, PR30–PR33, PR35, PR36, PR40–PR43, PR47, PR48, PR50–PR57, PR62, PR68, PR69)
 
 ## P. Audit, Security & Compliance
 - ~~237 Permission Matrix (SYS237)~~, ~~238 Membership (SYS238)~~, ~~239 SoD all modules (SYS239)~~, ~~240 Master Data Changes (SYS240)~~, ~~242 Back-dated (SYS242)~~, ~~243 Deleted & Voided (SYS243)~~, ~~244 Numbering Gaps (SYS244, journals)~~, ~~245 Unposted (SYS245)~~, ~~248 Licences (SYS248)~~, ~~250 Report Run Log (SYS250)~~
-- Data exists: partly 236 (no login history), 241 (overrides), 247 (hash-chain verification is in the audit service)
+- ~~241 Supervisor Overrides (SYS241)~~, ~~247 Hash-Chain Verification (SYS247)~~
+- Data exists: partly 236 (no login history)
 - Needs new data: 249 login sessions
 
 ## Q. Executive / BI Dashboards

@@ -118,6 +118,8 @@ public sealed class WeighbridgeTests
         (await Render("WB204")).Should().Contain($"{batch.RunNumber},2026-03-11,CONC-MIX,4,4,1,65.00,5");
         (await Render("WB205")).Should().Contain("Z1,Town,1,5,5,1.2,30").And.Contain("Z2,Country,1,22,15,0.2667,88");
 
+        (await Render("SYS241")).Should().Contain(",Weighbridge,Manual weight,").And.Contain(",Scale offline");
+
         foreach (string code in WeighbridgeReports.All().Select(r => r.Code))
         {
             await Render(code);

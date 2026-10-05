@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Reporting;
 using One4All.Application.Housing;
+using One4All.Core.Accounting;
 using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
 using One4All.Infrastructure.Trading;
@@ -29,6 +30,7 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
         DateOnly from = DateParameter(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
         return command.ToUpperInvariant() switch
         {
+            "RECVCOLLECTIONS" => await CollectionsAsync(companyId, from, to, ct).ConfigureAwait(false),
             "RECVAGEDDETAIL" => await AgedDetailAsync(companyId, asAt, ct).ConfigureAwait(false),
             "RECVAGEDBYREP" => await AgedByRepAsync(companyId, asAt, ct).ConfigureAwait(false),
             "RECVLEDGER" => await LedgerAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -107,6 +109,26 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
         }
 
         return rows;
+    }
+
+    // Each receipt's journal gives the bank account debited (the method) and who posted it.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CollectionsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        var receipts = await (from o in _db.OpenItems.AsNoTracking()
+                              join j in _db.Journals.AsNoTracking() on o.JournalEntryId equals j.Id
+                              where o.CompanyId == companyId && o.Ledger == TradingLedger.AccountsReceivable && o.ItemType == OpenItemType.Receipt && o.DocumentDate >= fromDate && o.DocumentDate <= toDate
+                              select new { o.DocumentDate, o.Currency, o.OriginalTransaction, o.OriginalBase, j.Id, j.CreatedByUserId }).ToListAsync(ct).ConfigureAwait(false);
+        List<long> journalIds = [.. receipts.Select(r => r.Id)];
+        Dictionary<long, string> banks = (await _db.Set<JournalLine>().AsNoTracking().Where(l => journalIds.Contains(l.JournalEntryId) && l.BaseDebit > 0m)
+                .Select(l => new { l.JournalEntryId, l.AccountCode }).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(l => l.JournalEntryId).ToDictionary(g => g.Key, g => g.First().AccountCode);
+        Dictionary<string, string> names = await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AccountCode, a => a.Name, ct).ConfigureAwait(false);
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        return [.. receipts.GroupBy(r => (r.DocumentDate, Bank: banks.GetValueOrDefault(r.Id, "?"), r.Currency, r.CreatedByUserId))
+            .OrderBy(g => g.Key.DocumentDate).ThenBy(g => g.Key.Bank, StringComparer.Ordinal).ThenBy(g => g.Key.Currency.ToString(), StringComparer.Ordinal)
+            .Select(g => Row(("Date", Date(g.Key.DocumentDate)), ("Method", $"{g.Key.Bank} {names.GetValueOrDefault(g.Key.Bank, string.Empty)}".Trim()), ("Currency", g.Key.Currency.ToString()),
+                ("User", users.GetValueOrDefault(g.Key.CreatedByUserId, g.Key.CreatedByUserId == 0 ? "system" : $"user {g.Key.CreatedByUserId}")), ("Count", g.Count()),
+                ("Amount", Money(g.Sum(r => Math.Abs(r.OriginalTransaction)))), ("Base", g.Sum(r => Math.Abs(r.OriginalBase)))))];
     }
 
     private static readonly OpenItemType[] SalesTypes = [OpenItemType.Invoice, OpenItemType.CreditNote, OpenItemType.DebitNote];

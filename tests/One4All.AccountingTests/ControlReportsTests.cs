@@ -55,6 +55,7 @@ public sealed class ControlReportsTests
         (await Render("SYS242")).Should().Contain($"{backdated.JournalNumber},2026-01-05,{today:yyyy-MM-dd}").And.Contain("SYS-BD-1").And.Contain("Late correction");
         (await Render("SYS240")).Should().Contain(",Customer,").And.Contain("Insert");
         (await Render("SYS260")).Should().Contain("JNL");
+        (await Render("SYS247")).Should().Contain("This company,").And.Contain("System-wide,").And.NotContain(",NO,");
         (await Render("SYS261")).Should().Contain("BaseCurrency,USD");
         (await Render("SYS262")).Should().Contain("SYS262,Report Definition Inventory");
 

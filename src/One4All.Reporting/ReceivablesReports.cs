@@ -37,6 +37,9 @@ public static class ReceivablesReports
         yield return Listing("AR36", "Customer Sales History & Trend", "Sales", "Per customer: net sales this year to date against the same period last year, and the last three months against the three before.",
             "RecvSalesTrend", [new Column("Customer", "Customer", 160), new Column("LastYear", "Same period last year", 110), new Column("Change", "Change", 65), new Column("Last3", "Last 3 months", 95),
              new Column("Prior3", "Prior 3 months", 95), new Column("Trend", "Trend", 60), new Column("ThisYear", "This year to date", 105, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("AR38", "Receipts / Collections Report", "Receivables", "Customer receipts in the period by day, bank account (method), currency and the user who posted them.",
+            "RecvCollections", [new Column("Date", "Date", 75), new Column("Method", "Bank / method", 150), new Column("Currency", "Currency", 55), new Column("User", "Posted by", 90), new Column("Count", "Receipts", 55),
+             new Column("Amount", "In currency", 95), new Column("Base", "Base", 95, true)], Period);
         yield return Listing("AR39", "Unallocated Receipts, Credits & Advances", "Sales", "Receipts, credit notes and advances not yet allocated to invoices at the date, with how long they have been unallocated.",
             "RecvUnallocated", [new Column("Customer", "Customer", 150), new Column("Document", "Document", 110), new Column("Type", "Type", 80), new Column("Date", "Date", 75), new Column("Days", "Days", 50),
              new Column("Unallocated", "Unallocated", 95, true)], [("AsAtDate", ParameterType.Date)]);

@@ -28,6 +28,9 @@ public static class ControlReports
         yield return Listing("SYS240", "Master Data Change Report", "System", "Changes in the period to customers, suppliers, items, accounts, tariffs, properties, employees, price lists, users and roles.",
             "SysrMasterChanges", [new Column("When", "When", 115), new Column("User", "User", 90), new Column("Entity", "Record", 110), new Column("Id", "Id", 50), new Column("Action", "Action", 60),
              new Column("Changed", "Fields changed", 280)], Period);
+        yield return Listing("SYS241", "Supervisor Override Report", "System", "Every override authorised by a supervisor in the period across the modules: POS price overrides, refunds and no-sales, and manual weighbridge weights.",
+            "SysrOverrides", [new Column("When", "When", 115), new Column("Module", "Module", 80), new Column("Override", "Override", 120), new Column("Detail", "Detail", 220), new Column("Operator", "Operator", 90),
+             new Column("AuthorisedBy", "Authorised by", 90), new Column("Reason", "Reason", 160)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
         yield return Listing("SYS242", "Back-dated Transactions", "System", "Journals entered in the period with a posting date more than the given number of days before they were entered.",
             "SysrBackdated", [new Column("Journal", "Journal", 100), new Column("Posting", "Posting date", 80), new Column("Entered", "Entered", 80), new Column("DaysBack", "Days back", 60),
              new Column("Source", "Source", 60), new Column("Document", "Document", 120), new Column("PreparedBy", "Prepared by", 90), new Column("Narrative", "Narrative", 200)],
@@ -40,6 +43,9 @@ public static class ControlReports
         yield return Listing("SYS245", "Unposted & Deferred Batches", "System", "Journals still draft, deferred or awaiting approval, with who prepared them.",
             "SysrUnposted", [new Column("Journal", "Journal", 100), new Column("Posting", "Posting date", 80), new Column("Status", "Status", 110), new Column("Source", "Source", 60),
              new Column("Document", "Document", 120), new Column("PreparedBy", "Prepared by", 90), new Column("Narrative", "Narrative", 200)], []);
+        yield return Listing("SYS247", "Audit Trail Hash-Chain Verification", "System", "Recomputes the audit trail's hash chain for the company and for system-wide entries and says whether it is intact or where it first breaks.",
+            "SysrHashChain", [new Column("Scope", "Scope", 120), new Column("Checked", "Entries checked", 90), new Column("Intact", "Intact", 60), new Column("FirstBroken", "First broken entry", 100),
+             new Column("Message", "Result", 300)], []);
         yield return Listing("SYS248", "Licence Installation History", "System", "Licences installed, when and by whom, and which is active (token fingerprint only).",
             "SysrLicences", [new Column("Installed", "Installed", 115), new Column("By", "By", 90), new Column("Active", "Active", 50), new Column("Fingerprint", "Token fingerprint", 140)], []);
         yield return Listing("SYS250", "Report Print & Export Log", "System", "Every report run in the period: who, what, format, size and copy number.",

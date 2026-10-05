@@ -121,6 +121,9 @@ public sealed class PosEventsTests
         (await Render("POS116")).Should().Contain(",ES-1,Customer copy,23");
         (await Render("POS121")).Should().Contain(",ES-1,FDMS-0001,Accepted,23");
 
+        string overrides = await Render("SYS241");
+        overrides.Should().Contain(",POS,PriceOverride,ES-1: Soda 500ml 2.00 → 1.50,").And.Contain(",POS,Refund,ES-1: Soda 500ml refunded 6.90,").And.Contain(",POS,NoSale,Drawer opened without a sale,");
+
         foreach (string code in RetailReports.All().Select(r => r.Code))
         {
             await Render(code);

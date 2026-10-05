@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-473 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+476 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -470,6 +470,12 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | RC8 | Collection by Currency | Amounts by currency with the rates applied and the realised FX effect. | FromDate (Date, optional), ToDate (Date, optional) | Currency, Transaction, Rate, BaseAmount | — | Sum(BaseAmount) |
 | RC9 | Collection by Ward / Zone | Collections by ward, zone, suburb, class or scheme. | FromDate (Date, optional), ToDate (Date, optional) | Area, Amount | — | Sum(Amount) |
 
+## Receivables
+
+| Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
+|---|---|---|---|---|---|---|
+| AR38 | Receipts / Collections Report | Customer receipts in the period by day, bank account (method), currency and the user who posted them. | FromDate (Date, optional), ToDate (Date, optional) | Date, Method, Currency, User, Count, Amount, Base | — | Sum(Base) |
+
 ## Restaurant
 
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
@@ -552,10 +558,12 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | SYS238 | User, Role & Group Membership | Every user with direct roles, groups, roles held through groups and individual overrides. | — | User, Name, Status, Roles, Groups, GroupRoles, Overrides | — | — |
 | SYS239 | Segregation of Duties Violations (all modules) | Every active user whose combined permissions break a separation-of-duties rule. | — | User, Rule, Conflict, Severity | — | — |
 | SYS240 | Master Data Change Report | Changes in the period to customers, suppliers, items, accounts, tariffs, properties, employees, price lists, users and roles. | FromDate (Date, optional), ToDate (Date, optional) | When, User, Entity, Id, Action, Changed | — | — |
+| SYS241 | Supervisor Override Report | Every override authorised by a supervisor in the period across the modules: POS price overrides, refunds and no-sales, and manual weighbridge weights. | FromDate (Date, optional), ToDate (Date, optional) | When, Module, Override, Detail, Operator, AuthorisedBy, Reason | — | — |
 | SYS242 | Back-dated Transactions | Journals entered in the period with a posting date more than the given number of days before they were entered. | FromDate (Date, optional), ToDate (Date, optional), Days (Integer, optional) | Journal, Posting, Entered, DaysBack, Source, Document, PreparedBy, Narrative | — | — |
 | SYS243 | Deleted & Voided Documents | Records deleted or retired in the period, and journals reversed or cancelled, with who and why. | FromDate (Date, optional), ToDate (Date, optional) | When, Kind, Entity, Id, User, Reason | — | — |
 | SYS244 | Document Numbering Gaps | Missing runs in each year's journal numbering. | — | Year, From, To, Missing, Description | — | — |
 | SYS245 | Unposted & Deferred Batches | Journals still draft, deferred or awaiting approval, with who prepared them. | — | Journal, Posting, Status, Source, Document, PreparedBy, Narrative | — | — |
+| SYS247 | Audit Trail Hash-Chain Verification | Recomputes the audit trail's hash chain for the company and for system-wide entries and says whether it is intact or where it first breaks. | — | Scope, Checked, Intact, FirstBroken, Message | — | — |
 | SYS248 | Licence Installation History | Licences installed, when and by whom, and which is active (token fingerprint only). | — | Installed, By, Active, Fingerprint | — | — |
 | SYS250 | Report Print & Export Log | Every report run in the period: who, what, format, size and copy number. | FromDate (Date, optional), ToDate (Date, optional) | When, Report, User, Purpose, Format, Bytes, Copy, Parameters | — | — |
 | SYS258 | Price List Listing | Every price list with its items, quantity breaks and prices. | — | PriceList, Currency, Status, Item, MinimumQuantity, UnitPrice | — | — |
