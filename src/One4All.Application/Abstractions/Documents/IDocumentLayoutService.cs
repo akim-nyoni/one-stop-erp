@@ -47,6 +47,39 @@ public interface IDocumentLayoutService
     /// <returns>The document text, or an error.</returns>
     Task<Result<string>> GoodsReceivedNoteAsync(long companyId, string grnNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default);
 
+    /// <summary>A supplier debit note for goods returned: what went back, at what price, and the credit claimed.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="documentNumber">The return / debit note number.</param>
+    /// <param name="width">The width.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The document text, or an error.</returns>
+    Task<Result<string>> SupplierDebitNoteAsync(long companyId, string documentNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default);
+
+    /// <summary>A ratepayer's municipal bill for a stand and month: each service charged in the month's billing runs, the balance brought forward and the total due.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="standNumber">The stand.</param>
+    /// <param name="month">Any day in the billing month.</param>
+    /// <param name="width">The width.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The document text, or an error.</returns>
+    Task<Result<string>> MunicipalBillAsync(long companyId, string standNumber, DateOnly month, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default);
+
+    /// <summary>A school fee invoice: the fee items of the student's structure, any bursary, and the amount billed.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="invoiceNumber">The fee invoice number.</param>
+    /// <param name="width">The width.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The document text, or an error.</returns>
+    Task<Result<string>> FeeInvoiceAsync(long companyId, string invoiceNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default);
+
+    /// <summary>An interim payment certificate / progress valuation: work done, materials on site, previously certified, retention and net payable.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="certificateNumber">The certificate number.</param>
+    /// <param name="width">The width.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The document text, or an error.</returns>
+    Task<Result<string>> PaymentCertificateAsync(long companyId, string certificateNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default);
+
     /// <summary>Shelf / bin labels for the items on a price list (optionally only some items), with price and barcode.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="priceListCode">The price list.</param>

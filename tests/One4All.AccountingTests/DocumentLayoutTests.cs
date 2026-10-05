@@ -80,4 +80,63 @@ public sealed class DocumentLayoutTests
         (await documents.ShelfLabelsAsync(companyId, "RETAIL")).Value.Should().Contain("Face brick").And.Contain("USD 0.95").And.Contain("*6001234*");
         (await documents.QuotationAsync(companyId, "NOPE")).Error.Code.Should().Be("Doc.QuotationNotFound");
     }
+
+    [SkippableFact]
+    public async Task Debit_notes_bills_fee_invoices_and_payment_certificates_render()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        db.Accounts.AddRange(new One4All.Core.Accounting.LedgerAccount(companyId, "5190", "Purchase Price Variance", One4All.Core.Accounting.AccountType.Expense),
+            new One4All.Core.Accounting.LedgerAccount(companyId, "1215", "Retention Receivable", One4All.Core.Accounting.AccountType.Asset));
+        Customer client = new(companyId, "DL2-C", "Council Client", Scenario.Usd), parent = new(companyId, "DL2-P", "Parent P", Scenario.Usd), payer = new(companyId, "DL2-R", "Rates Payer", Scenario.Usd);
+        Supplier supplier = new(companyId, "DL2-S", "Brick Co", Scenario.Usd);
+        Item brick = new(companyId, "DL2-BRK", "Face brick") { CostOfSalesAccountCode = "5000" };
+        Warehouse yard = new(companyId, "DL2-WH", "Yard");
+        One4All.Core.Municipal.Tariff refuse = new(companyId, "DL2-REF", "Refuse Removal", One4All.Core.Municipal.ServiceType.Refuse, One4All.Core.Municipal.TariffType.Flat, new DateOnly(2026, 1, 1), "4000") { FixedCharge = 30m };
+        db.AddRange(client, parent, payer, supplier, brick, yard, refuse);
+        await db.SaveChangesAsync();
+        One4All.Core.Municipal.Property stand = new(companyId, "DL2-901", "Ward 9", payer.Id);
+        stand.AddService(One4All.Core.Municipal.ServiceType.Refuse, refuse.Id, new DateOnly(2026, 1, 1));
+        One4All.Core.Schools.FeeStructure fees = new(companyId, "DL2-G3", "Grade 3 Term 2", "G3", "Term 2", "4200");
+        fees.AddItem("Tuition", 1_000m, true);
+        fees.AddItem("Levy", 200m, true);
+        db.AddRange(stand, fees);
+        await db.SaveChangesAsync();
+        One4All.Core.Schools.Student kid = new(companyId, "DL2-STU", "Kid K", "G3", parent.Id);
+        kid.GrantBursary(One4All.Core.Schools.BursaryType.Percentage, 10m);
+        db.Students.Add(kid);
+        await db.SaveChangesAsync();
+
+        (await scope.ServiceProvider.GetRequiredService<IInventoryService>().ReceiveAsync(new ReceiveStockRequest
+        {
+            CompanyId = companyId, ItemId = brick.Id, WarehouseId = yard.Id, Date = new DateOnly(2026, 4, 1), Quantity = 500m, UnitCost = 0.5m, CreditAccountCode = "1100",
+        })).IsSuccess.Should().BeTrue();
+        (await scope.ServiceProvider.GetRequiredService<IProcurementService>().ReturnToSupplierAsync(companyId, supplier.Id, brick.Id, yard.Id, 100m, 0.5m, new DateOnly(2026, 4, 3), "DL2-DN1", "5190"))
+            .IsSuccess.Should().BeTrue();
+        One4All.Application.Abstractions.Municipal.IBillingRunService runs = scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Municipal.IBillingRunService>();
+        var proposed = (await runs.ProposeAsync(new One4All.Application.Abstractions.Municipal.BillingRunProposal
+        {
+            CompanyId = companyId, ServiceType = One4All.Core.Municipal.ServiceType.Refuse, BillDate = new DateOnly(2026, 4, 30), Ward = "Ward 9", InvoicePrefix = "DL2B", UserId = 71,
+        })).Value;
+        (await runs.ApproveAsync(companyId, proposed.RunNumber, 72)).IsSuccess.Should().BeTrue();
+        (await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Schools.ISchoolBillingService>().BillTermAsync(companyId, fees.Id, "DL2-F-", new DateOnly(2026, 4, 5))).IsSuccess.Should().BeTrue();
+        One4All.Application.Abstractions.JobCosting.IJobCostingService jobs = scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.JobCosting.IJobCostingService>();
+        long contract = (await jobs.CreateContractAsync(companyId, "DL2-K1", "Civic hall", client.Id, 200_000m, 150_000m, 10m, "4300")).Value;
+        (await jobs.CertifyProgressAsync(companyId, contract, "IPC-1", new DateOnly(2026, 4, 20), 50_000m, 5_000m, "1215")).IsSuccess.Should().BeTrue();
+
+        IDocumentLayoutService documents = scope.ServiceProvider.GetRequiredService<IDocumentLayoutService>();
+        (await documents.SupplierDebitNoteAsync(companyId, "DL2-DN1")).Value.Should().Contain("DEBIT NOTE").And.Contain("Supplier: Brick Co (DL2-S)").And.Contain("DL2-BRK Face brick").And.Contain("CREDIT CLAIMED (USD)")
+            .And.Contain("50.00");
+        string bill = (await documents.MunicipalBillAsync(companyId, "DL2-901", new DateOnly(2026, 4, 1))).Value;
+        bill.Should().Contain("MUNICIPAL ACCOUNT").And.Contain("Ratepayer: Rates Payer (DL2-R)").And.Contain("Stand: DL2-901").And.Contain("Refuse").And.Contain("TOTAL DUE");
+        string invoice = (await documents.FeeInvoiceAsync(companyId, "DL2-F-DL2-STU")).Value;
+        invoice.Should().Contain("FEE INVOICE").And.Contain("Student: Kid K (DL2-STU)").And.Contain("Tuition").And.Contain("Levy").And.Contain("Less bursary / discount").And.Contain("1,080.00");
+        string ipc = (await documents.PaymentCertificateAsync(companyId, "IPC-1")).Value;
+        ipc.Should().Contain("INTERIM PAYMENT CERTIFICATE").And.Contain("Employer: Council Client (DL2-C)").And.Contain("Gross valuation").And.Contain("55,000.00").And.Contain("NET AMOUNT DUE").And.Contain("49,500.00");
+        (await documents.MunicipalBillAsync(companyId, "DL2-901", new DateOnly(2026, 2, 1))).Error.Code.Should().Be("Doc.BillNotFound");
+    }
 }

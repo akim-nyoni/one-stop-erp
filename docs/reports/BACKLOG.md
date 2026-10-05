@@ -28,7 +28,7 @@ missing domain data. Items are struck through as they ship (with the report code
 - ~~53 Supplier Ledger (AP53)~~, ~~54 Purchase Day Book (AP54)~~, ~~57 / 58 Payments Made incl. runs (AP58)~~, ~~59 GRNI (AP59)~~, ~~60 Matching Exceptions (AP60)~~, ~~62 WHT Deducted (AP62)~~, ~~63 Scorecard (AP63)~~, ~~64 Balances with debit flags (AP64)~~, ~~65 Bank Detail Change Audit (AP65)~~, ~~66 Top Suppliers (AP66)~~
 - ~~55 Purchase Analysis (AP55)~~
 - ~~67 layouts: requisition, GRN~~
-- Data exists: 67 supplier debit note layout
+- ~~67 supplier debit note~~
 - ~~61 Supplier Statement Reconciliation (AP61)~~
 
 ## D. Cash Book / Treasury
@@ -60,18 +60,18 @@ missing domain data. Items are struck through as they ship (with the report code
 ## I. Municipality (the M series)
 - ~~146 Billing Run Summary (M146)~~, ~~147 Billing Exceptions (M147)~~, ~~148 Aged Debtors by Ward / Category / Service (M148)~~, ~~151 Valuation Roll (M151)~~, ~~152 Property Register (M152)~~, ~~153 Clearance Register (M153)~~, ~~154 Reading Sheets (M154)~~, ~~155 Reading Exceptions (M155)~~, ~~156 Consumption (M156)~~, ~~159 Meter Register (M159)~~, ~~160 Disconnection / Reconnection (M160)~~, ~~161 Arrangements (M161)~~, ~~162 Indigent & Subsidy (M162)~~, ~~166 Licences (M166)~~, ~~167 Ticket SLA (M167)~~, ~~168 Tariff Schedule (M168)~~, ~~149 Arrears (M149)~~, ~~163 Interest (M163)~~, ~~164 Write-offs (M164)~~, ~~169 Revenue by Source (M169)~~, ~~170 Ward Pack (M170)~~, ~~171 Statutory Age Analysis (M171)~~, ~~172 Prepaid vs Conventional (M172)~~
 - ~~157 Water Balance / NRW (M157)~~, ~~158 Unread / Faulty / Tampered Meters (M158)~~
-- Data exists: 145 bill layout (a document template)
+- ~~145 municipal bill~~
 
 ## J. Schools
 - ~~175 Fee Billing Summary (SC175)~~, ~~176 Arrears by Grade (SC176)~~, ~~177 Collections (SC177)~~, ~~178 Bursaries (SC178)~~, ~~180 Enrolment (SC180, no gender)~~, ~~182 Student Balances (SC182)~~
 - ~~179 Sponsor Statement (SC179)~~, ~~181 Deferred Fee Income (SC181)~~, ~~183 Transport (SC183)~~, ~~184 Boarding (SC184)~~; streams on students (shown in SC176)
 - ~~185 Tuck Shop & Student Wallets (SC185)~~
-- Data exists: 174 fee invoice layout
+- ~~174 fee invoice~~
 
 ## K. Construction / Job Costing
 - ~~186 Job Cost by Head (JC186)~~, ~~189 Cost to Complete (JC189)~~, ~~190 Retention (JC190, no defects date)~~, ~~197 Contract Cash Flow (JC197)~~
 - ~~195 Materials Issued to Job (JC195)~~
-- Data exists: 188 IPC layout
+- ~~188 interim payment certificate~~
 - ~~191 Variation Order Register (JC191)~~, ~~193 Labour & Timesheet Cost (JC193)~~, ~~196 BOQ vs Measured (JC196)~~
 - ~~192 Subcontractor Ledger & Retention (JC192)~~, ~~194 Plant Utilisation & Hire Recovery (JC194)~~
 

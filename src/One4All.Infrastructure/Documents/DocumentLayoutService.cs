@@ -158,6 +158,129 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
     }
 
     /// <inheritdoc />
+    public async Task<Result<string>> SupplierDebitNoteAsync(long companyId, string documentNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
+    {
+        List<StockMovement> returned = await _db.StockMovements.AsNoTracking()
+            .Where(m => m.CompanyId == companyId && m.Type == StockMovementType.SupplierReturn && m.Reference == documentNumber).ToListAsync(ct).ConfigureAwait(false);
+        Core.Trading.OpenItem? credit = await _db.OpenItems.AsNoTracking()
+            .FirstOrDefaultAsync(o => o.CompanyId == companyId && o.Ledger == Core.Trading.TradingLedger.AccountsPayable && o.DocumentNumber == documentNumber, ct).ConfigureAwait(false);
+        if (returned.Count == 0 || credit is null)
+        {
+            return Error.NotFound("Doc.DebitNoteNotFound", $"No supplier return {documentNumber}.");
+        }
+
+        Company company = await CompanyAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, Item> items = await ItemsAsync(returned.Select(m => m.ItemId), ct).ConfigureAwait(false);
+        decimal units = -returned.Sum(m => m.Quantity), claimed = Math.Abs(credit.OriginalTransaction), price = units == 0m ? 0m : Math.Round(claimed / units, 4);
+        return BusinessDocumentFormatter.ToPlainText(new BusinessDocument
+        {
+            Title = "Debit Note", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Supplier", PartyName = await SupplierAsync(credit.TraderId, ct).ConfigureAwait(false),
+            Fields = [("Debit note", documentNumber), ("Date", D(credit.DocumentDate)), ("Currency", credit.Currency.ToString())],
+            Lines = [.. returned.Select(m => new BusinessDocumentLine(items.GetValueOrDefault(m.ItemId)?.Code ?? string.Empty, items.GetValueOrDefault(m.ItemId)?.Description ?? string.Empty, -m.Quantity, price,
+                Math.Round(-m.Quantity * price, 2)))],
+            Totals = [($"CREDIT CLAIMED ({credit.Currency})", claimed)], Notes = ["Goods returned to you as above. Please credit our account and confirm."], Signatures = ["Returned by", "Supplier acknowledgement"],
+        }, width);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<string>> MunicipalBillAsync(long companyId, string standNumber, DateOnly month, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
+    {
+        DateOnly first = new(month.Year, month.Month, 1), last = first.AddMonths(1).AddDays(-1);
+        var lines = await (from l in _db.Set<Core.Municipal.BillingRunLine>().AsNoTracking()
+                           join r in _db.Set<Core.Municipal.BillingRun>().AsNoTracking() on l.BillingRunId equals r.Id
+                           where r.CompanyId == companyId && l.StandNumber == standNumber && l.Included && r.Period >= first && r.Period <= last
+                           select new { l.InvoiceNumber, l.Narrative, l.Charge, l.RatepayerCustomerId, r.ServiceType, r.BillDate }).ToListAsync(ct).ConfigureAwait(false);
+        if (lines.Count == 0)
+        {
+            return Error.NotFound("Doc.BillNotFound", $"Stand {standNumber} was not billed in {first:yyyy-MM}.");
+        }
+
+        long ratepayer = lines[0].RatepayerCustomerId;
+        DateOnly billDate = lines.Max(l => l.BillDate);
+        List<string> invoices = [.. lines.Select(l => l.InvoiceNumber)];
+        decimal broughtForward = (await Trading.OpenItemsAsAt.LoadAsync(_db, companyId, Core.Trading.TradingLedger.AccountsReceivable, billDate, ct).ConfigureAwait(false))
+            .Where(o => o.Item.TraderId == ratepayer && !invoices.Contains(o.Item.DocumentNumber)).Sum(o => o.Signed(Core.Trading.LedgerSign.Debit));
+        decimal current = lines.Sum(l => l.Charge);
+        Company company = await CompanyAsync(companyId, ct).ConfigureAwait(false);
+        return BusinessDocumentFormatter.ToPlainText(new BusinessDocument
+        {
+            Title = "Municipal Account", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Ratepayer", PartyName = await CustomerAsync(ratepayer, ct).ConfigureAwait(false),
+            Fields = [("Stand", standNumber), ("Billing month", first.ToString("yyyy-MM", CultureInfo.InvariantCulture)), ("Bill date", D(billDate)), ("Due by", D(billDate.AddDays(30)))],
+            Lines = [.. lines.OrderBy(l => l.ServiceType).Select(l => new BusinessDocumentLine(l.ServiceType.ToString(), l.Narrative, 1m, l.Charge, l.Charge))],
+            Totals = [("Balance brought forward", broughtForward), ("Current charges", current), ("TOTAL DUE", broughtForward + current)],
+            Notes = ["Pay by the due date to avoid interest and restriction of services. Quote your stand number with every payment."],
+        }, width);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<string>> FeeInvoiceAsync(long companyId, string invoiceNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
+    {
+        var invoice = await (from o in _db.OpenItems.AsNoTracking()
+                             join j in _db.Journals.AsNoTracking() on o.JournalEntryId equals j.Id
+                             where o.CompanyId == companyId && o.Ledger == Core.Trading.TradingLedger.AccountsReceivable && o.DocumentNumber == invoiceNumber && o.ItemType == Core.Trading.OpenItemType.Invoice
+                             select new { o.TraderId, o.DocumentDate, o.DueDate, o.Currency, o.OriginalTransaction, j.Narrative }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (invoice?.Narrative is not string narrative || !narrative.Contains(" fees — ", StringComparison.Ordinal))
+        {
+            return Error.NotFound("Doc.FeeInvoiceNotFound", $"No fee invoice {invoiceNumber}.");
+        }
+
+        string term = narrative[..narrative.IndexOf(" fees — ", StringComparison.Ordinal)];
+        int open = narrative.LastIndexOf('('), close = narrative.LastIndexOf(')');
+        string admission = open >= 0 && close > open ? narrative[(open + 1)..close] : string.Empty;
+        Core.Schools.Student? student = await _db.Students.AsNoTracking().IgnoreQueryFilters().FirstOrDefaultAsync(s => s.CompanyId == companyId && s.AdmissionNumber == admission, ct).ConfigureAwait(false);
+        Company company = await CompanyAsync(companyId, ct).ConfigureAwait(false);
+        List<BusinessDocumentLine> lines;
+        int tag = narrative.IndexOf('[', StringComparison.Ordinal);
+        if (tag >= 0)
+        {
+            lines = [new BusinessDocumentLine(string.Empty, narrative[(tag + 1)..narrative.IndexOf(']', tag)], 1m, invoice.OriginalTransaction, invoice.OriginalTransaction)];
+        }
+        else
+        {
+            Core.Schools.FeeStructure? structure = student is null ? null : await _db.FeeStructures.AsNoTracking().Include(f => f.Items)
+                .Where(f => f.CompanyId == companyId && f.Grade == student.Grade && f.Term == term).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            lines = [.. (structure?.Items.Where(i => i.IsCompulsory) ?? []).Select(i => new BusinessDocumentLine(string.Empty, i.Description, 1m, i.Amount, i.Amount))];
+            decimal discount = lines.Sum(l => l.Amount ?? 0m) - invoice.OriginalTransaction;
+            if (discount > 0m)
+            {
+                lines.Add(new BusinessDocumentLine(string.Empty, $"Less bursary / discount ({student?.BursaryType})", 1m, -discount, -discount));
+            }
+        }
+
+        return BusinessDocumentFormatter.ToPlainText(new BusinessDocument
+        {
+            Title = "Fee Invoice", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Bill to", PartyName = await CustomerAsync(invoice.TraderId, ct).ConfigureAwait(false),
+            Fields = [("Invoice", invoiceNumber), ("Date", D(invoice.DocumentDate)), ("Student", student is null ? admission : $"{student.FullName} ({student.AdmissionNumber})"), ("Grade", student?.Grade ?? "—"),
+                ("Term", term), ("Due by", D(invoice.DueDate))],
+            Lines = lines, Totals = [($"AMOUNT DUE ({invoice.Currency})", invoice.OriginalTransaction)], Notes = ["Please quote the student's admission number with every payment."],
+        }, width);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<string>> PaymentCertificateAsync(long companyId, string certificateNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
+    {
+        Core.JobCosting.ProgressCertificate? certificate = await _db.ProgressCertificates.AsNoTracking().FirstOrDefaultAsync(c => c.CompanyId == companyId && c.CertificateNumber == certificateNumber, ct).ConfigureAwait(false);
+        if (certificate is null)
+        {
+            return Error.NotFound("Doc.CertificateNotFound", $"No payment certificate {certificateNumber}.");
+        }
+
+        Core.JobCosting.JobContract contract = await _db.JobContracts.AsNoTracking().IgnoreQueryFilters().FirstAsync(c => c.Id == certificate.JobContractId, ct).ConfigureAwait(false);
+        Company company = await CompanyAsync(companyId, ct).ConfigureAwait(false);
+        decimal valuation = certificate.WorkDoneToDate + certificate.MaterialsOnSite;
+        return BusinessDocumentFormatter.ToPlainText(new BusinessDocument
+        {
+            Title = "Interim Payment Certificate", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Employer", PartyName = await CustomerAsync(contract.CustomerId, ct).ConfigureAwait(false),
+            Fields = [("Certificate", certificate.CertificateNumber), ("Date", D(certificate.Date)), ("Contract", $"{contract.ContractNumber} {contract.Name}"), ("Contract value", contract.ContractValue.ToString("N2", CultureInfo.InvariantCulture))],
+            ShowPrices = false,
+            Totals = [("Value of work done to date", certificate.WorkDoneToDate), ("Materials on site", certificate.MaterialsOnSite), ("Gross valuation", valuation), ("Less previously certified", -certificate.PreviouslyCertified),
+                ("Gross this certificate", certificate.GrossThisCertificate), ($"Less retention ({contract.RetentionPercent.ToString("0.##", CultureInfo.InvariantCulture)}%)", -certificate.RetentionThisCertificate),
+                ("NET AMOUNT DUE", certificate.NetPayable)],
+            Notes = [$"Retention held to date: {contract.RetentionHeld.ToString("N2", CultureInfo.InvariantCulture)}."], Signatures = ["Certified by (quantity surveyor)", "Approved by (employer)"],
+        }, width);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<string>> ShelfLabelsAsync(long companyId, string priceListCode, IReadOnlyList<string>? itemCodes = null, int perRow = 2, CancellationToken ct = default)
     {
         PriceList? list = await _db.PriceLists.AsNoTracking().Include(p => p.Lines).FirstOrDefaultAsync(p => p.CompanyId == companyId && p.Code == priceListCode, ct).ConfigureAwait(false);
