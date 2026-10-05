@@ -21,13 +21,14 @@ missing domain data. Items are struck through as they ship (with the report code
 - ~~29 Aged detail (AR29)~~, ~~30 by rep / currency (AR30)~~, ~~31 Customer Ledger (AR31)~~, ~~33 Sales Day Book (AR33)~~, ~~35 Top Customers (AR35)~~, ~~39 / 44 Unallocated & advances (AR39)~~, ~~40 DSO (AR40)~~, ~~41 Promise-to-Pay (AR41)~~, ~~43 Write-offs (AR43)~~, ~~45 Lay-byes (AR45)~~, ~~47 Exposure by Currency (AR47)~~, ~~48 New & Dormant (AR48)~~
 - ~~34 Sales Analysis with Margin (AR34)~~, ~~36 Sales History & Trend (AR36)~~, ~~49 price lists (SYS258)~~
 - ~~38 Receipts / Collections (AR38)~~
-- Data exists: 50 layouts (quotation, SO confirmation, delivery note, remittance slip)
+- ~~50 layouts: quotation, order confirmation, delivery note (remittance advice already existed)~~
 - ~~28 Consolidated Group Statement (AR28)~~, ~~37 Credit Notes by Reason (AR37)~~
 
 ## C. Accounts Payable
 - ~~53 Supplier Ledger (AP53)~~, ~~54 Purchase Day Book (AP54)~~, ~~57 / 58 Payments Made incl. runs (AP58)~~, ~~59 GRNI (AP59)~~, ~~60 Matching Exceptions (AP60)~~, ~~62 WHT Deducted (AP62)~~, ~~63 Scorecard (AP63)~~, ~~64 Balances with debit flags (AP64)~~, ~~65 Bank Detail Change Audit (AP65)~~, ~~66 Top Suppliers (AP66)~~
 - ~~55 Purchase Analysis (AP55)~~
-- Data exists: 67 layouts (requisition, GRN, debit note)
+- ~~67 layouts: requisition, GRN~~
+- Data exists: 67 supplier debit note layout
 - ~~61 Supplier Statement Reconciliation (AP61)~~
 
 ## D. Cash Book / Treasury
@@ -37,7 +38,7 @@ missing domain data. Items are struck through as they ship (with the report code
 ## E. Inventory
 - ~~78 Valuation vs GL (INV78)~~, ~~79 Stock on Hand & Availability (INV79)~~, ~~81 Stocktake Variance (INV81)~~, ~~86 Overstock (INV86)~~, ~~87 Negative Stock (INV87)~~, ~~92 Turnover & Days Cover (INV92)~~, ~~93 Gross Margin by Item (INV93)~~, ~~96 Cost Change History (INV96)~~, ~~97 Landed Cost Analysis (INV97)~~
 - ~~100 Wastage / Shrinkage (INV100)~~
-- Data exists: 94 (labels, a print layout)
+- ~~94 shelf / bin labels with barcode~~
 - ~~82 Adjustments by Reason (INV82)~~, ~~88 Batch Stock (INV88)~~, ~~89 Serial Register (INV89)~~, ~~90 Expiry (INV90)~~
 - ~~91 Goods in Transit (INV91)~~, ~~101 Consignment Stock (INV101)~~
 - ~~98 Bill of Materials Costing (INV98)~~, ~~99 Production Yield & Usage Variance (INV99)~~
@@ -53,7 +54,7 @@ missing domain data. Items are struck through as they ship (with the report code
 
 ## H. Sales Order Processing
 - ~~137 Open Orders & Allocation (SO137)~~, ~~143 Quotation Conversion (SO143)~~
-- Data exists: 139 packing / despatch notes (layouts)
+- ~~139 packing / despatch notes~~
 - ~~140 OTIF (SO140)~~, ~~141 POD Outstanding (SO141)~~, ~~142 Load Sheet (SO142)~~
 
 ## I. Municipality (the M series)
