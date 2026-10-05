@@ -55,6 +55,9 @@ public sealed class BankAccount : SoftDeletableEntity, ICompanyScoped
     /// <summary>The external account number.</summary>
     public string? AccountNumber { get; set; }
 
+    /// <summary>Gets or sets a value indicating whether this is a mobile-money wallet rather than a bank account.</summary>
+    public bool IsMobileWallet { get; set; }
+
     /// <summary>Whether the account is active.</summary>
     public bool IsActive { get; set; }
 

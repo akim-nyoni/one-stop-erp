@@ -21,7 +21,7 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
 
     /// <inheritdoc />
     public bool CanHandle(string command) => command.StartsWith("Cash", StringComparison.OrdinalIgnoreCase)
-        && command.ToUpperInvariant() is "CASHBOOKLISTING" or "CASHUNRECONCILED" or "CASHFORECAST" or "CASHPETTY" or "CASHTRANSFERS";
+        && command.ToUpperInvariant() is "CASHBOOKLISTING" or "CASHUNRECONCILED" or "CASHFORECAST" or "CASHPETTY" or "CASHTRANSFERS" or "CASHCHEQUES" or "CASHWALLETS";
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GetRowsAsync(long companyId, string command, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct = default)
@@ -32,6 +32,9 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
         DateOnly fromDate = DateParameter(parameters, "FromDate") ?? new DateOnly(toDate.Year, 1, 1);
         return command.ToUpperInvariant() switch
         {
+            "CASHCHEQUES" => await ChequesAsync(companyId, fromDate, toDate, parameters.TryGetValue("StaleMonths", out object? stale) && stale is not null and not "" ? Convert.ToInt32(stale, CultureInfo.InvariantCulture) : 6, ct)
+                .ConfigureAwait(false),
+            "CASHWALLETS" => await WalletsAsync(companyId, DateParameter(parameters, "AsAtDate") ?? toDate, ct).ConfigureAwait(false),
             "CASHBOOKLISTING" => await ListingAsync(companyId, Text(parameters, "BankCode"), fromDate, toDate, ct).ConfigureAwait(false),
             "CASHUNRECONCILED" => await UnreconciledAsync(companyId, asAt, ct).ConfigureAwait(false),
             "CASHFORECAST" => await ForecastAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -168,6 +171,42 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
                 ("Out", from is null ? "—" : $"{Money(from.TransactionCredit)} {from.TransactionCurrency.Value}"), ("In", to is null ? "—" : $"{Money(to.TransactionDebit)} {to.TransactionCurrency.Value}"),
                 ("Difference", difference));
         })];
+    }
+
+    // A cheque still issued more than the stale limit after it was written is stale (as at the end of the period).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ChequesAsync(long companyId, DateOnly fromDate, DateOnly toDate, int staleMonths, CancellationToken ct)
+    {
+        Dictionary<long, string> banks = await _db.BankAccounts.AsNoTracking().IgnoreQueryFilters().Where(b => b.CompanyId == companyId).ToDictionaryAsync(b => b.Id, b => b.Code, ct).ConfigureAwait(false);
+        List<Core.Banking.Cheque> cheques = await _db.Cheques.AsNoTracking().Where(c => c.CompanyId == companyId && c.IssuedOn >= fromDate && c.IssuedOn <= toDate).ToListAsync(ct).ConfigureAwait(false);
+        return [.. cheques.OrderBy(c => banks.GetValueOrDefault(c.BankAccountId), StringComparer.Ordinal).ThenBy(c => c.ChequeNumber, StringComparer.Ordinal).Select(c =>
+        {
+            bool open = c.Status == Core.Banking.ChequeStatus.Issued;
+            string status = open && c.IssuedOn.AddMonths(staleMonths) < toDate ? "Stale" : c.Status.ToString();
+            return Row(("Bank", banks.GetValueOrDefault(c.BankAccountId, "?")), ("Cheque", c.ChequeNumber), ("Issued", Date(c.IssuedOn)), ("Payee", c.Payee), ("Document", c.DocumentNumber ?? "—"), ("Status", status),
+                ("StatusDate", Date(c.StatusDate)), ("Days", open ? (toDate.DayNumber - c.IssuedOn.DayNumber).ToString(CultureInfo.InvariantCulture) : "—"), ("Reason", c.Reason ?? string.Empty), ("Amount", c.Amount));
+        })];
+    }
+
+    // Ledger items not matched to a statement line and statement lines not yet reconciled should explain the whole gap.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> WalletsAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<Core.Banking.BankAccount> wallets = await _db.BankAccounts.AsNoTracking().Where(b => b.CompanyId == companyId && b.IsMobileWallet).OrderBy(b => b.Code).ToListAsync(ct).ConfigureAwait(false);
+        HashSet<long> matched = [.. await _db.BankStatementLines.AsNoTracking().Where(s => s.CompanyId == companyId && s.MatchedJournalLineId != null).Select(s => s.MatchedJournalLineId!.Value).ToListAsync(ct).ConfigureAwait(false)];
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (Core.Banking.BankAccount wallet in wallets)
+        {
+            var lines = await (from l in _db.Set<JournalLine>().AsNoTracking()
+                               join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
+                               where j.CompanyId == companyId && j.Status == JournalStatus.Posted && j.PostingDate <= asAt && l.AccountCode == wallet.GlAccountCode
+                               select new { l.Id, Amount = l.TransactionDebit - l.TransactionCredit }).ToListAsync(ct).ConfigureAwait(false);
+            List<Core.Banking.BankStatementLine> statement = await _db.BankStatementLines.AsNoTracking().Where(s => s.BankAccountId == wallet.Id && s.StatementDate <= asAt).ToListAsync(ct).ConfigureAwait(false);
+            decimal ledger = lines.Sum(l => l.Amount), onStatement = statement.Sum(s => s.Amount);
+            decimal ledgerOnly = lines.Where(l => !matched.Contains(l.Id)).Sum(l => l.Amount), statementOnly = statement.Where(s => !s.IsReconciled).Sum(s => s.Amount);
+            rows.Add(Row(("Wallet", $"{wallet.Code} {wallet.Name}"), ("Ledger", Money(ledger)), ("Statement", Money(onStatement)), ("LedgerOnly", Money(ledgerOnly)), ("StatementOnly", Money(statementOnly)),
+                ("Difference", ledger - onStatement - ledgerOnly + statementOnly)));
+        }
+
+        return rows;
     }
 
     private static string? Text(IReadOnlyDictionary<string, object?> parameters, string name)

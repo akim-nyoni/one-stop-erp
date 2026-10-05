@@ -25,11 +25,11 @@ missing domain data. Items are struck through as they ship (with the report code
 - ~~53 Supplier Ledger (AP53)~~, ~~54 Purchase Day Book (AP54)~~, ~~57 / 58 Payments Made incl. runs (AP58)~~, ~~59 GRNI (AP59)~~, ~~60 Matching Exceptions (AP60)~~, ~~62 WHT Deducted (AP62)~~, ~~63 Scorecard (AP63)~~, ~~64 Balances with debit flags (AP64)~~, ~~65 Bank Detail Change Audit (AP65)~~, ~~66 Top Suppliers (AP66)~~
 - ~~55 Purchase Analysis (AP55)~~
 - Data exists: 67 layouts (requisition, GRN, debit note)
-- Needs new data: 61 (supplier's own statement capture), cheque entity
+- ~~61 Supplier Statement Reconciliation (AP61)~~
 
 ## D. Cash Book / Treasury
 - ~~68 Cash Book Listing (CB68)~~, ~~70 Unpresented & Uncleared (CB70)~~, ~~72 13-week forecast by currency (CB72)~~, ~~73 Petty Cash & Imprest (CB73)~~, ~~74 Inter-account Transfers (CB74)~~
-- Needs new data: 75 cheque register, 76 wallet statements
+- ~~75 Cheque Register (CB75)~~, ~~76 Mobile Money / Wallet Reconciliation (CB76)~~
 
 ## E. Inventory
 - ~~78 Valuation vs GL (INV78)~~, ~~79 Stock on Hand & Availability (INV79)~~, ~~81 Stocktake Variance (INV81)~~, ~~86 Overstock (INV86)~~, ~~87 Negative Stock (INV87)~~, ~~92 Turnover & Days Cover (INV92)~~, ~~93 Gross Margin by Item (INV93)~~, ~~96 Cost Change History (INV96)~~, ~~97 Landed Cost Analysis (INV97)~~

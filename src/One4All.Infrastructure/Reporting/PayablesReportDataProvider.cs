@@ -13,6 +13,42 @@ namespace One4All.Infrastructure.Reporting;
 /// <summary>Serves the AP-numbered payables reports (brief §14 C): every data command whose name starts with <c>Payb</c>.</summary>
 public sealed class PayablesReportDataProvider : IReportDataProvider
 {
+    // Our open items are matched to theirs by document number; what is left on either side, and differing amounts, explain the gap.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> StatementReconAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<Core.Banking.SupplierStatement> statements = [.. (await _db.SupplierStatements.AsNoTracking().Include(s => s.Lines).Where(s => s.CompanyId == companyId && s.StatementDate <= asAt)
+                .ToListAsync(ct).ConfigureAwait(false)).GroupBy(s => s.SupplierId).Select(g => g.OrderBy(s => s.StatementDate).ThenBy(s => s.Id).Last())];
+        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (Core.Banking.SupplierStatement statement in statements.OrderBy(s => suppliers.GetValueOrDefault(s.SupplierId), StringComparer.Ordinal))
+        {
+            string name = suppliers.GetValueOrDefault(statement.SupplierId, "?");
+            Dictionary<string, decimal> ours = (await OpenItemsAsAt.LoadAsync(_db, companyId, TradingLedger.AccountsPayable, statement.StatementDate, ct).ConfigureAwait(false))
+                .Where(o => o.Item.TraderId == statement.SupplierId && o.OutstandingTransaction != 0m)
+                .GroupBy(o => o.Item.DocumentNumber, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Sum(o => o.SignedTransaction(LedgerSign.Credit)), StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, decimal> theirs = statement.Lines.GroupBy(l => l.DocumentNumber, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Sum(l => l.Amount), StringComparer.OrdinalIgnoreCase);
+            decimal ourBalance = ours.Values.Sum();
+            rows.Add(Row(("Supplier", name), ("Section", $"Balances at {statement.StatementDate:yyyy-MM-dd}"), ("Document", "—"), ("Theirs", Money(statement.ClosingBalance)), ("Ours", Money(ourBalance)),
+                ("Difference", statement.ClosingBalance - ourBalance)));
+            foreach (var only in theirs.Where(t => !ours.ContainsKey(t.Key)).OrderBy(t => t.Key, StringComparer.Ordinal))
+            {
+                rows.Add(Row(("Supplier", name), ("Section", "On their statement only"), ("Document", only.Key), ("Theirs", Money(only.Value)), ("Ours", "—"), ("Difference", 0m)));
+            }
+
+            foreach (var only in ours.Where(o => !theirs.ContainsKey(o.Key)).OrderBy(o => o.Key, StringComparer.Ordinal))
+            {
+                rows.Add(Row(("Supplier", name), ("Section", "In our ledger only"), ("Document", only.Key), ("Theirs", "—"), ("Ours", Money(only.Value)), ("Difference", 0m)));
+            }
+
+            foreach (var both in theirs.Where(t => ours.TryGetValue(t.Key, out decimal o) && o != t.Value).OrderBy(t => t.Key, StringComparer.Ordinal))
+            {
+                rows.Add(Row(("Supplier", name), ("Section", "Amount differs"), ("Document", both.Key), ("Theirs", Money(both.Value)), ("Ours", Money(ours[both.Key])), ("Difference", 0m)));
+            }
+        }
+
+        return rows;
+    }
+
     private static readonly OpenItemType[] PurchaseTypes = [OpenItemType.Invoice, OpenItemType.CreditNote, OpenItemType.DebitNote];
 
     private readonly One4AllDbContext _db;
@@ -39,6 +75,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
         DateOnly fromDate = DateParameter(parameters, "FromDate") ?? new DateOnly(toDate.Year, 1, 1);
         return command.ToUpperInvariant() switch
         {
+            "PAYBSTATEMENTRECON" => await StatementReconAsync(companyId, DateParameter(parameters, "AsAtDate") ?? DateOnly.FromDateTime(DateTime.Today), ct).ConfigureAwait(false),
             "PAYBLEDGER" => await LedgerAsync(companyId, parameters, ct).ConfigureAwait(false),
             "PAYBDAYBOOK" => await DayBookAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PAYBPURCHASEANALYSIS" => await PurchaseAnalysisAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),

@@ -33,3 +33,43 @@ internal sealed class BankStatementLineConfiguration : IEntityTypeConfiguration<
         b.HasIndex(x => new { x.CompanyId, x.BankAccountId, x.IsReconciled });
     }
 }
+
+internal sealed class ChequeConfiguration : IEntityTypeConfiguration<Cheque>
+{
+    public void Configure(EntityTypeBuilder<Cheque> b)
+    {
+        b.ToTable("cheque", Schemas.CashBook);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ChequeNumber).HasMaxLength(20);
+        b.Property(x => x.Payee).HasMaxLength(160);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.DocumentNumber).HasMaxLength(40);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Reason).HasMaxLength(200);
+        b.HasIndex(x => new { x.BankAccountId, x.ChequeNumber }).IsUnique();
+    }
+}
+
+internal sealed class SupplierStatementConfiguration : IEntityTypeConfiguration<SupplierStatement>
+{
+    public void Configure(EntityTypeBuilder<SupplierStatement> b)
+    {
+        b.ToTable("supplier_statement", Schemas.CashBook);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ClosingBalance).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.SupplierId, x.StatementDate });
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.SupplierStatementId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class SupplierStatementLineConfiguration : IEntityTypeConfiguration<SupplierStatementLine>
+{
+    public void Configure(EntityTypeBuilder<SupplierStatementLine> b)
+    {
+        b.ToTable("supplier_statement_line", Schemas.CashBook);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.DocumentNumber).HasMaxLength(60);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+    }
+}

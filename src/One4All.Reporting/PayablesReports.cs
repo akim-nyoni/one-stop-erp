@@ -33,6 +33,9 @@ public static class PayablesReports
         yield return Listing("AP60", "Invoice Matching Exceptions", "Purchasing", "Supplier invoices disputed against their order: reason, status and resolution.",
             "PaybDisputes", [new Column("Invoice", "Invoice", 100), new Column("Date", "Date", 75), new Column("Supplier", "Supplier", 140), new Column("Order", "Order", 85), new Column("Reason", "Reason", 180),
              new Column("Status", "Status", 70), new Column("Resolution", "Resolution", 160), new Column("Value", "Disputed value", 95, true)], []);
+        yield return Listing("AP61", "Supplier Statement Reconciliation", "Purchasing", "Each supplier's latest captured statement at the date against our ledger: both balances, items only they show, items only we show, and amounts that differ.",
+            "PaybStatementRecon", [new Column("Supplier", "Supplier", 140), new Column("Section", "Section", 160), new Column("Document", "Document", 110), new Column("Theirs", "Their amount", 95), new Column("Ours", "Our amount", 95),
+             new Column("Difference", "Difference", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("AP62", "Withholding Tax Deducted", "Purchasing", "Tax withheld from supplier payments in the period, by certificate, and whether it has been remitted.",
             "PaybWithholding", [new Column("Certificate", "Certificate", 90), new Column("Supplier", "Supplier", 140), new Column("Payment", "Payment", 110), new Column("Date", "Date", 75),
              new Column("Tax", "Tax", 60), new Column("Rate", "Rate %", 50), new Column("Gross", "Gross", 90), new Column("Remitted", "Remitted", 75), new Column("Withheld", "Withheld", 90, true)], Period);

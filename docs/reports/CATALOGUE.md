@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-492 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+495 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -43,6 +43,8 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | CB72 | 13-Week Cash Flow Forecast by Currency | From today's bank balances, week by week: customer receipts and supplier payments falling due, and the closing cash, per currency. | AsAtDate (Date, optional) | Week, Currency, Opening, Receipts, Payments, Closing | — | — |
 | CB73 | Petty Cash & Imprest Report | Disbursements and top-ups on the petty cash account in the period with its running balance. | AccountCode (String, optional), FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Document, Narrative, In, Out, Balance | — | — |
 | CB74 | Inter-account Transfers | Transfers between bank accounts in the period, with the amount out, the amount in and any exchange difference. | FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Document, From, To, Out, In, Difference | — | Sum(Difference) |
+| CB75 | Cheque Register | Every cheque written in the period by bank account: payee, amount and status — issued, presented, cancelled, voided, or stale when unpresented past the limit. | FromDate (Date, optional), ToDate (Date, optional), StaleMonths (Integer, optional) | Bank, Cheque, Issued, Payee, Document, Status, StatusDate, Days, Reason, Amount | — | Sum(Amount) |
+| CB76 | Mobile Money / Wallet Reconciliation | Per mobile-money wallet at the date: ledger balance against the wallet statement, unmatched items on each side and any difference left unexplained. | AsAtDate (Date, optional) | Wallet, Ledger, Statement, LedgerOnly, StatementOnly, Difference | — | Sum(Difference) |
 
 ## Expenses
 
@@ -394,6 +396,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | AP58 | Payments Made | Payments to suppliers in the period (payment runs and single payments) with tax withheld. | FromDate (Date, optional), ToDate (Date, optional) | Date, Document, Supplier, Currency, Transaction, Withheld, Base | — | Sum(Base) |
 | AP59 | Goods Received Not Invoiced (GRNI) | Order lines received but not yet invoiced: the GRNI accrual by order and item, with its age. | AsAtDate (Date, optional) | Order, Supplier, Item, Received, Invoiced, Price, LastReceipt, Days, Value | — | Sum(Value) |
 | AP60 | Invoice Matching Exceptions | Supplier invoices disputed against their order: reason, status and resolution. | — | Invoice, Date, Supplier, Order, Reason, Status, Resolution, Value | — | Sum(Value) |
+| AP61 | Supplier Statement Reconciliation | Each supplier's latest captured statement at the date against our ledger: both balances, items only they show, items only we show, and amounts that differ. | AsAtDate (Date, optional) | Supplier, Section, Document, Theirs, Ours, Difference | — | Sum(Difference) |
 | AP62 | Withholding Tax Deducted | Tax withheld from supplier payments in the period, by certificate, and whether it has been remitted. | FromDate (Date, optional), ToDate (Date, optional) | Certificate, Supplier, Payment, Date, Tax, Rate, Gross, Remitted, Withheld | — | Sum(Withheld) |
 | AP63 | Supplier Performance Scorecard | Per supplier in the period: deliveries, on time, quantity received and returned, quality and spend. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Deliveries, OnTime, Received, Returned, Quality, Spend | — | Sum(Spend) |
 | AP64 | Supplier Balances (with debit balances) | What is owed to each supplier at the date; suppliers in debit (owing us) flagged, with hold and blacklist status. | AsAtDate (Date, optional) | Supplier, Currency, Flag, Status, Balance | — | Sum(Balance) |

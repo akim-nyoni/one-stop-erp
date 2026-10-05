@@ -219,6 +219,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Trading.IRecurringSalesInvoiceService, Trading.RecurringSalesInvoiceService>();
         services.AddScoped<Application.Abstractions.Trading.IRecurringPurchaseInvoiceService, Trading.RecurringPurchaseInvoiceService>();
         services.AddScoped<Application.Abstractions.Banking.IBankReconciliationService, Banking.BankReconciliationService>();
+        services.AddScoped<Application.Abstractions.Banking.IChequeService, Banking.ChequeService>();
         services.AddScoped<Application.Abstractions.Banking.IBankStatementPostingService, Banking.BankStatementPostingService>();
         services.AddScoped<Application.Abstractions.Banking.IBankRuleService, Banking.BankRuleService>();
 

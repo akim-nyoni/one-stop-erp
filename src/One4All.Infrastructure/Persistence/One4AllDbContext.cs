@@ -125,6 +125,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Bank/cash accounts.</summary>
     public DbSet<Core.Banking.BankAccount> BankAccounts => Set<Core.Banking.BankAccount>();
 
+    /// <summary>Gets the cheque register.</summary>
+    public DbSet<Core.Banking.Cheque> Cheques => Set<Core.Banking.Cheque>();
+
+    /// <summary>Gets the captured supplier statements.</summary>
+    public DbSet<Core.Banking.SupplierStatement> SupplierStatements => Set<Core.Banking.SupplierStatement>();
+
     /// <summary>Imported bank statement lines.</summary>
     public DbSet<Core.Banking.BankStatementLine> BankStatementLines => Set<Core.Banking.BankStatementLine>();
 
