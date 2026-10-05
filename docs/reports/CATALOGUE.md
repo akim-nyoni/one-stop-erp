@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-495 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+497 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -275,6 +275,8 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | M154 | Meter Reading Sheets / Route Books | Each reading route in walking order: meter, stand, last reading and date, blank for the new reading. | RouteCode (String, optional) | Route, Reader, Sequence, Meter, Stand, Address, LastReading, LastDate, NewReading | — | — |
 | M155 | Meter Reading Exceptions | Readings flagged high or low consumption, rollover, negative or tampered, and estimates, with whether they were accepted. | AsAtDate (Date, optional) | Date, Meter, Stand, Kind, Flags, Previous, Reading, Accepted, Consumption | — | Sum(Consumption) |
 | M156 | Consumption Analysis | Metered consumption for the twelve months to the date against the twelve before, per meter with its category. | AsAtDate (Date, optional) | Stand, Meter, Service, Category, Readings, PriorYear, Change, Consumption | — | Sum(Consumption) |
+| M157 | Water Balance / Non-Revenue Water | Per supply zone over the period: bulk water put in, metered consumption billed to properties in the zone, the water lost and the loss rate. | FromDate (Date, optional), ToDate (Date, optional) | Zone, Bulk, Billed, Meters, LossRate, Lost | — | Sum(Lost) |
+| M158 | Unread / Faulty / Tampered Meter Report | Active meters not read for longer than the limit, running on estimates, or whose readings in the last year were flagged as tampered, negative or rolled over. | AsAtDate (Date, optional), Days (Integer, optional) | Meter, Stand, LastRead, LastActual, Estimated, Issue | — | — |
 | M159 | Meter Register & Replacement History | Every meter with stand, service, installation and removal, what replaced it, last actual reading and units estimated since. | — | Meter, Stand, Service, Installed, Removed, ReplacedBy, LastActual, Status, EstimatedSinceActual | — | Sum(EstimatedSinceActual) |
 | M160 | Disconnection & Reconnection Lists | Service orders to disconnect for arrears or reconnect after payment, with status, execution and the fee raised. | — | Order, Kind, Stand, Ward, Service, Raised, Status, Executed, Fee, Arrears | — | Sum(Arrears) |
 | M161 | Payment Arrangements Register (all debtors) | Every payment arrangement: terms, status and standing as at the date. | AsAtDate (Date, optional) | Ward, Debtor, Started, Total, Instalment, Status, DueToDate, Paid, Missed, Shortfall | — | Sum(Shortfall) |

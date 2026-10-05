@@ -11321,6 +11321,58 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("billing_run_line", "mun");
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.BulkSupplyReading", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("PeriodEnd")
+                        .HasColumnType("date")
+                        .HasColumnName("period_end");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date")
+                        .HasColumnName("period_start");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("source");
+
+                    b.Property<decimal>("Volume")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("volume");
+
+                    b.Property<string>("Zone")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("zone");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bulk_supply");
+
+                    b.HasIndex("CompanyId", "Zone", "PeriodStart")
+                        .HasDatabaseName("ix_bulk_supply_company_id_zone_period_start");
+
+                    b.ToTable("bulk_supply", "mun");
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.CemeteryInterment", b =>
                 {
                     b.Property<long>("Id")

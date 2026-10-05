@@ -49,6 +49,12 @@ public static class MunicipalReports
             [("AsAtDate", ParameterType.Date)]);
 
         // Meters, credit control and social relief.
+        yield return Listing("M157", "Water Balance / Non-Revenue Water", "Municipal", "Per supply zone over the period: bulk water put in, metered consumption billed to properties in the zone, the water lost and the loss rate.",
+            "MuniWaterBalance", [new Column("Zone", "Zone", 90), new Column("Bulk", "Bulk supply", 95), new Column("Billed", "Billed consumption", 110), new Column("Meters", "Meters read", 70), new Column("LossRate", "Loss %", 60),
+             new Column("Lost", "Non-revenue water", 110, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        yield return Listing("M158", "Unread / Faulty / Tampered Meter Report", "Municipal", "Active meters not read for longer than the limit, running on estimates, or whose readings in the last year were flagged as tampered, negative or rolled over.",
+            "MuniMeterExceptions", [new Column("Meter", "Meter", 90), new Column("Stand", "Stand", 80), new Column("LastRead", "Last read", 75), new Column("LastActual", "Last actual", 75),
+             new Column("Estimated", "Estimated since actual", 100), new Column("Issue", "Issue", 260)], [("AsAtDate", ParameterType.Date), ("Days", ParameterType.Integer)]);
         yield return Listing("M159", "Meter Register & Replacement History", "Municipal", "Every meter with stand, service, installation and removal, what replaced it, last actual reading and units estimated since.",
             "MuniMeters", [new Column("Meter", "Meter", 90), new Column("Stand", "Stand", 80), new Column("Service", "Service", 80), new Column("Installed", "Installed", 75), new Column("Removed", "Removed", 75),
              new Column("ReplacedBy", "Replaced by", 90), new Column("LastActual", "Last actual", 90), new Column("Status", "Status", 70), new Column("EstimatedSinceActual", "Estimated since actual", 110, true)], []);

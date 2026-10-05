@@ -451,3 +451,16 @@ internal sealed class TicketEventConfiguration : IEntityTypeConfiguration<Ticket
         b.HasIndex(x => x.ServiceTicketId);
     }
 }
+
+internal sealed class BulkSupplyReadingConfiguration : IEntityTypeConfiguration<BulkSupplyReading>
+{
+    public void Configure(EntityTypeBuilder<BulkSupplyReading> b)
+    {
+        b.ToTable("bulk_supply", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Zone).HasMaxLength(60);
+        b.Property(x => x.Volume).HasPrecision(19, 4);
+        b.Property(x => x.Source).HasMaxLength(120);
+        b.HasIndex(x => new { x.CompanyId, x.Zone, x.PeriodStart });
+    }
+}

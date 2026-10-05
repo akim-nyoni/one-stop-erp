@@ -212,6 +212,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Municipal meter readings.</summary>
     public DbSet<Core.Municipal.MeterReading> MeterReadings => Set<Core.Municipal.MeterReading>();
 
+    /// <summary>Gets the bulk water supplied into each zone.</summary>
+    public DbSet<Core.Municipal.BulkSupplyReading> BulkSupplyReadings => Set<Core.Municipal.BulkSupplyReading>();
+
     /// <summary>Housing land parcels (land bank).</summary>
     public DbSet<Core.Housing.LandParcel> LandParcels => Set<Core.Housing.LandParcel>();
 

@@ -27,6 +27,9 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
         DateOnly asAt = parameters.TryGetValue("AsAtDate", out object? value) && value is DateOnly date ? date : DateOnly.FromDateTime(DateTime.Today);
         return command.ToUpperInvariant() switch
         {
+            "MUNIWATERBALANCE" => await WaterBalanceAsync(companyId, Date(parameters, "FromDate") ?? new DateOnly(asAt.Year, 1, 1), Date(parameters, "ToDate") ?? asAt, ct).ConfigureAwait(false),
+            "MUNIMETEREXCEPTIONS" => await MeterExceptionsAsync(companyId, asAt,
+                parameters.TryGetValue("Days", out object? days) && days is not null and not "" ? Convert.ToInt32(days, CultureInfo.InvariantCulture) : 45, ct).ConfigureAwait(false),
             "MUNIBILLINGRUNS" => await BillingRunsAsync(companyId, ct).ConfigureAwait(false),
             "MUNIBILLINGEXCEPTIONS" => await BillingExceptionsAsync(companyId, ct).ConfigureAwait(false),
             "MUNIAGEDDEBTORS" => await AgedDebtorsAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -78,6 +81,72 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
     }
 
     // Each ratepayer's open items as at the date: ward and category from their (first) property, service from the billing run that raised the invoice.
+    private static DateOnly? Date(IReadOnlyDictionary<string, object?> parameters, string name) => parameters.TryGetValue(name, out object? value) && value is DateOnly date ? date : null;
+
+    // Billed consumption is the accepted readings in the period on water meters of properties in the zone.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> WaterBalanceAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<BulkSupplyReading> bulk = await _db.BulkSupplyReadings.AsNoTracking().Where(b => b.CompanyId == companyId && b.PeriodStart >= fromDate && b.PeriodEnd <= toDate).ToListAsync(ct).ConfigureAwait(false);
+        List<Property> properties = await _db.Properties.AsNoTracking().Include(p => p.Services).Where(p => p.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> meterZone = properties.SelectMany(p => p.Services.Where(s => s.ServiceType == ServiceType.Water && s.MeterId != null).Select(s => (Meter: s.MeterId!.Value, Zone: p.Zone ?? "—")))
+            .GroupBy(x => x.Meter).ToDictionary(g => g.Key, g => g.First().Zone);
+        List<long> meters = [.. meterZone.Keys];
+        List<MeterReading> readings = await _db.MeterReadings.AsNoTracking().Where(r => r.CompanyId == companyId && meters.Contains(r.MeterId) && r.Accepted && r.ReadingDate >= fromDate && r.ReadingDate <= toDate)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return [.. bulk.Select(b => b.Zone).Concat(readings.Select(r => meterZone[r.MeterId])).Distinct().Order(StringComparer.Ordinal).Select(zone =>
+        {
+            decimal supplied = bulk.Where(b => b.Zone == zone).Sum(b => b.Volume);
+            List<MeterReading> own = [.. readings.Where(r => meterZone[r.MeterId] == zone)];
+            decimal billed = own.Sum(r => r.BilledConsumption), lost = supplied - billed;
+            return Row(("Zone", zone), ("Bulk", Money(supplied)), ("Billed", Money(billed)), ("Meters", own.Select(r => r.MeterId).Distinct().Count()),
+                ("LossRate", supplied == 0m ? "—" : (lost * 100m / supplied).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Lost", lost));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> MeterExceptionsAsync(long companyId, DateOnly asAt, int unreadDays, CancellationToken ct)
+    {
+        List<Meter> meters = await _db.Meters.AsNoTracking().Where(m => m.CompanyId == companyId && m.IsActive && m.RemovedOn == null).OrderBy(m => m.Serial).ToListAsync(ct).ConfigureAwait(false);
+        List<Property> properties = await _db.Properties.AsNoTracking().Include(p => p.Services).Where(p => p.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> stands = properties.SelectMany(p => p.Services.Where(s => s.MeterId != null).Select(s => (Meter: s.MeterId!.Value, p.StandNumber))).GroupBy(x => x.Meter).ToDictionary(g => g.Key, g => g.First().StandNumber);
+        DateOnly yearBack = asAt.AddYears(-1);
+        var flagged = await _db.MeterReadings.AsNoTracking().Where(r => r.CompanyId == companyId && r.ReadingDate > yearBack && r.ReadingDate <= asAt && r.Flags != ReadingFlags.None)
+            .Select(r => new { r.MeterId, r.Flags }).ToListAsync(ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (Meter meter in meters)
+        {
+            List<string> issues = [];
+            if (meter.LastReadingDate is not DateOnly last || asAt.DayNumber - last.DayNumber > unreadDays)
+            {
+                issues.Add(meter.LastReadingDate is DateOnly l ? $"Unread for {asAt.DayNumber - l.DayNumber} days" : "Never read");
+            }
+
+            if (meter.EstimatedSinceActual > 0m)
+            {
+                issues.Add("Running on estimates");
+            }
+
+            ReadingFlags flags = flagged.Where(f => f.MeterId == meter.Id).Aggregate(ReadingFlags.None, (all, f) => all | f.Flags);
+            if (flags.HasFlag(ReadingFlags.Tamper))
+            {
+                issues.Add("Tamper suspected");
+            }
+
+            if ((flags & (ReadingFlags.Negative | ReadingFlags.Rollover)) != ReadingFlags.None)
+            {
+                issues.Add("Faulty readings (negative / rollover)");
+            }
+
+            if (issues.Count > 0)
+            {
+                rows.Add(Row(("Meter", meter.Serial), ("Stand", stands.GetValueOrDefault(meter.Id, "—")), ("LastRead", meter.LastReadingDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—"),
+                    ("LastActual", meter.LastActualDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—"), ("Estimated", meter.EstimatedSinceActual.ToString("0.###", CultureInfo.InvariantCulture)),
+                    ("Issue", string.Join("; ", issues))));
+            }
+        }
+
+        return rows;
+    }
+
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AgedDebtorsAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {
         var properties = await _db.Properties.AsNoTracking().Include(p => p.Services).Where(p => p.CompanyId == companyId).OrderBy(p => p.Id).ToListAsync(ct).ConfigureAwait(false);

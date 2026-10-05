@@ -54,8 +54,8 @@ missing domain data. Items are struck through as they ship (with the report code
 
 ## I. Municipality (the M series)
 - ~~146 Billing Run Summary (M146)~~, ~~147 Billing Exceptions (M147)~~, ~~148 Aged Debtors by Ward / Category / Service (M148)~~, ~~151 Valuation Roll (M151)~~, ~~152 Property Register (M152)~~, ~~153 Clearance Register (M153)~~, ~~154 Reading Sheets (M154)~~, ~~155 Reading Exceptions (M155)~~, ~~156 Consumption (M156)~~, ~~159 Meter Register (M159)~~, ~~160 Disconnection / Reconnection (M160)~~, ~~161 Arrangements (M161)~~, ~~162 Indigent & Subsidy (M162)~~, ~~166 Licences (M166)~~, ~~167 Ticket SLA (M167)~~, ~~168 Tariff Schedule (M168)~~, ~~149 Arrears (M149)~~, ~~163 Interest (M163)~~, ~~164 Write-offs (M164)~~, ~~169 Revenue by Source (M169)~~, ~~170 Ward Pack (M170)~~, ~~171 Statutory Age Analysis (M171)~~, ~~172 Prepaid vs Conventional (M172)~~
-- Data exists: 145 bill layout (a document template), 158 (partly)
-- Needs new data: 157 water balance (bulk supply readings)
+- ~~157 Water Balance / NRW (M157)~~, ~~158 Unread / Faulty / Tampered Meters (M158)~~
+- Data exists: 145 bill layout (a document template)
 
 ## J. Schools
 - ~~175 Fee Billing Summary (SC175)~~, ~~176 Arrears by Grade (SC176)~~, ~~177 Collections (SC177)~~, ~~178 Bursaries (SC178)~~, ~~180 Enrolment (SC180, no gender)~~, ~~182 Student Balances (SC182)~~
