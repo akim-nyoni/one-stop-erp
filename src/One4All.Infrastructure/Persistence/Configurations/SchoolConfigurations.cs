@@ -41,6 +41,8 @@ internal sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
     {
         b.ToTable("student", Schemas.School);
         b.HasKey(x => x.Id);
+        b.Property(x => x.Stream).HasMaxLength(20);
+        b.Ignore(x => x.PayerCustomerId);
         b.Property(x => x.AdmissionNumber).HasMaxLength(40);
         b.Property(x => x.FullName).HasMaxLength(200);
         b.Property(x => x.Grade).HasMaxLength(40);
@@ -48,5 +50,33 @@ internal sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
         b.HasIndex(x => new { x.CompanyId, x.AdmissionNumber }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => new { x.CompanyId, x.Grade });
         b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+internal sealed class TransportRouteConfiguration : IEntityTypeConfiguration<TransportRoute>
+{
+    public void Configure(EntityTypeBuilder<TransportRoute> b)
+    {
+        b.ToTable("transport_route", Schemas.School);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.FeePerTerm).HasPrecision(19, 4);
+        b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class HostelConfiguration : IEntityTypeConfiguration<Hostel>
+{
+    public void Configure(EntityTypeBuilder<Hostel> b)
+    {
+        b.ToTable("hostel", Schemas.School);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.FeePerTerm).HasPrecision(19, 4);
+        b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
     }
 }

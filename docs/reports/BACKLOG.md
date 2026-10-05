@@ -58,8 +58,9 @@ missing domain data. Items are struck through as they ship (with the report code
 
 ## J. Schools
 - ~~175 Fee Billing Summary (SC175)~~, ~~176 Arrears by Grade (SC176)~~, ~~177 Collections (SC177)~~, ~~178 Bursaries (SC178)~~, ~~180 Enrolment (SC180, no gender)~~, ~~182 Student Balances (SC182)~~
-- Data exists: 174 fee invoice layout, 181 deferred fee income; partly 184
-- Needs new data: 179 sponsors, 183 transport, 185 student wallet, streams
+- ~~179 Sponsor Statement (SC179)~~, ~~181 Deferred Fee Income (SC181)~~, ~~183 Transport (SC183)~~, ~~184 Boarding (SC184)~~; streams on students (shown in SC176)
+- Data exists: 174 fee invoice layout
+- Needs new data: 185 student wallet / tuck shop
 
 ## K. Construction / Job Costing
 - ~~186 Job Cost by Head (JC186)~~, ~~189 Cost to Complete (JC189)~~, ~~190 Retention (JC190, no defects date)~~, ~~197 Contract Cash Flow (JC197)~~

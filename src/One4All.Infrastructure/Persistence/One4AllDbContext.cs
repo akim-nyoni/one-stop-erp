@@ -221,6 +221,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Students.</summary>
     public DbSet<Core.Schools.Student> Students => Set<Core.Schools.Student>();
 
+    /// <summary>Gets the school transport routes.</summary>
+    public DbSet<Core.Schools.TransportRoute> TransportRoutes => Set<Core.Schools.TransportRoute>();
+
+    /// <summary>Gets the hostels.</summary>
+    public DbSet<Core.Schools.Hostel> Hostels => Set<Core.Schools.Hostel>();
+
     /// <summary>Construction contracts / jobs.</summary>
     public DbSet<Core.JobCosting.JobContract> JobContracts => Set<Core.JobCosting.JobContract>();
 

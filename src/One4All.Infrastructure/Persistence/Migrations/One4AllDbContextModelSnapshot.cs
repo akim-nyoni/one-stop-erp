@@ -19823,6 +19823,62 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("fee_structure", "sch");
                 });
 
+            modelBuilder.Entity("One4All.Core.Schools.Hostel", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("integer")
+                        .HasColumnName("capacity");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("FeePerTerm")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("fee_per_term");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("RevenueAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("revenue_account_code");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_hostel");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_hostel_company_id_code");
+
+                    b.ToTable("hostel", "sch");
+                });
+
             modelBuilder.Entity("One4All.Core.Schools.Student", b =>
                 {
                     b.Property<long>("Id")
@@ -19883,6 +19939,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("guardian_customer_id");
 
+                    b.Property<long?>("HostelId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("hostel_id");
+
                     b.Property<bool>("IsBoarder")
                         .HasColumnType("boolean")
                         .HasColumnName("is_boarder");
@@ -19909,6 +19969,19 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<long?>("SponsorCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sponsor_customer_id");
+
+                    b.Property<string>("Stream")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("stream");
+
+                    b.Property<long?>("TransportRouteId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("transport_route_id");
+
                     b.HasKey("Id")
                         .HasName("pk_student");
 
@@ -19921,6 +19994,62 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_student_company_id_grade");
 
                     b.ToTable("student", "sch");
+                });
+
+            modelBuilder.Entity("One4All.Core.Schools.TransportRoute", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Capacity")
+                        .HasColumnType("integer")
+                        .HasColumnName("capacity");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("FeePerTerm")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("fee_per_term");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("RevenueAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("revenue_account_code");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_transport_route");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_transport_route_company_id_code");
+
+                    b.ToTable("transport_route", "sch");
                 });
 
             modelBuilder.Entity("One4All.Core.Security.AccessScope", b =>

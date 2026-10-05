@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-481 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+485 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -540,8 +540,12 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | SC176 | Fee Arrears by Grade | Unpaid fee invoices as at the date per student, aged, grouped by grade. | AsAtDate (Date, optional) | Grade, Student, Guardian, Invoices, Oldest, Band, Outstanding | — | Sum(Outstanding) |
 | SC177 | Fee Collection Report | Receipts from guardians in the period, with the students they pay for. | FromDate (Date, optional), ToDate (Date, optional) | Date, Receipt, Guardian, Students, Amount | — | Sum(Amount) |
 | SC178 | Bursary & Discount Report | Students on bursaries with type and value, and what that is worth against their grade's fees. | — | Student, Grade, Type, Rate, Fees, Worth | — | Sum(Worth) |
+| SC179 | Sponsor Account Statement | Per sponsor: the students they sponsor, fees billed to them and receipts in the period, and the balance they owe at the end of it. | FromDate (Date, optional), ToDate (Date, optional) | Sponsor, Students, Billed, Received, Balance | — | Sum(Balance) |
 | SC180 | Enrolment & Headcount | Per grade: enrolled, boarders, day scholars, bursary holders and students no longer enrolled. | — | Grade, Enrolled, Boarders, Day, Bursary, Left | — | — |
+| SC181 | Deferred Fee Income Schedule | Fees billed in advance per invoice: billed, recognised to date as the term runs, and still deferred. | — | Invoice, Description, Term, Billed, Recognised, Deferred | — | Sum(Deferred) |
 | SC182 | Student Balances Listing | Every student with guardian, grade, enrolment and what is owed on their fee invoices at the date. | AsAtDate (Date, optional) | Admission, Student, Grade, Guardian, Status, Balance | — | Sum(Balance) |
+| SC183 | Transport Route Billing & Utilisation | Per route: seats, enrolled riders, utilisation, the fee and what was billed for transport in the period. | FromDate (Date, optional), ToDate (Date, optional) | Route, Name, Seats, Riders, Utilisation, Fee, Billed | — | Sum(Billed) |
+| SC184 | Boarding / Hostel Occupancy & Billing | Per hostel: beds, enrolled boarders, occupancy, the fee and what was billed for boarding in the period. | FromDate (Date, optional), ToDate (Date, optional) | Hostel, Name, Beds, Boarders, Occupancy, Fee, Billed | — | Sum(Billed) |
 | SCH-STU | Student Register | Enrolled students with grade, boarding status and bursary. | — | AdmissionNumber, FullName, Grade, Boarder, BursaryValue | — | Sum(BursaryValue) |
 
 ## System

@@ -63,6 +63,21 @@ public sealed class Student : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the student is a boarder.</summary>
     public bool IsBoarder { get; set; }
 
+    /// <summary>Gets or sets the sponsor (a customer account) billed for the student's fees instead of the guardian.</summary>
+    public long? SponsorCustomerId { get; set; }
+
+    /// <summary>Gets or sets the stream (class) within the grade.</summary>
+    public string? Stream { get; set; }
+
+    /// <summary>Gets or sets the transport route the student rides.</summary>
+    public long? TransportRouteId { get; set; }
+
+    /// <summary>Gets or sets the hostel a boarder lives in.</summary>
+    public long? HostelId { get; set; }
+
+    /// <summary>Gets the account the student's fees are billed to: the sponsor when there is one, otherwise the guardian.</summary>
+    public long PayerCustomerId => SponsorCustomerId ?? GuardianCustomerId;
+
     /// <summary>Whether the student is currently enrolled.</summary>
     public bool IsEnrolled { get; private set; }
 

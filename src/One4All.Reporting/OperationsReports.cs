@@ -27,14 +27,26 @@ public static class OperationsReports
         yield return Listing("SC178", "Bursary & Discount Report", "School", "Students on bursaries with type and value, and what that is worth against their grade's fees.",
             "OpsBursaries", [new Column("Student", "Student", 150), new Column("Grade", "Grade", 60), new Column("Type", "Type", 80), new Column("Rate", "Value", 70), new Column("Fees", "Grade fees", 90),
              new Column("Worth", "Bursary worth", 95, true)], []);
+        yield return Listing("SC179", "Sponsor Account Statement", "School", "Per sponsor: the students they sponsor, fees billed to them and receipts in the period, and the balance they owe at the end of it.",
+            "OpsSponsors", [new Column("Sponsor", "Sponsor", 150), new Column("Students", "Students", 220), new Column("Billed", "Billed", 95), new Column("Received", "Received", 95), new Column("Balance", "Balance", 95, true)],
+            [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
         yield return Listing("SC180", "Enrolment & Headcount", "School", "Per grade: enrolled, boarders, day scholars, bursary holders and students no longer enrolled.",
             "OpsEnrolment", [new Column("Grade", "Grade", 70), new Column("Enrolled", "Enrolled", 60), new Column("Boarders", "Boarders", 60), new Column("Day", "Day", 50), new Column("Bursary", "On bursary", 65),
              new Column("Left", "Not enrolled", 75)], []);
+        yield return Listing("SC181", "Deferred Fee Income Schedule", "School", "Fees billed in advance per invoice: billed, recognised to date as the term runs, and still deferred.",
+            "OpsDeferredFees", [new Column("Invoice", "Invoice", 100), new Column("Description", "Description", 200), new Column("Term", "Term", 160), new Column("Billed", "Billed", 90), new Column("Recognised", "Recognised", 90),
+             new Column("Deferred", "Deferred", 95, true)], []);
         yield return Listing("SC182", "Student Balances Listing", "School", "Every student with guardian, grade, enrolment and what is owed on their fee invoices at the date.",
             "OpsStudentBalances", [new Column("Admission", "Admission", 80), new Column("Student", "Student", 150), new Column("Grade", "Grade", 60), new Column("Guardian", "Guardian", 140),
              new Column("Status", "Status", 80), new Column("Balance", "Balance", 95, true)], [("AsAtDate", ParameterType.Date)]);
 
         // Construction / job costing.
+        yield return Listing("SC183", "Transport Route Billing & Utilisation", "School", "Per route: seats, enrolled riders, utilisation, the fee and what was billed for transport in the period.",
+            "OpsTransport", [new Column("Route", "Route", 70), new Column("Name", "Name", 140), new Column("Seats", "Seats", 50), new Column("Riders", "Riders", 50), new Column("Utilisation", "Utilisation", 70),
+             new Column("Fee", "Fee / term", 80), new Column("Billed", "Billed", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        yield return Listing("SC184", "Boarding / Hostel Occupancy & Billing", "School", "Per hostel: beds, enrolled boarders, occupancy, the fee and what was billed for boarding in the period.",
+            "OpsBoarding", [new Column("Hostel", "Hostel", 70), new Column("Name", "Name", 140), new Column("Beds", "Beds", 50), new Column("Boarders", "Boarders", 60), new Column("Occupancy", "Occupancy", 70),
+             new Column("Fee", "Fee / term", 80), new Column("Billed", "Billed", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
         yield return Listing("JC186", "Job Cost Report by Cost Head", "JobCosting", "Per contract and cost head: cost to date and share of the contract's cost, against its budget.",
             "OpsJobCosts", [new Column("Contract", "Contract", 90), new Column("Name", "Name", 150), new Column("CostHead", "Cost head", 110), new Column("Source", "Source", 90), new Column("Share", "Share", 60),
              new Column("Cost", "Cost to date", 100, true)], []);

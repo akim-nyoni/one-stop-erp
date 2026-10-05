@@ -128,6 +128,12 @@ public sealed class SchoolBillingService : ISchoolBillingService
 
     private async Task<Result<StudentBillResult>> BillOneAsync(Company company, Student student, FeeStructure structure, string invoiceNumber, DateOnly date, CancellationToken ct)
     {
+        Result extras = await BillExtrasAsync(company, student, structure, invoiceNumber, date, ct).ConfigureAwait(false);
+        if (extras.IsFailure)
+        {
+            return extras.Error;
+        }
+
         decimal gross = structure.CompulsoryTotal;
         decimal discount = student.ComputeDiscount(gross);
         decimal net = gross - discount;
@@ -139,7 +145,7 @@ public sealed class SchoolBillingService : ISchoolBillingService
         Result<TradingPostingResult> posted = await _salesLedger.PostInvoiceAsync(new SalesInvoiceRequest
         {
             CompanyId = company.Id,
-            CustomerId = student.GuardianCustomerId,
+            CustomerId = student.PayerCustomerId,
             DocumentNumber = invoiceNumber,
             DocumentDate = date,
             Currency = company.BaseCurrency,
@@ -164,5 +170,36 @@ public sealed class SchoolBillingService : ISchoolBillingService
         }
 
         return new StudentBillResult(student.Id, gross, discount, net, posted.Value.OpenItemId, posted.Value.JournalNumber);
+    }
+
+    // Transport and boarding are billed on their own invoices (-TR, -HS) to their own revenue accounts, without bursary discounts;
+    // the narrative keeps the fee pattern so arrears and collections see them, tagged with the route or hostel.
+    private async Task<Result> BillExtrasAsync(Company company, Student student, FeeStructure structure, string invoiceNumber, DateOnly date, CancellationToken ct)
+    {
+        List<(string Suffix, string Tag, decimal Fee, string Account)> extras = [];
+        if (student.TransportRouteId is long routeId && await _db.Set<TransportRoute>().AsNoTracking().FirstOrDefaultAsync(r => r.Id == routeId, ct).ConfigureAwait(false) is { FeePerTerm: > 0m } route)
+        {
+            extras.Add(("-TR", $"transport {route.Code}", route.FeePerTerm, route.RevenueAccountCode));
+        }
+
+        if (student.IsBoarder && student.HostelId is long hostelId && await _db.Set<Hostel>().AsNoTracking().FirstOrDefaultAsync(h => h.Id == hostelId, ct).ConfigureAwait(false) is { FeePerTerm: > 0m } hostel)
+        {
+            extras.Add(("-HS", $"boarding {hostel.Code}", hostel.FeePerTerm, hostel.RevenueAccountCode));
+        }
+
+        foreach ((string suffix, string tag, decimal fee, string account) in extras)
+        {
+            Result<TradingPostingResult> posted = await _salesLedger.PostInvoiceAsync(new SalesInvoiceRequest
+            {
+                CompanyId = company.Id, CustomerId = student.PayerCustomerId, DocumentNumber = invoiceNumber + suffix, DocumentDate = date, Currency = company.BaseCurrency, NetAmount = fee, TaxAmount = 0m,
+                SalesAccountCode = account, Narrative = $"{structure.Term} fees — {student.FullName} ({student.AdmissionNumber}) [{tag}]",
+            }, ct).ConfigureAwait(false);
+            if (posted.IsFailure)
+            {
+                return Result.Failure(posted.Error);
+            }
+        }
+
+        return Result.Success();
     }
 }

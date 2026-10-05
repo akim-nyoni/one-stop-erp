@@ -34,6 +34,10 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         return command.ToUpperInvariant() switch
         {
             "OPSFEEBILLING" => await FeeBillingAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "OPSSPONSORS" => await SponsorsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "OPSDEFERREDFEES" => await DeferredFeesAsync(companyId, ct).ConfigureAwait(false),
+            "OPSTRANSPORT" => await ExtrasAsync(companyId, fromDate, toDate, transport: true, ct).ConfigureAwait(false),
+            "OPSBOARDING" => await ExtrasAsync(companyId, fromDate, toDate, transport: false, ct).ConfigureAwait(false),
             "OPSFEEARREARS" => await FeeArrearsAsync(companyId, asAt, ct).ConfigureAwait(false),
             "OPSFEECOLLECTIONS" => await FeeCollectionsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "OPSBURSARIES" => await BursariesAsync(companyId, ct).ConfigureAwait(false),
@@ -99,7 +103,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         Dictionary<string, List<OpenItemAsAt>> open = await OpenFeesAsync(companyId, asAt, ct).ConfigureAwait(false);
         return [.. open.Where(o => students.ContainsKey(o.Key)).Select(o => (Student: students[o.Key], Items: o.Value, Oldest: o.Value.Min(i => i.Item.DueDate)))
             .Where(x => x.Oldest < asAt).OrderBy(x => x.Student.Grade, StringComparer.Ordinal).ThenBy(x => x.Student.FullName, StringComparer.Ordinal)
-            .Select(x => Row(("Grade", x.Student.Grade), ("Student", $"{x.Student.FullName} ({x.Student.AdmissionNumber})"), ("Guardian", guardians.GetValueOrDefault(x.Student.GuardianCustomerId, "?")),
+            .Select(x => Row(("Grade", x.Student.Stream is null ? x.Student.Grade : $"{x.Student.Grade} {x.Student.Stream}"), ("Student", $"{x.Student.FullName} ({x.Student.AdmissionNumber})"), ("Guardian", guardians.GetValueOrDefault(x.Student.GuardianCustomerId, "?")),
                 ("Invoices", x.Items.Count), ("Oldest", Date(x.Oldest)), ("Band", DebtorAgeing.Bands[DebtorAgeing.Band(x.Oldest, asAt)]), ("Outstanding", x.Items.Sum(i => i.OutstandingBase))))];
     }
 
@@ -312,6 +316,60 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             List<Quotation> converted = [.. g.Where(q => q.Status == QuotationStatus.Converted || q.SalesOrderId != null)];
             return Row(("Month", g.Key), ("Quotes", g.Count()), ("Converted", converted.Count), ("Rate", (converted.Count * 100m / g.Count()).ToString("0.0", CultureInfo.InvariantCulture) + "%"),
                 ("Quoted", Money(g.Sum(Value))), ("ConvertedValue", converted.Sum(Value)));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SponsorsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<Student> sponsored = [.. (await StudentsAsync(companyId, ct).ConfigureAwait(false)).Values.Where(s => s.SponsorCustomerId != null)];
+        List<long> sponsors = [.. sponsored.Select(s => s.SponsorCustomerId!.Value).Distinct()];
+        Dictionary<long, string> names = await GuardiansAsync(companyId, ct).ConfigureAwait(false);
+        List<OpenItem> items = await _db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && sponsors.Contains(i.TraderId) && i.DocumentDate <= toDate)
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<OpenItemAsAt> open = [.. (await OpenItemsAsAt.LoadAsync(_db, companyId, TradingLedger.AccountsReceivable, toDate, ct).ConfigureAwait(false)).Where(o => sponsors.Contains(o.Item.TraderId))];
+        return [.. sponsors.OrderBy(id => names.GetValueOrDefault(id), StringComparer.Ordinal).Select(id =>
+        {
+            List<OpenItem> inPeriod = [.. items.Where(i => i.TraderId == id && i.DocumentDate >= fromDate)];
+            return Row(("Sponsor", names.GetValueOrDefault(id, "?")), ("Students", string.Join(", ", sponsored.Where(s => s.SponsorCustomerId == id).Select(s => $"{s.FullName} ({s.AdmissionNumber})").Order(StringComparer.Ordinal))),
+                ("Billed", Money(inPeriod.Where(i => i.ItemType == OpenItemType.Invoice).Sum(i => i.OriginalBase))), ("Received", Money(inPeriod.Where(i => i.ItemType == OpenItemType.Receipt).Sum(i => Math.Abs(i.OriginalBase)))),
+                ("Balance", open.Where(o => o.Item.TraderId == id).Sum(o => o.Signed(LedgerSign.Debit))));
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DeferredFeesAsync(long companyId, CancellationToken ct)
+    {
+        List<string> deferredAccounts = await _db.FeeStructures.AsNoTracking().IgnoreQueryFilters().Where(f => f.CompanyId == companyId && f.DeferredIncomeAccountCode != null)
+            .Select(f => f.DeferredIncomeAccountCode!).Distinct().ToListAsync(ct).ConfigureAwait(false);
+        List<Core.Accounting.DeferredIncomeSchedule> schedules = await _db.Set<Core.Accounting.DeferredIncomeSchedule>().AsNoTracking()
+            .Where(d => d.CompanyId == companyId && deferredAccounts.Contains(d.DeferredAccountCode)).OrderBy(d => d.StartDate).ThenBy(d => d.Reference).ToListAsync(ct).ConfigureAwait(false);
+        return [.. schedules.Select(d => Row(("Invoice", d.Reference), ("Description", d.Description), ("Term", $"{Date(d.StartDate)} to {Date(d.EndDate)}"), ("Billed", Money(d.Amount)),
+            ("Recognised", Money(d.RecognisedAmount)), ("Deferred", d.Amount - d.RecognisedAmount)))];
+    }
+
+    // Transport and boarding invoices carry "[transport CODE]" / "[boarding CODE]" in their journal narrative.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ExtrasAsync(long companyId, DateOnly fromDate, DateOnly toDate, bool transport, CancellationToken ct)
+    {
+        List<Student> enrolled = [.. (await StudentsAsync(companyId, ct).ConfigureAwait(false)).Values.Where(s => s.IsEnrolled)];
+        string tag = transport ? "[transport " : "[boarding ";
+        var billed = await (from i in _db.OpenItems.AsNoTracking()
+                            join j in _db.Journals.AsNoTracking() on i.JournalEntryId equals j.Id
+                            where i.CompanyId == companyId && i.ItemType == OpenItemType.Invoice && i.DocumentDate >= fromDate && i.DocumentDate <= toDate && j.Narrative != null && j.Narrative.Contains(tag)
+                            select new { j.Narrative, i.OriginalBase }).ToListAsync(ct).ConfigureAwait(false);
+        decimal Billed(string code) => billed.Where(b => b.Narrative!.Contains($"{tag}{code}]", StringComparison.Ordinal)).Sum(b => b.OriginalBase);
+        static string Share(int used, int capacity) => capacity == 0 ? "—" : (used * 100m / capacity).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+        if (transport)
+        {
+            return [.. (await _db.TransportRoutes.AsNoTracking().Where(r => r.CompanyId == companyId).OrderBy(r => r.Code).ToListAsync(ct).ConfigureAwait(false)).Select(r =>
+            {
+                int riders = enrolled.Count(s => s.TransportRouteId == r.Id);
+                return Row(("Route", r.Code), ("Name", r.Name), ("Seats", r.Capacity), ("Riders", riders), ("Utilisation", Share(riders, r.Capacity)), ("Fee", Money(r.FeePerTerm)), ("Billed", Billed(r.Code)));
+            })];
+        }
+
+        return [.. (await _db.Hostels.AsNoTracking().Where(h => h.CompanyId == companyId).OrderBy(h => h.Code).ToListAsync(ct).ConfigureAwait(false)).Select(h =>
+        {
+            int boarders = enrolled.Count(s => s.IsBoarder && s.HostelId == h.Id);
+            return Row(("Hostel", h.Code), ("Name", h.Name), ("Beds", h.Capacity), ("Boarders", boarders), ("Occupancy", Share(boarders, h.Capacity)), ("Fee", Money(h.FeePerTerm)), ("Billed", Billed(h.Code)));
         })];
     }
 
