@@ -84,7 +84,7 @@ missing domain data. Items are struck through as they ship (with the report code
 - Needs new data: 249 login sessions
 
 ## Q. Executive / BI Dashboards
-- Data exists: 251–255; 256 except water losses
+- ~~251 Executive Dashboard (DB251)~~, ~~252 Daily Flash (DB252)~~, ~~253 KPI Scorecard (DB253)~~, ~~254 Branch League (DB254)~~, ~~255 Trend & Seasonality (DB255)~~, ~~256 Municipal Executive Dashboard (DB256, without water losses)~~
 
 ## R. Master Data & System Listings
 - ~~259 Exchange Rates (SYS259)~~, ~~260 Number Sequences (SYS260)~~, ~~261 Company Configuration (SYS261)~~, ~~262 Report Inventory (SYS262)~~, ~~263 Jobs & Deliveries (SYS263)~~

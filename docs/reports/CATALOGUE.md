@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-335 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+341 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -219,6 +219,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
+| DB256 | Municipal Executive Dashboard | Billed and collected this year, collection rate, debtors and over-90s, indigent households, disconnections, open faults and licences due. | AsAtDate (Date, optional) | Measure, Value | — | — |
 | M146 | Billing Run Summary & Control | Each billing run: service, period, ward, lines billed and excluded, total billed against the previous run, proposer and approver. | — | Run, Service, Period, Ward, Status, Lines, Excluded, Previous, Approver, Billed | — | Sum(Billed) |
 | M147 | Billing Exceptions Report | Lines of every billing run flagged as already billed, nothing to bill, failed or a large change on last time. | — | Run, Stand, Exceptions, Message, Included, Previous, Charge | — | Sum(Charge) |
 | M148 | Aged Debtors by Ward, Category and Service | Ratepayers' open items as at the date, aged 30/60/90/120+, grouped by ward, consumer category and service. | AsAtDate (Date, optional) | Ward, Category, Service, Accounts, Current, D30, D60, D90, D120, Over120, Total | — | Sum(Total) |
@@ -418,6 +419,11 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
+| DB251 | Executive Dashboard | Year to date at the date: revenue, expenses, profit, cash, debtors, creditors, stock, working capital and the cash cycle. | AsAtDate (Date, optional) | Measure, Value | — | — |
+| DB252 | Daily Flash Report | The day's sales, receipts and payments against the same day last week and the month to date, with cash at close. | AsAtDate (Date, optional) | Measure, Today, LastWeek, MonthToDate | — | — |
+| DB253 | KPI Scorecard | This month against last: revenue, profit, gross margin, debtor, creditor and stock days, cash cycle — with the direction of travel. | AsAtDate (Date, optional) | Kpi, ThisMonth, LastMonth, Trend | — | — |
+| DB254 | Branch Comparison League Table | Branches ranked by POS net sales in the period, with transactions, average basket and share. | FromDate (Date, optional), ToDate (Date, optional) | Rank, Branch, Transactions, AverageBasket, Share, Sales | — | Sum(Sales) |
+| DB255 | Trend & Seasonality Analysis | Revenue, expenses and profit month by month for the 24 months to the date, with each month against the same month a year before. | AsAtDate (Date, optional) | Month, Revenue, Expenses, LastYear, YearOnYear, Profit | — | Sum(Profit) |
 | SYS-PERIOD | Period Status | Accounting periods with their open/closed status for the key ledgers (GL, AR, AP) — a month-end close aid. | — | Period, Start, End, GL, AR, AP | — | — |
 | SYS237 | Permission Matrix | Every role with each permission it grants and the operations allowed. | — | Role, Module, Permission, Name, Operations | — | — |
 | SYS238 | User, Role & Group Membership | Every user with direct roles, groups, roles held through groups and individual overrides. | — | User, Name, Status, Roles, Groups, GroupRoles, Overrides | — | — |

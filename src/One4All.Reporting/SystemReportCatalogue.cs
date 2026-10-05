@@ -100,6 +100,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Executive dashboards (brief §14 Q, DB + item number).
+        foreach (ReportDefinition definition in DashboardReports.All())
+        {
+            yield return definition;
+        }
+
         // Fixed asset and tax additions (brief §14 M and N, FA / TX + item number).
         foreach (ReportDefinition definition in AssetTaxReports.All())
         {
