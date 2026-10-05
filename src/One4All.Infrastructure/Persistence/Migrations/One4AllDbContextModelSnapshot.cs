@@ -15000,6 +15000,133 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("element", "pay");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.PayrollDraft", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset?>("ApprovedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("approved_on");
+
+                    b.Property<long>("CalculatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("calculated_by_user_id");
+
+                    b.Property<DateTimeOffset>("CalculatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("calculated_on");
+
+                    b.Property<long?>("CommittedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("committed_by_user_id");
+
+                    b.Property<DateTimeOffset?>("CommittedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("committed_on");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("Deductions")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("deductions");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("document_number");
+
+                    b.Property<int>("Employees")
+                        .HasColumnType("integer")
+                        .HasColumnName("employees");
+
+                    b.Property<string>("Exceptions")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)")
+                        .HasColumnName("exceptions");
+
+                    b.Property<long?>("FirstApproverUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("first_approver_user_id");
+
+                    b.Property<decimal>("Gross")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("gross");
+
+                    b.Property<string>("JournalNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<decimal>("Net")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("net");
+
+                    b.Property<string>("NetPayAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("net_pay_account_code");
+
+                    b.Property<DateOnly>("PayDate")
+                        .HasColumnType("date")
+                        .HasColumnName("pay_date");
+
+                    b.Property<string>("PayGroup")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("pay_group");
+
+                    b.Property<string>("PeriodLabel")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("period_label");
+
+                    b.Property<decimal?>("PreviousNet")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("previous_net");
+
+                    b.Property<bool>("RequiresSecondApproval")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_second_approval");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long?>("SecondApproverUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("second_approver_user_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payroll_draft");
+
+                    b.HasIndex("CompanyId", "PayGroup", "PeriodLabel")
+                        .HasDatabaseName("ix_payroll_draft_company_id_pay_group_period_label");
+
+                    b.ToTable("payroll_draft", "pay");
+                });
+
             modelBuilder.Entity("One4All.Core.Payroll.PayrollRunRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -21963,6 +22090,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
+
+                    b.Property<bool>("PayrollApprovalRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("payroll_approval_required");
+
+                    b.Property<decimal?>("PayrollSecondApprovalVariancePercent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("payroll_second_approval_variance_percent");
 
                     b.Property<string>("RegistrationNumber")
                         .HasMaxLength(60)

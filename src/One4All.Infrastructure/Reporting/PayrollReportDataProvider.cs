@@ -493,9 +493,17 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RunsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        string User(long? id) => id is not long u ? "-" : u == 0 ? "system" : users.GetValueOrDefault(u, $"user {u}");
+        Dictionary<string, PayrollDraft> drafts = (await _db.PayrollDrafts.AsNoTracking().Where(d => d.CompanyId == companyId && d.Status == PayrollDraftStatus.Committed).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(d => d.DocumentNumber).ToDictionary(g => g.Key, g => g.Last());
         return [.. (await _db.Set<PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == companyId && r.PayDate >= fromDate && r.PayDate <= toDate).OrderBy(r => r.PayDate).ToListAsync(ct).ConfigureAwait(false))
-            .Select(r => Row(("Period", r.PeriodLabel), ("PayDate", Date(r.PayDate)), ("Employees", r.Employees), ("Gross", Money(r.Gross)), ("Deductions", Money(r.Deductions)), ("Journal", r.JournalNumber),
-                ("RunBy", r.CreatedByUserId == 0 ? "system" : users.GetValueOrDefault(r.CreatedByUserId, $"user {r.CreatedByUserId}")), ("Net", r.Net)))];
+            .Select(r =>
+            {
+                PayrollDraft? draft = r.Kind == PayRunKind.Regular && r.DocumentNumber.Length > 0 ? drafts.GetValueOrDefault(r.DocumentNumber) : null;
+                string approved = draft is null ? "-" : draft.SecondApproverUserId is long second ? $"{User(draft.FirstApproverUserId)} + {User(second)}" : User(draft.FirstApproverUserId);
+                return Row(("Period", r.PeriodLabel), ("PayDate", Date(r.PayDate)), ("Employees", r.Employees), ("Gross", Money(r.Gross)), ("Deductions", Money(r.Deductions)), ("Journal", r.JournalNumber),
+                    ("RunBy", User(r.CreatedByUserId)), ("CalculatedBy", draft is null ? "-" : User(draft.CalculatedByUserId)), ("ApprovedBy", approved), ("Net", r.Net));
+            })];
     }
 
     // PR8: per period paid in the range, One4All's net amount per employee and element (all runs) against the legacy import.

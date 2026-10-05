@@ -393,3 +393,24 @@ internal sealed class DeductionArrearConfiguration : IEntityTypeConfiguration<De
         b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.ElementCode });
     }
 }
+
+internal sealed class PayrollDraftConfiguration : IEntityTypeConfiguration<PayrollDraft>
+{
+    public void Configure(EntityTypeBuilder<PayrollDraft> b)
+    {
+        b.ToTable("payroll_draft", Schemas.Payroll);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PayGroup).HasMaxLength(20);
+        b.Property(x => x.PeriodLabel).HasMaxLength(40);
+        b.Property(x => x.NetPayAccountCode).HasMaxLength(8);
+        b.Property(x => x.DocumentNumber).HasMaxLength(40);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+        b.Property(x => x.Exceptions).HasMaxLength(8000);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Gross).HasPrecision(19, 4);
+        b.Property(x => x.Deductions).HasPrecision(19, 4);
+        b.Property(x => x.Net).HasPrecision(19, 4);
+        b.Property(x => x.PreviousNet).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.PayGroup, x.PeriodLabel });
+    }
+}

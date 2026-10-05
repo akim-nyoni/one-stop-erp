@@ -341,6 +341,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Deductions suspended by net-pay protection and arrears recovered.</summary>
     public DbSet<Core.Payroll.DeductionArrear> DeductionArrears => Set<Core.Payroll.DeductionArrear>();
 
+    /// <summary>Payroll runs calculated and awaiting approval.</summary>
+    public DbSet<Core.Payroll.PayrollDraft> PayrollDrafts => Set<Core.Payroll.PayrollDraft>();
+
     /// <summary>Backpay calculation lines.</summary>
     public DbSet<Core.Payroll.BackpayLine> BackpayLines => Set<Core.Payroll.BackpayLine>();
 

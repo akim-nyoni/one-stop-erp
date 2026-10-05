@@ -96,7 +96,8 @@ public static class PayrollReports
         // Runs, schemes and tax.
         yield return Listing("PR7", "Payroll Run Control Register", "Payroll", "Every payroll run in the period: employees, gross, deductions, net, the journal and who ran it.",
             "PyrlRuns", [new Column("Period", "Period", 70), new Column("PayDate", "Pay date", 75), new Column("Employees", "Employees", 65), new Column("Gross", "Gross", 95), new Column("Deductions", "Deductions", 95),
-             new Column("Journal", "Journal", 100), new Column("RunBy", "Run by", 90), new Column("Net", "Net", 100, true)], Period);
+             new Column("Journal", "Journal", 100), new Column("RunBy", "Committed by", 90), new Column("CalculatedBy", "Calculated by", 90), new Column("ApprovedBy", "Approved by", 120),
+             new Column("Net", "Net", 100, true)], Period);
         yield return Listing("PR8", "Parallel Run Comparison", "Payroll", "Go-live parallel run: One4All's payslips against the imported legacy payroll, per period, employee and element (NET for net pay).",
             "PyrlParallel", [new Column("Period", "Period", 70), new Column("Employee", "Employee", 160), new Column("Element", "Element", 70), new Column("One4All", "One4All", 95), new Column("Legacy", "Legacy", 95),
              new Column("Status", "Status", 110), new Column("Difference", "Difference", 95, true)], Period);

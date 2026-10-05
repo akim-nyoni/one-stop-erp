@@ -73,6 +73,18 @@ public sealed class Company : SoftDeletableEntity
     public decimal? MinimumTakeHomePercent { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether payroll runs need maker-checker approval (brief §4.15.6): calculate, approve by someone
+    /// else, then commit. When set, a direct run is refused.
+    /// </summary>
+    public bool PayrollApprovalRequired { get; set; }
+
+    /// <summary>
+    /// Gets or sets the net-pay movement from the group's last run (in percent, either way) above which a second, different approver
+    /// is needed. Null needs one approver always.
+    /// </summary>
+    public decimal? PayrollSecondApprovalVariancePercent { get; set; }
+
+    /// <summary>
     /// Whether fund control is on (brief §4.4 / §4.18.5): expenditure cannot be posted to a budget-enabled expense account
     /// (a vote) that has no appropriation in the year's active approved or supplementary budget.
     /// </summary>

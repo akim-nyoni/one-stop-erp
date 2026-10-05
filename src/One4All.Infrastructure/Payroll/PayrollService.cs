@@ -117,6 +117,32 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
     // One unit of work: its postings and record changes commit together or not at all.
     private async Task<Result<PayrollRunResult>> RunCoreAsync(long companyId, string payGroup, string periodLabel, DateOnly payDate, string netPayAccountCode, string documentNumber, CancellationToken ct)
     {
+        Result<PreparedRun> prepared = await PrepareRunAsync(companyId, payGroup, periodLabel, payDate, documentNumber, ct).ConfigureAwait(false);
+        if (prepared.IsFailure)
+        {
+            return prepared.Error;
+        }
+
+        // Where payroll needs approval, runs go through calculate → approve → commit instead.
+        if (prepared.Value.Company.PayrollApprovalRequired)
+        {
+            return Error.Rule("Payroll.ApprovalRequired", "This company's payroll must be calculated, approved by someone else, then committed.");
+        }
+
+        return await CommitPreparedAsync(prepared.Value, payGroup, payDate, netPayAccountCode, documentNumber, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>A run calculated but not yet saved or posted.</summary>
+    /// <param name="Company">The company.</param>
+    /// <param name="Period">The period label.</param>
+    /// <param name="Slips">The payslips.</param>
+    /// <param name="Arrears">The arrears movements.</param>
+    /// <param name="Elements">The pay elements.</param>
+    private sealed record PreparedRun(Company Company, string Period, List<Payslip> Slips, List<DeductionArrear> Arrears, Dictionary<long, PayElement> Elements);
+
+    // Calculates a pay group's regular run for the period without saving anything: the checks, then every payslip under net-pay protection.
+    private async Task<Result<PreparedRun>> PrepareRunAsync(long companyId, string payGroup, string periodLabel, DateOnly payDate, string documentNumber, CancellationToken ct)
+    {
         Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         if (company is null)
         {
@@ -166,10 +192,17 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             arrearEntries.AddRange(ArrearEntries(companyId, employee, periodLabel, documentNumber, payDate, [.. outcomes.Where(o => !recoveryCodes.Contains(o.Code))], arrears[employee.Id], floor));
         }
 
-        Result<PayrollRunResult> run = await PostRunAsync(company, periodLabel, payDate, netPayAccountCode, documentNumber, slips, elements, PayRunKind.Regular, null, payGroup, ct).ConfigureAwait(false);
-        if (run.IsSuccess && arrearEntries.Count > 0)
+        return new PreparedRun(company, periodLabel, slips, arrearEntries, elements);
+    }
+
+    // Saves and posts a prepared run, with its arrears movements.
+    private async Task<Result<PayrollRunResult>> CommitPreparedAsync(PreparedRun prepared, string payGroup, DateOnly payDate, string netPayAccountCode, string documentNumber, CancellationToken ct)
+    {
+        Result<PayrollRunResult> run = await PostRunAsync(prepared.Company, prepared.Period, payDate, netPayAccountCode, documentNumber, prepared.Slips, prepared.Elements, PayRunKind.Regular, null, payGroup, ct)
+            .ConfigureAwait(false);
+        if (run.IsSuccess && prepared.Arrears.Count > 0)
         {
-            _db.DeductionArrears.AddRange(arrearEntries);
+            _db.DeductionArrears.AddRange(prepared.Arrears);
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
