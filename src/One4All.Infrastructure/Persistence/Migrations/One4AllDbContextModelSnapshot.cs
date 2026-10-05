@@ -12311,6 +12311,84 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("element", "pay");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.PayrollRunRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<decimal>("Deductions")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("deductions");
+
+                    b.Property<int>("Employees")
+                        .HasColumnType("integer")
+                        .HasColumnName("employees");
+
+                    b.Property<decimal>("Gross")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("gross");
+
+                    b.Property<string>("JournalNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("Net")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("net");
+
+                    b.Property<DateOnly>("PayDate")
+                        .HasColumnType("date")
+                        .HasColumnName("pay_date");
+
+                    b.Property<string>("PeriodLabel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("period_label");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payroll_run");
+
+                    b.HasIndex("CompanyId", "PeriodLabel")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payroll_run_company_id_period_label");
+
+                    b.ToTable("payroll_run", "hr");
+                });
+
             modelBuilder.Entity("One4All.Core.Payroll.Payslip", b =>
                 {
                     b.Property<long>("Id")
@@ -12436,6 +12514,315 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_payslip_line_payslip_id");
 
                     b.ToTable("payslip_line", "pay");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.SchemeMembership", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<DateOnly>("JoinedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("joined_on");
+
+                    b.Property<DateOnly?>("LeftOn")
+                        .HasColumnType("date")
+                        .HasColumnName("left_on");
+
+                    b.Property<string>("MemberNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("member_number");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SchemeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("scheme_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_scheme_membership");
+
+                    b.HasIndex("EmployeeId")
+                        .HasDatabaseName("ix_scheme_membership_employee_id");
+
+                    b.HasIndex("SchemeId", "EmployeeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_scheme_membership_scheme_id_employee_id")
+                        .HasFilter("left_on IS NULL");
+
+                    b.ToTable("scheme_membership", "hr");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.SchemeRemittance", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("PaidOn")
+                        .HasColumnType("date")
+                        .HasColumnName("paid_on");
+
+                    b.Property<string>("PeriodLabel")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("period_label");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SchemeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("scheme_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_scheme_remittance");
+
+                    b.HasIndex("SchemeId", "PeriodLabel")
+                        .HasDatabaseName("ix_scheme_remittance_scheme_id_period_label");
+
+                    b.ToTable("scheme_remittance", "hr");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.StatutoryScheme", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("EmployeeElementCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("employee_element_code");
+
+                    b.Property<string>("EmployerElementCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("employer_element_code");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("provider");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_statutory_scheme");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_statutory_scheme_company_id_code");
+
+                    b.ToTable("statutory_scheme", "hr");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.TaxBand", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("From")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("from");
+
+                    b.Property<decimal>("RatePercent")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)")
+                        .HasColumnName("rate_percent");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("TaxTableId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("tax_table_id");
+
+                    b.Property<decimal?>("To")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("to");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tax_band");
+
+                    b.HasIndex("TaxTableId")
+                        .HasDatabaseName("ix_tax_band_tax_table_id");
+
+                    b.ToTable("tax_band", "hr");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.TaxTable", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tax_table");
+
+                    b.HasIndex("CompanyId", "Code", "EffectiveFrom")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tax_table_company_id_code_effective_from");
+
+                    b.ToTable("tax_table", "hr");
                 });
 
             modelBuilder.Entity("One4All.Core.Pos.PosTerminal", b =>
@@ -22025,6 +22412,43 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_payslip_line_payslips_payslip_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.SchemeMembership", b =>
+                {
+                    b.HasOne("One4All.Core.Payroll.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_scheme_membership_employee_employee_id");
+
+                    b.HasOne("One4All.Core.Payroll.StatutoryScheme", null)
+                        .WithMany()
+                        .HasForeignKey("SchemeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_scheme_membership_statutory_scheme_scheme_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.SchemeRemittance", b =>
+                {
+                    b.HasOne("One4All.Core.Payroll.StatutoryScheme", null)
+                        .WithMany()
+                        .HasForeignKey("SchemeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_scheme_remittance_statutory_scheme_scheme_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.TaxBand", b =>
+                {
+                    b.HasOne("One4All.Core.Payroll.TaxTable", null)
+                        .WithMany("Bands")
+                        .HasForeignKey("TaxTableId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tax_band_tax_table_tax_table_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Pos.SaleLine", b =>
                 {
                     b.HasOne("One4All.Core.Pos.Sale", null)
@@ -22667,6 +23091,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Payroll.Payslip", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.TaxTable", b =>
+                {
+                    b.Navigation("Bands");
                 });
 
             modelBuilder.Entity("One4All.Core.Pos.Sale", b =>

@@ -86,5 +86,37 @@ public static class PayrollReports
             [("AsAtDate", ParameterType.Date)]);
         yield return Listing("PR68", "Ghost Worker Investigation Pack", "Payroll", "Active employees sharing a bank account, wallet or national ID with another, with no ID, or with no leave in over a year.",
             "PyrlGhosts", [new Column("Employee", "Employee", 160), new Column("Department", "Department", 90), new Column("Engaged", "Engaged", 75), new Column("Signals", "Signals", 360)], [("AsAtDate", ParameterType.Date)]);
+
+        // Runs, schemes and tax.
+        yield return Listing("PR7", "Payroll Run Control Register", "Payroll", "Every payroll run in the period: employees, gross, deductions, net, the journal and who ran it.",
+            "PyrlRuns", [new Column("Period", "Period", 70), new Column("PayDate", "Pay date", 75), new Column("Employees", "Employees", 65), new Column("Gross", "Gross", 95), new Column("Deductions", "Deductions", 95),
+             new Column("Journal", "Journal", 100), new Column("RunBy", "Run by", 90), new Column("Net", "Net", 100, true)], Period);
+        yield return Listing("PR19", "Third-Party Remittance Schedules", "Payroll", "Per scheme and member for the period: the employee's deduction and the employer's contribution — the schedule each provider needs.",
+            "PyrlSchemes", [new Column("Scheme", "Scheme", 110), new Column("Employee", "Employee", 160), new Column("Member", "Member no.", 90), new Column("EmployeePart", "Employee", 90),
+             new Column("EmployerPart", "Employer", 90), new Column("Total", "Total", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("SchemeCode", ParameterType.String)]);
+        yield return Listing("PR20", "Deductions vs Remittances", "Payroll", "Per scheme and period: what the payroll deducted and contributed against what was paid over, with the gap.",
+            "PyrlRemittances", [new Column("Scheme", "Scheme", 120), new Column("Period", "Period", 70), new Column("Deducted", "Deducted + contributed", 120), new Column("Remitted", "Remitted", 100),
+             new Column("Status", "Status", 90), new Column("Outstanding", "Outstanding", 100, true)], Period);
+        yield return Listing("PR27", "PAYE Remittance Return", "Payroll", "Per month: employees, taxable earnings, PAYE deducted and PAYE by the tax table in force, with any difference.",
+            "PyrlPayeReturn", [new Column("Month", "Month", 70), new Column("Employees", "Employees", 65), new Column("Taxable", "Taxable", 100), new Column("ByTable", "Per tax table", 100), new Column("Difference", "Difference", 90),
+             new Column("Deducted", "PAYE deducted", 100, true)], Period);
+        yield return Listing("PR28", "Annual Tax Certificates", "Payroll", "Per employee for the year: ID and tax numbers, gross, taxable, pension contributions and PAYE — the certificate data.",
+            "PyrlCertificates", [new Column("Employee", "Employee", 160), new Column("NationalId", "National ID", 100), new Column("TaxNumber", "Tax no.", 80), new Column("Gross", "Gross", 95), new Column("Taxable", "Taxable", 95),
+             new Column("Pension", "Pension", 85), new Column("Paye", "PAYE", 95, true)], Period);
+        yield return Listing("PR30", "Social Security Contribution Schedule", "Payroll", "Social security members with the period's employee and employer contributions.",
+            "PyrlSchemeSocial", [new Column("Scheme", "Scheme", 110), new Column("Employee", "Employee", 160), new Column("Member", "Member no.", 90), new Column("EmployeePart", "Employee", 90),
+             new Column("EmployerPart", "Employer", 90), new Column("Total", "Total", 95, true)], Period);
+        yield return Listing("PR31", "Pension Fund Contribution Schedule", "Payroll", "Pension fund members with the period's employee and employer contributions.",
+            "PyrlSchemePension", [new Column("Scheme", "Scheme", 110), new Column("Employee", "Employee", 160), new Column("Member", "Member no.", 90), new Column("EmployeePart", "Employee", 90),
+             new Column("EmployerPart", "Employer", 90), new Column("Total", "Total", 95, true)], Period);
+        yield return Listing("PR32", "Medical Aid Contribution Schedule", "Payroll", "Medical aid members with the period's employee and employer contributions.",
+            "PyrlSchemeMedical", [new Column("Scheme", "Scheme", 110), new Column("Employee", "Employee", 160), new Column("Member", "Member no.", 90), new Column("EmployeePart", "Employee", 90),
+             new Column("EmployerPart", "Employer", 90), new Column("Total", "Total", 95, true)], Period);
+        yield return Listing("PR33", "Workers' Compensation & Skills Levy Schedule", "Payroll", "Workers' compensation and skills levy contributions for the period by member.",
+            "PyrlSchemeLevy", [new Column("Scheme", "Scheme", 110), new Column("Employee", "Employee", 160), new Column("Member", "Member no.", 90), new Column("EmployeePart", "Employee", 90),
+             new Column("EmployerPart", "Employer", 90), new Column("Total", "Total", 95, true)], Period);
+        yield return Listing("PR36", "Tax Table in Force", "Payroll", "The PAYE bands that apply at the date, with the tax at the top of each band.",
+            "PyrlTaxTable", [new Column("Table", "Table", 80), new Column("Effective", "Effective", 75), new Column("From", "From", 90), new Column("To", "To", 90), new Column("Rate", "Rate %", 60),
+             new Column("Cumulative", "Tax at band top", 100)], [("AsAtDate", ParameterType.Date)]);
     }
 }

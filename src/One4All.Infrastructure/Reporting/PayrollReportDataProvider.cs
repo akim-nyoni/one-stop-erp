@@ -62,6 +62,16 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLBANKCHANGES" => await BankChangesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLEXPIRIES" => await ExpiriesAsync(companyId, asAt, ct).ConfigureAwait(false),
             "PYRLGHOSTS" => await GhostsAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "PYRLRUNS" => await RunsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLSCHEMES" => await SchemeScheduleAsync(companyId, fromDate, toDate, _ => true, Text(parameters, "SchemeCode"), ct).ConfigureAwait(false),
+            "PYRLSCHEMESOCIAL" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.SocialSecurity, null, ct).ConfigureAwait(false),
+            "PYRLSCHEMEPENSION" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.Pension, null, ct).ConfigureAwait(false),
+            "PYRLSCHEMEMEDICAL" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k == SchemeKind.MedicalAid, null, ct).ConfigureAwait(false),
+            "PYRLSCHEMELEVY" => await SchemeScheduleAsync(companyId, fromDate, toDate, k => k is SchemeKind.WorkersCompensation or SchemeKind.SkillsLevy, null, ct).ConfigureAwait(false),
+            "PYRLREMITTANCES" => await RemittancesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLPAYERETURN" => await PayeReturnAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLCERTIFICATES" => await CertificatesAsync(companyId, toDate, ct).ConfigureAwait(false),
+            "PYRLTAXTABLE" => await TaxTableAsync(companyId, asAt, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -447,6 +457,96 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         return [.. EmployeeChecks.GhostSignals(await FactsAsync(companyId, ct).ConfigureAwait(false), asAt).OrderBy(s => Name(employees, s.Key), StringComparer.Ordinal)
             .Select(s => Row(("Employee", Name(employees, s.Key)), ("Department", employees[s.Key].Department ?? "—"), ("Engaged", Date(employees[s.Key].EngagementDate)), ("Signals", string.Join("; ", s.Value))))];
     }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RunsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        return [.. (await _db.Set<PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == companyId && r.PayDate >= fromDate && r.PayDate <= toDate).OrderBy(r => r.PayDate).ToListAsync(ct).ConfigureAwait(false))
+            .Select(r => Row(("Period", r.PeriodLabel), ("PayDate", Date(r.PayDate)), ("Employees", r.Employees), ("Gross", Money(r.Gross)), ("Deductions", Money(r.Deductions)), ("Journal", r.JournalNumber),
+                ("RunBy", r.CreatedByUserId == 0 ? "system" : users.GetValueOrDefault(r.CreatedByUserId, $"user {r.CreatedByUserId}")), ("Net", r.Net)))];
+    }
+
+    // Each member's lines on the scheme's employee and employer elements in the period.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SchemeScheduleAsync(long companyId, DateOnly fromDate, DateOnly toDate, Func<SchemeKind, bool> kind, string? schemeCode, CancellationToken ct)
+    {
+        List<StatutoryScheme> schemes = [.. (await _db.Set<StatutoryScheme>().AsNoTracking().Where(s => s.CompanyId == companyId).OrderBy(s => s.Code).ToListAsync(ct).ConfigureAwait(false))
+            .Where(s => kind(s.Kind) && (schemeCode == null || s.Code == schemeCode.ToUpperInvariant()))];
+        List<long> ids = [.. schemes.Select(s => s.Id)];
+        List<SchemeMembership> members = await _db.Set<SchemeMembership>().AsNoTracking().Where(m => ids.Contains(m.SchemeId) && m.JoinedOn <= toDate && (m.LeftOn == null || m.LeftOn >= fromDate))
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<Payslip> slips = await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        decimal Sum(long employeeId, string? element) => element is null ? 0m : slips.Where(p => p.EmployeeId == employeeId).SelectMany(p => p.Lines).Where(l => l.ElementCode == element).Sum(l => l.Amount);
+        return [.. schemes.SelectMany(s => members.Where(m => m.SchemeId == s.Id).OrderBy(m => Name(employees, m.EmployeeId), StringComparer.Ordinal).Select(m =>
+        {
+            decimal own = Sum(m.EmployeeId, s.EmployeeElementCode), employer = Sum(m.EmployeeId, s.EmployerElementCode);
+            return Row(("Scheme", $"{s.Code} {s.Name}"), ("Employee", Name(employees, m.EmployeeId)), ("Member", m.MemberNumber), ("EmployeePart", Money(own)), ("EmployerPart", Money(employer)), ("Total", own + employer));
+        }))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RemittancesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<StatutoryScheme> schemes = await _db.Set<StatutoryScheme>().AsNoTracking().Where(s => s.CompanyId == companyId).OrderBy(s => s.Code).ToListAsync(ct).ConfigureAwait(false);
+        List<Payslip> slips = await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
+        List<string> periods = [.. slips.Select(p => p.PeriodLabel).Distinct().Order(StringComparer.Ordinal)];
+        List<SchemeRemittance> remittances = await _db.Set<SchemeRemittance>().AsNoTracking().Where(r => r.CompanyId == companyId && periods.Contains(r.PeriodLabel)).ToListAsync(ct).ConfigureAwait(false);
+        return [.. schemes.SelectMany(s => periods.Select(period =>
+        {
+            decimal due = slips.Where(p => p.PeriodLabel == period).SelectMany(p => p.Lines).Where(l => l.ElementCode == s.EmployeeElementCode || l.ElementCode == s.EmployerElementCode).Sum(l => l.Amount);
+            decimal paid = remittances.Where(r => r.SchemeId == s.Id && r.PeriodLabel == period).Sum(r => r.Amount);
+            return (Scheme: s, Period: period, Due: due, Paid: paid);
+        })).Where(x => x.Due != 0m || x.Paid != 0m)
+            .Select(x => Row(("Scheme", $"{x.Scheme.Code} {x.Scheme.Name}"), ("Period", x.Period), ("Deducted", Money(x.Due)), ("Remitted", Money(x.Paid)),
+                ("Status", x.Paid == x.Due ? "Remitted" : x.Paid == 0m ? "Not remitted" : x.Paid < x.Due ? "Part remitted" : "Over remitted"), ("Outstanding", x.Due - x.Paid)))];
+    }
+
+    private async Task<List<TaxTable>> TaxTablesAsync(long companyId, CancellationToken ct)
+        => await _db.Set<TaxTable>().AsNoTracking().Include(t => t.Bands).Where(t => t.CompanyId == companyId).OrderBy(t => t.EffectiveFrom).ToListAsync(ct).ConfigureAwait(false);
+
+    private static TaxTable? InForce(List<TaxTable> tables, DateOnly date) => tables.LastOrDefault(t => t.EffectiveFrom <= date);
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PayeReturnAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<TaxTable> tables = await TaxTablesAsync(companyId, ct).ConfigureAwait(false);
+        return [.. (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).GroupBy(p => p.PayDate.ToString("yyyy-MM", CultureInfo.InvariantCulture)).OrderBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g =>
+            {
+                decimal taxable = g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount);
+                decimal deducted = g.SelectMany(p => p.Lines).Where(IsTax).Sum(l => l.Amount);
+                decimal? byTable = g.All(p => InForce(tables, p.PayDate) is not null)
+                    ? g.Sum(p => PayeTable.Tax(InForce(tables, p.PayDate)!.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), p.Lines.Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount)))
+                    : null;
+                return Row(("Month", g.Key), ("Employees", g.Select(p => p.EmployeeId).Distinct().Count()), ("Taxable", Money(taxable)), ("ByTable", byTable is decimal t ? Money(t) : "no table"),
+                    ("Difference", byTable is decimal d ? Money(deducted - d) : "—"), ("Deducted", deducted));
+            })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CertificatesAsync(long companyId, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        HashSet<string> pension = [.. await _db.Set<StatutoryScheme>().AsNoTracking().Where(s => s.CompanyId == companyId && s.Kind == SchemeKind.Pension && s.EmployeeElementCode != null)
+            .Select(s => s.EmployeeElementCode!).ToListAsync(ct).ConfigureAwait(false)];
+        return [.. (await PayslipsAsync(companyId, new DateOnly(toDate.Year, 1, 1), toDate, ct).ConfigureAwait(false)).GroupBy(p => p.EmployeeId).OrderBy(g => Name(employees, g.Key), StringComparer.Ordinal)
+            .Select(g => Row(("Employee", Name(employees, g.Key)), ("NationalId", employees.GetValueOrDefault(g.Key)?.NationalIdNumber ?? "MISSING"), ("TaxNumber", employees.GetValueOrDefault(g.Key)?.TaxNumber ?? "MISSING"),
+                ("Gross", Money(g.Sum(p => p.GrossEarnings))), ("Taxable", Money(g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount))),
+                ("Pension", Money(g.SelectMany(p => p.Lines).Where(l => pension.Contains(l.ElementCode)).Sum(l => l.Amount))), ("Paye", g.SelectMany(p => p.Lines).Where(IsTax).Sum(l => l.Amount))))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TaxTableAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        TaxTable? table = InForce(await TaxTablesAsync(companyId, ct).ConfigureAwait(false), asAt);
+        if (table is null)
+        {
+            return [];
+        }
+
+        List<PayeBand> bands = [.. table.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent))];
+        return [.. bands.Select(b => Row(("Table", table.Code), ("Effective", Date(table.EffectiveFrom)), ("From", Money(b.From)), ("To", b.To is decimal to ? Money(to) : "and above"),
+            ("Rate", b.RatePercent.ToString("0.##", CultureInfo.InvariantCulture)), ("Cumulative", b.To is decimal top ? Money(PayeTable.Tax(bands, top)) : "—")))];
+    }
+
+    private static string? Text(IReadOnlyDictionary<string, object?> parameters, string name)
+        => parameters.TryGetValue(name, out object? value) && value is string text && text.Trim().Length > 0 ? text.Trim() : null;
 
     private Task<Dictionary<string, string>> AccountNamesAsync(long companyId, CancellationToken ct)
         => _db.Accounts.AsNoTracking().IgnoreQueryFilters().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AccountCode, a => a.Name, ct);

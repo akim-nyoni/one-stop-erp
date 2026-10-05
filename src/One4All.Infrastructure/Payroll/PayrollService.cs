@@ -190,6 +190,7 @@ public sealed class PayrollService : IPayrollService
             return posted.Error;
         }
 
+        _db.Set<PayrollRunRecord>().Add(new PayrollRunRecord(companyId, periodLabel, payDate, employees.Count, totalGross, totalDeductions, totalNet, posted.Value.JournalNumber));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new PayrollRunResult(employees.Count, totalGross, totalDeductions, totalNet, posted.Value.JournalNumber);
     }

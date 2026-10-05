@@ -54,6 +54,15 @@ public sealed class PayrollReportsTests
         casual.HoldSalary("Pending verification");
         db.Employees.AddRange(employee, casual);
         await db.SaveChangesAsync();
+        StatutoryScheme fund = new(companyId, "PEN", "Pension Fund", SchemeKind.Pension, "Fund Administrators", "PENSION", null);
+        db.Add(fund);
+        TaxTable table = new(companyId, "TAX26", new DateOnly(2026, 1, 1));
+        table.AddBand(0m, 1000m, 0m);
+        table.AddBand(1000m, null, 20m);
+        db.Add(table);
+        await db.SaveChangesAsync();
+        db.AddRange(new SchemeMembership(companyId, fund.Id, employee.Id, "PF-77", new DateOnly(2025, 1, 1)), new SchemeRemittance(companyId, fund.Id, "2026-01", 100m, new DateOnly(2026, 2, 5), "FUND-JAN"));
+        await db.SaveChangesAsync();
         (await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-01", new DateOnly(2026, 1, 25), "2420", "PRR-2026-01")).IsSuccess.Should().BeTrue();
 
         IReportRunner runner = scope.ServiceProvider.GetRequiredService<IReportRunner>();
@@ -80,6 +89,13 @@ public sealed class PayrollReportsTests
         (await Render("PR48")).Should().Contain("G3,1,1,0,0").And.Contain("G1,1,0,0,1");
         (await Render("PR51")).Should().Contain("Contract end,PR-EMP Pat Payee,—,2026-03-15,in 43 days");
         (await Render("PR68")).Should().Contain("PR-EMP2 Casey Casual,—,2026-01-05,No national ID");
+
+        (await Render("PR7")).Should().Contain("2026-01,2026-01-25,2,\"3,500.00\",280.00,JNL-");
+        (await Render("PR19")).Should().Contain("PEN Pension Fund,PR-EMP Pat Payee,PF-77,100.00,0.00,100");
+        (await Render("PR20")).Should().Contain("PEN Pension Fund,2026-01,100.00,100.00,Remitted,0");
+        (await Render("PR27")).Should().Contain("2026-01,2,\"3,500.00\",300.00,-120.00,180"); // the formula relieves pension; the table does not
+        (await Render("PR31")).Should().Contain("PEN Pension Fund,PR-EMP Pat Payee,PF-77,100.00,0.00,100");
+        (await Render("PR36")).Should().Contain("TAX26,2026-01-01,0.00,\"1,000.00\",0,0.00").And.Contain("and above");
 
         foreach (string code in PayrollReports.All().Select(r => r.Code))
         {

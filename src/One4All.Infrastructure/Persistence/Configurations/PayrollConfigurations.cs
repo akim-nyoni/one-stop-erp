@@ -119,3 +119,88 @@ internal sealed class EmployeeLeaveBalanceConfiguration : IEntityTypeConfigurati
         b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.LeaveType }).IsUnique();
     }
 }
+
+internal sealed class StatutorySchemeConfiguration : IEntityTypeConfiguration<StatutoryScheme>
+{
+    public void Configure(EntityTypeBuilder<StatutoryScheme> b)
+    {
+        b.ToTable("statutory_scheme", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(150);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Provider).HasMaxLength(150);
+        b.Property(x => x.EmployeeElementCode).HasMaxLength(30);
+        b.Property(x => x.EmployerElementCode).HasMaxLength(30);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class SchemeMembershipConfiguration : IEntityTypeConfiguration<SchemeMembership>
+{
+    public void Configure(EntityTypeBuilder<SchemeMembership> b)
+    {
+        b.ToTable("scheme_membership", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.MemberNumber).HasMaxLength(40);
+        b.HasOne<StatutoryScheme>().WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<Employee>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+
+        // One open membership per employee per scheme.
+        b.HasIndex(x => new { x.SchemeId, x.EmployeeId }).IsUnique().HasFilter("left_on IS NULL");
+    }
+}
+
+internal sealed class SchemeRemittanceConfiguration : IEntityTypeConfiguration<SchemeRemittance>
+{
+    public void Configure(EntityTypeBuilder<SchemeRemittance> b)
+    {
+        b.ToTable("scheme_remittance", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PeriodLabel).HasMaxLength(20);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.HasOne<StatutoryScheme>().WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.SchemeId, x.PeriodLabel });
+    }
+}
+
+internal sealed class TaxTableConfiguration : IEntityTypeConfiguration<TaxTable>
+{
+    public void Configure(EntityTypeBuilder<TaxTable> b)
+    {
+        b.ToTable("tax_table", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.HasMany(x => x.Bands).WithOne().HasForeignKey(x => x.TaxTableId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Bands).UsePropertyAccessMode(PropertyAccessMode.Field).HasField("_bands");
+        b.HasIndex(x => new { x.CompanyId, x.Code, x.EffectiveFrom }).IsUnique();
+    }
+}
+
+internal sealed class TaxBandConfiguration : IEntityTypeConfiguration<TaxBand>
+{
+    public void Configure(EntityTypeBuilder<TaxBand> b)
+    {
+        b.ToTable("tax_band", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.From).HasPrecision(19, 4);
+        b.Property(x => x.To).HasPrecision(19, 4);
+        b.Property(x => x.RatePercent).HasPrecision(7, 4);
+    }
+}
+
+internal sealed class PayrollRunRecordConfiguration : IEntityTypeConfiguration<PayrollRunRecord>
+{
+    public void Configure(EntityTypeBuilder<PayrollRunRecord> b)
+    {
+        b.ToTable("payroll_run", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PeriodLabel).HasMaxLength(20);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+        b.Property(x => x.Gross).HasPrecision(19, 4);
+        b.Property(x => x.Deductions).HasPrecision(19, 4);
+        b.Property(x => x.Net).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.PeriodLabel }).IsUnique();
+    }
+}
