@@ -100,6 +100,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Accounts Payable additions (brief §14 C, AP + item number).
+        foreach (ReportDefinition definition in PayablesReports.All())
+        {
+            yield return definition;
+        }
+
         // Procurement additions (brief §14 G, PO + item number).
         foreach (ReportDefinition definition in ProcurementReports.All())
         {

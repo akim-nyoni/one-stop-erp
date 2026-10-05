@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-270 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+280 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -239,6 +239,16 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | AP-DUE | Payments Due | Outstanding supplier invoices ordered by due date, with days until due (negative when overdue). | AsAtDate (Date, optional) | SupplierCode, SupplierName, DocumentNumber, DueDate, DaysUntilDue, Outstanding | — | Sum(Outstanding) |
 | AP-RECUR | Recurring Purchases | Standing recurring supplier-invoice templates with amount, tax, interval, next run date and active flag. | — | Reference, Supplier, NetAmount, TaxAmount, IntervalMonths, NextRunDate, Active | — | Sum(IntervalMonths) |
 | AP-SUP | Supplier Register | Supplier master: code, name, currency, payment terms and on-hold flag. | — | Code, Name, Currency, TermsDays, OnHold | — | Sum(TermsDays) |
+| AP53 | Supplier Ledger | One supplier's documents in date order with running balance and what is still outstanding on each. | SupplierCode (String, optional) | Date, Type, Document, Due, Debit, Credit, Balance, Outstanding | — | Sum(Outstanding) |
+| AP54 | Purchase Day Book | Supplier invoices, credit notes and debit notes posted in the period, in transaction and base currency. | FromDate (Date, optional), ToDate (Date, optional) | Date, Document, Type, Supplier, Currency, Transaction, Base | — | Sum(Base) |
+| AP58 | Payments Made | Payments to suppliers in the period (payment runs and single payments) with tax withheld. | FromDate (Date, optional), ToDate (Date, optional) | Date, Document, Supplier, Currency, Transaction, Withheld, Base | — | Sum(Base) |
+| AP59 | Goods Received Not Invoiced (GRNI) | Order lines received but not yet invoiced: the GRNI accrual by order and item, with its age. | AsAtDate (Date, optional) | Order, Supplier, Item, Received, Invoiced, Price, LastReceipt, Days, Value | — | Sum(Value) |
+| AP60 | Invoice Matching Exceptions | Supplier invoices disputed against their order: reason, status and resolution. | — | Invoice, Date, Supplier, Order, Reason, Status, Resolution, Value | — | Sum(Value) |
+| AP62 | Withholding Tax Deducted | Tax withheld from supplier payments in the period, by certificate, and whether it has been remitted. | FromDate (Date, optional), ToDate (Date, optional) | Certificate, Supplier, Payment, Date, Tax, Rate, Gross, Remitted, Withheld | — | Sum(Withheld) |
+| AP63 | Supplier Performance Scorecard | Per supplier in the period: deliveries, on time, quantity received and returned, quality and spend. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Deliveries, OnTime, Received, Returned, Quality, Spend | — | Sum(Spend) |
+| AP64 | Supplier Balances (with debit balances) | What is owed to each supplier at the date; suppliers in debit (owing us) flagged, with hold and blacklist status. | AsAtDate (Date, optional) | Supplier, Currency, Flag, Status, Balance | — | Sum(Balance) |
+| AP65 | Supplier Bank Detail Change Audit | Every request to change a supplier's bank details: who asked, who reviewed, outcome (account numbers masked). | — | Requested, Supplier, RequestedBy, NewDetails, Status, ReviewedBy, Reason | — | — |
+| AP66 | Top Suppliers & Concentration | Suppliers ranked by net purchases in the period, with share and cumulative share. | FromDate (Date, optional), ToDate (Date, optional) | Rank, Supplier, Documents, Share, Cumulative, Purchases | — | Sum(Purchases) |
 | PO124 | Requisition Approval Turnaround | Requisitions in the period with who approved them and how many days it took. | FromDate (Date, optional), ToDate (Date, optional) | Requisition, Supplier, Requested, Status, Approver, Approved, Days, Value | — | Sum(Value) |
 | PO125 | Approval History / Authorisation Audit | Every workflow action in the period: document, stage, who, what and when, with the document value. | FromDate (Date, optional), ToDate (Date, optional) | When, Document, Reference, Stage, User, Action, Comment, Value | — | Sum(Value) |
 | PO126 | Purchase Order Listing | Every order in the period with status, required-by date, overdue flag and the value still to be received. | FromDate (Date, optional), ToDate (Date, optional), AsAtDate (Date, optional) | Order, Date, Supplier, Status, RequiredBy, Overdue, Currency, Ordered, Received, Outstanding | — | Sum(Outstanding) |

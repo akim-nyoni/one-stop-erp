@@ -27,7 +27,8 @@ missing domain data. Items are struck through as they ship (with the report code
 - Needs new data: 28 (parent / child customers), 37 reason codes
 
 ## C. Accounts Payable
-- Data exists: 53–55, 57 run listing, 58–60, 62 WHT return, 63, 64–66, 67 layouts (requisition, GRN, debit note)
+- ~~53 Supplier Ledger (AP53)~~, ~~54 Purchase Day Book (AP54)~~, ~~57 / 58 Payments Made incl. runs (AP58)~~, ~~59 GRNI (AP59)~~, ~~60 Matching Exceptions (AP60)~~, ~~62 WHT Deducted (AP62)~~, ~~63 Scorecard (AP63)~~, ~~64 Balances with debit flags (AP64)~~, ~~65 Bank Detail Change Audit (AP65)~~, ~~66 Top Suppliers (AP66)~~
+- Data exists: 55 purchase analysis by item, 67 layouts (requisition, GRN, debit note)
 - Needs new data: 61 (supplier's own statement capture), cheque entity
 
 ## D. Cash Book / Treasury
