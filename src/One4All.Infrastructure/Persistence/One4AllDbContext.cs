@@ -230,6 +230,15 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the job timesheets.</summary>
     public DbSet<Core.JobCosting.JobTimesheet> JobTimesheets => Set<Core.JobCosting.JobTimesheet>();
 
+    /// <summary>Gets the subcontracts.</summary>
+    public DbSet<Core.JobCosting.Subcontract> Subcontracts => Set<Core.JobCosting.Subcontract>();
+
+    /// <summary>Gets the plant register.</summary>
+    public DbSet<Core.JobCosting.PlantItem> PlantItems => Set<Core.JobCosting.PlantItem>();
+
+    /// <summary>Gets the plant hours and running costs.</summary>
+    public DbSet<Core.JobCosting.PlantLog> PlantLogs => Set<Core.JobCosting.PlantLog>();
+
     /// <summary>Interim payment certificates.</summary>
     public DbSet<Core.JobCosting.ProgressCertificate> ProgressCertificates => Set<Core.JobCosting.ProgressCertificate>();
 

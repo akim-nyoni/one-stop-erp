@@ -47,9 +47,17 @@ public static class OperationsReports
         yield return Listing("JC191", "Variation Order Register", "JobCosting", "Every variation submitted in the period: contract, status, decision, and the value and cost impact (approved impacts move the contract).",
             "OpsVariations", [new Column("Contract", "Contract", 85), new Column("Number", "VO", 70), new Column("Description", "Description", 180), new Column("Submitted", "Submitted", 75), new Column("Status", "Status", 70),
              new Column("Decided", "Decided", 75), new Column("CostImpact", "Cost impact", 90), new Column("ValueImpact", "Value impact", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        yield return Listing("JC192", "Subcontractor Ledger, Certificates & Retention", "JobCosting", "Each subcontract's certificates in the period (gross, retention, payable) and retention released, with value, certified to date and retention held.",
+            "OpsSubcontracts", [new Column("Contract", "Contract", 80), new Column("Subcontractor", "Subcontractor", 130), new Column("Subcontract", "Subcontract", 90), new Column("Document", "Certificate", 80),
+             new Column("Date", "Date", 75), new Column("Gross", "Gross", 85), new Column("Retention", "Retention", 80), new Column("Position", "Certified / value · held", 160), new Column("Payable", "Payable", 90, true)],
+            [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
         yield return Listing("JC193", "Labour & Timesheet Cost by Job", "JobCosting", "Hours and labour cost booked to each contract in the period, per employee and cost head.",
             "OpsTimesheets", [new Column("Contract", "Contract", 85), new Column("Employee", "Employee", 150), new Column("CostHead", "Cost head", 80), new Column("Days", "Days", 45), new Column("Hours", "Hours", 60),
              new Column("Rate", "Avg rate", 70), new Column("Cost", "Cost", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        yield return Listing("JC194", "Plant Utilisation & Hire Recovery", "JobCosting", "Per item of plant over the period: hours worked against hours available, hire recovered from jobs, running costs, cost per hour and the net recovery.",
+            "OpsPlant", [new Column("Plant", "Plant", 70), new Column("Name", "Name", 140), new Column("Hours", "Hours", 55), new Column("Available", "Available", 65), new Column("Utilisation", "Utilisation", 70),
+             new Column("Recovered", "Hire recovered", 90), new Column("Running", "Running cost", 90), new Column("PerHour", "Cost / hour", 75), new Column("Net", "Net recovery", 95, true)],
+            [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("HoursPerDay", ParameterType.Decimal)]);
         yield return Listing("JC196", "BOQ vs Measured Quantities", "JobCosting", "Each bill-of-quantities line: billed quantity, measured to date, the over / under measure and the value of work measured.",
             "OpsBoq", [new Column("Contract", "Contract", 85), new Column("Item", "Item", 60), new Column("Description", "Description", 180), new Column("Unit", "Unit", 40), new Column("Billed", "BOQ qty", 65),
              new Column("Measured", "Measured", 65), new Column("Variance", "Over / (under)", 75), new Column("Complete", "% measured", 65), new Column("Value", "Value measured", 95, true)], []);

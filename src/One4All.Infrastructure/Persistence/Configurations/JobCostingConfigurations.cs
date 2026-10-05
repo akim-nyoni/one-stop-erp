@@ -155,3 +155,64 @@ internal sealed class JobTimesheetConfiguration : IEntityTypeConfiguration<JobTi
         b.HasIndex(x => x.JobContractId);
     }
 }
+
+internal sealed class SubcontractConfiguration : IEntityTypeConfiguration<Subcontract>
+{
+    public void Configure(EntityTypeBuilder<Subcontract> b)
+    {
+        b.ToTable("subcontract", Schemas.JobCosting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(40);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.Property(x => x.Value).HasPrecision(19, 4);
+        b.Property(x => x.RetentionPercent).HasPrecision(9, 4);
+        b.Property(x => x.RetentionReleased).HasPrecision(19, 4);
+        b.Ignore(x => x.CertifiedToDate);
+        b.Ignore(x => x.RetentionHeld);
+        b.HasIndex(x => new { x.CompanyId, x.Reference }).IsUnique();
+        b.HasMany(x => x.Certificates).WithOne().HasForeignKey(l => l.SubcontractId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Certificates).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class SubcontractCertificateConfiguration : IEntityTypeConfiguration<SubcontractCertificate>
+{
+    public void Configure(EntityTypeBuilder<SubcontractCertificate> b)
+    {
+        b.ToTable("subcontract_certificate", Schemas.JobCosting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Number).HasMaxLength(40);
+        b.Property(x => x.InvoiceNumber).HasMaxLength(80);
+        b.Property(x => x.WorkDoneToDate).HasPrecision(19, 4);
+        b.Property(x => x.Gross).HasPrecision(19, 4);
+        b.Property(x => x.Retention).HasPrecision(19, 4);
+        b.Ignore(x => x.Payable);
+    }
+}
+
+internal sealed class PlantItemConfiguration : IEntityTypeConfiguration<PlantItem>
+{
+    public void Configure(EntityTypeBuilder<PlantItem> b)
+    {
+        b.ToTable("plant_item", Schemas.JobCosting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.HireRatePerHour).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class PlantLogConfiguration : IEntityTypeConfiguration<PlantLog>
+{
+    public void Configure(EntityTypeBuilder<PlantLog> b)
+    {
+        b.ToTable("plant_log", Schemas.JobCosting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Hours).HasPrecision(9, 2);
+        b.Property(x => x.HireCharge).HasPrecision(19, 4);
+        b.Property(x => x.RunningCost).HasPrecision(19, 4);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.HasIndex(x => new { x.PlantItemId, x.Date });
+    }
+}

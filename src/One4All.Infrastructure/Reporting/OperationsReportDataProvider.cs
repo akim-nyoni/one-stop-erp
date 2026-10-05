@@ -44,6 +44,9 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             "OPSRETENTION" => await RetentionAsync(companyId, ct).ConfigureAwait(false),
             "OPSVARIATIONS" => await VariationsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "OPSTIMESHEETS" => await TimesheetsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "OPSSUBCONTRACTS" => await SubcontractsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "OPSPLANT" => await PlantAsync(companyId, fromDate, toDate,
+                parameters.TryGetValue("HoursPerDay", out object? perDay) && perDay is not null and not "" ? Convert.ToDecimal(perDay, CultureInfo.InvariantCulture) : 8m, ct).ConfigureAwait(false),
             "OPSBOQ" => await BoqAsync(companyId, ct).ConfigureAwait(false),
             "OPSCONTRACTCASH" => await ContractCashAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "OPSOPENORDERS" => await OpenOrdersAsync(companyId, ct).ConfigureAwait(false),
@@ -205,6 +208,49 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
                 return Row(("Contract", contracts.GetValueOrDefault(g.Key.JobContractId, "?")), ("Employee", employees.GetValueOrDefault(g.Key.EmployeeId, "?")), ("CostHead", g.Key.CostHead),
                     ("Days", g.Select(t => t.Date).Distinct().Count()), ("Hours", hours.ToString("0.##", CultureInfo.InvariantCulture)), ("Rate", hours == 0m ? "—" : Money(cost / hours)), ("Cost", cost));
             })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SubcontractsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, string> contracts = await ContractNumbersAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
+        List<Core.JobCosting.Subcontract> subcontracts = await _db.Subcontracts.AsNoTracking().Include(s => s.Certificates).Where(s => s.CompanyId == companyId).OrderBy(s => s.Reference).ToListAsync(ct).ConfigureAwait(false);
+        List<string> releaseRefs = [.. subcontracts.Select(s => s.Reference)];
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (Core.JobCosting.Subcontract s in subcontracts)
+        {
+            string position = $"{Money(s.CertifiedToDate)} / {Money(s.Value)} · held {Money(s.RetentionHeld)}";
+            foreach (Core.JobCosting.SubcontractCertificate c in s.Certificates.Where(c => c.Date >= fromDate && c.Date <= toDate).OrderBy(c => c.Date).ThenBy(c => c.Number, StringComparer.Ordinal))
+            {
+                rows.Add(Row(("Contract", contracts.GetValueOrDefault(s.JobContractId, "?")), ("Subcontractor", suppliers.GetValueOrDefault(s.SupplierId, "?")), ("Subcontract", s.Reference), ("Document", c.Number),
+                    ("Date", Date(c.Date)), ("Gross", Money(c.Gross)), ("Retention", Money(c.Retention)), ("Position", position), ("Payable", c.Payable)));
+            }
+
+            if (s.RetentionReleased != 0m)
+            {
+                rows.Add(Row(("Contract", contracts.GetValueOrDefault(s.JobContractId, "?")), ("Subcontractor", suppliers.GetValueOrDefault(s.SupplierId, "?")), ("Subcontract", s.Reference), ("Document", "Release"),
+                    ("Date", "—"), ("Gross", "—"), ("Retention", Money(-s.RetentionReleased)), ("Position", position), ("Payable", s.RetentionReleased)));
+            }
+        }
+
+        return rows;
+    }
+
+    // Available hours: the weekdays in the period times the working hours per day.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PlantAsync(long companyId, DateOnly fromDate, DateOnly toDate, decimal hoursPerDay, CancellationToken ct)
+    {
+        int weekdays = Enumerable.Range(0, toDate.DayNumber - fromDate.DayNumber + 1).Select(fromDate.AddDays).Count(d => d.DayOfWeek is not DayOfWeek.Saturday and not DayOfWeek.Sunday);
+        decimal available = weekdays * hoursPerDay;
+        List<Core.JobCosting.PlantItem> plant = await _db.PlantItems.AsNoTracking().Where(p => p.CompanyId == companyId).OrderBy(p => p.Code).ToListAsync(ct).ConfigureAwait(false);
+        List<Core.JobCosting.PlantLog> logs = await _db.PlantLogs.AsNoTracking().Where(l => l.CompanyId == companyId && l.Date >= fromDate && l.Date <= toDate).ToListAsync(ct).ConfigureAwait(false);
+        return [.. plant.Select(p =>
+        {
+            List<Core.JobCosting.PlantLog> own = [.. logs.Where(l => l.PlantItemId == p.Id)];
+            decimal hours = own.Sum(l => l.Hours), recovered = own.Sum(l => l.HireCharge), running = own.Sum(l => l.RunningCost);
+            return Row(("Plant", p.Code), ("Name", p.Name), ("Hours", hours.ToString("0.##", CultureInfo.InvariantCulture)), ("Available", available.ToString("0.##", CultureInfo.InvariantCulture)),
+                ("Utilisation", available == 0m ? "—" : (hours * 100m / available).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Recovered", Money(recovered)), ("Running", Money(running)),
+                ("PerHour", hours == 0m ? "—" : Money(running / hours)), ("Net", recovered - running));
+        })];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BoqAsync(long companyId, CancellationToken ct)

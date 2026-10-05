@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-450 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+452 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -249,7 +249,9 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | JC189 | Cost to Complete & Forecast Final Cost | Per contract: value, budget, cost to date, % complete by certification, forecast final cost and the variance to budget. | — | Contract, Name, Value, Budget, Actual, Complete, Forecast, Variance | — | Sum(Variance) |
 | JC190 | Retention Held by Contract | Retention held on each contract's certificates, with the contract status. | — | Contract, Name, Customer, Status, Rate, Certified, Retention | — | Sum(Retention) |
 | JC191 | Variation Order Register | Every variation submitted in the period: contract, status, decision, and the value and cost impact (approved impacts move the contract). | FromDate (Date, optional), ToDate (Date, optional) | Contract, Number, Description, Submitted, Status, Decided, CostImpact, ValueImpact | — | Sum(ValueImpact) |
+| JC192 | Subcontractor Ledger, Certificates & Retention | Each subcontract's certificates in the period (gross, retention, payable) and retention released, with value, certified to date and retention held. | FromDate (Date, optional), ToDate (Date, optional) | Contract, Subcontractor, Subcontract, Document, Date, Gross, Retention, Position, Payable | — | Sum(Payable) |
 | JC193 | Labour & Timesheet Cost by Job | Hours and labour cost booked to each contract in the period, per employee and cost head. | FromDate (Date, optional), ToDate (Date, optional) | Contract, Employee, CostHead, Days, Hours, Rate, Cost | — | Sum(Cost) |
+| JC194 | Plant Utilisation & Hire Recovery | Per item of plant over the period: hours worked against hours available, hire recovered from jobs, running costs, cost per hour and the net recovery. | FromDate (Date, optional), ToDate (Date, optional), HoursPerDay (Decimal, optional) | Plant, Name, Hours, Available, Utilisation, Recovered, Running, PerHour, Net | — | Sum(Net) |
 | JC196 | BOQ vs Measured Quantities | Each bill-of-quantities line: billed quantity, measured to date, the over / under measure and the value of work measured. | — | Contract, Item, Description, Unit, Billed, Measured, Variance, Complete, Value | — | Sum(Value) |
 | JC197 | Contract Cash Flow | Per contract over the period: net certified (after retention) against costs incurred, and the net cash position. | FromDate (Date, optional), ToDate (Date, optional) | Contract, Name, Certified, Costs, Net | — | Sum(Net) |
 | JOB-IPC | Progress Certificates | Interim payment certificates with gross, retention and net payable for a period. | FromDate (Date, optional), ToDate (Date, optional) | CertificateNumber, Date, Gross, Retention, Net | — | Sum(Net) |

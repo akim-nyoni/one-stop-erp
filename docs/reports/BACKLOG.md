@@ -64,7 +64,7 @@ missing domain data. Items are struck through as they ship (with the report code
 - ~~186 Job Cost by Head (JC186)~~, ~~189 Cost to Complete (JC189)~~, ~~190 Retention (JC190, no defects date)~~, ~~197 Contract Cash Flow (JC197)~~
 - Data exists: 188 IPC layout; partly 195
 - ~~191 Variation Order Register (JC191)~~, ~~193 Labour & Timesheet Cost (JC193)~~, ~~196 BOQ vs Measured (JC196)~~
-- Needs new data: 192 subcontractors, 194 plant
+- ~~192 Subcontractor Ledger & Retention (JC192)~~, ~~194 Plant Utilisation & Hire Recovery (JC194)~~
 
 ## L. Weighbridge
 - ~~198 Weighbridge Ticket (WB198)~~, ~~199 Daily Register & Tonnage (WB199)~~, ~~200 Vehicle Turnaround (WB200)~~, ~~201 Deliveries by Customer / Site (WB201)~~, ~~202 Manual Weight Overrides (WB202)~~, ~~203 Stockpile Reconciliation (WB203)~~, ~~204 Concrete Batch Report (WB204)~~, ~~205 Haulage Charge Analysis (WB205)~~
