@@ -39,6 +39,45 @@ public static partial class OperationCatalogue
         };
     }
 
+    private static IEnumerable<Operation> WorkflowRules()
+    {
+        const string module = "Approvals";
+        yield return new Operation
+        {
+            Module = module, Title = "Approve or reject several at once", ListTitle = "Waiting on me",
+            Description = "Acts on every listed instance (ids separated by commas); each succeeds or fails on its own.",
+            Fields = [Req("Instances", "Instance ids (1,2,3)"), Pick("Action", "Action", Enum.GetNames<Core.Workflow.WorkflowActionType>()), Opt("Comment", "Comment")],
+            Run = async (c, i) =>
+            {
+                List<long> ids = [.. i.Text("Instances").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(x => long.Parse(x, System.Globalization.CultureInfo.InvariantCulture))];
+                IReadOnlyList<BulkActionResult> results = await c.Get<IWorkflowService>().ActManyAsync(ids, c.UserId, Enum.Parse<Core.Workflow.WorkflowActionType>(i.Text("Action")), i.Optional("Comment"))
+                    .ConfigureAwait(true);
+                return string.Join(Environment.NewLine, results.Select(r => r.Succeeded ? $"{r.InstanceId}: {r.Status}" : $"{r.InstanceId}: not done — {r.Error}"));
+            },
+            List = WaitingOnMeAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Set a stage's rules", ListTitle = "Workflow stages",
+            Description = "A condition (e.g. Department = IT and Value > 5000; ops = != > >= < <= in), a role whose holders approve, and/or the requester's manager.",
+            Fields = [Num("Definition", "Workflow definition id"), Num("Stage", "Stage sequence"), Opt("Condition", "Condition"), Opt("Role", "Approving role"),
+                Pick("Dynamic", "Dynamic approver", Enum.GetNames<Core.Workflow.DynamicApprover>())],
+            Run = async (c, i) => Check(await c.Get<IWorkflowService>().SetStageRulesAsync(c.CompanyId, (long)i.Number("Definition"), i.Whole("Stage"), i.Optional("Condition"), i.Optional("Role"),
+                Enum.Parse<Core.Workflow.DynamicApprover>(i.Text("Dynamic"))).ConfigureAwait(true), "Stage rules saved."),
+            List = async c => Table(await c.Db.WorkflowDefinitions.AsNoTracking().Include(d => d.Stages).Where(d => d.CompanyId == c.CompanyId).SelectMany(d => d.Stages.Select(s => new { d.Id, d.DocumentType, s.Sequence, s.Name, s.Condition, s.RequiredRoleName, s.DynamicApprover }))
+                .ToListAsync().ConfigureAwait(true), ("Definition", x => x.Id), ("Document", x => x.DocumentType), ("Stage", x => x.Sequence), ("Name", x => x.Name), ("Condition", x => x.Condition),
+                ("Role", x => x.RequiredRoleName), ("Dynamic", x => x.DynamicApprover)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Set a user's manager", ListTitle = "Waiting on me", Description = "The manager approves stages that ask for the requester's manager.",
+            Fields = [Req("User", "User name"), Opt("Manager", "Manager's user name (blank: none)")],
+            Run = async (c, i) => Check(await c.Get<One4All.Application.Abstractions.Security.IUserAdminService>().SetManagerAsync(await UserAsync(c, i.Text("User")).ConfigureAwait(true),
+                await OptionalUserAsync(c, i.Optional("Manager")).ConfigureAwait(true)).ConfigureAwait(true), "Manager set."),
+            List = WaitingOnMeAsync,
+        };
+    }
+
     private static async Task<DataTable> WaitingOnMeAsync(OperationContext c)
         => Table(await c.Get<IWorkflowService>().PendingForUserAsync(c.CompanyId, c.UserId).ConfigureAwait(true),
             ("Instance", p => p.InstanceId), ("Document", p => $"{p.DocumentType} {p.DocumentReference}"), ("Value", p => M(p.Value)), ("Stage", p => p.StageName),

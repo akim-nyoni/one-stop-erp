@@ -230,6 +230,20 @@ public sealed class UserAdminService : IUserAdminService
         return await ConflictsAsync(userId, ct).ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    public async Task<Result> SetManagerAsync(long userId, long? managerUserId, CancellationToken ct = default)
+    {
+        User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false);
+        if (user is null || (managerUserId is long m && (m == userId || !await _db.Users.AnyAsync(u => u.Id == m, ct).ConfigureAwait(false))))
+        {
+            return Result.Failure(Error.Validation("Security.ManagerInvalid", "The user and manager must exist and be different people."));
+        }
+
+        user.ManagerUserId = managerUserId;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
     private async Task<Result<IReadOnlyList<string>>> ConflictsAsync(long userId, CancellationToken ct)
     {
         List<string> names = [.. (await _permissions.GetSodViolationsAsync(userId, ct).ConfigureAwait(false)).Select(r => r.Name)];

@@ -79,4 +79,11 @@ public interface IUserAdminService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Any SoD conflicts.</returns>
     Task<Result<IReadOnlyList<string>>> SetGroupMembershipAsync(long userId, long groupId, bool member, CancellationToken ct = default);
+
+    /// <summary>Sets (or clears) a user's manager, who approves stages that ask for the requester's manager; never the user themselves.</summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="managerUserId">The manager, or null.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or why not.</returns>
+    Task<Result> SetManagerAsync(long userId, long? managerUserId, CancellationToken ct = default);
 }

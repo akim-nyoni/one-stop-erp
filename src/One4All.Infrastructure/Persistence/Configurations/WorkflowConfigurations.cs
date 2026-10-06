@@ -26,6 +26,8 @@ internal sealed class WorkflowStageConfiguration : IEntityTypeConfiguration<Work
     {
         b.ToTable("stage", Schemas.Workflow);
         b.HasKey(x => x.Id);
+        b.Property(x => x.Condition).HasMaxLength(500);
+        b.Property(x => x.DynamicApprover).HasConversion<int>();
         b.Property(x => x.Name).HasMaxLength(120);
         b.Property(x => x.MinValue).HasPrecision(19, 4);
         b.Property(x => x.RequiredRoleName).HasMaxLength(120);
@@ -45,6 +47,7 @@ internal sealed class WorkflowInstanceConfiguration : IEntityTypeConfiguration<W
     {
         b.ToTable("instance", Schemas.Workflow);
         b.HasKey(x => x.Id);
+        b.Property(x => x.AttributesJson).HasColumnType("text");
         b.Property(x => x.DocumentType).HasMaxLength(60);
         b.Property(x => x.DocumentReference).HasMaxLength(60);
         b.Property(x => x.Value).HasPrecision(19, 4);
@@ -62,6 +65,7 @@ internal sealed class WorkflowApprovalConfiguration : IEntityTypeConfiguration<W
     {
         b.ToTable("approval", Schemas.Workflow);
         b.HasKey(x => x.Id);
+        b.Property(x => x.Snapshot).HasColumnType("text");
         b.Property(x => x.Action).HasConversion<int>();
         b.Property(x => x.Comment).HasMaxLength(1024);
     }

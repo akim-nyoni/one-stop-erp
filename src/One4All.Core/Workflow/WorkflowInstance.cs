@@ -65,6 +65,9 @@ public sealed class WorkflowInstance : AuditableEntity, ICompanyScoped
     /// <summary>The approvals/actions recorded.</summary>
     public IReadOnlyList<WorkflowApproval> Approvals => _approvals.AsReadOnly();
 
+    /// <summary>Gets or sets the document's attributes (JSON object of name → text) that stage conditions read.</summary>
+    public string? AttributesJson { get; set; }
+
     /// <summary>When the instance entered its current stage (escalation runs from here; null: since it was created).</summary>
     public DateTimeOffset? StageEnteredOnUtc { get; private set; }
 
@@ -188,4 +191,7 @@ public sealed class WorkflowApproval : Entity
 
     /// <summary>Gets the approver a delegate acted for, if any.</summary>
     public long? OnBehalfOfUserId { get; init; }
+
+    /// <summary>Gets or sets the document as it stood when this decision was made (JSON).</summary>
+    public string? Snapshot { get; set; }
 }

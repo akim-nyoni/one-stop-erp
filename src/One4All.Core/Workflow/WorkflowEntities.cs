@@ -130,6 +130,12 @@ public sealed class WorkflowStage : Entity
     /// <summary>A role name whose holders may approve this stage (optional).</summary>
     public string? RequiredRoleName { get; set; }
 
+    /// <summary>Gets or sets the condition (over the document's value and attributes) for the stage to apply; null: always (value bands aside).</summary>
+    public string? Condition { get; set; }
+
+    /// <summary>Gets or sets a dynamic approver resolved per document (e.g. the requester's manager).</summary>
+    public DynamicApprover DynamicApprover { get; set; }
+
     /// <summary>Explicit eligible approver user ids (in addition to the required role).</summary>
     public IReadOnlyList<long> EligibleUserIds => _eligibleUserIds.AsReadOnly();
 
@@ -261,3 +267,14 @@ public sealed class ApprovalDelegation : Entity, ICompanyScoped
     /// <returns>True when in force.</returns>
     public bool InForce(DateOnly date) => !Withdrawn && date >= StartsOn && date <= EndsOn;
 }
+
+/// <summary>An approver worked out from the document rather than named on the stage.</summary>
+public enum DynamicApprover
+{
+    /// <summary>None.</summary>
+    None = 0,
+
+    /// <summary>The manager of whoever started the workflow.</summary>
+    RequesterManager = 1,
+}
+

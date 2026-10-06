@@ -113,6 +113,9 @@ public sealed class User : SoftDeletableEntity
     /// <param name="active">True to activate.</param>
     public void SetActive(bool active) => IsActive = active;
 
+    /// <summary>Gets or sets the user's manager (workflow's "requester's manager" approver).</summary>
+    public long? ManagerUserId { get; set; }
+
     /// <summary>Clears a lockout and the failed-attempt count (after an administrator's password reset).</summary>
     public void Unlock()
     {

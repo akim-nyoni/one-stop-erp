@@ -23,7 +23,12 @@ public sealed class WorkflowService : IWorkflowService
     }
 
     /// <inheritdoc />
-    public async Task<Result<WorkflowStartResult>> StartAsync(long companyId, string documentType, string documentReference, decimal value, long initiatedByUserId, CancellationToken ct = default)
+    public Task<Result<WorkflowStartResult>> StartAsync(long companyId, string documentType, string documentReference, decimal value, long initiatedByUserId, CancellationToken ct = default)
+        => StartAsync(companyId, documentType, documentReference, value, initiatedByUserId, new Dictionary<string, string>(), ct);
+
+    /// <inheritdoc />
+    public async Task<Result<WorkflowStartResult>> StartAsync(long companyId, string documentType, string documentReference, decimal value, long initiatedByUserId,
+        IReadOnlyDictionary<string, string> attributes, CancellationToken ct = default)
     {
         WorkflowDefinition? definition = await _db.WorkflowDefinitions
             .Include(d => d.Stages)
@@ -35,10 +40,13 @@ public sealed class WorkflowService : IWorkflowService
             return Error.NotFound("Workflow.NoDefinition", $"No active workflow is defined for '{documentType}'.");
         }
 
-        List<WorkflowStage> applicable = definition.Stages.Where(s => s.AppliesTo(value)).OrderBy(s => s.Sequence).ToList();
+        List<WorkflowStage> applicable = Applicable(definition, value, attributes);
         int firstSequence = applicable.Count > 0 ? applicable[0].Sequence : 0;
 
-        WorkflowInstance instance = new(companyId, definition.Id, documentType, documentReference, value, initiatedByUserId, firstSequence);
+        WorkflowInstance instance = new(companyId, definition.Id, documentType, documentReference, value, initiatedByUserId, firstSequence)
+        {
+            AttributesJson = attributes.Count == 0 ? null : System.Text.Json.JsonSerializer.Serialize(attributes),
+        };
         _db.WorkflowInstances.Add(instance);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
@@ -73,9 +81,7 @@ public sealed class WorkflowService : IWorkflowService
                 continue;
             }
 
-            WorkflowStage? stage = definition.Stages
-                .Where(s => s.AppliesTo(instance.Value))
-                .FirstOrDefault(s => s.Sequence == instance.CurrentStageSequence);
+            WorkflowStage? stage = Applicable(definition, instance.Value, Attributes(instance)).FirstOrDefault(s => s.Sequence == instance.CurrentStageSequence);
             if (stage is null)
             {
                 continue;
@@ -118,7 +124,7 @@ public sealed class WorkflowService : IWorkflowService
             return Error.NotFound("Workflow.NoDefinition", "The workflow definition was not found.");
         }
 
-        List<WorkflowStage> applicable = definition.Stages.Where(s => s.AppliesTo(instance.Value)).OrderBy(s => s.Sequence).ToList();
+        List<WorkflowStage> applicable = Applicable(definition, instance.Value, Attributes(instance));
         WorkflowStage? currentStage = applicable.FirstOrDefault(s => s.Sequence == instance.CurrentStageSequence);
 
         long? onBehalfOf = null;
@@ -137,6 +143,14 @@ public sealed class WorkflowService : IWorkflowService
         }
 
         Result<WorkflowStatus> result = instance.Act(applicable, userId, action, comment, _clock.UtcNow, onBehalfOf);
+        if (result.IsSuccess && instance.Approvals.Count > 0)
+        {
+            // The document as it stood at this decision.
+            instance.Approvals[^1].Snapshot = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                instance.DocumentType, instance.DocumentReference, instance.Value, Stage = currentStage?.Name, Attributes = Attributes(instance),
+            });
+        }
         if (result.IsFailure)
         {
             return result;
@@ -226,7 +240,30 @@ public sealed class WorkflowService : IWorkflowService
     private async Task<(bool Eligible, long? OnBehalfOf)> EligibilityAsync(WorkflowInstance instance, WorkflowStage stage, long userId, CancellationToken ct)
     {
         List<long> extra = await _db.WorkflowInstanceApprovers.Where(a => a.WorkflowInstanceId == instance.Id && a.StageSequence == stage.Sequence).Select(a => a.UserId).ToListAsync(ct).ConfigureAwait(false);
-        bool open = stage.EligibleUserIds.Count == 0 && extra.Count == 0;
+
+        // Holders of the stage's role, and the requester's manager when the stage asks for them, may approve too.
+        if (!string.IsNullOrWhiteSpace(stage.RequiredRoleName))
+        {
+            string role = stage.RequiredRoleName.Trim().ToUpperInvariant();
+            extra.AddRange(await (from ur in _db.Set<Core.Security.UserRole>()
+                                  join r in _db.Roles on ur.RoleId equals r.Id
+                                  where r.NormalizedName == role
+                                  select ur.UserId).ToListAsync(ct).ConfigureAwait(false));
+        }
+
+        bool dynamicOnly = false;
+        if (stage.DynamicApprover == DynamicApprover.RequesterManager)
+        {
+            long? manager = await _db.Users.Where(u => u.Id == instance.InitiatedByUserId).Select(u => u.ManagerUserId).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (manager is long m)
+            {
+                extra.Add(m);
+            }
+
+            dynamicOnly = true;
+        }
+
+        bool open = stage.EligibleUserIds.Count == 0 && extra.Count == 0 && string.IsNullOrWhiteSpace(stage.RequiredRoleName) && !dynamicOnly;
         bool Direct(long user) => open || stage.EligibleUserIds.Contains(user) || extra.Contains(user);
         if (Direct(userId))
         {
@@ -244,4 +281,52 @@ public sealed class WorkflowService : IWorkflowService
     private static bool AlreadyApproved(WorkflowInstance instance, int stage, long userId, long? onBehalfOf)
         => instance.Approvals.Any(a => a.StageSequence == stage && a.Action == WorkflowActionType.Approve
             && (a.UserId == userId || a.OnBehalfOfUserId == userId || (onBehalfOf is long principal && (a.UserId == principal || a.OnBehalfOfUserId == principal))));
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<BulkActionResult>> ActManyAsync(IReadOnlyList<long> instanceIds, long userId, WorkflowActionType action, string? comment, CancellationToken ct = default)
+    {
+        List<BulkActionResult> results = [];
+        foreach (long id in instanceIds.Distinct())
+        {
+            Result<WorkflowStatus> acted = await ActAsync(id, userId, action, comment, ct).ConfigureAwait(false);
+            results.Add(acted.IsSuccess ? new BulkActionResult(id, true, acted.Value, null) : new BulkActionResult(id, false, null, acted.Error.Message));
+        }
+
+        return results;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetStageRulesAsync(long companyId, long definitionId, int sequence, string? condition, string? roleName, DynamicApprover dynamicApprover, CancellationToken ct = default)
+    {
+        if (Application.Workflow.WorkflowCondition.Problem(condition) is string problem)
+        {
+            return Result.Failure(Error.Validation("Workflow.ConditionInvalid", problem));
+        }
+
+        WorkflowDefinition? definition = await _db.WorkflowDefinitions.Include(d => d.Stages).FirstOrDefaultAsync(d => d.Id == definitionId && d.CompanyId == companyId, ct).ConfigureAwait(false);
+        WorkflowStage? stage = definition?.Stages.FirstOrDefault(s => s.Sequence == sequence);
+        if (stage is null)
+        {
+            return Result.Failure(Error.NotFound("Workflow.StageNotFound", $"Stage {sequence} not found."));
+        }
+
+        if (!string.IsNullOrWhiteSpace(roleName) && !await _db.Roles.AnyAsync(r => r.NormalizedName == roleName.Trim().ToUpperInvariant(), ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.NotFound("Workflow.RoleNotFound", $"Role {roleName} not found."));
+        }
+
+        stage.Condition = string.IsNullOrWhiteSpace(condition) ? null : condition.Trim();
+        stage.RequiredRoleName = string.IsNullOrWhiteSpace(roleName) ? null : roleName.Trim();
+        stage.DynamicApprover = dynamicApprover;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    // The stages that apply to a document: within their value band and with their condition holding.
+    private static List<WorkflowStage> Applicable(WorkflowDefinition definition, decimal value, IReadOnlyDictionary<string, string> attributes)
+        => [.. definition.Stages.Where(s => s.AppliesTo(value) && Application.Workflow.WorkflowCondition.Matches(s.Condition, value, attributes)).OrderBy(s => s.Sequence)];
+
+    private static IReadOnlyDictionary<string, string> Attributes(WorkflowInstance instance)
+        => string.IsNullOrWhiteSpace(instance.AttributesJson) ? new Dictionary<string, string>()
+            : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(instance.AttributesJson) ?? [];
 }

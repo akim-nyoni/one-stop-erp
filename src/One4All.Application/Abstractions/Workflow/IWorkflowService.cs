@@ -27,6 +27,13 @@ public sealed record PendingApproval(long InstanceId, string DocumentType, strin
 /// payment runs, budgets, master-data changes and more: start a workflow for a document, then route
 /// approvals through its stages with quorum and value-band rules.
 /// </summary>
+/// <summary>One item of a bulk action.</summary>
+/// <param name="InstanceId">The workflow instance.</param>
+/// <param name="Succeeded">Whether the action was taken.</param>
+/// <param name="Status">The instance's status after it.</param>
+/// <param name="Error">Why not, when it failed.</param>
+public sealed record BulkActionResult(long InstanceId, bool Succeeded, One4All.Core.Workflow.WorkflowStatus? Status, string? Error);
+
 public interface IWorkflowService
 {
     /// <summary>
@@ -94,4 +101,42 @@ public interface IWorkflowService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>How many instances escalated.</returns>
     Task<int> EscalateOverdueAsync(long companyId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Starts a workflow with the document's attributes (e.g. Department, Category), which stage conditions read and which are kept as the
+    /// document's snapshot at each decision.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="documentType">The document type.</param>
+    /// <param name="documentReference">The document.</param>
+    /// <param name="value">Its value.</param>
+    /// <param name="initiatedByUserId">Who started it.</param>
+    /// <param name="attributes">Its attributes.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The instance.</returns>
+    Task<Result<WorkflowStartResult>> StartAsync(long companyId, string documentType, string documentReference, decimal value, long initiatedByUserId, IReadOnlyDictionary<string, string> attributes,
+        CancellationToken ct = default);
+
+    /// <summary>Acts on many instances at once (bulk approve); each succeeds or fails on its own.</summary>
+    /// <param name="instanceIds">The instances.</param>
+    /// <param name="userId">Who acts.</param>
+    /// <param name="action">The action.</param>
+    /// <param name="comment">A comment for each.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Each instance's outcome.</returns>
+    Task<IReadOnlyList<BulkActionResult>> ActManyAsync(IReadOnlyList<long> instanceIds, long userId, One4All.Core.Workflow.WorkflowActionType action, string? comment, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sets a stage's rules: its condition (validated, <c>Workflow.ConditionInvalid</c>), a role whose holders may approve, and a dynamic
+    /// approver such as the requester's manager.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="definitionId">The workflow definition.</param>
+    /// <param name="sequence">The stage.</param>
+    /// <param name="condition">The condition, or null.</param>
+    /// <param name="roleName">The approving role, or null.</param>
+    /// <param name="dynamicApprover">The dynamic approver.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or why not.</returns>
+    Task<Result> SetStageRulesAsync(long companyId, long definitionId, int sequence, string? condition, string? roleName, One4All.Core.Workflow.DynamicApprover dynamicApprover, CancellationToken ct = default);
 }

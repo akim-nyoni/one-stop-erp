@@ -24109,6 +24109,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("lockout_end_utc");
 
+                    b.Property<long?>("ManagerUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("manager_user_id");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -27146,6 +27150,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<string>("Snapshot")
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("snapshot");
+
                     b.Property<int>("StageSequence")
                         .HasColumnType("integer")
                         .HasColumnName("stage_sequence");
@@ -27248,6 +27257,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AttributesJson")
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("attributes_json");
 
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
@@ -27380,6 +27394,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Condition")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("condition");
+
+                    b.Property<int>("DynamicApprover")
+                        .HasColumnType("integer")
+                        .HasColumnName("dynamic_approver");
 
                     b.Property<int?>("EscalateAfterHours")
                         .HasColumnType("integer")
