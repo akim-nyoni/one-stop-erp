@@ -3240,6 +3240,53 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("asset_maintenance", "fa");
                 });
 
+            modelBuilder.Entity("One4All.Core.FixedAssets.AssetUsageReading", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AssetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("asset_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<decimal>("Units")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("units");
+
+                    b.HasKey("Id")
+                        .HasName("pk_usage_reading");
+
+                    b.HasIndex("AssetId", "Date")
+                        .HasDatabaseName("ix_usage_reading_asset_id_date");
+
+                    b.ToTable("usage_reading", "fa");
+                });
+
             modelBuilder.Entity("One4All.Core.FixedAssets.CapitalProject", b =>
                 {
                     b.Property<long>("Id")
@@ -3515,6 +3562,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");
+
+                    b.Property<decimal?>("TotalEstimatedUnits")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("total_estimated_units");
 
                     b.Property<int>("UsefulLifeMonths")
                         .HasColumnType("integer")

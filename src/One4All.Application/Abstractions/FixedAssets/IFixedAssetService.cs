@@ -50,6 +50,9 @@ public sealed class RegisterAssetRequest
 
     /// <summary>The acquisition document number.</summary>
     public string DocumentNumber { get; init; } = string.Empty;
+
+    /// <summary>Gets the total units a units-of-production asset is expected to produce.</summary>
+    public decimal? TotalEstimatedUnits { get; init; }
 }
 
 /// <summary>The result of a depreciation run.</summary>
@@ -154,6 +157,19 @@ public interface IFixedAssetService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The depreciation forecast.</returns>
     Task<Result<DepreciationForecastReport>> DepreciationForecastAsync(long companyId, DateOnly startMonth, int months, CancellationToken ct = default);
+
+    /// <summary>
+    /// Records the units a units-of-production asset was used for (the run charges the month's readings); refused for another method
+    /// (<c>Fa.NotUnitsOfProduction</c>), a month already depreciated (<c>Fa.PeriodDepreciated</c>) or non-positive units.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="assetId">The asset.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="units">The units used.</param>
+    /// <param name="reference">Where the reading came from.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The reading id.</returns>
+    Task<Result<long>> RecordUsageAsync(long companyId, long assetId, DateOnly date, decimal units, string reference, CancellationToken ct = default);
 
     /// <summary>
     /// Logs a maintenance/service event against an asset (operational history — no GL posting; the spend is

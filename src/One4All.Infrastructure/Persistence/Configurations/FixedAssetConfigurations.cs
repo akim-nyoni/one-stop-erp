@@ -10,6 +10,7 @@ internal sealed class FixedAssetConfiguration : IEntityTypeConfiguration<FixedAs
     public void Configure(EntityTypeBuilder<FixedAsset> b)
     {
         b.ToTable("asset", Schemas.FixedAssets);
+        b.Property(x => x.TotalEstimatedUnits).HasPrecision(19, 4);
         b.HasKey(x => x.Id);
         b.Property(x => x.Insurer).HasMaxLength(120);
         b.Property(x => x.PolicyNumber).HasMaxLength(60);
@@ -143,5 +144,17 @@ internal sealed class CapitalProjectCostConfiguration : IEntityTypeConfiguration
         b.Property(x => x.Description).HasMaxLength(200);
         b.Property(x => x.Amount).HasPrecision(19, 4);
         b.Property(x => x.JournalNumber).HasMaxLength(40);
+    }
+}
+
+internal sealed class AssetUsageReadingConfiguration : IEntityTypeConfiguration<AssetUsageReading>
+{
+    public void Configure(EntityTypeBuilder<AssetUsageReading> b)
+    {
+        b.ToTable("usage_reading", Schemas.FixedAssets);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Units).HasPrecision(19, 4);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.HasIndex(x => new { x.AssetId, x.Date });
     }
 }

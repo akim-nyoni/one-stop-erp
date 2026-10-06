@@ -10,6 +10,9 @@ public enum DepreciationMethod
 
     /// <summary>Reducing balance: a fixed percentage of the net book value each period.</summary>
     ReducingBalance = 2,
+
+    /// <summary>Units of production: (cost − residual) × units used in the month ÷ the total units the asset is expected to produce.</summary>
+    UnitsOfProduction = 3,
 }
 
 /// <summary>Why a depreciation run passed over an asset.</summary>
@@ -159,6 +162,9 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
     /// <summary>Gets or sets when the manufacturer's / supplier's warranty ends.</summary>
     public DateOnly? WarrantyExpiry { get; set; }
 
+    /// <summary>Gets or sets the total units (hours, kilometres, tonnes…) a units-of-production asset is expected to produce in its life.</summary>
+    public decimal? TotalEstimatedUnits { get; set; }
+
     /// <summary>The net book value (cost − accumulated depreciation).</summary>
     public decimal NetBookValue => Cost - AccumulatedDepreciation;
 
@@ -169,7 +175,8 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
     /// Computes the depreciation charge for one month, never taking the net book value below the residual.
     /// </summary>
     /// <returns>The monthly depreciation charge.</returns>
-    public decimal MonthlyDepreciation()
+    /// <param name="unitsUsed">Units used in the month (units-of-production assets).</param>
+    public decimal MonthlyDepreciation(decimal unitsUsed = 0m)
     {
         if (Status != FixedAssetStatus.Active)
         {
@@ -180,6 +187,7 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
         {
             DepreciationMethod.StraightLine => UsefulLifeMonths <= 0 ? 0m : decimal.Round(DepreciableAmount / UsefulLifeMonths, 4, MidpointRounding.ToEven),
             DepreciationMethod.ReducingBalance => decimal.Round(NetBookValue * ReducingBalanceRatePercent / 100m, 4, MidpointRounding.ToEven),
+            DepreciationMethod.UnitsOfProduction => TotalEstimatedUnits is > 0m and decimal total ? decimal.Round(DepreciableAmount * unitsUsed / total, 4, MidpointRounding.ToEven) : 0m,
             _ => 0m,
         };
 
@@ -247,4 +255,41 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
     /// </summary>
     /// <param name="delta">The change to the carrying amount (+ up, − down).</param>
     public void Revalue(decimal delta) => Cost += delta;
+}
+
+/// <summary>Units an asset was used for in a month (<c>fa.usage_reading</c>), which a units-of-production asset is depreciated on.</summary>
+public sealed class AssetUsageReading : Entity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private AssetUsageReading() => Reference = string.Empty;
+
+    /// <summary>Creates the reading.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="assetId">The asset.</param>
+    /// <param name="date">The date (its month is the one charged).</param>
+    /// <param name="units">The units used.</param>
+    /// <param name="reference">Where the reading came from (meter, log book).</param>
+    public AssetUsageReading(long companyId, long assetId, DateOnly date, decimal units, string reference)
+    {
+        CompanyId = companyId;
+        AssetId = assetId;
+        Date = date;
+        Units = units;
+        Reference = reference;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The asset.</summary>
+    public long AssetId { get; private set; }
+
+    /// <summary>The date.</summary>
+    public DateOnly Date { get; private set; }
+
+    /// <summary>The units used.</summary>
+    public decimal Units { get; private set; }
+
+    /// <summary>Where the reading came from.</summary>
+    public string Reference { get; private set; }
 }

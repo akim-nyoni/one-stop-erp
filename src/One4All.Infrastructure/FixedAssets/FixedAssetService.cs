@@ -39,7 +39,15 @@ public sealed class FixedAssetService : IFixedAssetService
             return Error.NotFound("Fa.CompanyNotFound", $"Company {request.CompanyId} not found.");
         }
 
-        FixedAsset asset = new(request.CompanyId, request.AssetNumber, request.Description, request.AssetClass, request.Cost, request.ResidualValue, request.AcquisitionDate, request.Method, request.UsefulLifeMonths, request.ReducingBalanceRatePercent, request.CostAccountCode, request.AccumulatedDepreciationAccountCode, request.DepreciationExpenseAccountCode);
+        if (request.Method == DepreciationMethod.UnitsOfProduction && request.TotalEstimatedUnits is not > 0m)
+        {
+            return Error.Validation("Fa.TotalUnits", "A units-of-production asset needs the total units it is expected to produce.");
+        }
+
+        FixedAsset asset = new(request.CompanyId, request.AssetNumber, request.Description, request.AssetClass, request.Cost, request.ResidualValue, request.AcquisitionDate, request.Method, request.UsefulLifeMonths, request.ReducingBalanceRatePercent, request.CostAccountCode, request.AccumulatedDepreciationAccountCode, request.DepreciationExpenseAccountCode)
+        {
+            TotalEstimatedUnits = request.TotalEstimatedUnits,
+        };
         _db.Set<FixedAsset>().Add(asset);
 
         Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
@@ -68,6 +76,36 @@ public sealed class FixedAssetService : IFixedAssetService
     }
 
     /// <inheritdoc />
+    public async Task<Result<long>> RecordUsageAsync(long companyId, long assetId, DateOnly date, decimal units, string reference, CancellationToken ct = default)
+    {
+        FixedAsset? asset = await _db.Set<FixedAsset>().FirstOrDefaultAsync(a => a.Id == assetId && a.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (asset is null)
+        {
+            return Error.NotFound("Fa.AssetNotFound", $"Asset {assetId} not found.");
+        }
+
+        if (asset.Method != DepreciationMethod.UnitsOfProduction)
+        {
+            return Error.Rule("Fa.NotUnitsOfProduction", $"{asset.AssetNumber} is not depreciated on units of production.");
+        }
+
+        if (units <= 0m)
+        {
+            return Error.Validation("Fa.UsageUnits", "Usage must be a positive number of units.");
+        }
+
+        if (asset.LastDepreciatedPeriod is int last && last >= FixedAsset.PeriodOf(date))
+        {
+            return Error.Rule("Fa.PeriodDepreciated", $"{asset.AssetNumber} has already been depreciated for {date:yyyy-MM}.");
+        }
+
+        AssetUsageReading reading = new(companyId, assetId, date, units, (reference ?? string.Empty).Trim());
+        _db.AssetUsageReadings.Add(reading);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return reading.Id;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<DepreciationRunResult>> RunDepreciationAsync(long companyId, DateOnly date, string documentNumber, CancellationToken ct = default)
     {
         Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
@@ -79,6 +117,12 @@ public sealed class FixedAssetService : IFixedAssetService
         List<FixedAsset> assets = await _db.Set<FixedAsset>()
             .Where(a => a.CompanyId == companyId && a.Status == FixedAssetStatus.Active)
             .ToListAsync(ct).ConfigureAwait(false);
+
+        // Units-of-production assets are charged on the month's usage readings.
+        DateOnly monthStart = new(date.Year, date.Month, 1), monthEnd = monthStart.AddMonths(1).AddDays(-1);
+        List<long> unitAssets = [.. assets.Where(a => a.Method == DepreciationMethod.UnitsOfProduction).Select(a => a.Id)];
+        Dictionary<long, decimal> usage = await _db.AssetUsageReadings.Where(r => unitAssets.Contains(r.AssetId) && r.Date >= monthStart && r.Date <= monthEnd)
+            .GroupBy(r => r.AssetId).Select(g => new { g.Key, Units = g.Sum(r => r.Units) }).ToDictionaryAsync(x => x.Key, x => x.Units, ct).ConfigureAwait(false);
 
         List<JournalLineRequest> lines = [];
         List<(FixedAsset Asset, decimal Charge)> charges = [];
@@ -101,7 +145,7 @@ public sealed class FixedAssetService : IFixedAssetService
                     continue;
             }
 
-            decimal charge = asset.MonthlyDepreciation();
+            decimal charge = asset.MonthlyDepreciation(usage.GetValueOrDefault(asset.Id));
             if (charge <= 0m)
             {
                 continue;

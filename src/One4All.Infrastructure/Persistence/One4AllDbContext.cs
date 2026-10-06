@@ -290,6 +290,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the physical asset verifications.</summary>
     public DbSet<Core.FixedAssets.AssetCount> AssetCounts => Set<Core.FixedAssets.AssetCount>();
 
+    /// <summary>Usage readings of units-of-production assets.</summary>
+    public DbSet<Core.FixedAssets.AssetUsageReading> AssetUsageReadings => Set<Core.FixedAssets.AssetUsageReading>();
+
     /// <summary>Gets the planned maintenance tasks.</summary>
     public DbSet<Core.FixedAssets.MaintenancePlan> MaintenancePlans => Set<Core.FixedAssets.MaintenancePlan>();
 

@@ -67,6 +67,17 @@ public static partial class OperationCatalogue
         const string module = "Fixed Assets";
         yield return new Operation
         {
+            Module = module, Title = "Record asset usage", Description = "Units (hours, km, tonnes) a units-of-production asset was used for; the month's depreciation run charges them.",
+            Fields = [Req("Asset", "Asset number"), Today(), Num("Units", "Units used"), Opt("Reference", "Reading reference", "Meter")],
+            Run = async (c, i) =>
+            {
+                long asset = await FindAsync(c.Db.FixedAssets, a => a.CompanyId == c.CompanyId && a.AssetNumber.ToUpper() == i.Text("Asset").ToUpper(), a => a.Id, "asset", i.Text("Asset")).ConfigureAwait(true);
+                return Check(await c.Get<IFixedAssetService>().RecordUsageAsync(c.CompanyId, asset, i.Date("Date"), i.Number("Units"), i.Optional("Reference") ?? string.Empty).ConfigureAwait(true),
+                    id => $"Usage reading {id} recorded.");
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Start an asset count", ListTitle = "Open counts", Description = "Lists every held asset the register places at the location (blank for everywhere) for verification.",
             Fields = [Opt("Location", "Location"), Today()],
             Run = async (c, i) =>
