@@ -23,6 +23,15 @@ public sealed partial class PayrollService
     /// <summary>The formula variable holding the rent owed on the employee's housing tenancy.</summary>
     public const string HousingRentVariable = "HOUSINGRENT";
 
+    /// <summary>The formula variable holding the taxable pay earlier in the tax year.</summary>
+    public const string YtdTaxableVariable = "YTDTAXABLE";
+
+    /// <summary>The formula variable holding the period number in the tax year (the pay date's month).</summary>
+    public const string TaxPeriodVariable = "TAXPERIOD";
+
+    private const string TaxTablesKey = "__TAXTABLES";
+    private const string PayDateKey = "__PAYDATE";
+
     // Each employee's balances to recover as at the date: staff tenders less staff-purchase deductions already made, and the tenancy
     // account's balance (never below zero — a tenant in credit has nothing to deduct).
     private async Task<Dictionary<long, Dictionary<string, object?>>> RecoveryVariablesAsync(long companyId, IReadOnlyCollection<Employee> employees, IReadOnlyDictionary<long, PayElement> elements,
@@ -46,11 +55,35 @@ public sealed partial class PayrollService
                 .Where(i => customers.Contains(i.Item.TraderId)).GroupBy(i => i.Item.TraderId).ToDictionary(g => g.Key, g => g.Sum(i => i.Signed(LedgerSign.Debit)));
         }
 
-        return employees.ToDictionary(e => e.Id, e => new Dictionary<string, object?>(StringComparer.Ordinal)
+        // The tax year so far (January to the period before this pay date): taxable pay and the tax each tax-table element deducted.
+        DateOnly yearStart = new(asAt.Year, 1, 1);
+        List<string> taxCodes = [.. elements.Values.Where(e => e.Basis == CalculationBasis.TaxTable).Select(e => e.Code)];
+        var ytd = await _db.Set<Payslip>().Where(p => p.CompanyId == companyId && ids.Contains(p.EmployeeId) && p.PayDate >= yearStart && p.PayDate < asAt)
+            .SelectMany(p => p.Lines.Where(l => (l.Type == PayElementType.Earning && l.Taxable) || taxCodes.Contains(l.ElementCode)).Select(l => new { p.EmployeeId, l.ElementCode, l.Type, l.Amount }))
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<TaxTable> tables = taxCodes.Count == 0 ? [] : await _db.Set<TaxTable>().AsNoTracking().Include(t => t.Bands).Where(t => t.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<long, Dictionary<string, object?>> result = [];
+        foreach (Employee e in employees)
         {
-            [StaffPurchasesVariable] = Math.Max(0m, (tendered.FirstOrDefault(t => t.EmployeeId == e.Id)?.Amount ?? 0m) - (recovered.FirstOrDefault(r => r.EmployeeId == e.Id)?.Amount ?? 0m)),
-            [HousingRentVariable] = tenantByEmployee.TryGetValue(e.Id, out long customer) ? Math.Max(0m, owing.GetValueOrDefault(customer)) : 0m,
-        });
+            Dictionary<string, object?> values = new(StringComparer.Ordinal)
+            {
+                [YtdTaxableVariable] = ytd.Where(l => l.EmployeeId == e.Id && l.Type == PayElementType.Earning).Sum(l => l.Amount),
+                [TaxPeriodVariable] = (decimal)asAt.Month,
+                [TaxTablesKey] = tables,
+                [PayDateKey] = asAt,
+                [StaffPurchasesVariable] = Math.Max(0m, (tendered.FirstOrDefault(t => t.EmployeeId == e.Id)?.Amount ?? 0m) - (recovered.FirstOrDefault(r => r.EmployeeId == e.Id)?.Amount ?? 0m)),
+                [HousingRentVariable] = tenantByEmployee.TryGetValue(e.Id, out long customer) ? Math.Max(0m, owing.GetValueOrDefault(customer)) : 0m,
+            };
+            foreach (string code in taxCodes)
+            {
+                values["YTD_" + code] = ytd.Where(l => l.EmployeeId == e.Id && l.ElementCode == code && l.Type != PayElementType.Earning).Sum(l => l.Amount);
+            }
+
+            result[e.Id] = values;
+        }
+
+        return result;
     }
 
     private async Task<Dictionary<long, long>> TenantCustomersAsync(long companyId, IEnumerable<Employee> employees, CancellationToken ct)

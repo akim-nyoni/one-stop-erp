@@ -380,7 +380,9 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
         decimal gross = 0m;
         decimal taxable = 0m;
+        decimal annualTaxable = 0m;
         decimal deductions = 0m;
+        vars["ANNUALTAXABLE"] = 0m;
 
         foreach ((PayElement element, EmployeePayElement assigned1) in ordered)
         {
@@ -419,6 +421,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                     if (element.Taxable)
                     {
                         taxable += amount;
+                        annualTaxable += element.IsAnnualPayment ? amount : 0m;
                     }
 
                     break;
@@ -429,6 +432,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
             vars["GROSS"] = gross;
             vars["TAXABLE"] = taxable;
+            vars["ANNUALTAXABLE"] = annualTaxable;
             vars["DEDUCTIONS"] = deductions;
             payslip.AddLine(element.Code, element.Name, element.Type, amount, element.Taxable);
         }
@@ -452,6 +456,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                 return gross * rate / 100m;
             case CalculationBasis.RatePerUnit:
                 return rate * (assignment.Units ?? 0m);
+            case CalculationBasis.TaxTable:
+                return TaxFromTable(element, vars);
             case CalculationBasis.Formula:
                 if (string.IsNullOrWhiteSpace(element.Formula))
                 {
@@ -471,6 +477,34 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             default:
                 return 0m;
         }
+    }
+
+    // §4.15.3: the table in force on the pay date; cumulative elements tax the year to date on the bands times the period number less the
+    // tax already deducted; otherwise the period's regular taxable pay on the bands, with annual payments annualised and apportioned.
+    private static Result<decimal> TaxFromTable(PayElement element, IReadOnlyDictionary<string, object?> vars)
+    {
+        DateOnly payDate = vars.GetValueOrDefault(PayDateKey) is DateOnly d ? d : DateOnly.FromDateTime(DateTime.UtcNow);
+        TaxTable? table = (vars.GetValueOrDefault(TaxTablesKey) as IEnumerable<TaxTable> ?? [])
+            .Where(t => t.Currency == null && t.EffectiveFrom <= payDate && (element.TaxTableCode == null || string.Equals(t.Code, element.TaxTableCode, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(t => t.EffectiveFrom).LastOrDefault();
+        if (table is null)
+        {
+            return Error.Validation("Payroll.NoTaxTable", $"No tax table{(element.TaxTableCode is null ? string.Empty : " " + element.TaxTableCode)} is in force on {payDate:yyyy-MM-dd} for {element.Code}.");
+        }
+
+        decimal Number(string name) => vars.GetValueOrDefault(name) is decimal value ? value : 0m;
+        IEnumerable<PayeBand> Bands(decimal times) => table.Bands.Select(b => new PayeBand(b.From * times, b.To * times, b.RatePercent));
+        decimal taxable = Number("TAXABLE");
+        if (element.CumulativeTax)
+        {
+            decimal period = Math.Max(1m, Number(TaxPeriodVariable));
+            return PayeTable.Tax(Bands(period), Number(YtdTaxableVariable) + taxable) - Number("YTD_" + element.Code);
+        }
+
+        decimal annual = Number("ANNUALTAXABLE");
+        decimal regular = taxable - annual;
+        decimal tax = PayeTable.Tax(Bands(1m), regular);
+        return annual == 0m ? tax : tax + PayeTable.Tax(Bands(12m), (regular * 12m) + annual) - PayeTable.Tax(Bands(12m), regular * 12m);
     }
 
     private static void Add(Dictionary<string, decimal> map, string account, decimal amount) =>

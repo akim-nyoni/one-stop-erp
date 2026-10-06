@@ -55,7 +55,8 @@ public sealed partial class PayrollService
         foreach (IGrouping<string, Payslip> period in periods)
         {
             Dictionary<long, Dictionary<string, PayrollVariable>> variables = await VariablesAsync(companyId, period.Key, [employee], ct).ConfigureAwait(false);
-            Result<Payslip> due = BuildPayslip(companyId, employee, elements, period.Key, period.Min(p => p.PayDate), newBasicSalary, variables: variables[employee.Id]);
+            Dictionary<long, Dictionary<string, object?>> context = await RecoveryVariablesAsync(companyId, [employee], elements, period.Min(p => p.PayDate), ct).ConfigureAwait(false);
+            Result<Payslip> due = BuildPayslip(companyId, employee, elements, period.Key, period.Min(p => p.PayDate), newBasicSalary, recoveries: context[employee.Id], variables: variables[employee.Id]);
             if (due.IsFailure)
             {
                 return due.Error;

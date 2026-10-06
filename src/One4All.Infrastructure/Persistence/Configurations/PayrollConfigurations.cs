@@ -55,6 +55,7 @@ internal sealed class PayElementConfiguration : IEntityTypeConfiguration<PayElem
     {
         b.ToTable("element", Schemas.Payroll);
         b.Property(x => x.Recovers).HasConversion<int>();
+        b.Property(x => x.TaxTableCode).HasMaxLength(20);
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).HasMaxLength(30);
         b.Property(x => x.Name).HasMaxLength(120);

@@ -33,6 +33,9 @@ public enum CalculationBasis
 
     /// <summary>A formula evaluated by the shared expression engine (brief §13.1).</summary>
     Formula = 4,
+
+    /// <summary>Income tax from the effective-dated tax table in force (brief §4.15.3), per period or cumulative year-to-date.</summary>
+    TaxTable = 5,
 }
 
 /// <summary>
@@ -128,6 +131,22 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
     /// suspended; otherwise the highest number is suspended first.
     /// </summary>
     public int SuspensionPriority { get; set; }
+
+    /// <summary>Gets or sets the tax table a <see cref="CalculationBasis.TaxTable"/> element uses (null: the base table in force).</summary>
+    public string? TaxTableCode { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether a tax-table element is cumulative: the year-to-date taxable pay is taxed on the table's bands
+    /// times the period number, less the tax already deducted this year (the tax year runs January to December).
+    /// </summary>
+    public bool CumulativeTax { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the earning is an annual payment (bonus, 13th cheque): a non-cumulative tax-table element taxes
+    /// it annualised and apportioned — the annual tax on twelve periods of regular pay plus the payment, less that on the regular pay alone —
+    /// rather than at one period's marginal rate.
+    /// </summary>
+    public bool IsAnnualPayment { get; set; }
 }
 
 /// <summary>A balance a payroll deduction recovers from the employee (brief §4.15.4).</summary>

@@ -15151,6 +15151,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<bool>("CumulativeTax")
+                        .HasColumnType("boolean")
+                        .HasColumnName("cumulative_tax");
+
                     b.Property<long?>("DeletedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("deleted_by_user_id");
@@ -15168,6 +15172,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("formula");
+
+                    b.Property<bool>("IsAnnualPayment")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_annual_payment");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
@@ -15214,6 +15222,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("SuspensionPriority")
                         .HasColumnType("integer")
                         .HasColumnName("suspension_priority");
+
+                    b.Property<string>("TaxTableCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("tax_table_code");
 
                     b.Property<bool>("Taxable")
                         .HasColumnType("boolean")
