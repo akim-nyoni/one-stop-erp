@@ -17,6 +17,12 @@ public static partial class ApiAccessRules
     /// <summary>The operations any of which lets a user change data in a module.</summary>
     public const OperationFlags WriteOperations = OperationFlags.Create | OperationFlags.Edit | OperationFlags.Delete | OperationFlags.Post | OperationFlags.Approve | OperationFlags.VoidReverse;
 
+    /// <summary>
+    /// Routes called without a signed-in user, each protecting itself: sign-in (credentials) and the WhatsApp webhook (Meta's verify token and
+    /// signed deliveries). Any other route must belong to a governed area.
+    /// </summary>
+    public static readonly IReadOnlyList<string> AnonymousRoutes = ["/api/auth/login", "/api/webhooks/whatsapp"];
+
     /// <summary>Query parameters naming the user acting: they must be the signed-in user.</summary>
     public static readonly IReadOnlyList<string> ActorParameters = ["userId", "approverUserId"];
 

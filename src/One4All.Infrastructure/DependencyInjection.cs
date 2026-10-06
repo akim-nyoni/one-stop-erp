@@ -145,6 +145,8 @@ public static class DependencyInjection
         services.AddSingleton(new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(30) });
         services.AddScoped<Application.Abstractions.Communications.IMessageGateway, Communications.SmtpEmailGateway>();
         services.AddScoped<Application.Abstractions.Communications.IMessageGateway, Communications.HttpSmsGateway>();
+        services.AddScoped<Application.Abstractions.Communications.IMessageGateway, Communications.WhatsAppCloudGateway>();
+        services.AddScoped<Application.Abstractions.Communications.IWhatsAppWebhookService, Communications.WhatsAppWebhookService>();
         services.AddScoped<Application.Abstractions.Integration.IWebhookService, Integration.WebhookService>();
         services.AddScoped<Application.Abstractions.Communications.INotificationService, Communications.NotificationService>();
         if (!services.Any(d => d.ServiceType == typeof(Application.Municipal.IPrepaidTokenGenerator)))

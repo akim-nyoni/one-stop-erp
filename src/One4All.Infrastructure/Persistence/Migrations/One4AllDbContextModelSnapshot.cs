@@ -3021,6 +3021,83 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("despatch_batch", "msg");
                 });
 
+            modelBuilder.Entity("One4All.Core.Communications.InboundMessage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)")
+                        .HasColumnName("body");
+
+                    b.Property<int>("Channel")
+                        .HasColumnType("integer")
+                        .HasColumnName("channel");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("From")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("from");
+
+                    b.Property<DateTimeOffset?>("HandledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("handled_at");
+
+                    b.Property<long?>("HandledByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("handled_by_user_id");
+
+                    b.Property<long?>("LeadId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("lead_id");
+
+                    b.Property<string>("ProviderReference")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("provider_reference");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("SenderName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("sender_name");
+
+                    b.HasKey("Id")
+                        .HasName("pk_inbound_message");
+
+                    b.HasIndex("ProviderReference")
+                        .IsUnique()
+                        .HasDatabaseName("ix_inbound_message_provider_reference");
+
+                    b.HasIndex("CompanyId", "HandledAt")
+                        .HasDatabaseName("ix_inbound_message_company_id_handled_at");
+
+                    b.ToTable("inbound_message", "msg");
+                });
+
             modelBuilder.Entity("One4All.Core.Communications.MessageTemplate", b =>
                 {
                     b.Property<long>("Id")
@@ -3143,6 +3220,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delivered_at");
+
                     b.Property<string>("LastError")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
@@ -3156,6 +3237,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("QueuedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("queued_at");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
 
                     b.Property<string>("Recipient")
                         .IsRequired()
@@ -3186,6 +3271,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("BatchId")
                         .HasDatabaseName("ix_outbound_message_batch_id");
+
+                    b.HasIndex("ProviderReference")
+                        .HasDatabaseName("ix_outbound_message_provider_reference");
 
                     b.HasIndex("CompanyId", "Status")
                         .HasDatabaseName("ix_outbound_message_company_id_status");

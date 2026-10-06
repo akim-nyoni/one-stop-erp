@@ -1,6 +1,7 @@
 using System.Data;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using One4All.Application.Abstractions.Communications;
 using One4All.Application.Abstractions.Crm;
 using One4All.Core.Accounting;
 using One4All.Core.Crm;
@@ -74,6 +75,20 @@ public static partial class OperationCatalogue
             Run = async (c, i) => Check(await c.Get<ICrmService>().LinkQuotationAsync(c.CompanyId, (long)i.Number("Opportunity"), (long)i.Number("Quotation")).ConfigureAwait(true), "Quotation linked."),
             List = async c => Table(await c.Get<ICrmService>().LeadFunnelAsync(c.CompanyId).ConfigureAwait(true), ("Source", f => f.Source), ("Leads", f => f.Leads), ("Qualified", f => f.Qualified),
                 ("Converted", f => f.Converted), ("Disqualified", f => f.Disqualified), ("Conversion %", f => f.ConversionPercent)),
+        };
+    }
+
+    private static IEnumerable<Operation> WhatsAppInbox()
+    {
+        yield return new Operation
+        {
+            Module = "CRM", Title = "WhatsApp replies", ListTitle = "Replies not yet handled",
+            Description = "Messages customers and leads sent on WhatsApp (matched by their number), oldest first. Deal with one, then mark it handled.",
+            Fields = [Num("Message", "Message id")],
+            Run = async (c, i) => Check(await c.Get<IWhatsAppWebhookService>().MarkHandledAsync(c.CompanyId, (long)i.Number("Message"), c.UserId).ConfigureAwait(true), "Marked handled."),
+            List = async c => Table(await c.Get<IWhatsAppWebhookService>().UnhandledAsync(c.CompanyId).ConfigureAwait(true), ("Id", m => m.Id),
+                ("Received", m => m.ReceivedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("From", m => m.From), ("Name", m => m.SenderName),
+                ("Customer", m => m.CustomerId), ("Lead", m => m.LeadId), ("Message", m => m.Body)),
         };
     }
 

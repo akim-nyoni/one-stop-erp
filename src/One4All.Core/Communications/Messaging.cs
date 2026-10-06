@@ -13,6 +13,9 @@ public enum MessageChannel
 
     /// <summary>SMS.</summary>
     Sms = 3,
+
+    /// <summary>WhatsApp (Cloud API), with delivery and read receipts.</summary>
+    WhatsApp = 4,
 }
 
 /// <summary>Where an outbound message stands.</summary>
@@ -219,6 +222,40 @@ public sealed class OutboundMessage : Entity, ICompanyScoped
         AttachmentContent = content;
     }
 
+    /// <summary>Gets when the provider reported it delivered to the handset.</summary>
+    public DateTimeOffset? DeliveredAt { get; private set; }
+
+    /// <summary>Gets when the provider reported it read.</summary>
+    public DateTimeOffset? ReadAt { get; private set; }
+
+    /// <summary>
+    /// Records a receipt from the provider: delivered, read (which implies delivered), or failed after sending (the handset could not be
+    /// reached, the 24-hour window had closed...). Receipts arrive out of order, so a later state is never undone by an earlier one.
+    /// </summary>
+    /// <param name="status">The provider's status (sent, delivered, read, failed).</param>
+    /// <param name="at">When it happened.</param>
+    /// <param name="error">The provider's error, for a failure.</param>
+    /// <returns>True when it changed anything.</returns>
+    public bool RecordReceipt(string status, DateTimeOffset at, string? error = null)
+    {
+        switch ((status ?? string.Empty).ToLowerInvariant())
+        {
+            case "delivered" when DeliveredAt is null:
+                DeliveredAt = at;
+                return true;
+            case "read" when ReadAt is null:
+                ReadAt = at;
+                DeliveredAt ??= at;
+                return true;
+            case "failed" when DeliveredAt is null && Status != MessageStatus.Failed:
+                Status = MessageStatus.Failed;
+                LastError = string.IsNullOrWhiteSpace(error) ? "The provider could not deliver it." : (error.Length > 1000 ? error[..1000] : error);
+                return true;
+            default:
+                return false;
+        }
+    }
+
     /// <summary>Records a successful attempt.</summary>
     /// <param name="reference">The gateway's reference.</param>
     /// <param name="at">When.</param>
@@ -296,4 +333,68 @@ public sealed class UserNotification : Entity, ICompanyScoped
     /// <summary>Marks it read.</summary>
     /// <param name="at">When.</param>
     public void MarkRead(DateTimeOffset at) => ReadAt ??= at;
+}
+
+/// <summary>A message received from outside (a WhatsApp reply), matched to the customer or lead whose number it came from (<c>comms.inbound_message</c>).</summary>
+public sealed class InboundMessage : Entity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private InboundMessage()
+    {
+        From = string.Empty;
+        Body = string.Empty;
+        ProviderReference = string.Empty;
+    }
+
+    /// <summary>Records a received message.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="channel">The channel.</param>
+    /// <param name="from">The sender's number.</param>
+    /// <param name="senderName">The sender's profile name.</param>
+    /// <param name="body">The text (or a description of non-text content).</param>
+    /// <param name="receivedAt">When it was sent.</param>
+    /// <param name="providerReference">The provider's message id (one record per id).</param>
+    public InboundMessage(long companyId, MessageChannel channel, string from, string? senderName, string body, DateTimeOffset receivedAt, string providerReference)
+    {
+        CompanyId = companyId;
+        Channel = channel;
+        From = from;
+        SenderName = senderName;
+        Body = body;
+        ReceivedAt = receivedAt;
+        ProviderReference = providerReference;
+    }
+
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; private set; }
+
+    /// <summary>Gets the channel.</summary>
+    public MessageChannel Channel { get; private set; }
+
+    /// <summary>Gets the sender's number.</summary>
+    public string From { get; private set; }
+
+    /// <summary>Gets the sender's profile name.</summary>
+    public string? SenderName { get; private set; }
+
+    /// <summary>Gets the text.</summary>
+    public string Body { get; private set; }
+
+    /// <summary>Gets when it was sent.</summary>
+    public DateTimeOffset ReceivedAt { get; private set; }
+
+    /// <summary>Gets the provider's message id.</summary>
+    public string ProviderReference { get; private set; }
+
+    /// <summary>Gets or sets the customer whose number it came from.</summary>
+    public long? CustomerId { get; set; }
+
+    /// <summary>Gets or sets the CRM lead whose number it came from.</summary>
+    public long? LeadId { get; set; }
+
+    /// <summary>Gets or sets when someone dealt with it.</summary>
+    public DateTimeOffset? HandledAt { get; set; }
+
+    /// <summary>Gets or sets who dealt with it.</summary>
+    public long? HandledByUserId { get; set; }
 }

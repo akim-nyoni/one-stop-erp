@@ -65,6 +65,9 @@ public sealed class MessagingOptions
 
     /// <summary>Gets or sets the SMS settings.</summary>
     public SmsOptions Sms { get; set; } = new();
+
+    /// <summary>Gets or sets the WhatsApp Cloud API settings.</summary>
+    public WhatsAppOptions WhatsApp { get; set; } = new();
 }
 
 /// <summary>Sends email through SMTP (brief §8), with an attachment when given.</summary>

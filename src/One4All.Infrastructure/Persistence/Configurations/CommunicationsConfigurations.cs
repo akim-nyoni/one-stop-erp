@@ -48,6 +48,7 @@ internal sealed class OutboundMessageConfiguration : IEntityTypeConfiguration<Ou
         b.Property(x => x.AttachmentContentType).HasMaxLength(100);
         b.HasOne<DespatchBatch>().WithMany().HasForeignKey(x => x.BatchId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.CompanyId, x.Status });
+        b.HasIndex(x => x.ProviderReference);
         b.HasIndex(x => x.BatchId);
     }
 }
@@ -61,5 +62,21 @@ internal sealed class UserNotificationConfiguration : IEntityTypeConfiguration<U
         b.Property(x => x.Title).HasMaxLength(300);
         b.Property(x => x.Body).HasMaxLength(4000);
         b.HasIndex(x => new { x.UserId, x.ReadAt });
+    }
+}
+
+internal sealed class InboundMessageConfiguration : IEntityTypeConfiguration<InboundMessage>
+{
+    public void Configure(EntityTypeBuilder<InboundMessage> b)
+    {
+        b.ToTable("inbound_message", Schemas.Communications);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Channel).HasConversion<int>();
+        b.Property(x => x.From).HasMaxLength(30);
+        b.Property(x => x.SenderName).HasMaxLength(200);
+        b.Property(x => x.Body).HasMaxLength(4096);
+        b.Property(x => x.ProviderReference).HasMaxLength(200);
+        b.HasIndex(x => x.ProviderReference).IsUnique();
+        b.HasIndex(x => new { x.CompanyId, x.HandledAt });
     }
 }

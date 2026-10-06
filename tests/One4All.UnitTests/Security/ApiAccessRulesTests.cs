@@ -35,7 +35,7 @@ public sealed partial class ApiAccessRulesTests
     {
         string program = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "One4All.Server", "Program.cs"));
         List<string> ungoverned = [.. Route().Matches(program).Select(m => m.Groups[1].Value).Distinct()
-            .Where(path => path != "/api/auth/login" && ApiAccessRules.Requirement("GET", path) is null)];
+            .Where(path => !ApiAccessRules.AnonymousRoutes.Contains(path) && ApiAccessRules.Requirement("GET", path) is null)];
         ungoverned.Should().BeEmpty("every API area needs a permission module in ApiAccessRules");
     }
 

@@ -217,6 +217,26 @@ app.MapPost("/api/auth/login", async (LoginRequest request, IAuthenticationServi
 .AllowAnonymous()
 .WithName("Login");
 
+// WhatsApp Cloud API webhook: Meta calls these without a user; the GET is the subscription handshake and every POST is signed with the app secret.
+app.MapGet("/api/webhooks/whatsapp", (HttpRequest request, One4All.Application.Abstractions.Communications.IWhatsAppWebhookService whatsApp) =>
+    whatsApp.VerifySubscription(request.Query["hub.mode"], request.Query["hub.verify_token"], request.Query["hub.challenge"]) is string challenge
+        ? Results.Text(challenge)
+        : Results.StatusCode(StatusCodes.Status403Forbidden))
+.AllowAnonymous()
+.WithName("WhatsAppWebhookVerify");
+
+app.MapPost("/api/webhooks/whatsapp", async (HttpRequest request, One4All.Application.Abstractions.Communications.IWhatsAppWebhookService whatsApp, CancellationToken ct) =>
+{
+    using MemoryStream buffer = new();
+    await request.Body.CopyToAsync(buffer, ct).ConfigureAwait(false);
+    Result<One4All.Application.Abstractions.Communications.WhatsAppWebhookResult> processed =
+        await whatsApp.ProcessAsync(buffer.ToArray(), request.Headers["X-Hub-Signature-256"].FirstOrDefault(), ct).ConfigureAwait(false);
+    return processed.IsSuccess ? Results.Ok(processed.Value)
+        : processed.Error.Code == "WhatsApp.Signature" ? Results.StatusCode(StatusCodes.Status401Unauthorized) : Results.BadRequest(new { error = processed.Error.Message });
+})
+.AllowAnonymous()
+.WithName("WhatsAppWebhook");
+
 app.MapGet("/api/me", (ClaimsPrincipal user) => Results.Ok(new
 {
     userId = user.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub),
