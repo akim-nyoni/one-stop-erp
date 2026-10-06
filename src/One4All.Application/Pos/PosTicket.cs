@@ -34,7 +34,8 @@ public sealed record PosSaleContext(
     string ChangeAccountCode,
     IReadOnlyDictionary<TenderType, string> TenderAccounts,
     bool AgeVerified = false,
-    string? PrescriptionReference = null);
+    string? PrescriptionReference = null,
+    string? DiscountAccountCode = null);
 
 /// <summary>
 /// One line on a POS ticket. Prices are tax-exclusive (a menu/item <c>Price</c> is a net price, matching
@@ -48,6 +49,7 @@ public sealed class PosTicketLine
         ItemId = itemId;
         Description = description;
         UnitPriceNet = unitPriceNet;
+        ListUnitPriceNet = unitPriceNet;
         TaxRate = taxRate;
         RevenueAccountCode = revenueAccountCode;
         TaxCode = taxCode;
@@ -60,8 +62,27 @@ public sealed class PosTicketLine
     /// <summary>The line description shown on screen and the receipt.</summary>
     public string Description { get; }
 
-    /// <summary>The tax-exclusive unit price.</summary>
-    public decimal UnitPriceNet { get; }
+    /// <summary>The tax-exclusive unit price charged (the list price unless overridden).</summary>
+    public decimal UnitPriceNet { get; private set; }
+
+    /// <summary>Gets the price the line was rung up at, before any override.</summary>
+    public decimal ListUnitPriceNet { get; private set; }
+
+    /// <summary>Gets a value indicating whether the price was overridden.</summary>
+    public bool IsOverridden => UnitPriceNet != ListUnitPriceNet;
+
+    /// <summary>Gets the discount as a percentage of the line, if one was given that way.</summary>
+    public decimal? DiscountPercent { get; private set; }
+
+    /// <summary>Gets the discount as a fixed amount, if one was given that way.</summary>
+    public decimal? DiscountAmount { get; private set; }
+
+    /// <summary>Gets the line value before its discount.</summary>
+    public decimal LineNetBeforeDiscount => PosMoney.Round(Quantity * UnitPriceNet);
+
+    /// <summary>Gets the net discount on the line (a percentage follows the quantity; a fixed amount never exceeds the line).</summary>
+    public decimal Discount => DiscountPercent is decimal percent ? PosMoney.Round(LineNetBeforeDiscount * percent / 100m)
+        : DiscountAmount is decimal amount ? Math.Min(amount, LineNetBeforeDiscount) : 0m;
 
     /// <summary>The tax rate as a fraction (e.g. 0.15 for 15%).</summary>
     public decimal TaxRate { get; }
@@ -75,14 +96,28 @@ public sealed class PosTicketLine
     /// <summary>The quantity sold (settable so the terminal can +/- a line).</summary>
     public decimal Quantity { get; set; }
 
-    /// <summary>The net line value (quantity × unit price), rounded to two decimals.</summary>
-    public decimal LineNet => PosMoney.Round(Quantity * UnitPriceNet);
+    /// <summary>The net line value (quantity × unit price, less any discount), rounded to two decimals.</summary>
+    public decimal LineNet => LineNetBeforeDiscount - Discount;
 
     /// <summary>The tax on the line, rounded to two decimals.</summary>
     public decimal TaxAmount => PosMoney.Round(LineNet * TaxRate);
 
     /// <summary>The gross line value (net + tax).</summary>
     public decimal LineGross => LineNet + TaxAmount;
+
+    internal void SetDiscount(decimal? percent, decimal? amount)
+    {
+        DiscountPercent = percent;
+        DiscountAmount = amount;
+    }
+
+    internal void SetPrice(decimal unitPriceNet) => UnitPriceNet = unitPriceNet;
+
+    internal void Restore(decimal listUnitPriceNet, decimal discount)
+    {
+        ListUnitPriceNet = listUnitPriceNet;
+        DiscountAmount = discount > 0m ? discount : null;
+    }
 }
 
 /// <summary>A tender taken against a ticket.</summary>
@@ -172,6 +207,108 @@ public sealed class PosTicket
         return line;
     }
 
+    /// <summary>
+    /// Discounts a line by a percentage (0–100; 0 removes the discount). Discounts above <paramref name="unsupervisedLimitPercent"/> need a
+    /// supervisor: the caller passes <paramref name="supervised"/> once one has authorised it.
+    /// </summary>
+    /// <param name="line">The line.</param>
+    /// <param name="percent">The percentage.</param>
+    /// <param name="unsupervisedLimitPercent">The most a cashier may give alone.</param>
+    /// <param name="supervised">Whether a supervisor authorised it.</param>
+    /// <returns>Success, or why not (<c>Pos.SupervisorRequired</c> asks for a supervisor).</returns>
+    public Result DiscountLine(PosTicketLine line, decimal percent, decimal unsupervisedLimitPercent, bool supervised)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        if (!_lines.Contains(line) || percent is < 0m or > 100m)
+        {
+            return Result.Failure(Error.Validation("Pos.Discount", "A discount is between 0% and 100% of a line on this ticket."));
+        }
+
+        if (percent > unsupervisedLimitPercent && !supervised)
+        {
+            return Result.Failure(Error.Rule("Pos.SupervisorRequired", $"A discount over {unsupervisedLimitPercent:0.##}% needs a supervisor."));
+        }
+
+        line.SetDiscount(percent == 0m ? null : percent, null);
+        return Result.Success();
+    }
+
+    /// <summary>Discounts every line by the same percentage (a whole-sale discount), with the same supervisor rule.</summary>
+    /// <param name="percent">The percentage.</param>
+    /// <param name="unsupervisedLimitPercent">The most a cashier may give alone.</param>
+    /// <param name="supervised">Whether a supervisor authorised it.</param>
+    /// <returns>Success, or why not.</returns>
+    public Result DiscountSale(decimal percent, decimal unsupervisedLimitPercent, bool supervised)
+    {
+        if (_lines.Count == 0)
+        {
+            return Result.Failure(Error.Validation("Pos.Empty", "The ticket has no lines."));
+        }
+
+        foreach (PosTicketLine line in _lines)
+        {
+            Result applied = DiscountLine(line, percent, unsupervisedLimitPercent, supervised);
+            if (applied.IsFailure)
+            {
+                return applied;
+            }
+        }
+
+        return Result.Success();
+    }
+
+    /// <summary>Overrides a line's unit price (always supervised: the caller passes <paramref name="supervised"/> once authorised).</summary>
+    /// <param name="line">The line.</param>
+    /// <param name="unitPriceNet">The new tax-exclusive unit price.</param>
+    /// <param name="supervised">Whether a supervisor authorised it.</param>
+    /// <returns>Success, or why not.</returns>
+    public Result OverridePrice(PosTicketLine line, decimal unitPriceNet, bool supervised)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        if (!_lines.Contains(line) || unitPriceNet < 0m)
+        {
+            return Result.Failure(Error.Validation("Pos.Price", "The price must not be negative, on a line of this ticket."));
+        }
+
+        if (!supervised)
+        {
+            return Result.Failure(Error.Rule("Pos.SupervisorRequired", "A price override needs a supervisor."));
+        }
+
+        line.SetPrice(PosMoney.Round(unitPriceNet));
+        return Result.Success();
+    }
+
+    /// <summary>The ticket's lines as sale lines (for parking it, or posting it).</summary>
+    /// <param name="discountAccountCode">The account discounts post to (needed when any line is discounted).</param>
+    /// <returns>The lines.</returns>
+    public IReadOnlyList<PosSaleLineRequest> SaleLines(string? discountAccountCode = null)
+        => [.. _lines.Select(l => new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPriceNet, l.LineNet, l.TaxAmount, l.RevenueAccountCode,
+            l.Discount, l.Discount > 0m ? discountAccountCode : null, l.Discount > 0m ? (l.IsOverridden ? "OVERRIDE+DISC" : "MANUAL") : null))];
+
+    /// <summary>Loads parked lines back onto an empty ticket (prices, discounts and quantities as parked; tax rates looked up again).</summary>
+    /// <param name="lines">The parked lines.</param>
+    /// <param name="taxRateFor">The tax rate for a line (by its revenue account and description).</param>
+    /// <returns>Success, or why not.</returns>
+    public Result Load(IEnumerable<PosSaleLineRequest> lines, Func<PosSaleLineRequest, decimal> taxRateFor)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        ArgumentNullException.ThrowIfNull(taxRateFor);
+        if (!IsEmpty)
+        {
+            return Result.Failure(Error.Rule("Pos.NotEmpty", "Finish or park the current sale first."));
+        }
+
+        foreach (PosSaleLineRequest parked in lines)
+        {
+            PosTicketLine line = new(parked.ItemId, parked.Description, parked.UnitPrice, taxRateFor(parked), parked.RevenueAccountCode, null) { Quantity = parked.Quantity };
+            line.Restore(parked.UnitPrice, parked.PromotionDiscount);
+            _lines.Add(line);
+        }
+
+        return Result.Success();
+    }
+
     /// <summary>Removes a line from the ticket.</summary>
     /// <param name="line">The line to remove.</param>
     public void RemoveLine(PosTicketLine line) => _lines.Remove(line);
@@ -220,9 +357,12 @@ public sealed class PosTicket
             return Error.Rule("Pos.Underpaid", $"The ticket is short by {BalanceDue:0.00}.");
         }
 
-        List<PosSaleLineRequest> lines = _lines
-            .Select(l => new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPriceNet, l.LineNet, l.TaxAmount, l.RevenueAccountCode))
-            .ToList();
+        if (_lines.Any(l => l.Discount > 0m) && string.IsNullOrWhiteSpace(context.DiscountAccountCode))
+        {
+            return Error.Validation("Pos.DiscountAccount", "No discount account is configured for discounted lines.");
+        }
+
+        List<PosSaleLineRequest> lines = [.. SaleLines(context.DiscountAccountCode)];
 
         List<PosTenderRequest> tenders = [];
         foreach (PosTicketTender tender in _tenders)

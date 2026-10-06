@@ -1,3 +1,5 @@
+using One4All.Application.Abstractions.Security;
+using One4All.Core.Security;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text.Json;
@@ -59,6 +61,16 @@ public sealed class PosCartLineVm(PosTicketLine line)
 
     /// <summary>The gross line value.</summary>
     public string LineGrossText => Line.LineGross.ToString("N2", CultureInfo.CurrentCulture);
+
+    /// <summary>Gets the adjustments on the line (price override, discount).</summary>
+    public string Detail => string.Join("  ", new[]
+    {
+        Line.IsOverridden ? $"price {Line.ListUnitPriceNet.ToString("N2", CultureInfo.CurrentCulture)} → {Line.UnitPriceNet.ToString("N2", CultureInfo.CurrentCulture)}" : null,
+        Line.Discount > 0m ? $"less {Line.Discount.ToString("N2", CultureInfo.CurrentCulture)}{(Line.DiscountPercent is decimal p ? $" ({p:0.##}%)" : string.Empty)}" : null,
+    }.Where(t => t is not null));
+
+    /// <summary>Gets or sets a value indicating whether this row is selected for an adjustment.</summary>
+    public bool IsSelected { get; init; }
 }
 
 /// <summary>
@@ -112,6 +124,44 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     /// <summary>The GL account card tenders post to.</summary>
     [ObservableProperty]
     private string _cardAccountCode = string.Empty;
+
+    /// <summary>The GL account mobile-money tenders post to.</summary>
+    [ObservableProperty]
+    private string _mobileMoneyAccountCode = string.Empty;
+
+    /// <summary>The GL account manual discounts post to.</summary>
+    [ObservableProperty]
+    private string _discountAccountCode = string.Empty;
+
+    /// <summary>The most a cashier may discount without a supervisor (percent).</summary>
+    [ObservableProperty]
+    private decimal _unsupervisedDiscountLimit = 10m;
+
+    /// <summary>The cart row selected for a discount or price override.</summary>
+    [ObservableProperty]
+    private PosCartLineVm? _selectedCartLine;
+
+    /// <summary>The supervisor authorising an override (user name; the PIN comes from the PIN box).</summary>
+    [ObservableProperty]
+    private string _supervisorName = string.Empty;
+
+    /// <summary>Gets or sets the supervisor's PIN (set from the PIN box, never shown).</summary>
+    public string SupervisorPin { get; set; } = string.Empty;
+
+    /// <summary>The loyalty member earning points on this sale.</summary>
+    [ObservableProperty]
+    private string _loyaltyMember = string.Empty;
+
+    /// <summary>The name a parked sale is filed under.</summary>
+    [ObservableProperty]
+    private string _parkTag = string.Empty;
+
+    /// <summary>The parked sale chosen to resume.</summary>
+    [ObservableProperty]
+    private ParkedSaleSummary? _selectedParkedSale;
+
+    /// <summary>Gets the parked sales waiting.</summary>
+    public ObservableCollection<ParkedSaleSummary> ParkedSales { get; } = [];
 
     /// <summary>The output-tax account.</summary>
     [ObservableProperty]
@@ -204,6 +254,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         await LoadTaxRatesAsync(db, ct).ConfigureAwait(true);
         await LoadProductsAsync(db, ct).ConfigureAwait(true);
         await PrefillAccountsAsync(db, ct).ConfigureAwait(true);
+        await RefreshParkedAsync().ConfigureAwait(true);
 
         PendingOfflineCount = await LocalQueue.CountAsync(ct).ConfigureAwait(true);
 
@@ -293,6 +344,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         CardAccountCode = FindByName(accounts, "card", "clearing") ?? CashAccountCode;
         TaxAccountCode = FindByName(accounts, "vat", "output tax", "tax") ?? TaxAccountCode;
         OverShortAccountCode = FindByName(accounts, "over", "short", "variance") ?? OverShortAccountCode;
+        DiscountAccountCode = FindByName(accounts, "discount allowed", "discounts allowed", "sales discount") ?? DiscountAccountCode;
+        MobileMoneyAccountCode = FindByName(accounts, "mobile money", "ecocash", "wallet") ?? MobileMoneyAccountCode;
     }
 
     private static string? FindByName(IEnumerable<LedgerAccount> accounts, params string[] keywords) =>
@@ -471,6 +524,215 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             : $"Balance {BalanceText} due.";
     }
 
+    /// <summary>Selects a cart line for a discount or price override (tapping it again clears the selection).</summary>
+    /// <param name="row">The row tapped.</param>
+    [RelayCommand]
+    private void SelectLine(PosCartLineVm? row)
+    {
+        SelectedCartLine = row is null || row.IsSelected ? null : row;
+        PosTicketLine? keep = SelectedCartLine?.Line;
+        Cart.Clear();
+        foreach (PosTicketLine line in _ticket.Lines)
+        {
+            PosCartLineVm rebuilt = new(line) { IsSelected = ReferenceEquals(line, keep) };
+            Cart.Add(rebuilt);
+            if (rebuilt.IsSelected)
+            {
+                SelectedCartLine = rebuilt;
+            }
+        }
+    }
+
+    /// <summary>Takes a mobile-money tender for the entered amount (or the exact balance when blank).</summary>
+    [RelayCommand]
+    private void TenderMobileMoney() => AddTender(TenderType.MobileMoney, allowOverTender: false);
+
+    /// <summary>Discounts the selected line by the percentage on the pad (a supervisor above the cashier's limit).</summary>
+    [RelayCommand]
+    private async Task DiscountLineAsync()
+    {
+        if (SelectedCartLine is not PosCartLineVm row || !TryEntry(out decimal percent))
+        {
+            StatusMessage = "Select a line and type the discount % on the pad.";
+            return;
+        }
+
+        long? supervisor = percent > UnsupervisedDiscountLimit ? await SupervisorAsync("Pos.Sale", OperationFlags.OverrideDiscount).ConfigureAwait(true) : null;
+        if (percent > UnsupervisedDiscountLimit && supervisor is null)
+        {
+            return;
+        }
+
+        decimal before = row.Line.LineNet;
+        Result applied = _ticket.DiscountLine(row.Line, percent, UnsupervisedDiscountLimit, supervisor is not null);
+        await AfterAdjustmentAsync(applied, PosEventKind.LineDiscount, $"{row.Line.Description}: {percent:0.##}% off", row.Line.LineNet, before, supervisor).ConfigureAwait(true);
+    }
+
+    /// <summary>Discounts the whole sale by the percentage on the pad.</summary>
+    [RelayCommand]
+    private async Task DiscountSaleAsync()
+    {
+        if (_ticket.Lines.Count == 0 || !TryEntry(out decimal percent))
+        {
+            StatusMessage = "Type the sale discount % on the pad.";
+            return;
+        }
+
+        long? supervisor = percent > UnsupervisedDiscountLimit ? await SupervisorAsync("Pos.Sale", OperationFlags.OverrideDiscount).ConfigureAwait(true) : null;
+        if (percent > UnsupervisedDiscountLimit && supervisor is null)
+        {
+            return;
+        }
+
+        decimal before = _ticket.SubtotalNet;
+        Result applied = _ticket.DiscountSale(percent, UnsupervisedDiscountLimit, supervisor is not null);
+        await AfterAdjustmentAsync(applied, PosEventKind.LineDiscount, $"Sale discount {percent:0.##}%", _ticket.SubtotalNet, before, supervisor).ConfigureAwait(true);
+    }
+
+    /// <summary>Overrides the selected line's unit price with the price on the pad (always supervised).</summary>
+    [RelayCommand]
+    private async Task OverridePriceAsync()
+    {
+        if (SelectedCartLine is not PosCartLineVm row || !TryEntry(out decimal price))
+        {
+            StatusMessage = "Select a line and type the new price on the pad.";
+            return;
+        }
+
+        if (await SupervisorAsync("Pos.PriceOverride", OperationFlags.OverridePrice).ConfigureAwait(true) is not long supervisor)
+        {
+            return;
+        }
+
+        decimal before = row.Line.UnitPriceNet;
+        Result applied = _ticket.OverridePrice(row.Line, price, supervised: true);
+        await AfterAdjustmentAsync(applied, PosEventKind.PriceOverride, $"{row.Line.Description}: price {before:N2} → {price:N2}", price, before, supervisor).ConfigureAwait(true);
+    }
+
+    /// <summary>Parks the current sale under a name so another customer can be served.</summary>
+    [RelayCommand]
+    private async Task ParkAsync()
+    {
+        if (!IsSessionOpen || _ticket.Lines.Count == 0 || _ticket.Tenders.Count > 0)
+        {
+            StatusMessage = _ticket.Tenders.Count > 0 ? "Clear the tenders before parking." : "Nothing to park.";
+            return;
+        }
+
+        string tag = string.IsNullOrWhiteSpace(ParkTag) ? $"Park {DateTime.Now:HH:mm}" : ParkTag.Trim();
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        Result<long> parked = await scope.ServiceProvider.GetRequiredService<IParkedSaleService>()
+            .ParkAsync(_companyId, _terminalId, tag, _cashierUserId, _ticket.SaleLines(NullIfBlank(DiscountAccountCode))).ConfigureAwait(true);
+        if (parked.IsFailure)
+        {
+            StatusMessage = parked.Error.Message;
+            return;
+        }
+
+        _ticket.Clear();
+        ParkTag = string.Empty;
+        RebuildCart();
+        await RefreshParkedAsync().ConfigureAwait(true);
+        StatusMessage = $"Sale parked as \"{tag}\".";
+    }
+
+    /// <summary>Brings the chosen parked sale back onto the (empty) ticket.</summary>
+    [RelayCommand]
+    private async Task ResumeAsync()
+    {
+        if (SelectedParkedSale is not ParkedSaleSummary chosen)
+        {
+            StatusMessage = "Choose a parked sale.";
+            return;
+        }
+
+        if (!_ticket.IsEmpty)
+        {
+            StatusMessage = "Finish or park the current sale first.";
+            return;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        Result<IReadOnlyList<PosSaleLineRequest>> lines = await scope.ServiceProvider.GetRequiredService<IParkedSaleService>()
+            .ResumeAsync(_companyId, chosen.Id, _terminalId, _cashierUserId).ConfigureAwait(true);
+        Result loaded = lines.IsSuccess ? _ticket.Load(lines.Value, l => l.LineNet == 0m ? 0m : Math.Round(l.TaxAmount / l.LineNet, 4)) : Result.Failure(lines.Error);
+        StatusMessage = loaded.IsSuccess ? $"Resumed \"{chosen.Tag}\"." : loaded.Error.Message;
+        RebuildCart();
+        await RefreshParkedAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>Reloads the parked sales.</summary>
+    [RelayCommand]
+    private async Task RefreshParkedAsync()
+    {
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        IReadOnlyList<ParkedSaleSummary> parked = await scope.ServiceProvider.GetRequiredService<IParkedSaleService>().ParkedAsync(_companyId).ConfigureAwait(true);
+        ParkedSales.Clear();
+        foreach (ParkedSaleSummary sale in parked)
+        {
+            ParkedSales.Add(sale);
+        }
+    }
+
+    // A supervisor's user name and PIN, checked now: they must hold the permission and not be the cashier.
+    private async Task<long?> SupervisorAsync(string permission, OperationFlags needed)
+    {
+        if (string.IsNullOrWhiteSpace(SupervisorName) || string.IsNullOrEmpty(SupervisorPin))
+        {
+            StatusMessage = "A supervisor must enter their name and PIN.";
+            return null;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        AuthenticationResult supervisor = await scope.ServiceProvider.GetRequiredService<IAuthenticationService>()
+            .AuthenticateByPinAsync(SupervisorName.Trim(), SupervisorPin, $"POS-{_terminalId}").ConfigureAwait(true);
+        SupervisorPin = string.Empty;
+        SupervisorPinCleared?.Invoke();
+        if (!supervisor.Succeeded || supervisor.UserId == _cashierUserId || !supervisor.Permissions.Has(permission, needed))
+        {
+            StatusMessage = !supervisor.Succeeded ? supervisor.Message ?? "Supervisor not recognised."
+                : supervisor.UserId == _cashierUserId ? "A cashier cannot authorise their own override." : "That supervisor may not authorise this.";
+            return null;
+        }
+
+        return supervisor.UserId;
+    }
+
+    /// <summary>Raised when the supervisor PIN has been used and the PIN box should be emptied.</summary>
+    public event Action? SupervisorPinCleared;
+
+    // Shows the adjustment and logs it as a till event (who, what, authorised by whom).
+    private async Task AfterAdjustmentAsync(Result applied, PosEventKind kind, string description, decimal amount, decimal original, long? supervisor)
+    {
+        if (applied.IsFailure)
+        {
+            StatusMessage = applied.Error.Message;
+            return;
+        }
+
+        TenderEntry = string.Empty;
+        RebuildCart();
+        StatusMessage = description + (supervisor is null ? "." : " (authorised).");
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<IPosEventService>().RecordAsync(new PosEventRequest
+            {
+                CompanyId = _companyId, TerminalId = _terminalId, TillSessionId = TillSessionId, CashierUserId = _cashierUserId, Kind = kind, Date = DateOnly.FromDateTime(DateTime.Today),
+                Description = description, Amount = amount, OriginalAmount = original, AuthorisedByUserId = supervisor,
+            }).ConfigureAwait(true);
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            // The adjustment stands; the event log catches up with the next online action.
+        }
+    }
+
+    private bool TryEntry(out decimal value)
+        => decimal.TryParse(TenderEntry, NumberStyles.Number, CultureInfo.CurrentCulture, out value);
+
+    private static string? NullIfBlank(string text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
     /// <summary>Clears all tenders taken so far, keeping the ticket lines.</summary>
     [RelayCommand]
     private void ClearTenders()
@@ -501,6 +763,11 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             tenderAccounts[TenderType.Card] = CardAccountCode.Trim();
         }
 
+        if (!string.IsNullOrWhiteSpace(MobileMoneyAccountCode))
+        {
+            tenderAccounts[TenderType.MobileMoney] = MobileMoneyAccountCode.Trim();
+        }
+
         string saleNumber = $"POS{_terminalId}-{DateTime.Now:yyMMddHHmmss}-{++_saleSequence}";
         PosSaleContext context = new(
             _companyId, _terminalId, TillSessionId, _cashierUserId,
@@ -509,7 +776,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             ChangeAccountCode: CashAccountCode.Trim(),
             TenderAccounts: tenderAccounts,
             AgeVerified: AgeVerified,
-            PrescriptionReference: string.IsNullOrWhiteSpace(PrescriptionReference) ? null : PrescriptionReference.Trim());
+            PrescriptionReference: string.IsNullOrWhiteSpace(PrescriptionReference) ? null : PrescriptionReference.Trim(),
+            DiscountAccountCode: NullIfBlank(DiscountAccountCode));
 
         Result<CompleteSaleRequest> build = _ticket.BuildSale(context);
         if (build.IsFailure)
@@ -533,6 +801,15 @@ public sealed partial class PosTerminalViewModel : ObservableObject
                 return;
             }
 
+            string loyalty = string.Empty;
+            if (NullIfBlank(LoyaltyMember) is string member)
+            {
+                Result<LoyaltyEarned> earned = await scope.ServiceProvider.GetRequiredService<ILoyaltyService>()
+                    .EarnAsync(request.CompanyId, member, result.Value.TotalGross, request.SaleDate, saleNumber).ConfigureAwait(true);
+                loyalty = earned.IsSuccess ? $" {member} earned {earned.Value.Points:0.##} point(s), balance {earned.Value.Balance:0.##}." : $" Loyalty not earned: {earned.Error.Message}";
+                LoyaltyMember = string.Empty;
+            }
+
             IPosReceiptService receipts = scope.ServiceProvider.GetRequiredService<IPosReceiptService>();
             Result<string> receipt = await receipts.RenderReceiptTextAsync(request.CompanyId, result.Value.SaleId).ConfigureAwait(true);
             LastReceiptText = receipt.IsSuccess ? receipt.Value : string.Empty;
@@ -541,7 +818,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             AgeVerified = false;
             PrescriptionReference = string.Empty;
             RebuildCart();
-            StatusMessage = $"Sale {saleNumber} posted (journal {result.Value.JournalNumber}). Change {change:N2}.";
+            StatusMessage = $"Sale {saleNumber} posted (journal {result.Value.JournalNumber}). Change {change:N2}.{loyalty}";
         }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
         {
@@ -701,9 +978,16 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     private void RebuildCart()
     {
         Cart.Clear();
+        PosTicketLine? selected = SelectedCartLine?.Line;
+        SelectedCartLine = null;
         foreach (PosTicketLine line in _ticket.Lines)
         {
-            Cart.Add(new PosCartLineVm(line));
+            PosCartLineVm row = new(line) { IsSelected = ReferenceEquals(line, selected) };
+            Cart.Add(row);
+            if (row.IsSelected)
+            {
+                SelectedCartLine = row;
+            }
         }
 
         RefreshTotals();

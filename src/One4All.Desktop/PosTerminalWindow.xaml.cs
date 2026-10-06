@@ -24,8 +24,11 @@ public partial class PosTerminalWindow : Window
         DataContext = _viewModel;
         InitializeComponent();
 
+        _viewModel.SupervisorPinCleared += () => SupervisorPinBox.Clear();
         Loaded += async (_, _) => await _viewModel.LoadAsync().ConfigureAwait(true);
     }
+
+    private void SupervisorPin_Changed(object sender, RoutedEventArgs e) => _viewModel.SupervisorPin = SupervisorPinBox.Password;
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 

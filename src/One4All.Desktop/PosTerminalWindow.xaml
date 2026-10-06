@@ -90,6 +90,49 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
+                    <!-- Till functions: adjustments (supervised), loyalty, park / resume -->
+                    <Border DockPanel.Dock="Bottom" Background="#1F2A33" CornerRadius="6" Padding="8" Margin="0,8,0,0">
+                        <StackPanel>
+                            <UniformGrid Columns="4">
+                                <StackPanel Margin="2">
+                                    <TextBlock Text="Supervisor" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBox Text="{Binding SupervisorName}" />
+                                </StackPanel>
+                                <StackPanel Margin="2">
+                                    <TextBlock Text="Supervisor PIN" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <PasswordBox x:Name="SupervisorPinBox" PasswordChanged="SupervisorPin_Changed" />
+                                </StackPanel>
+                                <StackPanel Margin="2">
+                                    <TextBlock Text="Loyalty member" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBox Text="{Binding LoyaltyMember}" />
+                                </StackPanel>
+                                <StackPanel Margin="2">
+                                    <TextBlock Text="Discount a/c" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBox Text="{Binding DiscountAccountCode}" />
+                                </StackPanel>
+                            </UniformGrid>
+                            <UniformGrid Columns="4" Margin="0,4,0,0">
+                                <Button Content="Line % off" Style="{StaticResource PadButton}" Height="40" FontSize="14" Background="#D35400" Command="{Binding DiscountLineCommand}" />
+                                <Button Content="Sale % off" Style="{StaticResource PadButton}" Height="40" FontSize="14" Background="#D35400" Command="{Binding DiscountSaleCommand}" />
+                                <Button Content="Price override" Style="{StaticResource PadButton}" Height="40" FontSize="14" Background="#A04000" Command="{Binding OverridePriceCommand}" />
+                                <Button Content="Park" Style="{StaticResource PadButton}" Height="40" FontSize="14" Background="#2C3E50" Command="{Binding ParkCommand}" />
+                            </UniformGrid>
+                            <DockPanel Margin="0,4,0,0">
+                                <Button Content="Resume" Style="{StaticResource PadButton}" Height="34" Width="100" FontSize="14" Background="#2C3E50" Command="{Binding ResumeCommand}" DockPanel.Dock="Right" />
+                                <TextBox Width="120" Text="{Binding ParkTag}" ToolTip="Name to park the sale under" DockPanel.Dock="Left" Margin="2,0,6,0" />
+                                <ComboBox ItemsSource="{Binding ParkedSales}" SelectedItem="{Binding SelectedParkedSale}" Margin="0,0,6,0">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock><Run Text="{Binding Tag}" /><Run Text="  ·  " /><Run Text="{Binding Total, StringFormat=N2}" /><Run Text="  ·  " /><Run Text="{Binding ParkedAt, StringFormat=HH:mm}" /></TextBlock>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </DockPanel>
+                            <TextBlock Foreground="{StaticResource Muted}" FontSize="11" Margin="2,4,0,0" TextWrapping="Wrap"
+                                       Text="Tap a cart line to select it, type the % or price on the pad, then press the button. Over the cashier's limit, and every price override, needs a supervisor's name and PIN." />
+                        </StackPanel>
+                    </Border>
+
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding Products}">
                             <ItemsControl.ItemsPanel>
@@ -125,7 +168,7 @@
                     <!-- Session / account setup -->
                     <Border Grid.Row="0" Background="#1F2A33" CornerRadius="6" Padding="8" Margin="0,0,0,8">
                         <StackPanel>
-                            <UniformGrid Columns="3">
+                            <UniformGrid Columns="4">
                                 <StackPanel Margin="2">
                                     <TextBlock Text="Cash a/c" Foreground="{StaticResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding CashAccountCode}" />
@@ -137,6 +180,10 @@
                                 <StackPanel Margin="2">
                                     <TextBlock Text="Tax a/c" Foreground="{StaticResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding TaxAccountCode}" />
+                                </StackPanel>
+                                <StackPanel Margin="2">
+                                    <TextBlock Text="Mobile money a/c" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBox Text="{Binding MobileMoneyAccountCode}" />
                                 </StackPanel>
                             </UniformGrid>
                             <UniformGrid Columns="2" Margin="0,4,0,0">
@@ -178,6 +225,19 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type vm:PosCartLineVm}">
                                     <Grid Margin="2">
+                                        <Grid.Style>
+                                            <Style TargetType="Grid">
+                                                <Setter Property="Background" Value="Transparent" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                        <Setter Property="Background" Value="#2E4A62" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Grid.Style>
+                                        <Grid.InputBindings>
+                                            <MouseBinding Gesture="LeftClick" Command="{Binding DataContext.SelectLineCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
+                                        </Grid.InputBindings>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
@@ -188,6 +248,7 @@
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                             <TextBlock Text="{Binding Description}" Foreground="White" FontSize="15" />
                                             <TextBlock Text="{Binding Quantity, StringFormat='× {0}'}" Foreground="{StaticResource Muted}" FontSize="12" />
+                                            <TextBlock Text="{Binding Detail}" Foreground="#F5B041" FontSize="12" />
                                         </StackPanel>
                                         <TextBlock Grid.Column="1" Text="{Binding LineGrossText}" Foreground="White" FontSize="15"
                                                    VerticalAlignment="Center" Margin="6,0" MinWidth="64" TextAlignment="Right" />
@@ -247,7 +308,10 @@
                         <!-- Tender / complete -->
                         <StackPanel Grid.Column="1">
                             <Button Content="CASH" Style="{StaticResource PadButton}" Height="64" Background="#2980B9" Command="{Binding TenderCashCommand}" />
-                            <Button Content="CARD" Style="{StaticResource PadButton}" Height="64" Background="#8E44AD" Command="{Binding TenderCardCommand}" />
+                            <UniformGrid Columns="2">
+                                <Button Content="CARD" Style="{StaticResource PadButton}" Height="64" Background="#8E44AD" Command="{Binding TenderCardCommand}" />
+                                <Button Content="MOBILE" Style="{StaticResource PadButton}" Height="64" Background="#117A65" Command="{Binding TenderMobileMoneyCommand}" />
+                            </UniformGrid>
                             <Button Content="PAY / COMPLETE" Style="{StaticResource PadButton}" Height="72" FontSize="22" Background="#27AE60" Command="{Binding PayCommand}" />
                             <UniformGrid Columns="2">
                                 <Button Content="Clear Tenders" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#7F8C8D" Command="{Binding ClearTendersCommand}" />
