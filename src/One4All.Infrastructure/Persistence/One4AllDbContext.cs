@@ -152,6 +152,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Stock balances (item × warehouse).</summary>
     public DbSet<Core.Inventory.StockBalance> StockBalances => Set<Core.Inventory.StockBalance>();
 
+    /// <summary>Approvers added to workflow instances (by hand or escalation).</summary>
+    public DbSet<Core.Workflow.WorkflowInstanceApprover> WorkflowInstanceApprovers => Set<Core.Workflow.WorkflowInstanceApprover>();
+
+    /// <summary>Approval delegations while approvers are away.</summary>
+    public DbSet<Core.Workflow.ApprovalDelegation> ApprovalDelegations => Set<Core.Workflow.ApprovalDelegation>();
+
     /// <summary>Bin locations.</summary>
     public DbSet<Core.Inventory.WarehouseBin> WarehouseBins => Set<Core.Inventory.WarehouseBin>();
 

@@ -65,6 +65,9 @@ public sealed class WorkflowInstance : AuditableEntity, ICompanyScoped
     /// <summary>The approvals/actions recorded.</summary>
     public IReadOnlyList<WorkflowApproval> Approvals => _approvals.AsReadOnly();
 
+    /// <summary>When the instance entered its current stage (escalation runs from here; null: since it was created).</summary>
+    public DateTimeOffset? StageEnteredOnUtc { get; private set; }
+
     /// <summary>
     /// Records an action by a user and advances the workflow. Eligibility must be checked by the caller.
     /// </summary>
@@ -74,7 +77,8 @@ public sealed class WorkflowInstance : AuditableEntity, ICompanyScoped
     /// <param name="comment">An optional comment (mandatory for reject/return by policy).</param>
     /// <param name="nowUtc">The current time.</param>
     /// <returns>The updated status, or a rule error.</returns>
-    public Result<WorkflowStatus> Act(IReadOnlyList<WorkflowStage> applicableStages, long userId, WorkflowActionType action, string? comment, DateTimeOffset nowUtc)
+    /// <param name="onBehalfOfUserId">The approver a delegate acts for, if any.</param>
+    public Result<WorkflowStatus> Act(IReadOnlyList<WorkflowStage> applicableStages, long userId, WorkflowActionType action, string? comment, DateTimeOffset nowUtc, long? onBehalfOfUserId = null)
     {
         if (Status != WorkflowStatus.InProgress)
         {
@@ -92,7 +96,7 @@ public sealed class WorkflowInstance : AuditableEntity, ICompanyScoped
             return Error.Validation("Workflow.CommentRequired", "A comment is required to reject or return.");
         }
 
-        _approvals.Add(new WorkflowApproval(CurrentStageSequence, userId, action, comment, nowUtc));
+        _approvals.Add(new WorkflowApproval(CurrentStageSequence, userId, action, comment, nowUtc) { OnBehalfOfUserId = onBehalfOfUserId });
 
         switch (action)
         {
@@ -117,6 +121,7 @@ public sealed class WorkflowInstance : AuditableEntity, ICompanyScoped
                     else
                     {
                         CurrentStageSequence = next.Sequence;
+                        StageEnteredOnUtc = nowUtc;
                     }
                 }
 
@@ -128,11 +133,13 @@ public sealed class WorkflowInstance : AuditableEntity, ICompanyScoped
 
     /// <summary>Resubmits a returned workflow to the first applicable stage.</summary>
     /// <param name="firstStageSequence">The first applicable stage sequence.</param>
-    public void Resubmit(int firstStageSequence)
+    /// <param name="nowUtc">When it was resubmitted (escalation restarts from here).</param>
+    public void Resubmit(int firstStageSequence, DateTimeOffset? nowUtc = null)
     {
         if (Status == WorkflowStatus.Returned)
         {
             CurrentStageSequence = firstStageSequence;
+            StageEnteredOnUtc = nowUtc;
             Status = firstStageSequence == 0 ? WorkflowStatus.Approved : WorkflowStatus.InProgress;
         }
     }
@@ -178,4 +185,7 @@ public sealed class WorkflowApproval : Entity
 
     /// <summary>When it occurred.</summary>
     public DateTimeOffset OccurredOnUtc { get; private set; }
+
+    /// <summary>Gets the approver a delegate acted for, if any.</summary>
+    public long? OnBehalfOfUserId { get; init; }
 }

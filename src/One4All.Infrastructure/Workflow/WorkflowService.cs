@@ -81,16 +81,15 @@ public sealed class WorkflowService : IWorkflowService
                 continue;
             }
 
-            // Eligible when the stage names this user, or names nobody (anyone may act).
-            bool eligible = stage.EligibleUserIds.Count == 0 || stage.EligibleUserIds.Contains(userId);
-            bool alreadyApproved = instance.Approvals.Any(a => a.StageSequence == stage.Sequence && a.UserId == userId && a.Action == WorkflowActionType.Approve);
-            if (!eligible || alreadyApproved)
+            (bool eligible, long? onBehalfOf) = await EligibilityAsync(instance, stage, userId, ct).ConfigureAwait(false);
+            if (!eligible || AlreadyApproved(instance, stage.Sequence, userId, onBehalfOf))
             {
                 continue;
             }
 
             int approvalsSoFar = instance.Approvals.Count(a => a.StageSequence == stage.Sequence && a.Action == WorkflowActionType.Approve);
-            pending.Add(new PendingApproval(instance.Id, instance.DocumentType, instance.DocumentReference, instance.Value, instance.InitiatedByUserId, stage.Sequence, stage.Name, approvalsSoFar, stage.Quorum));
+            pending.Add(new PendingApproval(instance.Id, instance.DocumentType, instance.DocumentReference, instance.Value, instance.InitiatedByUserId, stage.Sequence, stage.Name, approvalsSoFar, stage.Quorum,
+                onBehalfOf));
         }
 
         return pending;
@@ -122,12 +121,22 @@ public sealed class WorkflowService : IWorkflowService
         List<WorkflowStage> applicable = definition.Stages.Where(s => s.AppliesTo(instance.Value)).OrderBy(s => s.Sequence).ToList();
         WorkflowStage? currentStage = applicable.FirstOrDefault(s => s.Sequence == instance.CurrentStageSequence);
 
-        if (currentStage is not null && currentStage.EligibleUserIds.Count > 0 && !currentStage.EligibleUserIds.Contains(userId))
+        long? onBehalfOf = null;
+        if (currentStage is not null)
         {
-            return Error.Forbidden("Workflow.NotEligible", $"User {userId} may not approve stage '{currentStage.Name}'.");
+            (bool eligible, onBehalfOf) = await EligibilityAsync(instance, currentStage, userId, ct).ConfigureAwait(false);
+            if (!eligible)
+            {
+                return Error.Forbidden("Workflow.NotEligible", $"User {userId} may not approve stage '{currentStage.Name}'.");
+            }
+
+            if (action == WorkflowActionType.Approve && AlreadyApproved(instance, currentStage.Sequence, userId, onBehalfOf))
+            {
+                return Error.Conflict("Workflow.AlreadyApproved", "That approval has already been given at this stage.");
+            }
         }
 
-        Result<WorkflowStatus> result = instance.Act(applicable, userId, action, comment, _clock.UtcNow);
+        Result<WorkflowStatus> result = instance.Act(applicable, userId, action, comment, _clock.UtcNow, onBehalfOf);
         if (result.IsFailure)
         {
             return result;
@@ -145,4 +154,94 @@ public sealed class WorkflowService : IWorkflowService
             ? Error.NotFound("Workflow.InstanceNotFound", $"Workflow instance {instanceId} not found.")
             : instance.Status;
     }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> DelegateAsync(long companyId, long fromUserId, long toUserId, DateOnly startsOn, DateOnly endsOn, string reason, CancellationToken ct = default)
+    {
+        if (fromUserId == toUserId || endsOn < startsOn || string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Workflow.DelegationInvalid", "A delegation is to someone else, for a period, with a reason.");
+        }
+
+        if (await _db.ApprovalDelegations.AnyAsync(d => d.CompanyId == companyId && d.FromUserId == fromUserId && !d.Withdrawn && d.StartsOn <= endsOn && d.EndsOn >= startsOn, ct).ConfigureAwait(false))
+        {
+            return Error.Conflict("Workflow.DelegationOverlap", "The approver already has a delegation covering some of those dates.");
+        }
+
+        ApprovalDelegation delegation = new(companyId, fromUserId, toUserId, startsOn, endsOn, reason.Trim());
+        _db.ApprovalDelegations.Add(delegation);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return delegation.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> AddApproverAsync(long instanceId, long userId, long addedByUserId, CancellationToken ct = default)
+    {
+        WorkflowInstance? instance = await _db.WorkflowInstances.FirstOrDefaultAsync(i => i.Id == instanceId, ct).ConfigureAwait(false);
+        if (instance is null || instance.Status != WorkflowStatus.InProgress)
+        {
+            return Result.Failure(Error.Rule("Workflow.NotInProgress", "Approvers can only be added to a workflow in progress."));
+        }
+
+        if (await _db.WorkflowInstanceApprovers.AnyAsync(a => a.WorkflowInstanceId == instanceId && a.StageSequence == instance.CurrentStageSequence && a.UserId == userId, ct).ConfigureAwait(false))
+        {
+            return Result.Success();
+        }
+
+        _db.WorkflowInstanceApprovers.Add(new WorkflowInstanceApprover(instanceId, instance.CurrentStageSequence, userId, AddedApproverReason.AdHoc, addedByUserId, _clock.UtcNow));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<int> EscalateOverdueAsync(long companyId, CancellationToken ct = default)
+    {
+        DateTimeOffset now = _clock.UtcNow;
+        List<WorkflowInstance> open = await _db.WorkflowInstances.Where(i => i.CompanyId == companyId && i.Status == WorkflowStatus.InProgress).ToListAsync(ct).ConfigureAwait(false);
+        List<long> definitionIds = [.. open.Select(i => i.WorkflowDefinitionId).Distinct()];
+        Dictionary<long, WorkflowDefinition> definitions = await _db.WorkflowDefinitions.Include(d => d.Stages).Where(d => definitionIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, ct).ConfigureAwait(false);
+        List<long> ids = [.. open.Select(i => i.Id)];
+        List<WorkflowInstanceApprover> added = await _db.WorkflowInstanceApprovers.Where(a => ids.Contains(a.WorkflowInstanceId) && a.Reason == AddedApproverReason.Escalated).ToListAsync(ct).ConfigureAwait(false);
+        int escalated = 0;
+        foreach (WorkflowInstance instance in open)
+        {
+            WorkflowStage? stage = definitions.GetValueOrDefault(instance.WorkflowDefinitionId)?.Stages.FirstOrDefault(s => s.Sequence == instance.CurrentStageSequence);
+            DateTimeOffset entered = instance.StageEnteredOnUtc ?? instance.CreatedOnUtc;
+            if (stage is not { EscalateAfterHours: int hours, EscalateToUserId: long to } || now - entered < TimeSpan.FromHours(hours)
+                || added.Any(a => a.WorkflowInstanceId == instance.Id && a.StageSequence == stage.Sequence && a.AddedOnUtc >= entered))
+            {
+                continue;
+            }
+
+            _db.WorkflowInstanceApprovers.Add(new WorkflowInstanceApprover(instance.Id, stage.Sequence, to, AddedApproverReason.Escalated, null, now));
+            escalated++;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return escalated;
+    }
+
+    // Whether a user may act at a stage: named on it (or it names nobody), added to this instance's stage, or the delegate of someone who
+    // may — then acting on their behalf.
+    private async Task<(bool Eligible, long? OnBehalfOf)> EligibilityAsync(WorkflowInstance instance, WorkflowStage stage, long userId, CancellationToken ct)
+    {
+        List<long> extra = await _db.WorkflowInstanceApprovers.Where(a => a.WorkflowInstanceId == instance.Id && a.StageSequence == stage.Sequence).Select(a => a.UserId).ToListAsync(ct).ConfigureAwait(false);
+        bool open = stage.EligibleUserIds.Count == 0 && extra.Count == 0;
+        bool Direct(long user) => open || stage.EligibleUserIds.Contains(user) || extra.Contains(user);
+        if (Direct(userId))
+        {
+            return (true, null);
+        }
+
+        DateOnly today = DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime);
+        List<ApprovalDelegation> covering = await _db.ApprovalDelegations.Where(d => d.CompanyId == instance.CompanyId && d.ToUserId == userId && !d.Withdrawn && d.StartsOn <= today && d.EndsOn >= today)
+            .ToListAsync(ct).ConfigureAwait(false);
+        ApprovalDelegation? delegation = covering.FirstOrDefault(d => Direct(d.FromUserId) && !AlreadyApproved(instance, stage.Sequence, d.FromUserId, null));
+        return delegation is null ? (false, null) : (true, delegation.FromUserId);
+    }
+
+    // An approval counts for the person it was given by or on behalf of.
+    private static bool AlreadyApproved(WorkflowInstance instance, int stage, long userId, long? onBehalfOf)
+        => instance.Approvals.Any(a => a.StageSequence == stage && a.Action == WorkflowActionType.Approve
+            && (a.UserId == userId || a.OnBehalfOfUserId == userId || (onBehalfOf is long principal && (a.UserId == principal || a.OnBehalfOfUserId == principal))));
 }

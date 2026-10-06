@@ -18,7 +18,9 @@ public readonly record struct WorkflowStartResult(long InstanceId, WorkflowStatu
 /// <param name="StageName">The current stage name.</param>
 /// <param name="ApprovalsSoFar">Approvals already recorded at the current stage.</param>
 /// <param name="Quorum">Approvals the stage needs.</param>
-public sealed record PendingApproval(long InstanceId, string DocumentType, string DocumentReference, decimal Value, long InitiatedByUserId, int StageSequence, string StageName, int ApprovalsSoFar, int Quorum);
+/// <param name="OnBehalfOfUserId">When it reaches the user as someone's delegate, whose approval it is.</param>
+public sealed record PendingApproval(long InstanceId, string DocumentType, string DocumentReference, decimal Value, long InitiatedByUserId, int StageSequence, string StageName, int ApprovalsSoFar, int Quorum,
+    long? OnBehalfOfUserId = null);
 
 /// <summary>
 /// The generic workflow/approval service (brief §7). One engine serves requisitions, POs, journals,
@@ -61,4 +63,35 @@ public interface IWorkflowService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The status, or an error.</returns>
     Task<Result<WorkflowStatus>> GetStatusAsync(long instanceId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Delegates an approver's approvals to another user between two dates (out of office); refused for oneself or overlapping an
+    /// existing delegation of the same approver (<c>Workflow.DelegationOverlap</c>).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromUserId">The approver who is away.</param>
+    /// <param name="toUserId">The delegate.</param>
+    /// <param name="startsOn">The first day.</param>
+    /// <param name="endsOn">The last day.</param>
+    /// <param name="reason">Why.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The delegation id.</returns>
+    Task<Result<long>> DelegateAsync(long companyId, long fromUserId, long toUserId, DateOnly startsOn, DateOnly endsOn, string reason, CancellationToken ct = default);
+
+    /// <summary>Adds an approver to an in-progress instance's current stage.</summary>
+    /// <param name="instanceId">The instance.</param>
+    /// <param name="userId">The approver to add.</param>
+    /// <param name="addedByUserId">Who adds them.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or why not.</returns>
+    Task<Result> AddApproverAsync(long instanceId, long userId, long addedByUserId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Escalates every in-progress instance that has waited at its stage longer than the stage allows: the stage's escalation user is
+    /// added as an approver of it (once per stage visit).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>How many instances escalated.</returns>
+    Task<int> EscalateOverdueAsync(long companyId, CancellationToken ct = default);
 }

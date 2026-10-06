@@ -26344,6 +26344,60 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("promo_redemption", "vou");
                 });
 
+            modelBuilder.Entity("One4All.Core.Workflow.ApprovalDelegation", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("EndsOn")
+                        .HasColumnType("date")
+                        .HasColumnName("ends_on");
+
+                    b.Property<long>("FromUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("from_user_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reason");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateOnly>("StartsOn")
+                        .HasColumnType("date")
+                        .HasColumnName("starts_on");
+
+                    b.Property<long>("ToUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("to_user_id");
+
+                    b.Property<bool>("Withdrawn")
+                        .HasColumnType("boolean")
+                        .HasColumnName("withdrawn");
+
+                    b.HasKey("Id")
+                        .HasName("pk_delegation");
+
+                    b.HasIndex("CompanyId", "ToUserId")
+                        .HasDatabaseName("ix_delegation_company_id_to_user_id");
+
+                    b.ToTable("delegation", "wf");
+                });
+
             modelBuilder.Entity("One4All.Core.Workflow.WorkflowApproval", b =>
                 {
                     b.Property<long>("Id")
@@ -26365,6 +26419,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("OccurredOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("occurred_on_utc");
+
+                    b.Property<long?>("OnBehalfOfUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("on_behalf_of_user_id");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
@@ -26521,6 +26579,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<DateTimeOffset?>("StageEnteredOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("stage_entered_on_utc");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");
@@ -26546,6 +26608,54 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("instance", "wf");
                 });
 
+            modelBuilder.Entity("One4All.Core.Workflow.WorkflowInstanceApprover", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("AddedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("added_by_user_id");
+
+                    b.Property<DateTimeOffset>("AddedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("added_on_utc");
+
+                    b.Property<int>("Reason")
+                        .HasColumnType("integer")
+                        .HasColumnName("reason");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("StageSequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage_sequence");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<long>("WorkflowInstanceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("workflow_instance_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_instance_approver");
+
+                    b.HasIndex("WorkflowInstanceId", "StageSequence")
+                        .HasDatabaseName("ix_instance_approver_workflow_instance_id_stage_sequence");
+
+                    b.ToTable("instance_approver", "wf");
+                });
+
             modelBuilder.Entity("One4All.Core.Workflow.WorkflowStage", b =>
                 {
                     b.Property<long>("Id")
@@ -26554,6 +26664,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int?>("EscalateAfterHours")
+                        .HasColumnType("integer")
+                        .HasColumnName("escalate_after_hours");
+
+                    b.Property<long?>("EscalateToUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("escalate_to_user_id");
 
                     b.Property<decimal?>("MinValue")
                         .HasPrecision(19, 4)

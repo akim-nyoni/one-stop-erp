@@ -66,3 +66,25 @@ internal sealed class WorkflowApprovalConfiguration : IEntityTypeConfiguration<W
         b.Property(x => x.Comment).HasMaxLength(1024);
     }
 }
+
+internal sealed class WorkflowInstanceApproverConfiguration : IEntityTypeConfiguration<WorkflowInstanceApprover>
+{
+    public void Configure(EntityTypeBuilder<WorkflowInstanceApprover> b)
+    {
+        b.ToTable("instance_approver", Schemas.Workflow);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reason).HasConversion<int>();
+        b.HasIndex(x => new { x.WorkflowInstanceId, x.StageSequence });
+    }
+}
+
+internal sealed class ApprovalDelegationConfiguration : IEntityTypeConfiguration<ApprovalDelegation>
+{
+    public void Configure(EntityTypeBuilder<ApprovalDelegation> b)
+    {
+        b.ToTable("delegation", Schemas.Workflow);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reason).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.ToUserId });
+    }
+}
