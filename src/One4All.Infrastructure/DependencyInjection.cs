@@ -166,6 +166,8 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.DespatchMessagesTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.LapseOffersTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Backup.BackupTask>();
+        services.AddScoped<Application.Abstractions.Reporting.IReportingSnapshotService, Reporting.ReportingSnapshotService>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Reporting.RefreshSnapshotsTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Backup.ReconcileCommitmentsTask>();
         Backup.BackupOptions backup = backupOptions ?? new Backup.BackupOptions();
         if (string.IsNullOrWhiteSpace(backup.ConnectionString))
