@@ -77,6 +77,12 @@ public static partial class ApiAccessRules
         return ModulesByArea.TryGetValue(segments[1], out string[]? modules) ? new ApiRequirement(modules, write) : null;
     }
 
+    /// <summary>The licence modules behind an API area's permission modules (from the permission catalogue); any one licensed suffices.</summary>
+    /// <param name="requirement">The requirement.</param>
+    /// <returns>The licence module codes (empty for personal areas).</returns>
+    public static IReadOnlyList<string> LicenceModules(ApiRequirement requirement)
+        => [.. PermissionCatalogue.All.Where(p => requirement.Modules.Contains(p.Module, StringComparer.OrdinalIgnoreCase)).Select(p => p.LicenceModule).Distinct(StringComparer.OrdinalIgnoreCase)];
+
     /// <summary>Whether a route takes its acting-user parameter as the target of the action rather than the actor.</summary>
     /// <param name="path">The request path.</param>
     /// <returns>True when the user id names someone else (e.g. the assignee of a fault).</returns>

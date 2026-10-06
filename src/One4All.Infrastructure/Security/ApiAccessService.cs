@@ -16,11 +16,15 @@ public sealed class ApiAccessService : IApiAccessService
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="permissions">Resolves the user's permissions.</param>
-    public ApiAccessService(One4AllDbContext db, IPermissionService permissions)
+    /// <param name="licence">Refuses unlicensed modules and changes while read-only.</param>
+    public ApiAccessService(One4AllDbContext db, IPermissionService permissions, Application.Abstractions.Licensing.ILicenceService? licence = null)
     {
         _db = db;
         _permissions = permissions;
+        _licence = licence;
     }
+
+    private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
 
     /// <inheritdoc />
     public async Task<ApiAccessDecision> AuthoriseAsync(ApiAccessRequest request, CancellationToken ct = default)
@@ -29,6 +33,21 @@ public sealed class ApiAccessService : IApiAccessService
         if (requirement is null)
         {
             return ApiAccessDecision.Refuse(404, "Unknown API area.");
+        }
+
+        // The licence: an area needs one of its modules licensed, and nothing changes while it is read-only (brief §11.5).
+        if (_licence is { Enforced: true })
+        {
+            IReadOnlyList<string> licences = ApiAccessRules.LicenceModules(requirement);
+            if (licences.Count > 0 && !licences.Any(_licence.IsModuleLicensed))
+            {
+                return ApiAccessDecision.Refuse(403, $"Not licensed: {string.Join(" / ", licences)}.");
+            }
+
+            if (requirement.IsWrite && _licence.CanPost() is { IsFailure: true } readOnly)
+            {
+                return ApiAccessDecision.Refuse(403, readOnly.Error.Message);
+            }
         }
 
         EffectivePermissions permissions = await _permissions.ResolveAsync(request.UserId, ct).ConfigureAwait(false);

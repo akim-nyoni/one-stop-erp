@@ -1,4 +1,4 @@
-namespace One4All.Desktop;
+namespace One4All.Infrastructure.Licensing;
 
 /// <summary>
 /// Development-only embedded licence so the app runs out of the box on a dev machine. The public key is

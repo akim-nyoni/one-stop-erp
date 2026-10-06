@@ -36,7 +36,7 @@ public partial class App : System.Windows.Application
         {
             string connectionString = ResolveConnectionString();
 
-            LicensingOptions licensing = new();
+            LicensingOptions licensing = new() { Enforce = true };
             licensing.TrustedKeys[DevLicensing.KeyId] = DevLicensing.PublicKeyBase64;
 
             ServiceCollection services = new();

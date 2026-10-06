@@ -10,6 +10,12 @@ public sealed class LicensingOptions
 
     /// <summary>Map of key id to Base64-encoded Ed25519 public key.</summary>
     public Dictionary<string, string> TrustedKeys { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the licence is enforced: posting refused unless it is usable, unlicensed API modules
+    /// refused, limits applied. The server and desktop enforce; embedded test hosts may not.
+    /// </summary>
+    public bool Enforce { get; set; }
 }
 
 /// <summary>Reads the trusted licence public keys from <see cref="LicensingOptions"/>.</summary>

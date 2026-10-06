@@ -26,15 +26,19 @@ public sealed class PostingEngine : IPostingEngine
     /// <summary>Creates the engine.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="scopes">Opens a separate unit of work to record a fund-control block that outlives the refused posting.</param>
-    public PostingEngine(One4AllDbContext db, IServiceScopeFactory? scopes = null)
+    /// <param name="licence">The licence: nothing posts while it is read-only or unusable.</param>
+    public PostingEngine(One4AllDbContext db, IServiceScopeFactory? scopes = null, Application.Abstractions.Licensing.ILicenceService? licence = null)
     {
         _db = db;
         _scopes = scopes;
+        _licence = licence;
     }
+
+    private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
 
     /// <inheritdoc />
     public Task<Result<PostingReceipt>> PostAsync(JournalRequest request, CancellationToken ct = default)
-        => _db.AtomicAsync(() => PostCoreAsync(request, ct), ct);
+        => _licence?.CanPost() is { IsFailure: true } refused ? Task.FromResult<Result<PostingReceipt>>(refused.Error) : _db.AtomicAsync(() => PostCoreAsync(request, ct), ct);
 
     // One unit of work, retried if it loses a race with another posting for the sequence or a period balance.
     private async Task<Result<PostingReceipt>> PostCoreAsync(JournalRequest request, CancellationToken ct)
@@ -178,7 +182,8 @@ public sealed class PostingEngine : IPostingEngine
 
     /// <inheritdoc />
     public Task<Result<PostingReceipt>> ReleaseDeferredAsync(long companyId, long journalId, CancellationToken ct = default)
-        => _db.AtomicAsync(() => ReleaseDeferredCoreAsync(companyId, journalId, ct), ct);
+        => _licence?.CanPost() is { IsFailure: true } refused ? Task.FromResult<Result<PostingReceipt>>(refused.Error)
+            : _db.AtomicAsync(() => ReleaseDeferredCoreAsync(companyId, journalId, ct), ct);
 
     // One unit of work, retried if it loses a race with another posting for the sequence or a period balance.
     private async Task<Result<PostingReceipt>> ReleaseDeferredCoreAsync(long companyId, long journalId, CancellationToken ct)
@@ -249,7 +254,8 @@ public sealed class PostingEngine : IPostingEngine
 
     /// <inheritdoc />
     public Task<Result<PostingReceipt>> ReverseAsync(long companyId, long journalId, DateOnly date, string reason, CancellationToken ct = default)
-        => _db.AtomicAsync(() => ReverseCoreAsync(companyId, journalId, date, reason, ct), ct);
+        => _licence?.CanPost() is { IsFailure: true } refused ? Task.FromResult<Result<PostingReceipt>>(refused.Error)
+            : _db.AtomicAsync(() => ReverseCoreAsync(companyId, journalId, date, reason, ct), ct);
 
     // One unit of work, retried if it loses a race with another posting for the sequence or a period balance.
     private async Task<Result<PostingReceipt>> ReverseCoreAsync(long companyId, long journalId, DateOnly date, string reason, CancellationToken ct)

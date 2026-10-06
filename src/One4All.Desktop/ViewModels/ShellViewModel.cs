@@ -46,7 +46,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
         LicenseValidationResult status = licence.Current;
         string customer = status.Payload?.Customer.Name ?? "Unlicensed";
-        LicenceStatusText = $"{customer}  •  {status.Status}";
+        LicenceStatusText = licence.Warning is string warning ? $"{customer}  •  {status.Status}  •  {warning}" : $"{customer}  •  {status.Status}";
 
         foreach (ModuleDescriptor descriptor in ModuleCatalogue.All)
         {

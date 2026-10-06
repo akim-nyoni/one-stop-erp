@@ -44,4 +44,24 @@ public interface ILicenceService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A task.</returns>
     Task ReloadAsync(CancellationToken ct = default);
+
+    /// <summary>Gets a value indicating whether the licence is enforced on this host.</summary>
+    bool Enforced { get; }
+
+    /// <summary>Gets the days until the licence expires (null: perpetual or none installed).</summary>
+    int? DaysUntilExpiry { get; }
+
+    /// <summary>Gets a warning to show users (expiry within 30 days, grace, read-only), or null.</summary>
+    string? Warning { get; }
+
+    /// <summary>Whether transactions may be posted: refused when enforced and the licence is read-only or unusable.</summary>
+    /// <returns>Success, or <c>Licence.ReadOnly</c> / <c>Licence.NotUsable</c>.</returns>
+    Core.Common.Result CanPost();
+
+    /// <summary>Whether a count stays within a licence limit (global, or the module's when given); unlimited or unenforced passes.</summary>
+    /// <param name="key">The limit key (e.g. pos_terminals, named_users).</param>
+    /// <param name="count">The count including the one being added or used.</param>
+    /// <param name="moduleCode">The module whose own limit applies, if any.</param>
+    /// <returns>Success, or <c>Licence.LimitReached</c>.</returns>
+    Core.Common.Result WithinLimit(string key, int count, string? moduleCode = null);
 }

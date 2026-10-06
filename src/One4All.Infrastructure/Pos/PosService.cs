@@ -16,6 +16,7 @@ namespace One4All.Infrastructure.Pos;
 /// <summary>Point of Sale service (brief §4.1): till sessions, sales with multi-currency tendering, and X/Z reads.</summary>
 public sealed class PosService : IPosService
 {
+    private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _postingEngine;
     private readonly IInventoryService _inventory;
@@ -26,8 +27,10 @@ public sealed class PosService : IPosService
     /// <param name="postingEngine">The posting engine.</param>
     /// <param name="inventory">The inventory service.</param>
     /// <param name="clock">The clock.</param>
-    public PosService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock)
+    /// <param name="licence">Caps the POS terminals that may trade.</param>
+    public PosService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, Application.Abstractions.Licensing.ILicenceService? licence = null)
     {
+        _licence = licence;
         _db = db;
         _postingEngine = postingEngine;
         _inventory = inventory;
@@ -37,6 +40,17 @@ public sealed class PosService : IPosService
     /// <inheritdoc />
     public async Task<Result<long>> OpenTillAsync(long companyId, long terminalId, long cashierUserId, decimal openingFloat, CancellationToken ct = default)
     {
+        // The licence caps the terminals that may trade: the earliest registered active terminals, across companies (brief §11.5).
+        if (_licence is { Enforced: true })
+        {
+            int place = await _db.PosTerminals.CountAsync(t => t.IsActive && t.Id <= terminalId, ct).ConfigureAwait(false);
+            Result licensed = _licence.WithinLimit("pos_terminals", place, "POS");
+            if (licensed.IsFailure)
+            {
+                return licensed.Error;
+            }
+        }
+
         TillSession session = new(companyId, terminalId, cashierUserId, _clock.UtcNow, openingFloat);
         _db.Set<TillSession>().Add(session);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

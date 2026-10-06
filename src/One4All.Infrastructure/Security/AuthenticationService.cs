@@ -22,6 +22,7 @@ public sealed class AuthenticationOptions
 /// </summary>
 public sealed class AuthenticationService : IAuthenticationService
 {
+    private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
     private readonly One4AllDbContext _db;
     private readonly IPasswordHasher _hasher;
     private readonly IPermissionService _permissions;
@@ -39,8 +40,10 @@ public sealed class AuthenticationService : IAuthenticationService
         IPasswordHasher hasher,
         IPermissionService permissions,
         IClock clock,
-        AuthenticationOptions? options = null)
+        AuthenticationOptions? options = null,
+        Application.Abstractions.Licensing.ILicenceService? licence = null)
     {
+        _licence = licence;
         _db = db;
         _hasher = hasher;
         _permissions = permissions;
@@ -80,6 +83,17 @@ public sealed class AuthenticationService : IAuthenticationService
         if (!user.IsActive)
         {
             return await LogAsync(AuthenticationResult.Failure(AuthenticationOutcome.Inactive, "This account is inactive.")).ConfigureAwait(false);
+        }
+
+        // The licence's named users are the earliest active accounts; later ones cannot sign in past the limit (brief §11.5).
+        if (_licence is { Enforced: true })
+        {
+            int place = await _db.Users.CountAsync(u => u.IsActive && u.Id <= user.Id, ct).ConfigureAwait(false);
+            Core.Common.Result named = _licence.WithinLimit("named_users", place);
+            if (named.IsFailure)
+            {
+                return await LogAsync(AuthenticationResult.Failure(AuthenticationOutcome.NotLicensed, named.Error.Message)).ConfigureAwait(false);
+            }
         }
 
         if (user.IsLockedOut(now))

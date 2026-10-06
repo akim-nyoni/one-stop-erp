@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Licensing;
 using One4All.Application.Abstractions.Security;
+using One4All.Core.Common;
 using One4All.Core.Licensing;
 using One4All.Infrastructure.Persistence;
 using One4All.Licensing.Core;
@@ -23,6 +24,7 @@ public sealed class LicenceService : ILicenceService
     private readonly LicenseValidator _validator;
     private readonly IClock _clock;
     private readonly Lazy<CoreFingerprint> _fingerprint;
+    private readonly bool _enforce;
     private volatile LicenseValidationResult _current;
 
     /// <summary>Creates the service and performs an initial (empty) validation.</summary>
@@ -34,9 +36,11 @@ public sealed class LicenceService : ILicenceService
         IServiceScopeFactory scopeFactory,
         ITrustedLicenceKeys trustedKeys,
         IClock clock,
-        IMachineIdProvider machineId)
+        IMachineIdProvider machineId,
+        LicensingOptions? options = null)
     {
         _scopeFactory = scopeFactory;
+        _enforce = options?.Enforce ?? false;
         _clock = clock;
         // Fingerprint the machine once, lazily: the hardware identity is stable for the process lifetime.
         _fingerprint = new Lazy<CoreFingerprint>(
@@ -60,6 +64,44 @@ public sealed class LicenceService : ILicenceService
 
     /// <inheritdoc />
     public bool HasFeature(string feature) => _current.HasFeature(feature);
+
+    /// <inheritdoc />
+    public bool Enforced => _enforce;
+
+    /// <inheritdoc />
+    public int? DaysUntilExpiry => _current.Payload?.ValidTo is DateOnly to ? to.DayNumber - DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime).DayNumber : null;
+
+    /// <inheritdoc />
+    public string? Warning => _current.Status switch
+    {
+        LicenseStatus.Grace => $"The licence has expired and is in its grace period: {_current.Message}",
+        LicenseStatus.ReadOnly => "The licence has expired: the system is read-only until a new licence is installed.",
+        LicenseStatus.Valid when DaysUntilExpiry is int days && days <= 30 => $"The licence expires in {days} day(s).",
+        LicenseStatus.Valid => null,
+        _ => $"No usable licence: {_current.Message}",
+    };
+
+    /// <inheritdoc />
+    public Result CanPost()
+    {
+        if (!_enforce || _current.IsUsable)
+        {
+            return Result.Success();
+        }
+
+        return Result.Failure(_current.IsReadOnly
+            ? Error.Rule("Licence.ReadOnly", "The licence has expired; the system is read-only and nothing can be posted.")
+            : Error.Rule("Licence.NotUsable", $"No usable licence ({_current.Status}); nothing can be posted."));
+    }
+
+    /// <inheritdoc />
+    public Result WithinLimit(string key, int count, string? moduleCode = null)
+    {
+        int? limit = moduleCode is null ? _current.GetLimit(key) : _current.GetModuleLimit(moduleCode, key) ?? _current.GetLimit(key);
+        return !_enforce || limit is null || count <= limit
+            ? Result.Success()
+            : Result.Failure(Error.Rule("Licence.LimitReached", $"The licence allows {limit} {key.Replace('_', ' ')}; this would be {count}. Free one up or contact your vendor."));
+    }
 
     /// <inheritdoc />
     public async Task ReloadAsync(CancellationToken ct = default)

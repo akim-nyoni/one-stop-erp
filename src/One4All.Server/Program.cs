@@ -16,7 +16,18 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 string connectionString = builder.Configuration.GetConnectionString("One4All")
     ?? Environment.GetEnvironmentVariable("ONE4ALL_CONNECTION")
     ?? throw new InvalidOperationException("No database connection string (ConnectionStrings:One4All or ONE4ALL_CONNECTION).");
-builder.Services.AddOne4AllInfrastructure(connectionString);
+// Licensing (brief §11.5): trusted vendor keys from Licensing:TrustedKeys, enforced unless Licensing:Enforce is false. Development
+// also trusts the development key and falls back to the development licence.
+One4All.Infrastructure.Licensing.LicensingOptions licensing = new();
+builder.Configuration.GetSection(One4All.Infrastructure.Licensing.LicensingOptions.SectionName).Bind(licensing);
+licensing.Enforce = builder.Configuration.GetValue("Licensing:Enforce", true);
+if (builder.Environment.IsDevelopment())
+{
+    licensing.TrustedKeys[One4All.Infrastructure.Licensing.DevLicensing.KeyId] = One4All.Infrastructure.Licensing.DevLicensing.PublicKeyBase64;
+}
+
+builder.Services.AddOne4AllInfrastructure(connectionString, licensing);
+builder.Services.AddHostedService<One4All.Server.LicenceHost>();
 
 // Scheduled jobs (brief §4.17): due jobs run once a minute; set Scheduler:Enabled=false to keep a node from running them.
 if (builder.Configuration.GetValue("Scheduler:Enabled", true))
@@ -65,6 +76,13 @@ await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())
     await scope.ServiceProvider.GetRequiredService<One4AllDbContext>().Database.MigrateAsync();
     await scope.ServiceProvider.GetRequiredService<PermissionSeeder>().SeedAsync();
     await scope.ServiceProvider.GetRequiredService<AdministratorSeeder>().SeedAsync();
+
+    One4All.Application.Abstractions.Licensing.ILicenceService licence = scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Licensing.ILicenceService>();
+    await licence.ReloadAsync();
+    if (app.Environment.IsDevelopment() && !licence.Current.IsUsable && !licence.Current.IsReadOnly)
+    {
+        await licence.InstallAsync(One4All.Infrastructure.Licensing.DevLicensing.LicenceToken);
+    }
 }
 
 if (app.Environment.IsDevelopment())
@@ -2110,6 +2128,32 @@ app.MapPost("/api/system/jobs/{code}/run", async (string code, long companyId, O
     ValueResponse(await jobs.RunNowAsync(companyId, code, DateTimeOffset.UtcNow, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("RunScheduledJob");
+
+app.MapGet("/api/system/licence", async (One4All.Application.Abstractions.Licensing.ILicenceService licence, One4AllDbContext db, CancellationToken ct) =>
+{
+    One4All.Licensing.Core.LicenseValidationResult current = licence.Current;
+    var usage = new Dictionary<string, int>(StringComparer.Ordinal)
+    {
+        ["companies"] = await db.Companies.CountAsync(ct).ConfigureAwait(false),
+        ["named_users"] = await db.Users.CountAsync(u => u.IsActive, ct).ConfigureAwait(false),
+        ["pos_terminals"] = await db.PosTerminals.CountAsync(t => t.IsActive, ct).ConfigureAwait(false),
+    };
+    return Results.Ok(new
+    {
+        status = current.Status.ToString(),
+        current.Message,
+        licence.Enforced,
+        licence.DaysUntilExpiry,
+        licence.Warning,
+        customer = current.Payload?.Customer.Name,
+        edition = current.Payload?.Edition.ToString(),
+        modules = current.Payload?.Modules.Select(m => new { m.Code, m.ValidTo, licensed = licence.IsModuleLicensed(m.Code) }),
+        limits = usage.Select(u => new { key = u.Key, inUse = u.Value, limit = licence.GetLimit(u.Key) }),
+        machine = licence.MachineFingerprint,
+    });
+})
+.RequireAuthorization()
+.WithName("LicenceStatus");
 
 app.MapGet("/api/system/jobs/{code}/history", async (string code, long companyId, One4All.Application.Abstractions.Scheduling.IJobScheduler jobs, CancellationToken ct) =>
     ValueResponse(await jobs.HistoryAsync(companyId, code, ct).ConfigureAwait(false)))

@@ -16,6 +16,9 @@ public enum AuthenticationOutcome
 
     /// <summary>The account is inactive.</summary>
     Inactive = 3,
+
+    /// <summary>The licence's named-user limit leaves no room for this account.</summary>
+    NotLicensed = 4,
 }
 
 /// <summary>The result of an authentication attempt, including the resolved permissions on success.</summary>
