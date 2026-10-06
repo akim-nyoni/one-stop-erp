@@ -102,6 +102,30 @@ public sealed class Item : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Whether the item is quantity-tracked stock.</summary>
     public bool IsStockTracked => ItemType is ItemType.Stock or ItemType.Weighed;
+
+    /// <summary>Gets or sets the price look-up code keyed at the till for unlabelled goods (fruit, bakery).</summary>
+    public string? Plu { get; set; }
+
+    /// <summary>Gets or sets the brand.</summary>
+    public string? Brand { get; set; }
+
+    /// <summary>Gets or sets the customs tariff (HS) code.</summary>
+    public string? HsCode { get; set; }
+
+    /// <summary>Gets or sets the country of origin.</summary>
+    public string? CountryOfOrigin { get; set; }
+
+    /// <summary>Gets or sets the item this is a variant of (size / colour of a style).</summary>
+    public long? ParentItemId { get; set; }
+
+    /// <summary>Gets or sets the variant's size.</summary>
+    public string? Size { get; set; }
+
+    /// <summary>Gets or sets the variant's colour.</summary>
+    public string? Colour { get; set; }
+
+    /// <summary>Gets or sets the ABC class from the last classification (A: the items making 80% of the value moved).</summary>
+    public string? AbcClass { get; set; }
 }
 
 /// <summary>A warehouse / stock location (brief §4.2, <c>inv.warehouse</c>).</summary>

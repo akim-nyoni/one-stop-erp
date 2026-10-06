@@ -152,6 +152,15 @@ public class One4AllDbContext : DbContext
     /// <summary>Stock balances (item × warehouse).</summary>
     public DbSet<Core.Inventory.StockBalance> StockBalances => Set<Core.Inventory.StockBalance>();
 
+    /// <summary>Extra barcodes and synonyms for items.</summary>
+    public DbSet<Core.Inventory.ItemAlias> ItemAliases => Set<Core.Inventory.ItemAlias>();
+
+    /// <summary>Pack units with conversion factors.</summary>
+    public DbSet<Core.Inventory.ItemUnit> ItemUnits => Set<Core.Inventory.ItemUnit>();
+
+    /// <summary>Item–supplier links.</summary>
+    public DbSet<Core.Inventory.ItemSupplier> ItemSuppliers => Set<Core.Inventory.ItemSupplier>();
+
     /// <summary>Stock movements.</summary>
     public DbSet<Core.Inventory.StockMovement> StockMovements => Set<Core.Inventory.StockMovement>();
 

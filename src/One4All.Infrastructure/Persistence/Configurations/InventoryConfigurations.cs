@@ -53,6 +53,15 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
     {
         b.ToTable("item", Schemas.Inventory);
         b.HasKey(x => x.Id);
+        b.Property(x => x.Plu).HasMaxLength(20);
+        b.Property(x => x.Brand).HasMaxLength(60);
+        b.Property(x => x.HsCode).HasMaxLength(20);
+        b.Property(x => x.CountryOfOrigin).HasMaxLength(60);
+        b.Property(x => x.Size).HasMaxLength(20);
+        b.Property(x => x.Colour).HasMaxLength(30);
+        b.Property(x => x.AbcClass).HasMaxLength(1);
+        b.HasIndex(x => new { x.CompanyId, x.Plu });
+        b.HasIndex(x => x.ParentItemId);
         b.Property(x => x.Tracking).HasConversion<int>();
         b.Property(x => x.Code).HasMaxLength(40);
         b.Property(x => x.Description).HasMaxLength(300);
@@ -209,5 +218,45 @@ internal sealed class AssemblyRunLineConfiguration : IEntityTypeConfiguration<As
         b.Property(x => x.StandardQuantity).HasPrecision(19, 4);
         b.Property(x => x.ActualQuantity).HasPrecision(19, 4);
         b.Property(x => x.Cost).HasPrecision(19, 4);
+    }
+}
+
+internal sealed class ItemAliasConfiguration : IEntityTypeConfiguration<ItemAlias>
+{
+    public void Configure(EntityTypeBuilder<ItemAlias> b)
+    {
+        b.ToTable("item_alias", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Alias).HasMaxLength(120);
+        b.HasIndex(x => new { x.CompanyId, x.Alias });
+        b.HasIndex(x => x.ItemId);
+    }
+}
+
+internal sealed class ItemUnitConfiguration : IEntityTypeConfiguration<ItemUnit>
+{
+    public void Configure(EntityTypeBuilder<ItemUnit> b)
+    {
+        b.ToTable("item_unit", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.UnitCode).HasMaxLength(20);
+        b.Property(x => x.Factor).HasPrecision(19, 6);
+        b.Property(x => x.Barcode).HasMaxLength(60);
+        b.HasIndex(x => new { x.ItemId, x.UnitCode }).IsUnique();
+        b.HasIndex(x => new { x.CompanyId, x.Barcode });
+    }
+}
+
+internal sealed class ItemSupplierConfiguration : IEntityTypeConfiguration<ItemSupplier>
+{
+    public void Configure(EntityTypeBuilder<ItemSupplier> b)
+    {
+        b.ToTable("item_supplier", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.SupplierItemCode).HasMaxLength(60);
+        b.Property(x => x.MinimumOrderQuantity).HasPrecision(19, 4);
+        b.Property(x => x.LastCost).HasPrecision(19, 6);
+        b.HasIndex(x => new { x.ItemId, x.SupplierId }).IsUnique();
     }
 }

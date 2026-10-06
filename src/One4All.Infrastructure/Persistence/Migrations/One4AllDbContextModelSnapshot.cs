@@ -9500,10 +9500,20 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("AbcClass")
+                        .HasMaxLength(1)
+                        .HasColumnType("character varying(1)")
+                        .HasColumnName("abc_class");
+
                     b.Property<string>("Barcode")
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)")
                         .HasColumnName("barcode");
+
+                    b.Property<string>("Brand")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("brand");
 
                     b.Property<string>("Category")
                         .HasMaxLength(60)
@@ -9515,6 +9525,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("code");
+
+                    b.Property<string>("Colour")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("colour");
 
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
@@ -9528,6 +9543,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("CostingMethod")
                         .HasColumnType("integer")
                         .HasColumnName("costing_method");
+
+                    b.Property<string>("CountryOfOrigin")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("country_of_origin");
 
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")
@@ -9551,6 +9571,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("description");
 
+                    b.Property<string>("HsCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("hs_code");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -9570,6 +9595,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
+
+                    b.Property<long?>("ParentItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("parent_item_id");
+
+                    b.Property<string>("Plu")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("plu");
 
                     b.Property<string>("PriceVarianceAccountCode")
                         .HasMaxLength(8)
@@ -9606,6 +9640,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("short_description");
 
+                    b.Property<string>("Size")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("size");
+
                     b.Property<decimal?>("StandardCost")
                         .HasPrecision(19, 6)
                         .HasColumnType("numeric(19,6)")
@@ -9639,12 +9678,175 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_item");
 
+                    b.HasIndex("ParentItemId")
+                        .HasDatabaseName("ix_item_parent_item_id");
+
                     b.HasIndex("CompanyId", "Code")
                         .IsUnique()
                         .HasDatabaseName("ix_item_company_id_code")
                         .HasFilter("is_deleted = false");
 
+                    b.HasIndex("CompanyId", "Plu")
+                        .HasDatabaseName("ix_item_company_id_plu");
+
                     b.ToTable("item", "inv");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.ItemAlias", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Alias")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("alias");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_item_alias");
+
+                    b.HasIndex("ItemId")
+                        .HasDatabaseName("ix_item_alias_item_id");
+
+                    b.HasIndex("CompanyId", "Alias")
+                        .HasDatabaseName("ix_item_alias_company_id_alias");
+
+                    b.ToTable("item_alias", "inv");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.ItemSupplier", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<bool>("IsPreferred")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_preferred");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<decimal?>("LastCost")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("last_cost");
+
+                    b.Property<int>("LeadTimeDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("lead_time_days");
+
+                    b.Property<decimal>("MinimumOrderQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("minimum_order_quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<string>("SupplierItemCode")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("supplier_item_code");
+
+                    b.HasKey("Id")
+                        .HasName("pk_item_supplier");
+
+                    b.HasIndex("ItemId", "SupplierId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_item_supplier_item_id_supplier_id");
+
+                    b.ToTable("item_supplier", "inv");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.ItemUnit", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("barcode");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("Factor")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("factor");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("UnitCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("unit_code");
+
+                    b.HasKey("Id")
+                        .HasName("pk_item_unit");
+
+                    b.HasIndex("CompanyId", "Barcode")
+                        .HasDatabaseName("ix_item_unit_company_id_barcode");
+
+                    b.HasIndex("ItemId", "UnitCode")
+                        .IsUnique()
+                        .HasDatabaseName("ix_item_unit_item_id_unit_code");
+
+                    b.ToTable("item_unit", "inv");
                 });
 
             modelBuilder.Entity("One4All.Core.Inventory.PriceList", b =>

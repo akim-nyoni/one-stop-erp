@@ -191,6 +191,46 @@ public static partial class OperationCatalogue
         const string module = "Stock";
         yield return new Operation
         {
+            Module = module, Title = "Find an item", Description = "Searches codes, PLUs, barcodes (item, pack, alias), synonyms, brands and descriptions.",
+            Fields = [Req("Term", "Search for")],
+            Run = async (c, i) =>
+            {
+                IReadOnlyList<ItemSearchHit> hits = await c.Get<IItemCatalogueService>().SearchAsync(c.CompanyId, i.Text("Term"), 30).ConfigureAwait(true);
+                return hits.Count == 0 ? "Nothing found." : string.Join(Environment.NewLine, hits.Select(h => $"{h.Code,-16} {h.Description,-40} {h.Brand,-14} ({h.MatchedOn})"));
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Add a barcode, synonym, pack or supplier to an item",
+            Description = "Barcode / Synonym: the value. Pack: unit code, factor and its barcode. Supplier: supplier code, their item code, lead days, minimum order, last cost, preferred.",
+            Fields = [Req("Item", "Item code"), Pick("What", "Add", "Barcode", "Synonym", "Pack", "Supplier"), Opt("Value", "Barcode / synonym / pack unit / supplier code"), OptNum("Factor", "Pack factor"),
+                Opt("Code", "Pack barcode / supplier's item code"), OptNum("Lead", "Lead time (days)"), OptNum("Minimum", "Minimum order"), OptNum("Cost", "Last cost"), Tick("Preferred", "Preferred supplier")],
+            Run = async (c, i) =>
+            {
+                IItemCatalogueService catalogue = c.Get<IItemCatalogueService>();
+                long item = await ItemAsync(c, i.Text("Item")).ConfigureAwait(true);
+                return i.Text("What") switch
+                {
+                    "Barcode" => Check(await catalogue.AddAliasAsync(c.CompanyId, item, ItemAliasKind.Barcode, i.Text("Value")).ConfigureAwait(true), "Barcode added."),
+                    "Synonym" => Check(await catalogue.AddAliasAsync(c.CompanyId, item, ItemAliasKind.Synonym, i.Text("Value")).ConfigureAwait(true), "Synonym added."),
+                    "Pack" => Check(await catalogue.AddUnitAsync(c.CompanyId, item, i.Text("Value"), i.Number("Factor"), i.Optional("Code")).ConfigureAwait(true), "Pack unit added."),
+                    _ => Check(await catalogue.LinkSupplierAsync(new ItemSupplierRequest(c.CompanyId, item, await SupplierAsync(c, i.Text("Value")).ConfigureAwait(true), i.Optional("Code"),
+                        (int)(i.OptionalNumber("Lead") ?? 0m), i.OptionalNumber("Minimum") ?? 0m, i.OptionalNumber("Cost"), i.Flag("Preferred"))).ConfigureAwait(true), "Supplier linked."),
+                };
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Classify items A / B / C", Description = "A: the items making the first 80% of the value issued in the period, B the next 15%, C the rest and unmoved stock.",
+            Fields = [Today("From", "From"), Today("To", "To")],
+            Run = async (c, i) =>
+            {
+                (int a, int b, int cc) = await c.Get<IItemCatalogueService>().ClassifyAbcAsync(c.CompanyId, i.Date("From"), i.Date("To")).ConfigureAwait(true);
+                return $"A: {a} item(s), B: {b}, C: {cc}.";
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Record batches / serials on a movement", ListTitle = "Recent movements of batch / serial items (without lots)",
             Description = "Records which batches or serial numbers a receipt, issue or transfer moved. Lots: BATCH:qty[:expiry yyyy-MM-dd]; separated by semicolons (serials are one each).",
             Fields = [Num("Movement", "Movement id (from the list)"), Req("Lots", "Lots", "B1:10")],
