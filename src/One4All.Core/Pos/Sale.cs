@@ -112,8 +112,15 @@ public sealed class SaleLine : Entity
     /// <param name="lineNet">The net line value.</param>
     /// <param name="taxAmount">The tax on the line.</param>
     /// <param name="revenueAccountCode">The revenue account.</param>
-    public SaleLine(long itemId, string description, long warehouseId, decimal quantity, decimal unitPrice, decimal lineNet, decimal taxAmount, string revenueAccountCode)
+    /// <param name="promotionDiscount">The promotion discount taken off the line.</param>
+    /// <param name="discountAccountCode">The account the discount posts to.</param>
+    /// <param name="promotionCode">The promotion(s) that gave it.</param>
+    public SaleLine(long itemId, string description, long warehouseId, decimal quantity, decimal unitPrice, decimal lineNet, decimal taxAmount, string revenueAccountCode,
+        decimal promotionDiscount = 0m, string? discountAccountCode = null, string? promotionCode = null)
     {
+        PromotionDiscount = promotionDiscount;
+        DiscountAccountCode = discountAccountCode;
+        PromotionCode = promotionCode;
         ItemId = itemId;
         Description = description;
         WarehouseId = warehouseId;
@@ -150,6 +157,15 @@ public sealed class SaleLine : Entity
 
     /// <summary>The revenue account.</summary>
     public string RevenueAccountCode { get; private set; }
+
+    /// <summary>The promotion discount taken off the line (so revenue is gross and the discount analysable).</summary>
+    public decimal PromotionDiscount { get; private set; }
+
+    /// <summary>The account the discount posts to.</summary>
+    public string? DiscountAccountCode { get; private set; }
+
+    /// <summary>The promotion(s) that gave the discount.</summary>
+    public string? PromotionCode { get; private set; }
 }
 
 /// <summary>A tender of a POS <see cref="Sale"/> (<c>pos.sale_tender</c>).</summary>

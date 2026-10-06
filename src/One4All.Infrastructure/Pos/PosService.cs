@@ -57,7 +57,13 @@ public sealed class PosService : IPosService
 
         foreach (PosSaleLineRequest line in request.Lines)
         {
-            sale.AddLine(new SaleLine(line.ItemId, line.Description, request.WarehouseId, line.Quantity, line.UnitPrice, line.LineNet, line.TaxAmount, line.RevenueAccountCode));
+            if (line.PromotionDiscount < 0m || (line.PromotionDiscount > 0m && string.IsNullOrWhiteSpace(line.DiscountAccountCode)))
+            {
+                return Error.Validation("Pos.PromotionDiscount", "A promotion discount must be positive and name the account it posts to.");
+            }
+
+            sale.AddLine(new SaleLine(line.ItemId, line.Description, request.WarehouseId, line.Quantity, line.UnitPrice, line.LineNet, line.TaxAmount, line.RevenueAccountCode,
+                line.PromotionDiscount, line.PromotionDiscount > 0m ? line.DiscountAccountCode : null, line.PromotionCode));
         }
 
         List<JournalLineRequest> journalLines = [];
@@ -91,9 +97,14 @@ public sealed class PosService : IPosService
         }
 
         // Revenue (net) per line, then output tax.
+        // Revenue at the gross price; a promotion's discount to its own account so margin stays analysable (brief §4.1).
         foreach (SaleLine line in sale.Lines)
         {
-            journalLines.Add(new JournalLineRequest { AccountCode = line.RevenueAccountCode, Side = JournalSide.Credit, TransactionAmount = line.LineNet });
+            journalLines.Add(new JournalLineRequest { AccountCode = line.RevenueAccountCode, Side = JournalSide.Credit, TransactionAmount = line.LineNet + line.PromotionDiscount });
+            if (line.PromotionDiscount > 0m)
+            {
+                journalLines.Add(new JournalLineRequest { AccountCode = line.DiscountAccountCode!, Side = JournalSide.Debit, TransactionAmount = line.PromotionDiscount, Narrative = line.PromotionCode });
+            }
         }
 
         if (sale.TotalTax != 0m && request.TaxAccountCode is not null)
@@ -193,7 +204,11 @@ public sealed class PosService : IPosService
 
         foreach (SaleLine line in sale.Lines)
         {
-            lines.Add(new JournalLineRequest { AccountCode = line.RevenueAccountCode, Side = JournalSide.Debit, TransactionAmount = line.LineNet });
+            lines.Add(new JournalLineRequest { AccountCode = line.RevenueAccountCode, Side = JournalSide.Debit, TransactionAmount = line.LineNet + line.PromotionDiscount });
+            if (line.PromotionDiscount > 0m)
+            {
+                lines.Add(new JournalLineRequest { AccountCode = line.DiscountAccountCode!, Side = JournalSide.Credit, TransactionAmount = line.PromotionDiscount, Narrative = line.PromotionCode });
+            }
         }
 
         if (sale.TotalTax != 0m)

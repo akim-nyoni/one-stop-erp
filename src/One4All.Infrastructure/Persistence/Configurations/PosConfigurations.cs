@@ -57,6 +57,9 @@ internal sealed class SaleLineConfiguration : IEntityTypeConfiguration<SaleLine>
     {
         b.ToTable("sale_line", Schemas.PointOfSale);
         b.HasKey(x => x.Id);
+        b.Property(x => x.PromotionDiscount).HasPrecision(19, 4);
+        b.Property(x => x.DiscountAccountCode).HasMaxLength(8);
+        b.Property(x => x.PromotionCode).HasMaxLength(60);
         b.Property(x => x.Description).HasMaxLength(200);
         b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
         b.Property(x => x.Quantity).HasPrecision(19, 4);
@@ -100,5 +103,34 @@ internal sealed class PosEventConfiguration : IEntityTypeConfiguration<PosEvent>
         b.Property(x => x.Outcome).HasMaxLength(200);
         b.HasIndex(x => new { x.CompanyId, x.Kind, x.EventDate });
         b.HasIndex(x => new { x.CompanyId, x.SaleNumber });
+    }
+}
+
+internal sealed class PromotionConfiguration : IEntityTypeConfiguration<Promotion>
+{
+    public void Configure(EntityTypeBuilder<Promotion> b)
+    {
+        b.ToTable("promotion", Schemas.PointOfSale);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(100);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.DiscountAccountCode).HasMaxLength(8);
+        b.Property(x => x.Price).HasPrecision(19, 4);
+        b.Property(x => x.Percent).HasPrecision(9, 4);
+        b.Property(x => x.Category).HasMaxLength(60);
+        b.Property(x => x.CouponCode).HasMaxLength(40);
+        b.HasMany(x => x.Items).WithOne().HasForeignKey(x => x.PromotionId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class PromotionItemConfiguration : IEntityTypeConfiguration<PromotionItem>
+{
+    public void Configure(EntityTypeBuilder<PromotionItem> b)
+    {
+        b.ToTable("promotion_item", Schemas.PointOfSale);
+        b.HasKey(x => x.Id);
     }
 }

@@ -12,7 +12,11 @@ namespace One4All.Application.Abstractions.Pos;
 /// <param name="LineNet">The net line value.</param>
 /// <param name="TaxAmount">The tax on the line.</param>
 /// <param name="RevenueAccountCode">The revenue account.</param>
-public readonly record struct PosSaleLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice, decimal LineNet, decimal TaxAmount, string RevenueAccountCode);
+/// <param name="PromotionDiscount">The promotion discount taken off the line (LineNet is after it).</param>
+/// <param name="DiscountAccountCode">The account the discount posts to.</param>
+/// <param name="PromotionCode">The promotion(s) that gave it.</param>
+public readonly record struct PosSaleLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice, decimal LineNet, decimal TaxAmount, string RevenueAccountCode,
+    decimal PromotionDiscount = 0m, string? DiscountAccountCode = null, string? PromotionCode = null);
 
 /// <summary>A tender in a POS sale request.</summary>
 /// <param name="TenderType">The tender type.</param>

@@ -16466,6 +16466,173 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("terminal", "pos");
                 });
 
+            modelBuilder.Entity("One4All.Core.Pos.Promotion", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("BranchId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("branch_id");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("category");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<bool>("Compounding")
+                        .HasColumnType("boolean")
+                        .HasColumnName("compounding");
+
+                    b.Property<string>("CouponCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("coupon_code");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<TimeOnly?>("DailyFrom")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("daily_from");
+
+                    b.Property<TimeOnly?>("DailyTo")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("daily_to");
+
+                    b.Property<string>("DiscountAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("discount_account_code");
+
+                    b.Property<DateOnly?>("EndsOn")
+                        .HasColumnType("date")
+                        .HasColumnName("ends_on");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<bool>("MemberOnly")
+                        .HasColumnType("boolean")
+                        .HasColumnName("member_only");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<decimal?>("Percent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("percent");
+
+                    b.Property<decimal?>("Price")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("price");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer")
+                        .HasColumnName("priority");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.Property<int>("RewardQuantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("reward_quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateOnly>("StartsOn")
+                        .HasColumnType("date")
+                        .HasColumnName("starts_on");
+
+                    b.HasKey("Id")
+                        .HasName("pk_promotion");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_promotion_company_id_code");
+
+                    b.ToTable("promotion", "pos");
+                });
+
+            modelBuilder.Entity("One4All.Core.Pos.PromotionItem", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Group")
+                        .HasColumnType("integer")
+                        .HasColumnName("group");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<long>("PromotionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("promotion_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_promotion_item");
+
+                    b.HasIndex("PromotionId")
+                        .HasDatabaseName("ix_promotion_item_promotion_id");
+
+                    b.ToTable("promotion_item", "pos");
+                });
+
             modelBuilder.Entity("One4All.Core.Pos.Sale", b =>
                 {
                     b.Property<long>("Id")
@@ -16565,6 +16732,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("description");
 
+                    b.Property<string>("DiscountAccountCode")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("discount_account_code");
+
                     b.Property<long>("ItemId")
                         .HasColumnType("bigint")
                         .HasColumnName("item_id");
@@ -16573,6 +16745,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("line_net");
+
+                    b.Property<string>("PromotionCode")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("promotion_code");
+
+                    b.Property<decimal>("PromotionDiscount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("promotion_discount");
 
                     b.Property<decimal>("Quantity")
                         .HasPrecision(19, 4)
@@ -26885,6 +27067,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tax_band_tax_table_tax_table_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Pos.PromotionItem", b =>
+                {
+                    b.HasOne("One4All.Core.Pos.Promotion", null)
+                        .WithMany("Items")
+                        .HasForeignKey("PromotionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_promotion_item_promotions_promotion_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Pos.SaleLine", b =>
                 {
                     b.HasOne("One4All.Core.Pos.Sale", null)
@@ -27592,6 +27784,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Payroll.TaxTable", b =>
                 {
                     b.Navigation("Bands");
+                });
+
+            modelBuilder.Entity("One4All.Core.Pos.Promotion", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("One4All.Core.Pos.Sale", b =>

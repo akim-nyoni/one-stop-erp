@@ -106,7 +106,7 @@ public sealed class PosEventService : IPosEventService
             .GroupBy(e => e.SaleLineId!.Value).Select(g => new { g.Key, Quantity = g.Sum(e => e.Quantity ?? 0m) })
             .ToDictionaryAsync(g => g.Key, g => g.Quantity, ct).ConfigureAwait(false);
 
-        List<(SaleLine Line, decimal Quantity, decimal Net, decimal Tax)> refunded = [];
+        List<(SaleLine Line, decimal Quantity, decimal Net, decimal Tax, decimal Discount)> refunded = [];
         foreach (IGrouping<long, PosRefundLine> group in request.Lines.GroupBy(l => l.SaleLineId))
         {
             SaleLine? line = sale.Lines.FirstOrDefault(l => l.Id == group.Key);
@@ -123,7 +123,8 @@ public sealed class PosEventService : IPosEventService
             }
 
             decimal share = quantity / line.Quantity;
-            refunded.Add((line, quantity, Math.Round(line.LineNet * share, 2, MidpointRounding.AwayFromZero), Math.Round(line.TaxAmount * share, 2, MidpointRounding.AwayFromZero)));
+            refunded.Add((line, quantity, Math.Round(line.LineNet * share, 2, MidpointRounding.AwayFromZero), Math.Round(line.TaxAmount * share, 2, MidpointRounding.AwayFromZero),
+                Math.Round(line.PromotionDiscount * share, 2, MidpointRounding.AwayFromZero)));
         }
 
         decimal tax = refunded.Sum(r => r.Tax), gross = refunded.Sum(r => r.Net) + tax;
@@ -132,8 +133,11 @@ public sealed class PosEventService : IPosEventService
             return Error.Validation("Pos.TaxAccountRequired", "Refunding taxed lines needs the output-tax account.");
         }
 
+        // Revenue comes back at the gross price and the promotion's share of the discount goes back to its account.
         List<JournalLineRequest> lines = [.. refunded.GroupBy(r => r.Line.RevenueAccountCode)
-            .Select(g => new JournalLineRequest { AccountCode = g.Key, Side = JournalSide.Debit, TransactionAmount = g.Sum(r => r.Net) })];
+            .Select(g => new JournalLineRequest { AccountCode = g.Key, Side = JournalSide.Debit, TransactionAmount = g.Sum(r => r.Net + r.Discount) }),
+            .. refunded.Where(r => r.Discount > 0m).GroupBy(r => r.Line.DiscountAccountCode!)
+                .Select(g => new JournalLineRequest { AccountCode = g.Key, Side = JournalSide.Credit, TransactionAmount = g.Sum(r => r.Discount) })];
         if (tax != 0m)
         {
             lines.Add(new JournalLineRequest { AccountCode = request.TaxAccountCode!, Side = JournalSide.Debit, TransactionAmount = tax });
@@ -159,7 +163,7 @@ public sealed class PosEventService : IPosEventService
 
         if (request.Restock)
         {
-            foreach ((SaleLine line, decimal quantity, _, _) in refunded)
+            foreach ((SaleLine line, decimal quantity, _, _, _) in refunded)
             {
                 Item? item = await _db.Set<Item>().AsNoTracking().FirstOrDefaultAsync(i => i.Id == line.ItemId, ct).ConfigureAwait(false);
                 if (item is not { IsStockTracked: true } || string.IsNullOrEmpty(item.CostOfSalesAccountCode))

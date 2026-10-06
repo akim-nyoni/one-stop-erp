@@ -17,6 +17,52 @@ public static partial class OperationCatalogue
         string[] kinds = [.. Enum.GetNames<PosEventKind>().Where(k => k != nameof(PosEventKind.Refund))];
         yield return new Operation
         {
+            Module = module, Title = "Save a promotion", ListTitle = "Promotions",
+            Description = "NForPrice (N items for a price), BuyXGetY (no reward items = lowest price free), PercentOff (items or a category), MealDeal (courses separated by '|'). Items as codes separated by ','.",
+            Fields = [Req("Code", "Code"), Req("Name", "Name on receipts"), Pick("Kind", "Kind", Enum.GetNames<PromotionKind>()), Req("Account", "Discount account"), Num("Quantity", "N / X", "0"),
+                Num("Reward", "Y", "0"), OptNum("Price", "Set price"), OptNum("Percent", "Percent off"), Opt("Category", "Category"), Opt("Items", "Items"), Opt("RewardItems", "Reward items"),
+                Opt("Courses", "Meal courses: A,B|C|D"), Num("Priority", "Priority (lower first)", "10"), Tick("Compounding", "Stacks on other promotions"), Tick("Member", "Members only"),
+                Opt("Coupon", "Coupon code"), Today("From", "Starts"), new("To", "Ends", FieldKind.Date, Required: false), Opt("DailyFrom", "Happy hour from (HH:mm)"), Opt("DailyTo", "Happy hour to (HH:mm)")],
+            Run = async (c, i) =>
+            {
+                static IReadOnlyList<string> Codes(string? text) => [.. (text ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+                static TimeOnly? Clock(string? text) => text is null ? null : TimeOnly.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
+                return Check(await c.Get<IPromotionService>().SaveAsync(new PromotionRequest
+                {
+                    CompanyId = c.CompanyId, Code = i.Text("Code"), Name = i.Text("Name"), Kind = Enum.Parse<PromotionKind>(i.Text("Kind")), DiscountAccountCode = i.Text("Account"),
+                    Quantity = i.Whole("Quantity"), RewardQuantity = i.Whole("Reward"), Price = i.OptionalNumber("Price"), Percent = i.OptionalNumber("Percent"), Category = i.Optional("Category"),
+                    Items = Codes(i.Optional("Items")), RewardItems = Codes(i.Optional("RewardItems")),
+                    Courses = [.. (i.Optional("Courses") ?? string.Empty).Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Codes)],
+                    Priority = i.Whole("Priority"), Compounding = i.Flag("Compounding"), MemberOnly = i.Flag("Member"), CouponCode = i.Optional("Coupon"), StartsOn = i.Date("From"),
+                    EndsOn = i.OptionalDate("To"), DailyFrom = Clock(i.Optional("DailyFrom")), DailyTo = Clock(i.Optional("DailyTo")),
+                }).ConfigureAwait(true), id => $"Promotion {i.Text("Code").ToUpperInvariant()} saved.");
+            },
+            List = async c => Table(await c.Db.Promotions.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.Priority).ThenBy(p => p.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", p => p.Code), ("Name", p => p.Name), ("Kind", p => p.Kind), ("Priority", p => p.Priority), ("Runs", p => $"{D(p.StartsOn)} – {(p.EndsOn is DateOnly e ? D(e) : "open")}"),
+                ("Hours", p => p.DailyFrom is TimeOnly f ? $"{f:HH\\:mm}–{p.DailyTo:HH\\:mm}" : "all day"), ("Members", p => p.MemberOnly ? "Yes" : string.Empty), ("Coupon", p => p.CouponCode)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Price a basket with promotions", Description = "Shows what the running promotions take off a basket at a date and time.",
+            Fields = [Req("Lines", "Lines: ITEM:quantity; … (at the default price list)"), Req("When", "When (yyyy-MM-dd HH:mm)", DateTime.Now.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)),
+                Tick("Member", "Loyalty member"), Opt("Coupons", "Coupon codes (',')"), Req("Prices", "Unit prices: ITEM:price; …")],
+            Run = async (c, i) =>
+            {
+                Dictionary<string, decimal> prices = i.Pairs("Prices").ToDictionary(p => p.Code.ToUpperInvariant(), p => p.Quantity);
+                List<BasketItem> lines = [];
+                foreach ((string code, decimal quantity, DateOnly? _) in i.Pairs("Lines"))
+                {
+                    lines.Add(new BasketItem(await ItemAsync(c, code).ConfigureAwait(true), quantity, prices.TryGetValue(code.ToUpperInvariant(), out decimal p) ? p : throw new OperationException($"No price for {code}.")));
+                }
+
+                BasketPricing priced = await c.Get<IPromotionService>().PriceBasketAsync(new BasketRequest(c.CompanyId, null, DateTime.Parse(i.Text("When"), System.Globalization.CultureInfo.InvariantCulture),
+                    i.Flag("Member"), [.. (i.Optional("Coupons") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)], lines)).ConfigureAwait(true);
+                return string.Join(Environment.NewLine, priced.Lines.Select(l => $"{Q(l.Quantity),6} × item {l.ItemId,-6} gross {M(l.Gross),10}  less {M(l.Discount),8}  net {M(l.Net),10}  {string.Join(",", l.PromotionCodes)}"))
+                    + Environment.NewLine + $"Savings: {string.Join("; ", priced.Applied.Select(a => $"{a.Name} {M(a.Saving)}"))}";
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Refund sale lines", ListTitle = "Recent till events",
             Description = "Refunds units of a completed sale's line (by item code): revenue and tax back, money out of the refund account, goods back on the shelf if ticked. Needs a supervisor other than you.",
             Fields = [Req("Sale", "Sale number"), Req("Item", "Item code"), Num("Quantity", "Quantity"), Req("Terminal", "Till code"), Today(), Req("RefundAccount", "Refund paid from (account)", "1000"),
