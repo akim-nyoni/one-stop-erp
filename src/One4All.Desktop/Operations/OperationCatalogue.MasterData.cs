@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.MasterData;
 using One4All.Application.Abstractions.Security;
+using One4All.Application.MasterData;
 using One4All.Core.Security;
 using One4All.Core.Accounting;
 using One4All.Core.Inventory;
@@ -20,6 +21,44 @@ public static partial class OperationCatalogue
     private static IEnumerable<Operation> MasterData()
     {
         const string module = "System Manager";
+        yield return new Operation
+        {
+            Module = module, Title = "Set up a company for an industry", ListTitle = "Companies",
+            Description = "The Industry Setup Wizard: a new company with the chart of accounts, tax codes, warehouses, an open fiscal year and starter roles for the industries chosen (they add up).",
+            Fields = [Req("Code", "Company code"), Req("Name", "Name"), Req("Currency", "Base currency", "USD"), Req("Industries", "Industries (" + string.Join(", ", Enum.GetNames<Vertical>()) + ")", "Retail"),
+                Today("Start", "Fiscal year starts"), Num("Vat", "VAT rate %", "15"), Tick("Demo", "Add demonstration data")],
+            Run = async (c, i) =>
+            {
+                List<Vertical> verticals = [];
+                foreach (string name in i.Text("Industries").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    verticals.Add(Enum.TryParse(name, true, out Vertical v) ? v : throw new OperationException($"Unknown industry {name}."));
+                }
+
+                IndustrySetupResult done = Check(await c.Get<IIndustrySetupService>().SetUpCompanyAsync(new IndustrySetupRequest
+                {
+                    Code = i.Text("Code"), Name = i.Text("Name"), BaseCurrency = CurrencyCode.Parse(i.Text("Currency")), Verticals = verticals, FiscalYearStart = i.Date("Start"),
+                    VatRatePercent = i.Number("Vat"), WithDemoData = i.Flag("Demo"),
+                }).ConfigureAwait(true));
+                return $"Company {done.CompanyId} set up: {done.Accounts} accounts, {done.TaxCodes} tax codes, {done.Warehouses} warehouses, {done.Roles} new roles, {done.DemoRecords} demo records.";
+            },
+            List = async c => Table(await c.Db.Companies.AsNoTracking().OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                ("Id", x => x.Id), ("Code", x => x.Code), ("Name", x => x.Name), ("Base currency", x => x.BaseCurrency.Value)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Add an industry to this company", ListTitle = "Chart of accounts",
+            Description = "Adds an industry's accounts, taxes, warehouses and roles to the current company, keeping everything already there.",
+            Fields = [Pick("Industry", "Industry", Enum.GetNames<Vertical>()), Num("Vat", "VAT rate %", "15"), Tick("Demo", "Add demonstration data")],
+            Run = async (c, i) =>
+            {
+                IndustrySetupResult done = Check(await c.Get<IIndustrySetupService>().AddVerticalAsync(c.CompanyId, Enum.Parse<Vertical>(i.Text("Industry")), i.Number("Vat"), i.Flag("Demo"))
+                    .ConfigureAwait(true));
+                return $"Added {done.Accounts} accounts, {done.TaxCodes} tax codes, {done.Warehouses} warehouses, {done.Roles} roles, {done.DemoRecords} demo records.";
+            },
+            List = async c => Table(await c.Db.Accounts.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.AccountCode).ToListAsync().ConfigureAwait(true),
+                ("Code", x => x.AccountCode), ("Name", x => x.Name), ("Type", x => x.Type), ("Control", x => x.ControlAccountType)),
+        };
         yield return new Operation
         {
             Module = module, Title = "Create a company", ListTitle = "Companies", Description = "A new company with a head-office branch, held to the licence's company limit.",

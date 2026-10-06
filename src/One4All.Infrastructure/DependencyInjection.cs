@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<IUserAdminService, UserAdminService>();
         services.AddScoped<Application.Abstractions.MasterData.IMasterDataService, MasterData.MasterDataService>();
+        services.AddScoped<Application.Abstractions.MasterData.IIndustrySetupService, MasterData.IndustrySetupService>();
         services.AddScoped<Application.Abstractions.Security.IApiAccessService, Security.ApiAccessService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IAuditService, Security.AuditService>();
