@@ -3243,6 +3243,189 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("notification", "msg");
                 });
 
+            modelBuilder.Entity("One4All.Core.Crm.CrmActivity", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateTimeOffset?>("DoneOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("done_on_utc");
+
+                    b.Property<DateTimeOffset?>("DueOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_on_utc");
+
+                    b.Property<long?>("LeadId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("lead_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("notes");
+
+                    b.Property<long?>("OpportunityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("opportunity_id");
+
+                    b.Property<long>("OwnerUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("owner_user_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("subject");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_activity");
+
+                    b.HasIndex("CustomerId")
+                        .HasDatabaseName("ix_activity_customer_id");
+
+                    b.HasIndex("LeadId")
+                        .HasDatabaseName("ix_activity_lead_id");
+
+                    b.HasIndex("OpportunityId")
+                        .HasDatabaseName("ix_activity_opportunity_id");
+
+                    b.HasIndex("CompanyId", "OwnerUserId", "DueOnUtc")
+                        .HasDatabaseName("ix_activity_company_id_owner_user_id_due_on_utc");
+
+                    b.ToTable("activity", "crm");
+                });
+
+            modelBuilder.Entity("One4All.Core.Crm.Lead", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("DisqualifiedReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("disqualified_reason");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("email");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<long?>("OpportunityId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("opportunity_id");
+
+                    b.Property<string>("Organisation")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("organisation");
+
+                    b.Property<long?>("OwnerUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("owner_user_id");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("phone");
+
+                    b.Property<long?>("PossibleDuplicateOfId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("possible_duplicate_of_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("source");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_lead");
+
+                    b.HasIndex("CompanyId", "Email")
+                        .HasDatabaseName("ix_lead_company_id_email");
+
+                    b.HasIndex("CompanyId", "Status")
+                        .HasDatabaseName("ix_lead_company_id_status");
+
+                    b.ToTable("lead", "crm");
+                });
+
             modelBuilder.Entity("One4All.Core.Crm.Opportunity", b =>
                 {
                     b.Property<long>("Id")
@@ -3309,6 +3492,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(9, 4)
                         .HasColumnType("numeric(9,4)")
                         .HasColumnName("probability_percent");
+
+                    b.Property<long?>("QuotationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("quotation_id");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()

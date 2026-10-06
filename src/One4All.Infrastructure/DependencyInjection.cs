@@ -271,6 +271,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.SalesOrders.ISalesOrderService, SalesOrders.SalesOrderService>();
         services.AddScoped<Application.Abstractions.SalesOrders.IQuotationService, SalesOrders.QuotationService>();
         services.AddScoped<Application.Abstractions.Crm.IOpportunityService, Crm.OpportunityService>();
+        services.AddScoped<Application.Abstractions.Crm.ICrmService, Crm.CrmService>();
 
         // Municipality / Council billing.
         services.AddScoped<Application.Abstractions.Municipal.IMunicipalBillingService, Municipal.MunicipalBillingService>();

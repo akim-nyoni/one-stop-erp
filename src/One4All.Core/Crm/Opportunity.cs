@@ -69,6 +69,9 @@ public sealed class Opportunity : SoftDeletableEntity, ICompanyScoped
     /// <summary>The estimated value.</summary>
     public decimal EstimatedValue { get; set; }
 
+    /// <summary>Gets or sets the quotation sent for it.</summary>
+    public long? QuotationId { get; set; }
+
     /// <summary>The current stage.</summary>
     public OpportunityStage Stage { get; private set; }
 
