@@ -87,6 +87,13 @@ public sealed class Sale : AuditableEntity, ICompanyScoped
 
     /// <summary>Adds a tender.</summary>
     /// <param name="tender">The tender.</param>
+    /// <summary>Gets the cash rounding on the sale (tendered less the exact total).</summary>
+    public decimal CashRounding { get; private set; }
+
+    /// <summary>Records the cash rounding.</summary>
+    /// <param name="amount">Tendered less the exact total.</param>
+    public void RecordCashRounding(decimal amount) => CashRounding = amount;
+
     public void AddTender(SaleTender tender) => _tenders.Add(tender);
 
     /// <summary>Voids the sale.</summary>

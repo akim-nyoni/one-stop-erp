@@ -16872,6 +16872,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(3)")
                         .HasColumnName("base_currency");
 
+                    b.Property<decimal>("CashRounding")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("cash_rounding");
+
                     b.Property<long>("CashierUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("cashier_user_id");
@@ -17092,6 +17097,77 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_sale_tender_staff_employee_id");
 
                     b.ToTable("sale_tender", "pos");
+                });
+
+            modelBuilder.Entity("One4All.Core.Pos.TillCashMovement", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("account_code");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long?>("AuthorisedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("authorised_by_user_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("JournalNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reason");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("TillSessionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("till_session_id");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_till_cash_movement");
+
+                    b.HasIndex("TillSessionId")
+                        .HasDatabaseName("ix_till_cash_movement_till_session_id");
+
+                    b.ToTable("till_cash_movement", "pos");
                 });
 
             modelBuilder.Entity("One4All.Core.Pos.TillSession", b =>
@@ -23185,6 +23261,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
                         .HasColumnName("base_currency");
+
+                    b.Property<string>("CashRoundingAccountCode")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("cash_rounding_account_code");
+
+                    b.Property<decimal?>("CashRoundingIncrement")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("cash_rounding_increment");
 
                     b.Property<string>("Code")
                         .IsRequired()

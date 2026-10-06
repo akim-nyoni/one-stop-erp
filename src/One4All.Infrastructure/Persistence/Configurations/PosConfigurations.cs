@@ -188,3 +188,19 @@ internal sealed class LoyaltyMovementConfiguration : IEntityTypeConfiguration<Lo
         b.HasIndex(x => new { x.MemberId, x.Date });
     }
 }
+
+internal sealed class TillCashMovementConfiguration : IEntityTypeConfiguration<TillCashMovement>
+{
+    public void Configure(EntityTypeBuilder<TillCashMovement> b)
+    {
+        b.ToTable("till_cash_movement", Schemas.PointOfSale);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.AccountCode).HasMaxLength(8);
+        b.Property(x => x.Reason).HasMaxLength(200);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+        b.Ignore(x => x.DrawerEffect);
+        b.HasIndex(x => x.TillSessionId);
+    }
+}

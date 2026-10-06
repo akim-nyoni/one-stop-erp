@@ -70,6 +70,17 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Till pickup / paid-out / float top-up", ListTitle = "Open till sessions",
+            Description = "Cash in or out of a drawer other than by sales; posted, and counted in the cash expected at cash-up. A paid-out needs a different supervisor.",
+            Fields = [Num("Session", "Till session id (from the list)"), Pick("Kind", "Kind", Enum.GetNames<TillCashKind>()), Num("Amount", "Amount"), Req("Cash", "Till cash account", "1000"),
+                Req("Other", "Safe / bank, expense or float source account"), Req("Reason", "Reason"), Opt("Supervisor", "Supervisor (user name)"), Today()],
+            Run = async (c, i) => $"Posted: {Check(await c.Get<ITillCashService>().RecordAsync(new TillCashRequest((long)i.Number("Session"), Enum.Parse<TillCashKind>(i.Text("Kind")), i.Number("Amount"),
+                i.Text("Cash"), i.Text("Other"), i.Text("Reason"), c.UserId, await OptionalUserAsync(c, i.Optional("Supervisor")).ConfigureAwait(true), i.Date("Date"))).ConfigureAwait(true))}.",
+            List = async c => Table(await c.Db.Set<TillSession>().AsNoTracking().Where(s => s.CompanyId == c.CompanyId && s.Status == TillSessionStatus.Open).OrderBy(s => s.Id).ToListAsync().ConfigureAwait(true),
+                ("Session", s => s.Id), ("Terminal", s => s.TerminalId), ("Opened", s => s.OpenedOnUtc.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)), ("Float", s => M(s.OpeningFloat))),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Expire loyalty points", Description = "Expires every member's points past their expiry (oldest first) and releases the liability.",
             Fields = [Today("AsAt", "As at"), Req("Document", "Document number")],
             Run = async (c, i) =>

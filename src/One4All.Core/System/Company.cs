@@ -94,6 +94,15 @@ public sealed class Company : SoftDeletableEntity
     public Payroll.PayslipPasswordRule PayslipPasswordRule { get; set; }
 
     /// <summary>
+    /// Gets or sets the smallest cash amount the tills deal in (e.g. 0.05) when coins are scarce: a cash sale may be tendered up to half of
+    /// it away from the exact total, the difference posted to <see cref="CashRoundingAccountCode"/> (brief §4.1). Null: no rounding.
+    /// </summary>
+    public decimal? CashRoundingIncrement { get; set; }
+
+    /// <summary>Gets or sets the account cash rounding differences post to.</summary>
+    public string? CashRoundingAccountCode { get; set; }
+
+    /// <summary>
     /// Whether fund control is on (brief §4.4 / §4.18.5): expenditure cannot be posted to a budget-enabled expense account
     /// (a vote) that has no appropriation in the year's active approved or supplementary budget.
     /// </summary>

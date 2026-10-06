@@ -164,3 +164,32 @@ public interface IPosService
     /// <returns>The cash-up result (Z-read, expected/counted/variance, variance journal).</returns>
     Task<Result<CashUpResult>> CashUpAndCloseAsync(CashUpRequest request, CancellationToken ct = default);
 }
+
+/// <summary>A till cash movement to record.</summary>
+/// <param name="TillSessionId">The open till session.</param>
+/// <param name="Kind">Pickup, paid-out or float top-up.</param>
+/// <param name="Amount">The amount.</param>
+/// <param name="CashAccountCode">The till's cash account.</param>
+/// <param name="OtherAccountCode">The safe / bank (pickup), the expense (paid-out) or the source (top-up).</param>
+/// <param name="Reason">Why.</param>
+/// <param name="UserId">Who did it.</param>
+/// <param name="AuthorisedByUserId">The supervisor (required for paid-outs; never the same person).</param>
+/// <param name="Date">The date.</param>
+public sealed record TillCashRequest(long TillSessionId, TillCashKind Kind, decimal Amount, string CashAccountCode, string OtherAccountCode, string Reason, long UserId, long? AuthorisedByUserId,
+    DateOnly Date);
+
+/// <summary>
+/// Cash in and out of a till drawer other than by sales (brief §4.1): pickups to the safe, paid-outs (authorised by a supervisor) and
+/// float top-ups, each posted and counted in the cash expected at cash-up.
+/// </summary>
+public interface ITillCashService
+{
+    /// <summary>
+    /// Records and posts a movement; refused on a closed session (<c>Pos.SessionClosed</c>), without a reason, or for a paid-out without a
+    /// different supervisor (<c>Pos.AuthorisationRequired</c>).
+    /// </summary>
+    /// <param name="request">The movement.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The journal number.</returns>
+    Task<Result<string>> RecordAsync(TillCashRequest request, CancellationToken ct = default);
+}

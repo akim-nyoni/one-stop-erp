@@ -112,9 +112,22 @@ public sealed class PosService : IPosService
             journalLines.Add(new JournalLineRequest { AccountCode = request.TaxAccountCode, Side = JournalSide.Credit, TransactionAmount = sale.TotalTax });
         }
 
-        if (Math.Abs(sale.NetTenderedBase - sale.TotalGross) > 0.0001m)
+        decimal difference = sale.NetTenderedBase - sale.TotalGross;
+        if (Math.Abs(difference) > 0.0001m)
         {
-            return Error.Rule("Pos.Unbalanced", $"Tenders {sale.NetTenderedBase:0.00} do not equal the sale total {sale.TotalGross:0.00}.");
+            // Cash rounding: a cash sale may be tendered up to half the smallest cash unit away from the exact total.
+            bool rounds = company.CashRoundingIncrement is decimal increment && increment > 0m && !string.IsNullOrWhiteSpace(company.CashRoundingAccountCode)
+                && Math.Abs(difference) <= (increment / 2m) + 0.0001m && sale.Tenders.Any(t => t.TenderType == TenderType.Cash);
+            if (!rounds)
+            {
+                return Error.Rule("Pos.Unbalanced", $"Tenders {sale.NetTenderedBase:0.00} do not equal the sale total {sale.TotalGross:0.00}.");
+            }
+
+            journalLines.Add(new JournalLineRequest
+            {
+                AccountCode = company.CashRoundingAccountCode!, Side = difference > 0m ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = Math.Abs(difference), Narrative = "Cash rounding",
+            });
+            sale.RecordCashRounding(difference);
         }
 
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
@@ -328,7 +341,9 @@ public sealed class PosService : IPosService
 
         decimal cashReceived = cashTenders.Where(t => !t.IsChange).Sum(t => t.BaseAmount);
         decimal changeGiven = cashTenders.Where(t => t.IsChange).Sum(t => t.BaseAmount);
-        CashUpCalculation cashUp = new(session.OpeningFloat, cashReceived, changeGiven, request.CountedCash);
+        // Pickups and paid-outs left the drawer; float top-ups went in.
+        decimal movements = (await _db.TillCashMovements.Where(m => m.TillSessionId == session.Id).ToListAsync(ct).ConfigureAwait(false)).Sum(m => m.DrawerEffect);
+        CashUpCalculation cashUp = new(session.OpeningFloat, cashReceived, changeGiven, request.CountedCash, movements);
 
         string? varianceJournal = null;
         if (!cashUp.Balances)

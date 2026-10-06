@@ -10,10 +10,10 @@ namespace One4All.Application.Pos;
 /// <param name="CashReceived">Cash tendered on sales (non-change).</param>
 /// <param name="ChangeGiven">Cash paid out as change.</param>
 /// <param name="CountedCash">The cash physically counted at close.</param>
-public readonly record struct CashUpCalculation(decimal OpeningFloat, decimal CashReceived, decimal ChangeGiven, decimal CountedCash)
+public readonly record struct CashUpCalculation(decimal OpeningFloat, decimal CashReceived, decimal ChangeGiven, decimal CountedCash, decimal CashMovements = 0m)
 {
     /// <summary>The cash the drawer is expected to hold: float + cash received − change given.</summary>
-    public decimal ExpectedCash => OpeningFloat + CashReceived - ChangeGiven;
+    public decimal ExpectedCash => OpeningFloat + CashReceived - ChangeGiven + CashMovements;
 
     /// <summary>Counted minus expected: positive is an overage, negative a shortage, zero balances.</summary>
     public decimal Variance => CountedCash - ExpectedCash;
@@ -26,4 +26,15 @@ public readonly record struct CashUpCalculation(decimal OpeningFloat, decimal Ca
 
     /// <summary>True when the drawer reconciles exactly.</summary>
     public bool Balances => Variance == 0m;
+}
+
+/// <summary>Cash rounding when the smallest coins are scarce (brief §4.1).</summary>
+public static class CashRounding
+{
+    /// <summary>An amount to the nearest increment (midpoint away from zero).</summary>
+    /// <param name="amount">The exact amount.</param>
+    /// <param name="increment">The smallest cash unit (e.g. 0.05).</param>
+    /// <returns>The amount to collect in cash.</returns>
+    public static decimal Round(decimal amount, decimal increment)
+        => increment <= 0m ? amount : decimal.Round(amount / increment, 0, MidpointRounding.AwayFromZero) * increment;
 }

@@ -191,6 +191,9 @@ public class One4AllDbContext : DbContext
     /// <summary>POS sales.</summary>
     public DbSet<Core.Pos.Sale> Sales => Set<Core.Pos.Sale>();
 
+    /// <summary>Till cash pickups, paid-outs and float top-ups.</summary>
+    public DbSet<Core.Pos.TillCashMovement> TillCashMovements => Set<Core.Pos.TillCashMovement>();
+
     /// <summary>The loyalty scheme.</summary>
     public DbSet<Core.Pos.LoyaltyScheme> LoyaltySchemes => Set<Core.Pos.LoyaltyScheme>();
 
