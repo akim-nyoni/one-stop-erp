@@ -11223,6 +11223,70 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("timesheet", "job");
                 });
 
+            modelBuilder.Entity("One4All.Core.JobCosting.JobWbsElement", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("BudgetCost")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("budget_cost");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(70)
+                        .HasColumnType("character varying(70)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("CostHead")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("cost_head");
+
+                    b.Property<decimal?>("EstimateToComplete")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("estimate_to_complete");
+
+                    b.Property<DateOnly?>("EstimatedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("estimated_on");
+
+                    b.Property<long>("JobContractId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("job_contract_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_wbs_element");
+
+                    b.HasIndex("JobContractId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_wbs_element_job_contract_id_code");
+
+                    b.ToTable("wbs_element", "job");
+                });
+
             modelBuilder.Entity("One4All.Core.JobCosting.PlantItem", b =>
                 {
                     b.Property<long>("Id")
@@ -11439,6 +11503,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
+
+                    b.Property<string>("CostHead")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasDefaultValue("Subcontract")
+                        .HasColumnName("cost_head");
 
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")

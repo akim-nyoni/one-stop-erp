@@ -44,9 +44,11 @@ public interface ISubcontractService
     /// <param name="description">The package.</param>
     /// <param name="value">The value.</param>
     /// <param name="retentionPercent">The retention percentage (0–100).</param>
+    /// <param name="costHead">The job cost head the work is captured under (default "Subcontract").</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The subcontract id, or an error.</returns>
-    Task<Result<long>> LetAsync(long companyId, long contractId, long supplierId, string reference, string description, decimal value, decimal retentionPercent, CancellationToken ct = default);
+    Task<Result<long>> LetAsync(long companyId, long contractId, long supplierId, string reference, string description, decimal value, decimal retentionPercent, string? costHead = null,
+        CancellationToken ct = default);
 
     /// <summary>
     /// Certifies work: the gross this certificate is the work to date less what was certified before; the supplier ledger is invoiced the

@@ -256,6 +256,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.JobCosting.IJobCostingService, JobCosting.JobCostingService>();
         services.AddScoped<Application.Abstractions.JobCosting.IWeighbridgeService, JobCosting.WeighbridgeService>();
         services.AddScoped<Application.Abstractions.JobCosting.IContractControlService, JobCosting.ContractControlService>();
+        services.AddScoped<Application.Abstractions.JobCosting.IJobWbsService, JobCosting.JobWbsService>();
         services.AddScoped<Application.Abstractions.JobCosting.ISubcontractService, JobCosting.SubcontractService>();
 
         // Fixed Assets.

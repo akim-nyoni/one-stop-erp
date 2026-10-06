@@ -158,6 +158,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Approval delegations while approvers are away.</summary>
     public DbSet<Core.Workflow.ApprovalDelegation> ApprovalDelegations => Set<Core.Workflow.ApprovalDelegation>();
 
+    /// <summary>Contract work breakdown structure elements.</summary>
+    public DbSet<Core.JobCosting.JobWbsElement> JobWbsElements => Set<Core.JobCosting.JobWbsElement>();
+
     /// <summary>Bin locations.</summary>
     public DbSet<Core.Inventory.WarehouseBin> WarehouseBins => Set<Core.Inventory.WarehouseBin>();
 

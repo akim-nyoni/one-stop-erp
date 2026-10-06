@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.FixedAssets;
 using One4All.Application.Abstractions.JobCosting;
@@ -196,6 +197,38 @@ public static partial class OperationCatalogue
         const string module = "Contracts";
         yield return new Operation
         {
+            Module = module, Title = "Add a WBS element", ListTitle = "Work breakdown structure",
+            Description = "Phases (no cost head) group activities; an activity carries a budget and the cost head its costs are captured under. Codes are dotted: 1, 1.2, 1.2.3.",
+            Fields = [Req("Contract", "Contract number"), Req("Code", "WBS code"), Req("Name", "Name"), OptNum("Budget", "Budget (activities)"), Opt("CostHead", "Cost head (activities)")],
+            Run = async (c, i) => Check(await c.Get<IJobWbsService>().AddElementAsync(c.CompanyId, await ContractAsync(c, i.Text("Contract")).ConfigureAwait(true), i.Text("Code"), i.Text("Name"),
+                i.OptionalNumber("Budget") ?? 0m, i.Optional("CostHead")).ConfigureAwait(true), id => $"WBS element {i.Text("Code")} added."),
+            List = WbsElementsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Give an estimate to complete", ListTitle = "Work breakdown structure",
+            Description = "The site's estimate of what an activity still needs beyond actual and committed cost. Leave blank to fall back to the budget left.",
+            Fields = [Req("Contract", "Contract number"), Req("Code", "Activity code"), OptNum("Estimate", "Estimate to complete"), Today()],
+            Run = async (c, i) => Check(await c.Get<IJobWbsService>().SetEstimateAsync(c.CompanyId, await ContractAsync(c, i.Text("Contract")).ConfigureAwait(true), i.Text("Code"), i.OptionalNumber("Estimate"),
+                i.Date("Date")).ConfigureAwait(true), "Estimate recorded."),
+            List = WbsElementsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Cost to complete by WBS", ListTitle = "Work breakdown structure",
+            Description = "Budget, actual, committed (open subcontracts), estimate to complete and forecast final cost per phase and activity.",
+            Fields = [Req("Contract", "Contract number")],
+            Run = async (c, i) =>
+            {
+                WbsBreakdown b = Check(await c.Get<IJobWbsService>().BreakdownAsync(c.CompanyId, await ContractAsync(c, i.Text("Contract")).ConfigureAwait(true)).ConfigureAwait(true));
+                IEnumerable<string> rows = b.Lines.Append(b.Total).Select(l => $"{new string(' ', Math.Max(0, l.Level - 1) * 2)}{l.Code} {l.Name}: budget {M(l.Budget)}, actual {M(l.Actual)}, committed {M(l.Committed)}, " +
+                    $"to complete {M(l.EstimateToComplete)}, forecast {M(l.ForecastFinalCost)}, variance {M(l.Variance)}");
+                return $"{b.ContractNumber} (contract budget {M(b.ContractBudget)}){Environment.NewLine}{string.Join(Environment.NewLine, rows)}";
+            },
+            List = WbsElementsAsync,
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Submit a variation order", ListTitle = "Variation orders", Description = "A change to the contract's scope, with its effect on value and budgeted cost.",
             Fields = [Req("Contract", "Contract number"), Req("Number", "VO number"), Req("Description", "What changes"), Num("Value", "Value impact"), Num("Cost", "Cost impact"), Today()],
             Run = async (c, i) => Check(await c.Get<IContractControlService>().SubmitVariationAsync(c.CompanyId, await ContractAsync(c, i.Text("Contract")).ConfigureAwait(true), i.Text("Number"), i.Text("Description"),
@@ -250,9 +283,10 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Let a subcontract", ListTitle = "Subcontracts", Description = "A package let to a supplier on a contract, with the retention held on its certificates.",
-            Fields = [Req("Contract", "Contract number"), Req("Supplier", "Subcontractor (supplier code)"), Req("Reference", "Subcontract reference"), Req("Description", "Package"), Num("Value", "Value"), Num("Retention", "Retention %", "10")],
+            Fields = [Req("Contract", "Contract number"), Req("Supplier", "Subcontractor (supplier code)"), Req("Reference", "Subcontract reference"), Req("Description", "Package"), Num("Value", "Value"), Num("Retention", "Retention %", "10"),
+                Opt("CostHead", "Job cost head (default Subcontract)")],
             Run = async (c, i) => Check(await c.Get<ISubcontractService>().LetAsync(c.CompanyId, await ContractAsync(c, i.Text("Contract")).ConfigureAwait(true), await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true),
-                i.Text("Reference"), i.Text("Description"), i.Number("Value"), i.Number("Retention")).ConfigureAwait(true), $"Subcontract {i.Text("Reference").ToUpperInvariant()} let."),
+                i.Text("Reference"), i.Text("Description"), i.Number("Value"), i.Number("Retention"), i.Optional("CostHead")).ConfigureAwait(true), $"Subcontract {i.Text("Reference").ToUpperInvariant()} let."),
             List = SubcontractsAsync,
         };
         yield return new Operation
@@ -311,5 +345,13 @@ public static partial class OperationCatalogue
         return Table(await c.Db.Subcontracts.AsNoTracking().Include(s => s.Certificates).Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.Reference).ToListAsync().ConfigureAwait(true),
             ("Subcontract", s => s.Reference), ("Contract", s => contracts.GetValueOrDefault(s.JobContractId)), ("Package", s => s.Description), ("Value", s => M(s.Value)),
             ("Certified", s => M(s.CertifiedToDate)), ("Retention held", s => M(s.RetentionHeld)));
+    }
+
+    private static async Task<DataTable> WbsElementsAsync(OperationContext c)
+    {
+        Dictionary<long, string> contracts = await c.Db.JobContracts.AsNoTracking().Where(j => j.CompanyId == c.CompanyId).ToDictionaryAsync(j => j.Id, j => j.ContractNumber).ConfigureAwait(true);
+        return Table((await c.Db.JobWbsElements.AsNoTracking().Where(e => e.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true)).OrderBy(e => contracts.GetValueOrDefault(e.JobContractId)).ThenBy(e => e.Code),
+            ("Contract", e => contracts.GetValueOrDefault(e.JobContractId)), ("Code", e => e.Code), ("Name", e => e.Name), ("Cost head", e => e.CostHead), ("Budget", e => M(e.BudgetCost)),
+            ("Estimate to complete", e => e.EstimateToComplete is decimal etc ? M(etc) : null));
     }
 }

@@ -28,7 +28,7 @@ public sealed class SubcontractService : ISubcontractService
     }
 
     /// <inheritdoc />
-    public async Task<Result<long>> LetAsync(long companyId, long contractId, long supplierId, string reference, string description, decimal value, decimal retentionPercent, CancellationToken ct = default)
+    public async Task<Result<long>> LetAsync(long companyId, long contractId, long supplierId, string reference, string description, decimal value, decimal retentionPercent, string? costHead = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(reference) || string.IsNullOrWhiteSpace(description) || value <= 0m || retentionPercent is < 0m or > 100m)
         {
@@ -52,6 +52,11 @@ public sealed class SubcontractService : ISubcontractService
         }
 
         Subcontract subcontract = new(companyId, contractId, supplierId, normalised, description.Trim(), value, retentionPercent);
+        if (!string.IsNullOrWhiteSpace(costHead))
+        {
+            subcontract.CostHead = costHead.Trim();
+        }
+
         _db.Subcontracts.Add(subcontract);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return subcontract.Id;
@@ -122,7 +127,7 @@ public sealed class SubcontractService : ISubcontractService
         }
 
         JobContract contract = await _db.JobContracts.Include(c => c.Costs).SingleAsync(c => c.Id == subcontract.JobContractId, ct).ConfigureAwait(false);
-        contract.CaptureCost("Subcontract", JobCostSource.Subcontractor, gross, request.Date, invoiceNumber);
+        contract.CaptureCost(subcontract.CostHead, JobCostSource.Subcontractor, gross, request.Date, invoiceNumber);
         subcontract.AddCertificate(new SubcontractCertificate(request.Number.Trim().ToUpperInvariant(), request.Date, request.WorkDoneToDate, gross, retention, invoiceNumber));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new SubcontractCertificateResult(gross, retention, payable);

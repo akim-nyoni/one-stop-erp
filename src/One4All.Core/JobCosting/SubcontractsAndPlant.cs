@@ -50,6 +50,9 @@ public sealed class Subcontract : AuditableEntity, ICompanyScoped
     /// <summary>Gets the value.</summary>
     public decimal Value { get; private set; }
 
+    /// <summary>Gets or sets the job cost head its certificates are captured under (and its open value committed to).</summary>
+    public string CostHead { get; set; } = "Subcontract";
+
     /// <summary>Gets the retention percentage.</summary>
     public decimal RetentionPercent { get; private set; }
 

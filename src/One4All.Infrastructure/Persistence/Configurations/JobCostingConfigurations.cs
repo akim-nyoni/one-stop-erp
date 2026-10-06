@@ -163,6 +163,7 @@ internal sealed class SubcontractConfiguration : IEntityTypeConfiguration<Subcon
     {
         b.ToTable("subcontract", Schemas.JobCosting);
         b.HasKey(x => x.Id);
+        b.Property(x => x.CostHead).HasMaxLength(60).HasDefaultValue("Subcontract");
         b.Property(x => x.Reference).HasMaxLength(40);
         b.Property(x => x.Description).HasMaxLength(200);
         b.Property(x => x.Value).HasPrecision(19, 4);
@@ -215,5 +216,21 @@ internal sealed class PlantLogConfiguration : IEntityTypeConfiguration<PlantLog>
         b.Property(x => x.RunningCost).HasPrecision(19, 4);
         b.Property(x => x.Description).HasMaxLength(200);
         b.HasIndex(x => new { x.PlantItemId, x.Date });
+    }
+}
+
+internal sealed class JobWbsElementConfiguration : IEntityTypeConfiguration<JobWbsElement>
+{
+    public void Configure(EntityTypeBuilder<JobWbsElement> b)
+    {
+        b.ToTable("wbs_element", Schemas.JobCosting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(70);
+        b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.CostHead).HasMaxLength(60);
+        b.Property(x => x.BudgetCost).HasPrecision(19, 4);
+        b.Property(x => x.EstimateToComplete).HasPrecision(19, 4);
+        b.Ignore(x => x.ParentCode);
+        b.HasIndex(x => new { x.JobContractId, x.Code }).IsUnique();
     }
 }
