@@ -13,12 +13,21 @@ public partial class AccountEnquiryWindow : Window
 
     /// <summary>Creates the enquiry against the application services.</summary>
     /// <param name="services">The application service provider.</param>
-    public AccountEnquiryWindow(IServiceProvider services)
+    /// <param name="accountCode">An account to show straight away (a report drilling through to it).</param>
+    public AccountEnquiryWindow(IServiceProvider services, string? accountCode = null)
     {
         _viewModel = new AccountEnquiryViewModel(services);
         DataContext = _viewModel;
         InitializeComponent();
 
-        Loaded += async (_, _) => await _viewModel.InitialiseAsync().ConfigureAwait(true);
+        Loaded += async (_, _) =>
+        {
+            await _viewModel.InitialiseAsync().ConfigureAwait(true);
+            if (accountCode is not null && _viewModel.Accounts.FirstOrDefault(a => a.Code == accountCode) is AccountChoiceVm account)
+            {
+                _viewModel.SelectedAccount = account;
+                await _viewModel.LoadAsync().ConfigureAwait(true);
+            }
+        };
     }
 }

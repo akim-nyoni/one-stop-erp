@@ -97,10 +97,6 @@ public sealed partial class ReportViewerViewModel : ObservableObject
     [ObservableProperty]
     private ReportFormat _selectedFormat = ReportFormat.Pdf;
 
-    /// <summary>The rendered HTML shown in the preview pane.</summary>
-    [ObservableProperty]
-    private string _previewHtml = "<html><body style='font-family:Segoe UI;color:#667;padding:24px'>Select a report and click <b>Run</b>.</body></html>";
-
     /// <summary>A status line for the footer.</summary>
     [ObservableProperty]
     private string _statusMessage = string.Empty;
@@ -164,21 +160,47 @@ public sealed partial class ReportViewerViewModel : ObservableObject
         StatusMessage = "Running…";
         try
         {
-            Result<RenderedDocument> result = await RenderAsync(ReportFormat.Html, ReportRunPurpose.View).ConfigureAwait(true);
+            Result<RenderedDocument> result = await RenderAsync(ReportFormat.Layout, ReportRunPurpose.View).ConfigureAwait(true);
             if (result.IsFailure)
             {
-                StatusMessage = result.Error.ToString();
-                PreviewHtml = $"<html><body style='font-family:Segoe UI;color:#b00;padding:24px'>{System.Net.WebUtility.HtmlEncode(result.Error.Message)}</body></html>";
+                StatusMessage = result.Error.Message;
+                Layout = null;
                 return;
             }
 
-            PreviewHtml = Encoding.UTF8.GetString(result.Value.Content);
-            StatusMessage = $"Rendered {SelectedReport.Code} at {DateTime.Now:HH:mm:ss}.";
+            Layout = One4All.Reporting.Engine.ReportLayout.Deserialize(result.Value.Content);
+            StatusMessage = $"Rendered {SelectedReport.Code} at {DateTime.Now:HH:mm:ss}. Blue values open their source.";
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>Gets the laid-out report on screen (null before a run or after a failure).</summary>
+    [ObservableProperty]
+    private One4All.Reporting.Engine.RenderModel? _layout;
+
+    /// <summary>Gets the company the reports run for.</summary>
+    public long CompanyId => _companyId;
+
+    /// <summary>
+    /// Runs the report again for printing, through the audited runner (so the print, or numbered reprint, is in the run log), returning the
+    /// laid-out report to print and its copy number.
+    /// </summary>
+    /// <returns>The layout and copy number, or why not.</returns>
+    public async Task<Result<(One4All.Reporting.Engine.RenderModel Layout, int? Copy)>> RenderForPrintAsync()
+    {
+        if (SelectedReport is null)
+        {
+            return Error.Validation("Report.None", "No report is selected.");
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        long? userId = _services.GetService<DesktopSession>()?.UserId;
+        Result<AuditedReport> run = await scope.ServiceProvider.GetRequiredService<IAuditedReportRunner>()
+            .RunAsync(_companyId, SelectedReport.Code, BuildParameters(), ReportFormat.Layout, ReportRunPurpose.Print, userId).ConfigureAwait(true);
+        return run.IsSuccess ? (One4All.Reporting.Engine.ReportLayout.Deserialize(run.Value.Document.Content), run.Value.CopyNumber) : run.Error;
     }
 
     /// <summary>Renders the selected report in the chosen export format (for saving to a file).</summary>

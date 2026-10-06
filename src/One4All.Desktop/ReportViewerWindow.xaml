@@ -69,10 +69,23 @@
             <GridSplitter Grid.Column="1" Width="3" HorizontalAlignment="Center" VerticalAlignment="Stretch"
                           Background="{StaticResource BorderBrush}" />
 
-            <!-- Right: HTML preview -->
-            <Border Grid.Column="2" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Margin="0">
-                <WebBrowser x:Name="Preview" />
-            </Border>
+            <!-- Right: paginated preview (zoom and page navigation in the viewer), search, audited print -->
+            <DockPanel Grid.Column="2">
+                <Border DockPanel.Dock="Top" Background="#ECF1EC" Padding="8,4" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                    <DockPanel>
+                        <Button Content="Print…" Width="80" Height="26" Margin="8,0,0,0" Click="Print_Click" DockPanel.Dock="Right" FontWeight="SemiBold" />
+                        <TextBlock x:Name="SearchResult" VerticalAlignment="Center" Margin="8,0" Foreground="#556" DockPanel.Dock="Right" />
+                        <Button Content="Find" Width="60" Height="26" Click="Find_Click" DockPanel.Dock="Right" />
+                        <TextBlock Text="Search in report" VerticalAlignment="Center" Margin="0,0,6,0" Foreground="#556" />
+                        <TextBox x:Name="SearchBox" Height="24" VerticalContentAlignment="Center" KeyDown="SearchBox_KeyDown" Margin="0,0,6,0" />
+                    </DockPanel>
+                </Border>
+                <DocumentViewer x:Name="Viewer">
+                    <DocumentViewer.CommandBindings>
+                        <CommandBinding Command="ApplicationCommands.Print" Executed="Print_Executed" />
+                    </DocumentViewer.CommandBindings>
+                </DocumentViewer>
+            </DockPanel>
         </Grid>
     </DockPanel>
 </Window>

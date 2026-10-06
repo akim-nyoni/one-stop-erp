@@ -47,6 +47,15 @@ public sealed class ReportElement
     /// <summary>The bound field name for a <see cref="ElementKind.Field"/>.</summary>
     public string? FieldName { get; set; }
 
+    /// <summary>
+    /// Gets or sets what clicking the value opens (Journal, Account, Customer, Supplier, Item...), with <see cref="DrillField"/> giving the key; when
+    /// empty, a field named like a journal number, account, customer, supplier or item code drills to that record by itself.
+    /// </summary>
+    public string? DrillTarget { get; set; }
+
+    /// <summary>Gets or sets the field whose value is the drill key (default: the element's own field).</summary>
+    public string? DrillField { get; set; }
+
     /// <summary>The expression for a <see cref="ElementKind.Expression"/> element.</summary>
     public string? Expression { get; set; }
 

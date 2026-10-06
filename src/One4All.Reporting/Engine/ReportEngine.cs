@@ -144,6 +144,7 @@ public sealed class ReportEngine
 
             string text = ResolveText(element, ctx, scope);
             (string foreground, string? background, bool bold) = ApplyConditionalFormats(element, ctx);
+            (string? drillTarget, string? drillKey) = DrillThrough.For(element, row);
 
             rendered.Cells.Add(new RenderCell
             {
@@ -163,6 +164,8 @@ public sealed class ReportEngine
                 HAlign = element.HAlign,
                 BorderThickness = element.BorderThickness,
                 BorderColor = element.BorderColor,
+                DrillTarget = drillTarget,
+                DrillKey = drillKey,
             });
         }
 

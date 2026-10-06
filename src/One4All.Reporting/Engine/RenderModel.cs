@@ -77,6 +77,12 @@ public sealed class RenderCell
 
     /// <summary>Border colour (hex).</summary>
     public string BorderColor { get; init; } = "#000000";
+
+    /// <summary>Gets what clicking the cell opens (null: nothing).</summary>
+    public string? DrillTarget { get; init; }
+
+    /// <summary>Gets the key of the record it opens.</summary>
+    public string? DrillKey { get; init; }
 }
 
 /// <summary>A resolved band ready to render.</summary>

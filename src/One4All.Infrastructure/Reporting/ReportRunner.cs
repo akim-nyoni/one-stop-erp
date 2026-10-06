@@ -84,6 +84,7 @@ public sealed class ReportRunner : IReportRunner
         {
             ReportFormat.Pdf => (new PdfReportRenderer().Render(model), "application/pdf", "pdf"),
             ReportFormat.Text => (new PlainTextReportRenderer().Render(model), "text/plain", "txt"),
+            ReportFormat.Layout => (ReportLayout.Serialize(model), "application/vnd.one4all.layout+json", "layout.json"),
             _ => (new HtmlReportRenderer().Render(model), "text/html", "html"),
         };
 

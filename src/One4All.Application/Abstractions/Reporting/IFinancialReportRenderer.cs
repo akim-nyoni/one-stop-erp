@@ -19,6 +19,9 @@ public enum ReportFormat
 
     /// <summary>Excel workbook (.xlsx / OpenXML SpreadsheetML).</summary>
     Xlsx = 4,
+
+    /// <summary>The laid-out model as JSON, for the desktop viewer's preview, search, drill-through and printing.</summary>
+    Layout = 5,
 }
 
 /// <summary>A rendered report document.</summary>
