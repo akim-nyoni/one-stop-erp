@@ -11,6 +11,9 @@ internal sealed class FixedAssetConfiguration : IEntityTypeConfiguration<FixedAs
     {
         b.ToTable("asset", Schemas.FixedAssets);
         b.Property(x => x.TotalEstimatedUnits).HasPrecision(19, 4);
+        b.Property(x => x.CostCentre).HasMaxLength(3);
+        b.Property(x => x.Department).HasMaxLength(3);
+        b.HasIndex(x => x.ParentAssetId);
         b.HasKey(x => x.Id);
         b.Property(x => x.Insurer).HasMaxLength(120);
         b.Property(x => x.PolicyNumber).HasMaxLength(60);

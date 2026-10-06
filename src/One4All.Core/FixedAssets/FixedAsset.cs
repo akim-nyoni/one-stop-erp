@@ -162,6 +162,15 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
     /// <summary>Gets or sets when the manufacturer's / supplier's warranty ends.</summary>
     public DateOnly? WarrantyExpiry { get; set; }
 
+    /// <summary>Gets or sets the asset this one is a component of (IAS 16 significant parts, depreciated separately).</summary>
+    public long? ParentAssetId { get; set; }
+
+    /// <summary>Gets or sets the GL cost centre the asset's cost, depreciation and disposal are analysed by.</summary>
+    public string? CostCentre { get; set; }
+
+    /// <summary>Gets or sets the GL department the asset's cost, depreciation and disposal are analysed by.</summary>
+    public string? Department { get; set; }
+
     /// <summary>Gets or sets the total units (hours, kilometres, tonnes…) a units-of-production asset is expected to produce in its life.</summary>
     public decimal? TotalEstimatedUnits { get; set; }
 

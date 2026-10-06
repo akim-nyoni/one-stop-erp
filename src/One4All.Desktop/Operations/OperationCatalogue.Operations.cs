@@ -67,6 +67,16 @@ public static partial class OperationCatalogue
         const string module = "Fixed Assets";
         yield return new Operation
         {
+            Module = module, Title = "Move an asset to another cost centre", Description = "Moves the asset's cost and accumulated depreciation to another cost centre / department; future depreciation follows.",
+            Fields = [Req("Asset", "Asset number"), Opt("CostCentre", "Cost centre code"), Opt("Department", "Department code"), Today(), Req("Document", "Document number")],
+            Run = async (c, i) =>
+            {
+                long asset = await FindAsync(c.Db.FixedAssets, a => a.CompanyId == c.CompanyId && a.AssetNumber.ToUpper() == i.Text("Asset").ToUpper(), a => a.Id, "asset", i.Text("Asset")).ConfigureAwait(true);
+                return $"Transferred: {Check(await c.Get<IFixedAssetService>().ReassignAsync(c.CompanyId, asset, i.Optional("CostCentre"), i.Optional("Department"), i.Date("Date"), i.Text("Document")).ConfigureAwait(true))}.";
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Record asset usage", Description = "Units (hours, km, tonnes) a units-of-production asset was used for; the month's depreciation run charges them.",
             Fields = [Req("Asset", "Asset number"), Today(), Num("Units", "Units used"), Opt("Reference", "Reading reference", "Meter")],
             Run = async (c, i) =>

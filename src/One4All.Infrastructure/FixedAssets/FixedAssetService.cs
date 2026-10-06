@@ -39,6 +39,23 @@ public sealed class FixedAssetService : IFixedAssetService
             return Error.NotFound("Fa.CompanyNotFound", $"Company {request.CompanyId} not found.");
         }
 
+        Result<(string? CostCentre, string? Department)> analysis = await DimensionsAsync(request.CompanyId, request.CostCentre, request.Department, ct).ConfigureAwait(false);
+        if (analysis.IsFailure)
+        {
+            return analysis.Error;
+        }
+
+        long? parentId = null;
+        if (!string.IsNullOrWhiteSpace(request.ParentAssetNumber))
+        {
+            parentId = await _db.Set<FixedAsset>().Where(a => a.CompanyId == request.CompanyId && a.AssetNumber == request.ParentAssetNumber.Trim().ToUpper() && a.Status != FixedAssetStatus.Disposed)
+                .Select(a => (long?)a.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (parentId is null)
+            {
+                return Error.NotFound("Fa.ParentNotFound", $"No asset '{request.ParentAssetNumber}' to make this a component of.");
+            }
+        }
+
         if (request.Method == DepreciationMethod.UnitsOfProduction && request.TotalEstimatedUnits is not > 0m)
         {
             return Error.Validation("Fa.TotalUnits", "A units-of-production asset needs the total units it is expected to produce.");
@@ -47,6 +64,9 @@ public sealed class FixedAssetService : IFixedAssetService
         FixedAsset asset = new(request.CompanyId, request.AssetNumber, request.Description, request.AssetClass, request.Cost, request.ResidualValue, request.AcquisitionDate, request.Method, request.UsefulLifeMonths, request.ReducingBalanceRatePercent, request.CostAccountCode, request.AccumulatedDepreciationAccountCode, request.DepreciationExpenseAccountCode)
         {
             TotalEstimatedUnits = request.TotalEstimatedUnits,
+            ParentAssetId = parentId,
+            CostCentre = analysis.Value.CostCentre,
+            Department = analysis.Value.Department,
         };
         _db.Set<FixedAsset>().Add(asset);
 
@@ -61,7 +81,7 @@ public sealed class FixedAssetService : IFixedAssetService
             Narrative = $"Capitalise asset {asset.AssetNumber}",
             Lines =
             [
-                new JournalLineRequest { AccountCode = request.CostAccountCode, Side = JournalSide.Debit, TransactionAmount = request.Cost },
+                new JournalLineRequest { AccountCode = request.CostAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Debit, TransactionAmount = request.Cost },
                 new JournalLineRequest { AccountCode = request.FundingAccountCode, Side = JournalSide.Credit, TransactionAmount = request.Cost },
             ],
         }, ct).ConfigureAwait(false);
@@ -73,6 +93,85 @@ public sealed class FixedAssetService : IFixedAssetService
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return asset.Id;
+    }
+
+    /// <inheritdoc />
+    public Task<Result<string>> ReassignAsync(long companyId, long assetId, string? costCentre, string? department, DateOnly date, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReassignCoreAsync(companyId, assetId, costCentre, department, date, documentNumber, ct), ct);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<(string AssetNumber, string Description, decimal Cost, decimal NetBookValue)>> ComponentsAsync(long companyId, long assetId, CancellationToken ct = default)
+        => [.. (await _db.Set<FixedAsset>().AsNoTracking().Where(a => a.CompanyId == companyId && a.ParentAssetId == assetId).OrderBy(a => a.AssetNumber).ToListAsync(ct).ConfigureAwait(false))
+            .Select(a => (a.AssetNumber, a.Description, a.Cost, a.NetBookValue))];
+
+    private async Task<Result<string>> ReassignCoreAsync(long companyId, long assetId, string? costCentre, string? department, DateOnly date, string documentNumber, CancellationToken ct)
+    {
+        FixedAsset? asset = await _db.Set<FixedAsset>().FirstOrDefaultAsync(a => a.Id == assetId && a.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (asset is null)
+        {
+            return Error.NotFound("Fa.AssetNotFound", $"Asset {assetId} not found.");
+        }
+
+        if (asset.Status == FixedAssetStatus.Disposed)
+        {
+            return Error.Rule("Fa.AlreadyDisposed", $"Asset {asset.AssetNumber} is disposed and cannot be transferred.");
+        }
+
+        Result<(string? CostCentre, string? Department)> to = await DimensionsAsync(companyId, costCentre, department, ct).ConfigureAwait(false);
+        if (to.IsFailure)
+        {
+            return to.Error;
+        }
+
+        if (to.Value.CostCentre == asset.CostCentre && to.Value.Department == asset.Department)
+        {
+            return Error.Validation("Fa.NothingToTransfer", $"Asset {asset.AssetNumber} is already analysed there.");
+        }
+
+        Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        List<JournalLineRequest> lines =
+        [
+            new JournalLineRequest { AccountCode = asset.CostAccountCode, CostCentre = to.Value.CostCentre, Department = to.Value.Department, Side = JournalSide.Debit, TransactionAmount = asset.Cost },
+            new JournalLineRequest { AccountCode = asset.CostAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Credit, TransactionAmount = asset.Cost },
+        ];
+        if (asset.AccumulatedDepreciation > 0m)
+        {
+            lines.Add(new JournalLineRequest { AccountCode = asset.AccumulatedDepreciationAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Debit, TransactionAmount = asset.AccumulatedDepreciation });
+            lines.Add(new JournalLineRequest { AccountCode = asset.AccumulatedDepreciationAccountCode, CostCentre = to.Value.CostCentre, Department = to.Value.Department, Side = JournalSide.Credit, TransactionAmount = asset.AccumulatedDepreciation });
+        }
+
+        Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId, SourceModule = "GL", PostingDate = date, TransactionCurrency = company.BaseCurrency, DocumentType = "FA-TRANSFER", DocumentNumber = documentNumber,
+            Narrative = $"Transfer asset {asset.AssetNumber} to {to.Value.CostCentre ?? "-"}/{to.Value.Department ?? "-"}", Lines = lines,
+        }, ct).ConfigureAwait(false);
+        if (posted.IsFailure)
+        {
+            return posted.Error;
+        }
+
+        asset.CostCentre = to.Value.CostCentre;
+        asset.Department = to.Value.Department;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return posted.Value.JournalNumber;
+    }
+
+    // Cost centre and department codes as the GL knows them (blank for none).
+    private async Task<Result<(string? CostCentre, string? Department)>> DimensionsAsync(long companyId, string? costCentre, string? department, CancellationToken ct)
+    {
+        string? cc = string.IsNullOrWhiteSpace(costCentre) ? null : costCentre.Trim().ToUpperInvariant();
+        string? dept = string.IsNullOrWhiteSpace(department) ? null : department.Trim().ToUpperInvariant();
+        if (cc is not null && !await _db.CostCentres.AnyAsync(c => c.CompanyId == companyId && c.Code == cc, ct).ConfigureAwait(false))
+        {
+            return Error.Validation("Fa.UnknownDimension", $"No cost centre '{cc}'.");
+        }
+
+        if (dept is not null && !await _db.Departments.AnyAsync(d => d.CompanyId == companyId && d.Code == dept, ct).ConfigureAwait(false))
+        {
+            return Error.Validation("Fa.UnknownDimension", $"No department '{dept}'.");
+        }
+
+        return (cc, dept);
     }
 
     /// <inheritdoc />
@@ -151,8 +250,8 @@ public sealed class FixedAssetService : IFixedAssetService
                 continue;
             }
 
-            lines.Add(new JournalLineRequest { AccountCode = asset.DepreciationExpenseAccountCode, Side = JournalSide.Debit, TransactionAmount = charge, Narrative = asset.AssetNumber });
-            lines.Add(new JournalLineRequest { AccountCode = asset.AccumulatedDepreciationAccountCode, Side = JournalSide.Credit, TransactionAmount = charge, Narrative = asset.AssetNumber });
+            lines.Add(new JournalLineRequest { AccountCode = asset.DepreciationExpenseAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Debit, TransactionAmount = charge, Narrative = asset.AssetNumber });
+            lines.Add(new JournalLineRequest { AccountCode = asset.AccumulatedDepreciationAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Credit, TransactionAmount = charge, Narrative = asset.AssetNumber });
             charges.Add((asset, charge));
             total += charge;
             count++;
@@ -209,6 +308,12 @@ public sealed class FixedAssetService : IFixedAssetService
             return Error.Rule("Fa.AlreadyDisposed", $"Asset {asset.AssetNumber} is already disposed.");
         }
 
+        // An asset goes with its significant parts: dispose of the components first.
+        if (await _db.Set<FixedAsset>().AnyAsync(a => a.ParentAssetId == asset.Id && a.Status != FixedAssetStatus.Disposed, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Fa.HasComponents", $"Asset {asset.AssetNumber} still has components in use; dispose of them first.");
+        }
+
         Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         if (company is null)
         {
@@ -222,8 +327,8 @@ public sealed class FixedAssetService : IFixedAssetService
         List<JournalLineRequest> lines =
         [
             new JournalLineRequest { AccountCode = fundingAccountCode, Side = JournalSide.Debit, TransactionAmount = proceeds },
-            new JournalLineRequest { AccountCode = asset.AccumulatedDepreciationAccountCode, Side = JournalSide.Debit, TransactionAmount = asset.AccumulatedDepreciation },
-            new JournalLineRequest { AccountCode = asset.CostAccountCode, Side = JournalSide.Credit, TransactionAmount = asset.Cost },
+            new JournalLineRequest { AccountCode = asset.AccumulatedDepreciationAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Debit, TransactionAmount = asset.AccumulatedDepreciation },
+            new JournalLineRequest { AccountCode = asset.CostAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Credit, TransactionAmount = asset.Cost },
         ];
 
         if (gainOrLoss > 0m)
@@ -291,13 +396,13 @@ public sealed class FixedAssetService : IFixedAssetService
         List<JournalLineRequest> lines = delta > 0m
             ?
             [
-                new JournalLineRequest { AccountCode = asset.CostAccountCode, Side = JournalSide.Debit, TransactionAmount = delta },
+                new JournalLineRequest { AccountCode = asset.CostAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Debit, TransactionAmount = delta },
                 new JournalLineRequest { AccountCode = revaluationReserveAccountCode, Side = JournalSide.Credit, TransactionAmount = delta },
             ]
             :
             [
                 new JournalLineRequest { AccountCode = impairmentExpenseAccountCode, Side = JournalSide.Debit, TransactionAmount = -delta },
-                new JournalLineRequest { AccountCode = asset.CostAccountCode, Side = JournalSide.Credit, TransactionAmount = -delta },
+                new JournalLineRequest { AccountCode = asset.CostAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Credit, TransactionAmount = -delta },
             ];
 
         Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);

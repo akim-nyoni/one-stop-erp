@@ -53,6 +53,15 @@ public sealed class RegisterAssetRequest
 
     /// <summary>Gets the total units a units-of-production asset is expected to produce.</summary>
     public decimal? TotalEstimatedUnits { get; init; }
+
+    /// <summary>Gets the asset this is a component of (by asset number), for an IAS 16 significant part.</summary>
+    public string? ParentAssetNumber { get; init; }
+
+    /// <summary>Gets the GL cost centre code the asset is analysed by.</summary>
+    public string? CostCentre { get; init; }
+
+    /// <summary>Gets the GL department code the asset is analysed by.</summary>
+    public string? Department { get; init; }
 }
 
 /// <summary>The result of a depreciation run.</summary>
@@ -157,6 +166,27 @@ public interface IFixedAssetService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The depreciation forecast.</returns>
     Task<Result<DepreciationForecastReport>> DepreciationForecastAsync(long companyId, DateOnly startMonth, int months, CancellationToken ct = default);
+
+    /// <summary>
+    /// Moves an asset to another cost centre / department: a journal moves its cost and accumulated depreciation between the analyses,
+    /// and its future depreciation follows. Refused for a disposed asset or an unknown code (<c>Fa.UnknownDimension</c>).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="assetId">The asset.</param>
+    /// <param name="costCentre">The new cost centre code (blank for none).</param>
+    /// <param name="department">The new department code (blank for none).</param>
+    /// <param name="date">The transfer date.</param>
+    /// <param name="documentNumber">The document number.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The journal number.</returns>
+    Task<Result<string>> ReassignAsync(long companyId, long assetId, string? costCentre, string? department, DateOnly date, string documentNumber, CancellationToken ct = default);
+
+    /// <summary>An asset's components (IAS 16 significant parts): asset number, cost and net book value.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="assetId">The parent asset.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The components.</returns>
+    Task<IReadOnlyList<(string AssetNumber, string Description, decimal Cost, decimal NetBookValue)>> ComponentsAsync(long companyId, long assetId, CancellationToken ct = default);
 
     /// <summary>
     /// Records the units a units-of-production asset was used for (the run charges the month's readings); refused for another method

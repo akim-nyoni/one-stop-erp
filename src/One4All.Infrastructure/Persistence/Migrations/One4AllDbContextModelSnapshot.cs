@@ -3466,6 +3466,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(8)")
                         .HasColumnName("cost_account_code");
 
+                    b.Property<string>("CostCentre")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("cost_centre");
+
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("created_by_user_id");
@@ -3486,6 +3491,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("DeletedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
+
+                    b.Property<string>("Department")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("department");
 
                     b.Property<string>("DepreciationExpenseAccountCode")
                         .IsRequired()
@@ -3538,6 +3548,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<long?>("ParentAssetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("parent_asset_id");
+
                     b.Property<string>("PolicyNumber")
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)")
@@ -3578,6 +3592,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_asset");
+
+                    b.HasIndex("ParentAssetId")
+                        .HasDatabaseName("ix_asset_parent_asset_id");
 
                     b.HasIndex("CompanyId", "AssetNumber")
                         .IsUnique()
