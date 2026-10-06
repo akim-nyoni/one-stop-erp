@@ -1999,6 +1999,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approved_by_user_id");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -2055,6 +2059,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("reason");
 
+                    b.Property<string>("ResolutionReference")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("resolution_reference");
+
+                    b.Property<int>("Round")
+                        .HasColumnType("integer")
+                        .HasColumnName("round");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -2069,6 +2082,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");
+
+                    b.Property<long?>("SubmittedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("submitted_by_user_id");
 
                     b.Property<int>("Type")
                         .HasColumnType("integer")
@@ -2480,6 +2497,113 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_budget_line_budget_id_account_code_period");
 
                     b.ToTable("budget_line", "bud");
+                });
+
+            modelBuilder.Entity("One4All.Core.Budgeting.BudgetProposal", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("account_code");
+
+                    b.Property<long>("BudgetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("budget_id");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("comment");
+
+                    b.Property<string>("CostCentre")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cost_centre");
+
+                    b.Property<int>("Period")
+                        .HasColumnType("integer")
+                        .HasColumnName("period");
+
+                    b.Property<decimal>("Proposed")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("proposed");
+
+                    b.Property<decimal>("Requested")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("requested");
+
+                    b.Property<int>("Round")
+                        .HasColumnType("integer")
+                        .HasColumnName("round");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_proposal");
+
+                    b.HasIndex("BudgetId", "Round")
+                        .HasDatabaseName("ix_proposal_budget_id_round");
+
+                    b.ToTable("proposal", "bud");
+                });
+
+            modelBuilder.Entity("One4All.Core.Budgeting.BudgetReviewEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer")
+                        .HasColumnName("action");
+
+                    b.Property<long>("BudgetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("budget_id");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("comment");
+
+                    b.Property<DateTimeOffset>("OccurredOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_on_utc");
+
+                    b.Property<int>("Round")
+                        .HasColumnType("integer")
+                        .HasColumnName("round");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_review_event");
+
+                    b.HasIndex("BudgetId")
+                        .HasDatabaseName("ix_review_event_budget_id");
+
+                    b.ToTable("review_event", "bud");
                 });
 
             modelBuilder.Entity("One4All.Core.Budgeting.BudgetVirement", b =>
@@ -24134,6 +24258,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
                         .HasColumnName("base_currency");
+
+                    b.Property<bool>("BudgetApprovalRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("budget_approval_required");
 
                     b.Property<string>("CashRoundingAccountCode")
                         .HasMaxLength(256)

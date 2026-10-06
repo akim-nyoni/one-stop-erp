@@ -45,6 +45,15 @@ public enum BudgetStatus
 
     /// <summary>Superseded by a later version (retained, never deleted).</summary>
     Superseded = 5,
+
+    /// <summary>Finance is reviewing it (may annotate, propose figures, return or recommend).</summary>
+    UnderReview = 6,
+
+    /// <summary>Sent back to the department to accept the proposals or revise, then resubmit.</summary>
+    Returned = 7,
+
+    /// <summary>Recommended by the committee/executive for approval.</summary>
+    Recommended = 8,
 }
 
 /// <summary>
@@ -115,6 +124,41 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Whether the budget is sealed, after which its approved lines cannot change.</summary>
     public bool IsSealed => SealHash is not null;
+
+    /// <summary>Gets the negotiation round (incremented at each submission).</summary>
+    public int Round { get; private set; }
+
+    /// <summary>Gets who last submitted it.</summary>
+    public long? SubmittedByUserId { get; private set; }
+
+    /// <summary>Gets who approved it.</summary>
+    public long? ApprovedByUserId { get; private set; }
+
+    /// <summary>Gets the board or council minute/resolution approving it.</summary>
+    public string? ResolutionReference { get; private set; }
+
+    /// <summary>Moves it through preparation (the service checks the transition is allowed).</summary>
+    /// <param name="status">The new status.</param>
+    public void MoveTo(BudgetStatus status) => Status = status;
+
+    /// <summary>Records a submission, starting a new negotiation round.</summary>
+    /// <param name="userId">Who submitted.</param>
+    public void Submit(long userId)
+    {
+        Round++;
+        SubmittedByUserId = userId;
+        Status = BudgetStatus.Submitted;
+    }
+
+    /// <summary>Approves it with the resolution that did so, sealing the lines.</summary>
+    /// <param name="userId">Who approved.</param>
+    /// <param name="resolutionReference">The minute or resolution.</param>
+    public void Approve(long userId, string resolutionReference)
+    {
+        ApprovedByUserId = userId;
+        ResolutionReference = resolutionReference;
+        Approve();
+    }
 
     /// <summary>The budget lines.</summary>
     public IReadOnlyList<BudgetLine> Lines => _lines.AsReadOnly();
@@ -189,12 +233,16 @@ public sealed class BudgetLine : Entity
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private BudgetLine() => AccountCode = string.Empty;
 
-    /// <summary>Creates a budget line.</summary>
+    /// <summary>Changes the amount during preparation (never once the budget is sealed: the service checks).</summary>
+    /// <param name="amount">The new amount.</param>
+    public void SetAmount(decimal amount) => Amount = amount;
+
+    /// <summary>Creates a line.</summary>
     /// <param name="accountCode">The account.</param>
-    /// <param name="period">The period (month 1–12).</param>
-    /// <param name="amount">The budgeted amount.</param>
-    /// <param name="costCentre">The cost centre, if any.</param>
-    /// <param name="virementId">The approved virement that added the line, if any.</param>
+    /// <param name="period">The period.</param>
+    /// <param name="amount">The amount.</param>
+    /// <param name="costCentre">The cost centre.</param>
+    /// <param name="virementId">The virement that added it, if any.</param>
     public BudgetLine(string accountCode, int period, decimal amount, string? costCentre, long? virementId = null)
     {
         AccountCode = accountCode;
@@ -286,3 +334,126 @@ public sealed class ActualVolume : Entity, ICompanyScoped
     /// <summary>Where the figure came from.</summary>
     public string Reference { get; private set; }
 }
+
+/// <summary>What happened in a budget's preparation.</summary>
+public enum BudgetReviewAction
+{
+    /// <summary>The department submitted it.</summary>
+    Submitted = 1,
+
+    /// <summary>Finance started reviewing it.</summary>
+    ReviewStarted = 2,
+
+    /// <summary>Finance proposed figures.</summary>
+    Proposed = 3,
+
+    /// <summary>Returned to the department.</summary>
+    Returned = 4,
+
+    /// <summary>The department accepted Finance's proposals.</summary>
+    ProposalsAccepted = 5,
+
+    /// <summary>The committee/executive recommended it.</summary>
+    Recommended = 6,
+
+    /// <summary>The board or council approved it.</summary>
+    Approved = 7,
+
+    /// <summary>The department revised a figure.</summary>
+    Revised = 8,
+}
+
+/// <summary>One step in a budget's preparation (<c>bud.review_event</c>); the trail is never rewritten.</summary>
+public sealed class BudgetReviewEvent : Entity
+{
+    private BudgetReviewEvent()
+    {
+    }
+
+    /// <summary>Records the step.</summary>
+    /// <param name="budgetId">The budget.</param>
+    /// <param name="round">The negotiation round.</param>
+    /// <param name="action">What happened.</param>
+    /// <param name="userId">Who.</param>
+    /// <param name="occurredOnUtc">When.</param>
+    /// <param name="comment">Why, or notes.</param>
+    public BudgetReviewEvent(long budgetId, int round, BudgetReviewAction action, long userId, DateTimeOffset occurredOnUtc, string? comment)
+    {
+        BudgetId = budgetId;
+        Round = round;
+        Action = action;
+        UserId = userId;
+        OccurredOnUtc = occurredOnUtc;
+        Comment = comment;
+    }
+
+    /// <summary>Gets the budget.</summary>
+    public long BudgetId { get; private set; }
+
+    /// <summary>Gets the round.</summary>
+    public int Round { get; private set; }
+
+    /// <summary>Gets what happened.</summary>
+    public BudgetReviewAction Action { get; private set; }
+
+    /// <summary>Gets who.</summary>
+    public long UserId { get; private set; }
+
+    /// <summary>Gets when.</summary>
+    public DateTimeOffset OccurredOnUtc { get; private set; }
+
+    /// <summary>Gets the comment.</summary>
+    public string? Comment { get; private set; }
+}
+
+/// <summary>A figure Finance proposed against the department's request in a round (<c>bud.proposal</c>); both are kept.</summary>
+public sealed class BudgetProposal : Entity
+{
+    private BudgetProposal() => AccountCode = string.Empty;
+
+    /// <summary>Records the proposal.</summary>
+    /// <param name="budgetId">The budget.</param>
+    /// <param name="round">The round.</param>
+    /// <param name="accountCode">The account.</param>
+    /// <param name="costCentre">The cost centre.</param>
+    /// <param name="period">The period.</param>
+    /// <param name="requested">The department's figure.</param>
+    /// <param name="proposed">Finance's figure.</param>
+    /// <param name="comment">Why.</param>
+    public BudgetProposal(long budgetId, int round, string accountCode, string? costCentre, int period, decimal requested, decimal proposed, string? comment)
+    {
+        BudgetId = budgetId;
+        Round = round;
+        AccountCode = accountCode;
+        CostCentre = costCentre;
+        Period = period;
+        Requested = requested;
+        Proposed = proposed;
+        Comment = comment;
+    }
+
+    /// <summary>Gets the budget.</summary>
+    public long BudgetId { get; private set; }
+
+    /// <summary>Gets the round.</summary>
+    public int Round { get; private set; }
+
+    /// <summary>Gets the account.</summary>
+    public string AccountCode { get; private set; }
+
+    /// <summary>Gets the cost centre.</summary>
+    public string? CostCentre { get; private set; }
+
+    /// <summary>Gets the period.</summary>
+    public int Period { get; private set; }
+
+    /// <summary>Gets the department's figure.</summary>
+    public decimal Requested { get; private set; }
+
+    /// <summary>Gets Finance's figure.</summary>
+    public decimal Proposed { get; private set; }
+
+    /// <summary>Gets why.</summary>
+    public string? Comment { get; private set; }
+}
+

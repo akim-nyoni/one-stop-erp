@@ -10,6 +10,7 @@ internal sealed class BudgetConfiguration : IEntityTypeConfiguration<Budget>
     {
         b.ToTable("budget", Schemas.Budget);
         b.HasKey(x => x.Id);
+        b.Property(x => x.ResolutionReference).HasMaxLength(120);
         b.Property(x => x.Label).HasMaxLength(120);
         b.Property(x => x.Type).HasConversion<int>();
         b.Property(x => x.Department).HasMaxLength(30);
@@ -168,5 +169,32 @@ internal sealed class BudgetEnforcementRuleConfiguration : IEntityTypeConfigurat
         b.Property(x => x.MinimumValue).HasPrecision(19, 4);
         b.Property(x => x.Action).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.Department, x.AccountPrefix, x.MinimumValue }).IsUnique();
+    }
+}
+
+internal sealed class BudgetReviewEventConfiguration : IEntityTypeConfiguration<BudgetReviewEvent>
+{
+    public void Configure(EntityTypeBuilder<BudgetReviewEvent> b)
+    {
+        b.ToTable("review_event", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Action).HasConversion<int>();
+        b.Property(x => x.Comment).HasMaxLength(500);
+        b.HasIndex(x => x.BudgetId);
+    }
+}
+
+internal sealed class BudgetProposalConfiguration : IEntityTypeConfiguration<BudgetProposal>
+{
+    public void Configure(EntityTypeBuilder<BudgetProposal> b)
+    {
+        b.ToTable("proposal", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AccountCode).HasMaxLength(8);
+        b.Property(x => x.CostCentre).HasMaxLength(20);
+        b.Property(x => x.Requested).HasPrecision(19, 4);
+        b.Property(x => x.Proposed).HasPrecision(19, 4);
+        b.Property(x => x.Comment).HasMaxLength(300);
+        b.HasIndex(x => new { x.BudgetId, x.Round });
     }
 }

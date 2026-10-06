@@ -111,6 +111,9 @@ public sealed class Company : SoftDeletableEntity
     /// </summary>
     public bool FundControlEnabled { get; set; }
 
+    /// <summary>Gets or sets a value indicating whether a budget must go through preparation and approval before it can be activated.</summary>
+    public bool BudgetApprovalRequired { get; set; }
+
     /// <summary>Sets or clears the second reporting currency.</summary>
     /// <param name="reportingCurrency">The reporting currency, or null to disable dual-currency reporting.</param>
     public void SetReportingCurrency(CurrencyCode? reportingCurrency) => ReportingCurrency = reportingCurrency;

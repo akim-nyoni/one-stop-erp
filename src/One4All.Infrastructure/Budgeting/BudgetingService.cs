@@ -85,6 +85,12 @@ public sealed class BudgetingService : IBudgetingService
             return Result.Failure(Error.NotFound("Budget.NotFound", $"Budget {budgetId} not found."));
         }
 
+        // Where the company requires it, only a budget approved through preparation can be activated (brief §4.18.4).
+        if (budget.Status != BudgetStatus.Approved && await _db.Companies.AnyAsync(c => c.Id == companyId && c.BudgetApprovalRequired, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.Rule("Budget.NotApproved", $"Budget {budget.Label} v{budget.VersionNumber} is {budget.Status}; it must be approved before activation."));
+        }
+
         List<Budget> priorActive = await _db.Set<Budget>()
             .Where(b => b.CompanyId == companyId && b.FiscalYearId == budget.FiscalYearId && b.Type == budget.Type && b.Department == budget.Department && b.IsActive && b.Id != budgetId)
             .ToListAsync(ct).ConfigureAwait(false);
