@@ -108,6 +108,14 @@ app.Use(async (context, next) =>
 
     One4All.Application.Abstractions.Security.IApiAccessService access = context.RequestServices.GetRequiredService<One4All.Application.Abstractions.Security.IApiAccessService>();
     Dictionary<string, string> query = context.Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString(), StringComparer.OrdinalIgnoreCase);
+    foreach ((string key, object? value) in context.Request.RouteValues)
+    {
+        if (value is not null && !query.ContainsKey(key))
+        {
+            query[key] = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+        }
+    }
+
     One4All.Application.Abstractions.Security.ApiAccessDecision decision = await access.AuthoriseAsync(
         new One4All.Application.Abstractions.Security.ApiAccessRequest(userId, context.Request.Method, context.Request.Path.Value ?? string.Empty, query), context.RequestAborted).ConfigureAwait(false);
     if (!decision.Allowed)

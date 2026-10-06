@@ -47,6 +47,7 @@ public static class DependencyInjection
         services.AddSingleton(new AuthenticationOptions());
         services.AddScoped<IPermissionService, PermissionService>();
         services.AddScoped<IUserAdminService, UserAdminService>();
+        services.AddScoped<IDataScopeService, DataScopeService>();
         services.AddScoped<Application.Abstractions.MasterData.IMasterDataService, MasterData.MasterDataService>();
         services.AddScoped<Application.Abstractions.MasterData.IIndustrySetupService, MasterData.IndustrySetupService>();
         services.AddScoped<Application.Abstractions.Security.IApiAccessService, Security.ApiAccessService>();

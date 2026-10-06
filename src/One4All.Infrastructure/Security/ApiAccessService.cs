@@ -17,14 +17,25 @@ public sealed class ApiAccessService : IApiAccessService
     /// <param name="db">The database context.</param>
     /// <param name="permissions">Resolves the user's permissions.</param>
     /// <param name="licence">Refuses unlicensed modules and changes while read-only.</param>
-    public ApiAccessService(One4AllDbContext db, IPermissionService permissions, Application.Abstractions.Licensing.ILicenceService? licence = null)
+    /// <param name="scopes">Applies row-level data scopes.</param>
+    public ApiAccessService(One4AllDbContext db, IPermissionService permissions, Application.Abstractions.Licensing.ILicenceService? licence = null, IDataScopeService? scopes = null)
     {
+        _scopes = scopes;
         _db = db;
         _permissions = permissions;
         _licence = licence;
     }
 
     private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
+    private readonly IDataScopeService? _scopes;
+
+    // Request parameters naming scoped data: by id (resolved to its code) or by code.
+    private static readonly (string Name, ScopeDimension Dimension, bool IsId)[] ScopedParameters =
+    [
+        ("companyId", ScopeDimension.Company, true), ("branchId", ScopeDimension.Branch, true), ("warehouseId", ScopeDimension.Warehouse, true),
+        ("terminalId", ScopeDimension.Till, true), ("contractId", ScopeDimension.Job, true), ("jobId", ScopeDimension.Job, true),
+        ("costCentre", ScopeDimension.CostCentre, false), ("department", ScopeDimension.Department, false), ("ward", ScopeDimension.WardZone, false),
+    ];
 
     /// <inheritdoc />
     public async Task<ApiAccessDecision> AuthoriseAsync(ApiAccessRequest request, CancellationToken ct = default)
@@ -74,29 +85,28 @@ public sealed class ApiAccessService : IApiAccessService
             }
         }
 
-        string? company = request.Query.FirstOrDefault(q => string.Equals(q.Key, "companyId", StringComparison.OrdinalIgnoreCase)).Value;
-        if (company is not null && !permissions.IsSuperAdministrator)
+        // Row-level scopes: a company, branch, warehouse, till, job, cost centre, department or ward the request names must be within the
+        // user's scopes (an assignment that leaves a dimension open opens it).
+        if (!permissions.IsSuperAdministrator && _scopes is not null)
         {
-            if (!long.TryParse(company, NumberStyles.Integer, CultureInfo.InvariantCulture, out long companyId) || !await CompanyAllowedAsync(request.UserId, companyId, ct).ConfigureAwait(false))
+            foreach ((string name, ScopeDimension dimension, bool isId) in ScopedParameters)
             {
-                return ApiAccessDecision.Refuse(403, "You have no access to that company.");
+                string? value = request.Query.FirstOrDefault(q => string.Equals(q.Key, name, StringComparison.OrdinalIgnoreCase)).Value;
+                if (value is null)
+                {
+                    continue;
+                }
+
+                bool allowed = isId
+                    ? long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long id) && await _scopes.AllowsAsync(request.UserId, dimension, id, ct).ConfigureAwait(false)
+                    : (await _scopes.ForUserAsync(request.UserId, ct).ConfigureAwait(false)).Allows(dimension, value);
+                if (!allowed)
+                {
+                    return ApiAccessDecision.Refuse(403, $"You have no access to that {dimension}.");
+                }
             }
         }
 
         return new ApiAccessDecision(true, 200, null, missing);
-    }
-
-    // A user is limited to the companies their role assignments are scoped to; any assignment without a company scope opens them all.
-    private async Task<bool> CompanyAllowedAsync(long userId, long companyId, CancellationToken ct)
-    {
-        List<UserRole> assignments = await _db.Set<UserRole>().AsNoTracking().Include(r => r.Scopes).Where(r => r.UserId == userId).ToListAsync(ct).ConfigureAwait(false);
-        if (assignments.Count == 0 || assignments.Any(a => a.Scopes.All(s => s.Dimension != ScopeDimension.Company)))
-        {
-            return true;
-        }
-
-        string? code = await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        string id = companyId.ToString(CultureInfo.InvariantCulture);
-        return assignments.SelectMany(a => a.Scopes).Where(s => s.Dimension == ScopeDimension.Company).Any(s => s.Allows(id) || (code is not null && s.Allows(code)));
     }
 }

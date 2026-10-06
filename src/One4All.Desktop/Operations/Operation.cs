@@ -261,8 +261,15 @@ public static class Ops
     /// <param name="c">The context.</param>
     /// <param name="code">The code.</param>
     /// <returns>The id.</returns>
-    public static Task<long> WarehouseAsync(OperationContext c, string code)
-        => FindAsync(c.Db.Warehouses, w => w.CompanyId == c.CompanyId && w.Code.ToUpper() == code.ToUpper(), w => w.Id, "warehouse", code);
+    public static async Task<long> WarehouseAsync(OperationContext c, string code)
+    {
+        long id = await FindAsync(c.Db.Warehouses, w => w.CompanyId == c.CompanyId && w.Code.ToUpper() == code.ToUpper(), w => w.Id, "warehouse", code).ConfigureAwait(true);
+
+        // Row-level scopes: a user limited to certain warehouses cannot work in others (brief §5.1).
+        return await c.Get<Application.Abstractions.Security.IDataScopeService>().AllowsAsync(c.UserId, Core.Security.ScopeDimension.Warehouse, id).ConfigureAwait(true)
+            ? id
+            : throw new OperationException($"You have no access to warehouse {code.ToUpperInvariant()}.");
+    }
 
     /// <summary>Finds a customer by code.</summary>
     /// <param name="c">The context.</param>

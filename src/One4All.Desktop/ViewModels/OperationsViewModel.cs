@@ -167,7 +167,10 @@ public sealed partial class OperationsViewModel : ObservableObject
         if (_companyId == 0)
         {
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
-            _companyId = await db.Companies.OrderBy(c => c.Id).Select(c => c.Id).FirstOrDefaultAsync().ConfigureAwait(true);
+            // The first company the user's data scope reaches (brief §5.1).
+            Application.Security.DataScope reach = await scope.ServiceProvider.GetRequiredService<Application.Abstractions.Security.IDataScopeService>().ForUserAsync(_userId).ConfigureAwait(true);
+            var companies = await db.Companies.OrderBy(c => c.Id).Select(c => new { c.Id, c.Code }).ToListAsync().ConfigureAwait(true);
+            _companyId = companies.FirstOrDefault(c => reach.Allows(Core.Security.ScopeDimension.Company, c.Code, c.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)))?.Id ?? 0;
         }
 
         return await work(new OperationContext(scope.ServiceProvider, _companyId, _userId)).ConfigureAwait(true);
