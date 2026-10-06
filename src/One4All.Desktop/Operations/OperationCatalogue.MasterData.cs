@@ -3,6 +3,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.MasterData;
+using One4All.Application.Abstractions.Onboarding;
 using One4All.Application.Abstractions.Security;
 using One4All.Application.MasterData;
 using One4All.Core.Security;
@@ -21,6 +22,35 @@ public static partial class OperationCatalogue
     private static IEnumerable<Operation> MasterData()
     {
         const string module = "System Manager";
+        string[] imports = ["Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance"];
+        yield return new Operation
+        {
+            Module = module, Title = "Import master data or opening balances", ListTitle = "Opening balance reconciliation",
+            Description = "Loads a CSV template (header row; dates yyyy-MM-dd). Untick Commit to preview: nothing is written while any row has an error. "
+                + "Customers/Suppliers: code,name,currency[,credit_limit]. Items: code,description[,type,revenue_account,cost_account,category]. Stock: item,warehouse,quantity,unit_cost. "
+                + "Receivables/Payables: trader,document,date,amount (negative = credit). TrialBalance: account,debit,credit.",
+            Fields = [Pick("Kind", "What", imports), Req("File", "CSV file path"), Today("Date", "Opening date"), Req("Suspense", "Migration suspense account", "2900"), Tick("Commit", "Commit")],
+            Run = async (c, i) =>
+            {
+                string csv = await System.IO.File.ReadAllTextAsync(i.Text("File")).ConfigureAwait(true);
+                IOpeningBalanceService ob = c.Get<IOpeningBalanceService>();
+                bool commit = i.Flag("Commit");
+                ImportReport report = i.Text("Kind") switch
+                {
+                    "Customers" => await ob.ImportCustomersAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
+                    "Suppliers" => await ob.ImportSuppliersAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
+                    "Items" => await ob.ImportItemsAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
+                    "Stock" => await ob.ImportStockAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),
+                    "Receivables" => await ob.ImportOpenItemsAsync(c.CompanyId, Core.Trading.TradingLedger.AccountsReceivable, csv, i.Text("Suspense"), commit).ConfigureAwait(true),
+                    "Payables" => await ob.ImportOpenItemsAsync(c.CompanyId, Core.Trading.TradingLedger.AccountsPayable, csv, i.Text("Suspense"), commit).ConfigureAwait(true),
+                    _ => await ob.ImportTrialBalanceAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),
+                };
+                string head = $"{report.Rows} row(s): {(report.Committed ? $"{report.Created} written" : "nothing written")}, {report.Skipped} already there, {report.Errors.Count} error(s).";
+                return report.Errors.Count == 0 ? head
+                    : head + Environment.NewLine + string.Join(Environment.NewLine, report.Errors.Take(30).Select(e => e.LineNumber > 0 ? $"Line {e.LineNumber}: {e.Message}" : e.Message));
+            },
+            List = OpeningReconciliationAsync,
+        };
         yield return new Operation
         {
             Module = module, Title = "Set up a company for an industry", ListTitle = "Companies",
@@ -300,5 +330,25 @@ public static partial class OperationCatalogue
             ("User", u => u.Username), ("Name", u => u.DisplayName), ("Active", u => u.IsActive), ("Administrator", u => u.IsSystemAdministrator),
             ("Roles", u => string.Join("; ", u.Roles.Select(r => roles.GetValueOrDefault(r.RoleId) + (r.Scopes.Count == 0 ? string.Empty
                 : " (" + string.Join(", ", r.Scopes.Select(s => $"{s.Dimension}: {string.Join("/", s.Values)}")) + ")")))));
+    }
+
+    private static async Task<DataTable> OpeningReconciliationAsync(OperationContext c)
+    {
+        string suspense = await c.Db.Accounts.Where(a => a.CompanyId == c.CompanyId && a.ControlAccountType == ControlAccountType.Suspense).Select(a => a.AccountCode).FirstOrDefaultAsync().ConfigureAwait(true) ?? "2900";
+        Core.Common.Result<OpeningBalanceReconciliation> result = await c.Get<IOpeningBalanceService>().ReconcileAsync(c.CompanyId, suspense).ConfigureAwait(true);
+        if (result.IsFailure)
+        {
+            return Table(new[] { result.Error.Message }, ("Problem", m => m));
+        }
+
+        OpeningBalanceReconciliation r = result.Value;
+        List<(string Check, string Ledger, string Sub, string Status)> rows =
+        [
+            ("Trial balance loaded", r.TrialBalanceLoaded ? "yes" : "no", string.Empty, r.TrialBalanceLoaded ? "OK" : "Load it"),
+            ($"Suspense {r.SuspenseAccountCode}", M(r.SuspenseBalance), string.Empty, Math.Abs(r.SuspenseBalance) < 0.01m ? "OK" : "Investigate"),
+            .. r.Controls.Select(x => (x.Ledger, M(x.ControlBalance), M(x.SubLedgerBalance), x.Agrees ? "OK" : "Differs")),
+            ("Ready to go live", r.Ready ? "yes" : "no", string.Empty, string.Empty),
+        ];
+        return Table(rows, ("Check", x => x.Check), ("Ledger / balance", x => x.Ledger), ("Sub-ledger", x => x.Sub), ("Status", x => x.Status));
     }
 }
