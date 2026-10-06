@@ -23,15 +23,31 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="postingEngine">The posting engine.</param>
-    public TradingService(One4AllDbContext db, IPostingEngine postingEngine)
+    /// <param name="webhooks">Publishes invoice and payment events.</param>
+    public TradingService(One4AllDbContext db, IPostingEngine postingEngine, Application.Abstractions.Integration.IWebhookService? webhooks = null)
     {
         _db = db;
         _postingEngine = postingEngine;
+        _webhooks = webhooks;
     }
+
+    private readonly Application.Abstractions.Integration.IWebhookService? _webhooks;
 
     /// <inheritdoc />
     public Task<Result<TradingPostingResult>> PostInvoiceAsync(SalesInvoiceRequest request, CancellationToken ct = default)
-        => _db.AtomicAsync(() => PostInvoiceCoreAsync(request, ct), ct);
+        => _db.AtomicAsync(async () =>
+        {
+            Result<TradingPostingResult> posted = await PostInvoiceCoreAsync(request, ct).ConfigureAwait(false);
+            if (posted.IsSuccess && _webhooks is not null)
+            {
+                await _webhooks.PublishAsync(request.CompanyId, Application.Integration.WebhookEvents.InvoicePosted, new
+                {
+                    request.CustomerId, request.DocumentNumber, request.DocumentDate, Currency = request.Currency.Value, request.NetAmount, request.TaxAmount, posted.Value.JournalNumber,
+                }, ct).ConfigureAwait(false);
+            }
+
+            return posted;
+        }, ct);
 
     // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
     private async Task<Result<TradingPostingResult>> PostInvoiceCoreAsync(SalesInvoiceRequest request, CancellationToken ct)
@@ -443,7 +459,19 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
     /// <inheritdoc />
     public Task<Result<TradingPostingResult>> PostReceiptAsync(ReceiptRequest request, CancellationToken ct = default)
-        => _db.AtomicAsync(() => PostReceiptCoreAsync(request, ct), ct);
+        => _db.AtomicAsync(async () =>
+        {
+            Result<TradingPostingResult> posted = await PostReceiptCoreAsync(request, ct).ConfigureAwait(false);
+            if (posted.IsSuccess && _webhooks is not null)
+            {
+                await _webhooks.PublishAsync(request.CompanyId, Application.Integration.WebhookEvents.PaymentReceived, new
+                {
+                    request.CustomerId, request.DocumentNumber, request.ReceiptDate, Currency = request.Currency.Value, request.Amount, posted.Value.JournalNumber,
+                }, ct).ConfigureAwait(false);
+            }
+
+            return posted;
+        }, ct);
 
     // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
     private async Task<Result<TradingPostingResult>> PostReceiptCoreAsync(ReceiptRequest request, CancellationToken ct)

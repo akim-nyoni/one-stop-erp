@@ -12,6 +12,7 @@ namespace One4All.Infrastructure.Municipal;
 /// <summary>Reviewed billing runs: proposed, reviewed, approved and posted through the receivables ledger.</summary>
 public sealed class BillingRunService : IBillingRunService
 {
+    private readonly Application.Abstractions.Integration.IWebhookService? _webhooks;
     private readonly One4AllDbContext _db;
     private readonly INumberSequenceService _numbers;
     private readonly ISalesLedgerService _ar;
@@ -20,8 +21,10 @@ public sealed class BillingRunService : IBillingRunService
     /// <param name="db">The database context.</param>
     /// <param name="numbers">The number sequences.</param>
     /// <param name="ar">The receivables ledger.</param>
-    public BillingRunService(One4AllDbContext db, INumberSequenceService numbers, ISalesLedgerService ar)
+    /// <param name="webhooks">Publishes generated bills.</param>
+    public BillingRunService(One4AllDbContext db, INumberSequenceService numbers, ISalesLedgerService ar, Application.Abstractions.Integration.IWebhookService? webhooks = null)
     {
+        _webhooks = webhooks;
         _db = db;
         _numbers = numbers;
         _ar = ar;
@@ -175,6 +178,14 @@ public sealed class BillingRunService : IBillingRunService
 
         run.MarkPosted(userId);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (_webhooks is not null)
+        {
+            await _webhooks.PublishAsync(companyId, Application.Integration.WebhookEvents.BillsGenerated, new
+            {
+                RunNumber = runNumber, run.BillDate, Bills = toPost.Count, Total = toPost.Sum(l => l.Charge), Invoices = toPost.Select(l => l.InvoiceNumber),
+            }, ct).ConfigureAwait(false);
+        }
+
         return Summary(run);
     }
 

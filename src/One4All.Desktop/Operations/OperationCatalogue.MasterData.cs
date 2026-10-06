@@ -2,6 +2,7 @@ using System.Data;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
+using One4All.Application.Abstractions.Integration;
 using One4All.Application.Abstractions.MasterData;
 using One4All.Application.Abstractions.Onboarding;
 using One4All.Application.Abstractions.Security;
@@ -22,6 +23,44 @@ public static partial class OperationCatalogue
     private static IEnumerable<Operation> MasterData()
     {
         const string module = "System Manager";
+        yield return new Operation
+        {
+            Module = module, Title = "Manage webhooks", ListTitle = "Webhook deliveries (latest 200)",
+            Description = "Subscribe an endpoint to sale.completed, invoice.posted, payment.received, bill.generated or *; deliveries are signed (X-One4All-Signature: sha256=HMAC). "
+                + "Give a subscription id to stop it, a failed delivery id to retry it, or tick Send now to dispatch what is due.",
+            Fields = [Opt("Event", "Event (to subscribe)"), Opt("Url", "Endpoint URL"), Opt("Secret", "Signing secret (16+ characters)"), OptNum("Stop", "Subscription id to stop"),
+                OptNum("Retry", "Failed delivery id to retry"), Tick("Send", "Send now")],
+            Run = async (c, i) =>
+            {
+                IWebhookService hooks = c.Get<IWebhookService>();
+                List<string> done = [];
+                if (i.Optional("Event") is string evt)
+                {
+                    done.Add($"Subscription {Check(await hooks.SubscribeAsync(c.CompanyId, evt, i.Text("Url"), i.Text("Secret")).ConfigureAwait(true))} created.");
+                }
+
+                if (i.OptionalNumber("Stop") is decimal stop)
+                {
+                    done.Add(Check(await hooks.UnsubscribeAsync(c.CompanyId, (long)stop).ConfigureAwait(true), "Subscription stopped."));
+                }
+
+                if (i.OptionalNumber("Retry") is decimal retry)
+                {
+                    done.Add(Check(await hooks.RetryAsync(c.CompanyId, (long)retry).ConfigureAwait(true), "Delivery queued again."));
+                }
+
+                if (i.Flag("Send"))
+                {
+                    WebhookDispatchResult pass = await hooks.DispatchDueAsync(DateTimeOffset.UtcNow).ConfigureAwait(true);
+                    done.Add($"{pass.Delivered} delivered, {pass.Retrying} to retry, {pass.Failed} given up.");
+                }
+
+                return done.Count == 0 ? "Nothing to do." : string.Join(" ", done);
+            },
+            List = async c => Table(await c.Db.Set<Core.Integration.WebhookDelivery>().AsNoTracking().Where(d => d.CompanyId == c.CompanyId).OrderByDescending(d => d.Id).Take(200).ToListAsync().ConfigureAwait(true),
+                ("Id", d => d.Id), ("Subscription", d => d.SubscriptionId), ("Event", d => d.EventType), ("Status", d => d.Status), ("Attempts", d => d.Attempts),
+                ("Next attempt", d => d.NextAttemptOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Last status", d => d.LastStatusCode), ("Last error", d => d.LastError)),
+        };
         yield return new Operation
         {
             Module = module, Title = "Review direct database changes", ListTitle = "Sensitive-table changes made outside One4All (last 30 days)",

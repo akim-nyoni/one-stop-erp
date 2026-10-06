@@ -17,6 +17,7 @@ namespace One4All.Infrastructure.Pos;
 public sealed class PosService : IPosService
 {
     private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
+    private readonly Application.Abstractions.Integration.IWebhookService? _webhooks;
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _postingEngine;
     private readonly IInventoryService _inventory;
@@ -28,8 +29,11 @@ public sealed class PosService : IPosService
     /// <param name="inventory">The inventory service.</param>
     /// <param name="clock">The clock.</param>
     /// <param name="licence">Caps the POS terminals that may trade.</param>
-    public PosService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, Application.Abstractions.Licensing.ILicenceService? licence = null)
+    /// <param name="webhooks">Publishes completed sales.</param>
+    public PosService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, Application.Abstractions.Licensing.ILicenceService? licence = null,
+        Application.Abstractions.Integration.IWebhookService? webhooks = null)
     {
+        _webhooks = webhooks;
         _licence = licence;
         _db = db;
         _postingEngine = postingEngine;
@@ -203,6 +207,14 @@ public sealed class PosService : IPosService
                     return issue.Error;
                 }
             }
+        }
+
+        if (_webhooks is not null)
+        {
+            await _webhooks.PublishAsync(request.CompanyId, Application.Integration.WebhookEvents.SaleCompleted, new
+            {
+                request.SaleNumber, request.SaleDate, request.TerminalId, sale.TotalGross, Lines = request.Lines.Select(l => new { l.ItemId, l.Quantity, l.LineNet }),
+            }, ct).ConfigureAwait(false);
         }
 
         return new CompleteSaleResult(sale.Id, posting.Value.JournalNumber, sale.TotalGross);

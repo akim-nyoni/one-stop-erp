@@ -32,6 +32,7 @@ builder.Configuration.GetSection(One4All.Infrastructure.Communications.Messaging
 
 builder.Services.AddOne4AllInfrastructure(connectionString, licensing, messaging);
 builder.Services.AddHostedService<One4All.Server.LicenceHost>();
+builder.Services.AddHostedService<One4All.Server.WebhookHost>();
 
 // Sign-in policy (brief §5.2): lockout, password history and expiry, idle timeout, concurrent sessions, from the Authentication section.
 One4All.Infrastructure.Security.AuthenticationOptions authentication = new();
