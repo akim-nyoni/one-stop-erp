@@ -71,6 +71,12 @@ public partial class ShellWindow : Window
         designer.Show();
     }
 
+    private void OpenBandedDesigner_Click(object sender, RoutedEventArgs e)
+    {
+        BandedDesignerWindow designer = new(_services) { Owner = this };
+        designer.Show();
+    }
+
     private void OpenPermissionEditor_Click(object sender, RoutedEventArgs e)
     {
         PermissionEditorWindow editor = new(_services) { Owner = this };

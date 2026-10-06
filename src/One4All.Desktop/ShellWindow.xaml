@@ -107,7 +107,8 @@
             </MenuItem>
             <MenuItem Header="_Reports">
                 <MenuItem Header="Report Viewer…" Click="OpenReportViewer_Click" />
-                <MenuItem Header="Report Designer…" Click="OpenReportDesigner_Click" />
+                <MenuItem Header="Report Designer…" Click="OpenBandedDesigner_Click" />
+                <MenuItem Header="Quick Column Layout…" Click="OpenReportDesigner_Click" />
             </MenuItem>
             <MenuItem Header="_Utilities">
                 <MenuItem Header="Period Close Checklist…" Click="OpenPeriodClose_Click" />
