@@ -76,6 +76,36 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Every signed-in API request is checked against the user's permissions for its area, the company it names and the user it says is
+// acting (brief §5.1); an acting user left out is filled in from the token.
+app.Use(async (context, next) =>
+{
+    Endpoint? endpoint = context.GetEndpoint();
+    if (endpoint is null || endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAllowAnonymous>() is not null
+        || !context.Request.Path.StartsWithSegments("/api") || SignedInUser(context.User) is not long userId)
+    {
+        await next(context).ConfigureAwait(false);
+        return;
+    }
+
+    One4All.Application.Abstractions.Security.IApiAccessService access = context.RequestServices.GetRequiredService<One4All.Application.Abstractions.Security.IApiAccessService>();
+    Dictionary<string, string> query = context.Request.Query.ToDictionary(q => q.Key, q => q.Value.ToString(), StringComparer.OrdinalIgnoreCase);
+    One4All.Application.Abstractions.Security.ApiAccessDecision decision = await access.AuthoriseAsync(
+        new One4All.Application.Abstractions.Security.ApiAccessRequest(userId, context.Request.Method, context.Request.Path.Value ?? string.Empty, query), context.RequestAborted).ConfigureAwait(false);
+    if (!decision.Allowed)
+    {
+        await Results.Json(new { error = decision.Reason }, statusCode: decision.StatusCode).ExecuteAsync(context).ConfigureAwait(false);
+        return;
+    }
+
+    foreach (string name in decision.MissingActorParameters)
+    {
+        context.Request.QueryString = context.Request.QueryString.Add(name, userId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    await next(context).ConfigureAwait(false);
+});
+
 // --- Endpoints --------------------------------------------------------------------------------------------
 app.MapPost("/api/auth/login", async (LoginRequest request, IAuthenticationService auth, IJwtTokenService tokens, CancellationToken ct) =>
 {

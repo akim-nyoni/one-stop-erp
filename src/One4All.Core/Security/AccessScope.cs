@@ -9,7 +9,8 @@ namespace One4All.Core.Security;
 /// </summary>
 public sealed class AccessScope : Entity
 {
-    private readonly List<string> _values = [];
+    // Not readonly and typed as a read-only list: the store materialises the column as an array.
+    private IReadOnlyList<string> _values = [];
 
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private AccessScope()
@@ -22,7 +23,7 @@ public sealed class AccessScope : Entity
     public AccessScope(ScopeDimension dimension, IEnumerable<string> values)
     {
         Dimension = dimension;
-        _values.AddRange(values.Distinct(StringComparer.OrdinalIgnoreCase));
+        _values = [.. values.Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
     /// <summary>The owning user-role assignment id.</summary>
@@ -32,7 +33,7 @@ public sealed class AccessScope : Entity
     public ScopeDimension Dimension { get; private set; }
 
     /// <summary>The allowed values on the dimension (e.g. branch codes, ward numbers).</summary>
-    public IReadOnlyList<string> Values => _values.AsReadOnly();
+    public IReadOnlyList<string> Values => _values;
 
     /// <summary>Returns true when <paramref name="value"/> is allowed by this scope.</summary>
     /// <param name="value">The candidate dimension value.</param>
