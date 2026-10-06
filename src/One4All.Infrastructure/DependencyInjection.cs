@@ -29,7 +29,8 @@ public static class DependencyInjection
     public static IServiceCollection AddOne4AllInfrastructure(
         this IServiceCollection services,
         string connectionString,
-        LicensingOptions? licensingOptions = null)
+        LicensingOptions? licensingOptions = null,
+        Communications.MessagingOptions? messagingOptions = null)
     {
         // Cross-cutting.
         services.AddSingleton<IClock, SystemClock>();
@@ -136,6 +137,12 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Housing.ISpatialRegisterService, Housing.SpatialRegisterService>();
         services.AddScoped<Application.Abstractions.Housing.IServicingCostService, Housing.ServicingCostService>();
         services.AddScoped<Application.Abstractions.Communications.IMessageGateway, Communications.InAppGateway>();
+
+        // Email (SMTP) and SMS (HTTP provider); unconfigured channels refuse sends, so despatch retries and reports them.
+        services.AddSingleton(messagingOptions ?? new Communications.MessagingOptions());
+        services.AddSingleton(new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(30) });
+        services.AddScoped<Application.Abstractions.Communications.IMessageGateway, Communications.SmtpEmailGateway>();
+        services.AddScoped<Application.Abstractions.Communications.IMessageGateway, Communications.HttpSmsGateway>();
         services.AddScoped<Application.Abstractions.Communications.INotificationService, Communications.NotificationService>();
         if (!services.Any(d => d.ServiceType == typeof(Application.Municipal.IPrepaidTokenGenerator)))
         {

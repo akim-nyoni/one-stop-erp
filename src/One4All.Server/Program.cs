@@ -26,7 +26,11 @@ if (builder.Environment.IsDevelopment())
     licensing.TrustedKeys[One4All.Infrastructure.Licensing.DevLicensing.KeyId] = One4All.Infrastructure.Licensing.DevLicensing.PublicKeyBase64;
 }
 
-builder.Services.AddOne4AllInfrastructure(connectionString, licensing);
+// Messaging (brief §8): SMTP and SMS provider settings from the Messaging section; secrets belong in user secrets or environment variables.
+One4All.Infrastructure.Communications.MessagingOptions messaging = new();
+builder.Configuration.GetSection(One4All.Infrastructure.Communications.MessagingOptions.SectionName).Bind(messaging);
+
+builder.Services.AddOne4AllInfrastructure(connectionString, licensing, messaging);
 builder.Services.AddHostedService<One4All.Server.LicenceHost>();
 
 // Scheduled jobs (brief §4.17): due jobs run once a minute; set Scheduler:Enabled=false to keep a node from running them.
