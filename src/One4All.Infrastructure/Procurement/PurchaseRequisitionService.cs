@@ -143,7 +143,11 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
         => TransitionAsync(companyId, requisitionId, r => r.Status is PurchaseRequisitionStatus.Draft or PurchaseRequisitionStatus.Submitted, r => r.Reject(), "Only a draft or submitted requisition can be rejected.", ct);
 
     /// <inheritdoc />
-    public async Task<Result<long>> ConvertToPurchaseOrderAsync(long companyId, long requisitionId, string orderNumber, DateOnly orderDate, CancellationToken ct = default)
+    public Task<Result<long>> ConvertToPurchaseOrderAsync(long companyId, long requisitionId, string orderNumber, DateOnly orderDate, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ConvertCoreAsync(companyId, requisitionId, orderNumber, orderDate, ct), ct);
+
+    // One unit of work: the requisition's commitment is released and the order raised (committing its own) together.
+    private async Task<Result<long>> ConvertCoreAsync(long companyId, long requisitionId, string orderNumber, DateOnly orderDate, CancellationToken ct)
     {
         PurchaseRequisition? req = await _db.Set<PurchaseRequisition>()
             .Include(r => r.Lines)
@@ -158,15 +162,21 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
             return Error.Rule("Pop.ReqNotApproved", $"Only an approved requisition can be converted; {req.RequisitionNumber} is {req.Status}.");
         }
 
+        if (_budget is not null)
+        {
+            await _budget.ReleaseAsync(companyId, req.RequisitionNumber, ct).ConfigureAwait(false);
+        }
+
         Result<PurchaseOrderResult> order = await _procurement.CreatePurchaseOrderAsync(new CreatePurchaseOrderRequest
         {
+            BudgetApprovedByUserId = req.ApprovedByUserId,
             CompanyId = companyId,
             SupplierId = req.SupplierId,
             OrderNumber = orderNumber,
             OrderDate = orderDate,
             Currency = req.Currency,
             Lines = req.Lines
-                .Select(l => new PurchaseOrderLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPrice))
+                .Select(l => new PurchaseOrderLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.ExpenseAccountCode))
                 .ToList(),
         }, ct).ConfigureAwait(false);
 
@@ -177,16 +187,6 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
 
         req.MarkConverted(order.Value.PurchaseOrderId);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-
-        // The requisition's commitment moves to the order.
-        if (_budget is not null && await _budget.ReleaseAsync(companyId, req.RequisitionNumber, ct).ConfigureAwait(false) > 0m)
-        {
-            Result<int> moved = await _budget.CommitAsync(companyId, orderNumber.Trim(), orderDate, Demands(req), ct).ConfigureAwait(false);
-            if (moved.IsFailure)
-            {
-                return moved.Error;
-            }
-        }
         return order.Value.PurchaseOrderId;
     }
 

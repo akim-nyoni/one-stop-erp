@@ -97,6 +97,63 @@ public sealed class BudgetGateService : IBudgetGateService
     }
 
     /// <inheritdoc />
+    public async Task<decimal> ReduceAsync(long companyId, string reference, string accountCode, decimal amount, CancellationToken ct = default)
+    {
+        string key = reference.Trim(), account = accountCode.Trim().ToUpperInvariant();
+        List<BudgetCommitment> open = await _db.Set<BudgetCommitment>().Where(c => c.CompanyId == companyId && c.Reference == key && c.AccountCode == account && c.Status == CommitmentStatus.Open)
+            .OrderBy(c => c.Id).ToListAsync(ct).ConfigureAwait(false);
+        decimal left = amount, used = 0m;
+        foreach (BudgetCommitment commitment in open)
+        {
+            decimal taken = commitment.Reduce(left);
+            left -= taken;
+            used += taken;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return used;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<CommitmentException>> ReconcileAsync(long companyId, CancellationToken ct = default)
+    {
+        List<Core.Procurement.PurchaseOrder> orders = await _db.PurchaseOrders.AsNoTracking().Include(o => o.Lines).Where(o => o.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<string, Core.Procurement.PurchaseOrder> byNumber = orders.ToDictionary(o => o.OrderNumber, StringComparer.Ordinal);
+        List<BudgetCommitment> open = await _db.Set<BudgetCommitment>().AsNoTracking().Where(c => c.CompanyId == companyId && c.Status == CommitmentStatus.Open).ToListAsync(ct).ConfigureAwait(false);
+        List<CommitmentException> exceptions = [];
+
+        // Each budgeted order: what it still has on order per account against what is committed.
+        foreach (Core.Procurement.PurchaseOrder order in orders)
+        {
+            bool live = order.Status is Core.Procurement.PurchaseOrderStatus.Open or Core.Procurement.PurchaseOrderStatus.PartReceived or Core.Procurement.PurchaseOrderStatus.Received;
+            foreach (var account in order.Lines.Where(l => l.ExpenseAccountCode is not null).GroupBy(l => l.ExpenseAccountCode!))
+            {
+                decimal onOrder = live ? account.Sum(l => (l.OrderedQuantity - l.InvoicedQuantity) * l.UnitPrice) : 0m;
+                decimal committed = open.Where(c => c.Reference == order.OrderNumber && c.AccountCode == account.Key).Sum(c => c.Amount);
+                string? problem = (onOrder, committed) switch
+                {
+                    (0m, > 0m) => "Committed but nothing left on order",
+                    (> 0m, 0m) => "On order with no commitment",
+                    _ when Math.Abs(onOrder - committed) > 0.01m => "Commitment differs from the uninvoiced order value",
+                    _ => null,
+                };
+                if (problem is not null)
+                {
+                    exceptions.Add(new CommitmentException(order.OrderNumber, account.Key, committed, onOrder, problem));
+                }
+            }
+        }
+
+        // Requisition commitments last only while the requisition is approved and not yet ordered (reservations are left alone).
+        var requisitions = await _db.Set<Core.Procurement.PurchaseRequisition>().AsNoTracking().Where(r => r.CompanyId == companyId)
+            .Select(r => new { r.RequisitionNumber, r.Status }).ToListAsync(ct).ConfigureAwait(false);
+        HashSet<string> stale = [.. requisitions.Where(r => r.Status != Core.Procurement.PurchaseRequisitionStatus.Approved).Select(r => r.RequisitionNumber)];
+        exceptions.AddRange(open.Where(c => !byNumber.ContainsKey(c.Reference) && stale.Contains(c.Reference))
+            .Select(c => new CommitmentException(c.Reference, c.AccountCode, c.Amount, 0m, "Requisition no longer approved and open")));
+        return [.. exceptions.OrderBy(e => e.Reference, StringComparer.Ordinal).ThenBy(e => e.AccountCode, StringComparer.Ordinal)];
+    }
+
+    /// <inheritdoc />
     public async Task<Result<BudgetGateResult>> ReserveAsync(long companyId, string reference, DateOnly date, BudgetDemand demand, CancellationToken ct = default)
     {
         string key = (reference ?? string.Empty).Trim();

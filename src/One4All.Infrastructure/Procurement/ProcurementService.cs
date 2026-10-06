@@ -14,6 +14,8 @@ namespace One4All.Infrastructure.Procurement;
 /// <summary>Procurement service: purchase orders, GRNs (GRNI accrual) and the three-way invoice match (brief §4.3).</summary>
 public sealed class ProcurementService : IProcurementService
 {
+    private readonly One4All.Application.Abstractions.Budgeting.IBudgetGateService? _budget;
+    private readonly One4All.Application.Abstractions.Security.IPermissionService? _permissions;
     private readonly One4AllDbContext _db;
     private readonly IInventoryService _inventory;
     private readonly IPostingEngine _postingEngine;
@@ -27,8 +29,13 @@ public sealed class ProcurementService : IProcurementService
     /// <param name="inventory">The inventory service (for stock receipts).</param>
     /// <param name="postingEngine">The posting engine.</param>
     /// <param name="numbers">The number-sequence service (allocates order numbers left blank).</param>
-    public ProcurementService(One4AllDbContext db, IInventoryService inventory, IPostingEngine postingEngine, One4All.Application.Abstractions.Numbering.INumberSequenceService numbers)
+    /// <param name="budget">The budget gate at order raising and invoice posting.</param>
+    /// <param name="permissions">Checks who may approve a budget overrun.</param>
+    public ProcurementService(One4AllDbContext db, IInventoryService inventory, IPostingEngine postingEngine, One4All.Application.Abstractions.Numbering.INumberSequenceService numbers,
+        One4All.Application.Abstractions.Budgeting.IBudgetGateService? budget = null, One4All.Application.Abstractions.Security.IPermissionService? permissions = null)
     {
+        _budget = budget;
+        _permissions = permissions;
         _db = db;
         _inventory = inventory;
         _postingEngine = postingEngine;
@@ -36,7 +43,11 @@ public sealed class ProcurementService : IProcurementService
     }
 
     /// <inheritdoc />
-    public async Task<Result<PurchaseOrderResult>> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken ct = default)
+    public Task<Result<PurchaseOrderResult>> CreatePurchaseOrderAsync(CreatePurchaseOrderRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => CreatePurchaseOrderCoreAsync(request, ct), ct);
+
+    // One unit of work: the order and its budget commitment are saved together.
+    private async Task<Result<PurchaseOrderResult>> CreatePurchaseOrderCoreAsync(CreatePurchaseOrderRequest request, CancellationToken ct)
     {
         var supplier = await _db.Suppliers.Where(s => s.Id == request.SupplierId && s.CompanyId == request.CompanyId)
             .Select(s => new { s.Code, s.IsBlacklisted }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
@@ -85,14 +96,35 @@ public sealed class ProcurementService : IProcurementService
             orderNumber = allocated.Value;
         }
 
+        // The budget gate at order raising (brief §4.18.5); budgeted lines commit their spend under the order number.
+        List<One4All.Application.Abstractions.Budgeting.BudgetDemand> demands = [.. request.Lines.Where(l => !string.IsNullOrWhiteSpace(l.ExpenseAccountCode))
+            .Select(l => new One4All.Application.Abstractions.Budgeting.BudgetDemand(l.ExpenseAccountCode!, null, l.Quantity * l.UnitPrice))];
+        if (_budget is not null && demands.Count > 0)
+        {
+            Result<One4All.Application.Abstractions.Budgeting.BudgetGateResult> check = await _budget.CheckAsync(request.CompanyId, request.OrderDate, demands, ct).ConfigureAwait(false);
+            if (check.IsSuccess && await BudgetRefusalAsync(check.Value, request.BudgetApprovedByUserId, ct).ConfigureAwait(false) is Error refused)
+            {
+                return refused;
+            }
+        }
+
         PurchaseOrder order = new(request.CompanyId, request.SupplierId, orderNumber, request.OrderDate, request.Currency) { RequiredBy = request.RequiredBy, FrameworkAgreementId = request.FrameworkAgreementId };
         foreach (PurchaseOrderLineRequest line in request.Lines)
         {
-            order.AddLine(line.ItemId, line.Description, line.Quantity, line.UnitPrice);
+            order.AddLine(line.ItemId, line.Description, line.Quantity, line.UnitPrice).ExpenseAccountCode = string.IsNullOrWhiteSpace(line.ExpenseAccountCode) ? null : line.ExpenseAccountCode.Trim().ToUpperInvariant();
         }
 
         _db.Set<PurchaseOrder>().Add(order);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (_budget is not null && demands.Count > 0)
+        {
+            Result<int> committed = await _budget.CommitAsync(request.CompanyId, order.OrderNumber, request.OrderDate, demands, ct).ConfigureAwait(false);
+            if (committed.IsFailure && committed.Error.Code != "Budget.NoFiscalYear")
+            {
+                return committed.Error;
+            }
+        }
+
         return new PurchaseOrderResult(order.Id, order.OrderNumber);
     }
 
@@ -118,6 +150,11 @@ public sealed class ProcurementService : IProcurementService
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (_budget is not null)
+        {
+            await _budget.ReleaseAsync(companyId, order.OrderNumber, ct).ConfigureAwait(false); // a cancelled order frees its budget
+        }
+
         return Result.Success();
     }
 
@@ -232,6 +269,7 @@ public sealed class ProcurementService : IProcurementService
 
         decimal invoiceValue = 0m;
         decimal accruedValue = 0m;
+        List<(string Account, decimal Committed, decimal Invoiced)> spent = [];
         foreach (InvoiceMatchLine invLine in request.Lines)
         {
             PurchaseOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == invLine.PurchaseOrderLineId);
@@ -258,7 +296,24 @@ public sealed class ProcurementService : IProcurementService
 
             invoiceValue += decimal.Round(invLine.Quantity * invLine.UnitPrice, 4, MidpointRounding.ToEven);
             accruedValue += decimal.Round(invLine.Quantity * line.UnitPrice, 4, MidpointRounding.ToEven);
+            if (line.ExpenseAccountCode is not null)
+            {
+                spent.Add((line.ExpenseAccountCode, invLine.Quantity * line.UnitPrice, invLine.Quantity * invLine.UnitPrice));
+            }
+
             line.Invoice(invLine.Quantity);
+        }
+
+        // The budget gate at invoice posting: only spend beyond what the order committed is checked again.
+        List<One4All.Application.Abstractions.Budgeting.BudgetDemand> excess = [.. spent.Where(s => s.Invoiced > s.Committed)
+            .Select(s => new One4All.Application.Abstractions.Budgeting.BudgetDemand(s.Account, null, s.Invoiced - s.Committed))];
+        if (_budget is not null && excess.Count > 0)
+        {
+            Result<One4All.Application.Abstractions.Budgeting.BudgetGateResult> check = await _budget.CheckAsync(request.CompanyId, request.Date, excess, ct).ConfigureAwait(false);
+            if (check.IsSuccess && await BudgetRefusalAsync(check.Value, request.BudgetApprovedByUserId, ct).ConfigureAwait(false) is Error refused)
+            {
+                return refused;
+            }
         }
 
         // Clear GRNI at what was accrued (the order price) and owe the supplier the invoice price; any difference is a
@@ -314,6 +369,15 @@ public sealed class ProcurementService : IProcurementService
 
         order.RecomputeStatus();
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // What is invoiced is spent: its share of the order's commitment is used up.
+        if (_budget is not null)
+        {
+            foreach ((string account, decimal committed, _) in spent)
+            {
+                await _budget.ReduceAsync(request.CompanyId, order.OrderNumber, account, committed, ct).ConfigureAwait(false);
+            }
+        }
 
         return new MatchInvoiceResult(openItem.Id, posting.Value.JournalNumber, invoiceValue);
     }
@@ -422,4 +486,22 @@ public sealed class ProcurementService : IProcurementService
     private async Task<string?> ControlCodeAsync(long companyId, ControlAccountType type, CancellationToken ct) =>
         await _db.Accounts.Where(a => a.CompanyId == companyId && a.ControlAccountType == type)
             .Select(a => a.AccountCode).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+
+    // A blocking overrun refuses; one needing approval needs an approver who may override budget blocks.
+    private async Task<Error?> BudgetRefusalAsync(One4All.Application.Abstractions.Budgeting.BudgetGateResult check, long? approverUserId, CancellationToken ct)
+    {
+        if (check.Outcome == One4All.Core.Budgeting.BudgetAction.Block)
+        {
+            return Error.Rule("Budget.Blocked", check.Warning!);
+        }
+
+        if (check.Outcome == One4All.Core.Budgeting.BudgetAction.RequireApproval
+            && (approverUserId is not long approver || _permissions is null
+                || !(await _permissions.ResolveAsync(approver, ct).ConfigureAwait(false)).Has("Budget.OverrideBlock", One4All.Core.Security.OperationFlags.View)))
+        {
+            return Error.Rule("Budget.ApprovalNeeded", $"{check.Warning} It needs the approval of someone who may override budget blocks.");
+        }
+
+        return null;
+    }
 }

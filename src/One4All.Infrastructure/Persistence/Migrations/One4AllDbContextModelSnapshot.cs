@@ -18591,6 +18591,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("description");
 
+                    b.Property<string>("ExpenseAccountCode")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("expense_account_code");
+
                     b.Property<decimal>("InvoicedQuantity")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")

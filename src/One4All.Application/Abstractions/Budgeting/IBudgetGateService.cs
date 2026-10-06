@@ -28,6 +28,14 @@ public sealed record BudgetGateResult(BudgetAction Outcome, IReadOnlyList<Budget
         : $"Over budget: {string.Join("; ", Lines.Where(l => l.Shortfall > 0m).Select(l => $"{l.AccountCode} short by {l.Shortfall:0.00}"))}.";
 }
 
+/// <summary>A commitment that does not agree with its purchase order.</summary>
+/// <param name="Reference">The order (or commitment reference).</param>
+/// <param name="AccountCode">The account.</param>
+/// <param name="Committed">The open commitment.</param>
+/// <param name="OnOrder">The order's uninvoiced value on the account.</param>
+/// <param name="Problem">What is wrong.</param>
+public sealed record CommitmentException(string Reference, string AccountCode, decimal Committed, decimal OnOrder, string Problem);
+
 /// <summary>
 /// The budget check at every spending gate (brief §4.18.5): available balance per line (full-year approved budget less actuals and open
 /// commitments), the enforcement rule for overruns, commitments raised for documents and released when they move on, and reservations
@@ -68,6 +76,24 @@ public interface IBudgetGateService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The amount released.</returns>
     Task<decimal> ReleaseAsync(long companyId, string reference, CancellationToken ct = default);
+
+    /// <summary>Reduces a document's open commitment on an account (spend invoiced), releasing it when nothing is left.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="reference">The document reference.</param>
+    /// <param name="accountCode">The account.</param>
+    /// <param name="amount">The amount now spent.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>How much of the commitment was used up.</returns>
+    Task<decimal> ReduceAsync(long companyId, string reference, string accountCode, decimal amount, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reconciles the commitment ledger to purchase orders (brief §4.18.7, nightly): open PO commitments whose order is cancelled, closed
+    /// or fully invoiced, orders budgeted against an account with no open commitment, and commitments differing from the uninvoiced value.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The exceptions.</returns>
+    Task<IReadOnlyList<CommitmentException>> ReconcileAsync(long companyId, CancellationToken ct = default);
 
     /// <summary>Earmarks budget for known future spend with no order yet; refused when it would overrun a blocking rule.</summary>
     /// <param name="companyId">The company.</param>

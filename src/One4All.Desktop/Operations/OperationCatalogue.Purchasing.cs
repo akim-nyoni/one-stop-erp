@@ -43,6 +43,20 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Reconcile budget commitments", ListTitle = "Commitment exceptions",
+            Description = "Compares the commitment ledger with purchase orders: stale commitments, orders with none, and amounts that differ. Release a stale one by its reference.",
+            Fields = [Opt("Release", "Reference to release (optional)")],
+            Run = async (c, i) =>
+            {
+                IBudgetGateService gate = c.Get<IBudgetGateService>();
+                string released = i.Optional("Release") is string reference ? $"Released {M(await gate.ReleaseAsync(c.CompanyId, reference).ConfigureAwait(true))} under {reference}. " : string.Empty;
+                return $"{released}{(await gate.ReconcileAsync(c.CompanyId).ConfigureAwait(true)).Count} exception(s).";
+            },
+            List = async c => Table(await c.Get<IBudgetGateService>().ReconcileAsync(c.CompanyId).ConfigureAwait(true),
+                ("Reference", e => e.Reference), ("Account", e => e.AccountCode), ("Committed", e => M(e.Committed)), ("On order", e => M(e.OnOrder)), ("Problem", e => e.Problem)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Schedule a PO line's deliveries", ListTitle = "Deliveries late or due within a week",
             Description = "Spreads an order line over due dates (DATE:qty;… as yyyy-MM-dd:qty). The quantities must add up to the line's ordered quantity.",
             Fields = [Req("Order", "Purchase order number"), Req("Item", "Item code"), Req("Deliveries", "Deliveries yyyy-MM-dd:qty;…")],

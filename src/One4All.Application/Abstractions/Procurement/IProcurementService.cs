@@ -7,7 +7,7 @@ namespace One4All.Application.Abstractions.Procurement;
 /// <param name="Description">The description.</param>
 /// <param name="Quantity">The quantity.</param>
 /// <param name="UnitPrice">The unit price.</param>
-public readonly record struct PurchaseOrderLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice);
+public readonly record struct PurchaseOrderLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice, string? ExpenseAccountCode = null);
 
 /// <summary>A request to create a purchase order.</summary>
 public sealed class CreatePurchaseOrderRequest
@@ -26,6 +26,9 @@ public sealed class CreatePurchaseOrderRequest
 
     /// <summary>When the goods are required, if a date is set; used to judge on-time delivery.</summary>
     public DateOnly? RequiredBy { get; init; }
+
+    /// <summary>Gets who approved an overrun needing approval (they must be able to override budget blocks).</summary>
+    public long? BudgetApprovedByUserId { get; init; }
 
     /// <summary>Gets the framework agreement the order is called off against: same supplier, within its term and its ceiling.</summary>
     public long? FrameworkAgreementId { get; init; }
@@ -87,6 +90,9 @@ public sealed class MatchInvoiceRequest
 
     /// <summary>The allowed price tolerance as a percentage (e.g. 5 = 5%).</summary>
     public decimal TolerancePercent { get; init; } = 5m;
+
+    /// <summary>Gets who approved a budget overrun on the invoice, if it needs approval.</summary>
+    public long? BudgetApprovedByUserId { get; init; }
 
     /// <summary>
     /// Where the difference between the invoice and order prices goes (purchase price variance). Required when the

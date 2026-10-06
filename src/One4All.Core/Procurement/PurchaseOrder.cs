@@ -253,6 +253,9 @@ public sealed class PurchaseOrderLine : Entity
     /// <summary>The quantity invoiced so far.</summary>
     public decimal InvoicedQuantity { get; private set; }
 
+    /// <summary>Gets or sets the expense account the line is budgeted (and committed) against, if any.</summary>
+    public string? ExpenseAccountCode { get; set; }
+
     /// <summary>Records a received quantity.</summary>
     /// <param name="quantity">The quantity received.</param>
     public void Receive(decimal quantity) => ReceivedQuantity += quantity;

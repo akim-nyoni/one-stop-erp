@@ -89,6 +89,26 @@ public sealed class BudgetCommitment : AuditableEntity, ICompanyScoped
     /// <summary>Who approved the year-end decision (lapse or carry forward), once made.</summary>
     public long? YearEndApprovedByUserId { get; private set; }
 
+    /// <summary>Uses up part of an open commitment as it is spent, releasing it when nothing is left.</summary>
+    /// <param name="amount">The amount spent.</param>
+    /// <returns>How much of the commitment was used up.</returns>
+    public decimal Reduce(decimal amount)
+    {
+        if (Status != CommitmentStatus.Open || amount <= 0m)
+        {
+            return 0m;
+        }
+
+        decimal taken = Math.Min(amount, Amount);
+        Amount -= taken;
+        if (Amount == 0m)
+        {
+            Status = CommitmentStatus.Released;
+        }
+
+        return taken;
+    }
+
     /// <summary>Releases the commitment, freeing the reserved budget.</summary>
     /// <returns>True when it was open and is now released; false when it was not open.</returns>
     public bool Release()

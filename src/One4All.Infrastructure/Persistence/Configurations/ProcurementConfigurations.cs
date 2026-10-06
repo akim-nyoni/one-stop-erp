@@ -173,6 +173,7 @@ internal sealed class PurchaseOrderLineConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.UnitPrice).HasPrecision(19, 6);
         b.Property(x => x.ReceivedQuantity).HasPrecision(19, 4);
         b.Property(x => x.InvoicedQuantity).HasPrecision(19, 4);
+        b.Property(x => x.ExpenseAccountCode).HasMaxLength(8);
     }
 }
 
