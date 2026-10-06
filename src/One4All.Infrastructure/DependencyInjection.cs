@@ -30,7 +30,8 @@ public static class DependencyInjection
         this IServiceCollection services,
         string connectionString,
         LicensingOptions? licensingOptions = null,
-        Communications.MessagingOptions? messagingOptions = null)
+        Communications.MessagingOptions? messagingOptions = null,
+        Backup.BackupOptions? backupOptions = null)
     {
         // Cross-cutting.
         services.AddSingleton<IClock, SystemClock>();
@@ -163,6 +164,16 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Reporting.ReportSubscriptionsTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.DespatchMessagesTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.LapseOffersTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Backup.BackupTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Backup.ReconcileCommitmentsTask>();
+        Backup.BackupOptions backup = backupOptions ?? new Backup.BackupOptions();
+        if (string.IsNullOrWhiteSpace(backup.ConnectionString))
+        {
+            backup.ConnectionString = connectionString;
+        }
+
+        services.AddSingleton(backup);
+        services.AddScoped<Application.Abstractions.Backup.IBackupService, Backup.BackupService>();
         services.AddScoped<Application.Abstractions.Communications.IStatementDespatchService, Communications.StatementDespatchService>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Communications.EmailStatementsTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IJobScheduler, Scheduling.JobScheduler>();

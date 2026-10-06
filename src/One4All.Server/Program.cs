@@ -30,7 +30,11 @@ if (builder.Environment.IsDevelopment())
 One4All.Infrastructure.Communications.MessagingOptions messaging = new();
 builder.Configuration.GetSection(One4All.Infrastructure.Communications.MessagingOptions.SectionName).Bind(messaging);
 
-builder.Services.AddOne4AllInfrastructure(connectionString, licensing, messaging);
+// Backups (brief §9): folder, off-site copy folder, pg tools folder and retention from the Backup section.
+One4All.Infrastructure.Backup.BackupOptions backup = new();
+builder.Configuration.GetSection(One4All.Infrastructure.Backup.BackupOptions.SectionName).Bind(backup);
+
+builder.Services.AddOne4AllInfrastructure(connectionString, licensing, messaging, backup);
 builder.Services.AddHostedService<One4All.Server.LicenceHost>();
 builder.Services.AddHostedService<One4All.Server.WebhookHost>();
 

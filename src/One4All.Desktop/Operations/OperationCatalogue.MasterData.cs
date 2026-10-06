@@ -2,6 +2,7 @@ using System.Data;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
+using One4All.Application.Abstractions.Backup;
 using One4All.Application.Abstractions.Integration;
 using One4All.Application.Abstractions.MasterData;
 using One4All.Application.Abstractions.Onboarding;
@@ -23,6 +24,37 @@ public static partial class OperationCatalogue
     private static IEnumerable<Operation> MasterData()
     {
         const string module = "System Manager";
+        yield return new Operation
+        {
+            Module = module, Title = "Back up or restore the database", ListTitle = "Backups",
+            Description = "Takes a backup now (pg_dump, SHA-256 recorded, copied off-site when configured), checks one, or restores a checked backup into a NEW database "
+                + "(type RESTORE <name> to confirm) — the live database is never overwritten.",
+            Fields = [Pick("Do", "Action", ["Back up now", "Check a backup", "Restore into a new database"]), OptNum("Backup", "Backup id (check / restore)"), Opt("Database", "New database name"),
+                Opt("Confirm", "Confirmation (RESTORE name)")],
+            Run = async (c, i) =>
+            {
+                IBackupService backups = c.Get<IBackupService>();
+                switch (i.Text("Do"))
+                {
+                    case "Back up now":
+                        Core.System.BackupRecord taken = Check(await backups.BackupAsync("manual").ConfigureAwait(true));
+                        if (taken.Status == Core.System.BackupStatus.Failed)
+                        {
+                            return taken.Message ?? "Backup failed.";
+                        }
+
+                        Core.System.BackupStatus status = Check(await backups.VerifyAsync(taken.Id).ConfigureAwait(true));
+                        return $"Backup {taken.Id}: {taken.FileName} ({taken.SizeBytes:N0} bytes), {status}.";
+                    case "Check a backup":
+                        return $"Backup is {Check(await backups.VerifyAsync((long)i.Number("Backup")).ConfigureAwait(true))}.";
+                    default:
+                        return Check(await backups.RestoreToNewDatabaseAsync((long)i.Number("Backup"), i.Text("Database"), i.Optional("Confirm") ?? string.Empty).ConfigureAwait(true));
+                }
+            },
+            List = async c => Table(await c.Get<IBackupService>().ListAsync().ConfigureAwait(true),
+                ("Id", b => b.Id), ("Started", b => b.StartedOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Reason", b => b.Reason), ("Status", b => b.Status),
+                ("Size", b => b.SizeBytes.ToString("N0", CultureInfo.InvariantCulture)), ("File", b => b.FileName), ("Off-site", b => b.OffsiteCopy), ("Message", b => b.Message)),
+        };
         yield return new Operation
         {
             Module = module, Title = "Manage webhooks", ListTitle = "Webhook deliveries (latest 200)",
