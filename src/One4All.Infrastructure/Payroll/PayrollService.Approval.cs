@@ -44,6 +44,13 @@ public sealed partial class PayrollService : IPayrollApprovalService
                 : "This payroll moved enough from the last run to need a second, different approver.");
         }
 
+        List<long> inRun = [.. (await _db.Set<Employee>().Where(e => e.CompanyId == companyId && e.Status == EmployeeStatus.Active).Select(e => new { e.Id, e.PayGroup }).ToListAsync(ct)
+            .ConfigureAwait(false)).Where(e => PayGroupKey(e.PayGroup) == draft.PayGroup).Select(e => e.Id)];
+        if (await OwnRecordAsync(approverUserId, inRun, ct).ConfigureAwait(false) is string own)
+        {
+            return OwnPay(own);
+        }
+
         draft.Approve(approverUserId, DateTimeOffset.UtcNow);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Describe(draft);
@@ -69,6 +76,11 @@ public sealed partial class PayrollService : IPayrollApprovalService
         }
 
         PreparedRun run = prepared.Value;
+        if (await OwnRecordAsync(request.UserId, [.. run.Slips.Select(p => p.EmployeeId)], ct).ConfigureAwait(false) is string own)
+        {
+            return OwnPay(own);
+        }
+
         decimal? previousNet = await _db.Set<PayrollRunRecord>()
             .Where(r => r.CompanyId == request.CompanyId && r.PayGroup == payGroup && r.Kind == PayRunKind.Regular && r.ReversedOn == null && r.PayDate < request.PayDate)
             .OrderByDescending(r => r.PayDate).Select(r => (decimal?)r.Net).FirstOrDefaultAsync(ct).ConfigureAwait(false);
@@ -111,6 +123,11 @@ public sealed partial class PayrollService : IPayrollApprovalService
         }
 
         List<Payslip> slips = prepared.Value.Slips;
+        if (await OwnRecordAsync(userId, [.. slips.Select(p => p.EmployeeId)], ct).ConfigureAwait(false) is string own)
+        {
+            return OwnPay(own);
+        }
+
         if (slips.Count != draft.Employees || slips.Sum(s => s.GrossEarnings) != draft.Gross || slips.Sum(s => s.TotalDeductions) != draft.Deductions || slips.Sum(s => s.NetPay) != draft.Net)
         {
             return Error.Conflict("Payroll.ChangedSinceApproval", "Pay data changed after the payroll was approved; recalculate and approve it again.");
@@ -164,6 +181,14 @@ public sealed partial class PayrollService : IPayrollApprovalService
 
         return issues;
     }
+
+    // §4.15.10: nobody calculates, approves, commits or reverses a run that pays them — the employee number of the conflict, or null.
+    private async Task<string?> OwnRecordAsync(long userId, IReadOnlyCollection<long> employeeIds, CancellationToken ct)
+        => userId == 0 ? null
+            : await _db.Set<Employee>().Where(e => e.UserId == userId && employeeIds.Contains(e.Id)).Select(e => e.EmployeeNumber).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+
+    private static Error OwnPay(string employeeNumber)
+        => Error.Rule("Payroll.OwnPay", $"The run includes your own employee record ({employeeNumber}); someone else must handle it.");
 
     private static decimal? Movement(decimal? before, decimal now)
         => before is decimal b && b != 0m ? decimal.Round((now - b) / Math.Abs(b) * 100m, 1, MidpointRounding.ToEven) : null;

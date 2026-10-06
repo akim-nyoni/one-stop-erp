@@ -242,8 +242,17 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
     private async Task<Result<PayrollRunResult>> PostRunAsync(Company company, string periodLabel, DateOnly payDate, string netPayAccountCode, string documentNumber, IReadOnlyList<Payslip> slips,
         Dictionary<long, PayElement> elements, PayRunKind kind, string? reason, string payGroup, CancellationToken ct)
     {
-        Dictionary<string, decimal> debitsByAccount = new(StringComparer.OrdinalIgnoreCase);
+        // Costs are analysed by the employee's department and cost centre (§4.15.9), matched to the GL dimensions by code or name.
+        Dictionary<(string Account, string CostCentre, string Department), decimal> debitsByAccount = [];
         Dictionary<string, decimal> creditsByAccount = new(StringComparer.OrdinalIgnoreCase);
+        List<long> employeeIds = [.. slips.Select(s => s.EmployeeId).Distinct()];
+        Dictionary<long, (string? Department, string? CostCentre)> staff = await _db.Set<Employee>().IgnoreQueryFilters().Where(e => employeeIds.Contains(e.Id))
+            .ToDictionaryAsync(e => e.Id, e => (e.Department, e.CostCentre), ct).ConfigureAwait(false);
+        var departments = await _db.Departments.Where(d => d.CompanyId == company.Id).Select(d => new { d.Code, d.Name }).ToListAsync(ct).ConfigureAwait(false);
+        var costCentres = await _db.CostCentres.Where(c => c.CompanyId == company.Id).Select(c => new { c.Code, c.Name }).ToListAsync(ct).ConfigureAwait(false);
+        string Dimension(string? value, IEnumerable<(string Code, string Name)> master)
+            => value is null ? string.Empty
+                : master.FirstOrDefault(m => string.Equals(m.Code, value.Trim(), StringComparison.OrdinalIgnoreCase) || string.Equals(m.Name, value.Trim(), StringComparison.OrdinalIgnoreCase)).Code ?? string.Empty;
         decimal totalGross = 0m;
         decimal totalDeductions = 0m;
         decimal totalNet = 0m;
@@ -251,6 +260,9 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         foreach (Payslip payslip in slips)
         {
             _db.Set<Payslip>().Add(payslip);
+            (string? department, string? costCentre) = staff.GetValueOrDefault(payslip.EmployeeId);
+            string dept = Dimension(department, departments.Select(d => (d.Code, d.Name)));
+            string cc = Dimension(costCentre, costCentres.Select(c => (c.Code, c.Name)));
 
             foreach (PayslipLine line in payslip.Lines)
             {
@@ -262,7 +274,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                 PayElement element = elements.Values.First(e => e.Code == line.ElementCode);
                 if (line.Type == PayElementType.Earning)
                 {
-                    Add(debitsByAccount, element.AccountCode, line.Amount);
+                    debitsByAccount[(element.AccountCode, cc, dept)] = debitsByAccount.GetValueOrDefault((element.AccountCode, cc, dept)) + line.Amount;
                 }
                 else if (line.Type == PayElementType.Deduction)
                 {
@@ -276,7 +288,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                         return Error.Validation("Payroll.ContributionAccount", $"Employer contribution {element.Code} needs an expense account before it can be posted.");
                     }
 
-                    Add(debitsByAccount, element.ContributionExpenseAccountCode, line.Amount);
+                    debitsByAccount[(element.ContributionExpenseAccountCode, cc, dept)] = debitsByAccount.GetValueOrDefault((element.ContributionExpenseAccountCode, cc, dept)) + line.Amount;
                     Add(creditsByAccount, element.AccountCode, line.Amount);
                 }
             }
@@ -288,10 +300,12 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
         Add(creditsByAccount, netPayAccountCode, totalNet);
 
-        static JournalSide Flip(JournalSide side) => side == JournalSide.Debit ? JournalSide.Credit : JournalSide.Debit;
-        List<JournalLineRequest> lines = [.. debitsByAccount.Select(kv => (kv, JournalSide.Debit)).Concat(creditsByAccount.Select(kv => (kv, JournalSide.Credit)))
-            .Where(x => x.kv.Value != 0m)
-            .Select(x => new JournalLineRequest { AccountCode = x.kv.Key, Side = x.kv.Value > 0m ? x.Item2 : Flip(x.Item2), TransactionAmount = Math.Abs(x.kv.Value) })];
+        List<JournalLineRequest> lines = [.. debitsByAccount.Where(kv => kv.Value != 0m).Select(kv => new JournalLineRequest
+            {
+                AccountCode = kv.Key.Account, CostCentre = kv.Key.CostCentre, Department = kv.Key.Department, Side = kv.Value > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(kv.Value),
+            }),
+            .. creditsByAccount.Where(kv => kv.Value != 0m)
+                .Select(kv => new JournalLineRequest { AccountCode = kv.Key, Side = kv.Value > 0m ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = Math.Abs(kv.Value) })];
 
         Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
         {

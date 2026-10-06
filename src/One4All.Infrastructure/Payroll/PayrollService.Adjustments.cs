@@ -184,6 +184,13 @@ public sealed partial class PayrollService
             return Error.Rule("Payroll.SameApprover", "The reversal must be approved by someone other than the person who ran the payroll.");
         }
 
+        List<long> paid = await _db.Set<Payslip>().Where(p => p.CompanyId == companyId && p.PeriodLabel == run.PeriodLabel && (p.RunReference == run.DocumentNumber || run.DocumentNumber == string.Empty))
+            .Select(p => p.EmployeeId).Distinct().ToListAsync(ct).ConfigureAwait(false);
+        if (await OwnRecordAsync(approvedByUserId, paid, ct).ConfigureAwait(false) is string own)
+        {
+            return OwnPay(own);
+        }
+
         long journalId = await _db.Journals.Where(j => j.CompanyId == companyId && j.JournalNumber == run.JournalNumber).Select(j => j.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         if (journalId == 0)
         {
