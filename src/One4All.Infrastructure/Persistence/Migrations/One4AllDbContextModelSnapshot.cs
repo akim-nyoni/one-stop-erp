@@ -9290,6 +9290,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("date");
 
+                    b.Property<bool>("IsDisassembly")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_disassembly");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -10482,14 +10486,27 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,6)")
                         .HasColumnName("average_cost");
 
+                    b.Property<long?>("CountedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("counted_by_user_id");
+
                     b.Property<decimal?>("CountedQuantity")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("counted_quantity");
 
+                    b.Property<decimal?>("FirstCountQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("first_count_quantity");
+
                     b.Property<long>("ItemId")
                         .HasColumnType("bigint")
                         .HasColumnName("item_id");
+
+                    b.Property<long?>("RecountedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("recounted_by_user_id");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
@@ -10543,6 +10560,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal?>("RecountTolerancePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("recount_tolerance_percent");
 
                     b.Property<string>("Reference")
                         .IsRequired()

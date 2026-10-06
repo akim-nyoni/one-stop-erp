@@ -378,6 +378,81 @@ public static partial class OperationCatalogue
                     ("Components", b => string.Join(", ", b.Lines.Select(l => $"{items.GetValueOrDefault(l.ComponentItemId)} × {Q(l.Quantity)}"))));
             },
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Disassemble finished goods", ListTitle = "Bills of materials",
+            Description = "Takes finished units apart into their components; their cost is split over the components recovered at each one's average cost.",
+            Fields = [Req("Bom", "BOM code"), Req("Warehouse", "Warehouse code"), Num("Quantity", "Units taken apart"), Today(), Req("Clearing", "Assembly clearing account"),
+                Opt("Recovered", "Recovered ITEM:qty;… (if not the BOM quantities)")],
+            Run = async (c, i) =>
+            {
+                long bom = await FindAsync(c.Db.BillsOfMaterials, b => b.CompanyId == c.CompanyId && b.Code.ToUpper() == i.Text("Bom").ToUpper(), b => b.Id, "BOM", i.Text("Bom")).ConfigureAwait(true);
+                List<ComponentUsage> recovered = [];
+                foreach (var (code, quantity, _) in i.Pairs("Recovered"))
+                {
+                    recovered.Add(new ComponentUsage(await ItemAsync(c, code).ConfigureAwait(true), quantity));
+                }
+
+                AssemblyResult run = Check(await c.Get<IAssemblyService>().DisassembleAsync(new DisassemblyRequest
+                {
+                    CompanyId = c.CompanyId, BillOfMaterialsId = bom, WarehouseId = await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true), Date = i.Date("Date"),
+                    Quantity = i.Number("Quantity"), Recovered = recovered, ClearingAccountCode = i.Text("Clearing"),
+                }).ConfigureAwait(true));
+                return $"Run {run.RunNumber}: {M(run.TotalCost)} moved into components.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Start a stocktake", ListTitle = "Blind count sheets (draft stocktakes)",
+            Description = "Freezes the warehouse's quantities. Counters see only the items, never the system quantity. Counts outside the tolerance must be recounted by someone else.",
+            Fields = [Req("Warehouse", "Warehouse code"), Today(), Req("Reference", "Stocktake reference"), OptNum("Tolerance", "Recount tolerance % (blank: none)")],
+            Run = async (c, i) => Check(await c.Get<IStocktakeService>().StartAsync(c.CompanyId, await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true), i.Date("Date"), i.Text("Reference"),
+                recountTolerancePercent: i.OptionalNumber("Tolerance")).ConfigureAwait(true), id => $"Stocktake {id} started."),
+            List = CountSheetsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Record a count", ListTitle = "Blind count sheets (draft stocktakes)", Description = "The first count of an item, by the signed-in user.",
+            Fields = [Num("Stocktake", "Stocktake id"), Req("Item", "Item code"), Num("Counted", "Counted quantity")],
+            Run = async (c, i) => Check(await c.Get<IStocktakeService>().RecordCountAsync(c.CompanyId, (long)i.Number("Stocktake"), await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Number("Counted"),
+                countedByUserId: c.UserId).ConfigureAwait(true), "Count recorded."),
+            List = CountSheetsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Record a recount", ListTitle = "Blind count sheets (draft stocktakes)", Description = "A recount of an item flagged as outside the tolerance, by someone other than the first counter.",
+            Fields = [Num("Stocktake", "Stocktake id"), Req("Item", "Item code"), Num("Counted", "Recounted quantity")],
+            Run = async (c, i) => Check(await c.Get<IStocktakeService>().RecordRecountAsync(c.CompanyId, (long)i.Number("Stocktake"), await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Number("Counted"),
+                c.UserId).ConfigureAwait(true), "Recount recorded."),
+            List = CountSheetsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Post a stocktake", ListTitle = "Blind count sheets (draft stocktakes)", Description = "Adjusts stock to the counts at average cost. Refused while recounts are due.",
+            Fields = [Num("Stocktake", "Stocktake id"), Today(), Req("Account", "Stock adjustment account")],
+            Run = async (c, i) =>
+            {
+                StocktakePostResult result = Check(await c.Get<IStocktakeService>().PostAsync(c.CompanyId, (long)i.Number("Stocktake"), i.Date("Date"), i.Text("Account")).ConfigureAwait(true));
+                return $"{result.AdjustmentsPosted} adjustment(s), net variance {M(result.TotalVarianceValue)}.";
+            },
+            List = CountSheetsAsync,
+        };
+    }
+
+    private static async Task<System.Data.DataTable> CountSheetsAsync(OperationContext c)
+    {
+        IStocktakeService stocktakes = c.Get<IStocktakeService>();
+        List<(long Id, string Reference)> drafts = [.. (await c.Db.Set<Core.Inventory.StocktakeSession>().AsNoTracking().Where(s => s.CompanyId == c.CompanyId && s.Status == Core.Inventory.StocktakeStatus.Draft)
+            .OrderBy(s => s.Id).Select(s => new { s.Id, s.Reference }).ToListAsync().ConfigureAwait(true)).Select(s => (s.Id, s.Reference))];
+        List<(long Id, string Reference, CountSheetLine Line)> rows = [];
+        foreach ((long id, string reference) in drafts)
+        {
+            Core.Common.Result<IReadOnlyList<CountSheetLine>> sheet = await stocktakes.CountSheetAsync(c.CompanyId, id).ConfigureAwait(true);
+            rows.AddRange(sheet.IsSuccess ? sheet.Value.Select(l => (id, reference, l)) : []);
+        }
+
+        return Table(rows, ("Stocktake", r => r.Id), ("Reference", r => r.Reference), ("Item", r => r.Line.ItemCode), ("Description", r => r.Line.Description), ("Counted", r => r.Line.Counted),
+            ("Recount due", r => r.Line.RecountDue), ("Recounted", r => r.Line.Recounted));
     }
 
     private static async Task<System.Data.DataTable> InTransitAsync(OperationContext c)

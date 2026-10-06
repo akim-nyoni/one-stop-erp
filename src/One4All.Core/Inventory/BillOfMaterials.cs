@@ -142,6 +142,9 @@ public sealed class AssemblyRun : AuditableEntity, ICompanyScoped
     /// <summary>Gets the cost of components consumed.</summary>
     public decimal TotalCost { get; private set; }
 
+    /// <summary>Gets or sets a value indicating whether the run took finished goods apart (lines are components recovered).</summary>
+    public bool IsDisassembly { get; set; }
+
     /// <summary>Gets the components consumed.</summary>
     public IReadOnlyList<AssemblyRunLine> Lines => _lines.AsReadOnly();
 

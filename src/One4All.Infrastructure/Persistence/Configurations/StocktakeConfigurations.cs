@@ -13,6 +13,7 @@ internal sealed class StocktakeSessionConfiguration : IEntityTypeConfiguration<S
         b.HasKey(x => x.Id);
         b.Property(x => x.Reference).HasMaxLength(60);
         b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.RecountTolerancePercent).HasPrecision(9, 4);
         b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.StocktakeSessionId).OnDelete(DeleteBehavior.Cascade);
         b.HasIndex(x => new { x.CompanyId, x.WarehouseId });
     }
@@ -28,5 +29,6 @@ internal sealed class StocktakeLineConfiguration : IEntityTypeConfiguration<Stoc
         b.Property(x => x.SystemQuantity).HasPrecision(19, 4);
         b.Property(x => x.AverageCost).HasPrecision(19, 6);
         b.Property(x => x.CountedQuantity).HasPrecision(19, 4);
+        b.Property(x => x.FirstCountQuantity).HasPrecision(19, 4);
     }
 }

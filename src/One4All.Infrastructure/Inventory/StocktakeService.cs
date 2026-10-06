@@ -26,11 +26,11 @@ public sealed class StocktakeService : IStocktakeService
     }
 
     /// <inheritdoc />
-    public async Task<Result<long>> StartAsync(long companyId, long warehouseId, DateOnly date, string reference, CancellationToken ct = default)
+    public async Task<Result<long>> StartAsync(long companyId, long warehouseId, DateOnly date, string reference, CancellationToken ct = default, decimal? recountTolerancePercent = null)
     {
-        if (string.IsNullOrWhiteSpace(reference))
+        if (string.IsNullOrWhiteSpace(reference) || recountTolerancePercent < 0m)
         {
-            return Error.Validation("Stocktake.Reference", "A stocktake reference is required.");
+            return Error.Validation("Stocktake.Reference", "A stocktake reference is required, and any recount tolerance cannot be negative.");
         }
 
         List<StockBalance> balances = await _db.Set<StockBalance>()
@@ -38,7 +38,7 @@ public sealed class StocktakeService : IStocktakeService
             .OrderBy(b => b.ItemId)
             .ToListAsync(ct).ConfigureAwait(false);
 
-        StocktakeSession session = new(companyId, warehouseId, reference.Trim(), date);
+        StocktakeSession session = new(companyId, warehouseId, reference.Trim(), date) { RecountTolerancePercent = recountTolerancePercent };
         foreach (StockBalance balance in balances)
         {
             session.AddLine(balance.ItemId, balance.QuantityOnHand, balance.AverageCost);
@@ -50,7 +50,7 @@ public sealed class StocktakeService : IStocktakeService
     }
 
     /// <inheritdoc />
-    public async Task<Result> RecordCountAsync(long companyId, long stocktakeId, long itemId, decimal countedQuantity, CancellationToken ct = default)
+    public async Task<Result> RecordCountAsync(long companyId, long stocktakeId, long itemId, decimal countedQuantity, CancellationToken ct = default, long? countedByUserId = null)
     {
         if (countedQuantity < 0m)
         {
@@ -63,17 +63,72 @@ public sealed class StocktakeService : IStocktakeService
             return Result.Failure(Error.NotFound("Stocktake.NotFound", $"No draft stocktake {stocktakeId}."));
         }
 
-        if (!session.RecordCount(itemId, countedQuantity))
+        StocktakeLine? line = session.Lines.FirstOrDefault(l => l.ItemId == itemId);
+        if (line is null)
         {
             return Result.Failure(Error.NotFound("Stocktake.ItemNotOnSheet", $"Item {itemId} is not on stocktake {stocktakeId}."));
         }
+
+        if (line.IsRecounted)
+        {
+            return Result.Failure(Error.Rule("Stocktake.AlreadyRecounted", "The item was recounted; its count stands."));
+        }
+
+        session.RecordCount(itemId, countedQuantity);
+        line.CountedByUserId = countedByUserId;
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
 
     /// <inheritdoc />
-    public async Task<Result<StocktakePostResult>> PostAsync(long companyId, long stocktakeId, DateOnly date, string adjustmentAccountCode, CancellationToken ct = default)
+    public async Task<Result> RecordRecountAsync(long companyId, long stocktakeId, long itemId, decimal quantity, long userId, CancellationToken ct = default)
+    {
+        StocktakeSession? session = await LoadDraftAsync(companyId, stocktakeId, ct).ConfigureAwait(false);
+        StocktakeLine? line = session?.Lines.FirstOrDefault(l => l.ItemId == itemId);
+        if (session is null || line is null)
+        {
+            return Result.Failure(Error.NotFound("Stocktake.NotFound", $"Item {itemId} is not on draft stocktake {stocktakeId}."));
+        }
+
+        if (quantity < 0m || !session.NeedsRecount(line))
+        {
+            return Result.Failure(Error.Rule("Stocktake.NoRecountDue", "Only a count outside the tolerance is recounted, once, and never to a negative quantity."));
+        }
+
+        if (line.CountedByUserId == userId)
+        {
+            return Result.Failure(Error.Rule("Stocktake.SameCounter", "A recount must be made by someone other than the first counter."));
+        }
+
+        line.Recount(quantity, userId);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<CountSheetLine>>> CountSheetAsync(long companyId, long stocktakeId, CancellationToken ct = default)
+    {
+        StocktakeSession? session = await _db.Set<StocktakeSession>().AsNoTracking().Include(s => s.Lines).FirstOrDefaultAsync(s => s.Id == stocktakeId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (session is null)
+        {
+            return Error.NotFound("Stocktake.NotFound", $"No stocktake {stocktakeId}.");
+        }
+
+        List<long> ids = [.. session.Lines.Select(l => l.ItemId)];
+        Dictionary<long, (string Code, string Description)> items = await _db.Items.AsNoTracking().Where(i => ids.Contains(i.Id)).ToDictionaryAsync(i => i.Id, i => (i.Code, i.Description), ct).ConfigureAwait(false);
+        List<CountSheetLine> sheet = [.. session.Lines
+            .Select(l => new CountSheetLine(l.ItemId, items.GetValueOrDefault(l.ItemId).Code ?? string.Empty, items.GetValueOrDefault(l.ItemId).Description ?? string.Empty, l.IsCounted, session.NeedsRecount(l), l.IsRecounted))
+            .OrderBy(l => l.ItemCode, StringComparer.Ordinal)];
+        return sheet;
+    }
+
+    /// <inheritdoc />
+    public Task<Result<StocktakePostResult>> PostAsync(long companyId, long stocktakeId, DateOnly date, string adjustmentAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PostCoreAsync(companyId, stocktakeId, date, adjustmentAccountCode, ct), ct);
+
+    // One unit of work: every variance adjustment and the session's close commit together.
+    private async Task<Result<StocktakePostResult>> PostCoreAsync(long companyId, long stocktakeId, DateOnly date, string adjustmentAccountCode, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(adjustmentAccountCode))
         {
@@ -84,6 +139,12 @@ public sealed class StocktakeService : IStocktakeService
         if (session is null)
         {
             return Error.NotFound("Stocktake.NotFound", $"No draft stocktake {stocktakeId}.");
+        }
+
+        int due = session.Lines.Count(session.NeedsRecount);
+        if (due > 0)
+        {
+            return Error.Rule("Stocktake.RecountsDue", $"{due} count(s) are outside the tolerance and must be recounted before posting.");
         }
 
         int posted = 0;

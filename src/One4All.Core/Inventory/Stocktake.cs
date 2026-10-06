@@ -54,6 +54,18 @@ public sealed class StocktakeSession : AuditableEntity, ICompanyScoped
     /// <summary>The status.</summary>
     public StocktakeStatus Status { get; private set; }
 
+    /// <summary>
+    /// Gets or sets the variance, as a percent of the frozen quantity, beyond which a count must be recounted by someone else before
+    /// posting (null: no recounts).
+    /// </summary>
+    public decimal? RecountTolerancePercent { get; set; }
+
+    /// <summary>Whether a line's count is outside the tolerance and not yet recounted.</summary>
+    /// <param name="line">The line.</param>
+    /// <returns>True when a recount is due.</returns>
+    public bool NeedsRecount(StocktakeLine line)
+        => RecountTolerancePercent is decimal pct && line.IsCounted && !line.IsRecounted && Math.Abs(line.VarianceQuantity) > Math.Abs(line.SystemQuantity) * pct / 100m;
+
     /// <summary>The count lines.</summary>
     public IReadOnlyList<StocktakeLine> Lines => _lines.AsReadOnly();
 
@@ -135,4 +147,26 @@ public sealed class StocktakeLine : Entity
     /// <summary>Sets the physical count.</summary>
     /// <param name="countedQuantity">The counted quantity.</param>
     public void SetCount(decimal countedQuantity) => CountedQuantity = countedQuantity;
+
+    /// <summary>Gets or sets who made the first count.</summary>
+    public long? CountedByUserId { get; set; }
+
+    /// <summary>Gets the first count, kept when a recount replaces it.</summary>
+    public decimal? FirstCountQuantity { get; private set; }
+
+    /// <summary>Gets who recounted.</summary>
+    public long? RecountedByUserId { get; private set; }
+
+    /// <summary>Gets a value indicating whether the line was recounted.</summary>
+    public bool IsRecounted => RecountedByUserId.HasValue;
+
+    /// <summary>Replaces the count with a recount, keeping the first.</summary>
+    /// <param name="quantity">The recount.</param>
+    /// <param name="userId">Who recounted.</param>
+    public void Recount(decimal quantity, long userId)
+    {
+        FirstCountQuantity = CountedQuantity;
+        CountedQuantity = quantity;
+        RecountedByUserId = userId;
+    }
 }

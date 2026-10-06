@@ -19,6 +19,34 @@ public static class BomRules
     public static decimal UnitCost(IEnumerable<(decimal Quantity, decimal ScrapPercent, decimal UnitCost)> lines, decimal batchOutput)
         => Math.Round(lines.Sum(l => Requirement(l.Quantity, l.ScrapPercent, batchOutput, 1m) * l.UnitCost), 4, MidpointRounding.AwayFromZero);
 
+    /// <summary>
+    /// Splits a cost across parts in proportion to their weights (equally when every weight is zero), to the cent, the last part taking
+    /// the rounding so the parts sum to the total.
+    /// </summary>
+    /// <param name="total">The cost to split.</param>
+    /// <param name="weights">Each part's weight (e.g. quantity × unit cost).</param>
+    /// <returns>Each part's share.</returns>
+    public static IReadOnlyList<decimal> SplitCost(decimal total, IReadOnlyList<decimal> weights)
+    {
+        if (weights.Count == 0)
+        {
+            return [];
+        }
+
+        decimal sum = weights.Sum();
+        decimal[] shares = new decimal[weights.Count];
+        decimal allocated = 0m;
+        for (int i = 0; i < weights.Count - 1; i++)
+        {
+            decimal share = sum == 0m ? total / weights.Count : total * weights[i] / sum;
+            shares[i] = Math.Round(share, 2, MidpointRounding.AwayFromZero);
+            allocated += shares[i];
+        }
+
+        shares[^1] = total - allocated;
+        return shares;
+    }
+
     /// <summary>Output yield: actual output as a share of planned.</summary>
     /// <param name="planned">The planned output.</param>
     /// <param name="actual">The actual output.</param>

@@ -35,6 +35,31 @@ public sealed class AssemblyRequest
     public string ClearingAccountCode { get; init; } = string.Empty;
 }
 
+/// <summary>A disassembly to post: finished goods taken apart into their components.</summary>
+public sealed class DisassemblyRequest
+{
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>Gets the BOM.</summary>
+    public long BillOfMaterialsId { get; init; }
+
+    /// <summary>Gets the warehouse the finished goods come from and components go to.</summary>
+    public long WarehouseId { get; init; }
+
+    /// <summary>Gets the date.</summary>
+    public DateOnly Date { get; init; }
+
+    /// <summary>Gets the finished units taken apart.</summary>
+    public decimal Quantity { get; init; }
+
+    /// <summary>Gets the components actually recovered, where they differ from the BOM (scrap excluded) for the quantity.</summary>
+    public IReadOnlyList<ComponentUsage> Recovered { get; init; } = [];
+
+    /// <summary>Gets the clearing account the finished goods are issued to and the components received from (nets to zero).</summary>
+    public string ClearingAccountCode { get; init; } = string.Empty;
+}
+
 /// <summary>The posted run.</summary>
 /// <param name="RunId">The run.</param>
 /// <param name="RunNumber">Its number.</param>
@@ -53,4 +78,14 @@ public interface IAssemblyService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The run, or an error.</returns>
     Task<Result<AssemblyResult>> AssembleAsync(AssemblyRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Takes finished goods apart (returns, rework, kit breaking): issues them to the clearing account at their cost and receives each
+    /// component recovered from the same account, the cost split by each component's recovered quantity at its current average cost
+    /// (standard cost when it has none), so nothing is gained or lost. Recorded as a run marked as a disassembly.
+    /// </summary>
+    /// <param name="request">The disassembly.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The run (total cost taken apart, cost per finished unit).</returns>
+    Task<Result<AssemblyResult>> DisassembleAsync(DisassemblyRequest request, CancellationToken ct = default);
 }
