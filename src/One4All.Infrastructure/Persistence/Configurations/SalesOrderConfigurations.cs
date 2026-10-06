@@ -136,3 +136,30 @@ internal sealed class CustomerContractLineConfiguration : IEntityTypeConfigurati
         b.Ignore(x => x.Remaining);
     }
 }
+
+internal sealed class DropShipmentConfiguration : IEntityTypeConfiguration<DropShipment>
+{
+    public void Configure(EntityTypeBuilder<DropShipment> b)
+    {
+        b.ToTable("drop_shipment", Schemas.SalesOrders);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(40);
+        b.Property(x => x.SupplierInvoiceNumber).HasMaxLength(40);
+        b.Ignore(x => x.Cost);
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.DropShipmentId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.Reference }).IsUnique();
+        b.HasIndex(x => x.SalesOrderId);
+    }
+}
+
+internal sealed class DropShipmentLineConfiguration : IEntityTypeConfiguration<DropShipmentLine>
+{
+    public void Configure(EntityTypeBuilder<DropShipmentLine> b)
+    {
+        b.ToTable("drop_shipment_line", Schemas.SalesOrders);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.Property(x => x.UnitCost).HasPrecision(19, 4);
+    }
+}

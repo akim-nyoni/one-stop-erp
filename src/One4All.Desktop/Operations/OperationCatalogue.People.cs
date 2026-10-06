@@ -516,6 +516,45 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Drop-ship order lines", ListTitle = "Drop-shipments",
+            Description = "The supplier sends sales-order items straight to the customer. Untick 'Confirm' to place it; tick it (with the supplier's invoice) once delivered — cost of sales is charged and the lines become invoiceable, no stock moves.",
+            Fields = [Req("Reference", "Drop-shipment reference"), Tick("Confirm", "Confirm delivered"), Opt("Order", "Sales order number (placing)"), Opt("Supplier", "Supplier code (placing)"),
+                Opt("Lines", "Lines: ITEM:quantity:unit cost; … (placing)"), Today(), Opt("Invoice", "Supplier invoice (confirming)"), Req("Cogs", "Cost of sales account", "5000")],
+            Run = async (c, i) =>
+            {
+                IDropShipService service = c.Get<IDropShipService>();
+                if (i.Flag("Confirm"))
+                {
+                    DropShipDelivered done = Check(await service.ConfirmDeliveredAsync(c.CompanyId, i.Text("Reference"), i.Date("Date"), i.Text("Invoice"), i.Text("Cogs")).ConfigureAwait(true));
+                    return $"Delivered: {M(done.Cost)} to cost of sales ({done.SupplierInvoiceJournal}); the order lines can now be invoiced.";
+                }
+
+                var order = await c.Db.SalesOrders.AsNoTracking().Include(o => o.Lines).FirstOrDefaultAsync(o => o.CompanyId == c.CompanyId && o.OrderNumber == i.Text("Order").ToUpper()).ConfigureAwait(true)
+                    ?? throw new OperationException($"No sales order '{i.Text("Order")}'.");
+                List<DropShipLine> lines = [];
+                foreach (string part in i.Text("Lines").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                    if (bits.Length != 3 || !decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal quantity)
+                        || !decimal.TryParse(bits[2], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal cost))
+                    {
+                        throw new OperationException($"'{part}' should look like ITEM:quantity:unit cost.");
+                    }
+
+                    long item = await ItemAsync(c, bits[0]).ConfigureAwait(true);
+                    long line = order.Lines.FirstOrDefault(l => l.ItemId == item)?.Id ?? throw new OperationException($"{bits[0]} is not on order {order.OrderNumber}.");
+                    lines.Add(new DropShipLine(line, quantity, cost));
+                }
+
+                return Check(await service.OrderAsync(c.CompanyId, order.Id, await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true), i.Text("Reference"), i.Date("Date"), lines).ConfigureAwait(true),
+                    id => $"Drop-shipment {i.Text("Reference").ToUpperInvariant()} placed.");
+            },
+            List = async c => Table(await c.Db.DropShipments.AsNoTracking().Include(d => d.Lines).Where(d => d.CompanyId == c.CompanyId).OrderByDescending(d => d.Id).Take(50).ToListAsync().ConfigureAwait(true),
+                ("Reference", d => d.Reference), ("Ordered", d => D(d.OrderedOn)), ("Delivered", d => d.DeliveredOn is DateOnly on ? D(on) : "pending"), ("Supplier invoice", d => d.SupplierInvoiceNumber),
+                ("Cost", d => M(d.Cost))),
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Save a delivery zone rate", ListTitle = "Delivery zone rates",
             Description = "A zone's charge per delivery plus per kg and per m³ of goods sent (from item weights and volumes), free above a goods value.",
             Fields = [Req("Zone", "Zone"), Num("Base", "Charge per delivery", "0"), Num("PerKg", "Per kg", "0"), Num("PerM3", "Per m³", "0"), OptNum("Free", "Free above goods value")],

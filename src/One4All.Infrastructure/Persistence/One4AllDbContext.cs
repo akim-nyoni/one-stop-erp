@@ -203,6 +203,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the delivery notes.</summary>
     public DbSet<Core.SalesOrders.SalesDelivery> SalesDeliveries => Set<Core.SalesOrders.SalesDelivery>();
 
+    /// <summary>Sales-order lines the supplier delivers straight to the customer.</summary>
+    public DbSet<Core.SalesOrders.DropShipment> DropShipments => Set<Core.SalesOrders.DropShipment>();
+
     /// <summary>Customer supply contracts drawn down by call-offs.</summary>
     public DbSet<Core.SalesOrders.CustomerContract> CustomerContracts => Set<Core.SalesOrders.CustomerContract>();
 

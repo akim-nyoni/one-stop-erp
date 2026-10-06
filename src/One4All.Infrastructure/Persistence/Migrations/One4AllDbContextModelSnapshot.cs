@@ -21070,6 +21070,123 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("delivery_zone_rate", "sop");
                 });
 
+            modelBuilder.Entity("One4All.Core.SalesOrders.DropShipment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly?>("DeliveredOn")
+                        .HasColumnType("date")
+                        .HasColumnName("delivered_on");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("OrderedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("ordered_on");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("reference");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("SalesOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sales_order_id");
+
+                    b.Property<long>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
+                    b.Property<string>("SupplierInvoiceNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("supplier_invoice_number");
+
+                    b.HasKey("Id")
+                        .HasName("pk_drop_shipment");
+
+                    b.HasIndex("SalesOrderId")
+                        .HasDatabaseName("ix_drop_shipment_sales_order_id");
+
+                    b.HasIndex("CompanyId", "Reference")
+                        .IsUnique()
+                        .HasDatabaseName("ix_drop_shipment_company_id_reference");
+
+                    b.ToTable("drop_shipment", "sop");
+                });
+
+            modelBuilder.Entity("One4All.Core.SalesOrders.DropShipmentLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("DropShipmentId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("drop_shipment_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("SalesOrderLineId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sales_order_line_id");
+
+                    b.Property<decimal>("UnitCost")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("unit_cost");
+
+                    b.HasKey("Id")
+                        .HasName("pk_drop_shipment_line");
+
+                    b.HasIndex("DropShipmentId")
+                        .HasDatabaseName("ix_drop_shipment_line_drop_shipment_id");
+
+                    b.ToTable("drop_shipment_line", "sop");
+                });
+
             modelBuilder.Entity("One4All.Core.SalesOrders.Quotation", b =>
                 {
                     b.Property<long>("Id")
@@ -27011,6 +27128,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_customer_contract_line_customer_contracts_customer_contract");
                 });
 
+            modelBuilder.Entity("One4All.Core.SalesOrders.DropShipmentLine", b =>
+                {
+                    b.HasOne("One4All.Core.SalesOrders.DropShipment", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("DropShipmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_drop_shipment_line_drop_shipments_drop_shipment_id");
+                });
+
             modelBuilder.Entity("One4All.Core.SalesOrders.QuotationLine", b =>
                 {
                     b.HasOne("One4All.Core.SalesOrders.Quotation", null)
@@ -27551,6 +27678,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("One4All.Core.SalesOrders.CustomerContract", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.SalesOrders.DropShipment", b =>
                 {
                     b.Navigation("Lines");
                 });
