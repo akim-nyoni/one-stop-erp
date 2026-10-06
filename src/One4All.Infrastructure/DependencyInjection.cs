@@ -46,6 +46,7 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
         services.AddSingleton(new AuthenticationOptions());
         services.AddScoped<IPermissionService, PermissionService>();
+        services.AddScoped<IUserAdminService, UserAdminService>();
         services.AddScoped<Application.Abstractions.MasterData.IMasterDataService, MasterData.MasterDataService>();
         services.AddScoped<Application.Abstractions.Security.IApiAccessService, Security.ApiAccessService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();

@@ -3,6 +3,8 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.MasterData;
+using One4All.Application.Abstractions.Security;
+using One4All.Core.Security;
 using One4All.Core.Accounting;
 using One4All.Core.Inventory;
 using One4All.Core.System;
@@ -141,5 +143,123 @@ public static partial class OperationCatalogue
             List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Take(500).ToListAsync().ConfigureAwait(true),
                 ("Code", x => x.Code), ("Description", x => x.Description), ("Type", x => x.ItemType), ("Revenue", x => x.RevenueAccountCode), ("Cost of sales", x => x.CostOfSalesAccountCode)),
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Create a user", ListTitle = "Users and their roles",
+            Description = "A login who must change the initial password at first sign-in (8+ characters, letters and digits, not the user name).",
+            Fields = [Req("Username", "Login name"), Req("Name", "Display name"), Opt("Email", "E-mail"), Req("Password", "Initial password")],
+            Run = async (c, i) => Check(await c.Get<IUserAdminService>().CreateUserAsync(i.Text("Username"), i.Text("Name"), i.Optional("Email"), i.Text("Password")).ConfigureAwait(true),
+                id => $"User {i.Text("Username")} created."),
+            List = UsersAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Reset a password", ListTitle = "Users and their roles", Description = "Sets a new password the user must change at next sign-in, and clears any lockout.",
+            Fields = [Req("Username", "Login name"), Req("Password", "New password")],
+            Run = async (c, i) => Check(await c.Get<IUserAdminService>().ResetPasswordAsync(await UserAsync(c, i.Text("Username")).ConfigureAwait(true), i.Text("Password")).ConfigureAwait(true), "Password reset."),
+            List = UsersAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Activate or deactivate a user", ListTitle = "Users and their roles", Description = "A deactivated user cannot sign in; the last system administrator stays active.",
+            Fields = [Req("Username", "Login name"), Tick("Active", "Active")],
+            Run = async (c, i) => Check(await c.Get<IUserAdminService>().SetActiveAsync(await UserAsync(c, i.Text("Username")).ConfigureAwait(true), i.Flag("Active")).ConfigureAwait(true), "Updated."),
+            List = UsersAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Create a role", ListTitle = "Roles", Description = "A role, optionally starting from a copy of another role's permissions (edit grants in the permission grid).",
+            Fields = [Req("Name", "Role name"), Opt("Description", "Description"), Opt("Copy", "Copy permissions from role")],
+            Run = async (c, i) => Check(await c.Get<IUserAdminService>().CreateRoleAsync(i.Text("Name"), i.Optional("Description"),
+                i.Optional("Copy") is string copy ? await RoleAsync(c, copy).ConfigureAwait(true) : null).ConfigureAwait(true), id => $"Role {i.Text("Name")} created."),
+            List = async c => Table(await c.Db.Roles.AsNoTracking().Include(r => r.Permissions).OrderBy(r => r.Name).ToListAsync().ConfigureAwait(true),
+                ("Role", r => r.Name), ("Description", r => r.Description), ("Permissions", r => r.Permissions.Count)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Assign a role", ListTitle = "Users and their roles",
+            Description = "Gives a user a role, limited by scopes such as Company:ACME;Branch:HO,NORTH (blank: unrestricted). Warns of segregation-of-duties conflicts.",
+            Fields = [Req("Username", "Login name"), Req("Role", "Role name"), Opt("Scopes", "Scopes (Dimension:values;...)"), Tick("Remove", "Remove the role instead")],
+            Run = async (c, i) =>
+            {
+                long user = await UserAsync(c, i.Text("Username")).ConfigureAwait(true);
+                long role = await RoleAsync(c, i.Text("Role")).ConfigureAwait(true);
+                if (i.Flag("Remove"))
+                {
+                    return Check(await c.Get<IUserAdminService>().RemoveRoleAsync(user, role).ConfigureAwait(true), "Role removed.");
+                }
+
+                Dictionary<ScopeDimension, IReadOnlyList<string>> scopes = [];
+                foreach (string part in (i.Optional("Scopes") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    string[] bits = part.Split(':', 2, StringSplitOptions.TrimEntries);
+                    if (bits.Length != 2 || !Enum.TryParse(bits[0], true, out ScopeDimension dimension))
+                    {
+                        throw new OperationException($"'{part}' should look like Company:CODE1,CODE2 (dimensions: {string.Join(", ", Enum.GetNames<ScopeDimension>())}).");
+                    }
+
+                    scopes[dimension] = [.. bits[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+                }
+
+                IReadOnlyList<string> conflicts = Check(await c.Get<IUserAdminService>().AssignRoleAsync(user, role, scopes).ConfigureAwait(true));
+                return conflicts.Count == 0 ? "Role assigned." : $"Role assigned. Segregation-of-duties conflicts: {string.Join("; ", conflicts)}.";
+            },
+            List = UsersAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Create a group or add a role to it", ListTitle = "Groups",
+            Description = "Groups bundle roles; users who join inherit them. Give a role to add it to the group (creating the group if new).",
+            Fields = [Req("Group", "Group name"), Opt("Role", "Role to add")],
+            Run = async (c, i) =>
+            {
+                IUserAdminService admin = c.Get<IUserAdminService>();
+                string name = i.Text("Group").Trim();
+                string normalized = name.ToUpperInvariant();
+                long? existing = await c.Db.Groups.Where(g => g.NormalizedName == normalized).Select(g => (long?)g.Id).FirstOrDefaultAsync().ConfigureAwait(true);
+                long group = existing ?? Check(await admin.CreateGroupAsync(name, null).ConfigureAwait(true));
+                if (i.Optional("Role") is string roleName)
+                {
+                    _ = Check(await admin.AddRoleToGroupAsync(group, await RoleAsync(c, roleName).ConfigureAwait(true)).ConfigureAwait(true), string.Empty);
+                }
+
+                return existing is null ? $"Group {name} created." : $"Group {name} updated.";
+            },
+            List = async c =>
+            {
+                Dictionary<long, string> roles = await c.Db.Roles.AsNoTracking().ToDictionaryAsync(r => r.Id, r => r.Name).ConfigureAwait(true);
+                return Table(await c.Db.Groups.AsNoTracking().Include(g => g.Roles).OrderBy(g => g.Name).ToListAsync().ConfigureAwait(true),
+                    ("Group", g => g.Name), ("Roles", g => string.Join(", ", g.Roles.Select(r => roles.GetValueOrDefault(r.RoleId)))));
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Join or leave a group", ListTitle = "Users and their roles", Description = "Puts a user in a group (inheriting its roles) or takes them out.",
+            Fields = [Req("Username", "Login name"), Req("Group", "Group name"), Tick("Member", "Member")],
+            Run = async (c, i) =>
+            {
+                string normalized = i.Text("Group").Trim().ToUpperInvariant();
+                long group = await FindAsync(c.Db.Groups, g => g.NormalizedName == normalized, g => g.Id, "group", i.Text("Group")).ConfigureAwait(true);
+                IReadOnlyList<string> conflicts = Check(await c.Get<IUserAdminService>().SetGroupMembershipAsync(await UserAsync(c, i.Text("Username")).ConfigureAwait(true), group, i.Flag("Member"))
+                    .ConfigureAwait(true));
+                return conflicts.Count == 0 ? "Membership updated." : $"Membership updated. Segregation-of-duties conflicts: {string.Join("; ", conflicts)}.";
+            },
+            List = UsersAsync,
+        };
+    }
+
+    private static Task<long> RoleAsync(OperationContext c, string name)
+    {
+        string normalized = name.Trim().ToUpperInvariant();
+        return FindAsync(c.Db.Roles, r => r.NormalizedName == normalized, r => r.Id, "role", name);
+    }
+
+    private static async Task<DataTable> UsersAsync(OperationContext c)
+    {
+        Dictionary<long, string> roles = await c.Db.Roles.AsNoTracking().ToDictionaryAsync(r => r.Id, r => r.Name).ConfigureAwait(true);
+        return Table(await c.Db.Users.AsNoTracking().Include(u => u.Roles).ThenInclude(r => r.Scopes).OrderBy(u => u.Username).ToListAsync().ConfigureAwait(true),
+            ("User", u => u.Username), ("Name", u => u.DisplayName), ("Active", u => u.IsActive), ("Administrator", u => u.IsSystemAdministrator),
+            ("Roles", u => string.Join("; ", u.Roles.Select(r => roles.GetValueOrDefault(r.RoleId) + (r.Scopes.Count == 0 ? string.Empty
+                : " (" + string.Join(", ", r.Scopes.Select(s => $"{s.Dimension}: {string.Join("/", s.Values)}")) + ")")))));
     }
 }

@@ -113,6 +113,13 @@ public sealed class User : SoftDeletableEntity
     /// <param name="active">True to activate.</param>
     public void SetActive(bool active) => IsActive = active;
 
+    /// <summary>Clears a lockout and the failed-attempt count (after an administrator's password reset).</summary>
+    public void Unlock()
+    {
+        FailedAccessCount = 0;
+        LockoutEndUtc = null;
+    }
+
     /// <summary>Enables or disables TOTP two-factor authentication.</summary>
     /// <param name="enabled">True to enable.</param>
     public void SetTwoFactor(bool enabled) => TwoFactorEnabled = enabled;

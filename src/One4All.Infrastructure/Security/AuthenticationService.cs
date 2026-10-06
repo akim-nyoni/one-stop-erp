@@ -135,7 +135,8 @@ public sealed class AuthenticationService : IAuthenticationService
     public async Task<bool> ChangePasswordAsync(long userId, string currentPassword, string newPassword, CancellationToken ct = default)
     {
         User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false);
-        if (user?.PasswordHash is null || !_hasher.Verify(user.PasswordHash, currentPassword))
+        if (user?.PasswordHash is null || !_hasher.Verify(user.PasswordHash, currentPassword)
+            || Application.Security.PasswordPolicy.Problem(newPassword, user.Username) is not null || _hasher.Verify(user.PasswordHash, newPassword))
         {
             return false;
         }
