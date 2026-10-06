@@ -61,4 +61,11 @@ public sealed class LoginEvent : Entity
     /// <summary>Ends the session.</summary>
     /// <param name="at">When.</param>
     public void End(DateTimeOffset at) => EndedOnUtc ??= at;
+
+    /// <summary>Gets when the session was last active (null: at sign-in).</summary>
+    public DateTimeOffset? LastSeenUtc { get; private set; }
+
+    /// <summary>Records activity on the session.</summary>
+    /// <param name="at">When.</param>
+    public void Touch(DateTimeOffset at) => LastSeenUtc = at;
 }

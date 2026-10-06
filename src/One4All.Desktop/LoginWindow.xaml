@@ -26,6 +26,9 @@
             <PasswordBox x:Name="PasswordBox" Height="32" Padding="6,4" FontSize="14"
                          KeyDown="PasswordBox_KeyDown" />
 
+            <TextBlock Text="Authenticator code (if you use one)" FontWeight="SemiBold" Margin="0,16,0,4" />
+            <TextBox x:Name="CodeBox" Text="{Binding OneTimeCode, UpdateSourceTrigger=PropertyChanged}" Height="32" Padding="6,4" FontSize="14" />
+
             <Button x:Name="SignInButton" Content="Sign in" Height="38" Margin="0,24,0,0"
                     FontSize="15" FontWeight="SemiBold" Foreground="White"
                     Background="{StaticResource BrandDarkBrush}" BorderThickness="0"

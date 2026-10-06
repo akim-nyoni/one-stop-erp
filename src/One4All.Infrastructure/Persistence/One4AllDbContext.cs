@@ -50,6 +50,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Users.</summary>
     public DbSet<User> Users => Set<User>();
 
+    /// <summary>Earlier password hashes, so they are not reused.</summary>
+    public DbSet<PasswordHistory> PasswordHistories => Set<PasswordHistory>();
+
     /// <summary>Gets the sign-in attempts and sessions.</summary>
     public DbSet<LoginEvent> LoginEvents => Set<LoginEvent>();
 

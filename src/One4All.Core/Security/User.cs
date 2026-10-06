@@ -124,6 +124,31 @@ public sealed class User : SoftDeletableEntity
     /// <param name="enabled">True to enable.</param>
     public void SetTwoFactor(bool enabled) => TwoFactorEnabled = enabled;
 
+    /// <summary>Gets the authenticator secret (Base32), once enrolment has started.</summary>
+    public string? TwoFactorSecret { get; private set; }
+
+    /// <summary>Gets when the password was last set (expiry runs from here).</summary>
+    public DateTimeOffset? PasswordChangedUtc { get; private set; }
+
+    /// <summary>Starts authenticator enrolment with a new secret (two-factor stays off until a code confirms it).</summary>
+    /// <param name="secret">The Base32 secret.</param>
+    public void BeginTwoFactor(string secret)
+    {
+        TwoFactorSecret = secret;
+        TwoFactorEnabled = false;
+    }
+
+    /// <summary>Turns two-factor off and forgets the secret.</summary>
+    public void ClearTwoFactor()
+    {
+        TwoFactorSecret = null;
+        TwoFactorEnabled = false;
+    }
+
+    /// <summary>Stamps when the password was set.</summary>
+    /// <param name="at">When.</param>
+    public void StampPasswordChange(DateTimeOffset at) => PasswordChangedUtc = at;
+
     /// <summary>Records a successful sign-in: clears failures and stamps the time.</summary>
     /// <param name="nowUtc">The current time.</param>
     public void RegisterSuccessfulLogin(DateTimeOffset nowUtc)
@@ -197,3 +222,30 @@ public sealed class User : SoftDeletableEntity
 
     private void RotateSecurityStamp() => SecurityStamp = Guid.NewGuid().ToString("N");
 }
+
+/// <summary>A password a user had (<c>sec.password_history</c>), kept hashed so it cannot be reused.</summary>
+public sealed class PasswordHistory : Entity
+{
+    private PasswordHistory() => PasswordHash = string.Empty;
+
+    /// <summary>Records the password.</summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="passwordHash">Its hash.</param>
+    /// <param name="setOnUtc">When it was set.</param>
+    public PasswordHistory(long userId, string passwordHash, DateTimeOffset setOnUtc)
+    {
+        UserId = userId;
+        PasswordHash = passwordHash;
+        SetOnUtc = setOnUtc;
+    }
+
+    /// <summary>Gets the user.</summary>
+    public long UserId { get; private set; }
+
+    /// <summary>Gets the hash.</summary>
+    public string PasswordHash { get; private set; }
+
+    /// <summary>Gets when it was set.</summary>
+    public DateTimeOffset SetOnUtc { get; private set; }
+}
+

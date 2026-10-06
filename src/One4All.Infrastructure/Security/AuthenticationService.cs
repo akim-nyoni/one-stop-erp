@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Security;
+using One4All.Core.Common;
 using One4All.Core.Security;
 using One4All.Infrastructure.Persistence;
 using One4All.Licensing.Core;
@@ -14,6 +15,24 @@ public sealed class AuthenticationOptions
 
     /// <summary>How long an account stays locked after too many failures.</summary>
     public TimeSpan LockoutDuration { get; set; } = TimeSpan.FromMinutes(15);
+
+    /// <summary>Gets or sets how many earlier passwords may not be reused (0: none remembered).</summary>
+    public int PasswordHistoryDepth { get; set; } = 5;
+
+    /// <summary>Gets or sets how long a password lasts before it must be changed (null: it never expires).</summary>
+    public TimeSpan? PasswordMaxAge { get; set; }
+
+    /// <summary>Gets or sets how long a session may sit idle before it locks (null: no timeout).</summary>
+    public TimeSpan? SessionIdleTimeout { get; set; }
+
+    /// <summary>Gets or sets how many sessions a user may have open at once (0: no limit).</summary>
+    public int MaxConcurrentSessions { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether, at the session limit, the oldest session is ended (true) or the new sign-in refused.</summary>
+    public bool EndOldestSessionAtLimit { get; set; }
+
+    /// <summary>Gets or sets the issuer shown in authenticator apps.</summary>
+    public string TwoFactorIssuer { get; set; } = "One4All";
 }
 
 /// <summary>
@@ -56,11 +75,15 @@ public sealed class AuthenticationService : IAuthenticationService
         AuthenticateCoreAsync(username, password, usePin: false, terminal, ct);
 
     /// <inheritdoc />
+    public Task<AuthenticationResult> AuthenticateWithCodeAsync(string username, string password, string? oneTimeCode, string? terminal = null, CancellationToken ct = default) =>
+        AuthenticateCoreAsync(username, password, usePin: false, terminal, ct, oneTimeCode);
+
+    /// <inheritdoc />
     public Task<AuthenticationResult> AuthenticateByPinAsync(string username, string pin, string? terminal = null, CancellationToken ct = default) =>
         AuthenticateCoreAsync(username, pin, usePin: true, terminal, ct);
 
     // Every attempt is logged (SYS236 / SYS249); a success opens a session.
-    private async Task<AuthenticationResult> AuthenticateCoreAsync(string username, string secret, bool usePin, string? terminal, CancellationToken ct)
+    private async Task<AuthenticationResult> AuthenticateCoreAsync(string username, string secret, bool usePin, string? terminal, CancellationToken ct, string? oneTimeCode = null)
     {
         string normalized = username.Trim().ToUpperInvariant();
         User? user = await _db.Users
@@ -113,11 +136,43 @@ public sealed class AuthenticationService : IAuthenticationService
                 : AuthenticationResult.Failure(AuthenticationOutcome.InvalidCredentials, "Invalid username or password.")).ConfigureAwait(false);
         }
 
+        // Back-office sign-in with two-factor needs the authenticator code too (the till's PIN sign-in does not).
+        if (!usePin && user.TwoFactorEnabled && user.TwoFactorSecret is string totpSecret)
+        {
+            if (string.IsNullOrWhiteSpace(oneTimeCode))
+            {
+                return await LogAsync(AuthenticationResult.Failure(AuthenticationOutcome.TwoFactorRequired, "Enter the code from your authenticator app.")).ConfigureAwait(false);
+            }
+
+            if (!Application.Security.Totp.Verify(totpSecret, oneTimeCode, now))
+            {
+                user.RegisterFailedLogin(now, _options.MaxFailedAttempts, _options.LockoutDuration);
+                return await LogAsync(AuthenticationResult.Failure(AuthenticationOutcome.TwoFactorRequired, "The authenticator code is not right.")).ConfigureAwait(false);
+            }
+        }
+
+        // The concurrent-session policy: refuse at the limit, or end the oldest open session.
+        if (_options.MaxConcurrentSessions > 0)
+        {
+            List<LoginEvent> open = await OpenSessionsAsync(user.Id, now, ct).ConfigureAwait(false);
+            if (open.Count >= _options.MaxConcurrentSessions)
+            {
+                if (!_options.EndOldestSessionAtLimit)
+                {
+                    return await LogAsync(AuthenticationResult.Failure(AuthenticationOutcome.TooManySessions,
+                        $"You already have {open.Count} session(s) open; sign out of one first.")).ConfigureAwait(false);
+                }
+
+                open.OrderBy(s => s.OccurredOnUtc).Take(open.Count - _options.MaxConcurrentSessions + 1).ToList().ForEach(s => s.End(now));
+            }
+        }
+
         user.RegisterSuccessfulLogin(now);
+        bool expired = !usePin && _options.PasswordMaxAge is TimeSpan maxAge && (user.PasswordChangedUtc ?? DateTimeOffset.MinValue) + maxAge < now;
         EffectivePermissions permissions = await _permissions.ResolveAsync(user.Id, ct).ConfigureAwait(false);
         string session = Guid.NewGuid().ToString("N");
         return await LogAsync(AuthenticationResult.Success(
-            user.Id, user.Username, user.DisplayName, user.IsSystemAdministrator, user.MustChangePassword, permissions, session), session).ConfigureAwait(false);
+            user.Id, user.Username, user.DisplayName, user.IsSystemAdministrator, user.MustChangePassword || expired, permissions, session), session).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -141,8 +196,96 @@ public sealed class AuthenticationService : IAuthenticationService
             return false;
         }
 
+        // Not one of the recent passwords either.
+        List<string> recent = await _db.PasswordHistories.Where(h => h.UserId == userId).OrderByDescending(h => h.SetOnUtc).Take(_options.PasswordHistoryDepth)
+            .Select(h => h.PasswordHash).ToListAsync(ct).ConfigureAwait(false);
+        if (recent.Any(h => _hasher.Verify(h, newPassword)))
+        {
+            return false;
+        }
+
+        DateTimeOffset now = _clock.UtcNow;
+        _db.PasswordHistories.Add(new PasswordHistory(userId, user.PasswordHash, now));
         user.SetPasswordHash(_hasher.Hash(newPassword), mustChange: false);
+        user.StampPasswordChange(now);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> TouchSessionAsync(string sessionId, CancellationToken ct = default)
+    {
+        LoginEvent? login = await _db.LoginEvents.FirstOrDefaultAsync(l => l.SessionId == sessionId, ct).ConfigureAwait(false);
+        if (login is null || login.EndedOnUtc is not null)
+        {
+            return false;
+        }
+
+        DateTimeOffset now = _clock.UtcNow;
+        if (_options.SessionIdleTimeout is TimeSpan idle && (login.LastSeenUtc ?? login.OccurredOnUtc) + idle < now)
+        {
+            login.End(now);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return false;
+        }
+
+        login.Touch(now);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<(string Secret, string ProvisioningUri)>> BeginTwoFactorAsync(long userId, CancellationToken ct = default)
+    {
+        User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false);
+        if (user is null)
+        {
+            return Error.NotFound("Security.UserNotFound", $"User {userId} not found.");
+        }
+
+        string secret = Application.Security.Totp.NewSecret();
+        user.BeginTwoFactor(secret);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return (secret, Application.Security.Totp.ProvisioningUri(_options.TwoFactorIssuer, user.Username, secret));
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> ConfirmTwoFactorAsync(long userId, string code, CancellationToken ct = default)
+    {
+        User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false);
+        if (user?.TwoFactorSecret is not string secret)
+        {
+            return Result.Failure(Error.Rule("Security.TwoFactorNotStarted", "Start authenticator enrolment first."));
+        }
+
+        if (!Application.Security.Totp.Verify(secret, code, _clock.UtcNow))
+        {
+            return Result.Failure(Error.Rule("Security.TwoFactorCode", "The code does not match; check the device's clock and try the next code."));
+        }
+
+        user.SetTwoFactor(true);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> DisableTwoFactorAsync(long userId, CancellationToken ct = default)
+    {
+        User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false);
+        if (user is null)
+        {
+            return Result.Failure(Error.NotFound("Security.UserNotFound", $"User {userId} not found."));
+        }
+
+        user.ClearTwoFactor();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    // Sessions still open: not ended, and (with an idle timeout) active within it.
+    private async Task<List<LoginEvent>> OpenSessionsAsync(long userId, DateTimeOffset now, CancellationToken ct)
+    {
+        List<LoginEvent> open = await _db.LoginEvents.Where(l => l.UserId == userId && l.SessionId != null && l.EndedOnUtc == null).ToListAsync(ct).ConfigureAwait(false);
+        return _options.SessionIdleTimeout is TimeSpan idle ? [.. open.Where(l => (l.LastSeenUtc ?? l.OccurredOnUtc) + idle >= now)] : open;
     }
 }

@@ -23,6 +23,10 @@ public sealed partial class LoginViewModel : ObservableObject
     [ObservableProperty]
     private string _statusMessage = "Enter your credentials to sign in.";
 
+    /// <summary>The authenticator code, for users with two-factor sign-in.</summary>
+    [ObservableProperty]
+    private string _oneTimeCode = string.Empty;
+
     /// <summary>True while authenticating.</summary>
     [ObservableProperty]
     private bool _isBusy;
@@ -42,8 +46,8 @@ public sealed partial class LoginViewModel : ObservableObject
         StatusMessage = "Signing in…";
         try
         {
-            AuthenticationResult result = await _authentication.AuthenticateAsync(Username.Trim(), password, Environment.MachineName)
-                .ConfigureAwait(true);
+            AuthenticationResult result = await _authentication.AuthenticateWithCodeAsync(Username.Trim(), password, string.IsNullOrWhiteSpace(OneTimeCode) ? null : OneTimeCode.Trim(),
+                Environment.MachineName).ConfigureAwait(true);
             StatusMessage = result.Message;
             return result;
         }

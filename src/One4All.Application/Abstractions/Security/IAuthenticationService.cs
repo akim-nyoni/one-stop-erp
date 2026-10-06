@@ -1,3 +1,4 @@
+using One4All.Core.Common;
 using One4All.Core.Security;
 
 namespace One4All.Application.Abstractions.Security;
@@ -19,6 +20,12 @@ public enum AuthenticationOutcome
 
     /// <summary>The licence's named-user limit leaves no room for this account.</summary>
     NotLicensed = 4,
+
+    /// <summary>The password was right; the authenticator code is needed (or was wrong).</summary>
+    TwoFactorRequired = 5,
+
+    /// <summary>The user already has as many open sessions as allowed.</summary>
+    TooManySessions = 6,
 }
 
 /// <summary>The result of an authentication attempt, including the resolved permissions on success.</summary>
@@ -102,6 +109,46 @@ public interface IAuthenticationService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The authentication result.</returns>
     Task<AuthenticationResult> AuthenticateAsync(string username, string password, string? terminal = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Signs in with a password and, for a user with two-factor sign-in, the authenticator code: without a code the outcome is
+    /// <see cref="AuthenticationOutcome.TwoFactorRequired"/> (not a failed attempt); a wrong code counts as one.
+    /// </summary>
+    /// <param name="username">The login name.</param>
+    /// <param name="password">The password.</param>
+    /// <param name="oneTimeCode">The authenticator code.</param>
+    /// <param name="terminal">The machine or IP.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The outcome.</returns>
+    Task<AuthenticationResult> AuthenticateWithCodeAsync(string username, string password, string? oneTimeCode, string? terminal = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Records activity on a session and says whether it is still open: a session idle longer than the timeout (or ended) is closed, so
+    /// the client locks and asks the user to sign in again.
+    /// </summary>
+    /// <param name="sessionId">The session.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True while the session is open.</returns>
+    Task<bool> TouchSessionAsync(string sessionId, CancellationToken ct = default);
+
+    /// <summary>Starts authenticator enrolment: a new secret and the otpauth URI to scan; two-factor turns on once a code confirms it.</summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The secret and URI.</returns>
+    Task<Result<(string Secret, string ProvisioningUri)>> BeginTwoFactorAsync(long userId, CancellationToken ct = default);
+
+    /// <summary>Confirms enrolment with a code from the authenticator, turning two-factor on.</summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="code">The code.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or why not.</returns>
+    Task<Result> ConfirmTwoFactorAsync(long userId, string code, CancellationToken ct = default);
+
+    /// <summary>Turns two-factor off (an administrator reset when a device is lost).</summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or why not.</returns>
+    Task<Result> DisableTwoFactorAsync(long userId, CancellationToken ct = default);
 
     /// <summary>Authenticates a user by username and POS PIN.</summary>
     /// <param name="username">The login name.</param>

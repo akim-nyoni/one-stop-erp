@@ -33,6 +33,11 @@ builder.Configuration.GetSection(One4All.Infrastructure.Communications.Messaging
 builder.Services.AddOne4AllInfrastructure(connectionString, licensing, messaging);
 builder.Services.AddHostedService<One4All.Server.LicenceHost>();
 
+// Sign-in policy (brief §5.2): lockout, password history and expiry, idle timeout, concurrent sessions, from the Authentication section.
+One4All.Infrastructure.Security.AuthenticationOptions authentication = new();
+builder.Configuration.GetSection("Authentication").Bind(authentication);
+builder.Services.AddSingleton(authentication);
+
 // Scheduled jobs (brief §4.17): due jobs run once a minute; set Scheduler:Enabled=false to keep a node from running them.
 if (builder.Configuration.GetValue("Scheduler:Enabled", true))
 {
@@ -139,10 +144,10 @@ app.Use(async (context, next) =>
 // --- Endpoints --------------------------------------------------------------------------------------------
 app.MapPost("/api/auth/login", async (LoginRequest request, IAuthenticationService auth, IJwtTokenService tokens, CancellationToken ct) =>
 {
-    AuthenticationResult result = await auth.AuthenticateAsync(request.Username, request.Password, "api", ct).ConfigureAwait(false);
+    AuthenticationResult result = await auth.AuthenticateWithCodeAsync(request.Username, request.Password, request.OneTimeCode, "api", ct).ConfigureAwait(false);
     if (!result.Succeeded)
     {
-        return Results.Json(new { error = result.Message }, statusCode: StatusCodes.Status401Unauthorized);
+        return Results.Json(new { error = result.Message, twoFactorRequired = result.Outcome == AuthenticationOutcome.TwoFactorRequired }, statusCode: StatusCodes.Status401Unauthorized);
     }
 
     TokenResult token = tokens.Issue(result);
@@ -167,6 +172,25 @@ app.MapGet("/api/me", (ClaimsPrincipal user) => Results.Ok(new
 }))
 .RequireAuthorization()
 .WithName("Me");
+
+// Two-factor enrolment for the signed-in user: begin returns the otpauth URI to scan; confirm switches it on with a first code.
+app.MapPost("/api/me/two-factor", async (ClaimsPrincipal user, IAuthenticationService auth, CancellationToken ct) =>
+{
+    if (SignedInUser(user) is not long id)
+    {
+        return Results.Unauthorized();
+    }
+
+    Result<(string Secret, string ProvisioningUri)> begun = await auth.BeginTwoFactorAsync(id, ct).ConfigureAwait(false);
+    return begun.IsSuccess ? Results.Ok(new { secret = begun.Value.Secret, provisioningUri = begun.Value.ProvisioningUri }) : ActionResponse(Result.Failure(begun.Error));
+})
+.RequireAuthorization()
+.WithName("TwoFactorBegin");
+
+app.MapPost("/api/me/two-factor/confirm", async (string code, ClaimsPrincipal user, IAuthenticationService auth, CancellationToken ct) =>
+    SignedInUser(user) is long id ? ActionResponse(await auth.ConfirmTwoFactorAsync(id, code, ct).ConfigureAwait(false)) : Results.Unauthorized())
+.RequireAuthorization()
+.WithName("TwoFactorConfirm");
 
 app.MapGet("/api/reports", async (One4AllDbContext db, CancellationToken ct) =>
 {
@@ -2431,4 +2455,5 @@ static IResult OfflineActionResult(Result result)
 /// <summary>The login request body.</summary>
 /// <param name="Username">The login name.</param>
 /// <param name="Password">The plaintext password.</param>
-internal sealed record LoginRequest(string Username, string Password);
+/// <param name="OneTimeCode">The authenticator code, for users with two-factor sign-in.</param>
+internal sealed record LoginRequest(string Username, string Password, string? OneTimeCode = null);

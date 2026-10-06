@@ -105,6 +105,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.Property(x => x.Email).HasMaxLength(256);
         b.Property(x => x.PasswordHash).HasMaxLength(512);
         b.Property(x => x.PinHash).HasMaxLength(512);
+        b.Property(x => x.TwoFactorSecret).HasMaxLength(64);
         b.Property(x => x.SecurityStamp).HasMaxLength(64);
 
         b.HasMany(x => x.Roles).WithOne().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
@@ -179,5 +180,16 @@ internal sealed class LoginEventConfiguration : IEntityTypeConfiguration<LoginEv
         b.Property(x => x.SessionId).HasMaxLength(40);
         b.HasIndex(x => x.SessionId);
         b.HasIndex(x => new { x.UserId, x.OccurredOnUtc });
+    }
+}
+
+internal sealed class PasswordHistoryConfiguration : IEntityTypeConfiguration<PasswordHistory>
+{
+    public void Configure(EntityTypeBuilder<PasswordHistory> b)
+    {
+        b.ToTable("password_history", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PasswordHash).HasMaxLength(512);
+        b.HasIndex(x => new { x.UserId, x.SetOnUtc });
     }
 }

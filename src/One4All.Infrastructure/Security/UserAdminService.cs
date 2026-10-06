@@ -47,6 +47,7 @@ public sealed class UserAdminService : IUserAdminService
 
         User user = new(name, displayName.Trim(), string.IsNullOrWhiteSpace(email) ? null : email.Trim());
         user.SetPasswordHash(_hasher.Hash(initialPassword), mustChange: true);
+        user.StampPasswordChange(DateTimeOffset.UtcNow);
         _db.Users.Add(user);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return user.Id;
@@ -66,7 +67,13 @@ public sealed class UserAdminService : IUserAdminService
             return Result.Failure(Error.Validation("Security.PasswordPolicy", problem));
         }
 
+        if (user.PasswordHash is string previous)
+        {
+            _db.PasswordHistories.Add(new PasswordHistory(user.Id, previous, DateTimeOffset.UtcNow));
+        }
+
         user.SetPasswordHash(_hasher.Hash(newPassword), mustChange: true);
+        user.StampPasswordChange(DateTimeOffset.UtcNow);
         user.Unlock();
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();

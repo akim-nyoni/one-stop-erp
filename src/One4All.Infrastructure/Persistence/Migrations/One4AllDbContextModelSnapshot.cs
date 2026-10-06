@@ -23764,6 +23764,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("ended_on_utc");
 
+                    b.Property<DateTimeOffset?>("LastSeenUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_utc");
+
                     b.Property<string>("Method")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -23816,6 +23820,44 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_login_event_user_id_occurred_on_utc");
 
                     b.ToTable("login_event", "sec");
+                });
+
+            modelBuilder.Entity("One4All.Core.Security.PasswordHistory", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("password_hash");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTimeOffset>("SetOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("set_on_utc");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_password_history");
+
+                    b.HasIndex("UserId", "SetOnUtc")
+                        .HasDatabaseName("ix_password_history_user_id_set_on_utc");
+
+                    b.ToTable("password_history", "sec");
                 });
 
             modelBuilder.Entity("One4All.Core.Security.Permission", b =>
@@ -24085,6 +24127,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("normalized_username");
 
+                    b.Property<DateTimeOffset?>("PasswordChangedUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("password_changed_utc");
+
                     b.Property<string>("PasswordHash")
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)")
@@ -24110,6 +24156,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean")
                         .HasColumnName("two_factor_enabled");
+
+                    b.Property<string>("TwoFactorSecret")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("two_factor_secret");
 
                     b.Property<string>("Username")
                         .IsRequired()
