@@ -291,6 +291,66 @@ public sealed class MasterDataService : IMasterDataService
     }
 
     /// <inheritdoc />
+    public async Task<Result<long>> SaveFundAsync(long companyId, string code, string name, bool isRestricted, bool isActive = true, CancellationToken ct = default)
+    {
+        if (Key(code, 20) is not string key || string.IsNullOrWhiteSpace(name))
+        {
+            return Invalid("A fund needs a code (up to 20 characters) and a name.");
+        }
+
+        if (await CompanyMissingAsync(companyId, ct).ConfigureAwait(false) is Error missing)
+        {
+            return missing;
+        }
+
+        Fund? fund = await _db.Funds.FirstOrDefaultAsync(f => f.CompanyId == companyId && f.Code == key, ct).ConfigureAwait(false);
+        if (fund is null)
+        {
+            fund = new Fund(companyId, key, name.Trim(), isRestricted);
+            _db.Funds.Add(fund);
+        }
+
+        fund.Name = name.Trim();
+        fund.IsRestricted = isRestricted;
+        fund.IsActive = isActive;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return fund.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> SaveProjectAsync(long companyId, string code, string name, string? fundCode, bool isActive = true, CancellationToken ct = default)
+    {
+        if (Key(code, 20) is not string key || string.IsNullOrWhiteSpace(name))
+        {
+            return Invalid("A project needs a code (up to 20 characters) and a name.");
+        }
+
+        if (await CompanyMissingAsync(companyId, ct).ConfigureAwait(false) is Error missing)
+        {
+            return missing;
+        }
+
+        string? fund = Key(fundCode ?? string.Empty, 20);
+        if (fund is not null && !await _db.Funds.AnyAsync(f => f.CompanyId == companyId && f.Code == fund, ct).ConfigureAwait(false))
+        {
+            return Error.NotFound("MasterData.FundNotFound", $"Fund {fund} not found.");
+        }
+
+        Project? project = await _db.Projects.FirstOrDefaultAsync(p => p.CompanyId == companyId && p.Code == key, ct).ConfigureAwait(false);
+        if (project is null)
+        {
+            project = new Project(companyId, key, name.Trim());
+            _db.Projects.Add(project);
+        }
+
+        project.Name = name.Trim();
+        project.FundCode = fund;
+        project.IsActive = isActive;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return project.Id;
+    }
+
+    /// <inheritdoc />
     public async Task<Result<long>> CreateCustomerAsync(long companyId, string code, string name, CurrencyCode currency, decimal creditLimit = 0m, CancellationToken ct = default)
     {
         if (Key(code, 20) is not string key || string.IsNullOrWhiteSpace(name) || creditLimit < 0m)

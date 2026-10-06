@@ -89,6 +89,28 @@ public sealed class JournalLine : Entity
     /// <param name="taxCode">The tax code, or null.</param>
     public void SetTaxCode(string? taxCode) => TaxCode = taxCode;
 
+    /// <summary>Gets the project the line belongs to (analysis: not part of the balance key).</summary>
+    public string? Project { get; private set; }
+
+    /// <summary>Gets the fund (vote) the line belongs to.</summary>
+    public string? Fund { get; private set; }
+
+    /// <summary>Gets the branch the line belongs to.</summary>
+    public string? Branch { get; private set; }
+
+    /// <summary>Tags the line with its project, fund and branch (codes upper-cased; blank for none).</summary>
+    /// <param name="project">The project.</param>
+    /// <param name="fund">The fund.</param>
+    /// <param name="branch">The branch.</param>
+    public void SetAnalysis(string? project, string? fund, string? branch)
+    {
+        Project = Code(project);
+        Fund = Code(fund);
+        Branch = Code(branch);
+    }
+
+    private static string? Code(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+
     /// <summary>Creates a debit line.</summary>
     /// <param name="key">The composite account key.</param>
     /// <param name="transactionCurrency">The transaction currency.</param>

@@ -274,6 +274,27 @@ public sealed class BudgetLine : Entity
     /// <summary>Gets the approved re-phasing that added this line (a timing move, never a change of value).</summary>
     public long? RephaseId { get; init; }
 
+    /// <summary>Gets the project the line budgets for.</summary>
+    public string? Project { get; private set; }
+
+    /// <summary>Gets the fund (vote) the line budgets for.</summary>
+    public string? Fund { get; private set; }
+
+    /// <summary>Gets the branch the line budgets for.</summary>
+    public string? Branch { get; private set; }
+
+    /// <summary>Keys the line on its project, fund and branch (codes upper-cased; blank for none).</summary>
+    /// <param name="project">The project.</param>
+    /// <param name="fund">The fund.</param>
+    /// <param name="branch">The branch.</param>
+    public void SetAnalysis(string? project, string? fund, string? branch)
+    {
+        static string? Code(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+        Project = Code(project);
+        Fund = Code(fund);
+        Branch = Code(branch);
+    }
+
     /// <summary>Gets or sets how the amount was arrived at.</summary>
     public BudgetBasis Basis { get; set; }
 

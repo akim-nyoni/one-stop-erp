@@ -83,7 +83,7 @@ public sealed class PostingEngine : IPostingEngine
 
         foreach (JournalLineRequest lineRequest in request.Lines)
         {
-            Result<JournalLine> lineResult = await BuildLineAsync(request, lineRequest, baseCurrency, ct).ConfigureAwait(false);
+            Result<JournalLine> lineResult = await BuildLineAsync(request, lineRequest, baseCurrency, company.FundAccounting ? company.DefaultFund : null, ct).ConfigureAwait(false);
             if (lineResult.IsFailure)
             {
                 return lineResult.Error;
@@ -98,6 +98,25 @@ public sealed class PostingEngine : IPostingEngine
             string cur = line.TransactionCurrency.Value;
             (decimal debit, decimal credit) running = perCurrency.GetValueOrDefault(cur);
             perCurrency[cur] = (running.debit + line.TransactionDebit, running.credit + line.TransactionCredit);
+        }
+
+        // Fund accounting: every line names a fund, and each fund balances on its own.
+        if (company.FundAccounting)
+        {
+            if (journal.Lines.FirstOrDefault(l => l.Fund is null) is JournalLine unfunded)
+            {
+                return Error.Rule("Posting.FundRequired", $"Fund accounting is on: the line to '{unfunded.AccountCode}' must name a fund.");
+            }
+
+            foreach (IGrouping<string?, JournalLine> fundLines in journal.Lines.GroupBy(l => l.Fund))
+            {
+                decimal difference = fundLines.Sum(l => l.BaseDebit) - fundLines.Sum(l => l.BaseCredit);
+                if (Math.Abs(difference) > BalanceTolerance)
+                {
+                    return Error.Rule("Posting.FundOutOfBalance",
+                        $"Fund {fundLines.Key} does not balance ({difference:0.00}); move money between funds with a balanced inter-fund entry in each.");
+                }
+            }
         }
 
         // Rule 1: Dr = Cr in base currency.
@@ -294,6 +313,9 @@ public sealed class PostingEngine : IPostingEngine
             AccountCode = l.AccountCode,
             CostCentre = string.IsNullOrEmpty(l.CostCentre) ? null : l.CostCentre,
             Department = string.IsNullOrEmpty(l.Department) ? null : l.Department,
+            Project = l.Project,
+            Fund = l.Fund,
+            Branch = l.Branch,
             Side = l.TransactionDebit != 0m ? JournalSide.Credit : JournalSide.Debit,
             TransactionAmount = l.TransactionDebit != 0m ? l.TransactionDebit : l.TransactionCredit,
             ExchangeRate = l.ExchangeRate,
@@ -326,7 +348,7 @@ public sealed class PostingEngine : IPostingEngine
         return posted.Value;
     }
 
-    private async Task<Result<JournalLine>> BuildLineAsync(JournalRequest request, JournalLineRequest lineRequest, CurrencyCode baseCurrency, CancellationToken ct)
+    private async Task<Result<JournalLine>> BuildLineAsync(JournalRequest request, JournalLineRequest lineRequest, CurrencyCode baseCurrency, string? defaultFund, CancellationToken ct)
     {
         AccountKey key = lineRequest.ToKey();
         LedgerAccount? account = await _db.Accounts
@@ -388,6 +410,34 @@ public sealed class PostingEngine : IPostingEngine
             ? JournalLine.Debit(key, lineCurrency, lineRequest.TransactionAmount, rate, baseAmount, lineRequest.Narrative)
             : JournalLine.Credit(key, lineCurrency, lineRequest.TransactionAmount, rate, baseAmount, lineRequest.Narrative);
         line.SetTaxCode(lineRequest.TaxCode);
+        line.SetAnalysis(lineRequest.Project, string.IsNullOrWhiteSpace(lineRequest.Fund) ? defaultFund : lineRequest.Fund, lineRequest.Branch);
+
+        // Project, fund and branch must be known and open; some accounts insist on them.
+        if (line.Project is string project && !await _db.Projects.AnyAsync(p => p.CompanyId == request.CompanyId && p.Code == project && p.IsActive, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Posting.ProjectUnknown", $"Project '{project}' does not exist or is closed.");
+        }
+
+        if (line.Fund is string fund && !await _db.Funds.AnyAsync(f => f.CompanyId == request.CompanyId && f.Code == fund && f.IsActive, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Posting.FundUnknown", $"Fund '{fund}' does not exist or is inactive.");
+        }
+
+        if (line.Branch is string branch && !await _db.Branches.AnyAsync(b => b.CompanyId == request.CompanyId && b.Code == branch, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Posting.BranchUnknown", $"Branch '{branch}' does not exist.");
+        }
+
+        if (account.RequiresProject && line.Project is null)
+        {
+            return Error.Rule("Posting.ProjectRequired", $"Postings to '{key.AccountCode}' must name a project.");
+        }
+
+        if (account.RequiresFund && line.Fund is null)
+        {
+            return Error.Rule("Posting.FundRequired", $"Postings to '{key.AccountCode}' must name a fund.");
+        }
+
         return line;
     }
 

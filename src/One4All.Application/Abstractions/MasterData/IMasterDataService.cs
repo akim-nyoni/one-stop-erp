@@ -123,6 +123,26 @@ public interface IMasterDataService
     /// <returns>The id.</returns>
     Task<Result<long>> CreateDepartmentAsync(long companyId, string code, string name, CancellationToken ct = default);
 
+    /// <summary>Adds a fund (vote), or renames an existing one and sets whether it is restricted and active.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="code">The code.</param>
+    /// <param name="name">The name.</param>
+    /// <param name="isRestricted">Whether its money is ring-fenced.</param>
+    /// <param name="isActive">Whether it takes postings.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The fund id, or why not.</returns>
+    Task<Result<long>> SaveFundAsync(long companyId, string code, string name, bool isRestricted, bool isActive = true, CancellationToken ct = default);
+
+    /// <summary>Adds a project, or renames an existing one and sets its fund and whether it is open.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="code">The code.</param>
+    /// <param name="name">The name.</param>
+    /// <param name="fundCode">The fund financing it, if one (must exist).</param>
+    /// <param name="isActive">Whether it takes postings (false closes it).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The project id, or why not.</returns>
+    Task<Result<long>> SaveProjectAsync(long companyId, string code, string name, string? fundCode, bool isActive = true, CancellationToken ct = default);
+
     /// <summary>Adds a customer.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="code">The account code.</param>

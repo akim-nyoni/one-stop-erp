@@ -12,7 +12,11 @@ namespace One4All.Application.Abstractions.Budgeting;
 /// <param name="Quantity">The budgeted volume behind the amount, for the volume / price split.</param>
 /// <param name="Currency">The currency the line was planned in, if foreign.</param>
 /// <param name="PlannedRate">The planned rate (base per unit of the currency).</param>
-public readonly record struct NewBudgetLine(string AccountCode, int Period, decimal Amount, string? CostCentre = null, decimal? Quantity = null, CurrencyCode? Currency = null, decimal? PlannedRate = null);
+/// <param name="Project">The project the line budgets for.</param>
+/// <param name="Fund">The fund (vote) the line budgets for.</param>
+/// <param name="Branch">The branch the line budgets for.</param>
+public readonly record struct NewBudgetLine(string AccountCode, int Period, decimal Amount, string? CostCentre = null, decimal? Quantity = null, CurrencyCode? Currency = null, decimal? PlannedRate = null,
+    string? Project = null, string? Fund = null, string? Branch = null);
 
 /// <summary>One row of a budget-vs-actual comparison.</summary>
 /// <param name="AccountCode">The account.</param>
@@ -48,6 +52,30 @@ public readonly record struct BudgetVsActualReport(long FiscalYearId, IReadOnlyL
 /// <param name="Proposed">The proposed spend tested.</param>
 /// <param name="Passes">Whether the proposed spend fits within the available balance.</param>
 public readonly record struct AvailabilityResult(string AccountCode, decimal Budget, decimal Actual, decimal Committed, decimal Available, decimal Proposed, bool Passes);
+
+/// <summary>An analysis dimension budgets and actuals can be compared on.</summary>
+public enum BudgetDimension
+{
+    /// <summary>The fund (vote).</summary>
+    Fund = 1,
+
+    /// <summary>The project.</summary>
+    Project = 2,
+
+    /// <summary>The branch.</summary>
+    Branch = 3,
+}
+
+/// <summary>Budget against actual for one dimension value and account.</summary>
+/// <param name="Value">The fund, project or branch ("" for lines without one).</param>
+/// <param name="AccountCode">The account.</param>
+/// <param name="Budget">Budgeted to the as-at period.</param>
+/// <param name="Actual">Posted to the as-at period (debit-positive).</param>
+public sealed record DimensionBudgetRow(string Value, string AccountCode, decimal Budget, decimal Actual)
+{
+    /// <summary>Gets what is left (budget less actual).</summary>
+    public decimal Remaining => Budget - Actual;
+}
 
 /// <summary>
 /// Budgeting, Planning &amp; Commitment Control (brief §4.18). Budgets live in their own schema and never
@@ -87,6 +115,22 @@ public interface IBudgetingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
     Task<Result> ActivateAsync(long companyId, long budgetId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Compares the active budget to actuals by fund, project or branch and account, to an as-at period (brief §4.18.1: budget lines key on the
+    /// full dimension set). Actuals come from the posted journal lines carrying the dimension.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fiscalYearId">The year.</param>
+    /// <param name="type">The budget type.</param>
+    /// <param name="department">The budget's department (null: company-wide).</param>
+    /// <param name="dimension">Fund, project or branch.</param>
+    /// <param name="value">One value only (null: all).</param>
+    /// <param name="asAtPeriod">Up to this period.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The rows by value then account, or why not.</returns>
+    Task<Result<IReadOnlyList<DimensionBudgetRow>>> BudgetVsActualByDimensionAsync(long companyId, long fiscalYearId, BudgetType type, string? department, BudgetDimension dimension, string? value,
+        int asAtPeriod, CancellationToken ct = default);
 
     /// <summary>Compares the active budget to GL actuals, account by account, to an as-at period.</summary>
     /// <param name="companyId">The company.</param>

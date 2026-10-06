@@ -39,6 +39,9 @@ internal sealed class BudgetLineConfiguration : IEntityTypeConfiguration<BudgetL
         b.Property(x => x.Quantity).HasPrecision(19, 4);
         b.Property(x => x.PlannedRate).HasPrecision(19, 8);
         b.Property(x => x.RephaseId);
+        b.Property(x => x.Project).HasMaxLength(20);
+        b.Property(x => x.Fund).HasMaxLength(20);
+        b.Property(x => x.Branch).HasMaxLength(20);
         b.HasIndex(x => new { x.BudgetId, x.AccountCode, x.Period });
     }
 }

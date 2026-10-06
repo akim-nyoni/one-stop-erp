@@ -49,6 +49,7 @@ public sealed class BudgetingService : IBudgetingService
             added.Quantity = line.Quantity;
             added.Currency = line.Currency;
             added.PlannedRate = line.Currency is null ? null : line.PlannedRate;
+            added.SetAnalysis(line.Project, line.Fund, line.Branch);
         }
 
         _db.Set<Budget>().Add(budget);
@@ -203,5 +204,40 @@ public sealed class BudgetingService : IBudgetingService
             select new { AccountCode = g.Key, Movement = g.Sum(x => x.BaseDebit) - g.Sum(x => x.BaseCredit) };
 
         return await query.ToDictionaryAsync(x => x.AccountCode, x => x.Movement, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<DimensionBudgetRow>>> BudgetVsActualByDimensionAsync(long companyId, long fiscalYearId, BudgetType type, string? department, BudgetDimension dimension,
+        string? value, int asAtPeriod, CancellationToken ct = default)
+    {
+        Budget? budget = await _db.Set<Budget>().AsNoTracking().Include(b => b.Lines)
+            .FirstOrDefaultAsync(b => b.CompanyId == companyId && b.FiscalYearId == fiscalYearId && b.Type == type && b.Department == department && b.IsActive, ct).ConfigureAwait(false);
+        if (budget is null)
+        {
+            return Error.NotFound("Budget.NoActiveVersion", "There is no active budget for the given year/type/department.");
+        }
+
+        string? wanted = string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+        string Of(string? fund, string? project, string? branch) => (dimension switch { BudgetDimension.Fund => fund, BudgetDimension.Project => project, _ => branch }) ?? string.Empty;
+
+        Dictionary<(string Value, string Account), decimal> budgeted = budget.Lines.Where(l => l.Period <= asAtPeriod)
+            .GroupBy(l => (Of(l.Fund, l.Project, l.Branch), l.AccountCode)).ToDictionary(g => g.Key, g => g.Sum(l => l.Amount));
+
+        var lines = await (
+            from line in _db.Set<JournalLine>()
+            join journal in _db.Journals on line.JournalEntryId equals journal.Id
+            join period in _db.Set<FiscalPeriod>() on journal.FiscalPeriodId equals period.Id
+            where journal.CompanyId == companyId && journal.FiscalYearId == fiscalYearId && period.PeriodNumber <= asAtPeriod
+                && (journal.Status == JournalStatus.Posted || journal.Status == JournalStatus.Reversed)
+            group line by new { line.Fund, line.Project, line.Branch, line.AccountCode } into g
+            select new { g.Key.Fund, g.Key.Project, g.Key.Branch, g.Key.AccountCode, Movement = g.Sum(x => x.BaseDebit) - g.Sum(x => x.BaseCredit) })
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<(string Value, string Account), decimal> actual = lines.GroupBy(l => (Of(l.Fund, l.Project, l.Branch), l.AccountCode)).ToDictionary(g => g.Key, g => g.Sum(l => l.Movement));
+
+        return Result<IReadOnlyList<DimensionBudgetRow>>.Success([.. budgeted.Keys.Union(actual.Keys)
+            .Where(k => wanted is null || k.Value == wanted)
+            .Where(k => budgeted.ContainsKey(k) || actual[k] != 0m)
+            .OrderBy(k => k.Value, StringComparer.Ordinal).ThenBy(k => k.Account, StringComparer.Ordinal)
+            .Select(k => new DimensionBudgetRow(k.Value, k.Account, budgeted.GetValueOrDefault(k), actual.GetValueOrDefault(k)))]);
     }
 }

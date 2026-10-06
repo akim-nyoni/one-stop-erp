@@ -39,6 +39,33 @@ internal sealed class CostCentreConfiguration : IEntityTypeConfiguration<CostCen
     }
 }
 
+internal sealed class FundConfiguration : IEntityTypeConfiguration<Fund>
+{
+    public void Configure(EntityTypeBuilder<Fund> b)
+    {
+        b.ToTable("fund", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
+        b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
+internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
+{
+    public void Configure(EntityTypeBuilder<Project> b)
+    {
+        b.ToTable("project", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(160);
+        b.Property(x => x.FundCode).HasMaxLength(20);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
+        b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
 internal sealed class DepartmentConfiguration : IEntityTypeConfiguration<Department>
 {
     public void Configure(EntityTypeBuilder<Department> b)
@@ -143,8 +170,13 @@ internal sealed class JournalLineConfiguration : IEntityTypeConfiguration<Journa
         b.Property(x => x.ExchangeRate).HasPrecision(19, 6);
         b.Property(x => x.Narrative).HasMaxLength(512);
         b.Property(x => x.TaxCode).HasMaxLength(20);
+        b.Property(x => x.Project).HasMaxLength(20);
+        b.Property(x => x.Fund).HasMaxLength(20);
+        b.Property(x => x.Branch).HasMaxLength(20);
         b.Ignore(x => x.Key);
         b.HasIndex(x => new { x.AccountCode, x.CostCentre, x.Department });
+        b.HasIndex(x => x.Project).HasFilter("project IS NOT NULL");
+        b.HasIndex(x => x.Fund).HasFilter("fund IS NOT NULL");
     }
 }
 

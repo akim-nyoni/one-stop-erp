@@ -381,6 +381,84 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("department", "gl");
                 });
 
+            modelBuilder.Entity("One4All.Core.Accounting.Fund", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DeletedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_on_utc");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsRestricted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_restricted");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_fund");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_fund_company_id_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("fund", "gl");
+                });
+
             modelBuilder.Entity("One4All.Core.Accounting.GlPeriodBalance", b =>
                 {
                     b.Property<long>("Id")
@@ -632,6 +710,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("base_debit");
 
+                    b.Property<string>("Branch")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("branch");
+
                     b.Property<string>("CostCentre")
                         .IsRequired()
                         .HasMaxLength(3)
@@ -649,6 +732,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,6)")
                         .HasColumnName("exchange_rate");
 
+                    b.Property<string>("Fund")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("fund");
+
                     b.Property<long>("JournalEntryId")
                         .HasColumnType("bigint")
                         .HasColumnName("journal_entry_id");
@@ -657,6 +745,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)")
                         .HasColumnName("narrative");
+
+                    b.Property<string>("Project")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("project");
 
                     b.Property<decimal>("ReportingCredit")
                         .HasPrecision(19, 4)
@@ -698,8 +791,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_journal_line");
 
+                    b.HasIndex("Fund")
+                        .HasDatabaseName("ix_journal_line_fund")
+                        .HasFilter("fund IS NOT NULL");
+
                     b.HasIndex("JournalEntryId")
                         .HasDatabaseName("ix_journal_line_journal_entry_id");
+
+                    b.HasIndex("Project")
+                        .HasDatabaseName("ix_journal_line_project")
+                        .HasFilter("project IS NOT NULL");
 
                     b.HasIndex("AccountCode", "CostCentre", "Department")
                         .HasDatabaseName("ix_journal_line_account_code_cost_centre_department");
@@ -800,6 +901,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("report_category");
 
+                    b.Property<bool>("RequiresFund")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_fund");
+
+                    b.Property<bool>("RequiresProject")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_project");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -861,6 +970,85 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_price_index_company_id_index_code_month");
 
                     b.ToTable("price_index", "gl");
+                });
+
+            modelBuilder.Entity("One4All.Core.Accounting.Project", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DeletedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deleted_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_on_utc");
+
+                    b.Property<string>("FundCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("fund_code");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_project");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_project_company_id_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("project", "gl");
                 });
 
             modelBuilder.Entity("One4All.Core.Accounting.RecurringJournal", b =>
@@ -2514,6 +2702,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("basis");
 
+                    b.Property<string>("Branch")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("branch");
+
                     b.Property<long>("BudgetId")
                         .HasColumnType("bigint")
                         .HasColumnName("budget_id");
@@ -2533,6 +2726,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("driver_code");
 
+                    b.Property<string>("Fund")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("fund");
+
                     b.Property<int>("Period")
                         .HasColumnType("integer")
                         .HasColumnName("period");
@@ -2541,6 +2739,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 8)
                         .HasColumnType("numeric(19,8)")
                         .HasColumnName("planned_rate");
+
+                    b.Property<string>("Project")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("project");
 
                     b.Property<decimal?>("Quantity")
                         .HasPrecision(19, 4)
@@ -24998,6 +25201,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<string>("DefaultFund")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("default_fund");
+
                     b.Property<long?>("DeletedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("deleted_by_user_id");
@@ -25005,6 +25213,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("DeletedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
+
+                    b.Property<bool>("FundAccounting")
+                        .HasColumnType("boolean")
+                        .HasColumnName("fund_accounting");
 
                     b.Property<bool>("FundControlEnabled")
                         .HasColumnType("boolean")

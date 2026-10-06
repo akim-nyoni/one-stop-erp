@@ -114,6 +114,12 @@ public sealed class Company : SoftDeletableEntity
     /// <summary>Gets or sets a value indicating whether a budget must go through preparation and approval before it can be activated.</summary>
     public bool BudgetApprovalRequired { get; set; }
 
+    /// <summary>Gets or sets a value indicating whether the company keeps fund accounts: every journal line names a fund and each fund balances within the journal.</summary>
+    public bool FundAccounting { get; set; }
+
+    /// <summary>Gets or sets the fund lines without one fall into under fund accounting (the general / rate fund), so sub-ledger postings need not name one.</summary>
+    public string? DefaultFund { get; set; }
+
     /// <summary>Sets or clears the second reporting currency.</summary>
     /// <param name="reportingCurrency">The reporting currency, or null to disable dual-currency reporting.</param>
     public void SetReportingCurrency(CurrencyCode? reportingCurrency) => ReportingCurrency = reportingCurrency;

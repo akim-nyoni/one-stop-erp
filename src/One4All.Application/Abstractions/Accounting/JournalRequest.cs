@@ -103,6 +103,15 @@ public sealed class JournalLineRequest
     public decimal? BaseAmount { get; init; }
 
     /// <summary>Optional line narrative.</summary>
+    /// <summary>Gets the project (analysis).</summary>
+    public string? Project { get; init; }
+
+    /// <summary>Gets the fund / vote (analysis; required under fund accounting).</summary>
+    public string? Fund { get; init; }
+
+    /// <summary>Gets the branch (analysis).</summary>
+    public string? Branch { get; init; }
+
     public string? Narrative { get; init; }
 
     /// <summary>The tax code this line relates to — set on tax-account lines so VAT can be analysed by rate/code.</summary>

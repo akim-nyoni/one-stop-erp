@@ -92,6 +92,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Cost centres.</summary>
     public DbSet<CostCentre> CostCentres => Set<CostCentre>();
 
+    /// <summary>Gets the funds (votes).</summary>
+    public DbSet<Fund> Funds => Set<Fund>();
+
+    /// <summary>Gets the projects.</summary>
+    public DbSet<Project> Projects => Set<Project>();
+
     /// <summary>Departments (GL analysis dimension).</summary>
     public DbSet<Department> Departments => Set<Department>();
 
