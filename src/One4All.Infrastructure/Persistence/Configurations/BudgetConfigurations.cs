@@ -156,3 +156,17 @@ internal sealed class ActualVolumeConfiguration : IEntityTypeConfiguration<Actua
         b.HasIndex(x => new { x.CompanyId, x.AccountCode, x.Date });
     }
 }
+
+internal sealed class BudgetEnforcementRuleConfiguration : IEntityTypeConfiguration<BudgetEnforcementRule>
+{
+    public void Configure(EntityTypeBuilder<BudgetEnforcementRule> b)
+    {
+        b.ToTable("enforcement_rule", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Department).HasMaxLength(30);
+        b.Property(x => x.AccountPrefix).HasMaxLength(8);
+        b.Property(x => x.MinimumValue).HasPrecision(19, 4);
+        b.Property(x => x.Action).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.Department, x.AccountPrefix, x.MinimumValue }).IsUnique();
+    }
+}

@@ -205,6 +205,7 @@ internal sealed class PurchaseRequisitionConfiguration : IEntityTypeConfiguratio
     public void Configure(EntityTypeBuilder<PurchaseRequisition> b)
     {
         b.ToTable("requisition", Schemas.Purchasing);
+        b.Property(x => x.BudgetOutcome).HasConversion<int>();
         b.HasKey(x => x.Id);
         b.Property(x => x.RequisitionNumber).HasMaxLength(40);
         b.Property(x => x.Currency).HasMaxLength(3);

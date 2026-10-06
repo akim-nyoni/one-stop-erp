@@ -20,11 +20,19 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="procurement">The procurement service (conversion target).</param>
-    public PurchaseRequisitionService(One4AllDbContext db, IProcurementService procurement)
+    /// <param name="budget">Checks and commits the budget at submission, approval and conversion.</param>
+    /// <param name="permissions">Checks an approver may override a budget block.</param>
+    public PurchaseRequisitionService(One4AllDbContext db, IProcurementService procurement, Application.Abstractions.Budgeting.IBudgetGateService? budget = null,
+        Application.Abstractions.Security.IPermissionService? permissions = null)
     {
         _db = db;
         _procurement = procurement;
+        _budget = budget;
+        _permissions = permissions;
     }
+
+    private readonly Application.Abstractions.Budgeting.IBudgetGateService? _budget;
+    private readonly Application.Abstractions.Security.IPermissionService? _permissions;
 
     /// <inheritdoc />
     public async Task<Result<long>> CreateAsync(long companyId, long supplierId, string requisitionNumber, DateOnly requestedDate, CurrencyCode currency, IReadOnlyList<PurchaseRequisitionLineRequest> lines, CancellationToken ct = default)
@@ -53,7 +61,7 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
         PurchaseRequisition req = new(companyId, supplierId, requisitionNumber, requestedDate, currency);
         foreach (PurchaseRequisitionLineRequest line in lines)
         {
-            req.AddLine(line.ItemId, line.Description, line.Quantity, line.UnitPrice);
+            req.AddLine(line.ItemId, line.Description, line.Quantity, line.UnitPrice).ExpenseAccountCode = string.IsNullOrWhiteSpace(line.ExpenseAccountCode) ? null : line.ExpenseAccountCode.Trim().ToUpperInvariant();
         }
 
         _db.Set<PurchaseRequisition>().Add(req);
@@ -62,12 +70,73 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
     }
 
     /// <inheritdoc />
-    public Task<Result> SubmitAsync(long companyId, long requisitionId, CancellationToken ct = default)
-        => TransitionAsync(companyId, requisitionId, r => r.Status == PurchaseRequisitionStatus.Draft, r => r.Submit(), "Only a draft requisition can be submitted.", ct);
+    public async Task<Result> SubmitAsync(long companyId, long requisitionId, CancellationToken ct = default)
+    {
+        // The budget gate at submission (brief §4.18.5): a block refuses it; a warning or an approval need travels with it.
+        Result<Core.Budgeting.BudgetAction> gate = await GateAsync(companyId, requisitionId, null, ct).ConfigureAwait(false);
+        return gate.IsFailure
+            ? Result.Failure(gate.Error)
+            : await TransitionAsync(companyId, requisitionId, r => r.Status == PurchaseRequisitionStatus.Draft, r => { r.Submit(); r.BudgetOutcome = gate.Value; },
+                "Only a draft requisition can be submitted.", ct).ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public Task<Result> ApproveAsync(long companyId, long requisitionId, long approvedByUserId, CancellationToken ct = default)
-        => TransitionAsync(companyId, requisitionId, r => r.Status == PurchaseRequisitionStatus.Submitted, r => r.Approve(approvedByUserId), "Only a submitted requisition can be approved.", ct);
+        => _db.AtomicAsync(async () =>
+        {
+            // Checked again at approval, when the budget may have moved; an overrun needing approval needs someone who may override.
+            Result<Core.Budgeting.BudgetAction> gate = await GateAsync(companyId, requisitionId, approvedByUserId, ct).ConfigureAwait(false);
+            if (gate.IsFailure)
+            {
+                return Result.Failure(gate.Error);
+            }
+
+            Result moved = await TransitionAsync(companyId, requisitionId, r => r.Status == PurchaseRequisitionStatus.Submitted, r => { r.Approve(approvedByUserId); r.BudgetOutcome = gate.Value; },
+                "Only a submitted requisition can be approved.", ct).ConfigureAwait(false);
+            if (moved.IsFailure || _budget is null)
+            {
+                return moved;
+            }
+
+            // An approved requisition commits its budget until it becomes an order.
+            PurchaseRequisition req = await _db.Set<PurchaseRequisition>().Include(r => r.Lines).SingleAsync(r => r.Id == requisitionId, ct).ConfigureAwait(false);
+            Result<int> committed = await _budget.CommitAsync(companyId, req.RequisitionNumber, req.RequestedDate, Demands(req), ct).ConfigureAwait(false);
+            return committed.IsFailure ? Result.Failure(committed.Error) : Result.Success();
+        }, ct);
+
+    private static List<Application.Abstractions.Budgeting.BudgetDemand> Demands(PurchaseRequisition req)
+        => [.. req.Lines.Where(l => !string.IsNullOrWhiteSpace(l.ExpenseAccountCode)).Select(l => new Application.Abstractions.Budgeting.BudgetDemand(l.ExpenseAccountCode!, null, l.Quantity * l.UnitPrice))];
+
+    // The budget check for a requisition: Block refuses; RequireApproval at approval needs an approver who may override budget blocks.
+    private async Task<Result<Core.Budgeting.BudgetAction>> GateAsync(long companyId, long requisitionId, long? approverUserId, CancellationToken ct)
+    {
+        PurchaseRequisition? req = await _db.Set<PurchaseRequisition>().AsNoTracking().Include(r => r.Lines).FirstOrDefaultAsync(r => r.Id == requisitionId && r.CompanyId == companyId, ct).ConfigureAwait(false);
+        List<Application.Abstractions.Budgeting.BudgetDemand> demands = req is null ? [] : Demands(req);
+        if (_budget is null || demands.Count == 0)
+        {
+            return Core.Budgeting.BudgetAction.Allow;
+        }
+
+        Result<Application.Abstractions.Budgeting.BudgetGateResult> check = await _budget.CheckAsync(companyId, req!.RequestedDate, demands, ct).ConfigureAwait(false);
+        if (check.IsFailure)
+        {
+            return check.Error.Code == "Budget.NoFiscalYear" ? Core.Budgeting.BudgetAction.Allow : check.Error;
+        }
+
+        Core.Budgeting.BudgetAction outcome = check.Value.Outcome;
+        if (outcome == Core.Budgeting.BudgetAction.Block)
+        {
+            return Error.Rule("Budget.Blocked", check.Value.Warning!);
+        }
+
+        if (outcome == Core.Budgeting.BudgetAction.RequireApproval && approverUserId is long approver
+            && (_permissions is null || !(await _permissions.ResolveAsync(approver, ct).ConfigureAwait(false)).Has("Budget.OverrideBlock", Core.Security.OperationFlags.View)))
+        {
+            return Error.Rule("Budget.ApprovalNeeded", $"{check.Value.Warning} Approval needs someone who may override budget blocks.");
+        }
+
+        return outcome;
+    }
 
     /// <inheritdoc />
     public Task<Result> RejectAsync(long companyId, long requisitionId, CancellationToken ct = default)
@@ -108,6 +177,16 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
 
         req.MarkConverted(order.Value.PurchaseOrderId);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // The requisition's commitment moves to the order.
+        if (_budget is not null && await _budget.ReleaseAsync(companyId, req.RequisitionNumber, ct).ConfigureAwait(false) > 0m)
+        {
+            Result<int> moved = await _budget.CommitAsync(companyId, orderNumber.Trim(), orderDate, Demands(req), ct).ConfigureAwait(false);
+            if (moved.IsFailure)
+            {
+                return moved.Error;
+            }
+        }
         return order.Value.PurchaseOrderId;
     }
 

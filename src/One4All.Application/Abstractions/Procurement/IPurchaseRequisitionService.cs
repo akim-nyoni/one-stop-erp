@@ -8,7 +8,8 @@ namespace One4All.Application.Abstractions.Procurement;
 /// <param name="Description">The line description.</param>
 /// <param name="Quantity">The quantity.</param>
 /// <param name="UnitPrice">The estimated unit price.</param>
-public readonly record struct PurchaseRequisitionLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice);
+/// <param name="ExpenseAccountCode">The expense account it is budgeted against, if any.</param>
+public readonly record struct PurchaseRequisitionLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice, string? ExpenseAccountCode = null);
 
 /// <summary>
 /// Manages purchase requisitions (internal buy requests): capture, submit, approve/reject, and conversion into

@@ -1,6 +1,8 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
+using One4All.Application.Abstractions.Budgeting;
 using One4All.Application.Abstractions.Procurement;
+using One4All.Core.Budgeting;
 using static One4All.Desktop.Operations.Ops;
 
 namespace One4All.Desktop.Operations;
@@ -11,6 +13,34 @@ public static partial class OperationCatalogue
     private static IEnumerable<Operation> Purchasing()
     {
         const string module = "Purchasing";
+        yield return new Operation
+        {
+            Module = module, Title = "Set a budget enforcement rule", ListTitle = "Budget enforcement rules",
+            Description = "What happens when spend overruns the available budget, by department, account prefix and value band (the most specific rule wins; none: allow).",
+            Fields = [Opt("Department", "Department (blank: any)"), Opt("Prefix", "Account prefix (blank: any)"), Num("From", "From value", "0"), Pick("Action", "Action", Enum.GetNames<BudgetAction>())],
+            Run = async (c, i) => Check(await c.Get<IBudgetGateService>().SetRuleAsync(c.CompanyId, i.Optional("Department"), i.Optional("Prefix"), i.Number("From"),
+                Enum.Parse<BudgetAction>(i.Text("Action"))).ConfigureAwait(true), "Rule saved."),
+            List = async c => Table(await c.Db.BudgetEnforcementRules.AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Department).ThenBy(r => r.AccountPrefix).ThenBy(r => r.MinimumValue)
+                .ToListAsync().ConfigureAwait(true), ("Department", r => r.Department ?? "(any)"), ("Account prefix", r => r.AccountPrefix ?? "(any)"), ("From value", r => M(r.MinimumValue)), ("Action", r => r.Action)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Check or reserve budget", ListTitle = "Open budget commitments",
+            Description = "Shows what is available on an account; tick Reserve to earmark it for known spend with no order yet (released by its reference).",
+            Fields = [Req("Account", "Expense account"), Opt("Department", "Department"), Num("Amount", "Amount"), Today(), Tick("Reserve", "Reserve it"), Opt("Reference", "Reservation reference")],
+            Run = async (c, i) =>
+            {
+                BudgetDemand demand = new(i.Text("Account"), i.Optional("Department"), i.Number("Amount"));
+                IBudgetGateService gate = c.Get<IBudgetGateService>();
+                BudgetGateResult result = i.Flag("Reserve")
+                    ? Check(await gate.ReserveAsync(c.CompanyId, i.Optional("Reference") ?? throw new OperationException("A reservation needs a reference."), i.Date("Date"), demand).ConfigureAwait(true))
+                    : Check(await gate.CheckAsync(c.CompanyId, i.Date("Date"), [demand]).ConfigureAwait(true));
+                BudgetGateLine line = result.Lines.Single();
+                return $"Available {M(line.Available)}; {(line.Shortfall > 0m ? $"short by {M(line.Shortfall)} ({line.Action})" : "fits")}{(i.Flag("Reserve") ? "; reserved" : string.Empty)}.";
+            },
+            List = async c => Table(await c.Db.Set<BudgetCommitment>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.Status == CommitmentStatus.Open).OrderBy(x => x.Reference)
+                .ToListAsync().ConfigureAwait(true), ("Reference", x => x.Reference), ("Account", x => x.AccountCode), ("Department", x => x.Department), ("Period", x => x.Period), ("Amount", x => M(x.Amount))),
+        };
         yield return new Operation
         {
             Module = module, Title = "Schedule a PO line's deliveries", ListTitle = "Deliveries late or due within a week",

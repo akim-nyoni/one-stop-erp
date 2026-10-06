@@ -77,6 +77,9 @@ public sealed class PurchaseRequisition : AuditableEntity, ICompanyScoped
     /// <summary>The requisition lines.</summary>
     public IReadOnlyList<PurchaseRequisitionLine> Lines => _lines.AsReadOnly();
 
+    /// <summary>Gets or sets the budget check's outcome at the last gate (warn / approval needed show to the approver).</summary>
+    public Budgeting.BudgetAction BudgetOutcome { get; set; }
+
     /// <summary>The estimated total (sum of line values).</summary>
     public decimal Total => _lines.Sum(l => l.Quantity * l.UnitPrice);
 

@@ -158,6 +158,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Approval delegations while approvers are away.</summary>
     public DbSet<Core.Workflow.ApprovalDelegation> ApprovalDelegations => Set<Core.Workflow.ApprovalDelegation>();
 
+    /// <summary>Budget enforcement rules for overruns at the spending gates.</summary>
+    public DbSet<Core.Budgeting.BudgetEnforcementRule> BudgetEnforcementRules => Set<Core.Budgeting.BudgetEnforcementRule>();
+
     /// <summary>Scheduled deliveries of purchase order lines.</summary>
     public DbSet<Core.Procurement.PurchaseOrderDelivery> PurchaseOrderDeliveries => Set<Core.Procurement.PurchaseOrderDelivery>();
 

@@ -2358,6 +2358,54 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("driver", "bud");
                 });
 
+            modelBuilder.Entity("One4All.Core.Budgeting.BudgetEnforcementRule", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountPrefix")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("account_prefix");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer")
+                        .HasColumnName("action");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Department")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("department");
+
+                    b.Property<decimal>("MinimumValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("minimum_value");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_enforcement_rule");
+
+                    b.HasIndex("CompanyId", "Department", "AccountPrefix", "MinimumValue")
+                        .IsUnique()
+                        .HasDatabaseName("ix_enforcement_rule_company_id_department_account_prefix_minim");
+
+                    b.ToTable("enforcement_rule", "bud");
+                });
+
             modelBuilder.Entity("One4All.Core.Budgeting.BudgetLine", b =>
                 {
                     b.Property<long>("Id")
@@ -18674,6 +18722,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long?>("ApprovedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("approved_by_user_id");
+
+                    b.Property<int>("BudgetOutcome")
+                        .HasColumnType("integer")
+                        .HasColumnName("budget_outcome");
 
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
