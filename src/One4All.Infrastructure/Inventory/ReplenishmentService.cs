@@ -30,8 +30,13 @@ public sealed class ReplenishmentService : IReplenishmentService
     /// <inheritdoc />
     public async Task<IReadOnlyList<ReplenishmentSuggestion>> SuggestAsync(long companyId, long? warehouseId = null, CancellationToken ct = default)
     {
+        // A warehouse's own reorder levels override the item's company-wide ones there.
+        Dictionary<long, ItemWarehouseLevel> levels = warehouseId is long wid
+            ? await _db.ItemWarehouseLevels.Where(l => l.CompanyId == companyId && l.WarehouseId == wid).ToDictionaryAsync(l => l.ItemId, ct).ConfigureAwait(false)
+            : [];
+        List<long> levelled = [.. levels.Keys];
         List<Item> items = await _db.Items
-            .Where(i => i.CompanyId == companyId && i.IsActive && i.ReorderLevel > 0m)
+            .Where(i => i.CompanyId == companyId && i.IsActive && (i.ReorderLevel > 0m || levelled.Contains(i.Id)))
             .OrderBy(i => i.Code)
             .ToListAsync(ct).ConfigureAwait(false);
         items = items.Where(i => i.IsStockTracked).ToList();
@@ -69,20 +74,26 @@ public sealed class ReplenishmentService : IReplenishmentService
         Dictionary<long, (decimal Price, long SupplierId)> last = await LastPurchasesAsync(companyId, ids, ct).ConfigureAwait(false);
 
         List<ReplenishmentSuggestion> suggestions = [];
+        // The preferred supplier on the item's supplier links wins over the last one bought from.
+        Dictionary<long, ItemSupplier> preferred = await _db.ItemSuppliers.Where(l => l.CompanyId == companyId && ids.Contains(l.ItemId) && l.IsPreferred).ToDictionaryAsync(l => l.ItemId, ct)
+            .ConfigureAwait(false);
         foreach (Item item in items)
         {
+            decimal level = levels.TryGetValue(item.Id, out ItemWarehouseLevel? own) ? own.ReorderLevel : item.ReorderLevel;
+            decimal reorderQuantity = own?.ReorderQuantity ?? item.ReorderQuantity;
             decimal hand = onHand.GetValueOrDefault(item.Id);
             decimal order = onOrder.GetValueOrDefault(item.Id);
             decimal available = hand + order;
-            if (available > item.ReorderLevel)
+            if (level <= 0m || available > level)
             {
                 continue;
             }
 
-            decimal suggested = item.ReorderQuantity > 0m ? item.ReorderQuantity : item.ReorderLevel - available;
+            decimal suggested = reorderQuantity > 0m ? reorderQuantity : level - available;
             last.TryGetValue(item.Id, out (decimal Price, long SupplierId) lastBuy);
-            suggestions.Add(new ReplenishmentSuggestion(item.Id, item.Code, item.Description, hand, order, available, item.ReorderLevel, suggested,
-                lastBuy.Price, last.ContainsKey(item.Id) ? lastBuy.SupplierId : null));
+            long? supplier = preferred.TryGetValue(item.Id, out ItemSupplier? link) ? link.SupplierId : last.ContainsKey(item.Id) ? lastBuy.SupplierId : null;
+            decimal price = link?.LastCost ?? lastBuy.Price;
+            suggestions.Add(new ReplenishmentSuggestion(item.Id, item.Code, item.Description, hand, order, available, level, suggested, price, supplier));
         }
 
         return suggestions;

@@ -152,6 +152,15 @@ public class One4AllDbContext : DbContext
     /// <summary>Stock balances (item × warehouse).</summary>
     public DbSet<Core.Inventory.StockBalance> StockBalances => Set<Core.Inventory.StockBalance>();
 
+    /// <summary>Bin locations.</summary>
+    public DbSet<Core.Inventory.WarehouseBin> WarehouseBins => Set<Core.Inventory.WarehouseBin>();
+
+    /// <summary>Stock held per bin.</summary>
+    public DbSet<Core.Inventory.BinStock> BinStocks => Set<Core.Inventory.BinStock>();
+
+    /// <summary>Per-warehouse reorder levels.</summary>
+    public DbSet<Core.Inventory.ItemWarehouseLevel> ItemWarehouseLevels => Set<Core.Inventory.ItemWarehouseLevel>();
+
     /// <summary>Extra barcodes and synonyms for items.</summary>
     public DbSet<Core.Inventory.ItemAlias> ItemAliases => Set<Core.Inventory.ItemAlias>();
 

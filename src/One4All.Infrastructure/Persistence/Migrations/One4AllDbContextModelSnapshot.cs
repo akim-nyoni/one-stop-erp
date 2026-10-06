@@ -9449,6 +9449,47 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("bom", "inv");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.BinStock", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("BinId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("bin_id");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bin_stock");
+
+                    b.HasIndex("ItemId")
+                        .HasDatabaseName("ix_bin_stock_item_id");
+
+                    b.HasIndex("BinId", "ItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_bin_stock_bin_id_item_id");
+
+                    b.ToTable("bin_stock", "inv");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.BomLine", b =>
                 {
                     b.Property<long>("Id")
@@ -9847,6 +9888,53 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_item_unit_item_id_unit_code");
 
                     b.ToTable("item_unit", "inv");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.ItemWarehouseLevel", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<decimal>("ReorderLevel")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("reorder_level");
+
+                    b.Property<decimal>("ReorderQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("reorder_quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("WarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_item_warehouse_level");
+
+                    b.HasIndex("ItemId", "WarehouseId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_item_warehouse_level_item_id_warehouse_id");
+
+                    b.ToTable("item_warehouse_level", "inv");
                 });
 
             modelBuilder.Entity("One4All.Core.Inventory.PriceList", b =>
@@ -10696,6 +10784,54 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("warehouse", "inv");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.WarehouseBin", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal?>("CapacityUnits")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("capacity_units");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<int>("PickSequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("pick_sequence");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("WarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bin");
+
+                    b.HasIndex("WarehouseId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_bin_warehouse_id_code");
+
+                    b.ToTable("bin", "inv");
                 });
 
             modelBuilder.Entity("One4All.Core.JobCosting.BoqItem", b =>

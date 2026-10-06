@@ -221,6 +221,50 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Bins: add, put away, move, take, pick walk", ListTitle = "Bin contents",
+            Description = "Add a bin (sequence, capacity), put stock away (never more than is unbinned), move between bins, take picked stock, or plan a pick walk (Lines: ITEM:qty; …).",
+            Fields = [Req("Warehouse", "Warehouse code"), Pick("Action", "Action", "Pick walk", "Add bin", "Put away", "Move", "Take"), Opt("Bin", "Bin (from)"), Opt("ToBin", "To bin"),
+                Opt("Item", "Item code"), OptNum("Quantity", "Quantity"), OptNum("Sequence", "Pick sequence (add)"), OptNum("Capacity", "Capacity (add)"), Opt("Lines", "Pick lines: ITEM:qty; …")],
+            Run = async (c, i) =>
+            {
+                IBinService bins = c.Get<IBinService>();
+                long warehouse = await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true);
+                switch (i.Text("Action"))
+                {
+                    case "Add bin":
+                        return Check(await bins.AddBinAsync(c.CompanyId, warehouse, i.Text("Bin"), (int)(i.OptionalNumber("Sequence") ?? 0m), i.OptionalNumber("Capacity")).ConfigureAwait(true), id => "Bin added.");
+                    case "Put away":
+                        return Check(await bins.PutAwayAsync(c.CompanyId, warehouse, i.Text("Bin"), await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Number("Quantity")).ConfigureAwait(true), "Put away.");
+                    case "Move":
+                        return Check(await bins.MoveAsync(c.CompanyId, warehouse, i.Text("Bin"), i.Text("ToBin"), await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Number("Quantity")).ConfigureAwait(true), "Moved.");
+                    case "Take":
+                        return Check(await bins.TakeAsync(c.CompanyId, warehouse, i.Text("Bin"), await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Number("Quantity")).ConfigureAwait(true), "Taken.");
+                    default:
+                        List<(long, decimal)> wanted = [];
+                        foreach ((string code, decimal quantity, DateOnly? _) in i.Pairs("Lines"))
+                        {
+                            wanted.Add((await ItemAsync(c, code).ConfigureAwait(true), quantity));
+                        }
+
+                        return string.Join(Environment.NewLine, (await bins.PickRouteAsync(c.CompanyId, warehouse, wanted).ConfigureAwait(true)).Select(s => $"{s.BinCode,-10} item {s.ItemId,-6} {Q(s.Quantity),10}"));
+                }
+            },
+            List = async c =>
+            {
+                long? warehouse = await c.Db.Warehouses.Where(w => w.CompanyId == c.CompanyId && c.Db.WarehouseBins.Any(b => b.WarehouseId == w.Id)).Select(w => (long?)w.Id).FirstOrDefaultAsync().ConfigureAwait(true);
+                return Table(warehouse is long id ? await c.Get<IBinService>().ContentsAsync(c.CompanyId, id).ConfigureAwait(true) : [],
+                    ("Bin", b => b.BinCode), ("Sequence", b => b.PickSequence), ("Item", b => b.ItemCode), ("Quantity", b => Q(b.Quantity)));
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Set a warehouse reorder level", Description = "An item's reorder level and quantity at one warehouse; replenishment for that warehouse uses them.",
+            Fields = [Req("Item", "Item code"), Req("Warehouse", "Warehouse code"), Num("Level", "Reorder level"), Num("Quantity", "Reorder quantity", "0")],
+            Run = async (c, i) => Check(await c.Get<IBinService>().SetWarehouseLevelAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true),
+                i.Number("Level"), i.Number("Quantity")).ConfigureAwait(true), "Reorder level saved."),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Classify items A / B / C", Description = "A: the items making the first 80% of the value issued in the period, B the next 15%, C the rest and unmoved stock.",
             Fields = [Today("From", "From"), Today("To", "To")],
             Run = async (c, i) =>

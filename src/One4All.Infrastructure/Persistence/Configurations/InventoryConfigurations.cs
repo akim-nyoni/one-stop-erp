@@ -260,3 +260,39 @@ internal sealed class ItemSupplierConfiguration : IEntityTypeConfiguration<ItemS
         b.HasIndex(x => new { x.ItemId, x.SupplierId }).IsUnique();
     }
 }
+
+internal sealed class WarehouseBinConfiguration : IEntityTypeConfiguration<WarehouseBin>
+{
+    public void Configure(EntityTypeBuilder<WarehouseBin> b)
+    {
+        b.ToTable("bin", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.CapacityUnits).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.WarehouseId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class BinStockConfiguration : IEntityTypeConfiguration<BinStock>
+{
+    public void Configure(EntityTypeBuilder<BinStock> b)
+    {
+        b.ToTable("bin_stock", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.BinId, x.ItemId }).IsUnique();
+        b.HasIndex(x => x.ItemId);
+    }
+}
+
+internal sealed class ItemWarehouseLevelConfiguration : IEntityTypeConfiguration<ItemWarehouseLevel>
+{
+    public void Configure(EntityTypeBuilder<ItemWarehouseLevel> b)
+    {
+        b.ToTable("item_warehouse_level", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ReorderLevel).HasPrecision(19, 4);
+        b.Property(x => x.ReorderQuantity).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.ItemId, x.WarehouseId }).IsUnique();
+    }
+}
