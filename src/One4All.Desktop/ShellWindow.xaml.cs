@@ -22,6 +22,31 @@ public partial class ShellWindow : Window
         DataContext = viewModel;
         InitializeComponent();
         _idleLock = new IdleLock(services);
+        Loaded += (_, _) => HideUnavailableOperations(viewModel);
+    }
+
+    // Operation groups belong to modules: a group no licensed, permitted module owns is not offered (brief §10).
+    private void HideUnavailableOperations(ShellViewModel viewModel)
+    {
+        foreach (System.Windows.Controls.MenuItem item in LogicalTreeHelperItems(MainMenu))
+        {
+            if (item.Tag is string group && group.Length > 0)
+            {
+                item.Visibility = viewModel.IsMenuEntryAvailable(group) ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+    }
+
+    private static IEnumerable<System.Windows.Controls.MenuItem> LogicalTreeHelperItems(System.Windows.Controls.ItemsControl parent)
+    {
+        foreach (System.Windows.Controls.MenuItem item in parent.Items.OfType<System.Windows.Controls.MenuItem>())
+        {
+            yield return item;
+            foreach (System.Windows.Controls.MenuItem child in LogicalTreeHelperItems(item))
+            {
+                yield return child;
+            }
+        }
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();

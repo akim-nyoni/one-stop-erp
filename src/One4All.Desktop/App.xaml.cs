@@ -81,7 +81,7 @@ public partial class App : System.Windows.Application
 
         Services.GetRequiredService<DesktopSession>().SignIn(result);
         ILicenceService licence = Services.GetRequiredService<ILicenceService>();
-        ShellWindow shell = new(new ShellViewModel(result, licence), Services);
+        ShellWindow shell = new(new ShellViewModel(result, licence, Services.GetService<One4All.Application.Modules.IModuleRegistry>()), Services);
         MainWindow = shell;
         shell.Show();
         return true;

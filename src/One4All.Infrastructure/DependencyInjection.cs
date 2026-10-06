@@ -180,6 +180,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Communications.IStatementDespatchService, Communications.StatementDespatchService>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Communications.EmailStatementsTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IJobScheduler, Scheduling.JobScheduler>();
+        services.AddSingleton<Application.Modules.IModuleRegistry>(sp => new Application.Modules.ModuleRegistry(sp.GetServices<Application.Modules.IModuleDescriptor>()));
         services.AddScoped<IAccrualService, Accounting.AccrualService>();
         services.AddScoped<IPeriodService, PeriodService>();
         services.AddScoped<Application.Abstractions.Numbering.INumberSequenceService, Infrastructure.Numbering.NumberSequenceService>();

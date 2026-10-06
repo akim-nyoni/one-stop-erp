@@ -20,38 +20,11 @@ public static partial class ApiAccessRules
     /// <summary>Query parameters naming the user acting: they must be the signed-in user.</summary>
     public static readonly IReadOnlyList<string> ActorParameters = ["userId", "approverUserId"];
 
-    private static readonly Dictionary<string, string[]> ModulesByArea = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["housing"] = ["Housing"],
-        ["municipal"] = ["Municipal"],
-        ["ar"] = ["Sales"],
-        ["credit"] = ["Sales"],
-        ["pop"] = ["Procurement"],
-        ["ap"] = ["Purchasing"],
-        ["trading"] = ["Sales", "Purchasing"],
-        ["vouchers"] = ["Voucher"],
-        ["banking"] = ["CashBook"],
-        ["treasury"] = ["CashBook"],
-        ["receipting"] = ["CashBook", "Sales"],
-        ["reports"] = ["Reporting"],
-        ["analytics"] = ["Reporting"],
-        ["gl"] = ["GeneralLedger"],
-        ["accounting"] = ["GeneralLedger"],
-        ["interco"] = ["GeneralLedger"],
-        ["consolidation"] = ["GeneralLedger"],
-        ["stock"] = ["Inventory"],
-        ["pricing"] = ["Inventory", "Sales"],
-        ["sop"] = ["SalesOrders"],
-        ["budgets"] = ["Budget"],
-        ["jobs"] = ["JobCosting"],
-        ["hr"] = ["Payroll"],
-        ["payroll"] = ["Payroll"],
-        ["crm"] = ["Crm"],
-        ["messages"] = ["Crm", "Sales"],
-        ["system"] = ["System"],
-        ["offline"] = ["System"],
-        ["audit"] = ["Security"],
-    };
+    // Each area belongs to the modules that declare it (brief §10: modules register their API areas).
+    private static readonly Dictionary<string, string[]> ModulesByArea = Modules.BuiltInModules.All
+        .SelectMany(m => m.ApiAreas.Select(area => (Area: area, Module: m.Code)))
+        .GroupBy(x => x.Area, StringComparer.OrdinalIgnoreCase)
+        .ToDictionary(g => g.Key, g => g.Select(x => x.Module).ToArray(), StringComparer.OrdinalIgnoreCase);
 
     // Areas a signed-in user may use for themselves: the acting user is enforced instead.
     private static readonly HashSet<string> PersonalAreas = new(StringComparer.OrdinalIgnoreCase) { "me", "ess", "workflow", "notifications" };

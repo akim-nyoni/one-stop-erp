@@ -51,7 +51,7 @@
 
     <DockPanel>
         <!-- Menu bar -->
-        <Menu DockPanel.Dock="Top" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+        <Menu x:Name="MainMenu" DockPanel.Dock="Top" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
             <MenuItem Header="_File">
                 <MenuItem Header="Lock" InputGestureText="Ctrl+L" Click="Lock_Click" />
                 <MenuItem Header="Sign-in Security (two-factor)…" Click="OpenTwoFactor_Click" />

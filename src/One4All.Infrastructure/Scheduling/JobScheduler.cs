@@ -14,12 +14,18 @@ public sealed class JobScheduler : IJobScheduler
 {
     private readonly One4AllDbContext _db;
     private readonly Dictionary<string, IScheduledTask> _tasks;
+    private readonly Application.Modules.IModuleRegistry? _modules;
+    private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
 
     /// <summary>Creates the scheduler.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="tasks">The registered tasks.</param>
-    public JobScheduler(One4AllDbContext db, IEnumerable<IScheduledTask> tasks)
+    /// <param name="modules">The module registry (gates tasks by their module's licence).</param>
+    /// <param name="licence">The licence.</param>
+    public JobScheduler(One4AllDbContext db, IEnumerable<IScheduledTask> tasks, Application.Modules.IModuleRegistry? modules = null, Application.Abstractions.Licensing.ILicenceService? licence = null)
     {
+        _modules = modules;
+        _licence = licence;
         ArgumentNullException.ThrowIfNull(tasks);
         _db = db;
         _tasks = new Dictionary<string, IScheduledTask>(StringComparer.OrdinalIgnoreCase);
@@ -132,6 +138,11 @@ public sealed class JobScheduler : IJobScheduler
         if (!_tasks.TryGetValue(job.TaskKey, out IScheduledTask? task))
         {
             (succeeded, message) = (false, $"Task \"{job.TaskKey}\" is no longer registered.");
+        }
+        else if (_licence is { Enforced: true } && _modules?.ForTask(job.TaskKey) is Application.Modules.IModuleDescriptor owner && !_licence.IsModuleLicensed(owner.LicenceModule))
+        {
+            // A module's jobs run only while it is licensed (brief §11.5).
+            (succeeded, message) = (false, $"Not run: {owner.Name} ({owner.LicenceModule}) is not licensed.");
         }
         else
         {

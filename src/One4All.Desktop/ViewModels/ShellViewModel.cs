@@ -1,3 +1,4 @@
+using One4All.Application.Modules;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -38,7 +39,8 @@ public sealed partial class ShellViewModel : ObservableObject
     /// <summary>Creates the shell view model for an authenticated session.</summary>
     /// <param name="auth">The authentication result (user + permissions).</param>
     /// <param name="licence">The licence service.</param>
-    public ShellViewModel(AuthenticationResult auth, ILicenceService licence)
+    /// <param name="registry">The module registry (null: built-in modules only).</param>
+    public ShellViewModel(AuthenticationResult auth, ILicenceService licence, IModuleRegistry? registry = null)
     {
         _permissions = auth.Permissions;
         UserId = auth.UserId;
@@ -48,19 +50,15 @@ public sealed partial class ShellViewModel : ObservableObject
         string customer = status.Payload?.Customer.Name ?? "Unlicensed";
         LicenceStatusText = licence.Warning is string warning ? $"{customer}  •  {status.Status}  •  {warning}" : $"{customer}  •  {status.Status}";
 
-        foreach (ModuleDescriptor descriptor in ModuleCatalogue.All)
+        // Navigation is built from the registered modules that are licensed and permitted (brief §10).
+        Registry = registry ?? new ModuleRegistry();
+        IsLicensed = licence.IsModuleLicensed;
+        foreach (IModuleDescriptor descriptor in Registry.Available(IsLicensed, _permissions))
         {
-            bool licensed = licence.IsModuleLicensed(descriptor.LicenceCode);
-            bool permitted = _permissions.HasAnyInModule(descriptor.PermissionModule);
-            if (!licensed || !permitted)
-            {
-                continue;
-            }
-
             Modules.Add(new ModuleTileViewModel(descriptor));
 
-            NavNode node = new(descriptor.Title) { IsExpanded = false };
-            foreach (string group in ModuleDescriptor.ChildGroups)
+            NavNode node = new(descriptor.Name) { IsExpanded = false };
+            foreach (string group in ModuleCatalogue.ChildGroups)
             {
                 node.Children.Add(new NavNode(group));
             }
@@ -73,6 +71,17 @@ public sealed partial class ShellViewModel : ObservableObject
             ? "No modules are available for your account."
             : $"{Modules.Count} module(s) available. Select a module to begin.";
     }
+
+    /// <summary>Gets the module registry the navigation was built from.</summary>
+    public IModuleRegistry Registry { get; }
+
+    /// <summary>Gets whether a licence module is licensed.</summary>
+    public Func<string, bool> IsLicensed { get; }
+
+    /// <summary>Whether a desktop operation group should be offered to this user.</summary>
+    /// <param name="menuEntry">The operation group (a menu item's tag).</param>
+    /// <returns>True when a licensed module the user has permissions in owns it.</returns>
+    public bool IsMenuEntryAvailable(string menuEntry) => Registry.IsMenuEntryAvailable(menuEntry, IsLicensed, _permissions);
 
     /// <summary>The signed-in user's id (the cashier at the POS terminal).</summary>
     public long UserId { get; }

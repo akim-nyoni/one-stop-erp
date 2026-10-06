@@ -1,3 +1,4 @@
+using One4All.Application.Modules;
 using One4All.Desktop.Navigation;
 
 namespace One4All.Desktop.ViewModels;
@@ -7,13 +8,13 @@ public sealed class ModuleTileViewModel
 {
     /// <summary>Creates the tile from a descriptor.</summary>
     /// <param name="descriptor">The module descriptor.</param>
-    public ModuleTileViewModel(ModuleDescriptor descriptor) => Descriptor = descriptor;
+    public ModuleTileViewModel(IModuleDescriptor descriptor) => Descriptor = descriptor;
 
     /// <summary>The underlying descriptor.</summary>
-    public ModuleDescriptor Descriptor { get; }
+    public IModuleDescriptor Descriptor { get; }
 
     /// <summary>The display title.</summary>
-    public string Title => Descriptor.Title;
+    public string Title => Descriptor.Name;
 
     /// <summary>The tile glyph.</summary>
     public string Glyph => Descriptor.Glyph;
@@ -22,5 +23,5 @@ public sealed class ModuleTileViewModel
     public string Accent => Descriptor.Accent;
 
     /// <summary>The standard child groups under this module.</summary>
-    public IReadOnlyList<string> Groups => ModuleDescriptor.ChildGroups;
+    public IReadOnlyList<string> Groups => ModuleCatalogue.ChildGroups;
 }
