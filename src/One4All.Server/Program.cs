@@ -141,6 +141,55 @@ app.Use(async (context, next) =>
     await next(context).ConfigureAwait(false);
 });
 
+// Field-level sensitivity (brief §5.1): cost, margin, salary and credit-limit fields are stripped from JSON responses for users who may
+// not see them.
+app.Use(async (context, next) =>
+{
+    if (!context.Request.Path.StartsWithSegments("/api") || SignedInUser(context.User) is not long userId)
+    {
+        await next(context).ConfigureAwait(false);
+        return;
+    }
+
+    One4All.Core.Security.EffectivePermissions permissions = await context.RequestServices.GetRequiredService<One4All.Application.Abstractions.Security.IPermissionService>()
+        .ResolveAsync(userId, context.RequestAborted).ConfigureAwait(false);
+    IReadOnlySet<One4All.Application.Security.SensitiveField> hidden = One4All.Application.Security.FieldSensitivity.HiddenFor(permissions);
+    if (hidden.Count == 0)
+    {
+        await next(context).ConfigureAwait(false);
+        return;
+    }
+
+    Stream original = context.Response.Body;
+    await using MemoryStream buffer = new();
+    context.Response.Body = buffer;
+    try
+    {
+        await next(context).ConfigureAwait(false);
+    }
+    finally
+    {
+        context.Response.Body = original;
+    }
+
+    buffer.Position = 0;
+    if (context.Response.ContentType?.Contains("json", StringComparison.OrdinalIgnoreCase) == true && buffer.Length > 0)
+    {
+        System.Text.Json.Nodes.JsonNode? json = await System.Text.Json.Nodes.JsonNode.ParseAsync(buffer, cancellationToken: context.RequestAborted).ConfigureAwait(false);
+        if (One4All.Application.Security.FieldSensitivity.Strip(json, hidden) > 0)
+        {
+            byte[] stripped = Encoding.UTF8.GetBytes(json!.ToJsonString());
+            context.Response.ContentLength = stripped.Length;
+            await original.WriteAsync(stripped, context.RequestAborted).ConfigureAwait(false);
+            return;
+        }
+
+        buffer.Position = 0;
+    }
+
+    await buffer.CopyToAsync(original, context.RequestAborted).ConfigureAwait(false);
+});
+
 // --- Endpoints --------------------------------------------------------------------------------------------
 app.MapPost("/api/auth/login", async (LoginRequest request, IAuthenticationService auth, IJwtTokenService tokens, CancellationToken ct) =>
 {

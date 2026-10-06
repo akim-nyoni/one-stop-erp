@@ -40,12 +40,20 @@ public sealed class AuditedReportRunner : IAuditedReportRunner
             : 0;
         (ReportRunPurpose recorded, int? copy) = ReportRunAudit.Classify(purpose, earlierPrints);
 
-        if (userId is long user && !(await _permissions.ResolveAsync(user, ct).ConfigureAwait(false)).Has(ReportPermission, ReportRunAudit.RequiredFlag(recorded)))
+        IReadOnlySet<Application.Security.SensitiveField> hidden = new HashSet<Application.Security.SensitiveField>();
+        if (userId is long user)
         {
-            return Error.Rule("Rpt.NotAuthorised", $"You may not {recorded.ToString().ToLowerInvariant()} reports.");
+            Core.Security.EffectivePermissions permissions = await _permissions.ResolveAsync(user, ct).ConfigureAwait(false);
+            if (!permissions.Has(ReportPermission, ReportRunAudit.RequiredFlag(recorded)))
+            {
+                return Error.Rule("Rpt.NotAuthorised", $"You may not {recorded.ToString().ToLowerInvariant()} reports.");
+            }
+
+            // Restricted columns (cost, margin, salary, credit limit) are left out for users who may not see them.
+            hidden = Application.Security.FieldSensitivity.HiddenFor(permissions);
         }
 
-        Result<RenderedDocument> rendered = await _runner.RenderAsync(companyId, code, parameters, format, ct).ConfigureAwait(false);
+        Result<RenderedDocument> rendered = await _runner.RenderAsync(companyId, code, parameters, format, hidden, ct).ConfigureAwait(false);
         if (rendered.IsFailure)
         {
             return rendered.Error;

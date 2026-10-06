@@ -31,7 +31,12 @@ public sealed class ReportRunner : IReportRunner
     }
 
     /// <inheritdoc />
-    public async Task<Result<RenderedDocument>> RenderAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, ReportFormat format, CancellationToken ct = default)
+    public Task<Result<RenderedDocument>> RenderAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, ReportFormat format, CancellationToken ct = default)
+        => RenderAsync(companyId, reportCode, parameters, format, new HashSet<Application.Security.SensitiveField>(), ct);
+
+    /// <inheritdoc />
+    public async Task<Result<RenderedDocument>> RenderAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, ReportFormat format,
+        IReadOnlySet<Application.Security.SensitiveField> hiddenFields, CancellationToken ct = default)
     {
         ReportDefinition? definition = await ResolveDefinitionAsync(companyId, reportCode, ct).ConfigureAwait(false)
             ?? BuiltInDefinition(reportCode);
@@ -45,6 +50,7 @@ public sealed class ReportRunner : IReportRunner
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = provider is null
             ? []
             : await provider.GetRowsAsync(companyId, command, parameters, ct).ConfigureAwait(false);
+        rows = Application.Security.FieldSensitivity.Strip(rows, hiddenFields);
 
         string companyName = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? string.Empty;
 
