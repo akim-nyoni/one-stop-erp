@@ -131,6 +131,18 @@ public interface IAuthenticationService
     /// <returns>True while the session is open.</returns>
     Task<bool> TouchSessionAsync(string sessionId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Confirms the user of an open session is still at the keyboard: their password (and authenticator code when two-factor is on).
+    /// Unlocks an idle-locked desktop, and steps up before a sensitive change. A wrong answer counts towards the account lockout, and
+    /// a lockout ends the session.
+    /// </summary>
+    /// <param name="sessionId">The session.</param>
+    /// <param name="password">The user's password.</param>
+    /// <param name="oneTimeCode">The authenticator code, when two-factor is on.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not (<c>Security.SessionEnded</c> means signing in again).</returns>
+    Task<Result> ReauthenticateAsync(string sessionId, string password, string? oneTimeCode, CancellationToken ct = default);
+
     /// <summary>Starts authenticator enrolment: a new secret and the otpauth URI to scan; two-factor turns on once a code confirms it.</summary>
     /// <param name="userId">The user.</param>
     /// <param name="ct">Cancellation token.</param>

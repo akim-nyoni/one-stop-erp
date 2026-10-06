@@ -98,4 +98,33 @@ public sealed class AuthenticationHardeningTests
             (await auth.TouchSessionAsync(result.SessionId!)).Should().BeFalse();
         }
     }
+
+    [SkippableFact]
+    public async Task A_locked_session_unlocks_with_the_password_and_code()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider(s => s.AddSingleton(new AuthenticationOptions { MaxFailedAttempts = 3 }));
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        IAuthenticationService auth = scope.ServiceProvider.GetRequiredService<IAuthenticationService>();
+        string login = $"lk.{Guid.NewGuid().ToString("N")[..8]}";
+        long userId = (await scope.ServiceProvider.GetRequiredService<IUserAdminService>().CreateUserAsync(login, "Locker", null, "Unlock2026a")).Value;
+
+        string session = (await auth.AuthenticateAsync(login, "Unlock2026a")).SessionId!;
+        (await auth.ReauthenticateAsync("no-such-session", "Unlock2026a", null)).Error.Code.Should().Be("Security.SessionEnded");
+        (await auth.ReauthenticateAsync(session, "wrong", null)).Error.Code.Should().Be("Security.Reauthenticate");
+        (await auth.ReauthenticateAsync(session, "Unlock2026a", null)).IsSuccess.Should().BeTrue();
+
+        // With two-factor on, the code is needed too; a right unlock clears earlier misses.
+        (string secret, _) = (await auth.BeginTwoFactorAsync(userId)).Value;
+        (await auth.ConfirmTwoFactorAsync(userId, Totp.Code(secret, DateTimeOffset.UtcNow))).IsSuccess.Should().BeTrue();
+        (await auth.ReauthenticateAsync(session, "Unlock2026a", null)).Error.Message.Should().Contain("authenticator");
+        (await auth.ReauthenticateAsync(session, "Unlock2026a", Totp.Code(secret, DateTimeOffset.UtcNow))).IsSuccess.Should().BeTrue();
+
+        // Three misses in a row lock the account and end the session; it cannot be unlocked, only signed into again later.
+        (await auth.ReauthenticateAsync(session, "wrong", null)).IsFailure.Should().BeTrue();
+        (await auth.ReauthenticateAsync(session, "wrong", null)).IsFailure.Should().BeTrue();
+        (await auth.ReauthenticateAsync(session, "wrong", null)).Error.Code.Should().Be("Security.SessionEnded");
+        (await auth.ReauthenticateAsync(session, "Unlock2026a", Totp.Code(secret, DateTimeOffset.UtcNow))).Error.Code.Should().Be("Security.SessionEnded");
+        (await auth.TouchSessionAsync(session)).Should().BeFalse();
+    }
 }

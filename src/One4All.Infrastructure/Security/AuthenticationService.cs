@@ -237,6 +237,49 @@ public sealed class AuthenticationService : IAuthenticationService
     }
 
     /// <inheritdoc />
+    public async Task<Result> ReauthenticateAsync(string sessionId, string password, string? oneTimeCode, CancellationToken ct = default)
+    {
+        LoginEvent? login = await _db.LoginEvents.FirstOrDefaultAsync(l => l.SessionId == sessionId, ct).ConfigureAwait(false);
+        User? user = login?.UserId is long userId ? await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false) : null;
+        DateTimeOffset now = _clock.UtcNow;
+        if (login is null || login.EndedOnUtc is not null || user is null || !user.IsActive)
+        {
+            return Result.Failure(Error.Rule("Security.SessionEnded", "This session has ended; sign in again."));
+        }
+
+        if (user.IsLockedOut(now))
+        {
+            login.End(now);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result.Failure(Error.Rule("Security.SessionEnded", "The account is locked; sign in again later."));
+        }
+
+        bool passwordOk = user.PasswordHash is string hash && _hasher.Verify(hash, password ?? string.Empty);
+        bool codeOk = !user.TwoFactorEnabled || user.TwoFactorSecret is not string secret
+            || (!string.IsNullOrWhiteSpace(oneTimeCode) && Application.Security.Totp.Verify(secret, oneTimeCode, now));
+        if (!passwordOk || !codeOk)
+        {
+            user.RegisterFailedLogin(now, _options.MaxFailedAttempts, _options.LockoutDuration);
+            bool locked = user.IsLockedOut(now);
+            if (locked)
+            {
+                login.End(now);
+            }
+
+            _db.LoginEvents.Add(new LoginEvent(user.Id, user.Username, now, login.Terminal, "unlock", locked ? AuthenticationOutcome.LockedOut.ToString() : AuthenticationOutcome.InvalidCredentials.ToString(), null));
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result.Failure(locked
+                ? Error.Rule("Security.SessionEnded", "Too many attempts; the account is locked and the session ended.")
+                : Error.Rule("Security.Reauthenticate", passwordOk ? "The authenticator code is not right." : "The password is not right."));
+        }
+
+        user.RegisterSuccessfulLogin(now);
+        login.Touch(now);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result<(string Secret, string ProvisioningUri)>> BeginTwoFactorAsync(long userId, CancellationToken ct = default)
     {
         User? user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false);

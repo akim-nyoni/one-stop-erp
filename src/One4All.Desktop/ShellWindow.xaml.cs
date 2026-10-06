@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using One4All.Desktop.ViewModels;
 
 namespace One4All.Desktop;
@@ -7,6 +8,10 @@ namespace One4All.Desktop;
 public partial class ShellWindow : Window
 {
     private readonly IServiceProvider _services;
+    private readonly IdleLock _idleLock;
+
+    /// <summary>Gets the command that locks the session (Ctrl+L).</summary>
+    public static RoutedCommand LockCommand { get; } = new(nameof(LockCommand), typeof(ShellWindow));
 
     /// <summary>Creates the shell window bound to a session view model.</summary>
     /// <param name="viewModel">The shell view model.</param>
@@ -16,9 +21,18 @@ public partial class ShellWindow : Window
         _services = services;
         DataContext = viewModel;
         InitializeComponent();
+        _idleLock = new IdleLock(services);
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void Lock_Click(object sender, RoutedEventArgs e) => _idleLock.Lock();
+
+    private void OpenTwoFactor_Click(object sender, RoutedEventArgs e)
+    {
+        TwoFactorWindow twoFactor = new(_services) { Owner = this };
+        twoFactor.ShowDialog();
+    }
 
     private void OpenReportViewer_Click(object sender, RoutedEventArgs e)
     {
