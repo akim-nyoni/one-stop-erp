@@ -38,6 +38,7 @@ internal sealed class BudgetLineConfiguration : IEntityTypeConfiguration<BudgetL
         b.Property(x => x.DriverCode).HasMaxLength(20);
         b.Property(x => x.Quantity).HasPrecision(19, 4);
         b.Property(x => x.PlannedRate).HasPrecision(19, 8);
+        b.Property(x => x.RephaseId);
         b.HasIndex(x => new { x.BudgetId, x.AccountCode, x.Period });
     }
 }
@@ -196,5 +197,20 @@ internal sealed class BudgetProposalConfiguration : IEntityTypeConfiguration<Bud
         b.Property(x => x.Proposed).HasPrecision(19, 4);
         b.Property(x => x.Comment).HasMaxLength(300);
         b.HasIndex(x => new { x.BudgetId, x.Round });
+    }
+}
+
+internal sealed class BudgetRephaseConfiguration : IEntityTypeConfiguration<BudgetRephase>
+{
+    public void Configure(EntityTypeBuilder<BudgetRephase> b)
+    {
+        b.ToTable("rephase", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AccountCode).HasMaxLength(8);
+        b.Property(x => x.CostCentre).HasMaxLength(20);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Reason).HasMaxLength(300);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => x.BudgetId);
     }
 }

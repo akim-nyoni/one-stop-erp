@@ -174,14 +174,15 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
     /// <returns>The created line.</returns>
     /// <param name="virementId">The approved virement adding the line, if any.</param>
     /// <exception cref="InvalidOperationException">Thrown when adding an ordinary line to a sealed budget: changes go in a new version or a virement.</exception>
-    public BudgetLine AddLine(string accountCode, int period, decimal amount, string? costCentre = null, long? virementId = null)
+    /// <param name="rephaseId">The approved re-phasing adding the line, if any.</param>
+    public BudgetLine AddLine(string accountCode, int period, decimal amount, string? costCentre = null, long? virementId = null, long? rephaseId = null)
     {
-        if (IsSealed && virementId is null)
+        if (IsSealed && virementId is null && rephaseId is null)
         {
             throw new InvalidOperationException("An approved budget cannot be edited; create a new version or a virement.");
         }
 
-        BudgetLine line = new(accountCode, period, amount, costCentre, virementId);
+        BudgetLine line = new(accountCode, period, amount, costCentre, virementId) { RephaseId = rephaseId };
         _lines.Add(line);
         return line;
     }
@@ -210,7 +211,7 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
     {
         StringBuilder canonical = new();
         canonical.Append(CultureInfo.InvariantCulture, $"{CompanyId}|{FiscalYearId}|{(int)Type}|{Department}|{VersionNumber}\n");
-        foreach (BudgetLine line in _lines.Where(l => l.VirementId is null)
+        foreach (BudgetLine line in _lines.Where(l => l.VirementId is null && l.RephaseId is null)
                      .OrderBy(l => l.AccountCode, StringComparer.Ordinal).ThenBy(l => l.CostCentre, StringComparer.Ordinal).ThenBy(l => l.Period).ThenBy(l => l.Amount))
         {
             canonical.Append(CultureInfo.InvariantCulture, $"{line.AccountCode}|{line.CostCentre}|{line.Period}|{line.Amount:0.0000}\n");
@@ -269,6 +270,9 @@ public sealed class BudgetLine : Entity
 
     /// <summary>The approved virement that added the line; null for the budget as approved.</summary>
     public long? VirementId { get; private set; }
+
+    /// <summary>Gets the approved re-phasing that added this line (a timing move, never a change of value).</summary>
+    public long? RephaseId { get; init; }
 
     /// <summary>Gets or sets how the amount was arrived at.</summary>
     public BudgetBasis Basis { get; set; }
@@ -455,5 +459,87 @@ public sealed class BudgetProposal : Entity
 
     /// <summary>Gets why.</summary>
     public string? Comment { get; private set; }
+}
+
+/// <summary>Where a re-phasing request stands.</summary>
+public enum RephaseStatus
+{
+    /// <summary>Awaiting a decision.</summary>
+    Pending = 0,
+
+    /// <summary>Approved and applied.</summary>
+    Approved = 1,
+
+    /// <summary>Rejected.</summary>
+    Rejected = 2,
+}
+
+/// <summary>
+/// A re-phasing of an approved budget (<c>bud.rephase</c>, brief §4.18.6): moves an amount on an account from one period to another
+/// within the year — a timing change kept apart from virements, with its own request and approval.
+/// </summary>
+public sealed class BudgetRephase : Entity, ICompanyScoped
+{
+    private BudgetRephase()
+    {
+        AccountCode = string.Empty;
+        Reason = string.Empty;
+    }
+
+    /// <summary>Creates the request.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="budgetId">The budget.</param>
+    /// <param name="accountCode">The account.</param>
+    /// <param name="costCentre">The cost centre.</param>
+    /// <param name="fromPeriod">The period giving the amount.</param>
+    /// <param name="toPeriod">The period receiving it.</param>
+    /// <param name="amount">The amount moved.</param>
+    /// <param name="reason">Why.</param>
+    /// <param name="requestedByUserId">Who asked.</param>
+    public BudgetRephase(long companyId, long budgetId, string accountCode, string? costCentre, int fromPeriod, int toPeriod, decimal amount, string reason, long requestedByUserId)
+    {
+        CompanyId = companyId;
+        BudgetId = budgetId;
+        AccountCode = accountCode;
+        CostCentre = costCentre;
+        FromPeriod = fromPeriod;
+        ToPeriod = toPeriod;
+        Amount = amount;
+        Reason = reason;
+        RequestedByUserId = requestedByUserId;
+    }
+
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; private set; }
+
+    /// <summary>Gets the budget.</summary>
+    public long BudgetId { get; private set; }
+
+    /// <summary>Gets the account.</summary>
+    public string AccountCode { get; private set; }
+
+    /// <summary>Gets the cost centre.</summary>
+    public string? CostCentre { get; private set; }
+
+    /// <summary>Gets the period giving the amount.</summary>
+    public int FromPeriod { get; private set; }
+
+    /// <summary>Gets the period receiving it.</summary>
+    public int ToPeriod { get; private set; }
+
+    /// <summary>Gets the amount.</summary>
+    public decimal Amount { get; private set; }
+
+    /// <summary>Gets why.</summary>
+    public string Reason { get; private set; }
+
+    /// <summary>Gets who asked.</summary>
+    public long RequestedByUserId { get; private set; }
+
+    /// <summary>Gets or sets the status.</summary>
+    public RephaseStatus Status { get; set; }
+
+    /// <summary>Gets or sets who decided.</summary>
+    public long? DecidedByUserId { get; set; }
 }
 

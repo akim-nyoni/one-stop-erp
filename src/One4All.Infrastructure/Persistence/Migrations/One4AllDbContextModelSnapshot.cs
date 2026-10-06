@@ -2480,6 +2480,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("quantity");
 
+                    b.Property<long?>("RephaseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rephase_id");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -2557,6 +2561,78 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_proposal_budget_id_round");
 
                     b.ToTable("proposal", "bud");
+                });
+
+            modelBuilder.Entity("One4All.Core.Budgeting.BudgetRephase", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("account_code");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("BudgetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("budget_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("CostCentre")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cost_centre");
+
+                    b.Property<long?>("DecidedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("decided_by_user_id");
+
+                    b.Property<int>("FromPeriod")
+                        .HasColumnType("integer")
+                        .HasColumnName("from_period");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("RequestedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<int>("ToPeriod")
+                        .HasColumnType("integer")
+                        .HasColumnName("to_period");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rephase");
+
+                    b.HasIndex("BudgetId")
+                        .HasDatabaseName("ix_rephase_budget_id");
+
+                    b.ToTable("rephase", "bud");
                 });
 
             modelBuilder.Entity("One4All.Core.Budgeting.BudgetReviewEvent", b =>
