@@ -18289,6 +18289,47 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("purchase_order", "pop");
                 });
 
+            modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrderDelivery", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("due_date");
+
+                    b.Property<long>("PurchaseOrderLineId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("purchase_order_line_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_po_delivery");
+
+                    b.HasIndex("PurchaseOrderLineId", "DueDate")
+                        .HasDatabaseName("ix_po_delivery_purchase_order_line_id_due_date");
+
+                    b.ToTable("po_delivery", "pop");
+                });
+
             modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrderLine", b =>
                 {
                     b.Property<long>("Id")
@@ -28109,6 +28150,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_invoice_dispute_line_invoice_dispute_invoice_dispute_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrderDelivery", b =>
+                {
+                    b.HasOne("One4All.Core.Procurement.PurchaseOrderLine", null)
+                        .WithMany()
+                        .HasForeignKey("PurchaseOrderLineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_po_delivery_purchase_order_line_purchase_order_line_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrderLine", b =>

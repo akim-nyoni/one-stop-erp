@@ -242,3 +242,15 @@ internal sealed class FrameworkAgreementConfiguration : IEntityTypeConfiguration
         b.HasIndex(x => new { x.CompanyId, x.Reference }).IsUnique();
     }
 }
+
+internal sealed class PurchaseOrderDeliveryConfiguration : IEntityTypeConfiguration<PurchaseOrderDelivery>
+{
+    public void Configure(EntityTypeBuilder<PurchaseOrderDelivery> b)
+    {
+        b.ToTable("po_delivery", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.HasOne<PurchaseOrderLine>().WithMany().HasForeignKey(x => x.PurchaseOrderLineId).OnDelete(DeleteBehavior.Cascade);
+        b.HasIndex(x => new { x.PurchaseOrderLineId, x.DueDate });
+    }
+}

@@ -270,3 +270,39 @@ public sealed class PurchaseOrderLine : Entity
         UnitPrice = unitPrice;
     }
 }
+
+/// <summary>
+/// One scheduled delivery of a purchase order line (<c>pur.po_delivery</c>): the line's quantity spread over due dates. Receipts are
+/// matched to the deliveries earliest-due first.
+/// </summary>
+public sealed class PurchaseOrderDelivery : Entity, ICompanyScoped
+{
+    private PurchaseOrderDelivery()
+    {
+    }
+
+    /// <summary>Creates the delivery.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="purchaseOrderLineId">The order line.</param>
+    /// <param name="dueDate">When it is due.</param>
+    /// <param name="quantity">How much is due.</param>
+    public PurchaseOrderDelivery(long companyId, long purchaseOrderLineId, DateOnly dueDate, decimal quantity)
+    {
+        CompanyId = companyId;
+        PurchaseOrderLineId = purchaseOrderLineId;
+        DueDate = dueDate;
+        Quantity = quantity;
+    }
+
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; private set; }
+
+    /// <summary>Gets the order line.</summary>
+    public long PurchaseOrderLineId { get; private set; }
+
+    /// <summary>Gets when it is due.</summary>
+    public DateOnly DueDate { get; private set; }
+
+    /// <summary>Gets how much is due.</summary>
+    public decimal Quantity { get; private set; }
+}
