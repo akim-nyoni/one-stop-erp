@@ -164,6 +164,12 @@ internal sealed class SubcontractConfiguration : IEntityTypeConfiguration<Subcon
         b.ToTable("subcontract", Schemas.JobCosting);
         b.HasKey(x => x.Id);
         b.Property(x => x.CostHead).HasMaxLength(60).HasDefaultValue("Subcontract");
+        b.Property(x => x.WithholdingTaxCode).HasMaxLength(20);
+        b.Property(x => x.AdvancePaid).HasPrecision(19, 4);
+        b.Property(x => x.AdvanceRecovered).HasPrecision(19, 4);
+        b.Property(x => x.AdvanceRecoveryPercent).HasPrecision(9, 4);
+        b.Property(x => x.AdvanceAccountCode).HasMaxLength(20);
+        b.Ignore(x => x.AdvanceOutstanding);
         b.Property(x => x.Reference).HasMaxLength(40);
         b.Property(x => x.Description).HasMaxLength(200);
         b.Property(x => x.Value).HasPrecision(19, 4);
@@ -188,6 +194,8 @@ internal sealed class SubcontractCertificateConfiguration : IEntityTypeConfigura
         b.Property(x => x.WorkDoneToDate).HasPrecision(19, 4);
         b.Property(x => x.Gross).HasPrecision(19, 4);
         b.Property(x => x.Retention).HasPrecision(19, 4);
+        b.Property(x => x.AdvanceRecovered).HasPrecision(19, 4);
+        b.Property(x => x.Withheld).HasPrecision(19, 4);
         b.Ignore(x => x.Payable);
     }
 }

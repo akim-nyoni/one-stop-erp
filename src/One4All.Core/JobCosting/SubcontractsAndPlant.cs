@@ -59,6 +59,44 @@ public sealed class Subcontract : AuditableEntity, ICompanyScoped
     /// <summary>Gets the retention released so far.</summary>
     public decimal RetentionReleased { get; private set; }
 
+    /// <summary>Gets or sets the withholding tax code deducted from certificates (unless the subcontractor's tax clearance is valid).</summary>
+    public string? WithholdingTaxCode { get; set; }
+
+    /// <summary>Gets the advance paid to the subcontractor.</summary>
+    public decimal AdvancePaid { get; private set; }
+
+    /// <summary>Gets the advance recovered from certificates so far.</summary>
+    public decimal AdvanceRecovered { get; private set; }
+
+    /// <summary>Gets the share of each certificate's gross recovered against the advance, as a percent.</summary>
+    public decimal AdvanceRecoveryPercent { get; private set; }
+
+    /// <summary>Gets the account the advance is carried in (an asset) until recovered.</summary>
+    public string? AdvanceAccountCode { get; private set; }
+
+    /// <summary>Gets the advance still to recover.</summary>
+    public decimal AdvanceOutstanding => AdvancePaid - AdvanceRecovered;
+
+    /// <summary>Records an advance paid.</summary>
+    /// <param name="amount">The amount.</param>
+    /// <param name="recoveryPercent">The share of each certificate recovered.</param>
+    /// <param name="accountCode">The advance account.</param>
+    public void PayAdvance(decimal amount, decimal recoveryPercent, string accountCode)
+    {
+        AdvancePaid += amount;
+        AdvanceRecoveryPercent = recoveryPercent;
+        AdvanceAccountCode = accountCode;
+    }
+
+    /// <summary>The advance to recover from a certificate's gross: its share, never more than is outstanding.</summary>
+    /// <param name="gross">The certificate gross.</param>
+    /// <returns>The recovery.</returns>
+    public decimal RecoveryFor(decimal gross) => Math.Min(AdvanceOutstanding, Math.Round(gross * AdvanceRecoveryPercent / 100m, 2, MidpointRounding.AwayFromZero));
+
+    /// <summary>Records advance recovered.</summary>
+    /// <param name="amount">The amount.</param>
+    public void Recover(decimal amount) => AdvanceRecovered += amount;
+
     /// <summary>Gets the certificates.</summary>
     public IReadOnlyList<SubcontractCertificate> Certificates => _certificates.AsReadOnly();
 
@@ -117,6 +155,12 @@ public sealed class SubcontractCertificate : Entity
 
     /// <summary>Gets the gross this certificate.</summary>
     public decimal Gross { get; private set; }
+
+    /// <summary>Gets or sets the advance recovered on this certificate.</summary>
+    public decimal AdvanceRecovered { get; set; }
+
+    /// <summary>Gets or sets the withholding tax deducted on this certificate.</summary>
+    public decimal Withheld { get; set; }
 
     /// <summary>Gets the retention held on it.</summary>
     public decimal Retention { get; private set; }

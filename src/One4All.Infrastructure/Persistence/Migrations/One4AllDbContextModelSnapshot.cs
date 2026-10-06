@@ -11500,6 +11500,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("AdvanceAccountCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("advance_account_code");
+
+                    b.Property<decimal>("AdvancePaid")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("advance_paid");
+
+                    b.Property<decimal>("AdvanceRecovered")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("advance_recovered");
+
+                    b.Property<decimal>("AdvanceRecoveryPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("advance_recovery_percent");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -11569,6 +11589,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("value");
 
+                    b.Property<string>("WithholdingTaxCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("withholding_tax_code");
+
                     b.HasKey("Id")
                         .HasName("pk_subcontract");
 
@@ -11587,6 +11612,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("AdvanceRecovered")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("advance_recovered");
 
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date")
@@ -11623,6 +11653,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("SubcontractId")
                         .HasColumnType("bigint")
                         .HasColumnName("subcontract_id");
+
+                    b.Property<decimal>("Withheld")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("withheld");
 
                     b.Property<decimal>("WorkDoneToDate")
                         .HasPrecision(19, 4)

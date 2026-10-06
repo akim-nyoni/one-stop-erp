@@ -31,7 +31,9 @@ public sealed class SubcontractCertificateRequest
 /// <param name="Gross">The gross this certificate.</param>
 /// <param name="Retention">The retention held.</param>
 /// <param name="Payable">The amount invoiced to the supplier ledger.</param>
-public readonly record struct SubcontractCertificateResult(decimal Gross, decimal Retention, decimal Payable);
+/// <param name="AdvanceRecovered">The advance recovered from it.</param>
+/// <param name="Withheld">The withholding tax deducted from it.</param>
+public readonly record struct SubcontractCertificateResult(decimal Gross, decimal Retention, decimal Payable, decimal AdvanceRecovered = 0m, decimal Withheld = 0m);
 
 /// <summary>Subcontracts and plant on contracts (brief §14 K 192, 194).</summary>
 public interface ISubcontractService
@@ -59,6 +61,36 @@ public interface ISubcontractService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The certificate, or an error.</returns>
     Task<Result<SubcontractCertificateResult>> CertifyAsync(SubcontractCertificateRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Pays the subcontractor an advance (mobilisation): Dr the advance account, Cr bank. A share of each later certificate's gross is
+    /// recovered against it until it is cleared, reducing what is invoiced to the supplier ledger. Another advance while one is outstanding
+    /// adds to it at the new recovery share.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="subcontractId">The subcontract.</param>
+    /// <param name="amount">The advance.</param>
+    /// <param name="recoveryPercent">The share of each certificate's gross recovered (1–100).</param>
+    /// <param name="date">The payment date.</param>
+    /// <param name="bankAccountCode">The bank paid from.</param>
+    /// <param name="advanceAccountCode">The advances-to-subcontractors asset account.</param>
+    /// <param name="documentNumber">The payment document number.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The journal number.</returns>
+    Task<Result<string>> PayAdvanceAsync(long companyId, long subcontractId, decimal amount, decimal recoveryPercent, DateOnly date, string bankAccountCode, string advanceAccountCode, string documentNumber,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Sets (or clears, with null) the withholding tax deducted from the subcontract's certificates. It applies to the certificate's gross
+    /// unless the subcontractor's tax clearance is valid on the certificate date; the tax is owed to the revenue authority and a withholding
+    /// certificate is issued, so it is returned and remitted with payment withholding. Pay such invoices without withholding again.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="subcontractId">The subcontract.</param>
+    /// <param name="withholdingTaxCode">The withholding tax code, or null.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or why not.</returns>
+    Task<Result> SetWithholdingAsync(long companyId, long subcontractId, string? withholdingTaxCode, CancellationToken ct = default);
 
     /// <summary>Releases held retention to the subcontractor: invoices it to the supplier ledger against the retention payable account.</summary>
     /// <param name="companyId">The company.</param>

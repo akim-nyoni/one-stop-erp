@@ -63,6 +63,73 @@ public sealed class SubcontractService : ISubcontractService
     }
 
     /// <inheritdoc />
+    public Task<Result<string>> PayAdvanceAsync(long companyId, long subcontractId, decimal amount, decimal recoveryPercent, DateOnly date, string bankAccountCode, string advanceAccountCode, string documentNumber,
+        CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            if (amount <= 0m || recoveryPercent is <= 0m or > 100m || string.IsNullOrWhiteSpace(bankAccountCode) || string.IsNullOrWhiteSpace(advanceAccountCode) || string.IsNullOrWhiteSpace(documentNumber))
+            {
+                return Error.Validation("Job.AdvanceInvalid", "An advance needs a positive amount, a recovery share of 1–100%, a bank, an advance account and a document number.");
+            }
+
+            Subcontract? subcontract = await _db.Subcontracts.Include(s => s.Certificates).FirstOrDefaultAsync(s => s.Id == subcontractId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+            if (subcontract is null)
+            {
+                return Error.NotFound("Job.SubcontractNotFound", $"Subcontract {subcontractId} not found.");
+            }
+
+            if (subcontract.AdvanceOutstanding + amount > subcontract.Value - subcontract.CertifiedToDate)
+            {
+                return Error.Rule("Job.AdvanceTooLarge", $"Advances outstanding cannot exceed the {subcontract.Value - subcontract.CertifiedToDate:0.00} of work not yet certified.");
+            }
+
+            if (subcontract.AdvanceAccountCode is string existing && subcontract.AdvanceOutstanding > 0m && !string.Equals(existing, advanceAccountCode.Trim(), StringComparison.Ordinal))
+            {
+                return Error.Rule("Job.AdvanceAccount", $"The outstanding advance is carried in {existing}; use the same account.");
+            }
+
+            CurrencyCode currency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).SingleAsync(ct).ConfigureAwait(false);
+            Result<PostingReceipt> posted = await _postingEngine.PostAsync(new JournalRequest
+            {
+                CompanyId = companyId, SourceModule = "GL", PostingDate = date, TransactionCurrency = currency, EnforceManualJournalRules = false,
+                DocumentType = "SubcontractAdvance", DocumentNumber = documentNumber.Trim(), Narrative = $"Advance to subcontract {subcontract.Reference}",
+                Lines =
+                [
+                    new JournalLineRequest { AccountCode = advanceAccountCode.Trim(), Side = JournalSide.Debit, TransactionAmount = amount },
+                    new JournalLineRequest { AccountCode = bankAccountCode.Trim(), Side = JournalSide.Credit, TransactionAmount = amount },
+                ],
+            }, ct).ConfigureAwait(false);
+            if (posted.IsFailure)
+            {
+                return posted.Error;
+            }
+
+            subcontract.PayAdvance(amount, recoveryPercent, advanceAccountCode.Trim());
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result<string>.Success(posted.Value.JournalNumber);
+        }, ct);
+
+    /// <inheritdoc />
+    public async Task<Result> SetWithholdingAsync(long companyId, long subcontractId, string? withholdingTaxCode, CancellationToken ct = default)
+    {
+        Subcontract? subcontract = await _db.Subcontracts.FirstOrDefaultAsync(s => s.Id == subcontractId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (subcontract is null)
+        {
+            return Result.Failure(Error.NotFound("Job.SubcontractNotFound", $"Subcontract {subcontractId} not found."));
+        }
+
+        string? code = string.IsNullOrWhiteSpace(withholdingTaxCode) ? null : withholdingTaxCode.Trim().ToUpperInvariant();
+        if (code is not null && !await _db.TaxCodes.AnyAsync(t => t.CompanyId == companyId && t.Code == code && t.IsActive && t.Type == TaxType.Withholding && t.OutputAccountCode != null, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.Rule("Ap.WithholdingCode", $"{code} is not an active withholding tax code with a payable account."));
+        }
+
+        subcontract.WithholdingTaxCode = code;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public Task<Result<SubcontractCertificateResult>> CertifyAsync(SubcontractCertificateRequest request, CancellationToken ct = default)
         => _db.AtomicAsync(() => CertifyCoreAsync(request, ct), ct);
 
@@ -92,9 +159,31 @@ public sealed class SubcontractService : ISubcontractService
 
         decimal gross = request.WorkDoneToDate - subcontract.CertifiedToDate;
         decimal retention = Math.Round(gross * subcontract.RetentionPercent / 100m, 2, MidpointRounding.AwayFromZero);
-        decimal payable = gross - retention;
+        decimal recovery = subcontract.RecoveryFor(gross);
+
+        // Withholding applies unless the subcontractor's tax clearance is valid on the certificate date.
+        TaxCode? withholding = null;
+        Core.Trading.Supplier supplier = await _db.Suppliers.SingleAsync(s => s.Id == subcontract.SupplierId, ct).ConfigureAwait(false);
+        if (subcontract.WithholdingTaxCode is string whtCode && !(supplier.TaxClearanceExpiry is { } expiry && expiry >= request.Date))
+        {
+            withholding = await _db.TaxCodes.Include(t => t.Rates).FirstOrDefaultAsync(t => t.CompanyId == request.CompanyId && t.Code == whtCode && t.IsActive, ct).ConfigureAwait(false);
+            if (withholding is null || withholding.Type != TaxType.Withholding || string.IsNullOrWhiteSpace(withholding.OutputAccountCode))
+            {
+                return Error.Rule("Ap.WithholdingCode", $"{whtCode} is not an active withholding tax code with a payable account.");
+            }
+        }
+
+        decimal whtRate = withholding?.RateOn(request.Date) ?? 0m;
+        decimal withheld = Math.Round(gross * whtRate / 100m, 2, MidpointRounding.AwayFromZero);
+        decimal payable = gross - retention - recovery - withheld;
+        if (payable < 0m)
+        {
+            return Error.Rule("Job.DeductionsExceedGross", $"Retention, advance recovery and withholding ({retention + recovery + withheld:0.00}) exceed the certificate's {gross:0.00}.");
+        }
+
         CurrencyCode currency = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.BaseCurrency).SingleAsync(ct).ConfigureAwait(false);
         string invoiceNumber = $"{subcontract.Reference}/{request.Number.Trim().ToUpperInvariant()}";
+        long? invoiceOpenItemId = null;
         if (payable > 0m)
         {
             Result<TradingPostingResult> invoice = await _payables.PostInvoiceAsync(new PurchaseInvoiceRequest
@@ -105,6 +194,32 @@ public sealed class SubcontractService : ISubcontractService
             if (invoice.IsFailure)
             {
                 return invoice.Error;
+            }
+
+            invoiceOpenItemId = invoice.Value.OpenItemId;
+        }
+
+        if (recovery + withheld > 0m)
+        {
+            List<JournalLineRequest> lines = [new JournalLineRequest { AccountCode = request.CostAccountCode, Side = JournalSide.Debit, TransactionAmount = recovery + withheld }];
+            if (recovery > 0m)
+            {
+                lines.Add(new JournalLineRequest { AccountCode = subcontract.AdvanceAccountCode!, Side = JournalSide.Credit, TransactionAmount = recovery });
+            }
+
+            if (withheld > 0m)
+            {
+                lines.Add(new JournalLineRequest { AccountCode = withholding!.OutputAccountCode!, Side = JournalSide.Credit, TransactionAmount = withheld });
+            }
+
+            Result<PostingReceipt> deductions = await _postingEngine.PostAsync(new JournalRequest
+            {
+                CompanyId = request.CompanyId, SourceModule = "GL", PostingDate = request.Date, TransactionCurrency = currency, EnforceManualJournalRules = false,
+                DocumentType = "SubcontractDeductions", DocumentNumber = invoiceNumber, Narrative = $"Advance recovered and tax withheld on {invoiceNumber}", Lines = lines,
+            }, ct).ConfigureAwait(false);
+            if (deductions.IsFailure)
+            {
+                return deductions.Error;
             }
         }
 
@@ -128,9 +243,19 @@ public sealed class SubcontractService : ISubcontractService
 
         JobContract contract = await _db.JobContracts.Include(c => c.Costs).SingleAsync(c => c.Id == subcontract.JobContractId, ct).ConfigureAwait(false);
         contract.CaptureCost(subcontract.CostHead, JobCostSource.Subcontractor, gross, request.Date, invoiceNumber);
-        subcontract.AddCertificate(new SubcontractCertificate(request.Number.Trim().ToUpperInvariant(), request.Date, request.WorkDoneToDate, gross, retention, invoiceNumber));
+        subcontract.AddCertificate(new SubcontractCertificate(request.Number.Trim().ToUpperInvariant(), request.Date, request.WorkDoneToDate, gross, retention, invoiceNumber)
+        {
+            AdvanceRecovered = recovery, Withheld = withheld,
+        });
+        subcontract.Recover(recovery);
+        if (withheld > 0m)
+        {
+            _db.Set<Core.Trading.WithholdingCertificate>().Add(new Core.Trading.WithholdingCertificate(request.CompanyId, $"WHT-{invoiceNumber}", supplier.Id, invoiceOpenItemId ?? 0L, invoiceNumber, request.Date,
+                withholding!.Code, whtRate, gross, withheld));
+        }
+
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new SubcontractCertificateResult(gross, retention, payable);
+        return new SubcontractCertificateResult(gross, retention, payable, recovery, withheld);
     }
 
     /// <inheritdoc />

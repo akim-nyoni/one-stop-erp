@@ -291,6 +291,25 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Pay a subcontract advance", ListTitle = "Subcontracts",
+            Description = "A mobilisation advance (Dr advance account, Cr bank), recovered as a share of each later certificate until cleared.",
+            Fields = [Req("Subcontract", "Subcontract reference"), Num("Amount", "Advance"), Num("Recovery", "Recovered per certificate %", "20"), Today(), Req("Bank", "Bank account", "1100"),
+                Req("AdvanceAccount", "Advances to subcontractors account"), Req("Document", "Payment document number")],
+            Run = async (c, i) => $"Advance paid, journal {Check(await c.Get<ISubcontractService>().PayAdvanceAsync(c.CompanyId, await SubcontractAsync(c, i.Text("Subcontract")).ConfigureAwait(true), i.Number("Amount"),
+                i.Number("Recovery"), i.Date("Date"), i.Text("Bank"), i.Text("AdvanceAccount"), i.Text("Document")).ConfigureAwait(true))}.",
+            List = SubcontractsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Set subcontract withholding tax", ListTitle = "Subcontracts",
+            Description = "Withholding tax deducted from each certificate unless the subcontractor's tax clearance is valid. Leave blank to stop withholding.",
+            Fields = [Req("Subcontract", "Subcontract reference"), Opt("Code", "Withholding tax code")],
+            Run = async (c, i) => Check(await c.Get<ISubcontractService>().SetWithholdingAsync(c.CompanyId, await SubcontractAsync(c, i.Text("Subcontract")).ConfigureAwait(true), i.Optional("Code")).ConfigureAwait(true),
+                "Withholding updated."),
+            List = SubcontractsAsync,
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Certify a subcontract", ListTitle = "Subcontracts", Description = "Invoices the subcontractor for the work since the last certificate, net of retention.",
             Fields = [Req("Subcontract", "Subcontract reference"), Req("Certificate", "Certificate number"), Today(), Num("ToDate", "Work done to date"), Req("CostAccount", "Job cost account", "5000"),
                 Req("RetentionAccount", "Retention payable account")],
@@ -301,7 +320,7 @@ public static partial class OperationCatalogue
                     CompanyId = c.CompanyId, SubcontractId = await SubcontractAsync(c, i.Text("Subcontract")).ConfigureAwait(true), Number = i.Text("Certificate"), Date = i.Date("Date"),
                     WorkDoneToDate = i.Number("ToDate"), CostAccountCode = i.Text("CostAccount"), RetentionPayableAccountCode = i.Text("RetentionAccount"),
                 }).ConfigureAwait(true));
-                return $"Certified gross {M(cert.Gross)}, retention {M(cert.Retention)}, payable {M(cert.Payable)}.";
+                return $"Certified gross {M(cert.Gross)}, retention {M(cert.Retention)}, advance recovered {M(cert.AdvanceRecovered)}, tax withheld {M(cert.Withheld)}, payable {M(cert.Payable)}.";
             },
             List = SubcontractsAsync,
         };
