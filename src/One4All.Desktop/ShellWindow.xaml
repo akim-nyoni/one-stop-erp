@@ -63,6 +63,8 @@
                 <MenuItem Header="Supplier Statement Reconciliation…" Click="OpenSupplierReconciliation_Click" />
             </MenuItem>
             <MenuItem Header="_Operations">
+                <MenuItem Header="System Manager — Companies, Accounts, Tax, Traders, Items…" Tag="System Manager" Click="OpenOperations_Click" />
+                <Separator />
                 <MenuItem Header="Point of Sale — Refunds, Till Events, Gift Cards…" Tag="Point of Sale" Click="OpenOperations_Click" />
                 <MenuItem Header="Stock — Lots, Transfers, Stocktakes, Assembly, Pricing…" Tag="Stock" Click="OpenOperations_Click" />
                 <MenuItem Header="Purchasing — Delivery Schedules &amp; Expediting…" Tag="Purchasing" Click="OpenOperations_Click" />
