@@ -1,3 +1,4 @@
+using One4All.Application.Abstractions.Inventory;
 using One4All.Application.Abstractions.Security;
 using One4All.Core.Security;
 using System.Collections.ObjectModel;
@@ -147,6 +148,10 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
     /// <summary>Gets or sets the supervisor's PIN (set from the PIN box, never shown).</summary>
     public string SupervisorPin { get; set; } = string.Empty;
+
+    /// <summary>What was scanned or typed: a barcode (plain or with an embedded weight / price), a PLU or an item code.</summary>
+    [ObservableProperty]
+    private string _scanEntry = string.Empty;
 
     /// <summary>The loyalty member earning points on this sale.</summary>
     [ObservableProperty]
@@ -482,9 +487,36 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [RelayCommand]
     private void TenderCash() => AddTender(TenderType.Cash, allowOverTender: true);
 
-    /// <summary>Takes a card tender for the entered amount (or the exact balance when blank).</summary>
+    /// <summary>Takes a card tender for the entered amount (or the exact balance when blank), through the card terminal when one is connected.</summary>
     [RelayCommand]
-    private void TenderCard() => AddTender(TenderType.Card, allowOverTender: false);
+    private async Task TenderCardAsync()
+    {
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        if (scope.ServiceProvider.GetRequiredService<IDeviceProvider>().CardTerminal is not ICardTerminal terminal || !IsSessionOpen || _ticket.Lines.Count == 0)
+        {
+            AddTender(TenderType.Card, allowOverTender: false);
+            return;
+        }
+
+        decimal amount = string.IsNullOrWhiteSpace(TenderEntry) ? _ticket.BalanceDue : TryEntry(out decimal typed) ? Math.Min(typed, _ticket.BalanceDue) : 0m;
+        if (amount <= 0m)
+        {
+            StatusMessage = "Enter a valid amount.";
+            return;
+        }
+
+        StatusMessage = $"Present the card for {amount:N2}…";
+        CardAuthorisation answer = await terminal.ChargeAsync(amount, $"POS{_terminalId}-{DateTime.Now:HHmmss}").ConfigureAwait(true);
+        if (!answer.Approved)
+        {
+            StatusMessage = $"Card declined: {answer.AuthorisationCode}";
+            return;
+        }
+
+        TenderEntry = amount.ToString(CultureInfo.CurrentCulture);
+        AddTender(TenderType.Card, allowOverTender: false);
+        StatusMessage = $"Card {answer.MaskedCard} approved ({answer.AuthorisationCode}). " + StatusMessage;
+    }
 
     private void AddTender(TenderType type, bool allowOverTender)
     {
@@ -540,6 +572,107 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             {
                 SelectedCartLine = rebuilt;
             }
+        }
+    }
+
+    /// <summary>
+    /// Adds a scanned or typed stock item: an embedded weight barcode sells that weight and an embedded price barcode that price; otherwise the
+    /// code is looked up (barcode, PLU, pack barcode, item code) and priced from the price list for the quantity on the pad (default 1).
+    /// </summary>
+    [RelayCommand]
+    private async Task ScanAsync()
+    {
+        string code = ScanEntry.Trim();
+        ScanEntry = string.Empty;
+        if (!IsSessionOpen || code.Length == 0)
+        {
+            return;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        IDeviceProvider devices = scope.ServiceProvider.GetRequiredService<IDeviceProvider>();
+        EmbeddedBarcode? embedded = Barcodes.TryParseEmbedded(code, devices.BarcodeRules);
+        Result<ItemLookup> found = await scope.ServiceProvider.GetRequiredService<IItemCatalogueService>().LookupAsync(_companyId, embedded?.ItemCode ?? code).ConfigureAwait(true);
+        if (found.IsFailure)
+        {
+            StatusMessage = $"Nothing found for {code}.";
+            return;
+        }
+
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        Item item = await db.Items.AsNoTracking().SingleAsync(i => i.Id == found.Value.ItemId).ConfigureAwait(true);
+        if (string.IsNullOrWhiteSpace(item.RevenueAccountCode))
+        {
+            StatusMessage = $"{item.Description} has no revenue account; it cannot be sold here.";
+            return;
+        }
+
+        decimal rate = item.TaxCode is not null && _taxRates.TryGetValue(item.TaxCode, out decimal r) ? r : 0m;
+        decimal quantity = embedded?.Kind == EmbeddedValueKind.Weight ? embedded.Value : (TryEntry(out decimal typed) && typed > 0m ? typed : 1m) * found.Value.Factor;
+        decimal unitPrice;
+        if (embedded?.Kind == EmbeddedValueKind.Price)
+        {
+            // The label's price is what the customer pays (tax included); sold as one pack.
+            unitPrice = PosMoney.Round(embedded.Value / (1m + rate));
+            quantity = 1m;
+        }
+        else
+        {
+            Result<ResolvedPrice> price = await scope.ServiceProvider.GetRequiredService<IPricingService>().PriceAsync(_companyId, null, item.Id, quantity).ConfigureAwait(true);
+            if (price.IsFailure)
+            {
+                StatusMessage = $"{item.Description}: {price.Error.Message}";
+                return;
+            }
+
+            unitPrice = price.Value.UnitPrice;
+        }
+
+        PosTicketLine line = _ticket.AddLine(item.Id, item.Description, unitPrice, rate, item.RevenueAccountCode, item.TaxCode, quantity);
+        TenderEntry = string.Empty;
+        RebuildCart();
+        StatusMessage = $"{item.Description} × {quantity:0.###}";
+        await ShowOnDisplayAsync(devices, line.Description, line.LineGross).ConfigureAwait(true);
+    }
+
+    /// <summary>Sets the selected line's quantity to the weight on the scale (a settled weight only).</summary>
+    [RelayCommand]
+    private async Task WeighAsync()
+    {
+        if (SelectedCartLine is not PosCartLineVm row)
+        {
+            StatusMessage = "Select the line to weigh.";
+            return;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        IScale? scale = scope.ServiceProvider.GetRequiredService<IDeviceProvider>().Scale;
+        ScaleReading? reading = scale is null ? null : await scale.ReadAsync().ConfigureAwait(true);
+        if (reading is null || !reading.Stable || reading.Kilograms <= 0m)
+        {
+            StatusMessage = scale is null ? "No scale is connected to this till." : reading is null ? "The scale did not answer." : "Wait for the weight to settle.";
+            return;
+        }
+
+        row.Line.Quantity = reading.Kilograms;
+        RebuildCart();
+        StatusMessage = $"{row.Line.Description}: {reading.Kilograms:0.000} kg";
+    }
+
+    /// <summary>Sends the last receipt to the receipt printer.</summary>
+    /// <returns>Null when printed, or why not (no printer: the caller saves it to a file instead).</returns>
+    public async Task<string?> PrintLastReceiptAsync()
+    {
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        IReceiptPrinter? printer = scope.ServiceProvider.GetRequiredService<IDeviceProvider>().Printer;
+        return printer is null ? "No receipt printer." : await printer.PrintAsync(EscPosBuilder.Receipt(LastReceiptText, openDrawer: false)).ConfigureAwait(true);
+    }
+
+    private static async Task ShowOnDisplayAsync(IDeviceProvider devices, string label, decimal amount)
+    {
+        if (devices.Display is ICustomerDisplay display)
+        {
+            await display.ShowAsync(label.Length > 20 ? label[..20] : label, Infrastructure.Pos.DisplayText.Amount("", amount)).ConfigureAwait(true);
         }
     }
 
@@ -813,12 +946,18 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             IPosReceiptService receipts = scope.ServiceProvider.GetRequiredService<IPosReceiptService>();
             Result<string> receipt = await receipts.RenderReceiptTextAsync(request.CompanyId, result.Value.SaleId).ConfigureAwait(true);
             LastReceiptText = receipt.IsSuccess ? receipt.Value : string.Empty;
+            IDeviceProvider devices = scope.ServiceProvider.GetRequiredService<IDeviceProvider>();
+            bool cashTaken = request.Tenders.Any(t => t.TenderType == TenderType.Cash);
+            string? printed = devices.Printer is IReceiptPrinter printer && LastReceiptText.Length > 0
+                ? await printer.PrintAsync(EscPosBuilder.Receipt(LastReceiptText, cashTaken && devices.Drawer is not null)).ConfigureAwait(true)
+                : null;
+            await ShowOnDisplayAsync(devices, "Thank you - change", change).ConfigureAwait(true);
 
             _ticket.Clear();
             AgeVerified = false;
             PrescriptionReference = string.Empty;
             RebuildCart();
-            StatusMessage = $"Sale {saleNumber} posted (journal {result.Value.JournalNumber}). Change {change:N2}.{loyalty}";
+            StatusMessage = $"Sale {saleNumber} posted (journal {result.Value.JournalNumber}). Change {change:N2}.{loyalty}{(printed is null ? string.Empty : $" Receipt not printed: {printed}")}";
         }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
         {

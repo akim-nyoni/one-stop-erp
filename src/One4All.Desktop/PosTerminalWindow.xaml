@@ -76,6 +76,16 @@
             <!-- Left: categories + products -->
             <Border Grid.Column="0" Background="{StaticResource Panel}" CornerRadius="8" Padding="10" Margin="0,0,10,0">
                 <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <Button Content="Weigh" Style="{StaticResource PadButton}" Height="36" Width="90" FontSize="14" Background="#6C3483" Command="{Binding WeighCommand}" DockPanel.Dock="Right" />
+                        <Button Content="Add" Style="{StaticResource PadButton}" Height="36" Width="70" FontSize="14" Background="#1E8449" Command="{Binding ScanCommand}" DockPanel.Dock="Right" />
+                        <TextBox x:Name="ScanBox" Text="{Binding ScanEntry, UpdateSourceTrigger=PropertyChanged}" FontSize="18" Padding="6,4" Margin="0,0,6,0"
+                                 ToolTip="Scan a barcode or type a PLU / item code and press Enter (type a quantity on the pad first for more than one)">
+                            <TextBox.InputBindings>
+                                <KeyBinding Key="Enter" Command="{Binding ScanCommand}" />
+                            </TextBox.InputBindings>
+                        </TextBox>
+                    </DockPanel>
                     <ListBox DockPanel.Dock="Top" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}"
                              Background="Transparent" BorderThickness="0" Margin="0,0,0,8">
                         <ListBox.ItemsPanel>

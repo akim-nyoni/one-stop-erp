@@ -40,6 +40,12 @@ public partial class PosTerminalWindow : Window
             return;
         }
 
+        // A connected receipt printer gets it directly; otherwise it is saved as a file.
+        if (await _viewModel.PrintLastReceiptAsync().ConfigureAwait(true) is null)
+        {
+            return;
+        }
+
         SaveFileDialog dialog = new()
         {
             FileName = "receipt.txt",

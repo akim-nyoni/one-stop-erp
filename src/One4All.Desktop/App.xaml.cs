@@ -41,6 +41,7 @@ public partial class App : System.Windows.Application
 
             ServiceCollection services = new();
             services.AddOne4AllInfrastructure(connectionString, licensing);
+            services.AddSingleton(PosDevices());
             services.AddTransient<ViewModels.LoginViewModel>();
             services.AddSingleton<DesktopSession>();
             _services = services.BuildServiceProvider();
@@ -102,6 +103,23 @@ public partial class App : System.Windows.Application
         {
             await licence.InstallAsync(DevLicensing.LicenceToken).ConfigureAwait(false);
         }
+    }
+
+    // The till's peripherals from appsettings (Pos:Devices); ONE4ALL_POS_SIMULATE=1 puts every device on its simulator.
+    private static One4All.Infrastructure.Pos.PosDeviceOptions PosDevices()
+    {
+        One4All.Infrastructure.Pos.PosDeviceOptions options = new();
+        new ConfigurationBuilder().SetBasePath(AppContext.BaseDirectory).AddJsonFile("appsettings.json", optional: true).AddJsonFile("appsettings.Development.json", optional: true)
+            .Build().GetSection("Pos:Devices").Bind(options);
+        if (Environment.GetEnvironmentVariable("ONE4ALL_POS_SIMULATE") == "1")
+        {
+            foreach (One4All.Infrastructure.Pos.DeviceSettings device in new[] { options.Printer, options.Scale, options.Display, options.CardTerminal, options.LabelPrinter })
+            {
+                device.Connection = One4All.Infrastructure.Pos.DeviceConnection.Simulator;
+            }
+        }
+
+        return options;
     }
 
     private static string ResolveConnectionString()

@@ -147,6 +147,8 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Communications.IMessageGateway, Communications.HttpSmsGateway>();
         services.AddScoped<Application.Abstractions.Communications.IMessageGateway, Communications.WhatsAppCloudGateway>();
         services.AddScoped<Application.Abstractions.Communications.IWhatsAppWebhookService, Communications.WhatsAppWebhookService>();
+        services.AddSingleton(new Pos.PosDeviceOptions());
+        services.AddSingleton<Application.Abstractions.Pos.IDeviceProvider>(sp => new Pos.DeviceProvider(sp.GetRequiredService<Pos.PosDeviceOptions>()));
         services.AddScoped<Application.Abstractions.Integration.IWebhookService, Integration.WebhookService>();
         services.AddScoped<Application.Abstractions.Communications.INotificationService, Communications.NotificationService>();
         if (!services.Any(d => d.ServiceType == typeof(Application.Municipal.IPrepaidTokenGenerator)))
