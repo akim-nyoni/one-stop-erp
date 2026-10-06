@@ -122,6 +122,9 @@ public sealed class Customer : SoftDeletableEntity, ICompanyScoped
     /// <summary>Optional sales agent code.</summary>
     public string? SalesAgent { get; set; }
 
+    /// <summary>Gets or sets the delivery zone deliveries to the customer are charged at (brief §4.13).</summary>
+    public string? DeliveryZone { get; set; }
+
     /// <summary>The selling price list this customer buys from (null = the company's default list).</summary>
     public long? PriceListId { get; set; }
 

@@ -8,6 +8,7 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 {
     public void Configure(EntityTypeBuilder<Customer> b)
     {
+        b.Property(x => x.DeliveryZone).HasMaxLength(20);
         b.ToTable("customer", Schemas.AccountsReceivable);
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).HasMaxLength(20);

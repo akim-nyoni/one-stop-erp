@@ -64,6 +64,21 @@ public sealed class SalesDelivery : AuditableEntity, ICompanyScoped
     /// <summary>Gets the lines.</summary>
     public IReadOnlyList<SalesDeliveryLine> Lines => _lines.AsReadOnly();
 
+    /// <summary>Gets the delivery charge invoiced, if it has been.</summary>
+    public decimal? DeliveryCharge { get; private set; }
+
+    /// <summary>Gets the invoice the delivery charge was billed on.</summary>
+    public string? ChargeInvoiceNumber { get; private set; }
+
+    /// <summary>Records the delivery charge billed.</summary>
+    /// <param name="charge">The charge.</param>
+    /// <param name="invoiceNumber">The invoice.</param>
+    public void RecordCharge(decimal charge, string invoiceNumber)
+    {
+        DeliveryCharge = charge;
+        ChargeInvoiceNumber = invoiceNumber;
+    }
+
     /// <summary>Adds a line.</summary>
     /// <param name="salesOrderLineId">The order line.</param>
     /// <param name="itemId">The item.</param>

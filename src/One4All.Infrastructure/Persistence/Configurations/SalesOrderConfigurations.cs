@@ -78,6 +78,8 @@ internal sealed class SalesDeliveryConfiguration : IEntityTypeConfiguration<Sale
         b.Property(x => x.Driver).HasMaxLength(120);
         b.Property(x => x.ReceivedBy).HasMaxLength(120);
         b.Property(x => x.PodReference).HasMaxLength(60);
+        b.Property(x => x.DeliveryCharge).HasPrecision(19, 4);
+        b.Property(x => x.ChargeInvoiceNumber).HasMaxLength(40);
         b.HasIndex(x => new { x.CompanyId, x.Reference });
         b.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.SalesDeliveryId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
@@ -91,5 +93,20 @@ internal sealed class SalesDeliveryLineConfiguration : IEntityTypeConfiguration<
         b.ToTable("delivery_line", Schemas.SalesOrders);
         b.HasKey(x => x.Id);
         b.Property(x => x.Quantity).HasPrecision(19, 4);
+    }
+}
+
+internal sealed class DeliveryZoneRateConfiguration : IEntityTypeConfiguration<DeliveryZoneRate>
+{
+    public void Configure(EntityTypeBuilder<DeliveryZoneRate> b)
+    {
+        b.ToTable("delivery_zone_rate", Schemas.SalesOrders);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Zone).HasMaxLength(20);
+        b.Property(x => x.BaseCharge).HasPrecision(19, 4);
+        b.Property(x => x.PerKg).HasPrecision(19, 6);
+        b.Property(x => x.PerCubicMetre).HasPrecision(19, 6);
+        b.Property(x => x.FreeAboveValue).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.Zone }).IsUnique();
     }
 }

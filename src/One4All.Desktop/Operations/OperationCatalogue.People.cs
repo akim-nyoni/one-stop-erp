@@ -475,6 +475,30 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Save a delivery zone rate", ListTitle = "Delivery zone rates",
+            Description = "A zone's charge per delivery plus per kg and per m³ of goods sent (from item weights and volumes), free above a goods value.",
+            Fields = [Req("Zone", "Zone"), Num("Base", "Charge per delivery", "0"), Num("PerKg", "Per kg", "0"), Num("PerM3", "Per m³", "0"), OptNum("Free", "Free above goods value")],
+            Run = async (c, i) => Check(await c.Get<IDeliveryChargeService>().SaveRateAsync(c.CompanyId, i.Text("Zone"), i.Number("Base"), i.Number("PerKg"), i.Number("PerM3"), i.OptionalNumber("Free"))
+                .ConfigureAwait(true), id => $"Zone {i.Text("Zone").ToUpperInvariant()} saved."),
+            List = async c => Table(await c.Db.DeliveryZoneRates.AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Zone).ToListAsync().ConfigureAwait(true),
+                ("Zone", r => r.Zone), ("Per delivery", r => M(r.BaseCharge)), ("Per kg", r => Q(r.PerKg)), ("Per m3", r => Q(r.PerCubicMetre)), ("Free above", r => r.FreeAboveValue is decimal f ? M(f) : "-")),
+        };
+        yield return new Operation
+        {
+            Module = "Sales & Schools", Title = "Charge for a delivery", Description = "Works out a delivery's charge from the customer's zone; tick 'Invoice' to bill it to the customer (once per delivery).",
+            Fields = [Req("Delivery", "Delivery reference"), Tick("Invoice", "Invoice it"), Opt("Number", "Invoice number"), Today(), Req("Revenue", "Delivery income account", "4000"), Opt("TaxCode", "Tax code"),
+                Opt("TaxAccount", "Output tax account")],
+            Run = async (c, i) =>
+            {
+                IDeliveryChargeService service = c.Get<IDeliveryChargeService>();
+                DeliveryChargeQuote quote = Check(i.Flag("Invoice")
+                    ? await service.InvoiceAsync(c.CompanyId, i.Text("Delivery"), i.Text("Number"), i.Date("Date"), i.Text("Revenue"), i.Optional("TaxCode"), i.Optional("TaxAccount")).ConfigureAwait(true)
+                    : await service.QuoteAsync(c.CompanyId, i.Text("Delivery")).ConfigureAwait(true));
+                return $"Zone {quote.Zone}: {Q(quote.WeightKg)} kg, {Q(quote.VolumeM3)} m³, goods {M(quote.GoodsValue)} → charge {M(quote.Charge)}{(i.Flag("Invoice") ? $", invoiced on {i.Text("Number")}" : string.Empty)}.";
+            },
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Top up / spend a student wallet", ListTitle = "Wallet balances",
             Description = "A top-up is paid into the bank; a spend (tuck shop) is limited to the balance and the student's daily limit.",
             Fields = [Req("Student", "Admission number"), Pick("Action", "Action", "Top up", "Spend"), Today(), Num("Amount", "Amount"), Req("Wallet", "Wallet liability account"),

@@ -20905,6 +20905,61 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("wastage", "res");
                 });
 
+            modelBuilder.Entity("One4All.Core.SalesOrders.DeliveryZoneRate", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("BaseCharge")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("base_charge");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal?>("FreeAboveValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("free_above_value");
+
+                    b.Property<decimal>("PerCubicMetre")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("per_cubic_metre");
+
+                    b.Property<decimal>("PerKg")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("per_kg");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Zone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("zone");
+
+                    b.HasKey("Id")
+                        .HasName("pk_delivery_zone_rate");
+
+                    b.HasIndex("CompanyId", "Zone")
+                        .IsUnique()
+                        .HasDatabaseName("ix_delivery_zone_rate_company_id_zone");
+
+                    b.ToTable("delivery_zone_rate", "sop");
+                });
+
             modelBuilder.Entity("One4All.Core.SalesOrders.Quotation", b =>
                 {
                     b.Property<long>("Id")
@@ -21050,6 +21105,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("ChargeInvoiceNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("charge_invoice_number");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -21065,6 +21125,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("DeliveredOn")
                         .HasColumnType("date")
                         .HasColumnName("delivered_on");
+
+                    b.Property<decimal?>("DeliveryCharge")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("delivery_charge");
 
                     b.Property<DateOnly>("DespatchedOn")
                         .HasColumnType("date")
@@ -23422,6 +23487,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("DeletedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
+
+                    b.Property<string>("DeliveryZone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("delivery_zone");
 
                     b.Property<string>("Email")
                         .HasMaxLength(200)
