@@ -120,6 +120,35 @@ public sealed class SchoolBillingService : ISchoolBillingService
         return new TermBillResult(bills, totalNet, skipped);
     }
 
+    /// <inheritdoc />
+    public async Task<Result> SetSiblingDiscountAsync(long companyId, int fromChild, decimal percent, CancellationToken ct = default)
+    {
+        if (fromChild < 2 || percent is < 0m or > 100m)
+        {
+            return Result.Failure(Error.Validation("School.SiblingDiscountInvalid", "A sibling discount starts at the second child or later and is between 0 and 100%."));
+        }
+
+        SiblingDiscount? rule = await _db.Set<SiblingDiscount>().FirstOrDefaultAsync(r => r.CompanyId == companyId && r.FromChild == fromChild, ct).ConfigureAwait(false);
+        if (percent == 0m)
+        {
+            if (rule is not null)
+            {
+                _db.Remove(rule);
+            }
+        }
+        else if (rule is null)
+        {
+            _db.Add(new SiblingDiscount(companyId, fromChild, percent));
+        }
+        else
+        {
+            rule.Percent = percent;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
     private async Task<HashSet<string>> AlreadyRaisedAsync(long companyId, List<string> numbers, CancellationToken ct)
         => (await _db.OpenItems
             .Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && numbers.Contains(i.DocumentNumber))
@@ -134,12 +163,23 @@ public sealed class SchoolBillingService : ISchoolBillingService
             return extras.Error;
         }
 
+        // Siblings: enrolled students sharing the guardian, in admission (id) order.
         decimal gross = structure.CompulsoryTotal;
-        decimal discount = student.ComputeDiscount(gross);
+        List<SiblingDiscount> rules = await _db.Set<SiblingDiscount>().AsNoTracking().Where(r => r.CompanyId == company.Id).ToListAsync(ct).ConfigureAwait(false);
+        decimal siblingPercent = 0m;
+        if (rules.Count > 0)
+        {
+            int ordinal = await _db.Set<Student>().CountAsync(s => s.CompanyId == company.Id && s.IsEnrolled && s.GuardianCustomerId == student.GuardianCustomerId && s.Id < student.Id, ct)
+                .ConfigureAwait(false) + 1;
+            siblingPercent = SiblingDiscount.PercentFor(rules, ordinal);
+        }
+
+        (decimal bursary, decimal sibling) = student.ComputeDiscounts(gross, siblingPercent);
+        decimal discount = bursary + sibling;
         decimal net = gross - discount;
         if (net <= 0m)
         {
-            return new StudentBillResult(student.Id, gross, discount, 0m, null, null);
+            return new StudentBillResult(student.Id, gross, discount, 0m, null, null, sibling);
         }
 
         Result<TradingPostingResult> posted = await _salesLedger.PostInvoiceAsync(new SalesInvoiceRequest
@@ -169,7 +209,7 @@ public sealed class SchoolBillingService : ISchoolBillingService
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
-        return new StudentBillResult(student.Id, gross, discount, net, posted.Value.OpenItemId, posted.Value.JournalNumber);
+        return new StudentBillResult(student.Id, gross, discount, net, posted.Value.OpenItemId, posted.Value.JournalNumber, sibling);
     }
 
     // Transport and boarding are billed on their own invoices (-TR, -HS) to their own revenue accounts, without bursary discounts;

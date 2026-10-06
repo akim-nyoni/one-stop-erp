@@ -464,6 +464,15 @@ public static partial class OperationCatalogue
     {
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Set a sibling discount", ListTitle = "Sibling discounts",
+            Description = "A family's children (sharing a guardian, in admission order) get this percentage off from the given child on, after any bursary. 0 removes the rule.",
+            Fields = [Num("From", "From child (2 = second)", "2"), Num("Percent", "Discount %")],
+            Run = async (c, i) => Check(await c.Get<ISchoolBillingService>().SetSiblingDiscountAsync(c.CompanyId, (int)i.Number("From"), i.Number("Percent")).ConfigureAwait(true), "Sibling discount updated."),
+            List = async c => Table(await c.Db.Set<Core.Schools.SiblingDiscount>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.FromChild).ToListAsync().ConfigureAwait(true),
+                ("From child", r => r.FromChild), ("Discount %", r => Q(r.Percent))),
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Confirm a delivery (proof of delivery)", ListTitle = "Deliveries not yet confirmed",
             Description = "Records who received a despatched delivery, when, and the signed POD reference.",
             Fields = [Req("Delivery", "Delivery reference"), Today(), Req("ReceivedBy", "Received by"), Opt("Pod", "POD reference")],

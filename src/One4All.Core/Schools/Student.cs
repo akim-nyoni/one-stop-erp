@@ -102,6 +102,17 @@ public sealed class Student : SoftDeletableEntity, ICompanyScoped
     /// <summary>Withdraws the student from enrolment.</summary>
     public void Withdraw() => IsEnrolled = false;
 
+    /// <summary>The bursary, then the sibling percentage on what is left.</summary>
+    /// <param name="compulsoryTotal">The compulsory fees.</param>
+    /// <param name="siblingPercent">The sibling discount percentage.</param>
+    /// <returns>The bursary and the sibling discount.</returns>
+    public (decimal Bursary, decimal Sibling) ComputeDiscounts(decimal compulsoryTotal, decimal siblingPercent)
+    {
+        decimal bursary = ComputeDiscount(compulsoryTotal);
+        decimal sibling = decimal.Round((compulsoryTotal - bursary) * siblingPercent / 100m, 2, MidpointRounding.AwayFromZero);
+        return (bursary, sibling);
+    }
+
     /// <summary>Computes the discount for a given compulsory fee total.</summary>
     /// <param name="compulsoryTotal">The compulsory fee total.</param>
     /// <returns>The discount amount (never more than the total).</returns>
@@ -117,3 +128,42 @@ public sealed class Student : SoftDeletableEntity, ICompanyScoped
         return discount > compulsoryTotal ? compulsoryTotal : discount;
     }
 }
+
+/// <summary>
+/// A sibling discount (<c>sch.sibling_discount</c>): from the given child of a family (students sharing a guardian, in admission order),
+/// a percentage off the compulsory fees left after any bursary. The rule with the highest child number not above a student's applies.
+/// </summary>
+public sealed class SiblingDiscount : Entity, ICompanyScoped
+{
+    private SiblingDiscount()
+    {
+    }
+
+    /// <summary>Creates the rule.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromChild">The child it starts at (2 = the second child).</param>
+    /// <param name="percent">The percentage off.</param>
+    public SiblingDiscount(long companyId, int fromChild, decimal percent)
+    {
+        CompanyId = companyId;
+        FromChild = fromChild;
+        Percent = percent;
+    }
+
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; private set; }
+
+    /// <summary>Gets the child it starts at.</summary>
+    public int FromChild { get; private set; }
+
+    /// <summary>Gets or sets the percentage off.</summary>
+    public decimal Percent { get; set; }
+
+    /// <summary>The sibling percentage for a child: the rule with the highest starting child not above it (0 when none applies).</summary>
+    /// <param name="rules">The company's rules.</param>
+    /// <param name="childOrdinal">The child's place in the family (1 = first).</param>
+    /// <returns>The percentage.</returns>
+    public static decimal PercentFor(IEnumerable<SiblingDiscount> rules, int childOrdinal)
+        => rules.Where(r => r.FromChild <= childOrdinal).OrderByDescending(r => r.FromChild).Select(r => r.Percent).FirstOrDefault();
+}
+

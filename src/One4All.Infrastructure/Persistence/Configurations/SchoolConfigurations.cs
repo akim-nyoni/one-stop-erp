@@ -94,3 +94,14 @@ internal sealed class StudentWalletEntryConfiguration : IEntityTypeConfiguration
         b.HasIndex(x => new { x.StudentId, x.Date });
     }
 }
+
+internal sealed class SiblingDiscountConfiguration : IEntityTypeConfiguration<SiblingDiscount>
+{
+    public void Configure(EntityTypeBuilder<SiblingDiscount> b)
+    {
+        b.ToTable("sibling_discount", Schemas.School);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Percent).HasPrecision(9, 4);
+        b.HasIndex(x => new { x.CompanyId, x.FromChild }).IsUnique();
+    }
+}

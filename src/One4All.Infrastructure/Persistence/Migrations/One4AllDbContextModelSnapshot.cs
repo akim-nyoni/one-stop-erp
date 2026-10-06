@@ -22928,6 +22928,42 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("hostel", "sch");
                 });
 
+            modelBuilder.Entity("One4All.Core.Schools.SiblingDiscount", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<int>("FromChild")
+                        .HasColumnType("integer")
+                        .HasColumnName("from_child");
+
+                    b.Property<decimal>("Percent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("percent");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sibling_discount");
+
+                    b.HasIndex("CompanyId", "FromChild")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sibling_discount_company_id_from_child");
+
+                    b.ToTable("sibling_discount", "sch");
+                });
+
             modelBuilder.Entity("One4All.Core.Schools.Student", b =>
                 {
                     b.Property<long>("Id")

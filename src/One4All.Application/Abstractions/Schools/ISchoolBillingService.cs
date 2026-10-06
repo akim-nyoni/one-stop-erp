@@ -9,7 +9,7 @@ namespace One4All.Application.Abstractions.Schools;
 /// <param name="NetFees">The net billed to the guardian.</param>
 /// <param name="OpenItemId">The AR open item raised, or null when nothing was billable.</param>
 /// <param name="JournalNumber">The AR journal number, or null when nothing was billable.</param>
-public readonly record struct StudentBillResult(long StudentId, decimal GrossFees, decimal Discount, decimal NetFees, long? OpenItemId, string? JournalNumber);
+public readonly record struct StudentBillResult(long StudentId, decimal GrossFees, decimal Discount, decimal NetFees, long? OpenItemId, string? JournalNumber, decimal SiblingDiscount = 0m);
 
 /// <summary>The result of a term billing run.</summary>
 /// <param name="Bills">The per-student results.</param>
@@ -54,4 +54,15 @@ public interface ISchoolBillingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The run result.</returns>
     Task<Result<TermBillResult>> BillTermAsync(long companyId, long feeStructureId, string invoiceNumberPrefix, DateOnly date, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sets the sibling discount from a child of the family onward (students sharing a guardian, in admission order): the second
+    /// child might get 10% and the third and later 15%. A percentage of 0 removes the rule. Applied when billing, after any bursary.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromChild">The child it starts at (2 or more).</param>
+    /// <param name="percent">The percentage (0–100).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or why not.</returns>
+    Task<Result> SetSiblingDiscountAsync(long companyId, int fromChild, decimal percent, CancellationToken ct = default);
 }
