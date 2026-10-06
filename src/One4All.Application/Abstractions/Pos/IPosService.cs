@@ -57,6 +57,12 @@ public sealed class CompleteSaleRequest
     /// <summary>The sold lines.</summary>
     public IReadOnlyList<PosSaleLineRequest> Lines { get; init; } = [];
 
+    /// <summary>Gets a value indicating whether the cashier checked the buyer is old enough for the sale's age-restricted items.</summary>
+    public bool AgeVerified { get; init; }
+
+    /// <summary>Gets the prescription the sale's prescription-only items are sold against.</summary>
+    public string? PrescriptionReference { get; init; }
+
     /// <summary>The tenders (including any change as IsChange).</summary>
     public IReadOnlyList<PosTenderRequest> Tenders { get; init; } = [];
 }

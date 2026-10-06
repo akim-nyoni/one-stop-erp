@@ -191,6 +191,34 @@ public static partial class OperationCatalogue
         const string module = "Stock";
         yield return new Operation
         {
+            Module = module, Title = "Price a list from cost", ListTitle = "Price lists",
+            Description = "Items with no price on the list are priced from cost (average, else standard): a markup on cost or a margin on price, rounded to a price point. Basis None turns it off.",
+            Fields = [Req("List", "Price list code"), Pick("Basis", "Basis", Enum.GetNames<CostPlusBasis>()), Num("Percent", "Markup or margin %", "0"), Num("RoundTo", "Price point", "0.05"),
+                Pick("Rounding", "Rounding", Enum.GetNames<PriceRounding>())],
+            Run = async (c, i) =>
+            {
+                long list = await FindAsync(c.Db.PriceLists, p => p.CompanyId == c.CompanyId && p.Code.ToUpper() == i.Text("List").ToUpper(), p => p.Id, "price list", i.Text("List")).ConfigureAwait(true);
+                return Check(await c.Get<IPricingService>().SetCostPlusAsync(c.CompanyId, list, Enum.Parse<CostPlusBasis>(i.Text("Basis")), i.Number("Percent"), i.Number("RoundTo"),
+                    Enum.Parse<PriceRounding>(i.Text("Rounding"))).ConfigureAwait(true), "Cost-plus pricing updated.");
+            },
+            List = async c => Table(await c.Db.PriceLists.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.Code).ToListAsync().ConfigureAwait(true),
+                ("List", p => p.Code), ("Name", p => p.Name), ("Currency", p => p.Currency.Value), ("Default", p => p.IsDefault), ("From cost", p => p.CostPlusBasis), ("Percent", p => Q(p.CostPlusPercent)),
+                ("Price point", p => Q(p.CostPlusRoundTo))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Set item sale limits", ListTitle = "Items with sale limits",
+            Description = "Age-restricted items need the till's age check, a per-sale limit caps the quantity in one sale, and prescription-only items need a prescription reference.",
+            Fields = [Req("Item", "Item code"), OptNum("Age", "Minimum age"), OptNum("Max", "Most per sale"), Tick("Rx", "Prescription only")],
+            Run = async (c, i) => Check(await c.Get<IItemCatalogueService>().SetSaleLimitsAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true),
+                i.OptionalNumber("Age") is decimal age ? (int)age : null, i.OptionalNumber("Max"), i.Flag("Rx")).ConfigureAwait(true), "Sale limits updated."),
+            List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && (x.MinimumAge != null || x.MaxQuantityPerSale != null || x.RequiresPrescription))
+                .OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                ("Item", x => x.Code), ("Description", x => x.Description), ("Minimum age", x => x.MinimumAge), ("Most per sale", x => x.MaxQuantityPerSale is decimal m ? Q(m) : null),
+                ("Prescription only", x => x.RequiresPrescription)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Find an item", Description = "Searches codes, PLUs, barcodes (item, pack, alias), synonyms, brands and descriptions.",
             Fields = [Req("Term", "Search for")],
             Run = async (c, i) =>

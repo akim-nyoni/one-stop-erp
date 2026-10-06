@@ -94,6 +94,12 @@ public sealed class Sale : AuditableEntity, ICompanyScoped
     /// <param name="amount">Tendered less the exact total.</param>
     public void RecordCashRounding(decimal amount) => CashRounding = amount;
 
+    /// <summary>Gets or sets a value indicating whether the cashier confirmed the buyer's age for age-restricted items.</summary>
+    public bool AgeVerified { get; set; }
+
+    /// <summary>Gets or sets the prescription the sale's prescription items were sold against.</summary>
+    public string? PrescriptionReference { get; set; }
+
     public void AddTender(SaleTender tender) => _tenders.Add(tender);
 
     /// <summary>Voids the sale.</summary>

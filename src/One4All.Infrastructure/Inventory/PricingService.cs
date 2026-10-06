@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Inventory;
+using One4All.Application.Inventory;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.Inventory;
@@ -195,7 +196,7 @@ public sealed class PricingService : IPricingService
             customerListId = customer.PriceListId;
         }
 
-        // The customer's own list first.
+        // The customer's own list first: its price, else its cost-plus rule.
         if (customerListId is { } own)
         {
             PriceList? mine = await LoadActiveListAsync(companyId, p => p.Id == own, itemId, ct).ConfigureAwait(false);
@@ -204,17 +205,66 @@ public sealed class PricingService : IPricingService
             {
                 return new ResolvedPrice(itemId, quantity, line.UnitPrice, mine.Currency, mine.Id, mine.Code, line.MinimumQuantity, FromCustomerList: true);
             }
+
+            if (mine is { CostPlusBasis: not CostPlusBasis.None } && await FromCostAsync(companyId, mine, itemId, ct).ConfigureAwait(false) is decimal costPlus)
+            {
+                return new ResolvedPrice(itemId, quantity, costPlus, mine.Currency, mine.Id, mine.Code, 1m, FromCustomerList: true, FromCost: true);
+            }
         }
 
         // Then the company default.
         PriceList? fallback = await LoadActiveListAsync(companyId, p => p.IsDefault, itemId, ct).ConfigureAwait(false);
         PriceListLine? resolved = fallback?.Resolve(itemId, quantity);
+        if (fallback is not null && resolved is null && fallback.CostPlusBasis != CostPlusBasis.None
+            && await FromCostAsync(companyId, fallback, itemId, ct).ConfigureAwait(false) is decimal defaultCostPlus)
+        {
+            return new ResolvedPrice(itemId, quantity, defaultCostPlus, fallback.Currency, fallback.Id, fallback.Code, 1m, FromCustomerList: false, FromCost: true);
+        }
+
         if (fallback is null || resolved is null)
         {
             return Error.NotFound("Price.NoPrice", $"No selling price is set for item {itemId} at quantity {quantity}.");
         }
 
         return new ResolvedPrice(itemId, quantity, resolved.UnitPrice, fallback.Currency, fallback.Id, fallback.Code, resolved.MinimumQuantity, FromCustomerList: false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetCostPlusAsync(long companyId, long priceListId, CostPlusBasis basis, decimal percent, decimal roundTo, PriceRounding rounding, CancellationToken ct = default)
+    {
+        if (basis != CostPlusBasis.None && (percent < 0m || (basis == CostPlusBasis.Margin && percent >= 100m) || roundTo < 0m))
+        {
+            return Result.Failure(Error.Validation("Price.CostPlusInvalid", "A markup cannot be negative, a margin must be under 100%, and the price point cannot be negative."));
+        }
+
+        PriceList? list = await _db.PriceLists.FirstOrDefaultAsync(p => p.Id == priceListId && p.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (list is null)
+        {
+            return Result.Failure(Error.NotFound("Price.ListNotFound", $"Price list {priceListId} not found."));
+        }
+
+        CurrencyCode baseCurrency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).SingleAsync(ct).ConfigureAwait(false);
+        if (basis != CostPlusBasis.None && list.Currency != baseCurrency)
+        {
+            return Result.Failure(Error.Rule("Price.CostPlusCurrency", $"Cost is held in {baseCurrency}; list {list.Code} is in {list.Currency}."));
+        }
+
+        list.CostPlusBasis = basis;
+        list.CostPlusPercent = basis == CostPlusBasis.None ? 0m : percent;
+        list.CostPlusRoundTo = roundTo;
+        list.CostPlusRounding = (int)rounding;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    // The cost-plus price of an item on a list, or null when the item has no cost to price from.
+    private async Task<decimal?> FromCostAsync(long companyId, PriceList list, long itemId, CancellationToken ct)
+    {
+        var stock = await _db.StockBalances.AsNoTracking().Where(b => b.CompanyId == companyId && b.ItemId == itemId && b.QuantityOnHand > 0m)
+            .GroupBy(b => b.ItemId).Select(g => new { Quantity = g.Sum(b => b.QuantityOnHand), Value = g.Sum(b => b.TotalValue) }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        decimal? cost = stock is { Quantity: > 0m } ? stock.Value / stock.Quantity
+            : await _db.Items.AsNoTracking().Where(i => i.Id == itemId && i.CompanyId == companyId).Select(i => i.StandardCost).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return cost is > 0m ? PriceAdjustment.FromCost(cost.Value, list.CostPlusBasis, list.CostPlusPercent, list.CostPlusRoundTo, (PriceRounding)list.CostPlusRounding) : null;
     }
 
     // Loads one active list matching the predicate with only the item's lines attached.

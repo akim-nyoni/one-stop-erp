@@ -140,6 +140,13 @@
                                 </StackPanel>
                             </UniformGrid>
                             <UniformGrid Columns="2" Margin="0,4,0,0">
+                                <CheckBox Margin="2" VerticalAlignment="Bottom" Foreground="{StaticResource Muted}" Content="Age checked" IsChecked="{Binding AgeVerified}" />
+                                <StackPanel Margin="2">
+                                    <TextBlock Text="Prescription ref" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBox Text="{Binding PrescriptionReference}" />
+                                </StackPanel>
+                            </UniformGrid>
+                            <UniformGrid Columns="2" Margin="0,4,0,0">
                                 <StackPanel Margin="2">
                                     <TextBlock Text="Over/short a/c" Foreground="{StaticResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding OverShortAccountCode}" />

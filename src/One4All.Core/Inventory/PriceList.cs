@@ -3,6 +3,19 @@ using One4All.Core.Common;
 
 namespace One4All.Core.Inventory;
 
+/// <summary>How a price list prices items it has no price for from their cost (brief §4.1 price book).</summary>
+public enum CostPlusBasis
+{
+    /// <summary>It does not: an item needs a price on the list.</summary>
+    None = 0,
+
+    /// <summary>Cost plus a markup on cost: cost × (1 + p%).</summary>
+    Markup = 1,
+
+    /// <summary>A margin on the selling price: cost ÷ (1 − p%).</summary>
+    Margin = 2,
+}
+
 /// <summary>
 /// A selling price list (brief §4.2/§4.13, <c>inv.price_list</c>): per item, one or more quantity-break
 /// prices in the list's currency. A customer may be linked to a list; the company's default list is the
@@ -50,6 +63,18 @@ public sealed class PriceList : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Whether the list is active.</summary>
     public bool IsActive { get; set; }
+
+    /// <summary>Gets or sets how items without a price on the list are priced from their cost (none: they are not).</summary>
+    public CostPlusBasis CostPlusBasis { get; set; }
+
+    /// <summary>Gets or sets the markup on cost, or the margin on price, in percent.</summary>
+    public decimal CostPlusPercent { get; set; }
+
+    /// <summary>Gets or sets the price point cost-plus prices round to (0: cents).</summary>
+    public decimal CostPlusRoundTo { get; set; }
+
+    /// <summary>Gets or sets the rounding direction (0 nearest, 1 up, 2 down).</summary>
+    public int CostPlusRounding { get; set; }
 
     /// <summary>The price lines (item × minimum quantity).</summary>
     public IReadOnlyList<PriceListLine> Lines => _lines.AsReadOnly();

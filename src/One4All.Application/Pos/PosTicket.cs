@@ -32,7 +32,9 @@ public sealed record PosSaleContext(
     CurrencyCode Currency,
     string? TaxAccountCode,
     string ChangeAccountCode,
-    IReadOnlyDictionary<TenderType, string> TenderAccounts);
+    IReadOnlyDictionary<TenderType, string> TenderAccounts,
+    bool AgeVerified = false,
+    string? PrescriptionReference = null);
 
 /// <summary>
 /// One line on a POS ticket. Prices are tax-exclusive (a menu/item <c>Price</c> is a net price, matching
@@ -253,6 +255,8 @@ public sealed class PosTicket
             SaleDate = context.SaleDate,
             WarehouseId = context.WarehouseId,
             TaxAccountCode = context.TaxAccountCode,
+            AgeVerified = context.AgeVerified,
+            PrescriptionReference = context.PrescriptionReference,
             Lines = lines,
             Tenders = tenders,
         };

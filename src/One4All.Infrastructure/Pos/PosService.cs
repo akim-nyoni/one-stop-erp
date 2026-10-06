@@ -53,7 +53,22 @@ public sealed class PosService : IPosService
         Company company = await _db.Companies.FirstAsync(c => c.Id == request.CompanyId, ct).ConfigureAwait(false);
         CurrencyCode baseCurrency = company.BaseCurrency;
 
-        Sale sale = new(request.CompanyId, request.TerminalId, request.TillSessionId, request.CashierUserId, request.SaleNumber, request.SaleDate, baseCurrency);
+        Sale sale = new(request.CompanyId, request.TerminalId, request.TillSessionId, request.CashierUserId, request.SaleNumber, request.SaleDate, baseCurrency)
+        {
+            AgeVerified = request.AgeVerified, PrescriptionReference = string.IsNullOrWhiteSpace(request.PrescriptionReference) ? null : request.PrescriptionReference.Trim(),
+        };
+
+        // Age-restricted, quantity-limited and prescription-only items (brief §4.1).
+        List<long> soldIds = [.. request.Lines.Select(l => l.ItemId).Distinct()];
+        Dictionary<long, Application.Pos.ItemSaleLimits> limits = await _db.Items.AsNoTracking()
+            .Where(i => soldIds.Contains(i.Id) && (i.MinimumAge != null || i.MaxQuantityPerSale != null || i.RequiresPrescription))
+            .Select(i => new Application.Pos.ItemSaleLimits(i.Id, i.Code, i.MinimumAge, i.MaxQuantityPerSale, i.RequiresPrescription))
+            .ToDictionaryAsync(l => l.ItemId, ct).ConfigureAwait(false);
+        Result allowed = Application.Pos.ItemSaleRules.Check(request.Lines.Select(l => (l.ItemId, l.Quantity)), limits, request.AgeVerified, request.PrescriptionReference);
+        if (allowed.IsFailure)
+        {
+            return allowed.Error;
+        }
 
         foreach (PosSaleLineRequest line in request.Lines)
         {

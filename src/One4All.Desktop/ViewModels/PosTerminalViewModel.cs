@@ -117,6 +117,14 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [ObservableProperty]
     private string _taxAccountCode = string.Empty;
 
+    /// <summary>Whether the cashier has checked the buyer is old enough for age-restricted items.</summary>
+    [ObservableProperty]
+    private bool _ageVerified;
+
+    /// <summary>The prescription prescription-only items are sold against.</summary>
+    [ObservableProperty]
+    private string _prescriptionReference = string.Empty;
+
     /// <summary>The cash-over/short account the Z cash-up variance posts to.</summary>
     [ObservableProperty]
     private string _overShortAccountCode = string.Empty;
@@ -499,7 +507,9 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             saleNumber, DateOnly.FromDateTime(DateTime.Today), _warehouseId, _currency,
             TaxAccountCode: string.IsNullOrWhiteSpace(TaxAccountCode) ? null : TaxAccountCode.Trim(),
             ChangeAccountCode: CashAccountCode.Trim(),
-            TenderAccounts: tenderAccounts);
+            TenderAccounts: tenderAccounts,
+            AgeVerified: AgeVerified,
+            PrescriptionReference: string.IsNullOrWhiteSpace(PrescriptionReference) ? null : PrescriptionReference.Trim());
 
         Result<CompleteSaleRequest> build = _ticket.BuildSale(context);
         if (build.IsFailure)
@@ -528,6 +538,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             LastReceiptText = receipt.IsSuccess ? receipt.Value : string.Empty;
 
             _ticket.Clear();
+            AgeVerified = false;
+            PrescriptionReference = string.Empty;
             RebuildCart();
             StatusMessage = $"Sale {saleNumber} posted (journal {result.Value.JournalNumber}). Change {change:N2}.";
         }
@@ -536,6 +548,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             // The central database is unreachable — capture the sale locally and sync on reconnect.
             await CaptureOfflineAsync(request).ConfigureAwait(true);
             _ticket.Clear();
+            AgeVerified = false;
+            PrescriptionReference = string.Empty;
             RebuildCart();
             StatusMessage = $"Offline: sale {saleNumber} saved locally ({PendingOfflineCount} queued). It will sync when the connection returns.";
         }
@@ -551,7 +565,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             request.CompanyId, request.TerminalId, request.TillSessionId, request.CashierUserId,
             request.SaleNumber, request.SaleDate, request.WarehouseId, _currency.Value, request.TaxAccountCode,
             request.Lines.Select(l => new PosSaleLineEnvelope(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode)).ToList(),
-            request.Tenders.Select(t => new PosTenderEnvelope(t.TenderType, t.Currency.Value, t.Amount, t.AccountCode, t.IsChange)).ToList());
+            request.Tenders.Select(t => new PosTenderEnvelope(t.TenderType, t.Currency.Value, t.Amount, t.AccountCode, t.IsChange)).ToList(),
+            request.AgeVerified, request.PrescriptionReference);
 
         LocalOfflineEntry entry = new(Guid.NewGuid(), request.CompanyId, PosSaleEnvelope.Kind, JsonSerializer.Serialize(envelope), DateTimeOffset.UtcNow);
         await LocalQueue.EnqueueAsync(entry).ConfigureAwait(true);
@@ -600,6 +615,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     private void NewSale()
     {
         _ticket.Clear();
+        AgeVerified = false;
+        PrescriptionReference = string.Empty;
         TenderEntry = string.Empty;
         RebuildCart();
         StatusMessage = "New sale.";
@@ -673,6 +690,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         _ticket.Clear();
+        AgeVerified = false;
+        PrescriptionReference = string.Empty;
         RebuildCart();
         IsSessionOpen = false;
         TillSessionId = 0;

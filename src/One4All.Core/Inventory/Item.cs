@@ -76,6 +76,15 @@ public sealed class Item : SoftDeletableEntity, ICompanyScoped
     /// <summary>Reorder quantity.</summary>
     public decimal ReorderQuantity { get; set; }
 
+    /// <summary>The minimum age a buyer must be (the till asks for the age check); null: none.</summary>
+    public int? MinimumAge { get; set; }
+
+    /// <summary>The most of it one sale may contain; null: no limit.</summary>
+    public decimal? MaxQuantityPerSale { get; set; }
+
+    /// <summary>Whether it is sold only against a prescription (the reference is recorded on the sale).</summary>
+    public bool RequiresPrescription { get; set; }
+
     /// <summary>The standard unit cost a standard-costed item is valued at.</summary>
     public decimal? StandardCost { get; set; }
 

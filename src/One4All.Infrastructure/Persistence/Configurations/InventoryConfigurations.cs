@@ -54,6 +54,7 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
         b.ToTable("item", Schemas.Inventory);
         b.HasKey(x => x.Id);
         b.Property(x => x.Plu).HasMaxLength(20);
+        b.Property(x => x.MaxQuantityPerSale).HasPrecision(19, 4);
         b.Property(x => x.Brand).HasMaxLength(60);
         b.Property(x => x.HsCode).HasMaxLength(20);
         b.Property(x => x.CountryOfOrigin).HasMaxLength(60);

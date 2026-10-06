@@ -186,6 +186,27 @@ public sealed class ItemCatalogueService : IItemCatalogueService
     }
 
     // Which item already uses a barcode (on the item itself, a pack unit or an alias), or null.
+    /// <inheritdoc />
+    public async Task<Result> SetSaleLimitsAsync(long companyId, long itemId, int? minimumAge, decimal? maxQuantityPerSale, bool requiresPrescription, CancellationToken ct = default)
+    {
+        if (minimumAge is <= 0 or > 120 || maxQuantityPerSale <= 0m)
+        {
+            return Result.Failure(Error.Validation("Inv.SaleLimitsInvalid", "A minimum age is between 1 and 120, and a per-sale limit is positive."));
+        }
+
+        Item? item = await _db.Items.FirstOrDefaultAsync(x => x.Id == itemId && x.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (item is null)
+        {
+            return Result.Failure(Error.NotFound("Inv.ItemNotFound", $"Item {itemId} not found."));
+        }
+
+        item.MinimumAge = minimumAge;
+        item.MaxQuantityPerSale = maxQuantityPerSale;
+        item.RequiresPrescription = requiresPrescription;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
     private async Task<string?> BarcodeOwnerAsync(long companyId, string barcode, CancellationToken ct)
         => await _db.Items.Where(i => i.CompanyId == companyId && i.Barcode == barcode).Select(i => i.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false)
             ?? await (from u in _db.ItemUnits join i in _db.Items on u.ItemId equals i.Id where u.CompanyId == companyId && u.Barcode == barcode select i.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false)

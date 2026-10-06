@@ -1,5 +1,6 @@
 using One4All.Core.Accounting;
 using One4All.Core.Common;
+using One4All.Core.Inventory;
 
 namespace One4All.Application.Abstractions.Inventory;
 
@@ -12,7 +13,7 @@ namespace One4All.Application.Abstractions.Inventory;
 /// <param name="PriceListCode">That list's code.</param>
 /// <param name="MinimumQuantity">The quantity break that applied.</param>
 /// <param name="FromCustomerList">True when the customer's own list supplied the price (false = the default list).</param>
-public sealed record ResolvedPrice(long ItemId, decimal Quantity, decimal UnitPrice, CurrencyCode Currency, long PriceListId, string PriceListCode, decimal MinimumQuantity, bool FromCustomerList);
+public sealed record ResolvedPrice(long ItemId, decimal Quantity, decimal UnitPrice, CurrencyCode Currency, long PriceListId, string PriceListCode, decimal MinimumQuantity, bool FromCustomerList, bool FromCost = false);
 
 /// <summary>
 /// Selling-price resolution (brief §4.13): looks up an item's price for a customer and quantity, from the
@@ -89,4 +90,20 @@ public interface IPricingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The resolved price.</returns>
     Task<Result<ResolvedPrice>> PriceAsync(long companyId, long? customerId, long itemId, decimal quantity, CancellationToken ct = default);
+
+    /// <summary>
+    /// Makes a price list price items it has no price for from their cost: a markup on cost or a margin on price, rounded to a price point.
+    /// Cost is the item's average cost across warehouses, or its standard cost. Only a list in the base currency can (<c>Price.CostPlusCurrency</c>).
+    /// <see cref="CostPlusBasis.None"/> turns it off. Prices set on the list still win.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="priceListId">The list.</param>
+    /// <param name="basis">Markup, margin or none.</param>
+    /// <param name="percent">The percent (a margin below 100).</param>
+    /// <param name="roundTo">The price point.</param>
+    /// <param name="rounding">The rounding direction.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or why not.</returns>
+    Task<Result> SetCostPlusAsync(long companyId, long priceListId, Core.Inventory.CostPlusBasis basis, decimal percent, decimal roundTo, One4All.Application.Inventory.PriceRounding rounding,
+        CancellationToken ct = default);
 }

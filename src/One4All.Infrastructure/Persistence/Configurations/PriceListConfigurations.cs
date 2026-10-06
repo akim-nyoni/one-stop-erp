@@ -14,6 +14,9 @@ internal sealed class PriceListConfiguration : IEntityTypeConfiguration<PriceLis
         b.Property(x => x.Code).HasMaxLength(20);
         b.Property(x => x.Name).HasMaxLength(120);
         b.Property(x => x.Currency).HasMaxLength(3);
+        b.Property(x => x.CostPlusBasis).HasConversion<int>();
+        b.Property(x => x.CostPlusPercent).HasPrecision(9, 4);
+        b.Property(x => x.CostPlusRoundTo).HasPrecision(19, 4);
         b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.PriceListId).OnDelete(DeleteBehavior.Cascade);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);

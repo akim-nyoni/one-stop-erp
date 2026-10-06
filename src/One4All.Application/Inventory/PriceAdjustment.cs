@@ -19,6 +19,20 @@ public enum PriceRounding
 /// </summary>
 public static class PriceAdjustment
 {
+    /// <summary>A selling price from cost: a markup on cost or a margin on price, rounded to the price point.</summary>
+    /// <param name="cost">The unit cost.</param>
+    /// <param name="basis">Markup or margin.</param>
+    /// <param name="percent">The markup or margin percent (a margin below 100).</param>
+    /// <param name="roundTo">The price-point increment.</param>
+    /// <param name="rounding">The rounding direction.</param>
+    /// <returns>The price.</returns>
+    public static decimal FromCost(decimal cost, Core.Inventory.CostPlusBasis basis, decimal percent, decimal roundTo, PriceRounding rounding) => basis switch
+    {
+        Core.Inventory.CostPlusBasis.Markup => Apply(cost, percent, roundTo, rounding),
+        Core.Inventory.CostPlusBasis.Margin when percent < 100m => Apply(cost * 100m / (100m - percent), 0m, roundTo, rounding),
+        _ => throw new ArgumentOutOfRangeException(nameof(basis), "Cost-plus needs a markup, or a margin below 100%."),
+    };
+
     /// <summary>Applies a percentage change and rounds.</summary>
     /// <param name="price">The current price (≥ 0).</param>
     /// <param name="percent">The change in percent (e.g. 5 for +5%, −10 for −10%); must be above −100.</param>

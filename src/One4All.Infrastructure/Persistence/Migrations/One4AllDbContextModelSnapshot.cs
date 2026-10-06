@@ -9633,6 +9633,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("item_type");
 
+                    b.Property<decimal?>("MaxQuantityPerSale")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("max_quantity_per_sale");
+
+                    b.Property<int?>("MinimumAge")
+                        .HasColumnType("integer")
+                        .HasColumnName("minimum_age");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -9664,6 +9673,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("reorder_quantity");
+
+                    b.Property<bool>("RequiresPrescription")
+                        .HasColumnType("boolean")
+                        .HasColumnName("requires_prescription");
 
                     b.Property<string>("RevenueAccountCode")
                         .HasMaxLength(8)
@@ -9959,6 +9972,24 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
+
+                    b.Property<int>("CostPlusBasis")
+                        .HasColumnType("integer")
+                        .HasColumnName("cost_plus_basis");
+
+                    b.Property<decimal>("CostPlusPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("cost_plus_percent");
+
+                    b.Property<decimal>("CostPlusRoundTo")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("cost_plus_round_to");
+
+                    b.Property<int>("CostPlusRounding")
+                        .HasColumnType("integer")
+                        .HasColumnName("cost_plus_rounding");
 
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")
@@ -17407,6 +17438,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<bool>("AgeVerified")
+                        .HasColumnType("boolean")
+                        .HasColumnName("age_verified");
+
                     b.Property<string>("BaseCurrency")
                         .IsRequired()
                         .HasMaxLength(3)
@@ -17445,6 +17480,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("PrescriptionReference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("prescription_reference");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()

@@ -36,6 +36,7 @@ internal sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
         b.ToTable("sale", Schemas.PointOfSale);
         b.HasKey(x => x.Id);
         b.Property(x => x.SaleNumber).HasMaxLength(40);
+        b.Property(x => x.PrescriptionReference).HasMaxLength(60);
         b.Property(x => x.BaseCurrency).HasMaxLength(3);
         b.Property(x => x.Status).HasConversion<int>();
         b.Ignore(x => x.TotalNet);

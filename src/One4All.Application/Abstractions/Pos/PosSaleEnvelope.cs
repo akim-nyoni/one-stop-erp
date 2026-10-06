@@ -39,6 +39,8 @@ public sealed record PosTenderEnvelope(TenderType TenderType, string Currency, d
 /// <param name="TaxAccountCode">The output-tax account, if any.</param>
 /// <param name="Lines">The sold lines.</param>
 /// <param name="Tenders">The tenders (including any change as IsChange).</param>
+/// <param name="AgeVerified">Whether the cashier confirmed the buyer's age.</param>
+/// <param name="PrescriptionReference">The prescription prescription-only items were sold against.</param>
 public sealed record PosSaleEnvelope(
     long CompanyId,
     long TerminalId,
@@ -50,7 +52,9 @@ public sealed record PosSaleEnvelope(
     string Currency,
     string? TaxAccountCode,
     IReadOnlyList<PosSaleLineEnvelope> Lines,
-    IReadOnlyList<PosTenderEnvelope> Tenders)
+    IReadOnlyList<PosTenderEnvelope> Tenders,
+    bool AgeVerified = false,
+    string? PrescriptionReference = null)
 {
     /// <summary>The operation kind used to route this envelope to its replay handler.</summary>
     public const string Kind = "PosSale";
@@ -67,6 +71,8 @@ public sealed record PosSaleEnvelope(
         SaleDate = SaleDate,
         WarehouseId = WarehouseId,
         TaxAccountCode = TaxAccountCode,
+        AgeVerified = AgeVerified,
+        PrescriptionReference = PrescriptionReference,
         Lines = Lines
             .Select(l => new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode))
             .ToList(),

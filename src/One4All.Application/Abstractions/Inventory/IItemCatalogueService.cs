@@ -86,4 +86,14 @@ public interface IItemCatalogueService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>How many items fell in A, B and C.</returns>
     Task<(int A, int B, int C)> ClassifyAbcAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
+
+    /// <summary>Sets what the till checks when selling the item: the buyer's minimum age, the most per sale, and prescription-only.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="itemId">The item.</param>
+    /// <param name="minimumAge">The minimum age (null: none).</param>
+    /// <param name="maxQuantityPerSale">The most per sale (null: no limit).</param>
+    /// <param name="requiresPrescription">Whether it is prescription-only.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or why not.</returns>
+    Task<Result> SetSaleLimitsAsync(long companyId, long itemId, int? minimumAge, decimal? maxQuantityPerSale, bool requiresPrescription, CancellationToken ct = default);
 }
