@@ -13,6 +13,32 @@ public static partial class OperationCatalogue
 {
     private static IEnumerable<Operation> Retail()
     {
+        yield return new Operation
+        {
+            Module = "Point of Sale", Title = "Create gift card stock", ListTitle = "Gift card stock",
+            Description = "A range of printed cards (prefix plus zero-padded serials), inactive with no value or liability until activated at sale.",
+            Fields = [Req("Prefix", "Number prefix", "GC"), Num("First", "First serial", "1"), Num("Last", "Last serial"), Num("Digits", "Serial digits", "6")],
+            Run = async (c, i) =>
+            {
+                Core.Accounting.CurrencyCode currency = await c.Db.Companies.Where(x => x.Id == c.CompanyId).Select(x => x.BaseCurrency).SingleAsync().ConfigureAwait(true);
+                return $"{Check(await c.Get<Application.Abstractions.Vouchers.IGiftCardServicing>().CreateRangeAsync(c.CompanyId, i.Text("Prefix"), (long)i.Number("First"), (long)i.Number("Last"),
+                    (int)i.Number("Digits"), currency, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true))} card(s) created.";
+            },
+            List = GiftCardStockAsync,
+        };
+        yield return new Operation
+        {
+            Module = "Point of Sale", Title = "Activate a gift card", ListTitle = "Gift card stock", Description = "Loads a card of printed stock with its value when sold (Dr cash, Cr gift card liability).",
+            Fields = [Req("Card", "Card number"), Num("Value", "Value"), Today(), Opt("Expiry", "Expires (yyyy-MM-dd, optional)"), Req("Cash", "Cash account", "1000"), Req("Liability", "Gift card liability account")],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.Vouchers.GiftCardResult card = Check(await c.Get<Application.Abstractions.Vouchers.IGiftCardServicing>().ActivateAsync(c.CompanyId, i.Text("Card"), i.Number("Value"),
+                    i.Date("Date"), i.Optional("Expiry") is string e ? DateOnly.ParseExact(e, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : null, i.Text("Cash"), i.Text("Liability"))
+                    .ConfigureAwait(true));
+                return $"Card active with {M(card.Balance)}.";
+            },
+            List = GiftCardStockAsync,
+        };
         const string module = "Point of Sale";
         string[] kinds = [.. Enum.GetNames<PosEventKind>().Where(k => k != nameof(PosEventKind.Refund))];
         yield return new Operation
@@ -466,6 +492,11 @@ public static partial class OperationCatalogue
             List = CountSheetsAsync,
         };
     }
+
+    private static async Task<System.Data.DataTable> GiftCardStockAsync(OperationContext c)
+        => Table((await c.Db.Set<Core.Vouchers.GiftCard>().AsNoTracking().Where(g => g.CompanyId == c.CompanyId).GroupBy(g => g.Status)
+                .Select(g => new { Status = g.Key, Cards = g.Count(), Balance = g.Sum(x => x.Balance) }).ToListAsync().ConfigureAwait(true)).OrderBy(g => g.Status),
+            ("Status", g => g.Status), ("Cards", g => g.Cards), ("Balance", g => M(g.Balance)));
 
     private static async Task<System.Data.DataTable> CountSheetsAsync(OperationContext c)
     {

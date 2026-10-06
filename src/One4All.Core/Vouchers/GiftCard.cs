@@ -17,6 +17,9 @@ public enum GiftCardStatus
 
     /// <summary>Blocked (lost/stolen).</summary>
     Blocked = 3,
+
+    /// <summary>Printed card stock not yet sold: no value and no liability until activated.</summary>
+    Inactive = 4,
 }
 
 /// <summary>
@@ -28,6 +31,43 @@ public sealed class GiftCard : AuditableEntity, ICompanyScoped
 {
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private GiftCard() => CardNumber = string.Empty;
+
+    private GiftCard(long companyId, string cardNumber, CurrencyCode currency, DateOnly createdOn)
+    {
+        CompanyId = companyId;
+        CardNumber = cardNumber.Trim().ToUpperInvariant();
+        Currency = currency;
+        IssuedDate = createdOn;
+        Status = GiftCardStatus.Inactive;
+    }
+
+    /// <summary>Creates a card of printed stock, inactive until sold.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="cardNumber">The card number (serial/barcode).</param>
+    /// <param name="currency">The currency it will hold.</param>
+    /// <param name="createdOn">When the stock was created.</param>
+    /// <returns>The inactive card.</returns>
+    public static GiftCard Blank(long companyId, string cardNumber, CurrencyCode currency, DateOnly createdOn) => new(companyId, cardNumber, currency, createdOn);
+
+    /// <summary>Activates printed stock at sale with its value.</summary>
+    /// <param name="value">The value loaded.</param>
+    /// <param name="date">The sale date.</param>
+    /// <param name="expiryDate">When it expires.</param>
+    /// <returns>Success, or why not.</returns>
+    public Result Activate(decimal value, DateOnly date, DateOnly? expiryDate)
+    {
+        if (Status != GiftCardStatus.Inactive || value <= 0m)
+        {
+            return Result.Failure(Error.Rule("Voucher.CannotActivate", $"Card {CardNumber} is {Status}; only inactive stock is activated, with a positive value."));
+        }
+
+        OriginalValue = value;
+        Balance = value;
+        IssuedDate = date;
+        ExpiryDate = expiryDate;
+        Status = GiftCardStatus.Active;
+        return Result.Success();
+    }
 
     /// <summary>Issues a gift card.</summary>
     /// <param name="companyId">The company.</param>

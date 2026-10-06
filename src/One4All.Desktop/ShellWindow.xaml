@@ -63,13 +63,15 @@
                 <MenuItem Header="Supplier Statement Reconciliation…" Click="OpenSupplierReconciliation_Click" />
             </MenuItem>
             <MenuItem Header="_Operations">
-                <MenuItem Header="Point of Sale — Refunds &amp; Till Events…" Tag="Point of Sale" Click="OpenOperations_Click" />
-                <MenuItem Header="Stock — Lots, Transfers, Adjustments, Assembly…" Tag="Stock" Click="OpenOperations_Click" />
+                <MenuItem Header="Point of Sale — Refunds, Till Events, Gift Cards…" Tag="Point of Sale" Click="OpenOperations_Click" />
+                <MenuItem Header="Stock — Lots, Transfers, Stocktakes, Assembly, Pricing…" Tag="Stock" Click="OpenOperations_Click" />
+                <MenuItem Header="Purchasing — Delivery Schedules &amp; Expediting…" Tag="Purchasing" Click="OpenOperations_Click" />
                 <MenuItem Header="Weighbridge…" Tag="Weighbridge" Click="OpenOperations_Click" />
                 <MenuItem Header="Fixed Assets — Counts, Maintenance, CWIP…" Tag="Fixed Assets" Click="OpenOperations_Click" />
-                <MenuItem Header="Contracts — Variations, BOQ, Subcontracts, Plant…" Tag="Contracts" Click="OpenOperations_Click" />
+                <MenuItem Header="Contracts — Variations, BOQ, WBS, Subcontracts, Plant…" Tag="Contracts" Click="OpenOperations_Click" />
                 <MenuItem Header="HR &amp; Attendance…" Tag="HR &amp; Attendance" Click="OpenOperations_Click" />
-                <MenuItem Header="Banking — Cheques &amp; Supplier Statements…" Tag="Banking" Click="OpenOperations_Click" />
+                <MenuItem Header="Banking — Cheques, Standing Orders, Direct Debits…" Tag="Banking" Click="OpenOperations_Click" />
+                <MenuItem Header="Approvals — Delegation &amp; Escalation…" Tag="Approvals" Click="OpenOperations_Click" />
                 <MenuItem Header="Sales &amp; Schools — Deliveries, Wallets…" Tag="Sales &amp; Schools" Click="OpenOperations_Click" />
                 <Separator />
                 <MenuItem Header="Document Printer…" Tag="Documents" Click="OpenOperations_Click" />

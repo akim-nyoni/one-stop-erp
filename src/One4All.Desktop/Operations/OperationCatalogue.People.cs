@@ -368,6 +368,20 @@ public static partial class OperationCatalogue
             ("Multiplier", a => Q(a.OvertimeMultiplier)));
     }
 
+    private static DateOnly? OptionalDate(OperationInput i, string name)
+        => i.Optional(name) is string text ? DateOnly.ParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null;
+
+    private static async Task<DataTable> RecurringBankAsync(OperationContext c)
+    {
+        var orders = (await c.Db.Set<StandingOrder>().AsNoTracking().Where(o => o.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true))
+            .Select(o => new { o.Reference, Kind = "Standing order", o.Frequency, Amount = M(o.Amount), o.StartDate, o.LastRunOn, o.IsActive });
+        var mandates = (await c.Db.Set<DirectDebitMandate>().AsNoTracking().Where(m => m.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true))
+            .Select(m => new { m.Reference, Kind = "Direct debit", m.Frequency, Amount = m.FixedAmount is decimal f ? M(f) : "owed", m.StartDate, m.LastRunOn, m.IsActive });
+        return Table(orders.Concat(mandates).OrderBy(r => r.Reference),
+            ("Reference", r => r.Reference), ("Kind", r => r.Kind), ("Frequency", r => r.Frequency), ("Amount", r => r.Amount), ("Starts", r => D(r.StartDate)),
+            ("Last run", r => r.LastRunOn is DateOnly d ? D(d) : null), ("Active", r => r.IsActive));
+    }
+
     private static async Task<DataTable> LeaveBalancesAsync(OperationContext c)
     {
         Dictionary<long, string> names = await EmployeeNamesAsync(c).ConfigureAwait(true);
@@ -386,6 +400,55 @@ public static partial class OperationCatalogue
     private static IEnumerable<Operation> Banking()
     {
         const string module = "Banking";
+        yield return new Operation
+        {
+            Module = module, Title = "Set up a standing order", ListTitle = "Standing orders and direct debits",
+            Description = "A fixed payment out of the bank on a schedule: to a supplier (purchase ledger) or to a GL account. Give a supplier or an account, not both.",
+            Fields = [Req("Reference", "Reference"), Req("Bank", "Bank account", "1100"), Num("Amount", "Amount"), Pick("Frequency", "Frequency", Enum.GetNames<RecurrenceFrequency>()),
+                Today("Start", "First payment"), Opt("End", "Last date (yyyy-MM-dd, optional)"), Opt("Supplier", "Supplier code"), Opt("Account", "GL account"), Opt("Narrative", "What it is for")],
+            Run = async (c, i) => Check(await c.Get<IStandingOrderService>().CreateStandingOrderAsync(new StandingOrderRequest
+            {
+                CompanyId = c.CompanyId, Reference = i.Text("Reference"), BankAccountCode = i.Text("Bank"), Amount = i.Number("Amount"), Frequency = Enum.Parse<RecurrenceFrequency>(i.Text("Frequency")),
+                StartDate = i.Date("Start"), EndDate = OptionalDate(i, "End"), SupplierId = i.Optional("Supplier") is string s ? await SupplierAsync(c, s).ConfigureAwait(true) : null,
+                DebitAccountCode = i.Optional("Account"), Narrative = i.Optional("Narrative") ?? string.Empty,
+            }).ConfigureAwait(true), id => $"Standing order {i.Text("Reference").ToUpperInvariant()} set up."),
+            List = RecurringBankAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Set up a direct debit mandate", ListTitle = "Standing orders and direct debits",
+            Description = "The customer's authority to collect on a schedule: a fixed amount, or what they owe (optionally capped).",
+            Fields = [Req("Reference", "Mandate reference"), Req("Customer", "Customer code"), Req("CustomerBank", "Customer's bank account"), Req("Bank", "Collect into bank account", "1100"),
+                Pick("Frequency", "Frequency", Enum.GetNames<RecurrenceFrequency>()), Today("Start", "First collection"), Opt("End", "Last date (yyyy-MM-dd, optional)"),
+                OptNum("Fixed", "Fixed amount (blank: what is owed)"), OptNum("Max", "Most per collection")],
+            Run = async (c, i) => Check(await c.Get<IStandingOrderService>().CreateMandateAsync(new DirectDebitMandateRequest
+            {
+                CompanyId = c.CompanyId, Reference = i.Text("Reference"), CustomerId = await CustomerAsync(c, i.Text("Customer")).ConfigureAwait(true), CustomerBankAccount = i.Text("CustomerBank"),
+                BankAccountCode = i.Text("Bank"), Frequency = Enum.Parse<RecurrenceFrequency>(i.Text("Frequency")), StartDate = i.Date("Start"), EndDate = OptionalDate(i, "End"),
+                FixedAmount = i.OptionalNumber("Fixed"), MaximumAmount = i.OptionalNumber("Max"),
+            }).ConfigureAwait(true), id => $"Mandate {i.Text("Reference").ToUpperInvariant()} set up."),
+            List = RecurringBankAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Run standing orders and direct debits", ListTitle = "Standing orders and direct debits",
+            Description = "Pays every standing order and collects every direct debit due up to the date; nothing is ever run twice.",
+            Fields = [Today("Date", "Run up to")],
+            Run = async (c, i) =>
+            {
+                RecurringBankRun run = Check(await c.Get<IStandingOrderService>().RunDueAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true));
+                return $"{run.Lines.Count(l => !l.IsCollection)} payment(s) {M(run.Lines.Where(l => !l.IsCollection).Sum(l => l.Amount))}, "
+                    + $"{run.Lines.Count(l => l.IsCollection)} collection(s) {M(run.Lines.Where(l => l.IsCollection).Sum(l => l.Amount))}, {run.NothingOwed} with nothing owed.";
+            },
+            List = RecurringBankAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Stop a standing order or mandate", ListTitle = "Standing orders and direct debits", Description = "Stops it running from now on.",
+            Fields = [Req("Reference", "Reference")],
+            Run = async (c, i) => Check(await c.Get<IStandingOrderService>().CancelAsync(c.CompanyId, i.Text("Reference")).ConfigureAwait(true), "Stopped."),
+            List = RecurringBankAsync,
+        };
         yield return new Operation
         {
             Module = module, Title = "Issue a cheque", ListTitle = "Cheque register (latest 100)", Description = "Records a cheque leaf written out of the cheque book (numbers are unique per bank account).",

@@ -25,6 +25,9 @@ public enum GiftCardEvent
 
     /// <summary>Expired, its balance recognised as breakage.</summary>
     Breakage = 7,
+
+    /// <summary>Printed stock activated at sale with its value.</summary>
+    Activated = 8,
 }
 
 /// <summary>

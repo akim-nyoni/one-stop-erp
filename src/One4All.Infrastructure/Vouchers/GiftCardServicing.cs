@@ -146,6 +146,64 @@ public sealed class GiftCardServicing : IGiftCardServicing
         return Result<IReadOnlyList<GiftCardHistoryLine>>.Success(lines);
     }
 
+    /// <inheritdoc />
+    public async Task<Result<int>> CreateRangeAsync(long companyId, string prefix, long first, long last, int digits, Core.Accounting.CurrencyCode currency, DateOnly date, CancellationToken ct = default)
+    {
+        string head = (prefix ?? string.Empty).Trim().ToUpperInvariant();
+        if (first < 0 || last < first || last - first >= 10_000 || digits is < 1 or > 18 || last.ToString(System.Globalization.CultureInfo.InvariantCulture).Length > digits)
+        {
+            return Error.Validation("Voucher.RangeInvalid", "A range runs from a first to a last serial (at most 10,000 cards) that fit the number of digits.");
+        }
+
+        List<string> numbers = [.. Enumerable.Range(0, (int)(last - first + 1)).Select(n => head + (first + n).ToString(System.Globalization.CultureInfo.InvariantCulture).PadLeft(digits, '0'))];
+        if (await _db.Set<GiftCard>().AnyAsync(g => g.CompanyId == companyId && numbers.Contains(g.CardNumber), ct).ConfigureAwait(false))
+        {
+            return Error.Conflict("Voucher.RangeOverlaps", $"Some of {numbers[0]}–{numbers[^1]} already exist.");
+        }
+
+        _db.Set<GiftCard>().AddRange(numbers.Select(n => GiftCard.Blank(companyId, n, currency, date)));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return numbers.Count;
+    }
+
+    /// <inheritdoc />
+    public Task<Result<GiftCardResult>> ActivateAsync(long companyId, string cardNumber, decimal value, DateOnly date, DateOnly? expiryDate, string cashAccountCode, string liabilityAccountCode,
+        CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            Result<GiftCard> found = await LoadAsync(companyId, cardNumber, ct).ConfigureAwait(false);
+            if (found.IsFailure)
+            {
+                return found.Error;
+            }
+
+            GiftCard card = found.Value;
+            if (card.Status != GiftCardStatus.Inactive || value <= 0m)
+            {
+                return Error.Rule("Voucher.CannotActivate", $"Card {card.CardNumber} is {card.Status}; only inactive stock is activated, with a positive value.");
+            }
+
+            Result<PostingReceipt> posted = await _engine.PostAsync(new JournalRequest
+            {
+                CompanyId = companyId, SourceModule = "VOU", PostingDate = date, TransactionCurrency = card.Currency, EnforceManualJournalRules = false,
+                DocumentType = "GiftCardIssue", DocumentNumber = card.CardNumber, Narrative = $"Gift card activation {card.CardNumber}",
+                Lines =
+                [
+                    new JournalLineRequest { AccountCode = cashAccountCode, Side = JournalSide.Debit, TransactionAmount = value },
+                    new JournalLineRequest { AccountCode = liabilityAccountCode, Side = JournalSide.Credit, TransactionAmount = value },
+                ],
+            }, ct).ConfigureAwait(false);
+            if (posted.IsFailure)
+            {
+                return posted.Error;
+            }
+
+            card.Activate(value, date, expiryDate);
+            _db.Set<GiftCardTransaction>().Add(new GiftCardTransaction(companyId, card.Id, date, GiftCardEvent.Activated, value, card.Balance, posted.Value.JournalNumber));
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result<GiftCardResult>.Success(new GiftCardResult(card.Id, card.Balance, card.Status));
+        }, ct);
+
     private async Task<Result<GiftCard>> LoadAsync(long companyId, string cardNumber, CancellationToken ct)
     {
         string number = cardNumber.Trim().ToUpperInvariant();

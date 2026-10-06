@@ -142,4 +142,32 @@ public interface IGiftCardServicing
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The history, or why there is none.</returns>
     Task<Result<IReadOnlyList<GiftCardHistoryLine>>> HistoryAsync(long companyId, string cardNumber, CancellationToken ct = default);
+
+    /// <summary>
+    /// Creates a range of printed card stock (prefix plus zero-padded serials, e.g. GC000100–GC000199), inactive with no value and no
+    /// liability until activated. At most 10,000 cards per range; refused if any number in it exists (<c>Voucher.RangeOverlaps</c>).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="prefix">The number prefix.</param>
+    /// <param name="first">The first serial.</param>
+    /// <param name="last">The last serial.</param>
+    /// <param name="digits">The serial's width (zero-padded).</param>
+    /// <param name="currency">The currency the cards hold.</param>
+    /// <param name="date">When the stock is created.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>How many cards were created.</returns>
+    Task<Result<int>> CreateRangeAsync(long companyId, string prefix, long first, long last, int digits, CurrencyCode currency, DateOnly date, CancellationToken ct = default);
+
+    /// <summary>Activates a card of printed stock at sale: loads its value (Dr cash, Cr gift card liability) and makes it spendable.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="cardNumber">The card.</param>
+    /// <param name="value">The value loaded.</param>
+    /// <param name="date">The sale date.</param>
+    /// <param name="expiryDate">When it expires.</param>
+    /// <param name="cashAccountCode">Where the money went.</param>
+    /// <param name="liabilityAccountCode">The gift card liability.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The card.</returns>
+    Task<Result<GiftCardResult>> ActivateAsync(long companyId, string cardNumber, decimal value, DateOnly date, DateOnly? expiryDate, string cashAccountCode, string liabilityAccountCode,
+        CancellationToken ct = default);
 }
