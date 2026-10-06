@@ -15,7 +15,22 @@ public static class One4AllDbContextOptions
     /// <returns>The same builder, for chaining.</returns>
     public static DbContextOptionsBuilder UseOne4All(this DbContextOptionsBuilder builder, string connectionString) =>
         builder
-            .UseNpgsql(connectionString, npgsql =>
+            .UseNpgsql(WithApplicationName(connectionString), npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", Schemas.System))
             .UseSnakeCaseNamingConvention();
+
+    /// <summary>The application's database name; trigger-captured changes from other names were made outside the application.</summary>
+    public const string ApplicationName = "One4All";
+
+    // Names the connection so the audit triggers can tell the application from direct SQL.
+    private static string WithApplicationName(string connectionString)
+    {
+        Npgsql.NpgsqlConnectionStringBuilder builder = new(connectionString);
+        if (string.IsNullOrWhiteSpace(builder.ApplicationName))
+        {
+            builder.ApplicationName = ApplicationName;
+        }
+
+        return builder.ConnectionString;
+    }
 }

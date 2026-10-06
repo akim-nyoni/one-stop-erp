@@ -22,6 +22,21 @@ public static partial class OperationCatalogue
     private static IEnumerable<Operation> MasterData()
     {
         const string module = "System Manager";
+        yield return new Operation
+        {
+            Module = module, Title = "Review direct database changes", ListTitle = "Sensitive-table changes made outside One4All (last 30 days)",
+            Description = "Database triggers record every change to users, roles, permissions, prices, tariffs, meters and the licence — including changes made with SQL tools, listed here.",
+            Fields = [Num("Days", "Look back (days)", "30"), Tick("All", "Include the application's own changes")],
+            Run = async (c, i) =>
+            {
+                IReadOnlyList<DatabaseChangeView> changes = await c.Get<IAuditService>().DatabaseChangesAsync(DateTimeOffset.UtcNow.AddDays(-i.Whole("Days")), DateTimeOffset.UtcNow, !i.Flag("All"))
+                    .ConfigureAwait(true);
+                return string.Join(Environment.NewLine, [$"{changes.Count} change(s).", .. changes.Take(50).Select(x => $"{x.OccurredOnUtc:yyyy-MM-dd HH:mm} {x.Operation} {x.TableName} #{x.RowId} by {x.DbUser} via {x.ApplicationName ?? "(unnamed)"} from {x.ClientAddress ?? "local"}")]);
+            },
+            List = async c => Table(await c.Get<IAuditService>().DatabaseChangesAsync(DateTimeOffset.UtcNow.AddDays(-30), DateTimeOffset.UtcNow, true).ConfigureAwait(true),
+                ("When", x => x.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Operation", x => x.Operation), ("Table", x => x.TableName), ("Row", x => x.RowId),
+                ("Database user", x => x.DbUser), ("Application", x => x.ApplicationName), ("Client", x => x.ClientAddress)),
+        };
         string[] imports = ["Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance"];
         yield return new Operation
         {

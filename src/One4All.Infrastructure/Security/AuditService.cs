@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Security;
 using One4All.Core.Audit;
+using One4All.Core.Common;
 using One4All.Infrastructure.Persistence;
 
 namespace One4All.Infrastructure.Security;
@@ -98,5 +99,36 @@ public sealed class AuditService : IAuditService
         }
 
         return new AuditChainVerification(checkedCount, true, null, $"Audit chain intact: {checkedCount} entr{(checkedCount == 1 ? "y" : "ies")} verified.");
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> RecordAsync(AuditEvent auditEvent, CancellationToken ct = default)
+    {
+        if (auditEvent.Action == AuditAction.Override && string.IsNullOrWhiteSpace(auditEvent.Reason))
+        {
+            return Error.Validation("Audit.ReasonRequired", "An override is recorded with its reason.");
+        }
+
+        string previous = await _db.ChangeLog.Where(c => c.CompanyId == auditEvent.CompanyId).OrderByDescending(c => c.Id).Select(c => c.RowHash).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+            ?? string.Empty;
+        ChangeLogEntry entry = ChangeLogEntry.Create(previous, DateTimeOffset.UtcNow, auditEvent.CompanyId, auditEvent.UserId, auditEvent.UserName, auditEvent.Module, auditEvent.EntityType,
+            auditEvent.EntityId, auditEvent.Action, newValues: auditEvent.Details, reason: auditEvent.Reason, terminal: auditEvent.Terminal);
+        _db.ChangeLog.Add(entry);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return entry.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<DatabaseChangeView>> DatabaseChangesAsync(DateTimeOffset from, DateTimeOffset to, bool outsideApplicationOnly, int take = 500, CancellationToken ct = default)
+    {
+        IQueryable<Core.Audit.DatabaseChange> q = _db.DatabaseChanges.AsNoTracking().Where(c => c.OccurredOnUtc >= from && c.OccurredOnUtc <= to);
+        if (outsideApplicationOnly)
+        {
+            q = q.Where(c => c.ApplicationName == null || c.ApplicationName != Persistence.One4AllDbContextOptions.ApplicationName);
+        }
+
+        return [.. (await q.OrderByDescending(c => c.Id).Take(take).ToListAsync(ct).ConfigureAwait(false))
+            .Select(c => new DatabaseChangeView(c.Id, c.OccurredOnUtc, c.TableName, c.Operation, c.RowId, c.DbUser, c.ApplicationName, c.ClientAddress,
+                c.ApplicationName != Persistence.One4AllDbContextOptions.ApplicationName))];
     }
 }

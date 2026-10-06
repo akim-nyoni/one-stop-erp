@@ -50,6 +50,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Users.</summary>
     public DbSet<User> Users => Set<User>();
 
+    /// <summary>Row changes caught by triggers on sensitive tables (read only).</summary>
+    public DbSet<Core.Audit.DatabaseChange> DatabaseChanges => Set<Core.Audit.DatabaseChange>();
+
     /// <summary>Earlier password hashes, so they are not reused.</summary>
     public DbSet<PasswordHistory> PasswordHistories => Set<PasswordHistory>();
 

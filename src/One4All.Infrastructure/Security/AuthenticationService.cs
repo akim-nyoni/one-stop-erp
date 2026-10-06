@@ -171,6 +171,7 @@ public sealed class AuthenticationService : IAuthenticationService
         bool expired = !usePin && _options.PasswordMaxAge is TimeSpan maxAge && (user.PasswordChangedUtc ?? DateTimeOffset.MinValue) + maxAge < now;
         EffectivePermissions permissions = await _permissions.ResolveAsync(user.Id, ct).ConfigureAwait(false);
         string session = Guid.NewGuid().ToString("N");
+        _db.ChangeLog.Add(await LoginEntryAsync(user.Id, user.Username, Core.Audit.AuditAction.Login, terminal, session, method, ct).ConfigureAwait(false));
         return await LogAsync(AuthenticationResult.Success(
             user.Id, user.Username, user.DisplayName, user.IsSystemAdministrator, user.MustChangePassword || expired, permissions, session), session).ConfigureAwait(false);
     }
@@ -179,9 +180,10 @@ public sealed class AuthenticationService : IAuthenticationService
     public async Task EndSessionAsync(string sessionId, CancellationToken ct = default)
     {
         LoginEvent? login = await _db.LoginEvents.FirstOrDefaultAsync(l => l.SessionId == sessionId, ct).ConfigureAwait(false);
-        if (login is not null)
+        if (login is not null && login.EndedOnUtc is null)
         {
             login.End(_clock.UtcNow);
+            _db.ChangeLog.Add(await LoginEntryAsync(login.UserId, login.Username, Core.Audit.AuditAction.Logout, login.Terminal, sessionId, login.Method, ct).ConfigureAwait(false));
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
     }
@@ -287,5 +289,15 @@ public sealed class AuthenticationService : IAuthenticationService
     {
         List<LoginEvent> open = await _db.LoginEvents.Where(l => l.UserId == userId && l.SessionId != null && l.EndedOnUtc == null).ToListAsync(ct).ConfigureAwait(false);
         return _options.SessionIdleTimeout is TimeSpan idle ? [.. open.Where(l => (l.LastSeenUtc ?? l.OccurredOnUtc) + idle >= now)] : open;
+    }
+
+    // A sign-in or sign-out in the system chain of the change log.
+    private async Task<Core.Audit.ChangeLogEntry> LoginEntryAsync(long? userId, string userName, Core.Audit.AuditAction action, string? terminal, string sessionId, string method, CancellationToken ct)
+    {
+        // An entry added in this unit of work but not yet saved comes last; otherwise the newest saved entry.
+        Core.Audit.ChangeLogEntry? pending = _db.ChangeLog.Local.LastOrDefault(c => c.CompanyId == null && c.Id == 0);
+        string previous = pending?.RowHash ?? await _db.ChangeLog.Where(c => c.CompanyId == null).OrderByDescending(c => c.Id).Select(c => c.RowHash).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+            ?? string.Empty;
+        return Core.Audit.ChangeLogEntry.Create(previous, _clock.UtcNow, null, userId, userName, "Security", "Session", sessionId, action, reason: method, terminal: terminal, sessionId: sessionId);
     }
 }

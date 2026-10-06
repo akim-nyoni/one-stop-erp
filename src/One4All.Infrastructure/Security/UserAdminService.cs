@@ -13,13 +13,19 @@ public sealed class UserAdminService : IUserAdminService
     private readonly One4AllDbContext _db;
     private readonly IPasswordHasher _hasher;
     private readonly IPermissionService _permissions;
+    private readonly IAuditService? _audit;
+    private readonly ICurrentUser? _currentUser;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="hasher">Hashes passwords.</param>
     /// <param name="permissions">Checks segregation of duties after changes.</param>
-    public UserAdminService(One4AllDbContext db, IPasswordHasher hasher, IPermissionService permissions)
+    /// <param name="audit">Records permission and account changes.</param>
+    /// <param name="currentUser">Who is making the change.</param>
+    public UserAdminService(One4AllDbContext db, IPasswordHasher hasher, IPermissionService permissions, IAuditService? audit = null, ICurrentUser? currentUser = null)
     {
+        _audit = audit;
+        _currentUser = currentUser;
         _db = db;
         _hasher = hasher;
         _permissions = permissions;
@@ -76,6 +82,7 @@ public sealed class UserAdminService : IUserAdminService
         user.StampPasswordChange(DateTimeOffset.UtcNow);
         user.Unlock();
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await RecordAsync(Core.Audit.AuditAction.ConfigChange, "User", userId, "Password reset by an administrator", ct).ConfigureAwait(false);
         return Result.Success();
     }
 
@@ -96,6 +103,7 @@ public sealed class UserAdminService : IUserAdminService
 
         user.SetActive(active);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await RecordAsync(Core.Audit.AuditAction.ConfigChange, "User", userId, active ? "Activated" : "Deactivated", ct).ConfigureAwait(false);
         return Result.Success();
     }
 
@@ -157,6 +165,8 @@ public sealed class UserAdminService : IUserAdminService
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await RecordAsync(Core.Audit.AuditAction.PermissionChange, "User", userId, $"Role {roleId} assigned{(scopes is { Count: > 0 } ? " with scopes " + string.Join("; ", scopes.Select(s => $"{s.Key}: {string.Join(",", s.Value)}")) : string.Empty)}", ct)
+            .ConfigureAwait(false);
         return await ConflictsAsync(userId, ct).ConfigureAwait(false);
     }
 
@@ -171,6 +181,7 @@ public sealed class UserAdminService : IUserAdminService
 
         user.RemoveRole(roleId);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await RecordAsync(Core.Audit.AuditAction.PermissionChange, "User", userId, $"Role {roleId} removed", ct).ConfigureAwait(false);
         return Result.Success();
     }
 
@@ -227,6 +238,7 @@ public sealed class UserAdminService : IUserAdminService
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await RecordAsync(Core.Audit.AuditAction.PermissionChange, "User", userId, $"{(member ? "Joined" : "Left")} group {groupId}", ct).ConfigureAwait(false);
         return await ConflictsAsync(userId, ct).ConfigureAwait(false);
     }
 
@@ -248,5 +260,15 @@ public sealed class UserAdminService : IUserAdminService
     {
         List<string> names = [.. (await _permissions.GetSodViolationsAsync(userId, ct).ConfigureAwait(false)).Select(r => r.Name)];
         return names;
+    }
+
+    // A permission or account change in the change log, by whoever is signed in.
+    private async Task RecordAsync(Core.Audit.AuditAction action, string entityType, long entityId, string what, CancellationToken ct)
+    {
+        if (_audit is not null)
+        {
+            await _audit.RecordAsync(new AuditEvent(null, _currentUser?.UserId, _currentUser?.UserName ?? "system", "Security", entityType,
+                entityId.ToString(System.Globalization.CultureInfo.InvariantCulture), action, what), ct).ConfigureAwait(false);
+        }
     }
 }

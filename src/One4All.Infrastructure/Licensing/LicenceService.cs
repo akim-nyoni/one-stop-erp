@@ -147,6 +147,9 @@ public sealed class LicenceService : ILicenceService
 
         db.Set<InstalledLicence>().Add(new InstalledLicence(licenceToken.Trim(), _clock.UtcNow, currentUser.UserId));
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await scope.ServiceProvider.GetRequiredService<IAuditService>().RecordAsync(new AuditEvent(null, currentUser.UserId, currentUser.UserName, "Licensing", "Licence",
+            validation.Payload?.LicenceId, Core.Audit.AuditAction.LicenceChange, $"Installed: {validation.Status}",
+            System.Text.Json.JsonSerializer.Serialize(new { Customer = validation.Payload?.Customer.Name, Edition = validation.Payload?.Edition.ToString(), validation.Payload?.ValidTo })), ct).ConfigureAwait(false);
 
         _current = validation;
         return validation;

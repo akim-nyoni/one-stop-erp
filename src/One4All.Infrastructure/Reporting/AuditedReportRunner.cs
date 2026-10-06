@@ -16,13 +16,16 @@ public sealed class AuditedReportRunner : IAuditedReportRunner
     private readonly One4AllDbContext _db;
     private readonly IReportRunner _runner;
     private readonly IPermissionService _permissions;
+    private readonly IAuditService? _audit;
 
     /// <summary>Creates the runner.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="runner">The generic report runner.</param>
     /// <param name="permissions">The permission resolver.</param>
-    public AuditedReportRunner(One4AllDbContext db, IReportRunner runner, IPermissionService permissions)
+    /// <param name="audit">Records prints and exports in the change log.</param>
+    public AuditedReportRunner(One4AllDbContext db, IReportRunner runner, IPermissionService permissions, IAuditService? audit = null)
     {
+        _audit = audit;
         _db = db;
         _runner = runner;
         _permissions = permissions;
@@ -62,6 +65,15 @@ public sealed class AuditedReportRunner : IAuditedReportRunner
         _db.Set<ReportRun>().Add(new ReportRun(companyId, code, userId, recorded, format.ToString(), canonical, DateTimeOffset.UtcNow, rendered.Value.Content.Length,
             ReportRunAudit.Fingerprint(rendered.Value.Content), copy));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // Prints and exports also go in the change log, as the brief's explicit (non-data) events.
+        if (_audit is not null && recorded is not ReportRunPurpose.View)
+        {
+            string userName = userId is long u ? await _db.Users.Where(x => x.Id == u).Select(x => x.Username).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? $"user {u}" : "system";
+            await _audit.RecordAsync(new AuditEvent(companyId, userId, userName, "Reporting", "Report", code, recorded == ReportRunPurpose.Export ? Core.Audit.AuditAction.Export : Core.Audit.AuditAction.Print,
+                Details: System.Text.Json.JsonSerializer.Serialize(new { Purpose = recorded.ToString(), Format = format.ToString(), Copy = copy, Parameters = canonical })), ct).ConfigureAwait(false);
+        }
+
         return new AuditedReport(rendered.Value, recorded, copy);
     }
 

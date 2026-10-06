@@ -56,8 +56,53 @@ public sealed record AuditChainVerification(int EntriesChecked, bool IsIntact, l
 /// The audit trail (brief §6): query the append-only change log, and verify its SHA-256 hash chain so any
 /// tampering with a historical row — even by direct SQL — is detected and located.
 /// </summary>
+/// <summary>An event to record that is not a data change (a print, export, override, permission or licence change, sign-in).</summary>
+/// <param name="CompanyId">The company, or null for system-wide events.</param>
+/// <param name="UserId">Who.</param>
+/// <param name="UserName">Who, by name.</param>
+/// <param name="Module">The module.</param>
+/// <param name="EntityType">What it concerns (e.g. Report, User, Licence).</param>
+/// <param name="EntityId">Which one.</param>
+/// <param name="Action">The action.</param>
+/// <param name="Reason">Why, or what (mandatory for overrides).</param>
+/// <param name="Details">Further details as JSON.</param>
+/// <param name="Terminal">The machine or IP.</param>
+public sealed record AuditEvent(long? CompanyId, long? UserId, string UserName, string Module, string EntityType, string? EntityId, AuditAction Action, string? Reason = null,
+    string? Details = null, string? Terminal = null);
+
+/// <summary>A change caught by the database triggers.</summary>
+/// <param name="Id">The id.</param>
+/// <param name="OccurredOnUtc">When.</param>
+/// <param name="TableName">The table.</param>
+/// <param name="Operation">INSERT, UPDATE or DELETE.</param>
+/// <param name="RowId">The row.</param>
+/// <param name="DbUser">The database user.</param>
+/// <param name="ApplicationName">The connection's application name.</param>
+/// <param name="ClientAddress">The client address.</param>
+/// <param name="OutsideApplication">Whether it came from outside the application.</param>
+public sealed record DatabaseChangeView(long Id, DateTimeOffset OccurredOnUtc, string TableName, string Operation, string? RowId, string DbUser, string? ApplicationName, string? ClientAddress,
+    bool OutsideApplication);
+
 public interface IAuditService
 {
+    /// <summary>
+    /// Records an event that is not a data change in the hash-chained change log (brief §6 explicit calls): prints, exports, overrides,
+    /// permission, configuration and licence changes, sign-ins. An override needs a reason (<c>Audit.ReasonRequired</c>).
+    /// </summary>
+    /// <param name="auditEvent">The event.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The entry id.</returns>
+    Task<Core.Common.Result<long>> RecordAsync(AuditEvent auditEvent, CancellationToken ct = default);
+
+    /// <summary>Row changes the database triggers caught on sensitive tables, newest first; optionally only those made outside the application.</summary>
+    /// <param name="from">From.</param>
+    /// <param name="to">To.</param>
+    /// <param name="outsideApplicationOnly">Only direct changes.</param>
+    /// <param name="take">At most this many.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The changes.</returns>
+    Task<IReadOnlyList<DatabaseChangeView>> DatabaseChangesAsync(DateTimeOffset from, DateTimeOffset to, bool outsideApplicationOnly, int take = 500, CancellationToken ct = default);
+
     /// <summary>Queries the audit trail, newest first.</summary>
     /// <param name="query">The filter.</param>
     /// <param name="ct">Cancellation token.</param>

@@ -1252,6 +1252,73 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("change_log", "audit");
                 });
 
+            modelBuilder.Entity("One4All.Core.Audit.DatabaseChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ApplicationName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("application_name");
+
+                    b.Property<string>("ClientAddress")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("client_address");
+
+                    b.Property<string>("DbUser")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("db_user");
+
+                    b.Property<string>("NewValues")
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("new_values");
+
+                    b.Property<DateTimeOffset>("OccurredOnUtc")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_on_utc")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("OldValues")
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("old_values");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("operation");
+
+                    b.Property<string>("RowId")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("row_id");
+
+                    b.Property<string>("TableName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("table_name");
+
+                    b.HasKey("Id")
+                        .HasName("pk_db_change");
+
+                    b.HasIndex("OccurredOnUtc")
+                        .HasDatabaseName("ix_db_change_occurred_on_utc");
+
+                    b.ToTable("db_change", "audit");
+                });
+
             modelBuilder.Entity("One4All.Core.Banking.BankAccount", b =>
                 {
                     b.Property<long>("Id")
