@@ -28,6 +28,7 @@ public static class Program
                 "issue" => Issue(Args(args)),
                 "verify" => Verify(Args(args)),
                 "machineid" => MachineId(),
+                string desk when DeskCommands.Names.Contains(desk) => DeskCommands.Run(desk, Args(args), LoadPrivateKey),
                 _ => Unknown(args[0]),
             };
         }
@@ -184,5 +185,17 @@ public static class Program
         Console.WriteLine("  issue     --key <keyfile> [--passphrase <pass>] --template <payload.json> --out <file.lic> [--kid <id>]");
         Console.WriteLine("  verify    --lic <file.lic> --pub <pubfile> [--kid <id>] [--product \"One4All ERP\"]");
         Console.WriteLine("  machineid");
+        Console.WriteLine();
+        Console.WriteLine("Licence desk (all take --key <keyfile> [--passphrase <pass>] [--register <folder>]):");
+        Console.WriteLine("  customer    --id <ref> --name <name> [--contact <c>] [--sites \"a;b\"]      customers");
+        Console.WriteLine("  grant       --customer <ref> [--edition Standard] [--type Subscription] [--term 1y|6m|30d|yyyy-MM-dd|perpetual]");
+        Console.WriteLine("              [--modules \"GL AR\"] [--module-terms \"POS=6m,PAY=2026-12-31\"] [--fingerprint sha256:..|--request O4A-REQ-..] [--grace 14] [--hard-stop] [--out f.lic]");
+        Console.WriteLine("  renew       --licence <id> --term <term>          change  --licence <id> [--edition E] [--add \"A B\"] [--remove \"C\"]");
+        Console.WriteLine("  reissue     --licence <id> --fingerprint <fp>|--request <code>");
+        Console.WriteLine("  revoke      --licence <id> --reason <why>         crl [--out file.crl]   (signed revocation list)");
+        Console.WriteLine("  expiring    [--days 30]                            history --customer <ref>");
+        Console.WriteLine("  bulk        --csv <customer_id,customer_name,edition,type,term[,modules]>");
+        Console.WriteLine("  certificate --licence <id> [--out cert.html]       log [--export log.csv]   (verifies the hash chain)");
+        Console.WriteLine("  request     [--customer <ref>] [--site <name>]     (offline activation request code for this machine)");
     }
 }

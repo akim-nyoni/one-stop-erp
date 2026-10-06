@@ -29,6 +29,9 @@ public enum LicenseStatus
 
     /// <summary>The machine does not match the licence's binding.</summary>
     MachineMismatch = 8,
+
+    /// <summary>The vendor has revoked the licence (it appears on an installed revocation list): read-only until a new licence is installed.</summary>
+    Revoked = 9,
 }
 
 /// <summary>The result of validating a licence, with helpers for module gating and limits.</summary>
@@ -57,7 +60,7 @@ public sealed class LicenseValidationResult
     public bool IsUsable => Status is LicenseStatus.Valid or LicenseStatus.Grace;
 
     /// <summary>True when the product may run only in read-only mode.</summary>
-    public bool IsReadOnly => Status == LicenseStatus.ReadOnly;
+    public bool IsReadOnly => Status is LicenseStatus.ReadOnly or LicenseStatus.Revoked;
 
     /// <summary>Creates a failed result (no usable payload).</summary>
     /// <param name="status">The failure status.</param>
@@ -178,8 +181,9 @@ public sealed class LicenseValidator
     /// <summary>Validates a licence token for the current machine.</summary>
     /// <param name="token">The compact licence token.</param>
     /// <param name="currentFingerprint">The current machine's fingerprint, required when the licence is machine-bound.</param>
+    /// <param name="revokedLicenceIds">Licence ids on the installed revocation list.</param>
     /// <returns>The validation result.</returns>
-    public LicenseValidationResult Validate(string token, MachineFingerprint? currentFingerprint = null)
+    public LicenseValidationResult Validate(string token, MachineFingerprint? currentFingerprint = null, IReadOnlyCollection<string>? revokedLicenceIds = null)
     {
         SignatureVerification verification = _verifier.Verify(token);
         if (!verification.IsValid || verification.Payload is null)
@@ -193,6 +197,11 @@ public sealed class LicenseValidator
         {
             return LicenseValidationResult.Failure(
                 LicenseStatus.WrongProduct, $"Licence is for '{payload.Product}', not '{_expectedProduct}'.", _clock);
+        }
+
+        if (revokedLicenceIds is not null && revokedLicenceIds.Contains(payload.LicenceId, StringComparer.Ordinal))
+        {
+            return LicenseValidationResult.ForPayload(LicenseStatus.Revoked, payload, "The vendor has revoked this licence; the system is read-only until a new licence is installed.", _clock);
         }
 
         DateTimeOffset now = _clock.UtcNow;

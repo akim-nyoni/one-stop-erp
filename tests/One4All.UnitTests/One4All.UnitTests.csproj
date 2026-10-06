@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\src\One4All.Application\One4All.Application.csproj" />
     <ProjectReference Include="..\..\src\One4All.Licensing.Core\One4All.Licensing.Core.csproj" />
     <ProjectReference Include="..\..\src\One4All.Reporting\One4All.Reporting.csproj" />
+    <ProjectReference Include="..\..\src\One4All.Licensing.Generator\One4All.Licensing.Generator.csproj" />
   </ItemGroup>
 
 </Project>

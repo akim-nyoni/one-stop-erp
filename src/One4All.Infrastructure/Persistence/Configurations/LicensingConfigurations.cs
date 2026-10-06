@@ -14,3 +14,14 @@ internal sealed class InstalledLicenceConfiguration : IEntityTypeConfiguration<I
         b.HasIndex(x => x.IsActive).HasFilter("is_active = true");
     }
 }
+
+internal sealed class InstalledRevocationListConfiguration : IEntityTypeConfiguration<InstalledRevocationList>
+{
+    public void Configure(EntityTypeBuilder<InstalledRevocationList> b)
+    {
+        b.ToTable("installed_revocation_list", Schemas.Licensing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Token).HasColumnType("text");
+        b.HasIndex(x => x.Sequence).IsUnique();
+    }
+}

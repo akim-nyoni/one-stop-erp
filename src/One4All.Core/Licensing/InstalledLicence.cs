@@ -39,3 +39,40 @@ public sealed class InstalledLicence : AuditableEntity
     /// <summary>Deactivates this licence (superseded by a newer install).</summary>
     public void Deactivate() => IsActive = false;
 }
+
+/// <summary>A vendor revocation list installed on this system (<c>lic.installed_revocation_list</c>); the highest sequence applies.</summary>
+public sealed class InstalledRevocationList : AuditableEntity
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private InstalledRevocationList() => Token = string.Empty;
+
+    /// <summary>Records an installed list.</summary>
+    /// <param name="token">The signed token.</param>
+    /// <param name="sequence">Its sequence number.</param>
+    /// <param name="revokedCount">How many licences it revokes.</param>
+    /// <param name="installedOnUtc">When.</param>
+    /// <param name="installedByUserId">Who.</param>
+    public InstalledRevocationList(string token, int sequence, int revokedCount, DateTimeOffset installedOnUtc, long? installedByUserId)
+    {
+        Token = token;
+        Sequence = sequence;
+        RevokedCount = revokedCount;
+        InstalledOnUtc = installedOnUtc;
+        InstalledByUserId = installedByUserId;
+    }
+
+    /// <summary>Gets the signed token.</summary>
+    public string Token { get; private set; }
+
+    /// <summary>Gets the list's sequence number.</summary>
+    public int Sequence { get; private set; }
+
+    /// <summary>Gets how many licences it revokes.</summary>
+    public int RevokedCount { get; private set; }
+
+    /// <summary>Gets when it was installed.</summary>
+    public DateTimeOffset InstalledOnUtc { get; private set; }
+
+    /// <summary>Gets who installed it.</summary>
+    public long? InstalledByUserId { get; private set; }
+}

@@ -45,6 +45,15 @@ public interface ILicenceService
     /// <returns>A task.</returns>
     Task ReloadAsync(CancellationToken ct = default);
 
+    /// <summary>
+    /// Installs a vendor revocation list (signed by a trusted key, and newer than the one installed) and re-checks the licence against it:
+    /// a revoked licence turns read-only.
+    /// </summary>
+    /// <param name="token">The <c>RL1.…</c> token.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>How many licences the list revokes, or why it was refused.</returns>
+    Task<Core.Common.Result<int>> InstallRevocationListAsync(string token, CancellationToken ct = default);
+
     /// <summary>Gets a value indicating whether the licence is enforced on this host.</summary>
     bool Enforced { get; }
 

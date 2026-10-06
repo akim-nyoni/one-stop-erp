@@ -12872,6 +12872,67 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("installed_licence", "lic");
                 });
 
+            modelBuilder.Entity("One4All.Core.Licensing.InstalledRevocationList", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("InstalledByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("installed_by_user_id");
+
+                    b.Property<DateTimeOffset>("InstalledOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("installed_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<int>("RevokedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("revoked_count");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("token");
+
+                    b.HasKey("Id")
+                        .HasName("pk_installed_revocation_list");
+
+                    b.HasIndex("Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("ix_installed_revocation_list_sequence");
+
+                    b.ToTable("installed_revocation_list", "lic");
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.BillingRun", b =>
                 {
                     b.Property<long>("Id")

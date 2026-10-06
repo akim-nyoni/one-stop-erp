@@ -25,6 +25,8 @@ public sealed class LicenceService : ILicenceService
     private readonly IClock _clock;
     private readonly Lazy<CoreFingerprint> _fingerprint;
     private readonly bool _enforce;
+    private readonly IReadOnlyDictionary<string, byte[]> _trustedKeys;
+    private volatile IReadOnlyCollection<string> _revoked = [];
     private volatile LicenseValidationResult _current;
 
     /// <summary>Creates the service and performs an initial (empty) validation.</summary>
@@ -46,6 +48,7 @@ public sealed class LicenceService : ILicenceService
         _fingerprint = new Lazy<CoreFingerprint>(
             () => CoreFingerprint.FromComponents(machineId.GetComponents()),
             LazyThreadSafetyMode.ExecutionAndPublication);
+        _trustedKeys = trustedKeys.PublicKeysByKid;
         _validator = new LicenseValidator(new LicenseVerifier(trustedKeys.PublicKeysByKid), clock, Product);
         _current = LicenseValidationResult.Failure(LicenseStatus.Invalid, "No licence installed.", clock);
     }
@@ -108,6 +111,8 @@ public sealed class LicenceService : ILicenceService
     {
         await using AsyncServiceScope scope = _scopeFactory.CreateAsyncScope();
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        string? revocations = await db.Set<InstalledRevocationList>().OrderByDescending(r => r.Sequence).Select(r => r.Token).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        _revoked = revocations is not null && RevocationListCodec.Verify(revocations, _trustedKeys).List is RevocationList list ? list.Revoked : [];
 
         InstalledLicence? active = await db.Set<InstalledLicence>()
             .Where(l => l.IsActive)
@@ -117,13 +122,13 @@ public sealed class LicenceService : ILicenceService
 
         _current = active is null
             ? LicenseValidationResult.Failure(LicenseStatus.Invalid, "No licence installed.", _clock)
-            : _validator.Validate(active.Token, _fingerprint.Value);
+            : _validator.Validate(active.Token, _fingerprint.Value, _revoked);
     }
 
     /// <inheritdoc />
     public async Task<LicenseValidationResult> InstallAsync(string licenceToken, CancellationToken ct = default)
     {
-        LicenseValidationResult validation = _validator.Validate(licenceToken.Trim(), _fingerprint.Value);
+        LicenseValidationResult validation = _validator.Validate(licenceToken.Trim(), _fingerprint.Value, _revoked);
 
         // Only persist a licence whose signature and product are acceptable (it may still be expired/grace).
         if (validation.Status is LicenseStatus.Invalid or LicenseStatus.TamperDetected or LicenseStatus.WrongProduct)
@@ -153,5 +158,32 @@ public sealed class LicenceService : ILicenceService
 
         _current = validation;
         return validation;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<int>> InstallRevocationListAsync(string token, CancellationToken ct = default)
+    {
+        (RevocationList? list, string? error) = RevocationListCodec.Verify(token, _trustedKeys);
+        if (list is null)
+        {
+            return Error.Validation("Licence.RevocationListInvalid", error ?? "The revocation list is not valid.");
+        }
+
+        await using AsyncServiceScope scope = _scopeFactory.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        int installed = await db.Set<InstalledRevocationList>().Select(r => (int?)r.Sequence).MaxAsync(ct).ConfigureAwait(false) ?? 0;
+        if (list.Sequence <= installed)
+        {
+            return Error.Rule("Licence.RevocationListOld", $"Revocation list {list.Sequence} is not newer than the installed list {installed}.");
+        }
+
+        ICurrentUser currentUser = scope.ServiceProvider.GetRequiredService<ICurrentUser>();
+        db.Add(new InstalledRevocationList(token.Trim(), list.Sequence, list.Revoked.Count, _clock.UtcNow, currentUser.UserId));
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await scope.ServiceProvider.GetRequiredService<IAuditService>().RecordAsync(new AuditEvent(null, currentUser.UserId, currentUser.UserName, "Licensing", "RevocationList",
+            list.Sequence.ToString(System.Globalization.CultureInfo.InvariantCulture), Core.Audit.AuditAction.LicenceChange, $"Revocation list {list.Sequence} installed ({list.Revoked.Count} revoked)",
+            null), ct).ConfigureAwait(false);
+        await ReloadAsync(ct).ConfigureAwait(false);
+        return list.Revoked.Count;
     }
 }
