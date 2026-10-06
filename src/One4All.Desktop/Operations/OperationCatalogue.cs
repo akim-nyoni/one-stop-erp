@@ -11,5 +11,5 @@ public static partial class OperationCatalogue
 
     /// <summary>Every operation.</summary>
     /// <returns>The operations, by module.</returns>
-    public static IReadOnlyList<Operation> All() => [.. Retail(), .. Stock(), .. Weighbridge(), .. FixedAssets(), .. Contracts(), .. People(), .. Banking(), .. SalesAndSchools(), .. Workflow(), .. WorkflowRules(), .. Purchasing(), .. Budgeting(), .. Crm(), .. WhatsAppInbox(), .. MasterData(), .. Snapshots(), .. Licence(), .. Documents()];
+    public static IReadOnlyList<Operation> All() => [.. Retail(), .. Stock(), .. Weighbridge(), .. FixedAssets(), .. Contracts(), .. People(), .. Banking(), .. SalesAndSchools(), .. Workflow(), .. WorkflowRules(), .. Purchasing(), .. Budgeting(), .. Crm(), .. WhatsAppInbox(), .. Municipal(), .. Receipting(), .. MasterData(), .. Snapshots(), .. Licence(), .. Documents()];
 }

@@ -82,6 +82,8 @@
                 <MenuItem Header="Purchasing — Budget Gate, Delivery Schedules &amp; Expediting…" Tag="Purchasing" Click="OpenOperations_Click" />
                 <MenuItem Header="Budgeting — Preparation, Review &amp; Approval…" Tag="Budgeting" Click="OpenOperations_Click" />
                 <MenuItem Header="CRM — Leads, Activities &amp; Agenda…" Tag="CRM" Click="OpenOperations_Click" />
+                <MenuItem Header="Municipality — Enquiry Desk, Meter Readings, Billing Runs, Statements…" Tag="Municipality" Click="OpenOperations_Click" />
+                <MenuItem Header="Receipting — Cashier Session, Payments, Reversals…" Tag="Receipting" Click="OpenOperations_Click" />
                 <MenuItem Header="Weighbridge…" Tag="Weighbridge" Click="OpenOperations_Click" />
                 <MenuItem Header="Fixed Assets — Counts, Maintenance, CWIP…" Tag="Fixed Assets" Click="OpenOperations_Click" />
                 <MenuItem Header="Contracts — Variations, BOQ, WBS, Subcontracts, Plant…" Tag="Contracts" Click="OpenOperations_Click" />
