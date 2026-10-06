@@ -18,6 +18,12 @@ public sealed class ReportEngine
     /// <returns>The resolved render model.</returns>
     public RenderModel Build(ReportInput input)
     {
+        ArgumentNullException.ThrowIfNull(input);
+        if (input.Definition.CrossTab is CrossTab crossTab)
+        {
+            input = CrossTabs.Pivot(input, crossTab);
+        }
+
         ReportDefinition def = input.Definition;
         RenderModel model = new() { ReportName = def.Name, Page = def.Page };
 
@@ -142,14 +148,26 @@ public sealed class ReportEngine
                 continue;
             }
 
-            string text = ResolveText(element, ctx, scope);
+            if (element.Kind == ElementKind.Chart)
+            {
+                rendered.Cells.AddRange(Charts.Bars(element, scope));
+                continue;
+            }
+
+            string text = element.Kind switch
+            {
+                ElementKind.Checkbox => Truthy(ctx.Fields.GetValueOrDefault(element.FieldName ?? string.Empty)) ? "☑" : "☐",
+                ElementKind.Signature => element.Text ?? "Signature",
+                ElementKind.Aggregate => NumberToWords.Format(ComputeAggregate(element, scope, row, input.Rows), element.Format),
+                _ => ResolveText(element, ctx, scope),
+            };
             (string foreground, string? background, bool bold) = ApplyConditionalFormats(element, ctx);
             (string? drillTarget, string? drillKey) = DrillThrough.For(element, row);
 
             rendered.Cells.Add(new RenderCell
             {
-                Kind = element.Kind,
-                Text = text,
+                Kind = element.Kind == ElementKind.Signature ? ElementKind.Label : element.Kind,
+                Text = element.Kind == ElementKind.Signature ? "______________________________\n" + text : text,
                 X = element.X,
                 Y = element.Y,
                 Width = element.Width,
@@ -177,20 +195,29 @@ public sealed class ReportEngine
         ElementKind.Label => element.Text ?? string.Empty,
         ElementKind.Field => NumberToWords.Format(ctx.Fields.GetValueOrDefault(element.FieldName ?? string.Empty), element.Format),
         ElementKind.Expression => NumberToWords.Format(_expressions.Evaluate(element.Expression ?? string.Empty, ctx), element.Format),
-        ElementKind.Aggregate => NumberToWords.Format(ComputeAggregate(element, scope), element.Format),
+        ElementKind.Aggregate => NumberToWords.Format(ComputeAggregate(element, scope, null, scope), element.Format),
         _ => string.Empty,
     };
 
-    private static decimal ComputeAggregate(ReportElement element, IReadOnlyList<IReadOnlyDictionary<string, object?>> scope)
+    private static decimal ComputeAggregate(ReportElement element, IReadOnlyList<IReadOnlyDictionary<string, object?>> scope, IReadOnlyDictionary<string, object?>? row,
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> all)
     {
         string field = element.AggregateField ?? string.Empty;
-        IEnumerable<decimal> values = scope
+        List<decimal> values = [.. scope
             .Select(r => r.GetValueOrDefault(field))
             .Where(v => v is not null)
-            .Select(ToDecimal);
+            .Select(ToDecimal)];
 
+        decimal Value(IReadOnlyDictionary<string, object?> r) => r.GetValueOrDefault(field) is object v ? ToDecimal(v) : 0m;
         return element.Aggregate switch
         {
+            AggregateFunction.RunningTotal when row is not null => scope.TakeWhile(r => !ReferenceEquals(r, row)).Sum(Value) + Value(row),
+            AggregateFunction.Median => Statistics.Median(values),
+            AggregateFunction.StdDev => Statistics.SampleStdDev(values),
+            AggregateFunction.PercentOfTotal when row is not null && ReferenceEquals(scope, all) =>
+                values.Sum() is decimal total && total != 0m ? Math.Round(Value(row) * 100m / total, 2) : 0m,
+            AggregateFunction.PercentOfTotal => all.Where(r => r.GetValueOrDefault(field) is not null).Sum(Value) is decimal grand && grand != 0m ? Math.Round(values.Sum() * 100m / grand, 2) : 0m,
+            AggregateFunction.RankOf when row is not null => 1 + values.Count(v => v > Value(row)),
             AggregateFunction.Sum => values.Sum(),
             AggregateFunction.Average => values.Any() ? values.Average() : 0m,
             AggregateFunction.Count => scope.Count,
@@ -231,6 +258,14 @@ public sealed class ReportEngine
         UserName = input.UserName,
         CompanyName = input.CompanyName,
         ToBase = input.ToBase,
+    };
+
+    private static bool Truthy(object? value) => value switch
+    {
+        bool b => b,
+        string s => s.Equals("true", StringComparison.OrdinalIgnoreCase) || s.Equals("yes", StringComparison.OrdinalIgnoreCase) || s == "1" || s.Equals("y", StringComparison.OrdinalIgnoreCase),
+        null => false,
+        _ => ToDecimal(value) != 0m,
     };
 
     private static decimal ToDecimal(object? value) => value switch

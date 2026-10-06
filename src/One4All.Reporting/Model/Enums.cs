@@ -89,6 +89,15 @@ public enum ElementKind
 
     /// <summary>A barcode/QR.</summary>
     Barcode = 7,
+
+    /// <summary>A tick box showing a true / false field (☑ / ☐).</summary>
+    Checkbox = 8,
+
+    /// <summary>A signature block: a line to sign on with the caption (its text) beneath.</summary>
+    Signature = 9,
+
+    /// <summary>A bar chart of a value field by a category field over the band's scope (drawn as bars and labels, so every renderer shows it).</summary>
+    Chart = 10,
 }
 
 /// <summary>Horizontal text alignment.</summary>
@@ -175,6 +184,18 @@ public enum AggregateFunction
 
     /// <summary>Running total.</summary>
     RunningTotal = 6,
+
+    /// <summary>The middle value.</summary>
+    Median = 7,
+
+    /// <summary>The sample standard deviation.</summary>
+    StdDev = 8,
+
+    /// <summary>The value as a percentage of the scope's total (on a detail row: the row; in a group footer: the group against the report).</summary>
+    PercentOfTotal = 9,
+
+    /// <summary>The row's rank by value within the scope, highest first.</summary>
+    RankOf = 10,
 }
 
 /// <summary>The scope an aggregate resets at.</summary>

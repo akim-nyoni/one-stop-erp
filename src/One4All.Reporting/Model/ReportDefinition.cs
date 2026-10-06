@@ -141,8 +141,33 @@ public sealed class ReportDefinition
     /// <summary>The bands, in render order.</summary>
     public List<ReportBand> Bands { get; set; } = [];
 
+    /// <summary>Gets or sets a cross-tab layout: when set, the rows are pivoted and the header and detail bands are generated from the columns found.</summary>
+    public CrossTab? CrossTab { get; set; }
+
     /// <summary>Returns the first band of a given type, or null.</summary>
     /// <param name="type">The band type.</param>
     /// <returns>The band, or null.</returns>
     public ReportBand? BandOfType(BandType type) => Bands.FirstOrDefault(b => b.Type == type);
+}
+
+/// <summary>A cross-tab (pivot): one output row per row-field value, one column per column-field value, each cell the aggregate of the value field.</summary>
+public sealed class CrossTab
+{
+    /// <summary>Gets or sets the field down the side.</summary>
+    public string RowField { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the field across the top.</summary>
+    public string ColumnField { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the field summarised in the cells.</summary>
+    public string ValueField { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets how cells summarise (Sum, Count, Average, Min, Max).</summary>
+    public AggregateFunction Function { get; set; }
+
+    /// <summary>Gets or sets the number format of the cells.</summary>
+    public string? Format { get; set; } = "N2";
+
+    /// <summary>Gets or sets a value indicating whether a total column is added.</summary>
+    public bool RowTotals { get; set; } = true;
 }

@@ -100,7 +100,7 @@ public partial class BandedDesignerWindow : Window
             ParameterType.Date => p.Name.Contains("From", StringComparison.OrdinalIgnoreCase) || p.Name.Contains("Start", StringComparison.OrdinalIgnoreCase) ? new DateOnly(today.Year, 1, 1) : today,
             _ => p.DefaultValue,
         }), StringComparer.OrdinalIgnoreCase);
-        string command = definition.DataSources.FirstOrDefault()?.Command ?? definition.Code;
+        string command = ReportCommands.For(definition);
         try
         {
             await using AsyncServiceScope scope = _services.CreateAsyncScope();
@@ -180,6 +180,9 @@ public partial class BandedDesignerWindow : Window
             ElementKind.Expression => $"={element.Expression}",
             ElementKind.Aggregate => $"{element.Aggregate}({element.AggregateField ?? element.FieldName})",
             ElementKind.Line => string.Empty,
+            ElementKind.Checkbox => $"☐ [{element.FieldName}]",
+            ElementKind.Signature => $"____________ {element.Text}",
+            ElementKind.Chart => $"▇▅▃ chart of {element.AggregateField} by {element.ChartCategoryField ?? "(set ChartCategoryField)"}",
             _ => element.Text ?? string.Empty,
         };
         Grid visual = new() { Width = Math.Max(4, element.Width * Zoom), Height = Math.Max(element.Kind == ElementKind.Line ? 3 : 6, element.Height * Zoom), Tag = element.Name, Cursor = Cursors.SizeAll };
@@ -379,6 +382,12 @@ public partial class BandedDesignerWindow : Window
 
     private void AddLine_Click(object sender, RoutedEventArgs e) => Add(ElementKind.Line, null);
 
+    private void AddCheckbox_Click(object sender, RoutedEventArgs e) => Add(ElementKind.Field, FieldList.SelectedItem as string, ElementKind.Checkbox);
+
+    private void AddSignature_Click(object sender, RoutedEventArgs e) => Add(ElementKind.Label, "Authorised signature", ElementKind.Signature, 200, 32);
+
+    private void AddChart_Click(object sender, RoutedEventArgs e) => Add(ElementKind.Field, FieldList.SelectedItem as string, ElementKind.Chart, 360, 140);
+
     private void Field_DoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (FieldList.SelectedItem is string field && _session is not null)
@@ -388,7 +397,8 @@ public partial class BandedDesignerWindow : Window
         }
     }
 
-    private void Add(ElementKind kind, string? content)
+    // Tick boxes and charts read a field; a signature is a captioned label; each then becomes its own kind and size.
+    private void Add(ElementKind kind, string? content, ElementKind? asKind = null, double width = 0, double height = 0)
     {
         if (_session is null)
         {
@@ -401,7 +411,23 @@ public partial class BandedDesignerWindow : Window
             return;
         }
 
-        Select(_session.AddElement(TargetBand, kind, 4, 2, content));
+        string name = _session.AddElement(TargetBand, kind, 4, 2, content);
+        if (asKind is ElementKind finalKind && _session.Find(name).Element is ReportElement element)
+        {
+            element.Kind = finalKind;
+            if (finalKind == ElementKind.Chart)
+            {
+                element.AggregateField = content;
+            }
+
+            if (width > 0)
+            {
+                _session.SetBandHeight(TargetBand, Math.Max(_session.Definition.BandOfType(TargetBand)!.Height, height + 4));
+                _session.Resize(name, width, height);
+            }
+        }
+
+        Select(name);
     }
 
     private void Select(string name)

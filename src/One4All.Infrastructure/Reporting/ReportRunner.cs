@@ -45,7 +45,7 @@ public sealed class ReportRunner : IReportRunner
             return Error.NotFound("Report.NotFound", $"No report definition found for code '{reportCode}'.");
         }
 
-        string command = definition.DataSources.FirstOrDefault()?.Command ?? reportCode;
+        string command = definition.DataSources.Count == 0 ? reportCode : ReportCommands.For(definition);
         IReportDataProvider? provider = _providers.FirstOrDefault(p => p.CanHandle(command));
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = provider is null
             ? []

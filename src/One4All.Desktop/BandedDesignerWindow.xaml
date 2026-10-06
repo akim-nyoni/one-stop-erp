@@ -29,6 +29,9 @@
                 <Button Content="Field" Padding="8,2" Margin="1" Click="AddField_Click" />
                 <Button Content="Expression" Padding="8,2" Margin="1" Click="AddExpression_Click" />
                 <Button Content="Line" Padding="8,2" Margin="1" Click="AddLine_Click" />
+                <Button Content="Tick box" Padding="8,2" Margin="1" Click="AddCheckbox_Click" />
+                <Button Content="Signature" Padding="8,2" Margin="1" Click="AddSignature_Click" />
+                <Button Content="Chart" Padding="8,2" Margin="1" Click="AddChart_Click" ToolTip="A bar chart of the selected field; set its category field in the properties" />
                 <Separator Margin="6,0" />
                 <Button Content="⇤ Left" Padding="6,2" Margin="1" Tag="Left" Click="Align_Click" />
                 <Button Content="Right ⇥" Padding="6,2" Margin="1" Tag="Right" Click="Align_Click" />

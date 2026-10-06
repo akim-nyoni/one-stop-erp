@@ -56,6 +56,12 @@ public sealed class ReportElement
     /// <summary>Gets or sets the field whose value is the drill key (default: the element's own field).</summary>
     public string? DrillField { get; set; }
 
+    /// <summary>Gets or sets a chart's category field (the bars' labels).</summary>
+    public string? ChartCategoryField { get; set; }
+
+    /// <summary>Gets or sets a chart's bar colour.</summary>
+    public string ChartColor { get; set; } = "#2E7D32";
+
     /// <summary>The expression for a <see cref="ElementKind.Expression"/> element.</summary>
     public string? Expression { get; set; }
 
