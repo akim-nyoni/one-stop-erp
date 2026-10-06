@@ -43,6 +43,43 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Loyalty: enrol, earn, redeem, statement", ListTitle = "Loyalty members",
+            Description = "Pick an action. Earning books the points' value as a liability; a redemption's value is tendered at the till on the scheme's liability account.",
+            Fields = [Pick("Action", "Action", "Statement", "Enrol", "Earn", "Redeem"), Req("Member", "Member number"), Opt("Name", "Name (enrol)"), OptNum("Amount", "Spend (earn) / points (redeem)"),
+                Today(), Opt("Reference", "Sale reference")],
+            Run = async (c, i) =>
+            {
+                ILoyaltyService loyalty = c.Get<ILoyaltyService>();
+                switch (i.Text("Action"))
+                {
+                    case "Enrol":
+                        return Check(await loyalty.EnrolAsync(c.CompanyId, i.Text("Member"), i.Text("Name"), null, i.Date("Date")).ConfigureAwait(true), id => $"Member {i.Text("Member").ToUpperInvariant()} enrolled.");
+                    case "Earn":
+                        LoyaltyEarned earned = Check(await loyalty.EarnAsync(c.CompanyId, i.Text("Member"), i.Number("Amount"), i.Date("Date"), i.Optional("Reference") ?? "MANUAL").ConfigureAwait(true));
+                        return $"{Q(earned.Points)} points earned{(earned.Tier is null ? string.Empty : $" ({earned.Tier})")}; balance {Q(earned.Balance)}.";
+                    case "Redeem":
+                        return $"Redeemed: tender {M(Check(await loyalty.RedeemAsync(c.CompanyId, i.Text("Member"), i.Number("Amount"), i.Date("Date"), i.Optional("Reference") ?? "MANUAL").ConfigureAwait(true)))} on the loyalty liability account.";
+                    default:
+                        LoyaltyStatement s = Check(await loyalty.StatementAsync(c.CompanyId, i.Text("Member"), i.Date("Date")).ConfigureAwait(true));
+                        return $"{s.MemberNumber} {s.Name} — {s.Tier ?? "no tier"}, {Q(s.Balance)} points worth {M(s.BalanceValue)}{Environment.NewLine}"
+                            + string.Join(Environment.NewLine, s.Movements.Select(m => $"{D(m.Date)}  {m.Kind,-7} {Q(m.Points),10}  {m.Reference}"));
+                }
+            },
+            List = async c => Table(await c.Db.LoyaltyMembers.AsNoTracking().Where(m => m.CompanyId == c.CompanyId).OrderBy(m => m.MemberNumber).ToListAsync().ConfigureAwait(true),
+                ("Member", m => m.MemberNumber), ("Name", m => m.Name), ("Joined", m => D(m.JoinedOn))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Expire loyalty points", Description = "Expires every member's points past their expiry (oldest first) and releases the liability.",
+            Fields = [Today("AsAt", "As at"), Req("Document", "Document number")],
+            Run = async (c, i) =>
+            {
+                (int members, decimal points, decimal value) = Check(await c.Get<ILoyaltyService>().ExpireAsync(c.CompanyId, i.Date("AsAt"), i.Text("Document")).ConfigureAwait(true));
+                return $"{Q(points)} points of {members} member(s) expired, releasing {M(value)}.";
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Price a basket with promotions", Description = "Shows what the running promotions take off a basket at a date and time.",
             Fields = [Req("Lines", "Lines: ITEM:quantity; … (at the default price list)"), Req("When", "When (yyyy-MM-dd HH:mm)", DateTime.Now.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)),
                 Tick("Member", "Loyalty member"), Opt("Coupons", "Coupon codes (',')"), Req("Prices", "Unit prices: ITEM:price; …")],

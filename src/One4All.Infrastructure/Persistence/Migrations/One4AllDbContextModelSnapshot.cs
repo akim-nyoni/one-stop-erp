@@ -16275,6 +16275,230 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("training", "hr");
                 });
 
+            modelBuilder.Entity("One4All.Core.Pos.LoyaltyMember", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateOnly>("JoinedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("joined_on");
+
+                    b.Property<string>("MemberNumber")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("member_number");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loyalty_member");
+
+                    b.HasIndex("CompanyId", "MemberNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_loyalty_member_company_id_member_number");
+
+                    b.ToTable("loyalty_member", "pos");
+                });
+
+            modelBuilder.Entity("One4All.Core.Pos.LoyaltyMovement", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<DateOnly?>("ExpiresOn")
+                        .HasColumnType("date")
+                        .HasColumnName("expires_on");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<long>("MemberId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("member_id");
+
+                    b.Property<decimal>("Points")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("points");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loyalty_movement");
+
+                    b.HasIndex("MemberId", "Date")
+                        .HasDatabaseName("ix_loyalty_movement_member_id_date");
+
+                    b.ToTable("loyalty_movement", "pos");
+                });
+
+            modelBuilder.Entity("One4All.Core.Pos.LoyaltyScheme", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("ExpenseAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("expense_account_code");
+
+                    b.Property<int?>("ExpiryMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("expiry_months");
+
+                    b.Property<string>("LiabilityAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("liability_account_code");
+
+                    b.Property<decimal>("PointsPerUnit")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("points_per_unit");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<decimal>("ValuePerPoint")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("value_per_point");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loyalty_scheme");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_loyalty_scheme_company_id");
+
+                    b.ToTable("loyalty_scheme", "pos");
+                });
+
+            modelBuilder.Entity("One4All.Core.Pos.LoyaltyTier", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("LoyaltySchemeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("loyalty_scheme_id");
+
+                    b.Property<decimal>("MinPoints")
+                        .HasPrecision(19, 2)
+                        .HasColumnType("numeric(19,2)")
+                        .HasColumnName("min_points");
+
+                    b.Property<decimal>("Multiplier")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("multiplier");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("name");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_loyalty_tier");
+
+                    b.HasIndex("LoyaltySchemeId")
+                        .HasDatabaseName("ix_loyalty_tier_loyalty_scheme_id");
+
+                    b.ToTable("loyalty_tier", "pos");
+                });
+
             modelBuilder.Entity("One4All.Core.Pos.PosEvent", b =>
                 {
                     b.Property<long>("Id")
@@ -27067,6 +27291,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tax_band_tax_table_tax_table_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Pos.LoyaltyTier", b =>
+                {
+                    b.HasOne("One4All.Core.Pos.LoyaltyScheme", null)
+                        .WithMany("Tiers")
+                        .HasForeignKey("LoyaltySchemeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_loyalty_tier_loyalty_schemes_loyalty_scheme_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Pos.PromotionItem", b =>
                 {
                     b.HasOne("One4All.Core.Pos.Promotion", null)
@@ -27784,6 +28018,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Payroll.TaxTable", b =>
                 {
                     b.Navigation("Bands");
+                });
+
+            modelBuilder.Entity("One4All.Core.Pos.LoyaltyScheme", b =>
+                {
+                    b.Navigation("Tiers");
                 });
 
             modelBuilder.Entity("One4All.Core.Pos.Promotion", b =>

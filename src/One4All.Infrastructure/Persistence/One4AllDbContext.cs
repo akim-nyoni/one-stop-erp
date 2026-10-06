@@ -191,6 +191,15 @@ public class One4AllDbContext : DbContext
     /// <summary>POS sales.</summary>
     public DbSet<Core.Pos.Sale> Sales => Set<Core.Pos.Sale>();
 
+    /// <summary>The loyalty scheme.</summary>
+    public DbSet<Core.Pos.LoyaltyScheme> LoyaltySchemes => Set<Core.Pos.LoyaltyScheme>();
+
+    /// <summary>Loyalty members.</summary>
+    public DbSet<Core.Pos.LoyaltyMember> LoyaltyMembers => Set<Core.Pos.LoyaltyMember>();
+
+    /// <summary>Loyalty points movements.</summary>
+    public DbSet<Core.Pos.LoyaltyMovement> LoyaltyMovements => Set<Core.Pos.LoyaltyMovement>();
+
     /// <summary>POS promotions.</summary>
     public DbSet<Core.Pos.Promotion> Promotions => Set<Core.Pos.Promotion>();
 

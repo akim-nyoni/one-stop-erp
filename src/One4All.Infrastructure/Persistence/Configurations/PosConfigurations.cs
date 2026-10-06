@@ -134,3 +134,57 @@ internal sealed class PromotionItemConfiguration : IEntityTypeConfiguration<Prom
         b.HasKey(x => x.Id);
     }
 }
+
+internal sealed class LoyaltySchemeConfiguration : IEntityTypeConfiguration<LoyaltyScheme>
+{
+    public void Configure(EntityTypeBuilder<LoyaltyScheme> b)
+    {
+        b.ToTable("loyalty_scheme", Schemas.PointOfSale);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PointsPerUnit).HasPrecision(19, 6);
+        b.Property(x => x.ValuePerPoint).HasPrecision(19, 6);
+        b.Property(x => x.LiabilityAccountCode).HasMaxLength(8);
+        b.Property(x => x.ExpenseAccountCode).HasMaxLength(8);
+        b.HasMany(x => x.Tiers).WithOne().HasForeignKey(x => x.LoyaltySchemeId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Tiers).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => x.CompanyId).IsUnique();
+    }
+}
+
+internal sealed class LoyaltyTierConfiguration : IEntityTypeConfiguration<LoyaltyTier>
+{
+    public void Configure(EntityTypeBuilder<LoyaltyTier> b)
+    {
+        b.ToTable("loyalty_tier", Schemas.PointOfSale);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Name).HasMaxLength(40);
+        b.Property(x => x.MinPoints).HasPrecision(19, 2);
+        b.Property(x => x.Multiplier).HasPrecision(9, 4);
+    }
+}
+
+internal sealed class LoyaltyMemberConfiguration : IEntityTypeConfiguration<LoyaltyMember>
+{
+    public void Configure(EntityTypeBuilder<LoyaltyMember> b)
+    {
+        b.ToTable("loyalty_member", Schemas.PointOfSale);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.MemberNumber).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.HasIndex(x => new { x.CompanyId, x.MemberNumber }).IsUnique();
+    }
+}
+
+internal sealed class LoyaltyMovementConfiguration : IEntityTypeConfiguration<LoyaltyMovement>
+{
+    public void Configure(EntityTypeBuilder<LoyaltyMovement> b)
+    {
+        b.ToTable("loyalty_movement", Schemas.PointOfSale);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Points).HasPrecision(19, 2);
+        b.Property(x => x.Value).HasPrecision(19, 4);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.HasIndex(x => new { x.MemberId, x.Date });
+    }
+}
