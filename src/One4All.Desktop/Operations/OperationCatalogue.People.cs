@@ -267,6 +267,27 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Accrue unpaid salaries", Description = "Period end: accrues basic salary for everyone employed but not yet paid for the month, reversed on the 1st of next month.",
+            Fields = [Today("AsAt", "Period end"), Req("Expense", "Salary expense account", "6100"), Req("Accrual", "Accrued salaries account"), Req("Document", "Document number")],
+            Run = async (c, i) =>
+            {
+                SalaryAccrual accrual = Check(await c.Get<IPayrollAccountingService>().AccrueSalariesAsync(c.CompanyId, i.Date("AsAt"), i.Text("Expense"), i.Text("Accrual"), i.Text("Document")).ConfigureAwait(true));
+                return $"Accrued {M(accrual.Amount)} for {accrual.Employees} employee(s): {accrual.JournalNumber}, reversed by {accrual.ReversalJournalNumber}.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Capitalise timesheet labour to WIP", Description = "Moves a contract's timesheet labour up to a date into its WIP account, each timesheet once.",
+            Fields = [Req("Contract", "Contract number"), Today("UpTo", "Up to"), Req("Wip", "Contract WIP account"), Req("Recovery", "Payroll cost account credited", "6100"), Req("Document", "Document number")],
+            Run = async (c, i) =>
+            {
+                LabourCapitalised done = Check(await c.Get<IPayrollAccountingService>().CapitaliseTimesheetsAsync(c.CompanyId, await ContractAsync(c, i.Text("Contract")).ConfigureAwait(true), i.Date("UpTo"),
+                    i.Text("Wip"), i.Text("Recovery"), i.Text("Document")).ConfigureAwait(true));
+                return $"{done.Timesheets} timesheet(s), {Q(done.Hours)} h, {M(done.Amount)} capitalised: {done.JournalNumber}.";
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set an employee's pay group", Description = "Moves an employee to a pay group (MONTHLY, WEEKLY, CASUAL…); blank returns them to the default payroll.",
             Fields = [Req("Employee", "Employee number"), Opt("Group", "Pay group")],
             Run = async (c, i) =>

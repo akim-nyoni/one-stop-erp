@@ -10761,6 +10761,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("CapitalisedJournal")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("capitalised_journal");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");

@@ -206,4 +206,11 @@ public sealed class JobTimesheet : Entity, ICompanyScoped
 
     /// <summary>Gets the cost (hours × rate).</summary>
     public decimal Cost => Math.Round(Hours * HourlyCost, 2, MidpointRounding.AwayFromZero);
+
+    /// <summary>Gets the journal that capitalised the labour into the contract's WIP, once it has been.</summary>
+    public string? CapitalisedJournal { get; private set; }
+
+    /// <summary>Marks the labour capitalised.</summary>
+    /// <param name="journalNumber">The capitalising journal.</param>
+    public void MarkCapitalised(string journalNumber) => CapitalisedJournal = journalNumber;
 }

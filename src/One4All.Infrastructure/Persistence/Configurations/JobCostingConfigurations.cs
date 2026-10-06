@@ -150,6 +150,7 @@ internal sealed class JobTimesheetConfiguration : IEntityTypeConfiguration<JobTi
         b.Property(x => x.Hours).HasPrecision(9, 2);
         b.Property(x => x.HourlyCost).HasPrecision(19, 4);
         b.Property(x => x.CostHead).HasMaxLength(60);
+        b.Property(x => x.CapitalisedJournal).HasMaxLength(40);
         b.Ignore(x => x.Cost);
         b.HasIndex(x => new { x.EmployeeId, x.Date });
         b.HasIndex(x => x.JobContractId);
