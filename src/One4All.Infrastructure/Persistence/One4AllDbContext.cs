@@ -191,6 +191,9 @@ public class One4AllDbContext : DbContext
     /// <summary>POS sales.</summary>
     public DbSet<Core.Pos.Sale> Sales => Set<Core.Pos.Sale>();
 
+    /// <summary>Sales parked to be resumed.</summary>
+    public DbSet<Core.Pos.ParkedSale> ParkedSales => Set<Core.Pos.ParkedSale>();
+
     /// <summary>Till cash pickups, paid-outs and float top-ups.</summary>
     public DbSet<Core.Pos.TillCashMovement> TillCashMovements => Set<Core.Pos.TillCashMovement>();
 

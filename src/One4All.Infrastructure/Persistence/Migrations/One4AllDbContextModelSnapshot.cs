@@ -16499,6 +16499,80 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("loyalty_tier", "pos");
                 });
 
+            modelBuilder.Entity("One4All.Core.Pos.ParkedSale", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ClosedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("closed_by_user_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("DiscardReason")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("discard_reason");
+
+                    b.Property<string>("LinesJson")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("lines_json");
+
+                    b.Property<DateTimeOffset>("ParkedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("parked_at");
+
+                    b.Property<long>("ParkedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("parked_by_user_id");
+
+                    b.Property<long?>("ResumedAtTerminalId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("resumed_at_terminal_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Tag")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("tag");
+
+                    b.Property<long>("TerminalId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("terminal_id");
+
+                    b.Property<decimal>("Total")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("total");
+
+                    b.HasKey("Id")
+                        .HasName("pk_parked_sale");
+
+                    b.HasIndex("CompanyId", "Status")
+                        .HasDatabaseName("ix_parked_sale_company_id_status");
+
+                    b.ToTable("parked_sale", "pos");
+                });
+
             modelBuilder.Entity("One4All.Core.Pos.PosEvent", b =>
                 {
                     b.Property<long>("Id")
@@ -23374,6 +23448,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("time_zone_id");
+
+                    b.Property<decimal?>("UnreceiptedRefundLimit")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("unreceipted_refund_limit");
 
                     b.HasKey("Id")
                         .HasName("pk_company");

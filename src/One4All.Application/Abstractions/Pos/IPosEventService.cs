@@ -97,6 +97,49 @@ public sealed class PosRefundRequest
     public bool Restock { get; init; }
 }
 
+/// <summary>A refund without a receipt.</summary>
+public sealed class UnreceiptedRefundRequest
+{
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>Gets the till.</summary>
+    public long TerminalId { get; init; }
+
+    /// <summary>Gets the cashier.</summary>
+    public long CashierUserId { get; init; }
+
+    /// <summary>Gets the supervisor authorising it (required; not the cashier).</summary>
+    public long? AuthorisedByUserId { get; init; }
+
+    /// <summary>Gets the date.</summary>
+    public DateOnly Date { get; init; }
+
+    /// <summary>Gets the item returned.</summary>
+    public long ItemId { get; init; }
+
+    /// <summary>Gets the quantity.</summary>
+    public decimal Quantity { get; init; }
+
+    /// <summary>Gets the unit price refunded (tax-exclusive).</summary>
+    public decimal UnitPrice { get; init; }
+
+    /// <summary>Gets the tax refunded.</summary>
+    public decimal TaxAmount { get; init; }
+
+    /// <summary>Gets the output tax account (with tax).</summary>
+    public string? TaxAccountCode { get; init; }
+
+    /// <summary>Gets the account the money is paid from.</summary>
+    public string RefundAccountCode { get; init; } = string.Empty;
+
+    /// <summary>Gets the reason.</summary>
+    public string Reason { get; init; } = string.Empty;
+
+    /// <summary>Gets the warehouse the goods go back into (null: not restocked).</summary>
+    public long? RestockWarehouseId { get; init; }
+}
+
 /// <summary>The posted refund.</summary>
 /// <param name="EventId">The recorded refund event.</param>
 /// <param name="JournalNumber">The refund journal.</param>
@@ -120,4 +163,14 @@ public interface IPosEventService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The refund, or an error.</returns>
     Task<Result<PosRefundResult>> RefundAsync(PosRefundRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Refunds goods brought back without a receipt: always authorised by a supervisor other than the cashier, never above the company's
+    /// limit for such refunds (<c>Pos.UnreceiptedNotAllowed</c> / <c>Pos.UnreceiptedLimit</c>); revenue (and tax) reversed against the
+    /// item's revenue account and the goods optionally put back into stock at their average cost.
+    /// </summary>
+    /// <param name="request">The refund.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The refund.</returns>
+    Task<Result<PosRefundResult>> RefundWithoutReceiptAsync(UnreceiptedRefundRequest request, CancellationToken ct = default);
 }

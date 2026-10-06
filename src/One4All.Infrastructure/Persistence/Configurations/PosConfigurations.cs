@@ -204,3 +204,18 @@ internal sealed class TillCashMovementConfiguration : IEntityTypeConfiguration<T
         b.HasIndex(x => x.TillSessionId);
     }
 }
+
+internal sealed class ParkedSaleConfiguration : IEntityTypeConfiguration<ParkedSale>
+{
+    public void Configure(EntityTypeBuilder<ParkedSale> b)
+    {
+        b.ToTable("parked_sale", Schemas.PointOfSale);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Tag).HasMaxLength(80);
+        b.Property(x => x.LinesJson).HasColumnType("jsonb");
+        b.Property(x => x.Total).HasPrecision(19, 4);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.DiscardReason).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}

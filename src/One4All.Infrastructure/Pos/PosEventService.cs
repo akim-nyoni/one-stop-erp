@@ -7,6 +7,7 @@ using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.Inventory;
 using One4All.Core.Pos;
+using One4All.Core.System;
 using One4All.Infrastructure.Persistence;
 using One4All.Licensing.Core;
 
@@ -194,5 +195,93 @@ public sealed class PosEventService : IPosEventService
         _db.PosEvents.AddRange(events);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new PosRefundResult(events[0].Id, posting.Value.JournalNumber, gross);
+    }
+
+    /// <inheritdoc />
+    public Task<Result<PosRefundResult>> RefundWithoutReceiptAsync(UnreceiptedRefundRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RefundWithoutReceiptCoreAsync(request, ct), ct);
+
+    private async Task<Result<PosRefundResult>> RefundWithoutReceiptCoreAsync(UnreceiptedRefundRequest request, CancellationToken ct)
+    {
+        if (request.AuthorisedByUserId is null || request.AuthorisedByUserId == request.CashierUserId)
+        {
+            return Error.Rule("Pos.AuthorisationRequired", "A refund without a receipt needs a supervisor other than the cashier.");
+        }
+
+        if (request.Quantity <= 0m || request.UnitPrice <= 0m || request.TaxAmount < 0m || string.IsNullOrWhiteSpace(request.Reason) || string.IsNullOrWhiteSpace(request.RefundAccountCode))
+        {
+            return Error.Validation("Pos.UnreceiptedInvalid", "The refund needs a quantity, a price, a reason and the account the money is paid from.");
+        }
+
+        if (request.TaxAmount > 0m && string.IsNullOrWhiteSpace(request.TaxAccountCode))
+        {
+            return Error.Validation("Pos.TaxAccountRequired", "Refunding tax needs the output-tax account.");
+        }
+
+        Company company = await _db.Companies.AsNoTracking().FirstAsync(c => c.Id == request.CompanyId, ct).ConfigureAwait(false);
+        decimal net = decimal.Round(request.Quantity * request.UnitPrice, 2, MidpointRounding.AwayFromZero);
+        decimal gross = net + request.TaxAmount;
+        if (company.UnreceiptedRefundLimit is not decimal limit)
+        {
+            return Error.Rule("Pos.UnreceiptedNotAllowed", "This company does not refund without a receipt.");
+        }
+
+        if (gross > limit)
+        {
+            return Error.Rule("Pos.UnreceiptedLimit", $"Refunds without a receipt are limited to {limit:N2}.");
+        }
+
+        Item? item = await _db.Set<Item>().AsNoTracking().FirstOrDefaultAsync(i => i.Id == request.ItemId && i.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
+        if (item is null || string.IsNullOrWhiteSpace(item.RevenueAccountCode))
+        {
+            return Error.NotFound("Pos.ItemNotFound", "The item returned must exist and have a revenue account.");
+        }
+
+        if (!await _db.PosTerminals.AnyAsync(t => t.Id == request.TerminalId && t.CompanyId == request.CompanyId, ct).ConfigureAwait(false))
+        {
+            return Error.NotFound("Pos.TerminalNotFound", $"Till {request.TerminalId} not found.");
+        }
+
+        List<JournalLineRequest> lines = [new JournalLineRequest { AccountCode = item.RevenueAccountCode, Side = JournalSide.Debit, TransactionAmount = net }];
+        if (request.TaxAmount > 0m)
+        {
+            lines.Add(new JournalLineRequest { AccountCode = request.TaxAccountCode!, Side = JournalSide.Debit, TransactionAmount = request.TaxAmount });
+        }
+
+        lines.Add(new JournalLineRequest { AccountCode = request.RefundAccountCode, Side = JournalSide.Credit, TransactionAmount = gross });
+        int sequence = await _db.PosEvents.CountAsync(e => e.CompanyId == request.CompanyId && e.Kind == PosEventKind.Refund && e.SaleNumber == null, ct).ConfigureAwait(false) + 1;
+        string document = $"NR-{request.Date:yyyyMMdd}-{sequence}";
+        Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
+        {
+            CompanyId = request.CompanyId, SourceModule = "POS", PostingDate = request.Date, TransactionCurrency = company.BaseCurrency, EnforceManualJournalRules = false, DocumentType = "PosRefund",
+            DocumentNumber = document, Narrative = $"Refund without receipt: {item.Code} — {request.Reason.Trim()}", Lines = lines,
+        }, ct).ConfigureAwait(false);
+        if (posting.IsFailure)
+        {
+            return posting.Error;
+        }
+
+        if (request.RestockWarehouseId is long warehouse && item.IsStockTracked && !string.IsNullOrEmpty(item.CostOfSalesAccountCode))
+        {
+            decimal cost = await _db.StockBalances.Where(b => b.ItemId == item.Id && b.WarehouseId == warehouse).Select(b => b.AverageCost).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            Result<StockMovementResult> back = await _inventory.ReceiveAsync(new ReceiveStockRequest
+            {
+                CompanyId = request.CompanyId, ItemId = item.Id, WarehouseId = warehouse, Date = request.Date, Quantity = request.Quantity, UnitCost = cost, CreditAccountCode = item.CostOfSalesAccountCode,
+                Reference = $"REFUND:{document}",
+            }, ct).ConfigureAwait(false);
+            if (back.IsFailure)
+            {
+                return back.Error;
+            }
+        }
+
+        PosEvent refund = new(request.CompanyId, request.TerminalId, request.CashierUserId, PosEventKind.Refund, _clock.UtcNow, request.Date, item.Description, gross)
+        {
+            ItemId = item.Id, Quantity = request.Quantity, Reason = $"No receipt: {request.Reason.Trim()}", AuthorisedByUserId = request.AuthorisedByUserId, Reference = posting.Value.JournalNumber,
+            Outcome = request.RestockWarehouseId is null ? "Not restocked" : "Restocked",
+        };
+        _db.PosEvents.Add(refund);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new PosRefundResult(refund.Id, posting.Value.JournalNumber, gross);
     }
 }

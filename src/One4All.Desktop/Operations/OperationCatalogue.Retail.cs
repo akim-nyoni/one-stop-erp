@@ -81,6 +81,33 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Discard a parked sale", ListTitle = "Parked sales", Description = "Sales held at the tills under a name, table or customer tag; resumed at any till, or discarded here with a reason.",
+            Fields = [Num("Parked", "Parked sale id (from the list)"), Req("Reason", "Reason")],
+            Run = async (c, i) => Check(await c.Get<IParkedSaleService>().DiscardAsync(c.CompanyId, (long)i.Number("Parked"), c.UserId, i.Text("Reason")).ConfigureAwait(true), "Parked sale discarded."),
+            List = async c => Table(await c.Get<IParkedSaleService>().ParkedAsync(c.CompanyId).ConfigureAwait(true),
+                ("Parked", p => p.Id), ("Tag", p => p.Tag), ("Till", p => p.TerminalId), ("Lines", p => p.Lines), ("Total", p => M(p.Total)),
+                ("Since", p => p.ParkedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Refund without a receipt", Description = "Goods brought back with no receipt: a different supervisor authorises it, within the company's limit; optionally restocked.",
+            Fields = [Num("Terminal", "Till id"), Req("Item", "Item code"), Num("Quantity", "Quantity", "1"), Num("Price", "Unit price refunded (excl. tax)"), Num("Tax", "Tax refunded", "0"),
+                Opt("TaxAccount", "Output tax account"), Req("RefundAccount", "Paid from (cash) account", "1000"), Req("Reason", "Reason"), Req("Supervisor", "Supervisor (user name)"),
+                Opt("Warehouse", "Restock into warehouse"), Today()],
+            Run = async (c, i) =>
+            {
+                PosRefundResult refund = Check(await c.Get<IPosEventService>().RefundWithoutReceiptAsync(new UnreceiptedRefundRequest
+                {
+                    CompanyId = c.CompanyId, TerminalId = (long)i.Number("Terminal"), CashierUserId = c.UserId, AuthorisedByUserId = await UserAsync(c, i.Text("Supervisor")).ConfigureAwait(true), Date = i.Date("Date"),
+                    ItemId = await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), Quantity = i.Number("Quantity"), UnitPrice = i.Number("Price"), TaxAmount = i.Number("Tax"), TaxAccountCode = i.Optional("TaxAccount"),
+                    RefundAccountCode = i.Text("RefundAccount"), Reason = i.Text("Reason"),
+                    RestockWarehouseId = i.Optional("Warehouse") is string w ? await WarehouseAsync(c, w).ConfigureAwait(true) : null,
+                }).ConfigureAwait(true));
+                return $"Refunded {M(refund.Gross)} ({refund.JournalNumber}).";
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Expire loyalty points", Description = "Expires every member's points past their expiry (oldest first) and releases the liability.",
             Fields = [Today("AsAt", "As at"), Req("Document", "Document number")],
             Run = async (c, i) =>
