@@ -123,6 +123,39 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Export a budget to Excel", ListTitle = "Budgets in preparation",
+            Description = "Writes the budget as an .xlsx workbook (a row per account and cost centre, P1 to P12 and a total) into the folder given, for editing offline. Keep the first two rows as they are.",
+            Fields = [Num("Budget", "Budget id"), Tick("All", "Add a zero row for every budget account"),
+                Req("Folder", "Folder", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments))],
+            Run = async (c, i) =>
+            {
+                (byte[] workbook, string file) = Check(await c.Get<IBudgetWorkbookService>().ExportAsync(c.CompanyId, (long)i.Number("Budget"), i.Flag("All")).ConfigureAwait(true));
+                string path = System.IO.Path.Combine(i.Text("Folder"), file);
+                await System.IO.File.WriteAllBytesAsync(path, workbook).ConfigureAwait(true);
+                return $"Saved {path}.";
+            },
+            List = BudgetsInPreparationAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Import a budget workbook", ListTitle = "Budgets in preparation",
+            Description = "Reads an edited budget workbook back: every row is checked and the differences listed. Tick Apply to write them (draft or returned budgets only; nothing is written while any row is wrong). Rows deleted from the workbook leave those figures unchanged.",
+            Fields = [Num("Budget", "Budget id"), Req("File", "Workbook (.xlsx) path"), Tick("Apply", "Apply the changes")],
+            Run = async (c, i) =>
+            {
+                byte[] bytes = await System.IO.File.ReadAllBytesAsync(i.Text("File")).ConfigureAwait(true);
+                BudgetWorkbookImport import = Check(await c.Get<IBudgetWorkbookService>().ImportAsync(c.CompanyId, (long)i.Number("Budget"), bytes, c.UserId, i.Flag("Apply")).ConfigureAwait(true));
+                string head = $"{import.Changes.Count} figure(s) differ; total {M(import.AnnualTotalBefore)} → {M(import.AnnualTotalAfter)}. "
+                    + (import.Applied ? "Applied." : import.Problems.Count > 0 ? $"{import.Problems.Count} problem(s) — nothing written:" : "Preview only (tick Apply to write).");
+                IEnumerable<string> detail = import.Problems.Count > 0
+                    ? import.Problems.Select(p => $"  row {p.Row}: {p.Message}")
+                    : import.Changes.Take(40).Select(ch => $"  {ch.AccountCode}{(ch.CostCentre is null ? string.Empty : $"/{ch.CostCentre}")} P{ch.Period}: {M(ch.Before)} → {M(ch.After)}");
+                return string.Join(Environment.NewLine, detail.Prepend(head));
+            },
+            List = BudgetsInPreparationAsync,
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Re-phase an approved budget", ListTitle = "Re-phasing requests",
             Description = "Moves an amount between periods of an approved budget (the annual total does not change). Ask, then someone else approves or rejects (give the request id).",
             Fields = [Opt("Request", "Request id to decide (blank: new request)"), Tick("Approve", "Approve (untick to reject)"), OptNum("Budget", "Budget id"), Opt("Account", "Account"),

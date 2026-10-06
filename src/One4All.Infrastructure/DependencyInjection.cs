@@ -77,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Budgeting.IBudgetGateService, Budgeting.BudgetGateService>();
         services.AddScoped<Application.Abstractions.Budgeting.IBudgetPreparationService, Budgeting.BudgetPreparationService>();
         services.AddScoped<Application.Abstractions.Budgeting.IBudgetPlanningService, Budgeting.BudgetPlanningService>();
+        services.AddScoped<Application.Abstractions.Budgeting.IBudgetWorkbookService, Budgeting.BudgetWorkbookService>();
         services.AddScoped<Application.Abstractions.Procurement.IRebateService, Procurement.RebateService>();
         services.AddScoped<Application.Abstractions.Banking.ITreasuryService, Banking.TreasuryService>();
         services.AddScoped<Application.Abstractions.Vouchers.IPromoService, Vouchers.PromoService>();
