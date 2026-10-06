@@ -110,3 +110,29 @@ internal sealed class DeliveryZoneRateConfiguration : IEntityTypeConfiguration<D
         b.HasIndex(x => new { x.CompanyId, x.Zone }).IsUnique();
     }
 }
+
+internal sealed class CustomerContractConfiguration : IEntityTypeConfiguration<CustomerContract>
+{
+    public void Configure(EntityTypeBuilder<CustomerContract> b)
+    {
+        b.ToTable("customer_contract", Schemas.SalesOrders);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ContractNumber).HasMaxLength(40);
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.CustomerContractId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => new { x.CompanyId, x.ContractNumber }).IsUnique();
+    }
+}
+
+internal sealed class CustomerContractLineConfiguration : IEntityTypeConfiguration<CustomerContractLine>
+{
+    public void Configure(EntityTypeBuilder<CustomerContractLine> b)
+    {
+        b.ToTable("customer_contract_line", Schemas.SalesOrders);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AgreedQuantity).HasPrecision(19, 4);
+        b.Property(x => x.CalledOffQuantity).HasPrecision(19, 4);
+        b.Property(x => x.UnitPrice).HasPrecision(19, 4);
+        b.Ignore(x => x.Remaining);
+    }
+}

@@ -20905,6 +20905,116 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("wastage", "res");
                 });
 
+            modelBuilder.Entity("One4All.Core.SalesOrders.CustomerContract", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("ContractNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("contract_number");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("end_date");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
+
+                    b.HasKey("Id")
+                        .HasName("pk_customer_contract");
+
+                    b.HasIndex("CompanyId", "ContractNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_customer_contract_company_id_contract_number");
+
+                    b.ToTable("customer_contract", "sop");
+                });
+
+            modelBuilder.Entity("One4All.Core.SalesOrders.CustomerContractLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("AgreedQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("agreed_quantity");
+
+                    b.Property<decimal>("CalledOffQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("called_off_quantity");
+
+                    b.Property<long>("CustomerContractId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_contract_id");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id")
+                        .HasName("pk_customer_contract_line");
+
+                    b.HasIndex("CustomerContractId")
+                        .HasDatabaseName("ix_customer_contract_line_customer_contract_id");
+
+                    b.ToTable("customer_contract_line", "sop");
+                });
+
             modelBuilder.Entity("One4All.Core.SalesOrders.DeliveryZoneRate", b =>
                 {
                     b.Property<long>("Id")
@@ -26891,6 +27001,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_order_line_order_table_order_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.SalesOrders.CustomerContractLine", b =>
+                {
+                    b.HasOne("One4All.Core.SalesOrders.CustomerContract", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("CustomerContractId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_customer_contract_line_customer_contracts_customer_contract");
+                });
+
             modelBuilder.Entity("One4All.Core.SalesOrders.QuotationLine", b =>
                 {
                     b.HasOne("One4All.Core.SalesOrders.Quotation", null)
@@ -27428,6 +27548,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Restaurant.TableOrderLine", b =>
                 {
                     b.Navigation("Modifiers");
+                });
+
+            modelBuilder.Entity("One4All.Core.SalesOrders.CustomerContract", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("One4All.Core.SalesOrders.Quotation", b =>

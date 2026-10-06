@@ -475,6 +475,47 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Create a customer contract", Description = "Agreed quantities at agreed prices for a period, drawn down by call-off orders.",
+            Fields = [Req("Customer", "Customer code"), Req("Number", "Contract number"), Today("From", "From"), Today("To", "To"), Req("Lines", "Lines: ITEM:quantity:price; …")],
+            Run = async (c, i) =>
+            {
+                List<ContractLineRequest> lines = [];
+                foreach (string part in i.Text("Lines").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                    if (bits.Length != 3 || !decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal quantity)
+                        || !decimal.TryParse(bits[2], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal price))
+                    {
+                        throw new OperationException($"'{part}' should look like ITEM:quantity:price.");
+                    }
+
+                    lines.Add(new ContractLineRequest(await ItemAsync(c, bits[0]).ConfigureAwait(true), quantity, price));
+                }
+
+                return Check(await c.Get<ICustomerContractService>().CreateAsync(c.CompanyId, await CustomerAsync(c, i.Text("Customer")).ConfigureAwait(true), i.Text("Number"), i.Date("From"), i.Date("To"), lines)
+                    .ConfigureAwait(true), id => $"Contract {i.Text("Number").ToUpperInvariant()} created.");
+            },
+        };
+        yield return new Operation
+        {
+            Module = "Sales & Schools", Title = "Call off against a contract", Description = "Raises a sales order at the contract prices; never past what remains on the contract.",
+            Fields = [Req("Contract", "Contract number"), Opt("Order", "Order number (blank = automatic)"), Today(), Req("Lines", "Lines: ITEM:quantity; …")],
+            Run = async (c, i) =>
+            {
+                ICustomerContractService service = c.Get<ICustomerContractService>();
+                List<CallOffLine> lines = [];
+                foreach ((string code, decimal quantity, DateOnly? _) in i.Pairs("Lines"))
+                {
+                    lines.Add(new CallOffLine(await ItemAsync(c, code).ConfigureAwait(true), quantity));
+                }
+
+                SalesOrderResult order = Check(await service.CallOffAsync(c.CompanyId, i.Text("Contract"), i.Optional("Order") ?? string.Empty, i.Date("Date"), lines).ConfigureAwait(true));
+                IReadOnlyList<ContractPosition> position = Check(await service.PositionAsync(c.CompanyId, i.Text("Contract")).ConfigureAwait(true));
+                return $"Order {order.OrderNumber} raised.{Environment.NewLine}" + string.Join(Environment.NewLine, position.Select(p => $"{p.ItemCode,-12} agreed {Q(p.Agreed),10}  called off {Q(p.CalledOff),10}  remaining {Q(p.Remaining),10}"));
+            },
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Save a delivery zone rate", ListTitle = "Delivery zone rates",
             Description = "A zone's charge per delivery plus per kg and per m³ of goods sent (from item weights and volumes), free above a goods value.",
             Fields = [Req("Zone", "Zone"), Num("Base", "Charge per delivery", "0"), Num("PerKg", "Per kg", "0"), Num("PerM3", "Per m³", "0"), OptNum("Free", "Free above goods value")],
