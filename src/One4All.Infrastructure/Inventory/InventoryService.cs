@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Inventory;
+using One4All.Application.Inventory;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.Inventory;
@@ -16,14 +17,17 @@ namespace One4All.Infrastructure.Inventory;
 public sealed class InventoryService : IInventoryService
 {
     private readonly One4AllDbContext _db;
+    private readonly ILotTrackingService? _lots;
     private readonly Application.Abstractions.Security.IPermissionService? _permissions;
     private readonly IPostingEngine _postingEngine;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="postingEngine">The posting engine.</param>
-    public InventoryService(One4AllDbContext db, IPostingEngine postingEngine, Application.Abstractions.Security.IPermissionService? permissions = null)
+    public InventoryService(One4AllDbContext db, IPostingEngine postingEngine, Application.Abstractions.Security.IPermissionService? permissions = null,
+        ILotTrackingService? lots = null)
     {
+        _lots = lots;
         _permissions = permissions;
         _db = db;
         _postingEngine = postingEngine;
@@ -134,6 +138,11 @@ public sealed class InventoryService : IInventoryService
         };
         _db.Set<StockMovement>().Add(movement);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        Result traced = await RecordLotsAsync(request.CompanyId, item, movement, request.Lots, inbound: true, fromTill: false, ct).ConfigureAwait(false);
+        if (traced.IsFailure)
+        {
+            return traced.Error;
+        }
 
         return new StockMovementResult(movement.Id, posting.Value.JournalNumber, value, balance.AverageCost);
     }
@@ -225,8 +234,58 @@ public sealed class InventoryService : IInventoryService
         };
         _db.Set<StockMovement>().Add(movement);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        Result traced = await RecordLotsAsync(request.CompanyId, item, movement, request.Lots, inbound: false, request.FromTill, ct).ConfigureAwait(false);
+        if (traced.IsFailure)
+        {
+            return traced.Error;
+        }
 
         return new StockMovementResult(movement.Id, posting.Value.JournalNumber, cost, balance.AverageCost);
+    }
+
+    // Batches / serials: recorded when given; under the company's enforcement a tracked receipt must carry them and an issue without them
+    // takes the earliest-expiry batches on hand (a till sale takes what there is; anything else short is refused).
+    private async Task<Result> RecordLotsAsync(long companyId, Item item, StockMovement movement, IReadOnlyList<LotQuantity> lots, bool inbound, bool fromTill, CancellationToken ct)
+    {
+        if (_lots is null || item.Tracking == ItemTracking.None)
+        {
+            return Result.Success();
+        }
+
+        bool enforced = await _db.Companies.AnyAsync(c => c.Id == companyId && c.EnforceLotTracking, ct).ConfigureAwait(false);
+        if (lots.Count == 0)
+        {
+            if (!enforced)
+            {
+                return Result.Success();
+            }
+
+            if (inbound)
+            {
+                return Result.Failure(Error.Validation("Inv.LotsRequired", $"Receiving '{item.Code}' needs its {(item.Tracking == ItemTracking.Serial ? "serial numbers" : "batch numbers")}."));
+            }
+
+            (IReadOnlyList<LotQuantity> picks, decimal shortfall) = await _lots.SuggestPicksAsync(companyId, item.Id, movement.WarehouseId, Math.Abs(movement.Quantity), movement.Date, ct)
+                .ConfigureAwait(false);
+            if (shortfall > 0m && !fromTill)
+            {
+                return Result.Failure(Error.Rule("Inv.LotsShort", $"Only {Math.Abs(movement.Quantity) - shortfall:0.###} of '{item.Code}' is on hand in known batches; name the batches issued."));
+            }
+
+            if (picks.Count == 0)
+            {
+                return Result.Success();
+            }
+
+            lots = picks;
+            if (shortfall > 0m)
+            {
+                // A till sale beyond the known batches: the batches there are go, the rest stays untraced (and shows as an exception).
+                return await _lots.RecordPartialAsync(companyId, movement.Id, picks, ct).ConfigureAwait(false);
+            }
+        }
+
+        return await _lots.RecordAsync(companyId, movement.Id, lots, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

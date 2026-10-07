@@ -259,6 +259,7 @@ public sealed class ProcurementService : IProcurementService
                 UnitCost = line.UnitPrice,
                 CreditAccountCode = grniCode,
                 Reference = request.GrnNumber,
+                Lots = received.Lots ?? [],
             }, ct).ConfigureAwait(false);
 
             if (receipt.IsFailure)

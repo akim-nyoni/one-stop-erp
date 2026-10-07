@@ -27,4 +27,35 @@ public interface ILotTrackingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The picks and any shortfall.</returns>
     Task<(IReadOnlyList<LotQuantity> Picks, decimal Shortfall)> SuggestPicksAsync(long companyId, long itemId, long warehouseId, decimal quantity, DateOnly asAt, CancellationToken ct = default);
+
+    /// <summary>Records batches for part of a movement (a till sale beyond the batches on hand), skipping the quantity check.</summary>
+    Task<Result> RecordPartialAsync(long companyId, long stockMovementId, IReadOnlyList<LotQuantity> lots, CancellationToken ct = default);
+
+    /// <summary>
+    /// Traces a batch or serial for a recall (brief §4.2): back to where it came from (receipts, with the supplier) and forward to where it went
+    /// (issues and sales, with the customer where known), with what is still on hand by warehouse.
+    /// </summary>
+    Task<Result<LotTrace>> TraceAsync(long companyId, long itemId, string lotNumber, CancellationToken ct = default);
+}
+
+/// <summary>One movement of a traced lot.</summary>
+/// <param name="Date">When.</param>
+/// <param name="Reference">The document (GRN, sale, issue).</param>
+/// <param name="Quantity">The quantity (positive in, negative out).</param>
+/// <param name="WarehouseId">The warehouse.</param>
+/// <param name="Party">The supplier or customer, where known.</param>
+public sealed record LotTraceMovement(DateOnly Date, string? Reference, decimal Quantity, long WarehouseId, string? Party);
+
+/// <summary>A lot's trace for a recall.</summary>
+/// <param name="ItemId">The item.</param>
+/// <param name="LotNumber">The batch / serial.</param>
+/// <param name="ExpiryDate">Its expiry.</param>
+/// <param name="CameFrom">Where it came from (receipts and other movements in).</param>
+/// <param name="WentTo">Where it went (issues and sales).</param>
+/// <param name="OnHand">What is still on hand, by warehouse.</param>
+public sealed record LotTrace(long ItemId, string LotNumber, DateOnly? ExpiryDate, IReadOnlyList<LotTraceMovement> CameFrom, IReadOnlyList<LotTraceMovement> WentTo,
+    IReadOnlyDictionary<long, decimal> OnHand)
+{
+    /// <summary>The customers it reached (for the recall notices).</summary>
+    public IReadOnlyList<string> Customers => [.. WentTo.Select(m => m.Party).OfType<string>().Distinct(StringComparer.Ordinal)];
 }

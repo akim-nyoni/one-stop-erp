@@ -44,7 +44,7 @@ public sealed class CreatePurchaseOrderRequest
 /// <summary>A received line on a GRN.</summary>
 /// <param name="PurchaseOrderLineId">The PO line.</param>
 /// <param name="Quantity">The quantity received.</param>
-public readonly record struct ReceiveLine(long PurchaseOrderLineId, decimal Quantity);
+public readonly record struct ReceiveLine(long PurchaseOrderLineId, decimal Quantity, IReadOnlyList<One4All.Application.Inventory.LotQuantity>? Lots = null);
 
 /// <summary>A request to receive goods against a purchase order.</summary>
 public sealed class ReceiveGoodsRequest

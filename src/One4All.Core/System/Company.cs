@@ -129,6 +129,12 @@ public sealed class Company : SoftDeletableEntity
     /// </summary>
     public bool NegativeStockControl { get; set; }
 
+    /// <summary>
+    /// Whether batch / serial numbers are enforced (brief §4.2): a receipt of a tracked item must carry them, and an issue must name them or
+    /// takes the earliest-expiry batches on hand.
+    /// </summary>
+    public bool EnforceLotTracking { get; set; }
+
     /// <summary>The company's logo (PNG or JPEG) for report layouts (expression <c>CompanyLogo</c>).</summary>
     public byte[]? Logo { get; set; }
 

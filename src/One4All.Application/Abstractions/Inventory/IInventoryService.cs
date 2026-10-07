@@ -28,6 +28,9 @@ public sealed class ReceiveStockRequest
 
     /// <summary>An optional reference.</summary>
     public string? Reference { get; init; }
+
+    /// <summary>The batches / serials received (required for a tracked item when the company enforces lot tracking).</summary>
+    public IReadOnlyList<One4All.Application.Inventory.LotQuantity> Lots { get; init; } = [];
 }
 
 /// <summary>A request to issue stock out of a warehouse (at moving-average cost).</summary>
@@ -62,6 +65,9 @@ public sealed class IssueStockRequest
 
     /// <summary>Whether this is a till sale (let through under the control, recorded for review).</summary>
     public bool FromTill { get; init; }
+
+    /// <summary>The batches / serials issued (none: the earliest-expiry batches on hand are taken when the company enforces lot tracking).</summary>
+    public IReadOnlyList<One4All.Application.Inventory.LotQuantity> Lots { get; init; } = [];
 
     /// <summary>
     /// The account the issue is charged to, for internal consumption (a department's supplies expense, say); null to
