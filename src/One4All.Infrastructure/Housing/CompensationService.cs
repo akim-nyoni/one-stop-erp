@@ -75,8 +75,8 @@ public sealed class CompensationService : ICompensationService
         {
             // An increase capitalises more into the land; a decrease takes it back out.
             Result<PostingReceipt> posted = movement > 0m
-                ? await PostAsync(companyId, date, $"{claim.ClaimNumber}-{date:yyyyMMdd}", $"Compensation provision for {claim.Claimant}", claim.LandCostAccountCode, claim.ProvisionAccountCode, movement, ct).ConfigureAwait(false)
-                : await PostAsync(companyId, date, $"{claim.ClaimNumber}-{date:yyyyMMdd}", $"Compensation provision for {claim.Claimant} reduced", claim.ProvisionAccountCode, claim.LandCostAccountCode, -movement, ct).ConfigureAwait(false);
+                ? await PostAsync(companyId, date, $"{claim.ClaimNumber}-{date:yyyyMMdd}-{claim.Steps.Count}", $"Compensation provision for {claim.Claimant}", claim.LandCostAccountCode, claim.ProvisionAccountCode, movement, ct).ConfigureAwait(false)
+                : await PostAsync(companyId, date, $"{claim.ClaimNumber}-{date:yyyyMMdd}-{claim.Steps.Count}", $"Compensation provision for {claim.Claimant} reduced", claim.ProvisionAccountCode, claim.LandCostAccountCode, -movement, ct).ConfigureAwait(false);
             if (posted.IsFailure)
             {
                 return posted.Error;
@@ -185,10 +185,253 @@ public sealed class CompensationService : ICompensationService
         }, ct).ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    public Task<Result> ServeNoticeAsync(long companyId, string claimNumber, string noticeReference, DateOnly servedOn, int objectionDays, CancellationToken ct = default)
+        => StepAsync(companyId, claimNumber, claim =>
+        {
+            if (string.IsNullOrWhiteSpace(noticeReference) || objectionDays < 0)
+            {
+                return Error.Validation("Hse.Notice", "A notice needs its reference and an objection period of nil days or more.");
+            }
+
+            if (claim.NoticeServedOn is not null)
+            {
+                return Error.Conflict("Hse.NoticeServed", $"Claim {claim.ClaimNumber}'s notice was served on {claim.NoticeServedOn:yyyy-MM-dd}.");
+            }
+
+            claim.ServeNotice(noticeReference.Trim(), servedOn, objectionDays);
+            return null;
+        }, ct);
+
+    /// <inheritdoc />
+    public async Task<Result<long>> LodgeObjectionAsync(long companyId, string claimNumber, string objector, string grounds, DateOnly lodgedOn, CancellationToken ct = default)
+    {
+        CompensationStep? step = null;
+        Result done = await StepAsync(companyId, claimNumber, claim =>
+        {
+            if (string.IsNullOrWhiteSpace(objector) || string.IsNullOrWhiteSpace(grounds))
+            {
+                return Error.Validation("Hse.Objection", "An objection needs the objector and the grounds.");
+            }
+
+            if (claim.NoticeServedOn is not DateOnly served || lodgedOn < served || lodgedOn > claim.ObjectionDeadline)
+            {
+                return Error.Rule("Hse.ObjectionWindow", claim.NoticeServedOn is null
+                    ? $"No notice has been served on claim {claim.ClaimNumber}."
+                    : $"Objections to claim {claim.ClaimNumber} run from {claim.NoticeServedOn:yyyy-MM-dd} to {claim.ObjectionDeadline:yyyy-MM-dd}.");
+            }
+
+            step = claim.AddStep(new CompensationStep(CompensationStepKind.Objection, objector.Trim(), lodgedOn, null, grounds.Trim()));
+            return null;
+        }, ct).ConfigureAwait(false);
+        return done.IsFailure ? done.Error : step!.Id;
+    }
+
+    /// <inheritdoc />
+    public Task<Result> DecideObjectionAsync(long companyId, string claimNumber, long objectionId, bool upheld, DateOnly date, string? note, CancellationToken ct = default)
+        => StepAsync(companyId, claimNumber, claim =>
+        {
+            CompensationStep? objection = OpenStep(claim, objectionId, CompensationStepKind.Objection);
+            if (objection is null)
+            {
+                return Error.NotFound("Hse.ObjectionNotOpen", $"No open objection {objectionId} on claim {claim.ClaimNumber}.");
+            }
+
+            objection.Resolve(upheld ? CompensationStepStatus.Upheld : CompensationStepStatus.Dismissed, date, note: note);
+            return null;
+        }, ct);
+
+    /// <inheritdoc />
+    public Task<Result> AssessAsync(long companyId, string claimNumber, string assessor, DateOnly date, decimal amount, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            Result done = await StepAsync(companyId, claimNumber, claim =>
+            {
+                if (string.IsNullOrWhiteSpace(assessor) || amount < 0m)
+                {
+                    return Error.Validation("Hse.Assessment", "An assessment needs the assessor and an amount of nil or more.");
+                }
+
+                claim.Assess(assessor.Trim(), date, amount);
+                return null;
+            }, ct).ConfigureAwait(false);
+            return done.IsFailure ? done : await ReProvideAsync(companyId, claimNumber, amount, date, ct).ConfigureAwait(false);
+        }, ct);
+
+    /// <inheritdoc />
+    public async Task<Result<long>> OfferAsync(long companyId, string claimNumber, decimal amount, DateOnly date, CancellationToken ct = default)
+    {
+        CompensationStep? step = null;
+        Result done = await StepAsync(companyId, claimNumber, claim =>
+        {
+            if (claim.AssessedAmount is null || amount <= 0m)
+            {
+                return Error.Rule("Hse.OfferBeforeAssessment", $"Claim {claim.ClaimNumber} needs its compensation assessed before a positive offer is made.");
+            }
+
+            if (claim.Steps.Any(s => s.Kind == CompensationStepKind.Offer && s.Status == CompensationStepStatus.Open))
+            {
+                return Error.Conflict("Hse.OfferOpen", $"Claim {claim.ClaimNumber} already has an offer awaiting a response.");
+            }
+
+            step = claim.AddStep(new CompensationStep(CompensationStepKind.Offer, claim.Claimant, date, amount, null));
+            return null;
+        }, ct).ConfigureAwait(false);
+        return done.IsFailure ? done.Error : step!.Id;
+    }
+
+    /// <inheritdoc />
+    public Task<Result> RespondToOfferAsync(long companyId, string claimNumber, long offerId, bool accepted, DateOnly date, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            decimal offered = 0m;
+            Result done = await StepAsync(companyId, claimNumber, claim =>
+            {
+                CompensationStep? offer = OpenStep(claim, offerId, CompensationStepKind.Offer);
+                if (offer is null)
+                {
+                    return Error.NotFound("Hse.OfferNotOpen", $"No open offer {offerId} on claim {claim.ClaimNumber}.");
+                }
+
+                offer.Resolve(accepted ? CompensationStepStatus.Accepted : CompensationStepStatus.Rejected, date);
+                offered = offer.Amount ?? 0m;
+                return null;
+            }, ct).ConfigureAwait(false);
+            return done.IsFailure || !accepted ? done : await ReProvideAsync(companyId, claimNumber, offered, date, ct).ConfigureAwait(false);
+        }, ct);
+
+    /// <inheritdoc />
+    public async Task<Result<long>> DisputeAsync(long companyId, string claimNumber, string forum, DateOnly date, string? note, CancellationToken ct = default)
+    {
+        CompensationStep? step = null;
+        Result done = await StepAsync(companyId, claimNumber, claim =>
+        {
+            if (string.IsNullOrWhiteSpace(forum))
+            {
+                return Error.Validation("Hse.DisputeForum", "Say where the dispute was referred (arbitrator or court).");
+            }
+
+            if (claim.Steps.Any(s => s.Kind == CompensationStepKind.Dispute && s.Status == CompensationStepStatus.Open))
+            {
+                return Error.Conflict("Hse.DisputeOpen", $"Claim {claim.ClaimNumber} already has a dispute awaiting its award.");
+            }
+
+            step = claim.AddStep(new CompensationStep(CompensationStepKind.Dispute, forum.Trim(), date, null, note?.Trim()));
+            return null;
+        }, ct).ConfigureAwait(false);
+        return done.IsFailure ? done.Error : step!.Id;
+    }
+
+    /// <inheritdoc />
+    public Task<Result> AwardAsync(long companyId, string claimNumber, long disputeId, decimal amount, DateOnly date, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            Result done = await StepAsync(companyId, claimNumber, claim =>
+            {
+                CompensationStep? dispute = OpenStep(claim, disputeId, CompensationStepKind.Dispute);
+                if (dispute is null || amount < 0m)
+                {
+                    return Error.NotFound("Hse.DisputeNotOpen", $"No open dispute {disputeId} on claim {claim.ClaimNumber} (or a negative award).");
+                }
+
+                dispute.Resolve(CompensationStepStatus.Awarded, date, amount);
+                return null;
+            }, ct).ConfigureAwait(false);
+            return done.IsFailure ? done : await ReProvideAsync(companyId, claimNumber, amount, date, ct).ConfigureAwait(false);
+        }, ct);
+
+    /// <inheritdoc />
+    public Task<Result> PayPartAsync(long companyId, string claimNumber, decimal amount, string bankAccountCode, DateOnly date, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            Result<CompensationClaim> found = await FindOpenAsync(companyId, claimNumber, ct).ConfigureAwait(false);
+            if (found.IsFailure)
+            {
+                return Result.Failure(found.Error);
+            }
+
+            CompensationClaim claim = found.Value;
+            if (amount <= 0m || amount > claim.Provision || string.IsNullOrWhiteSpace(bankAccountCode))
+            {
+                return Result.Failure(Error.Rule("Hse.PartPayment", $"A part payment on claim {claim.ClaimNumber} must be positive and within the {claim.Provision:0.00} provided, from a bank account."));
+            }
+
+            Result<PostingReceipt> posted = await PostAsync(companyId, date, $"{claim.ClaimNumber}-PART-{date:yyyyMMdd}-{claim.PaidToDate:0.##}", $"Compensation part payment to {claim.Claimant}",
+                claim.ProvisionAccountCode, bankAccountCode.Trim(), amount, ct).ConfigureAwait(false);
+            if (posted.IsFailure)
+            {
+                return Result.Failure(posted.Error);
+            }
+
+            claim.PayPart(amount);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result.Success();
+        }, ct);
+
+    /// <inheritdoc />
+    public Task<Result> TakePossessionAsync(long companyId, string claimNumber, DateOnly date, CancellationToken ct = default)
+        => StepAsync(companyId, claimNumber, claim =>
+        {
+            if (claim.NoticeServedOn is null || date <= claim.ObjectionDeadline)
+            {
+                return Error.Rule("Hse.PossessionEarly", claim.NoticeServedOn is null
+                    ? $"No notice has been served on claim {claim.ClaimNumber}."
+                    : $"Possession under claim {claim.ClaimNumber} can be taken only after the objection window closes on {claim.ObjectionDeadline:yyyy-MM-dd}.");
+            }
+
+            if (claim.Steps.Any(s => s.Kind == CompensationStepKind.Objection && s.Status is CompensationStepStatus.Open or CompensationStepStatus.Upheld))
+            {
+                return Error.Rule("Hse.PossessionObjected", $"Claim {claim.ClaimNumber} has objections open or upheld; possession cannot be taken.");
+            }
+
+            if (claim.PossessionOn is not null)
+            {
+                return Error.Conflict("Hse.PossessionTaken", $"Possession under claim {claim.ClaimNumber} was taken on {claim.PossessionOn:yyyy-MM-dd}.");
+            }
+
+            claim.TakePossession(date);
+            return null;
+        }, ct);
+
+    // Applies a check-and-change to an open claim (with its steps) and saves it.
+    private async Task<Result> StepAsync(long companyId, string claimNumber, Func<CompensationClaim, Error?> change, CancellationToken ct)
+    {
+        Result<CompensationClaim> found = await FindOpenAsync(companyId, claimNumber, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return Result.Failure(found.Error);
+        }
+
+        Error? refused = change(found.Value);
+        if (refused is not null)
+        {
+            return Result.Failure(refused);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    private async Task<Result> ReProvideAsync(long companyId, string claimNumber, decimal estimate, DateOnly date, CancellationToken ct)
+    {
+        Result<CompensationClaim> found = await FindOpenAsync(companyId, claimNumber, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return Result.Failure(found.Error);
+        }
+
+        // What is still owed: the estimate less what has been paid already.
+        Result<decimal> provided = await ProvideCoreAsync(companyId, claimNumber, Math.Max(0m, estimate - found.Value.PaidToDate), date, ct).ConfigureAwait(false);
+        return provided.IsFailure ? Result.Failure(provided.Error) : Result.Success();
+    }
+
+    private static CompensationStep? OpenStep(CompensationClaim claim, long id, CompensationStepKind kind)
+        => claim.Steps.FirstOrDefault(s => s.Id == id && s.Kind == kind && s.Status == CompensationStepStatus.Open);
+
     private async Task<Result<CompensationClaim>> FindOpenAsync(long companyId, string claimNumber, CancellationToken ct)
     {
         string number = (claimNumber ?? string.Empty).Trim();
-        CompensationClaim? claim = await _db.Set<CompensationClaim>().FirstOrDefaultAsync(c => c.CompanyId == companyId && c.ClaimNumber == number, ct).ConfigureAwait(false);
+        CompensationClaim? claim = await _db.Set<CompensationClaim>().Include(c => c.Steps).FirstOrDefaultAsync(c => c.CompanyId == companyId && c.ClaimNumber == number, ct).ConfigureAwait(false);
         if (claim is null)
         {
             return Error.NotFound("Hse.ClaimNotFound", $"Claim {number} not found.");

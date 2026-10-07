@@ -5731,6 +5731,20 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<decimal?>("AssessedAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("assessed_amount");
+
+                    b.Property<DateOnly?>("AssessedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("assessed_on");
+
+                    b.Property<string>("Assessor")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("assessor");
+
                     b.Property<string>("ClaimNumber")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -5777,6 +5791,28 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<string>("NoticeReference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("notice_reference");
+
+                    b.Property<DateOnly?>("NoticeServedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("notice_served_on");
+
+                    b.Property<DateOnly?>("ObjectionDeadline")
+                        .HasColumnType("date")
+                        .HasColumnName("objection_deadline");
+
+                    b.Property<decimal>("PaidToDate")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("paid_to_date");
+
+                    b.Property<DateOnly?>("PossessionOn")
+                        .HasColumnType("date")
+                        .HasColumnName("possession_on");
+
                     b.Property<decimal>("Provision")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -5815,6 +5851,64 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_compensation_claim_provision", "provision >= 0");
                         });
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.CompensationStep", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal?>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompensationClaimId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("compensation_claim_id");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("Party")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("party");
+
+                    b.Property<DateOnly>("RaisedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("raised_on");
+
+                    b.Property<DateOnly?>("ResolvedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("resolved_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_compensation_step");
+
+                    b.HasIndex("CompensationClaimId")
+                        .HasDatabaseName("ix_compensation_step_compensation_claim_id");
+
+                    b.ToTable("compensation_step", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.Cooperative", b =>
@@ -30863,6 +30957,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_compensation_claim_land_parcels_land_parcel_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.CompensationStep", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.CompensationClaim", null)
+                        .WithMany("Steps")
+                        .HasForeignKey("CompensationClaimId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_compensation_step_compensation_claim_compensation_claim_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.CooperativeMember", b =>
                 {
                     b.HasOne("One4All.Core.Housing.Cooperative", null)
@@ -32502,6 +32606,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Navigation("Allocations");
 
                     b.Navigation("Exclusions");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.CompensationClaim", b =>
+                {
+                    b.Navigation("Steps");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.Cooperative", b =>

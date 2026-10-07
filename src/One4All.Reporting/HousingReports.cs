@@ -24,9 +24,11 @@ public static class HousingReports
             [new Column("Acquisition", "Acquisition", 90), new Column("Parcel", "Parcel", 90), new Column("Element", "Element", 140), new Column("PerM2", "Per m²", 70), new Column("Amount", "Amount", 100, true)], []);
         yield return Listing("H4","Due Diligence Outstanding", "Housing", "Open acquisitions and the due-diligence items blocking each.", "HousingDueDiligence",
             [new Column("Acquisition", "Acquisition", 90), new Column("Parcel", "Parcel", 90), new Column("Outstanding", "What blocks completion", 420)], []);
-        yield return Listing("H5", "Compulsory Acquisition Compensation Register", "Housing", "Compensation claims with provision, settlement and status.", "HousingCompensation",
-            [new Column("Claim", "Claim", 90), new Column("Parcel", "Parcel", 90), new Column("Claimant", "Claimant", 160), new Column("Lodged", "Lodged", 80),
-             new Column("Status", "Status", 80), new Column("Provision", "Provision", 90, true), new Column("Settled", "Settled", 90, true)], []);
+        yield return Listing("H5", "Compulsory Acquisition Compensation Register", "Housing", "Compulsory acquisitions: notice served, objections, assessed, offered, paid and outstanding, and possession.",
+            "HousingCompensation",
+            [new Column("Claim", "Claim", 80), new Column("Parcel", "Parcel", 75), new Column("Claimant", "Claimant", 130), new Column("Lodged", "Lodged", 70), new Column("Notice", "Notice", 70),
+             new Column("Objections", "Objections", 80), new Column("Status", "Status", 70), new Column("Assessed", "Assessed", 80, true), new Column("Offered", "Offered", 80, true),
+             new Column("Paid", "Paid", 80, true), new Column("Outstanding", "Outstanding", 85, true), new Column("Possession", "Possession", 75)], []);
         yield return Listing("H6", "Land Disposals & Exchanges Register", "Housing", "Land sold, exchanged, donated or expropriated: resolution, area, cost out, consideration and gain or loss.",
             "HousingLandDisposals", [new Column("Disposal", "Disposal", 80), new Column("Date", "Date", 75), new Column("Parcel", "Parcel", 80), new Column("Type", "Type", 85),
              new Column("Counterparty", "Counterparty", 150), new Column("Resolution", "Resolution", 90), new Column("Area", "Area m²", 75), new Column("Cost", "Cost out", 90),

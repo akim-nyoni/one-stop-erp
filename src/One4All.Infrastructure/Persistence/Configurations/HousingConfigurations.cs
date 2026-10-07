@@ -441,6 +441,12 @@ internal sealed class CompensationClaimConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.Status).HasConversion<int>();
         b.Property(x => x.Provision).HasPrecision(19, 4);
         b.Property(x => x.SettledAmount).HasPrecision(19, 4);
+        b.Property(x => x.PaidToDate).HasPrecision(19, 4);
+        b.Property(x => x.AssessedAmount).HasPrecision(19, 4);
+        b.Property(x => x.NoticeReference).HasMaxLength(60);
+        b.Property(x => x.Assessor).HasMaxLength(120);
+        b.HasMany(x => x.Steps).WithOne().HasForeignKey(x => x.CompensationClaimId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Steps).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.Property(x => x.LandCostAccountCode).HasMaxLength(20);
         b.Property(x => x.ProvisionAccountCode).HasMaxLength(20);
         b.HasOne<LandParcel>().WithMany().HasForeignKey(x => x.LandParcelId).OnDelete(DeleteBehavior.Restrict);
@@ -1266,5 +1272,19 @@ internal sealed class StandStatusChangeConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.To).HasConversion<int>();
         b.Property(x => x.Authority).HasMaxLength(120);
         b.Property(x => x.Reason).HasMaxLength(300);
+    }
+}
+
+internal sealed class CompensationStepConfiguration : IEntityTypeConfiguration<CompensationStep>
+{
+    public void Configure(EntityTypeBuilder<CompensationStep> b)
+    {
+        b.ToTable("compensation_step", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Party).HasMaxLength(200);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Note).HasMaxLength(1000);
     }
 }

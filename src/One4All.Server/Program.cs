@@ -1375,6 +1375,56 @@ app.MapPost("/api/housing/compensation-claims/{claimNumber}/withdraw", async (st
 .RequireAuthorization()
 .WithName("WithdrawCompensation");
 
+app.MapPost("/api/housing/compensation-claims/{claimNumber}/notice", async (string claimNumber, long companyId, string reference, DateOnly servedOn, int objectionDays, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ActionResponse(await compensation.ServeNoticeAsync(companyId, claimNumber, reference, servedOn, objectionDays, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ServeAcquisitionNotice");
+
+app.MapPost("/api/housing/compensation-claims/{claimNumber}/objections", async (string claimNumber, long companyId, string objector, string grounds, DateOnly lodgedOn, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ValueResponse(await compensation.LodgeObjectionAsync(companyId, claimNumber, objector, grounds, lodgedOn, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("LodgeAcquisitionObjection");
+
+app.MapPost("/api/housing/compensation-claims/{claimNumber}/objections/{objectionId:long}/decide", async (string claimNumber, long objectionId, long companyId, bool upheld, DateOnly date, string? note, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ActionResponse(await compensation.DecideObjectionAsync(companyId, claimNumber, objectionId, upheld, date, note, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DecideAcquisitionObjection");
+
+app.MapPost("/api/housing/compensation-claims/{claimNumber}/assess", async (string claimNumber, long companyId, string assessor, DateOnly date, decimal amount, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ActionResponse(await compensation.AssessAsync(companyId, claimNumber, assessor, date, amount, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AssessCompensation");
+
+app.MapPost("/api/housing/compensation-claims/{claimNumber}/offers", async (string claimNumber, long companyId, decimal amount, DateOnly date, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ValueResponse(await compensation.OfferAsync(companyId, claimNumber, amount, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("OfferCompensation");
+
+app.MapPost("/api/housing/compensation-claims/{claimNumber}/offers/{offerId:long}/respond", async (string claimNumber, long offerId, long companyId, bool accepted, DateOnly date, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ActionResponse(await compensation.RespondToOfferAsync(companyId, claimNumber, offerId, accepted, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RespondToCompensationOffer");
+
+app.MapPost("/api/housing/compensation-claims/{claimNumber}/disputes", async (string claimNumber, long companyId, string forum, DateOnly date, string? note, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ValueResponse(await compensation.DisputeAsync(companyId, claimNumber, forum, date, note, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("DisputeCompensation");
+
+app.MapPost("/api/housing/compensation-claims/{claimNumber}/disputes/{disputeId:long}/award", async (string claimNumber, long disputeId, long companyId, decimal amount, DateOnly date, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ActionResponse(await compensation.AwardAsync(companyId, claimNumber, disputeId, amount, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AwardCompensation");
+
+app.MapPost("/api/housing/compensation-claims/{claimNumber}/part-payments", async (string claimNumber, long companyId, decimal amount, string bankAccountCode, DateOnly date, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ActionResponse(await compensation.PayPartAsync(companyId, claimNumber, amount, bankAccountCode, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PayCompensationPart");
+
+app.MapPost("/api/housing/compensation-claims/{claimNumber}/possession", async (string claimNumber, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
+    ActionResponse(await compensation.TakePossessionAsync(companyId, claimNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("TakeAcquisitionPossession");
+
 app.MapGet("/api/housing/compensation-claims", async (long companyId, One4All.Application.Abstractions.Housing.ICompensationService compensation, CancellationToken ct) =>
     Results.Ok(await compensation.RegisterAsync(companyId, ct).ConfigureAwait(false)))
 .RequireAuthorization()

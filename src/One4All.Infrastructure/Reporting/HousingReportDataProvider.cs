@@ -179,13 +179,21 @@ public sealed class HousingReportDataProvider : IReportDataProvider
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CompensationAsync(long companyId, CancellationToken ct)
-        => [.. (await (from c in _db.Set<CompensationClaim>().AsNoTracking()
-                       join p in _db.LandParcels.AsNoTracking() on c.LandParcelId equals p.Id
-                       where c.CompanyId == companyId
-                       orderby c.ClaimNumber
-                       select new { c.ClaimNumber, p.ParcelNumber, c.Claimant, c.LodgedOn, c.Status, c.Provision, c.SettledAmount }).ToListAsync(ct).ConfigureAwait(false))
-            .Select(c => Row(("Claim", c.ClaimNumber), ("Parcel", c.ParcelNumber), ("Claimant", c.Claimant), ("Lodged", Date(c.LodgedOn)), ("Status", c.Status.ToString()),
-                ("Provision", c.Provision), ("Settled", c.SettledAmount ?? 0m)))];
+    {
+        Dictionary<long, string> parcels = await _db.LandParcels.AsNoTracking().Where(p => p.CompanyId == companyId).ToDictionaryAsync(p => p.Id, p => p.ParcelNumber, ct).ConfigureAwait(false);
+        List<CompensationClaim> claims = await _db.Set<CompensationClaim>().AsNoTracking().Include(c => c.Steps).Where(c => c.CompanyId == companyId).OrderBy(c => c.ClaimNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return [.. claims.Select(c =>
+        {
+            List<CompensationStep> objections = [.. c.Steps.Where(s => s.Kind == CompensationStepKind.Objection)];
+            CompensationStep? offer = c.Steps.Where(s => s.Kind == CompensationStepKind.Offer && s.Status != CompensationStepStatus.Rejected).OrderByDescending(s => s.RaisedOn).FirstOrDefault();
+            return Row(("Claim", c.ClaimNumber), ("Parcel", parcels.GetValueOrDefault(c.LandParcelId, "?")), ("Claimant", c.Claimant), ("Lodged", Date(c.LodgedOn)),
+                ("Notice", c.NoticeServedOn is DateOnly served ? Date(served) : string.Empty),
+                ("Objections", objections.Count == 0 ? string.Empty : $"{objections.Count(o => o.Status == CompensationStepStatus.Open)} open of {objections.Count}"),
+                ("Status", c.Status.ToString()), ("Assessed", c.AssessedAmount ?? 0m), ("Offered", offer?.Amount ?? 0m), ("Paid", c.PaidToDate), ("Outstanding", c.Provision),
+                ("Possession", c.PossessionOn is DateOnly on ? Date(on) : string.Empty));
+        })];
+    }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LayoutsAsync(long companyId, CancellationToken ct)
     {
