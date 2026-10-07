@@ -118,6 +118,7 @@ public sealed class DunningService : IDunningService
         {
             CompanyName = companyName,
             CustomerName = customerName,
+            CustomerAddress = await TraderDirectory.CorrespondenceAsync(_db, companyId, TradingLedger.AccountsReceivable, customerId, ct).ConfigureAwait(false),
             AsAtDate = asAtDate,
             Level = level,
             LevelLabel = Dunning.LabelFor(level),

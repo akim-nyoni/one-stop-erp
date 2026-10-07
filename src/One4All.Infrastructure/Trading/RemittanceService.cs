@@ -34,6 +34,8 @@ public sealed class RemittanceService : IRemittanceService
         }
 
         string companyName = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? string.Empty;
-        return RemittanceFormatter.ToPlainText(advice, companyName, width);
+        long supplierId = await _db.OpenItems.Where(i => i.Id == paymentOpenItemId).Select(i => i.TraderId).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return RemittanceFormatter.ToPlainText(advice, companyName, width,
+            await TraderDirectory.CorrespondenceAsync(_db, companyId, Core.Trading.TradingLedger.AccountsPayable, supplierId, ct).ConfigureAwait(false));
     }
 }

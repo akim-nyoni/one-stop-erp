@@ -22,6 +22,9 @@ public sealed class DunningReminder
     /// <summary>The customer's name.</summary>
     public string CustomerName { get; init; } = string.Empty;
 
+    /// <summary>The customer's correspondence address lines.</summary>
+    public IReadOnlyList<string> CustomerAddress { get; init; } = [];
+
     /// <summary>The letter date.</summary>
     public DateOnly AsAtDate { get; init; }
 
@@ -68,6 +71,11 @@ public static class DunningLetterFormatter
         AppendCentered(sb, reminder.LevelLabel.ToUpperInvariant(), width);
         sb.AppendLine(rule);
         sb.AppendLine($"To: {reminder.CustomerName}");
+        foreach (string addressLine in reminder.CustomerAddress)
+        {
+            sb.AppendLine("    " + addressLine);
+        }
+
         sb.AppendLine($"Date: {reminder.AsAtDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}");
         sb.AppendLine();
         sb.AppendLine(MessageFor(reminder.Level));

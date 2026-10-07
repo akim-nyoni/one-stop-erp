@@ -24,7 +24,8 @@ public sealed record InvoiceDocumentLine(string Description, decimal Amount);
 /// <param name="Outstanding">The amount still unpaid / unapplied.</param>
 /// <param name="Narrative">An optional narrative.</param>
 public sealed record InvoiceDocument(bool IsCreditNote, string CompanyName, string? CompanyTaxNumber, string CustomerCode, string CustomerName, string? CustomerTaxNumber,
-    string DocumentNumber, DateOnly DocumentDate, DateOnly DueDate, string Currency, IReadOnlyList<InvoiceDocumentLine> Lines, decimal Tax, decimal Outstanding, string? Narrative)
+    string DocumentNumber, DateOnly DocumentDate, DateOnly DueDate, string Currency, IReadOnlyList<InvoiceDocumentLine> Lines, decimal Tax, decimal Outstanding, string? Narrative,
+    IReadOnlyList<string>? CustomerAddress = null)
 {
     /// <summary>The net total.</summary>
     public decimal Net => Lines.Sum(l => l.Amount);
@@ -67,6 +68,11 @@ public static class InvoiceFormatter
         AppendCentered(sb, title, width);
         sb.AppendLine(rule);
         sb.AppendLine(TwoColumn($"To: {document.CustomerName} ({document.CustomerCode})", string.Empty, width));
+
+        foreach (string addressLine in document.CustomerAddress ?? [])
+        {
+            sb.AppendLine(TwoColumn("    " + addressLine, string.Empty, width));
+        }
         if (document.CustomerTaxNumber is not null)
         {
             sb.AppendLine(TwoColumn($"Customer VAT No. {document.CustomerTaxNumber}", string.Empty, width));

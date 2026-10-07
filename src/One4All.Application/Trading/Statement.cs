@@ -72,7 +72,8 @@ public static class StatementFormatter
     /// <param name="asAt">The statement date (also the ageing date).</param>
     /// <param name="width">The character width (default 64).</param>
     /// <returns>The formatted statement.</returns>
-    public static string ToPlainText(TraderStatement statement, string companyName, DateOnly asAt, int width = DefaultWidth)
+    /// <param name="address">The trader's correspondence address lines.</param>
+    public static string ToPlainText(TraderStatement statement, string companyName, DateOnly asAt, int width = DefaultWidth, IReadOnlyList<string>? address = null)
     {
         if (width < 40)
         {
@@ -86,6 +87,11 @@ public static class StatementFormatter
         AppendCentered(sb, "STATEMENT OF ACCOUNT", width);
         sb.AppendLine(rule);
         sb.AppendLine(TwoColumn($"To: {statement.TraderName} ({statement.TraderCode})", string.Empty, width));
+
+        foreach (string addressLine in address ?? [])
+        {
+            sb.AppendLine(TwoColumn("    " + addressLine, string.Empty, width));
+        }
         sb.AppendLine(TwoColumn($"Statement date: {asAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}", $"Currency: {statement.Currency}", width));
         sb.AppendLine(rule);
         sb.AppendLine(ThreeColumn("Date       Document", "Amount", "Outstanding", width));

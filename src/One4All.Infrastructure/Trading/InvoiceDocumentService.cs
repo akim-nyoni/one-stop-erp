@@ -92,7 +92,8 @@ public sealed class InvoiceDocumentService : IInvoiceDocumentService
             documentLines,
             tax,
             item.OutstandingTransaction,
-            item.Narrative);
+            item.Narrative,
+            await TraderDirectory.CorrespondenceAsync(_db, companyId, TradingLedger.AccountsReceivable, item.TraderId, ct).ConfigureAwait(false));
     }
 
     /// <inheritdoc />

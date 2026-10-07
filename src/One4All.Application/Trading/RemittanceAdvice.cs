@@ -18,7 +18,8 @@ public static class RemittanceFormatter
     /// <param name="companyName">The paying company's name (heading).</param>
     /// <param name="width">The character width (default 52).</param>
     /// <returns>The formatted remittance.</returns>
-    public static string ToPlainText(RemittanceAdvice advice, string companyName, int width = DefaultWidth)
+    /// <param name="address">The supplier's correspondence address lines.</param>
+    public static string ToPlainText(RemittanceAdvice advice, string companyName, int width = DefaultWidth, IReadOnlyList<string>? address = null)
     {
         if (width < 32)
         {
@@ -32,6 +33,11 @@ public static class RemittanceFormatter
         AppendCentered(sb, "REMITTANCE ADVICE", width);
         sb.AppendLine(rule);
         sb.AppendLine(TwoColumn($"To: {advice.SupplierName} ({advice.SupplierCode})", string.Empty, width));
+
+        foreach (string addressLine in address ?? [])
+        {
+            sb.AppendLine(TwoColumn("    " + addressLine, string.Empty, width));
+        }
         sb.AppendLine(TwoColumn($"Payment: {advice.PaymentNumber}", advice.PaymentDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), width));
         sb.AppendLine(rule);
         sb.AppendLine(TwoColumn("Invoice", "Amount", width));

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Trading;
 using One4All.Application.Trading;
 using One4All.Core.Common;
+using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
 
 namespace One4All.Infrastructure.Trading;
@@ -30,7 +31,7 @@ public sealed class StatementService : IStatementService
         TraderStatement? statement = await _reports.CustomerStatementAsync(companyId, customerId, ct).ConfigureAwait(false);
         return statement is null
             ? Error.NotFound("Ar.CustomerNotFound", $"Customer {customerId} not found.")
-            : await RenderAsync(companyId, statement, asAt, width, ct).ConfigureAwait(false);
+            : await RenderAsync(companyId, statement, asAt, width, TradingLedger.AccountsReceivable, customerId, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -39,12 +40,12 @@ public sealed class StatementService : IStatementService
         TraderStatement? statement = await _reports.SupplierStatementAsync(companyId, supplierId, ct).ConfigureAwait(false);
         return statement is null
             ? Error.NotFound("Ap.SupplierNotFound", $"Supplier {supplierId} not found.")
-            : await RenderAsync(companyId, statement, asAt, width, ct).ConfigureAwait(false);
+            : await RenderAsync(companyId, statement, asAt, width, TradingLedger.AccountsPayable, supplierId, ct).ConfigureAwait(false);
     }
 
-    private async Task<Result<string>> RenderAsync(long companyId, TraderStatement statement, DateOnly asAt, int width, CancellationToken ct)
+    private async Task<Result<string>> RenderAsync(long companyId, TraderStatement statement, DateOnly asAt, int width, TradingLedger ledger, long traderId, CancellationToken ct)
     {
         string companyName = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? string.Empty;
-        return StatementFormatter.ToPlainText(statement, companyName, asAt, width);
+        return StatementFormatter.ToPlainText(statement, companyName, asAt, width, await TraderDirectory.CorrespondenceAsync(_db, companyId, ledger, traderId, ct).ConfigureAwait(false));
     }
 }

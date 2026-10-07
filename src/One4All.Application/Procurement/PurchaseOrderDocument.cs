@@ -25,7 +25,8 @@ public sealed record PurchaseOrderDocumentLine(string ItemCode, string Descripti
 /// <param name="PaymentTermsDays">The supplier's payment terms.</param>
 /// <param name="Status">The order status, as text.</param>
 /// <param name="Lines">The order lines.</param>
-public sealed record PurchaseOrderDocument(string CompanyName, string? CompanyTaxNumber, string SupplierCode, string SupplierName, string OrderNumber, DateOnly OrderDate, string Currency, int PaymentTermsDays, string Status, IReadOnlyList<PurchaseOrderDocumentLine> Lines)
+public sealed record PurchaseOrderDocument(string CompanyName, string? CompanyTaxNumber, string SupplierCode, string SupplierName, string OrderNumber, DateOnly OrderDate, string Currency, int PaymentTermsDays, string Status, IReadOnlyList<PurchaseOrderDocumentLine> Lines,
+    IReadOnlyList<string>? SupplierAddress = null)
 {
     /// <summary>The order total (net).</summary>
     public decimal Total => Lines.Sum(l => l.LineTotal);
@@ -64,6 +65,11 @@ public static class PurchaseOrderFormatter
         AppendCentered(sb, "PURCHASE ORDER", width);
         sb.AppendLine(rule);
         sb.AppendLine(TwoColumn($"To: {document.SupplierName} ({document.SupplierCode})", string.Empty, width));
+
+        foreach (string addressLine in document.SupplierAddress ?? [])
+        {
+            sb.AppendLine(TwoColumn("    " + addressLine, string.Empty, width));
+        }
         sb.AppendLine(TwoColumn($"Order: {document.OrderNumber}", $"Date: {Date(document.OrderDate)}", width));
         sb.AppendLine(TwoColumn($"Currency: {document.Currency}", $"Status: {document.Status}", width));
         sb.AppendLine(rule);

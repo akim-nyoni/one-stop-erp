@@ -12,6 +12,64 @@ public static partial class OperationCatalogue
 {
     private static IEnumerable<Operation> Trading()
     {
+        foreach (string module in new[] { "Customers", "Suppliers" })
+        {
+            TradingLedger ledger = module == "Customers" ? TradingLedger.AccountsReceivable : TradingLedger.AccountsPayable;
+            yield return new Operation
+            {
+                Module = module, Title = "Addresses and contacts", ListTitle = "Directory",
+                Description = "Postal, physical and delivery addresses (the default postal address prints on invoices, statements, orders, remittances and letters) and the people who "
+                    + "receive statements, remittance advices and purchase orders by email. Remove takes an address or contact id. The list shows the trader typed in Code.",
+                Fields = [Pick("Step", "Step", ["Add address", "Add contact", "Remove address", "Remove contact"]), Req("Code", module == "Customers" ? "Customer code" : "Supplier code"),
+                    Pick("Kind", "Address kind", Enum.GetNames<AddressKind>()), Opt("Line1", "Address line 1"), Opt("Line2", "Address line 2"), Opt("City", "Town / city"), Opt("Region", "Province"),
+                    Opt("Postal", "Postal code"), Opt("Country", "Country"), Opt("Name", "Contact name"), Opt("Role", "Role"), Opt("Email", "Email"), Opt("Phone", "Phone"),
+                    Tick("Primary", "Primary contact"), Tick("Statements", "Receives statements"), Tick("Remittances", "Receives remittances"), Tick("Orders", "Receives purchase orders"),
+                    OptNum("Id", "Address / contact id (remove)")],
+                Run = async (c, i) =>
+                {
+                    ITraderDirectoryService directory = c.Get<ITraderDirectoryService>();
+                    switch (i.Text("Step"))
+                    {
+                        case "Add contact":
+                            long contact = Check(await directory.AddContactAsync(c.CompanyId, ledger, i.Text("Code"), new NewTraderContact(i.Optional("Name") ?? string.Empty, i.Optional("Role"),
+                                i.Optional("Email"), i.Optional("Phone"), i.Flag("Primary"), i.Flag("Statements"), i.Flag("Remittances"), i.Flag("Orders"))).ConfigureAwait(true));
+                            return $"Contact {contact} added.";
+                        case "Remove address":
+                            _ = Check(await directory.RemoveAddressAsync(c.CompanyId, (long)(i.OptionalNumber("Id") ?? 0)).ConfigureAwait(true), string.Empty);
+                            return "Address removed.";
+                        case "Remove contact":
+                            _ = Check(await directory.RemoveContactAsync(c.CompanyId, (long)(i.OptionalNumber("Id") ?? 0)).ConfigureAwait(true), string.Empty);
+                            return "Contact removed.";
+                        default:
+                            long address = Check(await directory.AddAddressAsync(c.CompanyId, ledger, i.Text("Code"), new NewTraderAddress(Enum.Parse<AddressKind>(i.Text("Kind")),
+                                i.Optional("Line1") ?? string.Empty, i.Optional("Line2"), i.Optional("City"), i.Optional("Region"), i.Optional("Postal"), i.Optional("Country"))).ConfigureAwait(true));
+                            return $"Address {address} added as the default {i.Text("Kind").ToLowerInvariant()} address.";
+                    }
+                },
+            };
+            yield return new Operation
+            {
+                Module = module, Title = module == "Customers" ? "Email a statement" : "Email a statement, remittance or order",
+                Description = "Sends the document as an attachment to the contacts who receive it (else the primary contact"
+                    + (module == "Customers" ? ", else the customer's own email)." : "). Remittance: the payment's open-item id; order: the purchase order id."),
+                Fields = module == "Customers"
+                    ? [Req("Code", "Customer code"), Today("AsAt", "Statement date")]
+                    : [Pick("Document", "Document", ["Statement", "Remittance advice", "Purchase order"]), Opt("Code", "Supplier code (statement)"), Today("AsAt", "Statement date"), OptNum("Id", "Payment item / order id")],
+                Run = async (c, i) =>
+                {
+                    ITraderDirectoryService directory = c.Get<ITraderDirectoryService>();
+                    string document = module == "Customers" ? "Statement" : i.Text("Document");
+                    long batch = Check(document switch
+                    {
+                        "Remittance advice" => await directory.EmailRemittanceAsync(c.CompanyId, (long)(i.OptionalNumber("Id") ?? 0)).ConfigureAwait(true),
+                        "Purchase order" => await directory.EmailPurchaseOrderAsync(c.CompanyId, (long)(i.OptionalNumber("Id") ?? 0)).ConfigureAwait(true),
+                        _ => await directory.EmailStatementAsync(c.CompanyId, ledger, i.Optional("Code") ?? string.Empty, i.Date("AsAt")).ConfigureAwait(true),
+                    });
+                    return $"{document} queued for email (batch {batch}).";
+                },
+            };
+        }
+
         yield return new Operation
         {
             Module = "Customers", Title = "Customer invoice or credit note", ListTitle = "Open customer items",

@@ -268,3 +268,36 @@ internal sealed class WithholdingCertificateConfiguration : IEntityTypeConfigura
         b.HasIndex(x => new { x.CompanyId, x.PaymentDate });
     }
 }
+
+internal sealed class TraderAddressConfiguration : IEntityTypeConfiguration<TraderAddress>
+{
+    public void Configure(EntityTypeBuilder<TraderAddress> b)
+    {
+        b.ToTable("trader_address", Schemas.AccountsReceivable);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Ledger).HasConversion<int>();
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Line1).HasMaxLength(120);
+        b.Property(x => x.Line2).HasMaxLength(120);
+        b.Property(x => x.City).HasMaxLength(80);
+        b.Property(x => x.Region).HasMaxLength(80);
+        b.Property(x => x.PostalCode).HasMaxLength(20);
+        b.Property(x => x.Country).HasMaxLength(60);
+        b.HasIndex(x => new { x.CompanyId, x.Ledger, x.TraderId });
+    }
+}
+
+internal sealed class TraderContactConfiguration : IEntityTypeConfiguration<TraderContact>
+{
+    public void Configure(EntityTypeBuilder<TraderContact> b)
+    {
+        b.ToTable("trader_contact", Schemas.AccountsReceivable);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Ledger).HasConversion<int>();
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.Role).HasMaxLength(60);
+        b.Property(x => x.Email).HasMaxLength(200);
+        b.Property(x => x.Phone).HasMaxLength(40);
+        b.HasIndex(x => new { x.CompanyId, x.Ledger, x.TraderId });
+    }
+}

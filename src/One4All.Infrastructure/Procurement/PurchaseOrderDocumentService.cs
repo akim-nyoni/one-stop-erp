@@ -55,7 +55,8 @@ public sealed class PurchaseOrderDocumentService : IPurchaseOrderDocumentService
             order.Currency.ToString(),
             supplier?.PaymentTermsDays ?? 30,
             order.Status.ToString(),
-            lines);
+            lines,
+            await Trading.TraderDirectory.CorrespondenceAsync(_db, companyId, Core.Trading.TradingLedger.AccountsPayable, order.SupplierId, ct).ConfigureAwait(false));
     }
 
     /// <inheritdoc />
