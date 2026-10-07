@@ -1994,8 +1994,12 @@ app.MapGet("/api/gl/journals/{journalNumber}", async (long companyId, string jou
 .RequireAuthorization()
 .WithName("JournalDetail");
 
-app.MapGet("/api/audit", async (long companyId, DateOnly? from, DateOnly? to, string? entityType, string? entityId, string? userName, One4All.Core.Audit.AuditAction? action, int? take, IAuditService audit, CancellationToken ct) =>
-    Results.Ok(await audit.QueryAsync(new AuditQuery { CompanyId = companyId, From = from, To = to, EntityType = entityType, EntityId = entityId, UserName = userName, Action = action, Take = take ?? 500 }, ct).ConfigureAwait(false)))
+app.MapGet("/api/audit", async (long companyId, DateOnly? from, DateOnly? to, string? entityType, string? entityId, string? userName, One4All.Core.Audit.AuditAction? action, int? take, ClaimsPrincipal user,
+    IAuditService audit, CancellationToken ct) =>
+    Results.Ok(await audit.QueryAsync(new AuditQuery
+    {
+        CompanyId = companyId, From = from, To = to, EntityType = entityType, EntityId = entityId, UserName = userName, Action = action, Take = take ?? 500, RequestingUserId = SignedInUser(user) ?? -1,
+    }, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("AuditTrail");
 

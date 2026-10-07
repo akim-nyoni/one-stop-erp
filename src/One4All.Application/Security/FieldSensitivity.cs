@@ -21,7 +21,7 @@ public enum SensitiveField
 
 /// <summary>
 /// Recognises restricted fields by name and strips them from what a user may not see: cost needs a grant with ViewCost, margin one with
-/// ViewMargin, salary any payroll permission, credit limit the credit control permission. Analysis codes (cost centre, cost head) and
+/// ViewMargin, salary Payroll › View Salary, credit limit the credit control permission. Analysis codes (cost centre, cost head) and
 /// account codes are not restricted. Pure.
 /// </summary>
 public static class FieldSensitivity
@@ -44,7 +44,8 @@ public static class FieldSensitivity
         }
 
         if (key.Contains("salary", StringComparison.Ordinal) || key.Contains("grosspay", StringComparison.Ordinal) || key.Contains("netpay", StringComparison.Ordinal)
-            || key.Contains("basicpay", StringComparison.Ordinal))
+            || key.Contains("basicpay", StringComparison.Ordinal) || key.Contains("grossearnings", StringComparison.Ordinal) || key.Contains("totaldeductions", StringComparison.Ordinal)
+            || key.Contains("hourlyrate", StringComparison.Ordinal))
         {
             return SensitiveField.Salary;
         }
@@ -79,7 +80,8 @@ public static class FieldSensitivity
             hidden.Add(SensitiveField.Margin);
         }
 
-        if (!Any((c, f) => f != OperationFlags.None && c.StartsWith("Payroll.", StringComparison.OrdinalIgnoreCase)))
+        // Pay is seen only with Payroll › View Salary: other payroll rights (leave approval, say) do not open it (brief §4.15.10).
+        if (!Any((c, f) => f.HasFlag(OperationFlags.View) && string.Equals(c, "Payroll.ViewSalary", StringComparison.OrdinalIgnoreCase)))
         {
             hidden.Add(SensitiveField.Salary);
         }

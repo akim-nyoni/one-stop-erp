@@ -263,6 +263,7 @@ public static class PermissionCatalogue
         P("LeaveApprove", "Leave Approval", OperationFlags.View | OperationFlags.Approve);
         P("Establishment", "Establishment / Posts", master | OperationFlags.Approve);
         P("ViewSalary", "View Salary (sensitive)", OperationFlags.View);
+        P("Audit", "Payroll Audit Trail (sensitive)", OperationFlags.View);
         P("Reports", "Payroll Reports", ro | OperationFlags.Export);
 
         static OperationFlags txnLike() =>

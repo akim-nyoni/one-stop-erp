@@ -15,7 +15,17 @@ public sealed class AuditService : IAuditService
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
-    public AuditService(One4AllDbContext db) => _db = db;
+    public AuditService(One4AllDbContext db, IPermissionService? permissions = null)
+    {
+        _db = db;
+        _permissions = permissions;
+    }
+
+    // Every payroll entity: their changes are kept from anyone without the payroll audit right.
+    private static readonly string[] PayrollEntities = [.. typeof(Core.Payroll.Employee).Assembly.GetTypes()
+        .Where(t => t.Namespace == typeof(Core.Payroll.Employee).Namespace && t.IsClass && !t.IsAbstract).Select(t => t.Name)];
+
+    private readonly IPermissionService? _permissions;
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<AuditEntryView>> QueryAsync(AuditQuery query, CancellationToken ct = default)
@@ -55,6 +65,15 @@ public sealed class AuditService : IAuditService
         if (query.Action is { } action)
         {
             q = q.Where(c => c.Action == action);
+        }
+
+        if (query.RequestingUserId is long requester && _permissions is not null)
+        {
+            Core.Security.EffectivePermissions rights = await _permissions.ResolveAsync(requester, ct).ConfigureAwait(false);
+            if (!rights.IsSuperAdministrator && !rights.Has("Payroll.Audit", Core.Security.OperationFlags.View))
+            {
+                q = q.Where(c => !PayrollEntities.Contains(c.EntityType));
+            }
         }
 
         int take = Math.Clamp(query.Take, 1, MaxTake);

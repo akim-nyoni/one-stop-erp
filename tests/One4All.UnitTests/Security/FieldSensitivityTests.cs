@@ -15,6 +15,8 @@ public sealed class FieldSensitivityTests
     [InlineData("grossMarginPercent", SensitiveField.Margin)]
     [InlineData("BasicSalary", SensitiveField.Salary)]
     [InlineData("net_pay", SensitiveField.Salary)]
+    [InlineData("GrossEarnings", SensitiveField.Salary)]
+    [InlineData("TotalDeductions", SensitiveField.Salary)]
     [InlineData("creditLimit", SensitiveField.CreditLimit)]
     [InlineData("costCentre", null)]
     [InlineData("CostOfSalesAccountCode", null)]
@@ -28,9 +30,13 @@ public sealed class FieldSensitivityTests
         FieldSensitivity.HiddenFor(clerk).Should().BeEquivalentTo([SensitiveField.Cost, SensitiveField.Margin, SensitiveField.Salary, SensitiveField.CreditLimit]);
         EffectivePermissions controller = new(new Dictionary<string, OperationFlags>
         {
-            ["Inventory.Item"] = OperationFlags.View | OperationFlags.ViewCost | OperationFlags.ViewMargin, ["Sales.CreditControl"] = OperationFlags.View, ["Payroll.Run"] = OperationFlags.View,
+            ["Inventory.Item"] = OperationFlags.View | OperationFlags.ViewCost | OperationFlags.ViewMargin, ["Sales.CreditControl"] = OperationFlags.View, ["Payroll.ViewSalary"] = OperationFlags.View,
         });
         FieldSensitivity.HiddenFor(controller).Should().BeEmpty();
+
+        // A line manager who approves leave (or even runs payroll steps) does not see pay without View Salary.
+        EffectivePermissions leaveApprover = new(new Dictionary<string, OperationFlags> { ["Payroll.LeaveApprove"] = OperationFlags.View | OperationFlags.Approve, ["Payroll.Calculate"] = OperationFlags.View });
+        FieldSensitivity.HiddenFor(leaveApprover).Should().Contain(SensitiveField.Salary);
         FieldSensitivity.HiddenFor(new EffectivePermissions(new Dictionary<string, OperationFlags>(), true)).Should().BeEmpty();
     }
 

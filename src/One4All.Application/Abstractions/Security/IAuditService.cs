@@ -29,6 +29,12 @@ public sealed record AuditQuery
     /// <summary>The most entries to return (newest first); capped at 5,000.</summary>
     public int Take { get; init; } = 500;
 
+    /// <summary>
+    /// The user asking: payroll changes are left out unless they hold Payroll › Payroll Audit Trail (brief §4.15.10 walled garden). Null for
+    /// the system (everything).
+    /// </summary>
+    public long? RequestingUserId { get; init; }
+
     /// <summary>Gets a value indicating whether entries that belong to no company (users, roles, permissions) are included.</summary>
     public bool IncludeUnscoped { get; init; }
 }

@@ -133,7 +133,7 @@ public sealed partial class AuditTrailViewModel : ObservableObject
         return await scope.ServiceProvider.GetRequiredService<IAuditService>().ExportAsync(new AuditQuery
         {
             CompanyId = _companyId, From = FromDate is { } f ? DateOnly.FromDateTime(f) : null, To = ToDate is { } t ? DateOnly.FromDateTime(t) : null, EntityType = EntityType,
-            EntityId = EntityId, UserName = UserName, Action = Action, Take = 10_000,
+            EntityId = EntityId, UserName = UserName, Action = Action, Take = 10_000, RequestingUserId = session?.UserId,
         }, format, session?.UserId, session?.UserName ?? "desktop").ConfigureAwait(true);
     }
 
@@ -168,6 +168,7 @@ public sealed partial class AuditTrailViewModel : ObservableObject
                 UserName = UserName,
                 Action = Action,
                 Take = 1_000,
+                RequestingUserId = _services.GetService<DesktopSession>()?.UserId,
             }, ct).ConfigureAwait(true);
 
             Entries.Clear();
