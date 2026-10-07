@@ -108,6 +108,41 @@ public static partial class OperationCatalogue
                 ("When", x => x.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Operation", x => x.Operation), ("Table", x => x.TableName), ("Row", x => x.RowId),
                 ("Database user", x => x.DbUser), ("Application", x => x.ApplicationName), ("Client", x => x.ClientAddress)),
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Attachments", ListTitle = "Recent attachments",
+            Description = "Scans, contracts and delivery notes on a record (journal, customer, supplier, ledger document, purchase order, asset, employee, property, student, "
+                + "contract): PDF, images, Word / Excel, CSV, text or e-mail up to 10 MB. Each file is checksummed and checked on opening; removing one keeps the file with the "
+                + "reason, and files on posted journals and ledger documents cannot be removed.",
+            Fields = [Pick("Step", "Step", ["List", "Attach", "Save a copy", "Remove"]), Pick("Target", "Record type", Enum.GetNames<AttachmentTarget>()), Opt("Key", "Record number / code"),
+                Opt("File", "File path (attach) or folder (save a copy)"), Opt("Description", "Description / removal reason"), OptNum("Id", "Attachment id (save / remove)")],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.System.IAttachmentService attachments = c.Get<Application.Abstractions.System.IAttachmentService>();
+                AttachmentTarget target = Enum.Parse<AttachmentTarget>(i.Text("Target"));
+                switch (i.Text("Step"))
+                {
+                    case "Attach":
+                        string path = i.Optional("File") ?? throw new OperationException("Give the file path.");
+                        long id = Check(await attachments.AttachAsync(c.CompanyId, target, i.Optional("Key") ?? string.Empty, System.IO.Path.GetFileName(path),
+                            await System.IO.File.ReadAllBytesAsync(path).ConfigureAwait(true), c.UserId, i.Optional("Description")).ConfigureAwait(true));
+                        return $"Attached as {id}.";
+                    case "Save a copy":
+                        Application.Abstractions.System.AttachmentFile file = Check(await attachments.OpenAsync(c.CompanyId, (long)i.Number("Id")).ConfigureAwait(true));
+                        string to = System.IO.Path.Combine(i.Optional("File") ?? System.IO.Path.GetTempPath(), file.FileName);
+                        await System.IO.File.WriteAllBytesAsync(to, file.Bytes).ConfigureAwait(true);
+                        return $"Saved to {to} (checksum verified).";
+                    case "Remove":
+                        return Check(await attachments.RemoveAsync(c.CompanyId, (long)i.Number("Id"), c.UserId, i.Optional("Description") ?? string.Empty).ConfigureAwait(true), "Removed (the file is kept).");
+                    default:
+                        IReadOnlyList<Application.Abstractions.System.AttachmentInfo> list = await attachments.ListAsync(c.CompanyId, target, i.Optional("Key") ?? string.Empty).ConfigureAwait(true);
+                        return list.Count == 0 ? "No attachments." : string.Join(Environment.NewLine, list.Select(a => $"{a.Id,6}  {a.FileName}  {a.SizeBytes / 1024} KB  {a.UploadedOnUtc:yyyy-MM-dd}  {a.Description}"));
+                }
+            },
+            List = async c => Table(await c.Db.Set<Attachment>().AsNoTracking().Where(a => a.CompanyId == c.CompanyId && a.RemovedOnUtc == null).OrderByDescending(a => a.Id).Take(200).ToListAsync()
+                    .ConfigureAwait(true), ("Id", a => a.Id), ("Record", a => a.Target), ("Number", a => a.TargetKey), ("File", a => a.FileName), ("KB", a => a.SizeBytes / 1024),
+                ("Uploaded", a => a.UploadedOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Description", a => a.Description)),
+        };
         string[] imports = ["Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "Properties", "Students"];
         yield return new Operation
         {

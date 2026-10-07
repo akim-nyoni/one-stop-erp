@@ -26085,6 +26085,123 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("user_role", "sec");
                 });
 
+            modelBuilder.Entity("One4All.Core.System.Attachment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("content_type");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("RemovalReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("removal_reason");
+
+                    b.Property<long?>("RemovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("removed_by_user_id");
+
+                    b.Property<DateTimeOffset?>("RemovedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("removed_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("sha256");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size_bytes");
+
+                    b.Property<int>("Target")
+                        .HasColumnType("integer")
+                        .HasColumnName("target");
+
+                    b.Property<string>("TargetKey")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("target_key");
+
+                    b.Property<long>("UploadedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("uploaded_by_user_id");
+
+                    b.Property<DateTimeOffset>("UploadedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("uploaded_on_utc");
+
+                    b.HasKey("Id")
+                        .HasName("pk_attachment");
+
+                    b.HasIndex("CompanyId", "Target", "TargetKey")
+                        .HasDatabaseName("ix_attachment_company_id_target_target_key");
+
+                    b.ToTable("attachment", "sys");
+                });
+
+            modelBuilder.Entity("One4All.Core.System.AttachmentContent", b =>
+                {
+                    b.Property<long>("AttachmentId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attachment_id");
+
+                    b.Property<byte[]>("Bytes")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("bytes");
+
+                    b.HasKey("AttachmentId")
+                        .HasName("pk_attachment_content");
+
+                    b.ToTable("attachment_content", "sys");
+                });
+
             modelBuilder.Entity("One4All.Core.System.BackupRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -31462,6 +31579,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_user_role_users_user_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.System.AttachmentContent", b =>
+                {
+                    b.HasOne("One4All.Core.System.Attachment", null)
+                        .WithOne()
+                        .HasForeignKey("One4All.Core.System.AttachmentContent", "AttachmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_attachment_content_attachment_attachment_id");
                 });
 
             modelBuilder.Entity("One4All.Core.System.CurrencyDenomination", b =>
