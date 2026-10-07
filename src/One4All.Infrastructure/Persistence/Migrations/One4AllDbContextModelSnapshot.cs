@@ -25795,6 +25795,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("fiscal_year_id");
 
+                    b.Property<bool>("IsAdjustment")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_adjustment");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(60)
@@ -25859,6 +25863,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsClosed")
                         .HasColumnType("boolean")
                         .HasColumnName("is_closed");
+
+                    b.Property<bool>("IsHardLocked")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_hard_locked");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")

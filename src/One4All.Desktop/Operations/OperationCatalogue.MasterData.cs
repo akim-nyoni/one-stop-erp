@@ -194,11 +194,15 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Create a fiscal year", ListTitle = "Fiscal years", Description = "Monthly periods from the start date; tick to open them for every ledger at once.",
-            Fields = [Req("Code", "Year code"), Today("Start", "First day"), Num("Months", "Periods", "12"), Tick("Open", "Open all periods now")],
+            Module = module, Title = "Create a fiscal year", ListTitle = "Fiscal years",
+            Description = "Monthly periods from the start date (any month — e.g. July to June), or a 4-4-5 week calendar; optionally an adjustment (13th) period on the last day for audit "
+                + "and year-end adjustments. Tick to open the periods for every ledger at once.",
+            Fields = [Req("Code", "Year code"), Today("Start", "First day"), Num("Months", "Periods (monthly)", "12"), Pick("Calendar", "Calendar", ["Monthly", "4-4-5 weeks"]),
+                Tick("Adjust", "Add an adjustment period"), Tick("Open", "Open all periods now")],
             Run = async (c, i) =>
             {
-                long year = Check(await c.Get<IMasterDataService>().CreateFiscalYearAsync(c.CompanyId, i.Text("Code"), i.Date("Start"), i.Whole("Months")).ConfigureAwait(true));
+                long year = Check(await c.Get<IMasterDataService>().CreateFiscalYearAsync(c.CompanyId, i.Text("Code"), i.Date("Start"),
+                    i.Text("Calendar") == "Monthly" ? FiscalCalendar.Monthly : FiscalCalendar.FourFourFive, i.Whole("Months"), i.Flag("Adjust")).ConfigureAwait(true));
                 if (i.Flag("Open"))
                 {
                     _ = Check(await c.Get<IPeriodService>().OpenYearAsync(c.CompanyId, year, ["GL", "AR", "AP", "CB", "INV", "POP", "SOP", "POS", "VOU", "FA", "PAY", "JOB", "MUNI", "HSE", "SCH", "BUD"])
@@ -208,7 +212,7 @@ public static partial class OperationCatalogue
                 return $"Fiscal year {i.Text("Code").ToUpperInvariant()} created{(i.Flag("Open") ? " and opened" : string.Empty)}.";
             },
             List = async c => Table(await c.Db.FiscalYears.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.StartDate).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("From", x => D(x.StartDate)), ("To", x => D(x.EndDate)), ("Closed", x => x.IsClosed)),
+                ("Id", x => x.Id), ("Code", x => x.Code), ("From", x => D(x.StartDate)), ("To", x => D(x.EndDate)), ("Closed", x => x.IsClosed), ("Hard-locked", x => x.IsHardLocked)),
         };
         yield return new Operation
         {

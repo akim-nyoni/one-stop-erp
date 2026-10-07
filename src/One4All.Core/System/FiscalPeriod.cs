@@ -50,6 +50,9 @@ public sealed class FiscalPeriod : Entity
     /// <returns>True when in range.</returns>
     public bool Contains(DateOnly date) => date >= StartDate && date <= EndDate;
 
+    /// <summary>Whether this is the year's adjustment period (reached only by journals that ask for it).</summary>
+    public bool IsAdjustment { get; init; }
+
     /// <summary>Returns the status of this period for a module, defaulting to <see cref="PeriodStatus.Future"/>.</summary>
     /// <param name="moduleCode">The posting module code.</param>
     /// <returns>The module's period status.</returns>

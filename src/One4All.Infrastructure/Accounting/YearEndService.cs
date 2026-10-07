@@ -47,9 +47,14 @@ public sealed class YearEndService : IYearEndService
             return Error.NotFound("YearEnd.YearNotFound", $"Fiscal year {fiscalYearId} not found.");
         }
 
+        if (year.IsHardLocked)
+        {
+            return Error.Rule("YearEnd.HardLocked", $"Fiscal year {year.Code} is hard-locked.");
+        }
+
         if (year.IsClosed)
         {
-            return Error.Rule("YearEnd.AlreadyClosed", $"Fiscal year {year.Code} is already closed.");
+            return Error.Rule("YearEnd.AlreadyClosed", $"Fiscal year {year.Code} is already closed; reverse its year-end to run it again.");
         }
 
         string retained = retainedEarningsAccountCode.Trim().ToUpperInvariant();
@@ -112,6 +117,7 @@ public sealed class YearEndService : IYearEndService
                 CompanyId = companyId,
                 SourceModule = "GL",
                 PostingDate = year.EndDate,
+                ToAdjustmentPeriod = year.AdjustmentPeriod is not null,
                 TransactionCurrency = company.BaseCurrency,
                 EnforceManualJournalRules = false,
                 DocumentType = "YearEndClose",
@@ -131,12 +137,12 @@ public sealed class YearEndService : IYearEndService
         // Create the next fiscal year (if it does not yet exist) with 12 future periods.
         long nextYearId = await EnsureNextYearAsync(company: companyId, year, ct).ConfigureAwait(false);
 
-        // Permanently close every period of the year just ended (all modules that had a status).
+        // Close every period of the year just ended (all modules that had a status); hard-locking later makes it permanent.
         foreach (FiscalPeriod period in year.Periods)
         {
             foreach (PeriodModuleStatus moduleStatus in period.ModuleStatuses.ToList())
             {
-                period.SetStatus(moduleStatus.ModuleCode, PeriodStatus.PermanentlyClosed);
+                period.SetStatus(moduleStatus.ModuleCode, PeriodStatus.Closed);
             }
         }
 
@@ -146,29 +152,127 @@ public sealed class YearEndService : IYearEndService
         return new YearEndResult(closingJournalNumber, netProfit, nextYearId);
     }
 
+    // The next year starts the day after this one ends and follows the same calendar (monthly or 4-4-5, with or without an
+    // adjustment period); an existing year starting that day is used as it is.
     private async Task<long> EnsureNextYearAsync(long company, FiscalYear year, CancellationToken ct)
     {
-        int nextYearNumber = year.EndDate.Year + 1;
-        string nextCode = nextYearNumber.ToString();
-
-        FiscalYear? existing = await _db.FiscalYears
-            .FirstOrDefaultAsync(y => y.CompanyId == company && y.Code == nextCode, ct)
-            .ConfigureAwait(false);
+        DateOnly nextStart = year.EndDate.AddDays(1);
+        FiscalYear? existing = await _db.FiscalYears.FirstOrDefaultAsync(y => y.CompanyId == company && y.StartDate <= nextStart && y.EndDate >= nextStart, ct).ConfigureAwait(false);
         if (existing is not null)
         {
             return existing.Id;
         }
 
-        DateOnly start = new(nextYearNumber, 1, 1);
-        FiscalYear next = new(company, nextCode, start, new DateOnly(nextYearNumber, 12, 31));
-        for (int month = 1; month <= 12; month++)
+        List<(DateOnly Start, DateOnly End)> ordinary = [.. year.OrderedPeriods.Where(p => !p.IsAdjustment).Select(p => (p.StartDate, p.EndDate))];
+        FiscalCalendar calendar = FiscalCalendars.Detect(ordinary);
+        IReadOnlyList<(DateOnly Start, DateOnly End)> periods = FiscalCalendars.Periods(calendar, nextStart, Math.Max(ordinary.Count, 1));
+        string code = FiscalCalendars.NextCode(year.Code, nextStart);
+        if (await _db.FiscalYears.AnyAsync(y => y.CompanyId == company && y.Code == code, ct).ConfigureAwait(false))
         {
-            DateOnly periodStart = new(nextYearNumber, month, 1);
-            next.AddPeriod(month, periodStart.ToString("MMMM"), periodStart, periodStart.AddMonths(1).AddDays(-1));
+            code = $"{code}-{nextStart:yyyyMMdd}";
+        }
+
+        FiscalYear next = new(company, code, nextStart, periods[^1].End);
+        for (int n = 0; n < periods.Count; n++)
+        {
+            next.AddPeriod(n + 1, calendar == FiscalCalendar.FourFourFive ? $"P{n + 1} {code}" : periods[n].Start.ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture),
+                periods[n].Start, periods[n].End);
+        }
+
+        if (year.AdjustmentPeriod is not null)
+        {
+            next.AddAdjustmentPeriod();
         }
 
         _db.FiscalYears.Add(next);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return next.Id;
+    }
+
+    /// <inheritdoc />
+    public Task<Result<string>> ReverseAsync(long companyId, long fiscalYearId, string reason, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReverseCoreAsync(companyId, fiscalYearId, reason, ct), ct);
+
+    private async Task<Result<string>> ReverseCoreAsync(long companyId, long fiscalYearId, string reason, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("YearEnd.ReasonRequired", "Reversing a year-end needs a reason.");
+        }
+
+        FiscalYear? year = await _db.FiscalYears.Include(y => y.Periods).ThenInclude(p => p.ModuleStatuses)
+            .FirstOrDefaultAsync(y => y.Id == fiscalYearId && y.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (year is null)
+        {
+            return Error.NotFound("YearEnd.YearNotFound", $"Fiscal year {fiscalYearId} not found.");
+        }
+
+        if (!year.IsClosed)
+        {
+            return Error.Rule("YearEnd.NotClosed", $"Fiscal year {year.Code} has not been closed.");
+        }
+
+        Result reopened = year.Reopen();
+        if (reopened.IsFailure)
+        {
+            return reopened.Error;
+        }
+
+        // The closing journal is reversed in its own period, opened for the general ledger just for that.
+        JournalEntry? closing = await _db.Journals
+            .Where(j => j.CompanyId == companyId && j.DocumentType == "YearEndClose" && j.PostingDate == year.EndDate && j.Status == JournalStatus.Posted && !j.IsReversal)
+            .OrderByDescending(j => j.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        bool reversedAlready = closing is not null
+            && await _db.Journals.AnyAsync(j => j.CompanyId == companyId && j.ReversalOfJournalId == closing.Id, ct).ConfigureAwait(false);
+        string reversal = "(none)";
+        if (closing is not null && !reversedAlready)
+        {
+            FiscalPeriod period = year.Periods.Single(p => p.Id == closing.FiscalPeriodId);
+            Result open = period.SetStatus("GL", PeriodStatus.Open);
+            if (open.IsFailure)
+            {
+                return open.Error;
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            Result<PostingReceipt> posted = await _postingEngine.ReverseAsync(companyId, closing.Id, year.EndDate, $"Year-end {year.Code} reversed: {reason.Trim()}", ct).ConfigureAwait(false);
+            if (posted.IsFailure)
+            {
+                return posted.Error;
+            }
+
+            reversal = posted.Value.JournalNumber;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return reversal;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> HardLockAsync(long companyId, long fiscalYearId, CancellationToken ct = default)
+    {
+        FiscalYear? year = await _db.FiscalYears.Include(y => y.Periods).ThenInclude(p => p.ModuleStatuses)
+            .FirstOrDefaultAsync(y => y.Id == fiscalYearId && y.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (year is null)
+        {
+            return Result.Failure(Error.NotFound("YearEnd.YearNotFound", $"Fiscal year {fiscalYearId} not found."));
+        }
+
+        if (!year.IsClosed)
+        {
+            return Result.Failure(Error.Rule("YearEnd.NotClosed", $"Run the year-end for {year.Code} before hard-locking it."));
+        }
+
+        foreach (FiscalPeriod period in year.Periods)
+        {
+            foreach (string module in period.ModuleStatuses.Select(m => m.ModuleCode).Append("GL").Distinct(StringComparer.OrdinalIgnoreCase).ToList())
+            {
+                period.SetStatus(module, PeriodStatus.PermanentlyClosed);
+            }
+        }
+
+        year.HardLock();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 }

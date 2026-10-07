@@ -73,7 +73,7 @@ public sealed class BudgetGateService : IBudgetGateService
             return Error.NotFound("Budget.NoFiscalYear", $"No fiscal year covers {date:yyyy-MM-dd}.");
         }
 
-        int period = year.Periods.FirstOrDefault(p => p.StartDate <= date && p.EndDate >= date)?.PeriodNumber ?? 1;
+        int period = year.Periods.FirstOrDefault(p => !p.IsAdjustment && p.StartDate <= date && p.EndDate >= date)?.PeriodNumber ?? 1;
         int raised = 0;
         foreach (var group in demands.Where(d => d.Amount > 0m).GroupBy(d => (Account: d.AccountCode.Trim().ToUpperInvariant(), Department: Clean(d.Department))))
         {

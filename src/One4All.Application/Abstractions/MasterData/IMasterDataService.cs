@@ -68,6 +68,17 @@ public interface IMasterDataService
     /// <returns>The fiscal year id.</returns>
     Task<Result<long>> CreateFiscalYearAsync(long companyId, string code, DateOnly startDate, int months = 12, CancellationToken ct = default);
 
+    /// <summary>Creates a fiscal year on a calendar: monthly periods, or 4-4-5 weeks (52 weeks in 12 periods); optionally with an adjustment period.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="code">The year code.</param>
+    /// <param name="startDate">The first day.</param>
+    /// <param name="calendar">Monthly or 4-4-5.</param>
+    /// <param name="months">Monthly periods (monthly calendar only).</param>
+    /// <param name="adjustmentPeriod">Whether to add the adjustment ("13th") period on the last day.</param>
+    /// <param name="ct">A cancellation token.</param>
+    /// <returns>The year id.</returns>
+    Task<Result<long>> CreateFiscalYearAsync(long companyId, string code, DateOnly startDate, Core.System.FiscalCalendar calendar, int months, bool adjustmentPeriod, CancellationToken ct = default);
+
     /// <summary>Adds a ledger account.</summary>
     /// <param name="account">The account.</param>
     /// <param name="ct">Cancellation token.</param>

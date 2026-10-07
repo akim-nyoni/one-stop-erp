@@ -58,7 +58,7 @@ public sealed class PostingEngine : IPostingEngine
 
         // Resolve the open period for the posting module.
         Result<(FiscalYear year, FiscalPeriod period)> periodResult =
-            await ResolvePeriodAsync(request.CompanyId, request.SourceModule, request.PostingDate, company.AllowFuturePeriodPosting, ct)
+            await ResolvePeriodAsync(request.CompanyId, request.SourceModule, request.PostingDate, company.AllowFuturePeriodPosting, ct, request.ToAdjustmentPeriod)
                 .ConfigureAwait(false);
         if (periodResult.IsFailure)
         {
@@ -322,11 +322,15 @@ public sealed class PostingEngine : IPostingEngine
             BaseAmount = l.TransactionDebit != 0m ? l.BaseDebit : l.BaseCredit,
         }).ToList();
 
+        // A journal in the adjustment period is reversed there when reversed on the same day.
+        bool inAdjustment = date == original.PostingDate
+            && await _db.Set<FiscalPeriod>().AnyAsync(p => p.Id == original.FiscalPeriodId && p.IsAdjustment, ct).ConfigureAwait(false);
         Result<PostingReceipt> posted = await PostAsync(new JournalRequest
         {
             CompanyId = companyId,
             SourceModule = original.SourceModule,
             PostingDate = date,
+            ToAdjustmentPeriod = inAdjustment,
             TransactionCurrency = original.TransactionCurrency,
             EnforceManualJournalRules = false,
             DocumentType = "REVERSAL",
@@ -486,7 +490,8 @@ public sealed class PostingEngine : IPostingEngine
         return null;
     }
 
-    private async Task<Result<(FiscalYear, FiscalPeriod)>> ResolvePeriodAsync(long companyId, string moduleCode, DateOnly date, bool allowFuture, CancellationToken ct)
+    private async Task<Result<(FiscalYear, FiscalPeriod)>> ResolvePeriodAsync(long companyId, string moduleCode, DateOnly date, bool allowFuture, CancellationToken ct,
+        bool toAdjustment = false)
     {
         List<FiscalYear> years = await _db.FiscalYears
             .Include(y => y.Periods).ThenInclude(p => p.ModuleStatuses)
@@ -496,9 +501,15 @@ public sealed class PostingEngine : IPostingEngine
 
         foreach (FiscalYear year in years)
         {
-            FiscalPeriod? period = year.Periods.FirstOrDefault(p => p.Contains(date));
+            // The adjustment period is reached only on request, and only on the year's last day.
+            FiscalPeriod? period = toAdjustment ? year.Periods.FirstOrDefault(p => p.IsAdjustment && p.Contains(date)) : year.Periods.FirstOrDefault(p => !p.IsAdjustment && p.Contains(date));
             if (period is null)
             {
+                if (toAdjustment)
+                {
+                    return Error.Rule("Posting.NoAdjustmentPeriod", $"Fiscal year {year.Code} has no adjustment period on {date:yyyy-MM-dd} (it is on the year's last day, {year.EndDate:yyyy-MM-dd}).");
+                }
+
                 continue;
             }
 

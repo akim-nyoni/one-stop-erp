@@ -82,7 +82,11 @@ public sealed class MasterDataService : IMasterDataService
     }
 
     /// <inheritdoc />
-    public async Task<Result<long>> CreateFiscalYearAsync(long companyId, string code, DateOnly startDate, int months = 12, CancellationToken ct = default)
+    public Task<Result<long>> CreateFiscalYearAsync(long companyId, string code, DateOnly startDate, int months = 12, CancellationToken ct = default)
+        => CreateFiscalYearAsync(companyId, code, startDate, FiscalCalendar.Monthly, months, false, ct);
+
+    /// <inheritdoc />
+    public async Task<Result<long>> CreateFiscalYearAsync(long companyId, string code, DateOnly startDate, FiscalCalendar calendar, int months, bool adjustmentPeriod, CancellationToken ct = default)
     {
         if (Key(code, 20) is not string key || months is < 1 or > 24)
         {
@@ -94,7 +98,8 @@ public sealed class MasterDataService : IMasterDataService
             return missing;
         }
 
-        DateOnly endDate = startDate.AddMonths(months).AddDays(-1);
+        IReadOnlyList<(DateOnly Start, DateOnly End)> periods = FiscalCalendars.Periods(calendar, startDate, months);
+        DateOnly endDate = periods[^1].End;
         List<FiscalYear> years = await _db.FiscalYears.Where(y => y.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
         if (years.Any(y => y.Code == key))
         {
@@ -107,10 +112,14 @@ public sealed class MasterDataService : IMasterDataService
         }
 
         FiscalYear year = new(companyId, key, startDate, endDate);
-        for (int n = 0; n < months; n++)
+        for (int n = 0; n < periods.Count; n++)
         {
-            DateOnly start = startDate.AddMonths(n);
-            year.AddPeriod(n + 1, start.ToString("MMMM yyyy", CultureInfo.InvariantCulture), start, start.AddMonths(1).AddDays(-1));
+            year.AddPeriod(n + 1, calendar == FiscalCalendar.FourFourFive ? $"P{n + 1} {key}" : periods[n].Start.ToString("MMMM yyyy", CultureInfo.InvariantCulture), periods[n].Start, periods[n].End);
+        }
+
+        if (adjustmentPeriod)
+        {
+            year.AddAdjustmentPeriod();
         }
 
         _db.FiscalYears.Add(year);

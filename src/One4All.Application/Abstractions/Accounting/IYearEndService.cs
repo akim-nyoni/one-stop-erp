@@ -9,8 +9,9 @@ namespace One4All.Application.Abstractions.Accounting;
 public readonly record struct YearEndResult(string ClosingJournalNumber, decimal NetProfitClosed, long NextYearId);
 
 /// <summary>
-/// Runs the year-end routine (brief §3.4): validates the trial balance, rolls the profit or loss to
-/// retained earnings via a closing journal, opens the next year, and permanently closes the prior year.
+/// Runs the year-end routine (brief §3.4): rolls the profit or loss to retained earnings via a closing journal (in the adjustment
+/// period when the year has one), opens the next year on the same calendar, and closes the year — reversible and re-runnable until
+/// it is hard-locked.
 /// Balance-sheet balances carry forward naturally because reports accumulate from inception.
 /// </summary>
 public interface IYearEndService
@@ -22,4 +23,22 @@ public interface IYearEndService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The year-end result, or an error.</returns>
     Task<Result<YearEndResult>> RunAsync(long companyId, long fiscalYearId, string retainedEarningsAccountCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reverses a year-end that is not yet hard-locked: the closing journal is reversed in the period it was posted to and the year
+    /// reopens (its periods stay closed until reopened), so adjustments can be made and the year-end run again.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fiscalYearId">The closed year.</param>
+    /// <param name="reason">Why it is reversed.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The reversal journal number.</returns>
+    Task<Result<string>> ReverseAsync(long companyId, long fiscalYearId, string reason, CancellationToken ct = default);
+
+    /// <summary>Makes a closed year final: every period is permanently closed and the year-end can no longer be reversed.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fiscalYearId">The closed year.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> HardLockAsync(long companyId, long fiscalYearId, CancellationToken ct = default);
 }

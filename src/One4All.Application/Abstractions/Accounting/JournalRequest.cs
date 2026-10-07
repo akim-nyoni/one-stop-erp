@@ -62,6 +62,9 @@ public sealed class JournalRequest
     /// <summary>An idempotency key so a retried post (e.g. POS sync) does not double-post.</summary>
     public string? IdempotencyKey { get; init; }
 
+    /// <summary>Post into the year's adjustment ("13th") period; the posting date must be the year's last day.</summary>
+    public bool ToAdjustmentPeriod { get; init; }
+
     /// <summary>The posting lines.</summary>
     public IReadOnlyList<JournalLineRequest> Lines { get; init; } = [];
 

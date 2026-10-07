@@ -78,4 +78,35 @@ public sealed class FiscalYear : AuditableEntity, ICompanyScoped
 
     /// <summary>Marks the year closed.</summary>
     public void Close() => IsClosed = true;
+
+    /// <summary>Whether the year-end is final: its periods are permanently closed and the year-end can no longer be reversed.</summary>
+    public bool IsHardLocked { get; private set; }
+
+    /// <summary>Reopens a closed year whose year-end was reversed (not once hard-locked).</summary>
+    /// <returns>Success, or why not.</returns>
+    public Result Reopen()
+    {
+        if (IsHardLocked)
+        {
+            return Result.Failure(Error.Rule("YearEnd.HardLocked", $"Fiscal year {Code} is hard-locked; its year-end cannot be reversed."));
+        }
+
+        IsClosed = false;
+        return Result.Success();
+    }
+
+    /// <summary>Makes the year-end final.</summary>
+    public void HardLock() => IsHardLocked = true;
+
+    /// <summary>Adds the adjustment ("13th") period: the year's last day, reached only by journals that ask for it (audit and year-end adjustments).</summary>
+    /// <returns>The period.</returns>
+    public FiscalPeriod AddAdjustmentPeriod()
+    {
+        FiscalPeriod period = new(_periods.Count == 0 ? 1 : _periods.Max(p => p.PeriodNumber) + 1, "Adjustments " + Code, EndDate, EndDate) { IsAdjustment = true };
+        _periods.Add(period);
+        return period;
+    }
+
+    /// <summary>The adjustment period, if the year has one.</summary>
+    public FiscalPeriod? AdjustmentPeriod => _periods.FirstOrDefault(p => p.IsAdjustment);
 }

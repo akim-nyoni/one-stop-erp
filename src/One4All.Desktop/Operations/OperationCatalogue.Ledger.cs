@@ -18,6 +18,32 @@ public static partial class OperationCatalogue
         const string module = "General Ledger";
         yield return new Operation
         {
+            Module = module, Title = "Year-end", ListTitle = "Fiscal years",
+            Description = "Run: rolls the year's profit or loss to retained earnings (in the adjustment period when there is one), opens the next year on the same calendar and closes "
+                + "the year. Reverse: undoes a year-end not yet hard-locked so adjustments can be made and it can be run again. Hard lock: makes it final — every period permanently closed.",
+            Fields = [Num("Year", "Fiscal year id"), Pick("Step", "Step", ["Run", "Reverse", "Hard lock"]), Req("Retained", "Retained earnings account", "3200"), Opt("Reason", "Reason (reverse)")],
+            Run = async (c, i) =>
+            {
+                IYearEndService yearEnd = c.Get<IYearEndService>();
+                long year = i.Whole("Year");
+                switch (i.Text("Step"))
+                {
+                    case "Reverse":
+                        string journal = Check(await yearEnd.ReverseAsync(c.CompanyId, year, i.Optional("Reason") ?? string.Empty).ConfigureAwait(true));
+                        return $"Year-end reversed (closing journal reversed by {journal}); the year is open again — reopen its periods to adjust.";
+                    case "Hard lock":
+                        _ = Check(await yearEnd.HardLockAsync(c.CompanyId, year).ConfigureAwait(true), string.Empty);
+                        return "Year hard-locked: its periods are permanently closed.";
+                    default:
+                        YearEndResult result = Check(await yearEnd.RunAsync(c.CompanyId, year, i.Text("Retained")).ConfigureAwait(true));
+                        return $"Year closed: net profit {result.NetProfitClosed:N2} to retained earnings by journal {result.ClosingJournalNumber}; next year id {result.NextYearId}.";
+                }
+            },
+            List = async c => Table(await c.Db.FiscalYears.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.StartDate).ToListAsync().ConfigureAwait(true),
+                ("Id", x => x.Id), ("Code", x => x.Code), ("From", x => D(x.StartDate)), ("To", x => D(x.EndDate)), ("Closed", x => x.IsClosed), ("Hard-locked", x => x.IsHardLocked)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Submit a manual journal", ListTitle = "Journals awaiting approval",
             Description = "Lines separated by ';', each ACCOUNT Dr|Cr AMOUNT with optional cc=, dept=, project=, fund=, branch= and a narrative after '#'; e.g. "
                 + "\"6100 Dr 500 project=P-DAM fund=WATER # Contractor; 2410 Cr 500 fund=WATER\". It is validated and numbered now, and posts once someone else approves it.",
