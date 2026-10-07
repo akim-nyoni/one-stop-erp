@@ -45,4 +45,25 @@ public interface IReportRunner
     Task<Result<RenderedDocument>> RenderAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, ReportFormat format,
         One4All.Application.Reporting.ReportAccess access, CancellationToken ct = default)
         => RenderAsync(companyId, reportCode, parameters, format, access.Hidden, ct);
+
+    /// <summary>
+    /// Runs a report once and splits it by a key field (brief §13.3 bursting): each key's rows rendered as their own document.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="reportCode">The report.</param>
+    /// <param name="parameters">Its parameters.</param>
+    /// <param name="format">The output format.</param>
+    /// <param name="keyField">The field the run is split by (e.g. the customer code).</param>
+    /// <param name="access">What the user may run and see.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A document per key, with the key's rows.</returns>
+    Task<Result<IReadOnlyList<BurstSlice>>> BurstAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, ReportFormat format, string keyField,
+        One4All.Application.Reporting.ReportAccess access, CancellationToken ct = default)
+        => Task.FromResult(Result<IReadOnlyList<BurstSlice>>.Failure(Error.Rule("Rpt.BurstUnsupported", "This report runner cannot burst.")));
 }
+
+/// <summary>One key's share of a burst report.</summary>
+/// <param name="Key">The key value.</param>
+/// <param name="Document">Its document.</param>
+/// <param name="Rows">Its rows.</param>
+public sealed record BurstSlice(string Key, RenderedDocument Document, IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows);

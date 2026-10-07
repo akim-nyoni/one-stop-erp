@@ -194,6 +194,70 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Burst a report by email", ListTitle = "Report subscriptions",
+            Description = "Run a report once, split it by a field (e.g. Customer code) and email each part as its own PDF — to the address in a field of the rows, or to the contacts of the "
+                + "customer or supplier the key names. Parameters as Name=value; ... (dates as yyyy-MM-dd). Parts with nobody to send to are listed.",
+            Fields = [Req("Report", "Report code"), Req("Key", "Split by field"), Opt("EmailField", "Field holding the email (optional)"), Pick("Ledger", "Or send to the contacts of", ["(email field)", "Customers", "Suppliers"]),
+                Opt("Parameters", "Parameters")],
+            Run = async (c, i) =>
+            {
+                Dictionary<string, object?> parameters = [];
+                foreach (string pair in (i.Optional("Parameters") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    string[] parts = pair.Split('=', 2, StringSplitOptions.TrimEntries);
+                    parameters[parts[0]] = parts.Length < 2 ? null : DateOnly.TryParseExact(parts[1], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly date) ? date : parts[1];
+                }
+
+                Core.Trading.TradingLedger? ledger = i.Text("Ledger") switch
+                {
+                    "Customers" => Core.Trading.TradingLedger.AccountsReceivable,
+                    "Suppliers" => Core.Trading.TradingLedger.AccountsPayable,
+                    _ => null,
+                };
+                IReadOnlyList<Application.Abstractions.Reporting.BurstDelivery> sent = Check(await c.Get<Application.Abstractions.Reporting.IReportBurstService>().BurstAsync(
+                    new Application.Abstractions.Reporting.BurstRequest(c.CompanyId, i.Text("Report"), i.Text("Key"))
+                    {
+                        Parameters = parameters, RecipientField = i.Optional("EmailField"), Ledger = ledger, UserId = c.UserId,
+                    }).ConfigureAwait(true));
+                List<string> missing = [.. sent.Where(d => d.Recipients.Count == 0).Select(d => d.Key)];
+                return $"{sent.Count(d => d.Recipients.Count > 0)} part(s) queued by email."
+                    + (missing.Count == 0 ? string.Empty : $" No email address for: {string.Join(", ", missing.Take(20))}{(missing.Count > 20 ? " ..." : string.Empty)}.");
+            },
+            List = async c => Table(await c.Db.Set<Core.Reporting.ReportSubscription>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", x => x.Code), ("Report", x => x.ReportCode), ("Burst by", x => x.BurstKeyField ?? "—"), ("Recipients", x => x.BurstKeyField is null ? string.Join(", ", x.Recipients) : x.BurstRecipientField ?? (x.BurstLedger == 2 ? "supplier contacts" : "customer contacts")),
+                ("Active", x => x.IsActive)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Report subscription", ListTitle = "Report subscriptions",
+            Description = "A report emailed every time the report-subscriptions job runs: to a list of addresses, or burst by a field to each customer's or supplier's contacts (or the address in "
+                + "a field). Parameters may use date tokens (@Today, @MonthStart, @PrevMonthEnd ...).",
+            Fields = [Req("Code", "Subscription code"), Req("Report", "Report code"), Pick("Format", "Format", ["Pdf", "Xlsx", "Csv", "Html"]), Opt("Recipients", "Email addresses (; separated)"),
+                Opt("Key", "Burst by field (optional)"), Opt("EmailField", "Field holding the email (burst)"), Pick("Ledger", "Or burst to the contacts of", ["(email field)", "Customers", "Suppliers"]),
+                Opt("Parameters", "Parameters (Name=value; ...)")],
+            Run = async (c, i) =>
+            {
+                Dictionary<string, string> parameters = [];
+                foreach (string pair in (i.Optional("Parameters") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    string[] parts = pair.Split('=', 2, StringSplitOptions.TrimEntries);
+                    parameters[parts[0]] = parts.Length < 2 ? string.Empty : parts[1];
+                }
+
+                _ = Check(await c.Get<Application.Abstractions.Reporting.IReportSubscriptionService>().SubscribeAsync(new Application.Abstractions.Reporting.SubscriptionRequest
+                {
+                    CompanyId = c.CompanyId, Code = i.Text("Code"), ReportCode = i.Text("Report"), Format = Enum.Parse<Application.Abstractions.Reporting.ReportFormat>(i.Text("Format")),
+                    Recipients = [.. (i.Optional("Recipients") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)], Parameters = parameters,
+                    BurstKeyField = i.Optional("Key"), BurstRecipientField = i.Optional("EmailField"),
+                    BurstLedger = i.Text("Ledger") switch { "Customers" => Core.Trading.TradingLedger.AccountsReceivable, "Suppliers" => Core.Trading.TradingLedger.AccountsPayable, _ => null },
+                }).ConfigureAwait(true), string.Empty);
+                return $"Subscription {i.Text("Code").ToUpperInvariant()} created.";
+            },
+            List = async c => Table(await c.Db.Set<Core.Reporting.ReportSubscription>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", x => x.Code), ("Report", x => x.ReportCode), ("Burst by", x => x.BurstKeyField ?? "—"), ("Active", x => x.IsActive)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set the company logo", ListTitle = "Company",
             Description = "A PNG or JPEG (up to 512 KB) that report layouts show wherever they place the Logo (an image element with expression CompanyLogo). Leave the path blank to remove it.",
             Fields = [Opt("Path", "Picture file path")],

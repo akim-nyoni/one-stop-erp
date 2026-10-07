@@ -22222,6 +22222,20 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("BurstKeyField")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("burst_key_field");
+
+                    b.Property<int?>("BurstLedger")
+                        .HasColumnType("integer")
+                        .HasColumnName("burst_ledger");
+
+                    b.Property<string>("BurstRecipientField")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("burst_recipient_field");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(40)

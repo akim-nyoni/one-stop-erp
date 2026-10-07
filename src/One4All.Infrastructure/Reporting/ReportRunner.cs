@@ -79,6 +79,60 @@ public sealed class ReportRunner : IReportRunner
         return Render(input, format, reportCode.ToLowerInvariant());
     }
 
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<BurstSlice>>> BurstAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, ReportFormat format, string keyField,
+        Application.Reporting.ReportAccess access, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(keyField))
+        {
+            return Error.Validation("Rpt.BurstKey", "Bursting needs the field to split the report by.");
+        }
+
+        ReportDefinition? definition = await ResolveDefinitionAsync(companyId, reportCode, ct).ConfigureAwait(false) ?? BuiltInDefinition(reportCode);
+        if (definition is null)
+        {
+            return Error.NotFound("Report.NotFound", $"No report definition found for code '{reportCode}'.");
+        }
+
+        if (!access.MayRun(definition.Module, definition.RequiredPermission))
+        {
+            return Error.Forbidden("Rpt.ModuleNotAuthorised", $"Report {reportCode} needs the {definition.RequiredPermission ?? definition.Module + " reports"} permission.");
+        }
+
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = Application.Reporting.ReportRowScope.Apply(
+            await RowsAsync(companyId, reportCode, definition, parameters, access.Hidden, ct).ConfigureAwait(false), access.Scope);
+        if (rows.Count > 0 && !rows[0].ContainsKey(keyField.Trim()))
+        {
+            return Error.Validation("Rpt.BurstKey", $"Report {reportCode} has no field {keyField.Trim()} to split by.");
+        }
+
+        var company = await _db.Companies.Where(c => c.Id == companyId).Select(c => new { c.Name, c.Locale, c.Logo }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        Dictionary<string, string> terms = await _db.TerminologyOverrides.AsNoTracking().Where(t => t.CompanyId == companyId)
+            .ToDictionaryAsync(t => t.Term, t => t.Replacement, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
+        Func<string, IReadOnlyDictionary<string, object?>, ReportInput?>? subReports = await SubReportsAsync(companyId, definition, rows, parameters, access, 0, new SubReportBudget(), ct).ConfigureAwait(false);
+        List<BurstSlice> slices = [];
+        foreach (IGrouping<string, IReadOnlyDictionary<string, object?>> group in rows.GroupBy(r => Convert.ToString(r.GetValueOrDefault(keyField.Trim()), System.Globalization.CultureInfo.InvariantCulture)?.Trim() ?? string.Empty)
+                     .Where(g => g.Key.Length > 0).OrderBy(g => g.Key, StringComparer.Ordinal))
+        {
+            List<IReadOnlyDictionary<string, object?>> slice = [.. group];
+            ReportInput input = new()
+            {
+                Definition = definition, Rows = slice, CompanyName = company?.Name ?? string.Empty, Parameters = parameters,
+                Culture = company?.Locale is string locale ? System.Globalization.CultureInfo.GetCultureInfo(locale) : null, Terminology = terms, CompanyLogo = company?.Logo, SubReports = subReports,
+            };
+            string safeKey = new([.. group.Key.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? c : '-')]);
+            Result<RenderedDocument> rendered = Render(input, format, $"{reportCode.ToLowerInvariant()}-{safeKey.ToLowerInvariant()}");
+            if (rendered.IsFailure)
+            {
+                return rendered.Error;
+            }
+
+            slices.Add(new BurstSlice(group.Key, rendered.Value, slice));
+        }
+
+        return slices;
+    }
+
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RowsAsync(long companyId, string reportCode, ReportDefinition definition, IReadOnlyDictionary<string, object?> parameters,
         IReadOnlySet<Application.Security.SensitiveField> hiddenFields, CancellationToken ct)
     {

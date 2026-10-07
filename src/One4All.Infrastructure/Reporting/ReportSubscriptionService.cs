@@ -17,13 +17,15 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
     private readonly One4AllDbContext _db;
     private readonly IReportRunner _runner;
     private readonly INotificationService _messages;
+    private readonly IReportBurstService? _burst;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="runner">The report runner.</param>
     /// <param name="messages">The notification service.</param>
-    public ReportSubscriptionService(One4AllDbContext db, IReportRunner runner, INotificationService messages)
+    public ReportSubscriptionService(One4AllDbContext db, IReportRunner runner, INotificationService messages, IReportBurstService? burst = null)
     {
+        _burst = burst;
         _db = db;
         _runner = runner;
         _messages = messages;
@@ -34,10 +36,16 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
     {
         ArgumentNullException.ThrowIfNull(request);
         List<string> recipients = [.. request.Recipients.Where(r => !string.IsNullOrWhiteSpace(r)).Select(r => r.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)];
-        if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.ReportCode) || recipients.Count == 0 || !Enum.IsDefined(request.Format)
+        bool bursting = !string.IsNullOrWhiteSpace(request.BurstKeyField);
+        if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.ReportCode) || (!bursting && recipients.Count == 0) || !Enum.IsDefined(request.Format)
             || recipients.Any(r => !r.Contains('@', StringComparison.Ordinal)))
         {
-            return Result.Failure(Error.Validation("Rpt.Subscription", "A subscription needs a code, a report, a format and at least one email address."));
+            return Result.Failure(Error.Validation("Rpt.Subscription", "A subscription needs a code, a report, a format and at least one email address (or a burst key)."));
+        }
+
+        if (bursting && string.IsNullOrWhiteSpace(request.BurstRecipientField) && request.BurstLedger is null)
+        {
+            return Result.Failure(Error.Validation("Rpt.BurstRecipients", "A burst subscription needs the field holding each part's email, or the ledger whose contacts receive it."));
         }
 
         string? badToken = request.Parameters.Values.FirstOrDefault(v => !ReportParameterTokens.IsValid(v));
@@ -58,7 +66,11 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
             return Result.Failure(Error.Conflict("Rpt.SubscriptionExists", $"Subscription {code} already exists."));
         }
 
-        _db.Set<ReportSubscription>().Add(new ReportSubscription(request.CompanyId, code, reportCode, (int)request.Format, JsonSerializer.Serialize(request.Parameters), recipients));
+        _db.Set<ReportSubscription>().Add(new ReportSubscription(request.CompanyId, code, reportCode, (int)request.Format, JsonSerializer.Serialize(request.Parameters), recipients)
+        {
+            BurstKeyField = bursting ? request.BurstKeyField!.Trim() : null, BurstRecipientField = bursting ? request.BurstRecipientField?.Trim() : null,
+            BurstLedger = bursting ? (int?)request.BurstLedger : null,
+        });
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
@@ -116,6 +128,36 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
     {
         Dictionary<string, string> stored = JsonSerializer.Deserialize<Dictionary<string, string>>(subscription.ParametersJson) ?? [];
         IReadOnlyDictionary<string, object?> parameters = ReportParameterTokens.Resolve(stored, DateOnly.FromDateTime(runAt.UtcDateTime));
+        if (subscription.BurstKeyField is string keyField && _burst is not null)
+        {
+            Result<IReadOnlyList<BurstDelivery>> burst = await _burst.BurstAsync(new BurstRequest(subscription.CompanyId, subscription.ReportCode, keyField)
+            {
+                Parameters = parameters, RecipientField = subscription.BurstRecipientField, Ledger = (One4All.Core.Trading.TradingLedger?)subscription.BurstLedger, Format = (ReportFormat)subscription.Format,
+            }, ct).ConfigureAwait(false);
+            if (burst.IsFailure)
+            {
+                _db.Set<ReportDelivery>().Add(new ReportDelivery(subscription.CompanyId, subscription.Id, runAt, "(burst)", string.Empty, false, burst.Error.Message));
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+                return burst.Error;
+            }
+
+            foreach (BurstDelivery delivery in burst.Value)
+            {
+                if (delivery.Recipients.Count == 0)
+                {
+                    _db.Set<ReportDelivery>().Add(new ReportDelivery(subscription.CompanyId, subscription.Id, runAt, $"({delivery.Key})", delivery.FileName, false, $"No email address for {delivery.Key}."));
+                }
+
+                foreach (string recipient in delivery.Recipients)
+                {
+                    _db.Set<ReportDelivery>().Add(new ReportDelivery(subscription.CompanyId, subscription.Id, runAt, recipient, delivery.FileName, true, $"{delivery.Key}: queued in despatch batch {delivery.BatchId}"));
+                }
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return burst.Value.Sum(d => d.Recipients.Count);
+        }
+
         Result<RenderedDocument> rendered = await _runner.RenderAsync(subscription.CompanyId, subscription.ReportCode, parameters, (ReportFormat)subscription.Format, ct).ConfigureAwait(false);
         if (rendered.IsFailure)
         {

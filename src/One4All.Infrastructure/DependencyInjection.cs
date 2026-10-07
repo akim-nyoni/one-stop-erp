@@ -301,6 +301,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Trading.ITraderDirectoryService, Trading.TraderDirectoryService>();
         services.AddScoped<Application.Abstractions.Payroll.IPayrollSetupService, Payroll.PayrollSetupService>();
         services.AddScoped<Application.Abstractions.Payroll.ITerminationService, Payroll.TerminationService>();
+        services.AddScoped<Application.Abstractions.Reporting.IReportBurstService, Reporting.ReportBurstService>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Pos.FiscalRetryTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Integration.IdempotencyPurgeTask>();
         services.AddScoped<Application.Abstractions.Pos.IPosEventService, Pos.PosEventService>();

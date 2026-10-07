@@ -56,6 +56,15 @@ public sealed class ReportSubscription : AuditableEntity, ICompanyScoped
     /// <summary>Whether it runs.</summary>
     public bool IsActive { get; private set; }
 
+    /// <summary>When set, each run is split by this field and each part sent to its own recipients (bursting) instead of the distribution list.</summary>
+    public string? BurstKeyField { get; set; }
+
+    /// <summary>For bursting: the field of the rows holding each part's email address.</summary>
+    public string? BurstRecipientField { get; set; }
+
+    /// <summary>For bursting: the key is a customer (1) or supplier (2) code, sent to the trader's contacts.</summary>
+    public int? BurstLedger { get; set; }
+
     /// <summary>Starts or stops it.</summary>
     /// <param name="active">Whether it runs.</param>
     public void SetActive(bool active) => IsActive = active;

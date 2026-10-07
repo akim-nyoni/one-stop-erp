@@ -22,6 +22,15 @@ public sealed class SubscriptionRequest
 
     /// <summary>The distribution list (email addresses).</summary>
     public IReadOnlyList<string> Recipients { get; init; } = [];
+
+    /// <summary>Burst each run by this field (each part to its own recipients) instead of sending it to the list.</summary>
+    public string? BurstKeyField { get; init; }
+
+    /// <summary>For bursting: the field holding each part's email address.</summary>
+    public string? BurstRecipientField { get; init; }
+
+    /// <summary>For bursting: send each part to the contacts of the customer or supplier the key names.</summary>
+    public One4All.Core.Trading.TradingLedger? BurstLedger { get; init; }
 }
 
 /// <summary>A delivery log line.</summary>
