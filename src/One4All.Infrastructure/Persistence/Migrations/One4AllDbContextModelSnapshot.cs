@@ -15862,9 +15862,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("NewValue")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("new_value");
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("new_value")
+                        .HasAnnotation("One4All:Encrypted", true);
 
                     b.Property<string>("Note")
                         .HasMaxLength(200)
@@ -15872,9 +15873,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnName("note");
 
                     b.Property<string>("OldValue")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("old_value");
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("old_value")
+                        .HasAnnotation("One4All:Encrypted", true);
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
@@ -15959,24 +15961,28 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<string>("BankAccountNumber")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("bank_account_number");
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("bank_account_number")
+                        .HasAnnotation("One4All:Encrypted", true);
 
                     b.Property<string>("BankBranch")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("bank_branch");
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("bank_branch")
+                        .HasAnnotation("One4All:Encrypted", true);
 
                     b.Property<string>("BankName")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")
                         .HasColumnName("bank_name");
 
-                    b.Property<decimal>("BasicSalary")
+                    b.Property<string>("BasicSalary")
+                        .IsRequired()
                         .HasPrecision(19, 4)
-                        .HasColumnType("numeric(19,4)")
-                        .HasColumnName("basic_salary");
+                        .HasColumnType("text")
+                        .HasColumnName("basic_salary")
+                        .HasAnnotation("One4All:Encrypted", true);
 
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
@@ -16068,9 +16074,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnName("is_salary_held");
 
                     b.Property<string>("MobileMoneyNumber")
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("mobile_money_number");
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("mobile_money_number")
+                        .HasAnnotation("One4All:Encrypted", true);
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
@@ -16081,9 +16088,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnName("modified_on_utc");
 
                     b.Property<string>("NationalIdNumber")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("national_id_number");
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("national_id_number")
+                        .HasAnnotation("One4All:Encrypted", true);
 
                     b.Property<int?>("Notch")
                         .HasColumnType("integer")
@@ -16113,9 +16121,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnName("status");
 
                     b.Property<string>("TaxNumber")
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)")
-                        .HasColumnName("tax_number");
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("tax_number")
+                        .HasAnnotation("One4All:Encrypted", true);
 
                     b.Property<DateOnly?>("TerminationDate")
                         .HasColumnType("date")

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using One4All.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using One4All.Core.Payroll;
 
@@ -18,15 +19,16 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         b.Property(x => x.Department).HasMaxLength(30);
         b.Property(x => x.CostCentre).HasMaxLength(30);
         b.Property(x => x.Status).HasConversion<int>();
-        b.Property(x => x.NationalIdNumber).HasMaxLength(40);
-        b.Property(x => x.TaxNumber).HasMaxLength(40);
+        b.Property(x => x.NationalIdNumber).Encrypted();
+        b.Property(x => x.TaxNumber).Encrypted();
+        b.Property(x => x.BasicSalary).Encrypted();
         b.Property(x => x.Gender).HasConversion<int>();
         b.Property(x => x.Grade).HasMaxLength(20);
         b.Property(x => x.PaymentMethod).HasConversion<int>();
         b.Property(x => x.BankName).HasMaxLength(100);
-        b.Property(x => x.BankBranch).HasMaxLength(30);
-        b.Property(x => x.BankAccountNumber).HasMaxLength(40);
-        b.Property(x => x.MobileMoneyNumber).HasMaxLength(30);
+        b.Property(x => x.BankBranch).Encrypted();
+        b.Property(x => x.BankAccountNumber).Encrypted();
+        b.Property(x => x.MobileMoneyNumber).Encrypted();
         b.Property(x => x.TerminationReason).HasMaxLength(300);
         b.Property(x => x.HoldReason).HasMaxLength(300);
         b.HasMany(x => x.PayElements).WithOne().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Cascade);
@@ -468,8 +470,8 @@ internal sealed class DetailChangeRequestConfiguration : IEntityTypeConfiguratio
         b.ToTable("detail_change_request", Schemas.HumanResources);
         b.HasKey(x => x.Id);
         b.Property(x => x.Field).HasMaxLength(40);
-        b.Property(x => x.OldValue).HasMaxLength(100);
-        b.Property(x => x.NewValue).HasMaxLength(100);
+        b.Property(x => x.OldValue).Encrypted();
+        b.Property(x => x.NewValue).Encrypted();
         b.Property(x => x.Status).HasConversion<int>();
         b.Property(x => x.Note).HasMaxLength(200);
         b.HasIndex(x => new { x.CompanyId, x.Status });

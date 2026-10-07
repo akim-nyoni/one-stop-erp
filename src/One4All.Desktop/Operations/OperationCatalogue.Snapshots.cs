@@ -22,6 +22,23 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Payroll encryption", ListTitle = "Values not yet under the active key",
+            Description = "Salary, bank details, national ID and tax numbers are encrypted at rest. This shows what is still in plaintext (written before encryption) or under a retired key, "
+                + "and Encrypt now rewrites it with the active key (the scheduled task security.reencrypt-fields does the same).",
+            Fields = [Tick("Encrypt", "Encrypt now")],
+            Run = async (c, i) =>
+            {
+                One4All.Infrastructure.Security.IFieldEncryptionService encryption = c.Get<One4All.Infrastructure.Security.IFieldEncryptionService>();
+                int rewritten = i.Flag("Encrypt") ? await encryption.ReencryptAsync().ConfigureAwait(true) : 0;
+                One4All.Infrastructure.Security.FieldEncryptionReport report = await encryption.StatusAsync().ConfigureAwait(true);
+                return $"Active key {report.ActiveKeyId}{(report.DevelopmentKey ? " (DEVELOPMENT key file — configure FieldEncryption keys before going live)" : string.Empty)}. "
+                    + (i.Flag("Encrypt") ? $"{rewritten} row(s) rewritten. " : string.Empty) + (report.Complete ? "Everything is encrypted with the active key." : $"{report.Pending.Values.Sum()} value(s) still to encrypt.");
+            },
+            List = async c => Table((await c.Get<One4All.Infrastructure.Security.IFieldEncryptionService>().StatusAsync().ConfigureAwait(true)).Pending.ToList(),
+                ("Column", p => p.Key), ("Values to encrypt", p => p.Value)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Quick search", ListTitle = "Aged debt (snapshot)",
             Description = "Finds items, customers, suppliers, leads and accounts by name or code, forgiving a mistyped letter or two.",
             Fields = [Req("Term", "Search for")],

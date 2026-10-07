@@ -180,20 +180,23 @@ public sealed class AuditingInterceptor : SaveChangesInterceptor
                 continue;
             }
 
+            // Encrypted columns (salary, bank details, national ID) are never copied into the audit log in clear: the change is noted, not the value.
+            bool secret = property.Metadata.FindAnnotation(Security.FieldEncryptionModel.Annotation) is not null;
+            object? Shown(object? value) => secret && value is not null ? "[encrypted]" : value;
             switch (action)
             {
                 case AuditAction.Insert:
-                    newValues[name] = property.CurrentValue;
+                    newValues[name] = Shown(property.CurrentValue);
                     break;
 
                 case AuditAction.Delete:
-                    oldValues[name] = property.OriginalValue;
+                    oldValues[name] = Shown(property.OriginalValue);
                     break;
 
                 case AuditAction.Update when property.IsModified &&
                                               !Equals(property.OriginalValue, property.CurrentValue):
-                    oldValues[name] = property.OriginalValue;
-                    newValues[name] = property.CurrentValue;
+                    oldValues[name] = Shown(property.OriginalValue);
+                    newValues[name] = Shown(property.CurrentValue);
                     changed.Add(name);
                     break;
             }

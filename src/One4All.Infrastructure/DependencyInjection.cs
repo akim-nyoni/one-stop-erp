@@ -31,8 +31,17 @@ public static class DependencyInjection
         string connectionString,
         LicensingOptions? licensingOptions = null,
         Communications.MessagingOptions? messagingOptions = null,
-        Backup.BackupOptions? backupOptions = null)
+        Backup.BackupOptions? backupOptions = null,
+        FieldEncryptionOptions? fieldEncryption = null)
     {
+        // Column encryption for payroll (salary, bank details, national ID): keys from configuration, ONE4ALL_FIELD_KEY or a development key file.
+        (FieldEncryptionOptions keys, bool developmentKey) = FieldEncryptionOptions.Resolve(fieldEncryption);
+        FieldCipherHolder.Cipher = new FieldCipher(keys);
+        services.AddSingleton(FieldCipherHolder.Cipher);
+        services.AddSingleton(new FieldEncryptionStatus(keys.ActiveKeyId!, developmentKey));
+        services.AddScoped<IFieldEncryptionService, FieldEncryptionService>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, ReencryptFieldsTask>();
+
         // Cross-cutting.
         services.AddSingleton<IClock, SystemClock>();
         services.AddScoped<CurrentUserContext>();

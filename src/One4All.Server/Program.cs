@@ -34,7 +34,9 @@ builder.Configuration.GetSection(One4All.Infrastructure.Communications.Messaging
 One4All.Infrastructure.Backup.BackupOptions backup = new();
 builder.Configuration.GetSection(One4All.Infrastructure.Backup.BackupOptions.SectionName).Bind(backup);
 
-builder.Services.AddOne4AllInfrastructure(connectionString, licensing, messaging, backup);
+One4All.Infrastructure.Security.FieldEncryptionOptions fieldEncryption = new();
+builder.Configuration.GetSection(One4All.Infrastructure.Security.FieldEncryptionOptions.SectionName).Bind(fieldEncryption);
+builder.Services.AddOne4AllInfrastructure(connectionString, licensing, messaging, backup, fieldEncryption);
 builder.Services.AddHostedService<One4All.Server.LicenceHost>();
 builder.Services.AddHostedService<One4All.Server.WebhookHost>();
 
