@@ -13597,6 +13597,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(60)")
                         .HasColumnName("invoice_number");
 
+                    b.Property<bool>("IsPosted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_posted");
+
                     b.Property<string>("Message")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
@@ -13607,6 +13611,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
                         .HasColumnName("narrative");
+
+                    b.Property<long?>("PostedOpenItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("posted_open_item_id");
 
                     b.Property<decimal?>("PreviousCharge")
                         .HasPrecision(19, 4)

@@ -35,7 +35,30 @@ public sealed class BillingRunProposal
 /// <param name="Included">The bills to post.</param>
 /// <param name="Total">Their total.</param>
 /// <param name="Exceptions">The lines with exceptions.</param>
-public sealed record BillingRunSummary(string RunNumber, BillingRunStatus Status, int Lines, int Included, decimal Total, int Exceptions);
+public sealed record BillingRunSummary(string RunNumber, BillingRunStatus Status, int Lines, int Included, decimal Total, int Exceptions, int Posted = 0, int Failed = 0)
+{
+    /// <summary>Included bills still to post (the run resumes with them).</summary>
+    public int Remaining => Status == BillingRunStatus.Posting ? Included - Posted - Failed : 0;
+}
+
+/// <summary>How far posting a billing run has got.</summary>
+/// <param name="Posted">Bills posted so far.</param>
+/// <param name="Failed">Bills that failed.</param>
+/// <param name="Total">Bills to post.</param>
+public sealed record BillingRunProgress(int Posted, int Failed, int Total);
+
+/// <summary>How a run is posted.</summary>
+public sealed record BillingPostOptions
+{
+    /// <summary>Bills per chunk (each chunk saved before the next).</summary>
+    public int ChunkSize { get; init; } = 500;
+
+    /// <summary>Stop after this many bills (the run stays Posting and resumes later), e.g. to fit a batch window.</summary>
+    public int? MaxBills { get; init; }
+
+    /// <summary>Told after every chunk.</summary>
+    public IProgress<BillingRunProgress>? Progress { get; init; }
+}
 
 /// <summary>A line of a billing run.</summary>
 /// <param name="PropertyId">The property.</param>
@@ -78,13 +101,34 @@ public interface IBillingRunService
     /// <returns>The run's totals afterwards, or why it was refused.</returns>
     Task<Result<BillingRunSummary>> SetIncludedAsync(long companyId, string runNumber, long propertyId, bool included, CancellationToken ct = default);
 
-    /// <summary>Approves a proposed run and posts its included bills, all or none.</summary>
+    /// <summary>Approves a proposed run and posts its included bills (in chunks, see the overload with options).</summary>
     /// <param name="companyId">The council.</param>
     /// <param name="runNumber">The run.</param>
     /// <param name="userId">Who approves it (not the proposer).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The run's totals, or why it was refused.</returns>
     Task<Result<BillingRunSummary>> ApproveAsync(long companyId, string runNumber, long userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Approves a proposed run and posts its bills in chunks (brief §15: tens of thousands of accounts): each bill on its own, a failed
+    /// bill set aside with its reason while the rest carry on, progress after each chunk; the run stays Posting until every bill is
+    /// posted or failed, and <see cref="ResumeAsync"/> carries on after a stop.
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="runNumber">The run.</param>
+    /// <param name="userId">Who approves it (not the proposer).</param>
+    /// <param name="options">Chunk size, a cap and progress.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The run's totals.</returns>
+    Task<Result<BillingRunSummary>> ApproveAsync(long companyId, string runNumber, long userId, BillingPostOptions options, CancellationToken ct = default);
+
+    /// <summary>Carries on posting a run left Posting (stopped, capped or interrupted); a bill already on the account is not posted twice.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="runNumber">The run.</param>
+    /// <param name="options">Chunk size, a cap and progress.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The run's totals.</returns>
+    Task<Result<BillingRunSummary>> ResumeAsync(long companyId, string runNumber, BillingPostOptions options, CancellationToken ct = default);
 
     /// <summary>Cancels a proposed run; nothing was posted, so the month can be run again.</summary>
     /// <param name="companyId">The council.</param>

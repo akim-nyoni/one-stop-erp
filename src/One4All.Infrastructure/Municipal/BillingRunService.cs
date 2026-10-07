@@ -143,50 +143,142 @@ public sealed class BillingRunService : IBillingRunService
 
     /// <inheritdoc />
     public Task<Result<BillingRunSummary>> ApproveAsync(long companyId, string runNumber, long userId, CancellationToken ct = default)
-        => _db.AtomicAsync(() => ApproveCoreAsync(companyId, runNumber, userId, ct), ct);
+        => ApproveAsync(companyId, runNumber, userId, new BillingPostOptions(), ct);
 
-    private async Task<Result<BillingRunSummary>> ApproveCoreAsync(long companyId, string runNumber, long userId, CancellationToken ct)
+    /// <inheritdoc />
+    public async Task<Result<BillingRunSummary>> ApproveAsync(long companyId, string runNumber, long userId, BillingPostOptions options, CancellationToken ct = default)
     {
-        Result<BillingRun> found = await FindProposedAsync(companyId, runNumber, ct).ConfigureAwait(false);
+        // Approval itself is one unit: the checks, then the run marked Posting.
+        Result<BillingRun> approved = await _db.AtomicAsync(async () =>
+        {
+            Result<BillingRun> found = await FindProposedAsync(companyId, runNumber, ct).ConfigureAwait(false);
+            if (found.IsFailure)
+            {
+                return found;
+            }
+
+            BillingRun run = found.Value;
+            if (run.ProposedByUserId == userId)
+            {
+                return Error.Rule("Mun.SelfApproval", $"Run {runNumber} must be approved by someone other than who proposed it.");
+            }
+
+            List<string> invoices = [.. run.Lines.Where(l => l.Included).Select(l => l.InvoiceNumber)];
+            HashSet<string> raisedSince = await MunicipalCharges.AlreadyRaisedAsync(_db, companyId, invoices, ct).ConfigureAwait(false);
+            if (raisedSince.Count > 0)
+            {
+                return Error.Conflict("Mun.AlreadyBilled", $"Bills raised since the run was proposed: {string.Join(", ", raisedSince.Order().Take(20))}. Cancel and run again.");
+            }
+
+            run.StartPosting(userId);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return run;
+        }, ct).ConfigureAwait(false);
+        return approved.IsFailure ? approved.Error : await PostChunksAsync(companyId, approved.Value.Id, options, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<BillingRunSummary>> ResumeAsync(long companyId, string runNumber, BillingPostOptions options, CancellationToken ct = default)
+    {
+        Result<BillingRun> found = await FindAsync(companyId, runNumber, ct).ConfigureAwait(false);
         if (found.IsFailure)
         {
             return found.Error;
         }
 
-        BillingRun run = found.Value;
-        if (run.ProposedByUserId == userId)
-        {
-            return Error.Rule("Mun.SelfApproval", $"Run {runNumber} must be approved by someone other than who proposed it.");
-        }
+        return found.Value.Status != BillingRunStatus.Posting
+            ? Error.Rule("Mun.NotPosting", $"Run {runNumber} is {found.Value.Status}; only a run part-way through posting resumes.")
+            : await PostChunksAsync(companyId, found.Value.Id, options, ct).ConfigureAwait(false);
+    }
 
-        List<BillingRunLine> toPost = [.. run.Lines.Where(l => l.Included).OrderBy(l => l.PropertyId)];
-        HashSet<string> raisedSince = await MunicipalCharges.AlreadyRaisedAsync(_db, companyId, [.. toPost.Select(l => l.InvoiceNumber)], ct).ConfigureAwait(false);
-        if (raisedSince.Count > 0)
+    // Posts the run's remaining bills chunk by chunk, each bill on its own: a failure is recorded on its line and the rest carry on; the
+    // change tracker is cleared after each chunk so memory stays flat however large the run.
+    private async Task<Result<BillingRunSummary>> PostChunksAsync(long companyId, long runId, BillingPostOptions options, CancellationToken ct)
+    {
+        int chunkSize = Math.Clamp(options.ChunkSize, 1, 5_000);
+        var header = await _db.Set<BillingRun>().AsNoTracking().Where(r => r.Id == runId).Select(r => new { r.RunNumber, r.BillDate }).SingleAsync(ct).ConfigureAwait(false);
+        int total = await _db.Set<BillingRunLine>().CountAsync(l => l.BillingRunId == runId && l.Included, ct).ConfigureAwait(false);
+        int handled = 0;
+        while (options.MaxBills is not int cap || handled < cap)
         {
-            return Error.Conflict("Mun.AlreadyBilled", $"Bills raised since the run was proposed: {string.Join(", ", raisedSince.Order())}. Cancel and run again.");
-        }
-
-        foreach (BillingRunLine line in toPost)
-        {
-            Result<TradingPostingResult> posted = await MunicipalCharges.PostAsync(_db, _ar, companyId, line.RatepayerCustomerId, line.InvoiceNumber, run.BillDate,
-                line.Charge, 0m, line.RevenueAccountCode, null, line.Narrative, ct).ConfigureAwait(false);
-            if (posted.IsFailure)
+            ct.ThrowIfCancellationRequested();
+            int take = options.MaxBills is int limit ? Math.Min(chunkSize, limit - handled) : chunkSize;
+            List<BillingRunLine> chunk = await _db.Set<BillingRunLine>()
+                .Where(l => l.BillingRunId == runId && l.Included && !l.IsPosted && (l.Exceptions & BillingExceptions.Failed) == 0)
+                .OrderBy(l => l.PropertyId).Take(take).ToListAsync(ct).ConfigureAwait(false);
+            if (chunk.Count == 0)
             {
-                return posted.Error;
+                break;
+            }
+
+            // A bill already on the account (posted before an interruption) is marked, not posted again.
+            Dictionary<string, long> existing = await _db.OpenItems.Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsReceivable
+                    && chunk.Select(l => l.InvoiceNumber).Contains(i.DocumentNumber))
+                .ToDictionaryAsync(i => i.DocumentNumber, i => i.Id, StringComparer.Ordinal, ct).ConfigureAwait(false);
+            foreach (BillingRunLine line in chunk)
+            {
+                if (existing.TryGetValue(line.InvoiceNumber, out long already))
+                {
+                    line.MarkPosted(already);
+                    continue;
+                }
+
+                Result<TradingPostingResult> posted;
+                try
+                {
+                    posted = await MunicipalCharges.PostAsync(_db, _ar, companyId, line.RatepayerCustomerId, line.InvoiceNumber, header.BillDate,
+                        line.Charge, 0m, line.RevenueAccountCode, null, line.Narrative, ct).ConfigureAwait(false);
+                }
+                catch (DbUpdateException ex)
+                {
+                    posted = Error.Failure("Mun.PostFailed", ex.InnerException?.Message ?? ex.Message);
+                }
+
+                if (posted.IsSuccess)
+                {
+                    line.MarkPosted(posted.Value.OpenItemId);
+                }
+                else
+                {
+                    line.MarkFailed(posted.Error.Message);
+                }
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            handled += chunk.Count;
+            _db.ChangeTracker.Clear();
+            if (options.Progress is not null)
+            {
+                (int done, int failed) = await CountsAsync(runId, ct).ConfigureAwait(false);
+                options.Progress.Report(new BillingRunProgress(done, failed, total));
             }
         }
 
-        run.MarkPosted(userId);
-        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        if (_webhooks is not null)
+        BillingRun run = await _db.Set<BillingRun>().Include(r => r.Lines).SingleAsync(r => r.Id == runId, ct).ConfigureAwait(false);
+        bool finished = !run.Lines.Any(l => l.Included && !l.IsPosted && (l.Exceptions & BillingExceptions.Failed) == 0);
+        if (finished && run.Status == BillingRunStatus.Posting)
         {
-            await _webhooks.PublishAsync(companyId, Application.Integration.WebhookEvents.BillsGenerated, new
+            run.FinishPosting();
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            if (_webhooks is not null)
             {
-                RunNumber = runNumber, run.BillDate, Bills = toPost.Count, Total = toPost.Sum(l => l.Charge), Invoices = toPost.Select(l => l.InvoiceNumber),
-            }, ct).ConfigureAwait(false);
+                List<BillingRunLine> posted = [.. run.Lines.Where(l => l.IsPosted)];
+                await _webhooks.PublishAsync(companyId, Application.Integration.WebhookEvents.BillsGenerated, new
+                {
+                    RunNumber = header.RunNumber, header.BillDate, Bills = posted.Count, Total = posted.Sum(l => l.Charge), Invoices = posted.Select(l => l.InvoiceNumber),
+                }, ct).ConfigureAwait(false);
+            }
         }
 
         return Summary(run);
+    }
+
+    private async Task<(int Posted, int Failed)> CountsAsync(long runId, CancellationToken ct)
+    {
+        var counts = await _db.Set<BillingRunLine>().AsNoTracking().Where(l => l.BillingRunId == runId && l.Included)
+            .GroupBy(_ => 1).Select(g => new { Posted = g.Count(l => l.IsPosted), Failed = g.Count(l => (l.Exceptions & BillingExceptions.Failed) != 0) })
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return (counts?.Posted ?? 0, counts?.Failed ?? 0);
     }
 
     /// <inheritdoc />
@@ -206,7 +298,8 @@ public sealed class BillingRunService : IBillingRunService
     private static BillingRunSummary Summary(BillingRun run)
     {
         List<BillingRunLine> included = [.. run.Lines.Where(l => l.Included)];
-        return new BillingRunSummary(run.RunNumber, run.Status, run.Lines.Count, included.Count, included.Sum(l => l.Charge), run.Lines.Count(l => l.Exceptions != BillingExceptions.None));
+        return new BillingRunSummary(run.RunNumber, run.Status, run.Lines.Count, included.Count, included.Sum(l => l.Charge), run.Lines.Count(l => l.Exceptions != BillingExceptions.None),
+            included.Count(l => l.IsPosted), included.Count(l => (l.Exceptions & BillingExceptions.Failed) != 0));
     }
 
     // The last bill of this tariff for the stand before the run's month, whichever version it was raised under.

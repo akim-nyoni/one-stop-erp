@@ -13,6 +13,9 @@ public enum BillingRunStatus
 
     /// <summary>Cancelled before posting.</summary>
     Cancelled = 2,
+
+    /// <summary>Approved and posting in chunks; resumable until every included bill is posted or failed.</summary>
+    Posting = 3,
 }
 
 /// <summary>What the review of a proposed bill found.</summary>
@@ -117,6 +120,17 @@ public sealed class BillingRun : AuditableEntity, ICompanyScoped
         ApprovedByUserId = userId;
     }
 
+    /// <summary>Approves it: its bills now post in chunks.</summary>
+    /// <param name="userId">Who approved it.</param>
+    public void StartPosting(long userId)
+    {
+        Status = BillingRunStatus.Posting;
+        ApprovedByUserId = userId;
+    }
+
+    /// <summary>Every included bill is posted or failed.</summary>
+    public void FinishPosting() => Status = BillingRunStatus.Posted;
+
     /// <summary>Cancels it before posting.</summary>
     public void Cancel() => Status = BillingRunStatus.Cancelled;
 }
@@ -202,4 +216,26 @@ public sealed class BillingRunLine : Entity
     /// <summary>Puts it in or leaves it out of the run.</summary>
     /// <param name="included">Whether to post it.</param>
     public void SetIncluded(bool included) => Included = included && !IsBlocked;
+
+    /// <summary>The invoice posted for it, once posted.</summary>
+    public long? PostedOpenItemId { get; private set; }
+
+    /// <summary>Whether it is posted (its bill is on the ratepayer's account).</summary>
+    public bool IsPosted { get; private set; }
+
+    /// <summary>Records the bill as posted.</summary>
+    /// <param name="openItemId">Its invoice, when known.</param>
+    public void MarkPosted(long? openItemId)
+    {
+        IsPosted = true;
+        PostedOpenItemId = openItemId;
+    }
+
+    /// <summary>Records why the bill could not be posted; the rest of the run carries on.</summary>
+    /// <param name="message">Why.</param>
+    public void MarkFailed(string message)
+    {
+        Exceptions |= BillingExceptions.Failed;
+        Message = message.Length > 500 ? message[..500] : message;
+    }
 }

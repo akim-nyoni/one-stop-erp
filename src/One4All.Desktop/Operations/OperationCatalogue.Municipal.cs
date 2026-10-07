@@ -96,12 +96,13 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Billing run", ListTitle = "Billing runs",
             Description = "Propose a run for a service (and ward), review its exceptions, include or exclude stands, then approve to post the bills — someone other than the proposer approves.",
-            Fields = [Pick("Step", "Step", ["Propose", "Show exceptions", "Exclude a stand", "Include a stand", "Approve", "Cancel"]), Pick("Service", "Service", Enum.GetNames<ServiceType>()),
+            Fields = [Pick("Step", "Step", ["Propose", "Show exceptions", "Exclude a stand", "Include a stand", "Approve", "Resume posting", "Cancel"]), Pick("Service", "Service", Enum.GetNames<ServiceType>()),
                 Today("BillDate", "Bill date"), Opt("Ward", "Ward (blank: all)"), Opt("Prefix", "Invoice prefix", "MB"), Opt("Run", "Run number"), Opt("Stand", "Stand number")],
             Run = async (c, i) =>
             {
                 IBillingRunService runs = c.Get<IBillingRunService>();
-                string Summary(BillingRunSummary s) => $"Run {s.RunNumber} {s.Status}: {s.Included} of {s.Lines} stand(s), {M(s.Total)}, {s.Exceptions} exception(s).";
+                string Summary(BillingRunSummary s) => $"Run {s.RunNumber} {s.Status}: {s.Included} of {s.Lines} stand(s), {M(s.Total)}, {s.Exceptions} exception(s)."
+                    + (s.Status is BillingRunStatus.Posting or BillingRunStatus.Posted ? $" Posted {s.Posted}, failed {s.Failed}{(s.Remaining > 0 ? $", {s.Remaining} still to post — resume posting" : string.Empty)}." : string.Empty);
                 switch (i.Text("Step"))
                 {
                     case "Propose":
@@ -120,6 +121,8 @@ public static partial class OperationCatalogue
                             .ConfigureAwait(true)));
                     case "Approve":
                         return Summary(Check(await runs.ApproveAsync(c.CompanyId, i.Text("Run"), c.UserId).ConfigureAwait(true)));
+                    case "Resume posting":
+                        return Summary(Check(await runs.ResumeAsync(c.CompanyId, i.Text("Run"), new BillingPostOptions()).ConfigureAwait(true)));
                     default:
                         _ = Check(await runs.CancelAsync(c.CompanyId, i.Text("Run")).ConfigureAwait(true), string.Empty);
                         return "Run cancelled.";
