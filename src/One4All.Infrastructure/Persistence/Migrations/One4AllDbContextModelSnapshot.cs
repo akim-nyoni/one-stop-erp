@@ -18854,6 +18854,33 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<int>("FiscalAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("fiscal_attempts");
+
+                    b.Property<string>("FiscalCode")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("fiscal_code");
+
+                    b.Property<int?>("FiscalDayNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("fiscal_day_number");
+
+                    b.Property<string>("FiscalError")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("fiscal_error");
+
+                    b.Property<int>("FiscalStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("fiscal_status");
+
+                    b.Property<string>("FiscalVerification")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("fiscal_verification");
+
                     b.Property<long?>("JournalEntryId")
                         .HasColumnType("bigint")
                         .HasColumnName("journal_entry_id");
@@ -18904,6 +18931,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TillSessionId")
                         .HasDatabaseName("ix_sale_till_session_id");
+
+                    b.HasIndex("CompanyId", "FiscalStatus")
+                        .HasDatabaseName("ix_sale_company_id_fiscal_status");
 
                     b.HasIndex("CompanyId", "SaleNumber")
                         .IsUnique()

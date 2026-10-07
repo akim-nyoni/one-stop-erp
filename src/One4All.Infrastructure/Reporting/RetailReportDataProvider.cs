@@ -479,7 +479,16 @@ public sealed class RetailReportDataProvider : IReportDataProvider
         }));
         rows.Add(R("Totals", "Net / tax / gross", $"{M(net)} / {M(tax)} / {M(gross)} {sale.BaseCurrency.Value}"));
         rows.Add(R("Totals", "Tendered", M(tendered)));
-        rows.Add(R("Fiscal", "Fiscal device", _fiscal is { IsEnabled: true } ? "enabled — the receipt was fiscalised at the sale" : "not enabled"));
+        rows.Add(R("Fiscal", "Fiscal status", sale.FiscalStatus switch
+        {
+            Core.Pos.FiscalStatus.Fiscalised => $"fiscalised: {sale.FiscalCode} (day {sale.FiscalDayNumber})",
+            Core.Pos.FiscalStatus.Queued => $"waiting for the device after {sale.FiscalAttempts} attempt(s): {sale.FiscalError}",
+            _ => _fiscal is { IsEnabled: true } ? "not sent to the device" : "no fiscal device in use",
+        }));
+        if (sale.FiscalVerification is string verification)
+        {
+            rows.Add(R("Fiscal", "Verification (QR)", verification));
+        }
 
         string Ok(bool pass) => pass ? "PASS" : "FAIL";
         rows.Add(R("Compliance", "Supplier tax number shown", company.TaxNumber ?? "missing", Ok(!string.IsNullOrWhiteSpace(company.TaxNumber))));
@@ -488,6 +497,10 @@ public sealed class RetailReportDataProvider : IReportDataProvider
         rows.Add(R("Compliance", "Gross = net + tax", $"{M(net)} + {M(tax)} = {M(gross)}", Ok(true)));
         rows.Add(R("Compliance", "Payment covers the total", $"{M(tendered)} against {M(gross + sale.CashRounding)}", Ok(tendered >= gross + sale.CashRounding - 0.01m)));
         rows.Add(R("Compliance", "Sale completed (not voided or parked)", sale.Status.ToString(), Ok(sale.Status == Core.Pos.SaleStatus.Completed)));
+        if (_fiscal is { IsEnabled: true } || sale.FiscalStatus != Core.Pos.FiscalStatus.NotRequired)
+        {
+            rows.Add(R("Compliance", "Signed by the fiscal device", sale.FiscalCode ?? "not yet", Ok(sale.FiscalStatus == Core.Pos.FiscalStatus.Fiscalised)));
+        }
         return rows;
     }
 }

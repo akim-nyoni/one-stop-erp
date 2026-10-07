@@ -34,6 +34,11 @@ internal sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
     public void Configure(EntityTypeBuilder<Sale> b)
     {
         b.ToTable("sale", Schemas.PointOfSale);
+        b.Property(x => x.FiscalStatus).HasConversion<int>();
+        b.Property(x => x.FiscalCode).HasMaxLength(60);
+        b.Property(x => x.FiscalVerification).HasMaxLength(500);
+        b.Property(x => x.FiscalError).HasMaxLength(300);
+        b.HasIndex(x => new { x.CompanyId, x.FiscalStatus });
         b.HasKey(x => x.Id);
         b.Property(x => x.SaleNumber).HasMaxLength(40);
         b.Property(x => x.PrescriptionReference).HasMaxLength(60);

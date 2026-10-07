@@ -51,6 +51,9 @@ public sealed class PosReceiptService : IPosReceiptService
                 .Select(t => new PosReceiptTender(t.TenderType.ToString(), t.BaseAmount))
                 .ToList(),
             Change = sale.Tenders.Where(t => t.IsChange).Sum(t => t.BaseAmount),
+            FiscalCode = sale.FiscalCode,
+            FiscalVerification = sale.FiscalVerification,
+            FiscalPending = sale.FiscalStatus == FiscalStatus.Queued,
         };
 
         return PosReceiptFormatter.ToPlainText(model, width);

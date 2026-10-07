@@ -158,6 +158,12 @@ public interface IPosService
     /// <returns>Each part's sale.</returns>
     Task<Result<IReadOnlyList<CompleteSaleResult>>> SplitBillAsync(SplitBillRequest request, CancellationToken ct = default);
 
+    /// <summary>Sends every sale still waiting for the fiscal device to it again (oldest first).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="ct">A cancellation token.</param>
+    /// <returns>How many were signed and how many still wait.</returns>
+    Task<(int Fiscalised, int StillQueued)> RetryFiscalAsync(long companyId, CancellationToken ct = default);
+
     /// <summary>
     /// Voids/refunds a completed sale: posts the exact inverse of the sale's tender/revenue/tax journal
     /// (refunding the tenders) and reverses each cost-of-sales stock issue back into inventory at its original

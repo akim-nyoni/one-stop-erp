@@ -3,6 +3,19 @@ using One4All.Core.Common;
 
 namespace One4All.Core.Pos;
 
+/// <summary>Where a sale stands with the fiscal device.</summary>
+public enum FiscalStatus
+{
+    /// <summary>No fiscal device is in use.</summary>
+    NotRequired = 0,
+
+    /// <summary>Signed by the device.</summary>
+    Fiscalised = 1,
+
+    /// <summary>Waiting for the device (offline or refused); retried until signed.</summary>
+    Queued = 2,
+}
+
 /// <summary>
 /// A completed POS sale (brief §4.1, <c>pos.sale</c>). Holds the sold lines and the tenders. On completion
 /// the sale posts through the central engine: Dr the tender accounts, Cr revenue by line, Cr output tax,
@@ -93,6 +106,47 @@ public sealed class Sale : AuditableEntity, ICompanyScoped
     /// <summary>Records the cash rounding.</summary>
     /// <param name="amount">Tendered less the exact total.</param>
     public void RecordCashRounding(decimal amount) => CashRounding = amount;
+
+    /// <summary>Where the sale stands with the fiscal device (brief §3.5).</summary>
+    public FiscalStatus FiscalStatus { get; private set; }
+
+    /// <summary>The fiscal code the device gave the receipt.</summary>
+    public string? FiscalCode { get; private set; }
+
+    /// <summary>The device's signature or verification link (what the receipt's QR carries).</summary>
+    public string? FiscalVerification { get; private set; }
+
+    /// <summary>The fiscal day the receipt was signed in.</summary>
+    public int? FiscalDayNumber { get; private set; }
+
+    /// <summary>How many times fiscalisation has been tried.</summary>
+    public int FiscalAttempts { get; private set; }
+
+    /// <summary>Why the last attempt did not sign it.</summary>
+    public string? FiscalError { get; private set; }
+
+    /// <summary>Records the device's signature.</summary>
+    /// <param name="code">The fiscal code.</param>
+    /// <param name="verification">The signature or verification link.</param>
+    /// <param name="dayNumber">The fiscal day.</param>
+    public void RecordFiscal(string code, string? verification, int? dayNumber)
+    {
+        FiscalStatus = FiscalStatus.Fiscalised;
+        FiscalCode = code;
+        FiscalVerification = verification;
+        FiscalDayNumber = dayNumber;
+        FiscalAttempts++;
+        FiscalError = null;
+    }
+
+    /// <summary>Queues the receipt for the device (unreachable or refused), to be retried.</summary>
+    /// <param name="reason">Why.</param>
+    public void QueueFiscal(string reason)
+    {
+        FiscalStatus = FiscalStatus.Queued;
+        FiscalAttempts++;
+        FiscalError = reason.Length > 300 ? reason[..300] : reason;
+    }
 
     /// <summary>Gets or sets a value indicating whether the cashier confirmed the buyer's age for age-restricted items.</summary>
     public bool AgeVerified { get; set; }

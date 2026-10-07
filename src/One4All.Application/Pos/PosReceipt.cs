@@ -52,6 +52,15 @@ public sealed class PosReceiptModel
 
     /// <summary>The change given.</summary>
     public decimal Change { get; init; }
+
+    /// <summary>The fiscal code the device gave the receipt (none when no device is used).</summary>
+    public string? FiscalCode { get; init; }
+
+    /// <summary>The device's verification link or signature (what a QR on the slip carries).</summary>
+    public string? FiscalVerification { get; init; }
+
+    /// <summary>Whether the receipt is still waiting for the fiscal device.</summary>
+    public bool FiscalPending { get; init; }
 }
 
 /// <summary>
@@ -115,6 +124,26 @@ public static class PosReceiptFormatter
         }
 
         sb.AppendLine(rule);
+        if (model.FiscalCode is string fiscalCode)
+        {
+            sb.AppendLine(TwoColumn("Fiscal code", fiscalCode, width));
+            if (model.FiscalVerification is string verification)
+            {
+                sb.AppendLine("Verify:");
+                for (int at = 0; at < verification.Length; at += width)
+                {
+                    sb.AppendLine(verification.Substring(at, Math.Min(width, verification.Length - at)));
+                }
+            }
+
+            sb.AppendLine(rule);
+        }
+        else if (model.FiscalPending)
+        {
+            AppendCentered(sb, "FISCAL SIGNATURE PENDING", width);
+            sb.AppendLine(rule);
+        }
+
         AppendCentered(sb, "Thank you!", width);
 
         return sb.ToString();

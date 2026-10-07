@@ -22,6 +22,7 @@ public sealed class PosService : IPosService
     private readonly IPostingEngine _postingEngine;
     private readonly IInventoryService _inventory;
     private readonly IClock _clock;
+    private readonly IFiscalDeviceProvider? _fiscal;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
@@ -30,9 +31,11 @@ public sealed class PosService : IPosService
     /// <param name="clock">The clock.</param>
     /// <param name="licence">Caps the POS terminals that may trade.</param>
     /// <param name="webhooks">Publishes completed sales.</param>
+    /// <param name="fiscal">The fiscal device (brief §3.5); none or a disabled one means sales are not fiscalised.</param>
     public PosService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, Application.Abstractions.Licensing.ILicenceService? licence = null,
-        Application.Abstractions.Integration.IWebhookService? webhooks = null)
+        Application.Abstractions.Integration.IWebhookService? webhooks = null, IFiscalDeviceProvider? fiscal = null)
     {
+        _fiscal = fiscal;
         _webhooks = webhooks;
         _licence = licence;
         _db = db;
@@ -57,6 +60,15 @@ public sealed class PosService : IPosService
 
         TillSession session = new(companyId, terminalId, cashierUserId, _clock.UtcNow, openingFloat);
         _db.Set<TillSession>().Add(session);
+
+        // The fiscal day opens with the first till of the day (the device keeps an open day open).
+        if (_fiscal is { IsEnabled: true })
+        {
+            Result<int> day = await _fiscal.OpenDayAsync(companyId, ct).ConfigureAwait(false);
+            _db.Set<PosEvent>().Add(new PosEvent(companyId, terminalId, cashierUserId, PosEventKind.FiscalSubmission, _clock.UtcNow, DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime),
+                day.IsSuccess ? $"Fiscal day {day.Value} open" : $"Fiscal day not opened: {day.Error.Message}", 0m));
+        }
+
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return session.Id;
     }
@@ -263,6 +275,12 @@ public sealed class PosService : IPosService
                     return issue.Error;
                 }
             }
+        }
+
+        // The receipt is signed by the fiscal device; an unreachable or refusing device queues it (the sale stands) for the retry task.
+        if (_fiscal is { IsEnabled: true })
+        {
+            await FiscaliseAsync(sale, ct).ConfigureAwait(false);
         }
 
         if (_webhooks is not null)
@@ -548,6 +566,16 @@ public sealed class PosService : IPosService
             return read.Error;
         }
 
+        // The last till closed closes the fiscal day (its Z report goes to the device).
+        if (_fiscal is { IsEnabled: true }
+            && !await _db.Set<TillSession>().AnyAsync(s => s.CompanyId == session.CompanyId && s.Id != session.Id && s.ClosedOnUtc == null, ct).ConfigureAwait(false))
+        {
+            Result closedDay = await _fiscal.CloseDayAsync(session.CompanyId, ct).ConfigureAwait(false);
+            _db.Set<PosEvent>().Add(new PosEvent(session.CompanyId, session.TerminalId, session.CashierUserId, PosEventKind.FiscalSubmission, _clock.UtcNow, request.Date,
+                closedDay.IsSuccess ? "Fiscal day closed" : $"Fiscal day not closed: {closedDay.Error.Message}", 0m));
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
         return new CashUpResult(
             read.Value.ZReadNumber ?? 0,
             session.OpeningFloat,
@@ -577,5 +605,82 @@ public sealed class PosService : IPosService
         }
 
         return rate.Value;
+    }
+
+    /// <inheritdoc />
+    public async Task<(int Fiscalised, int StillQueued)> RetryFiscalAsync(long companyId, CancellationToken ct = default)
+    {
+        if (_fiscal is not { IsEnabled: true })
+        {
+            return (0, 0);
+        }
+
+        int signed = 0, waiting = 0;
+        foreach (Sale sale in await _db.Set<Sale>().Include(s => s.Lines).Include(s => s.Tenders)
+                     .Where(s => s.CompanyId == companyId && s.FiscalStatus == FiscalStatus.Queued).OrderBy(s => s.Id).Take(500).ToListAsync(ct).ConfigureAwait(false))
+        {
+            if (await FiscaliseAsync(sale, ct).ConfigureAwait(false))
+            {
+                signed++;
+            }
+            else
+            {
+                waiting++;
+            }
+        }
+
+        return (signed, waiting);
+    }
+
+    // One attempt at signing a sale's receipt; the outcome is written to the sale and the till's event log.
+    private async Task<bool> FiscaliseAsync(Sale sale, CancellationToken ct)
+    {
+        Result<FiscalReceiptResult> result;
+        try
+        {
+            result = await _fiscal!.FiscaliseAsync(new FiscalReceiptRequest(sale.CompanyId, sale.SaleNumber, sale.TotalGross, sale.TotalTax, sale.BaseCurrency.Value, _clock.UtcNow), ct)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or TimeoutException or HttpRequestException or InvalidOperationException)
+        {
+            result = Error.Failure("Fiscal.Device", ex.Message);
+        }
+
+        bool signed = result.IsSuccess && !result.Value.Queued && !string.IsNullOrWhiteSpace(result.Value.FiscalCode);
+        if (signed)
+        {
+            sale.RecordFiscal(result.Value.FiscalCode!, result.Value.SignatureOrQr, result.Value.FiscalDayNumber);
+        }
+        else
+        {
+            sale.QueueFiscal(result.IsFailure ? result.Error.Message : "The fiscal device queued the receipt.");
+        }
+
+        _db.Set<PosEvent>().Add(new PosEvent(sale.CompanyId, sale.TerminalId, sale.CashierUserId, PosEventKind.FiscalSubmission, _clock.UtcNow, sale.SaleDate,
+            signed ? $"Sale {sale.SaleNumber} fiscalised {sale.FiscalCode}" : $"Sale {sale.SaleNumber} queued for the fiscal device: {sale.FiscalError}", sale.TotalGross)
+        { SaleNumber = sale.SaleNumber });
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return signed;
+    }
+}
+
+/// <summary>Built-in task: send sales waiting for the fiscal device to it again.</summary>
+public sealed class FiscalRetryTask : Application.Abstractions.Scheduling.IScheduledTask
+{
+    private readonly IPosService _pos;
+
+    /// <summary>Creates the task.</summary>
+    /// <param name="pos">The POS service.</param>
+    public FiscalRetryTask(IPosService pos) => _pos = pos;
+
+    /// <inheritdoc />
+    public string Key => "pos.fiscal-retry";
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
+    {
+        (int signed, int waiting) = await _pos.RetryFiscalAsync(companyId, ct).ConfigureAwait(false);
+        string message = $"{signed} receipt(s) fiscalised, {waiting} still waiting for the fiscal device.";
+        return waiting == 0 ? message : Error.Rule("Pos.FiscalPending", message);
     }
 }

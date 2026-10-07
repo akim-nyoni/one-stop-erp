@@ -202,7 +202,9 @@ public static class DependencyInjection
         services.AddScoped<IYearEndService, YearEndService>();
         services.AddScoped<ITaxCalculator, TaxCalculator>();
         services.AddScoped<IFxRevaluationService, FxRevaluationService>();
-        services.AddSingleton<IFiscalDeviceProvider, NullFiscalDeviceProvider>();
+        // The fiscal device: none by default; ONE4ALL_FISCAL_SIMULATE=1 puts the tills on the simulator (a real device registers its own provider).
+        services.AddSingleton<IFiscalDeviceProvider>(_ => Environment.GetEnvironmentVariable("ONE4ALL_FISCAL_SIMULATE") == "1"
+            ? new SimulatedFiscalDeviceProvider() : new NullFiscalDeviceProvider());
         services.AddScoped<Application.Abstractions.Reporting.IGeneralLedgerReports, GeneralLedgerReports>();
         services.AddScoped<Application.Abstractions.Reporting.IConsolidationService, Accounting.ConsolidationService>();
         services.AddScoped<Application.Abstractions.Reporting.IWorkingCapitalService, Accounting.WorkingCapitalService>();
@@ -291,6 +293,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Pos.IPosService, Pos.PosService>();
         services.AddScoped<Application.Abstractions.Pos.IPosCatalogueService, Pos.PosCatalogueService>();
         services.AddScoped<Application.Abstractions.Integration.IIdempotencyStore, Integration.IdempotencyStore>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Pos.FiscalRetryTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Integration.IdempotencyPurgeTask>();
         services.AddScoped<Application.Abstractions.Pos.IPosEventService, Pos.PosEventService>();
         services.AddScoped<Application.Abstractions.Pos.IPosReceiptService, Pos.PosReceiptService>();
