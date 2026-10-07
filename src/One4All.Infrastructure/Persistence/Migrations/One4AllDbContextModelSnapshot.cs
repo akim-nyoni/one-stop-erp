@@ -18711,6 +18711,94 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("remittance_invoice", "pay");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.RosterAssignment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly>("Anchor")
+                        .HasColumnType("date")
+                        .HasColumnName("anchor");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("ShiftPatternId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("shift_pattern_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_roster_assignment");
+
+                    b.HasIndex("EmployeeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_roster_assignment_employee_id");
+
+                    b.HasIndex("ShiftPatternId")
+                        .HasDatabaseName("ix_roster_assignment_shift_pattern_id");
+
+                    b.ToTable("roster_assignment", "hr");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.RosterEntry", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<bool>("IsManual")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_manual");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long?>("ShiftId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("shift_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_roster_entry");
+
+                    b.HasIndex("ShiftId")
+                        .HasDatabaseName("ix_roster_entry_shift_id");
+
+                    b.HasIndex("EmployeeId", "Date")
+                        .IsUnique()
+                        .HasDatabaseName("ix_roster_entry_employee_id_date");
+
+                    b.ToTable("roster_entry", "hr");
+                });
+
             modelBuilder.Entity("One4All.Core.Payroll.SchemeMembership", b =>
                 {
                     b.Property<long>("Id")
@@ -18845,6 +18933,101 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_scheme_remittance_scheme_id_period_label");
 
                     b.ToTable("scheme_remittance", "hr");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.Shift", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Allowance")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("allowance");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<TimeOnly>("End")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("end");
+
+                    b.Property<int>("GraceMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("grace_minutes");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<TimeOnly>("Start")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("start");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shift");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_shift_company_id_code");
+
+                    b.ToTable("shift", "hr");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.ShiftPattern", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("Steps")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("steps");
+
+                    b.HasKey("Id")
+                        .HasName("pk_shift_pattern");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_shift_pattern_company_id_code");
+
+                    b.ToTable("shift_pattern", "hr");
                 });
 
             modelBuilder.Entity("One4All.Core.Payroll.StatutoryScheme", b =>
@@ -32141,6 +32324,25 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_payslip_line_payslips_payslip_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.RosterAssignment", b =>
+                {
+                    b.HasOne("One4All.Core.Payroll.ShiftPattern", null)
+                        .WithMany()
+                        .HasForeignKey("ShiftPatternId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_roster_assignment_shift_pattern_shift_pattern_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.RosterEntry", b =>
+                {
+                    b.HasOne("One4All.Core.Payroll.Shift", null)
+                        .WithMany()
+                        .HasForeignKey("ShiftId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_roster_entry_shift_shift_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Payroll.SchemeMembership", b =>

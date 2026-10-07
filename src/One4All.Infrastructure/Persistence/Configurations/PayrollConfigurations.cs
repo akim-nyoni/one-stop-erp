@@ -542,3 +542,51 @@ internal sealed class LeaveSickTierConfiguration : IEntityTypeConfiguration<Leav
         b.Property(x => x.PayPercent).HasPrecision(5, 2);
     }
 }
+
+internal sealed class ShiftConfiguration : IEntityTypeConfiguration<Shift>
+{
+    public void Configure(EntityTypeBuilder<Shift> b)
+    {
+        b.ToTable("shift", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(10);
+        b.Property(x => x.Name).HasMaxLength(60);
+        b.Property(x => x.Allowance).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class ShiftPatternConfiguration : IEntityTypeConfiguration<ShiftPattern>
+{
+    public void Configure(EntityTypeBuilder<ShiftPattern> b)
+    {
+        b.ToTable("shift_pattern", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Steps).HasMaxLength(400);
+        b.Ignore(x => x.Cycle);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class RosterAssignmentConfiguration : IEntityTypeConfiguration<RosterAssignment>
+{
+    public void Configure(EntityTypeBuilder<RosterAssignment> b)
+    {
+        b.ToTable("roster_assignment", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => x.EmployeeId).IsUnique();
+        b.HasOne<ShiftPattern>().WithMany().HasForeignKey(x => x.ShiftPatternId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class RosterEntryConfiguration : IEntityTypeConfiguration<RosterEntry>
+{
+    public void Configure(EntityTypeBuilder<RosterEntry> b)
+    {
+        b.ToTable("roster_entry", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.EmployeeId, x.Date }).IsUnique();
+        b.HasOne<Shift>().WithMany().HasForeignKey(x => x.ShiftId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

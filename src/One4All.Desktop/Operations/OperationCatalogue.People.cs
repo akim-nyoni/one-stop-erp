@@ -201,6 +201,43 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Shift rosters", ListTitle = "Roster (next 14 days)",
+            Description = "Shift: a code, times (an end before the start runs past midnight), grace minutes and allowance per shift. Pattern: a cycle like \"D,D,N,N,OFF,OFF\". "
+                + "Assign puts an employee on a pattern from an anchor date. Generate writes the roster for a period (days changed by hand are kept); Set day changes one day by hand. "
+                + "Allowances sets each employee's shift allowance for a pay period from the rostered shifts they worked. Attendance lateness is measured against the rostered start.",
+            Fields = [Pick("Step", "Step", ["Shift", "Pattern", "Assign", "Generate", "Set day", "Allowances"]), Opt("Code", "Shift / pattern code (or OFF)"), Opt("Name", "Shift name"),
+                Opt("Start", "Start (HH:mm)"), Opt("End", "End (HH:mm)"), Num("Grace", "Grace minutes", "0"), Num("Allowance", "Allowance per shift", "0"), Opt("Steps", "Pattern steps"),
+                Opt("Employee", "Employee number"), Today("From", "From / day"), Today("To", "To"), Opt("Period", "Pay period (allowances)"), Opt("Element", "Allowance element")],
+            Run = async (c, i) =>
+            {
+                IRosterService roster = c.Get<IRosterService>();
+                static TimeOnly Time(string? text) => TimeOnly.TryParse(text, CultureInfo.InvariantCulture, out TimeOnly t) ? t : throw new OperationException($"'{text}' is not a time (HH:mm).");
+                switch (i.Text("Step"))
+                {
+                    case "Shift":
+                        return Check(await roster.SaveShiftAsync(c.CompanyId, new ShiftRequest(i.Text("Code"), i.Optional("Name") ?? i.Text("Code"), Time(i.Optional("Start")), Time(i.Optional("End")),
+                            (int)i.Number("Grace"), i.Number("Allowance"))).ConfigureAwait(true), "Shift saved.");
+                    case "Pattern":
+                        return Check(await roster.SavePatternAsync(c.CompanyId, i.Text("Code"), i.Optional("Steps") ?? string.Empty).ConfigureAwait(true), "Pattern saved.");
+                    case "Assign":
+                        return Check(await roster.AssignAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Code"), i.Date("From")).ConfigureAwait(true),
+                            "Employee put on the pattern.");
+                    case "Generate":
+                        return $"{Check(await roster.GenerateAsync(c.CompanyId, i.Date("From"), i.Date("To")).ConfigureAwait(true))} rostered day(s) written.";
+                    case "Set day":
+                        return Check(await roster.SetDayAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Date("From"), i.Text("Code")).ConfigureAwait(true),
+                            "Day changed.");
+                    default:
+                        IReadOnlyList<ShiftAllowanceLine> lines = Check(await roster.ApplyShiftAllowancesAsync(c.CompanyId, i.Text("Period"), i.Date("From"), i.Date("To"), i.Text("Element"))
+                            .ConfigureAwait(true));
+                        return $"{lines.Count} employee(s): {lines.Sum(l => l.ShiftsWorked)} shift(s), {M(lines.Sum(l => l.Amount))} in allowances.";
+                }
+            },
+            List = async c => Table(await c.Get<IRosterService>().RosterAsync(c.CompanyId, DateOnly.FromDateTime(DateTime.Today), DateOnly.FromDateTime(DateTime.Today).AddDays(13)).ConfigureAwait(true),
+                ("Employee", d => d.EmployeeNumber), ("Date", d => D(d.Date)), ("Shift", d => d.Shift), ("By hand", d => d.IsManual), ("Attendance", d => d.Attendance ?? "-")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Leave policies", ListTitle = "Leave policies",
             Description = "Per leave type: yearly days (service bands \"5:24;10:30\" raise them after so many completed years), earned monthly or granted at the leave-year start, "
                 + "joiners pro rata, and a carry-over cap applied as the leave year turns (the excess is forfeited). A balance ceiling stops accrual; carried days can lapse so many months "

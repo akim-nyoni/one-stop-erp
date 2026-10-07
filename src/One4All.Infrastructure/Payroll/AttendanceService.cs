@@ -103,6 +103,16 @@ public sealed class AttendanceService : IAttendanceService
             return Error.Conflict("Hr.AttendanceExists", $"A day is already recorded for {date:yyyy-MM-dd}.");
         }
 
+        // Lateness not keyed in is measured against the rostered shift's start (beyond its grace).
+        if (status == AttendanceStatus.Present && lateMinutes == 0 && clockIn is TimeOnly arrived)
+        {
+            Shift? rostered = await (from r in _db.Set<RosterEntry>()
+                                     join s in _db.Set<Shift>() on r.ShiftId equals s.Id
+                                     where r.EmployeeId == employeeId && r.Date == date
+                                     select s).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            lateMinutes = rostered?.MinutesLate(arrived) ?? 0;
+        }
+
         AttendanceRecord record = new(companyId, employeeId, date, status, clockIn, clockOut, lateMinutes, overtimeHours, overtimeHours > 0m ? overtimeMultiplier : 0m);
         _db.AttendanceRecords.Add(record);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
