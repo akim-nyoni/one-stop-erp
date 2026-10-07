@@ -70,7 +70,7 @@ public static class FixedReportDocument
             return new System.Windows.Shapes.Line { X1 = 0, Y1 = 0, X2 = w, Y2 = 0, Stroke = Brush(cell.BorderColor) ?? Brushes.Black, StrokeThickness = Math.Max(0.75, cell.BorderThickness) };
         }
 
-        if (cell.Kind == ElementKind.Image && TryImage(cell.Text) is BitmapImage image)
+        if ((cell.ImageData ?? (cell.Kind == ElementKind.Image ? cell.Text : null)) is string picture && TryImage(picture) is BitmapImage image)
         {
             return new Image { Source = image, Width = w, Height = h, Stretch = Stretch.Uniform };
         }

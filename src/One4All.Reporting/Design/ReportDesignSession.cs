@@ -64,6 +64,7 @@ public sealed class ReportDesignSession
         nameof(ReportElement.Foreground), nameof(ReportElement.Background), nameof(ReportElement.HAlign), nameof(ReportElement.BorderThickness), nameof(ReportElement.BorderColor),
         nameof(ReportElement.SuppressWhen), nameof(ReportElement.DrillTarget), nameof(ReportElement.DrillField),
         nameof(ReportElement.ChartCategoryField), nameof(ReportElement.ChartColor), nameof(ReportElement.SubReportCode), nameof(ReportElement.SubReportLinks),
+        nameof(ReportElement.BarcodeSymbology),
     ];
 
     private const int MaxUndo = 200;

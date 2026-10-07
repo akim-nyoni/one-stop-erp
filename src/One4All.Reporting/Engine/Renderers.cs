@@ -103,6 +103,12 @@ public sealed class HtmlReportRenderer : IReportRenderer
                 sb.Append(";border:").Append(Px(Math.Max(cell.BorderThickness, 1))).Append("px solid ").Append(cell.BorderColor);
             }
 
+            if (cell.ImageData is string image)
+            {
+                sb.Append("\"><img src=\"").Append(image).Append("\" alt=\"").Append(Escape(cell.Text)).Append("\" style=\"max-width:100%;max-height:100%\"></div>");
+                continue;
+            }
+
             if (cell.Runs is { Count: > 0 } runs)
             {
                 sb.Append(";overflow:hidden\">");

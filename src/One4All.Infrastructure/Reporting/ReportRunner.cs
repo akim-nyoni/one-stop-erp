@@ -47,7 +47,7 @@ public sealed class ReportRunner : IReportRunner
 
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = await RowsAsync(companyId, reportCode, definition, parameters, hiddenFields, ct).ConfigureAwait(false);
 
-        var company = await _db.Companies.Where(c => c.Id == companyId).Select(c => new { c.Name, c.Locale }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        var company = await _db.Companies.Where(c => c.Id == companyId).Select(c => new { c.Name, c.Locale, c.Logo }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         Dictionary<string, string> terms = await _db.TerminologyOverrides.AsNoTracking().Where(t => t.CompanyId == companyId)
             .ToDictionaryAsync(t => t.Term, t => t.Replacement, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
 
@@ -60,6 +60,7 @@ public sealed class ReportRunner : IReportRunner
             Parameters = parameters,
             Culture = company?.Locale is string locale ? System.Globalization.CultureInfo.GetCultureInfo(locale) : null,
             Terminology = terms,
+            CompanyLogo = company?.Logo,
             SubReports = await SubReportsAsync(companyId, definition, rows, parameters, hiddenFields, 0, new SubReportBudget(), ct).ConfigureAwait(false),
         };
 

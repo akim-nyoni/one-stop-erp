@@ -124,7 +124,7 @@ public static class ReportLayout
     {
         Kind = c.Kind, Text = text, X = c.X, Y = c.Y, Width = c.Width, Height = c.Height, FontFamily = c.FontFamily, FontSize = c.FontSize, Bold = c.Bold, Italic = c.Italic,
         Underline = c.Underline, Foreground = c.Foreground, Background = c.Background, HAlign = c.HAlign, BorderThickness = c.BorderThickness, BorderColor = c.BorderColor,
-        DrillTarget = c.DrillTarget, DrillKey = c.DrillKey, Runs = c.Runs is null ? null : [new RichRun(text)],
+        DrillTarget = c.DrillTarget, DrillKey = c.DrillKey, Runs = c.Runs is null ? null : [new RichRun(text)], ImageData = c.ImageData,
     };
 }
 
@@ -140,7 +140,7 @@ public static class Layouts
     {
         Kind = c.Kind, Text = c.Text, X = x, Y = y, Width = c.Width, Height = c.Height, FontFamily = c.FontFamily, FontSize = c.FontSize, Bold = c.Bold, Italic = c.Italic,
         Underline = c.Underline, Foreground = c.Foreground, Background = c.Background, HAlign = c.HAlign, BorderThickness = c.BorderThickness, BorderColor = c.BorderColor,
-        DrillTarget = c.DrillTarget, DrillKey = c.DrillKey, Runs = c.Runs,
+        DrillTarget = c.DrillTarget, DrillKey = c.DrillKey, Runs = c.Runs, ImageData = c.ImageData,
     };
 }
 

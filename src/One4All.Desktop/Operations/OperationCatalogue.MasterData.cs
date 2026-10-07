@@ -194,6 +194,35 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Set the company logo", ListTitle = "Company",
+            Description = "A PNG or JPEG (up to 512 KB) that report layouts show wherever they place the Logo (an image element with expression CompanyLogo). Leave the path blank to remove it.",
+            Fields = [Opt("Path", "Picture file path")],
+            Run = async (c, i) =>
+            {
+                Company company = await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                if (i.Optional("Path") is not string path)
+                {
+                    company.Logo = null;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return "Logo removed.";
+                }
+
+                byte[] bytes = await System.IO.File.ReadAllBytesAsync(path.Trim('"')).ConfigureAwait(true);
+                bool png = bytes.Length > 4 && bytes[0] == 0x89 && bytes[1] == 0x50, jpeg = bytes.Length > 3 && bytes[0] == 0xFF && bytes[1] == 0xD8;
+                if (!png && !jpeg || bytes.Length > 512 * 1024)
+                {
+                    throw new OperationException("The logo must be a PNG or JPEG of at most 512 KB.");
+                }
+
+                company.Logo = bytes;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Logo set ({bytes.Length / 1024} KB).";
+            },
+            List = async c => Table(await c.Db.Companies.AsNoTracking().Where(x => x.Id == c.CompanyId).Select(x => new { x.Name, Logo = x.Logo != null }).ToListAsync().ConfigureAwait(true),
+                ("Company", x => x.Name), ("Logo", x => x.Logo ? "set" : "none")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set the reporting currency", ListTitle = "Company currencies",
             Description = "A second currency every posting is also kept in (e.g. USD beside ZWG), each at the base→reporting rate of its day, so statements can be drawn in it "
                 + "(General Ledger report GL2R). It applies to postings from now on — posted journals cannot change — so set it before go-live. Leave blank to stop keeping it.",

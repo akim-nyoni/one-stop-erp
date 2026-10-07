@@ -184,6 +184,8 @@ public partial class BandedDesignerWindow : Window
             ElementKind.Signature => $"____________ {element.Text}",
             ElementKind.Chart => $"▇▅▃ chart of {element.AggregateField} by {element.ChartCategoryField ?? "(set ChartCategoryField)"}",
             ElementKind.RichText => $"¶ {element.Text}",
+            ElementKind.Image => element.Expression is string logo ? $"🖼 {logo}" : "🖼 picture",
+            ElementKind.Barcode => $"▌▌▌ {element.BarcodeSymbology ?? "Code128"} of [{element.FieldName ?? element.Expression ?? element.Text}]",
             ElementKind.SubReport => $"⧉ sub-report {element.SubReportCode ?? "(set SubReportCode)"} {ReportDesignSession.FormatLinks(element.SubReportLinks)}",
             _ => element.Text ?? string.Empty,
         };
@@ -393,6 +395,62 @@ public partial class BandedDesignerWindow : Window
     private void AddRichText_Click(object sender, RoutedEventArgs e) => Add(ElementKind.Label, "**Bold** and *italic* text with {Field} values", ElementKind.RichText, 300, 40);
 
     private void AddSubReport_Click(object sender, RoutedEventArgs e) => Add(ElementKind.Label, null, ElementKind.SubReport, 400, 60);
+
+    private void AddImage_Click(object sender, RoutedEventArgs e)
+    {
+        Microsoft.Win32.OpenFileDialog dialog = new() { Filter = "Pictures (*.png;*.jpg;*.jpeg)|*.png;*.jpg;*.jpeg" };
+        if (_session is null || dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        byte[] bytes = System.IO.File.ReadAllBytes(dialog.FileName);
+        if (bytes.Length > 512 * 1024)
+        {
+            Status.Text = "Pictures in a layout are limited to 512 KB.";
+            return;
+        }
+
+        string name = _session.AddElement(TargetBand, ElementKind.Label, 4, 2, null);
+        if (_session.Find(name).Element is ReportElement element)
+        {
+            element.Kind = ElementKind.Image;
+            string type = dialog.FileName.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "png" : "jpeg";
+            element.ImageData = $"data:image/{type};base64,{Convert.ToBase64String(bytes)}";
+            _session.SetBandHeight(TargetBand, Math.Max(_session.Definition.BandOfType(TargetBand)!.Height, 64));
+            _session.Resize(name, 120, 60);
+        }
+
+        Select(name);
+    }
+
+    private void AddLogo_Click(object sender, RoutedEventArgs e)
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        string name = _session.AddElement(TargetBand, ElementKind.Label, 4, 2, null);
+        if (_session.Find(name).Element is ReportElement element)
+        {
+            element.Kind = ElementKind.Image;
+            element.Expression = "CompanyLogo";
+            _session.SetBandHeight(TargetBand, Math.Max(_session.Definition.BandOfType(TargetBand)!.Height, 64));
+            _session.Resize(name, 120, 60);
+        }
+
+        Select(name);
+    }
+
+    private void AddBarcode_Click(object sender, RoutedEventArgs e)
+    {
+        Add(ElementKind.Field, FieldList.SelectedItem as string, ElementKind.Barcode, 180, 40);
+        if (_session is not null && _selected.Count == 1 && _session.Find(_selected[0]).Element is ReportElement element && element.Kind == ElementKind.Barcode)
+        {
+            element.BarcodeSymbology = "Code128";
+        }
+    }
 
     private void Field_DoubleClick(object sender, MouseButtonEventArgs e)
     {

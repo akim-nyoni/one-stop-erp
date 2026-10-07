@@ -37,6 +37,9 @@ public sealed class ReportInput
 
     /// <summary>How deep this report is nested as a sub-report (0 for the report itself).</summary>
     public int Depth { get; init; }
+
+    /// <summary>The company's logo (PNG or JPEG), for image elements whose expression is <c>CompanyLogo</c>.</summary>
+    public byte[]? CompanyLogo { get; init; }
 }
 
 /// <summary>A resolved, positioned cell ready to render.</summary>
@@ -98,6 +101,9 @@ public sealed class RenderCell
 
     /// <summary>For rich text: the runs to draw (the plain text is in <see cref="Text"/>).</summary>
     public IReadOnlyList<RichRun>? Runs { get; init; }
+
+    /// <summary>For an image or barcode: the picture as a data URI (<c>data:image/png;base64,...</c>); the text keeps the barcode's value.</summary>
+    public string? ImageData { get; init; }
 }
 
 /// <summary>A resolved band ready to render.</summary>

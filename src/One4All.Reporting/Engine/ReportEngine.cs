@@ -160,6 +160,13 @@ public sealed class ReportEngine
                 continue;
             }
 
+            (string? imageData, string? barcodeValue) = element.Kind switch
+            {
+                ElementKind.Image => (ImageFor(element, ctx, input), null),
+                ElementKind.Barcode => BarcodeFor(element, ctx),
+                _ => ((string?)null, (string?)null),
+            };
+
             IReadOnlyList<RichRun>? runs = element.Kind == ElementKind.RichText
                 ? RichText.Parse(Label(element, input), name => ctx.Fields.TryGetValue(name, out object? value) ? value : input.Parameters.GetValueOrDefault(name), element.Format, input.Culture)
                 : null;
@@ -170,6 +177,8 @@ public sealed class ReportEngine
                 ElementKind.Signature => Label(element, input) is { Length: > 0 } caption ? caption : "Signature",
                 ElementKind.Aggregate => NumberToWords.Format(ComputeAggregate(element, scope, row, input.Rows), element.Format, input.Culture),
                 ElementKind.RichText => RichText.Plain(runs!),
+                ElementKind.Image => string.Empty,
+                ElementKind.Barcode => barcodeValue ?? string.Empty,
                 _ => ResolveText(element, ctx, scope, input),
             };
             (string foreground, string? background, bool bold) = ApplyConditionalFormats(element, ctx);
@@ -196,10 +205,45 @@ public sealed class ReportEngine
                 DrillTarget = drillTarget,
                 DrillKey = drillKey,
                 Runs = runs,
+                ImageData = imageData,
             });
         }
 
         return rendered;
+    }
+
+    // An image: the element's own picture, else a field holding one (bytes, a data URI or base64), else the company logo when the
+    // element's expression is CompanyLogo.
+    private string? ImageFor(ReportElement element, ReportExpressionContext ctx, ReportInput input)
+    {
+        if (!string.IsNullOrWhiteSpace(element.ImageData))
+        {
+            return element.ImageData.StartsWith("data:", StringComparison.Ordinal) ? element.ImageData : "data:image/png;base64," + element.ImageData;
+        }
+
+        if (element.FieldName is string field && ctx.Fields.GetValueOrDefault(field) is object value)
+        {
+            return value switch
+            {
+                byte[] bytes => Barcodes.DataUri(bytes),
+                string text when text.StartsWith("data:", StringComparison.Ordinal) => text,
+                string text when text.Length > 0 => "data:image/png;base64," + text,
+                _ => null,
+            };
+        }
+
+        return string.Equals(element.Expression?.Trim(), "CompanyLogo", StringComparison.OrdinalIgnoreCase) && input.CompanyLogo is { Length: > 0 } logo
+            ? Barcodes.DataUri(logo)
+            : null;
+    }
+
+    // A barcode of the field's value, else the expression's, else the element's text.
+    private (string? Image, string? Value) BarcodeFor(ReportElement element, ReportExpressionContext ctx)
+    {
+        string? value = element.FieldName is string field && ctx.Fields.GetValueOrDefault(field) is object raw ? Convert.ToString(raw, System.Globalization.CultureInfo.InvariantCulture)
+            : !string.IsNullOrWhiteSpace(element.Expression) ? Convert.ToString(_expressions.Evaluate(element.Expression, ctx), System.Globalization.CultureInfo.InvariantCulture)
+            : element.Text;
+        return (Barcodes.Png(element.BarcodeSymbology, value) is byte[] png ? Barcodes.DataUri(png) : null, value);
     }
 
     // The child report built with the linked parameters and laid into the element's box; the band grows to hold it.
@@ -222,7 +266,7 @@ public sealed class ReportEngine
         {
             Definition = child.Definition, Rows = child.Rows, Parameters = child.Parameters, UserName = input.UserName, CompanyName = input.CompanyName, PrintDate = input.PrintDate,
             ToBase = child.ToBase ?? input.ToBase, Culture = child.Culture ?? input.Culture, Terminology = child.Terminology ?? input.Terminology, SubReports = child.SubReports ?? input.SubReports,
-            Depth = input.Depth + 1,
+            Depth = input.Depth + 1, CompanyLogo = input.CompanyLogo,
         });
         (List<RenderCell> cells, double height) = SubReports.Place(element, built);
         band.Cells.AddRange(cells);

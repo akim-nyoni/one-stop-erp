@@ -33,6 +33,9 @@
                 <Button Content="Signature" Padding="8,2" Margin="1" Click="AddSignature_Click" />
                 <Button Content="Chart" Padding="8,2" Margin="1" Click="AddChart_Click" ToolTip="A bar chart of the selected field; set its category field in the properties" />
                 <Button Content="Rich text" Padding="8,2" Margin="1" Click="AddRichText_Click" ToolTip="Text with **bold**, *italic*, __underline__, line breaks and {Field} values" />
+                <Button Content="Image" Padding="8,2" Margin="1" Click="AddImage_Click" ToolTip="A picture from a file (PNG or JPEG), kept in the layout" />
+                <Button Content="Logo" Padding="8,2" Margin="1" Click="AddLogo_Click" ToolTip="The company logo (set under System Manager)" />
+                <Button Content="Barcode" Padding="8,2" Margin="1" Click="AddBarcode_Click" ToolTip="A Code 128 barcode of the selected field; set BarcodeSymbology to QR for a QR code" />
                 <Button Content="Sub-report" Padding="8,2" Margin="1" Click="AddSubReport_Click" ToolTip="Another report run inside this band; set SubReportCode and SubReportLinks (Parameter=Field; ...) in the properties" />
                 <Separator Margin="6,0" />
                 <Button Content="⇤ Left" Padding="6,2" Margin="1" Tag="Left" Click="Align_Click" />

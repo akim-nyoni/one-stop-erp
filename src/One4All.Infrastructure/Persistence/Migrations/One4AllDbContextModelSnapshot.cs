@@ -25707,6 +25707,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("locale");
 
+                    b.Property<byte[]>("Logo")
+                        .HasColumnType("bytea")
+                        .HasColumnName("logo");
+
                     b.Property<decimal?>("ManualJournalApprovalThreshold")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")

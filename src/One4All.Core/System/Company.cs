@@ -108,6 +108,9 @@ public sealed class Company : SoftDeletableEntity
     /// </summary>
     public string? WithholdingWithoutClearanceTaxCode { get; set; }
 
+    /// <summary>The company's logo (PNG or JPEG) for report layouts (expression <c>CompanyLogo</c>).</summary>
+    public byte[]? Logo { get; set; }
+
     /// <summary>Gets or sets the most a refund without a receipt may pay out (null: such refunds are not allowed).</summary>
     public decimal? UnreceiptedRefundLimit { get; set; }
 

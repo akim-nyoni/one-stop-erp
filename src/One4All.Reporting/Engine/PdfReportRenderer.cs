@@ -126,6 +126,19 @@ public sealed class PdfReportRenderer : IReportRenderer
             return;
         }
 
+        if (cell.ImageData is string image && image.IndexOf(',', StringComparison.Ordinal) is int comma and > 0)
+        {
+            try
+            {
+                container.Height((float)Math.Max(cell.Height, 1)).Image(Convert.FromBase64String(image[(comma + 1)..])).FitArea();
+                return;
+            }
+            catch (FormatException)
+            {
+                // Not a readable picture: fall through to the text.
+            }
+        }
+
         IContainer aligned = cell.HAlign switch
         {
             ReportHAlign.Right => container.AlignRight(),
