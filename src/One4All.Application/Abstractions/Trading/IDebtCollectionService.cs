@@ -61,6 +61,12 @@ public interface IDebtCollectionService
     /// <returns>Success, or why it was refused.</returns>
     Task<Result> RequestWriteOffAsync(long companyId, string caseNumber, long userId, string reason, CancellationToken ct = default);
 
+    /// <summary>
+    /// Asks for an open case to be written off to a bad-debt account; when the company has a write-off workflow, the request goes through
+    /// it (approval writes the debt off on the day it is approved, rejection withdraws the request) and cannot be approved directly.
+    /// </summary>
+    Task<Result> RequestWriteOffAsync(long companyId, string caseNumber, long userId, string reason, string badDebtAccountCode, CancellationToken ct = default);
+
     /// <summary>Approves a requested write-off — never by the requester — writing off the debtor's outstanding invoices.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="caseNumber">The case.</param>

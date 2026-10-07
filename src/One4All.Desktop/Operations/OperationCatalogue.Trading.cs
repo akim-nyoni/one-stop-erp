@@ -82,19 +82,23 @@ public static partial class OperationCatalogue
                 long customer = await CustomerAsync(c, i.Text("Customer")).ConfigureAwait(true);
                 CurrencyCode currency = i.Optional("Currency") is string code ? CurrencyCode.Parse(code)
                     : await c.Db.Customers.AsNoTracking().Where(x => x.Id == customer).Select(x => x.Currency).SingleAsync().ConfigureAwait(true);
-                ISalesLedgerService sales = c.Get<ISalesLedgerService>();
-                TradingPostingResult posted = Check(i.Text("Document") == "Invoice"
-                    ? await sales.PostInvoiceAsync(new SalesInvoiceRequest
-                    {
-                        CompanyId = c.CompanyId, CustomerId = customer, DocumentNumber = i.Text("Number"), DocumentDate = i.Date("Date"), Currency = currency, NetAmount = i.Number("Net"),
-                        TaxAmount = i.Number("Tax"), SalesAccountCode = i.Text("Account"), TaxAccountCode = i.Optional("TaxAccount"), TaxCode = i.Optional("TaxCode"), Narrative = i.Optional("Narrative"),
-                    }).ConfigureAwait(true)
-                    : await sales.PostCreditNoteAsync(new SalesCreditNoteRequest
+                if (i.Text("Document") != "Invoice")
+                {
+                    // A credit note goes through the company's credit-note approval workflow when there is one.
+                    CreditNoteSubmission credit = Check(await c.Get<ICreditNoteApprovalService>().SubmitAsync(new SalesCreditNoteRequest
                     {
                         CompanyId = c.CompanyId, CustomerId = customer, DocumentNumber = i.Text("Number"), DocumentDate = i.Date("Date"), Currency = currency, NetAmount = i.Number("Net"),
                         TaxAmount = i.Number("Tax"), SalesAccountCode = i.Text("Account"), TaxAccountCode = i.Optional("TaxAccount"), ReasonCode = i.Optional("Reason"), Narrative = i.Optional("Narrative"),
-                    }).ConfigureAwait(true));
-                return $"{i.Text("Document")} {i.Text("Number")} posted: {M(posted.BaseAmount)} base (journal {posted.JournalNumber}).";
+                    }, c.UserId).ConfigureAwait(true));
+                    return credit.Posted ? $"Credit note {i.Text("Number")} posted (journal {credit.JournalNumber})." : $"Credit note {i.Text("Number")} is awaiting approval.";
+                }
+
+                TradingPostingResult posted = Check(await c.Get<ISalesLedgerService>().PostInvoiceAsync(new SalesInvoiceRequest
+                {
+                    CompanyId = c.CompanyId, CustomerId = customer, DocumentNumber = i.Text("Number"), DocumentDate = i.Date("Date"), Currency = currency, NetAmount = i.Number("Net"),
+                    TaxAmount = i.Number("Tax"), SalesAccountCode = i.Text("Account"), TaxAccountCode = i.Optional("TaxAccount"), TaxCode = i.Optional("TaxCode"), Narrative = i.Optional("Narrative"),
+                }).ConfigureAwait(true));
+                return $"Invoice {i.Text("Number")} posted: {M(posted.BaseAmount)} base (journal {posted.JournalNumber}).";
             },
             List = c => OpenItemsAsync(c, TradingLedger.AccountsReceivable),
         };

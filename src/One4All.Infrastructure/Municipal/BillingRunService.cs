@@ -14,6 +14,7 @@ public sealed class BillingRunService : IBillingRunService
 {
     private readonly Application.Abstractions.Integration.IWebhookService? _webhooks;
     private readonly One4AllDbContext _db;
+    private readonly Lazy<Application.Abstractions.Workflow.IWorkflowService>? _workflow;
     private readonly INumberSequenceService _numbers;
     private readonly ISalesLedgerService _ar;
 
@@ -22,8 +23,10 @@ public sealed class BillingRunService : IBillingRunService
     /// <param name="numbers">The number sequences.</param>
     /// <param name="ar">The receivables ledger.</param>
     /// <param name="webhooks">Publishes generated bills.</param>
-    public BillingRunService(One4AllDbContext db, INumberSequenceService numbers, ISalesLedgerService ar, Application.Abstractions.Integration.IWebhookService? webhooks = null)
+    public BillingRunService(One4AllDbContext db, INumberSequenceService numbers, ISalesLedgerService ar, Application.Abstractions.Integration.IWebhookService? webhooks = null,
+        Lazy<Application.Abstractions.Workflow.IWorkflowService>? workflow = null)
     {
+        _workflow = workflow;
         _webhooks = webhooks;
         _db = db;
         _numbers = numbers;
@@ -112,7 +115,11 @@ public sealed class BillingRunService : IBillingRunService
 
         _db.Set<BillingRun>().Add(run);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return Summary(run);
+
+        // The company's billing-run workflow, when defined, governs the approval from here.
+        Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, proposal.CompanyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.BillingRun, run.RunNumber,
+            run.Lines.Where(l => l.Included).Sum(l => l.Charge), proposal.UserId, ct).ConfigureAwait(false);
+        return governed.IsFailure ? governed.Error : Summary(run);
     }
 
     /// <inheritdoc />
@@ -163,8 +170,21 @@ public sealed class BillingRunService : IBillingRunService
     /// <inheritdoc />
     public async Task<Result<BillingRunSummary>> ApproveAsync(long companyId, string runNumber, long userId, BillingPostOptions options, CancellationToken ct = default)
     {
-        // Approval itself is one unit: the checks, then the run marked Posting.
-        Result<BillingRun> approved = await _db.AtomicAsync(async () =>
+        if (await Workflow.WorkflowGate.InProgressAsync(_db, companyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.BillingRun, runNumber, ct).ConfigureAwait(false))
+        {
+            return Workflow.WorkflowGate.Governed("Billing run", runNumber);
+        }
+
+        Result<BillingRun> approved = await AuthoriseAsync(companyId, runNumber, userId, ct).ConfigureAwait(false);
+        return approved.IsFailure ? approved.Error : await PostChunksAsync(companyId, approved.Value.Id, options, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Authorises a proposed run (also the end of its workflow): the checks, then the run marked Posting — its bills then post through
+    /// <see cref="ResumeAsync"/> in resumable chunks.
+    /// </summary>
+    internal Task<Result<BillingRun>> AuthoriseAsync(long companyId, string runNumber, long userId, CancellationToken ct)
+        => _db.AtomicAsync(async () =>
         {
             Result<BillingRun> found = await FindProposedAsync(companyId, runNumber, ct).ConfigureAwait(false);
             if (found.IsFailure)
@@ -187,10 +207,8 @@ public sealed class BillingRunService : IBillingRunService
 
             run.StartPosting(userId);
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-            return run;
-        }, ct).ConfigureAwait(false);
-        return approved.IsFailure ? approved.Error : await PostChunksAsync(companyId, approved.Value.Id, options, ct).ConfigureAwait(false);
-    }
+            return Result<BillingRun>.Success(run);
+        }, ct);
 
     /// <inheritdoc />
     public async Task<Result<BillingRunSummary>> ResumeAsync(long companyId, string runNumber, BillingPostOptions options, CancellationToken ct = default)
@@ -299,6 +317,17 @@ public sealed class BillingRunService : IBillingRunService
     /// <inheritdoc />
     public async Task<Result> CancelAsync(long companyId, string runNumber, CancellationToken ct = default)
     {
+        if (await Workflow.WorkflowGate.InProgressAsync(_db, companyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.BillingRun, runNumber, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Workflow.WorkflowGate.Governed("Billing run", runNumber));
+        }
+
+        return await CancelFromWorkflowAsync(companyId, runNumber, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Cancels a proposed run (also a rejected workflow's end).</summary>
+    internal async Task<Result> CancelFromWorkflowAsync(long companyId, string runNumber, CancellationToken ct)
+    {
         Result<BillingRun> found = await FindProposedAsync(companyId, runNumber, ct).ConfigureAwait(false);
         if (found.IsFailure)
         {
@@ -352,5 +381,30 @@ public sealed class BillingRunService : IBillingRunService
         }
 
         return found;
+    }
+}
+
+/// <summary>
+/// Applies the end of a billing run's workflow: approved → authorised (its bills then post through the resumable chunked posting);
+/// rejected or returned → cancelled.
+/// </summary>
+internal sealed class BillingRunWorkflowHandler : Application.Abstractions.Workflow.IWorkflowDocumentHandler
+{
+    private readonly BillingRunService _runs;
+
+    public BillingRunWorkflowHandler(BillingRunService runs) => _runs = runs;
+
+    public string DocumentType => Application.Abstractions.Workflow.WorkflowDocumentTypes.BillingRun;
+
+    public async Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+    {
+        if (outcome != Core.Workflow.WorkflowStatus.Approved)
+        {
+            Result cancelled = await _runs.CancelFromWorkflowAsync(companyId, documentReference, ct).ConfigureAwait(false);
+            return cancelled.IsFailure && cancelled.Error.Code == "Mun.RunNotFound" ? Result.Success() : cancelled;
+        }
+
+        Result<Core.Municipal.BillingRun> authorised = await _runs.AuthoriseAsync(companyId, documentReference, decidedByUserId, ct).ConfigureAwait(false);
+        return authorised.IsFailure && authorised.Error.Code != "Mun.RunNotFound" ? Result.Failure(authorised.Error) : Result.Success();
     }
 }

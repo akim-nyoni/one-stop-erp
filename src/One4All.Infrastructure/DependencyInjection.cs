@@ -105,7 +105,8 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Municipal.IMeterReadingService, Municipal.MeterReadingService>();
         services.AddScoped<Application.Abstractions.Municipal.IPrepaidVendingService, Municipal.PrepaidVendingService>();
         services.AddScoped<Application.Abstractions.Municipal.IOwnershipService, Municipal.OwnershipService>();
-        services.AddScoped<Application.Abstractions.Municipal.IBillingRunService, Municipal.BillingRunService>();
+        services.AddScoped<Municipal.BillingRunService>();
+        services.AddScoped<Application.Abstractions.Municipal.IBillingRunService>(sp => sp.GetRequiredService<Municipal.BillingRunService>());
         services.AddScoped<Application.Abstractions.Municipal.IPropertyEnquiryService, Municipal.PropertyEnquiryService>();
         services.AddScoped<Application.Abstractions.Municipal.IReadingRouteService, Municipal.ReadingRouteService>();
         services.AddScoped<Application.Abstractions.Municipal.IServiceDepositService, Municipal.ServiceDepositService>();
@@ -170,7 +171,8 @@ public static class DependencyInjection
             // A live installation registers its token vendor's generator before this; the placeholder is for testing.
             services.AddSingleton<Application.Municipal.IPrepaidTokenGenerator, Municipal.PlaceholderPrepaidTokenGenerator>();
         }
-        services.AddScoped<Application.Abstractions.Trading.IDebtCollectionService, Trading.DebtCollectionService>();
+        services.AddScoped<Trading.DebtCollectionService>();
+        services.AddScoped<Application.Abstractions.Trading.IDebtCollectionService>(sp => sp.GetRequiredService<Trading.DebtCollectionService>());
         services.AddScoped<Application.Abstractions.Budgeting.IVarianceCommentaryService, Budgeting.VarianceCommentaryService>();
         services.AddScoped<Application.Abstractions.Trading.ISupplierBankDetailsService, Trading.SupplierBankDetailsService>();
         services.AddScoped<IRecurringJournalService, Accounting.RecurringJournalService>();
@@ -254,7 +256,8 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Trading.IPurchaseLedgerService>(sp => sp.GetRequiredService<Trading.TradingService>());
         services.AddScoped<Application.Abstractions.Trading.IAllocationService>(sp => sp.GetRequiredService<Trading.TradingService>());
         services.AddScoped<Application.Abstractions.Trading.ITradingReports, Trading.TradingReports>();
-        services.AddScoped<Application.Abstractions.Trading.IPaymentRunService, Trading.PaymentRunService>();
+        services.AddScoped<Trading.PaymentRunService>();
+        services.AddScoped<Application.Abstractions.Trading.IPaymentRunService>(sp => sp.GetRequiredService<Trading.PaymentRunService>());
         services.AddScoped<Application.Abstractions.Trading.IFinanceChargeService, Trading.FinanceChargeService>();
         services.AddScoped<Application.Abstractions.Trading.IDunningService, Trading.DunningService>();
         services.AddScoped<Application.Abstractions.Trading.IRemittanceService, Trading.RemittanceService>();
@@ -297,6 +300,12 @@ public static class DependencyInjection
         services.AddScoped<Procurement.PurchaseRequisitionService>();
         services.AddScoped<Application.Abstractions.Procurement.IPurchaseRequisitionService>(sp => sp.GetRequiredService<Procurement.PurchaseRequisitionService>());
         services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Procurement.PurchaseRequisitionWorkflowHandler>();
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Trading.PaymentRunWorkflowHandler>();
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Municipal.BillingRunWorkflowHandler>();
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Trading.WriteOffWorkflowHandler>();
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Trading.CreditNoteWorkflowHandler>();
+        services.AddScoped<Trading.CreditNoteApprovalService>();
+        services.AddScoped<Application.Abstractions.Trading.ICreditNoteApprovalService>(sp => sp.GetRequiredService<Trading.CreditNoteApprovalService>());
         services.AddScoped<Application.Abstractions.Pos.IPosService, Pos.PosService>();
         services.AddScoped<Application.Abstractions.Pos.IPosCatalogueService, Pos.PosCatalogueService>();
         services.AddScoped<Application.Abstractions.Integration.IIdempotencyStore, Integration.IdempotencyStore>();

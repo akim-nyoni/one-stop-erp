@@ -11,6 +11,7 @@ namespace One4All.Infrastructure.Trading;
 public sealed class DebtCollectionService : IDebtCollectionService
 {
     private readonly One4AllDbContext _db;
+    private readonly Lazy<Application.Abstractions.Workflow.IWorkflowService>? _workflow;
     private readonly ISalesLedgerService _ar;
     private readonly INumberSequenceService _numbers;
 
@@ -18,8 +19,9 @@ public sealed class DebtCollectionService : IDebtCollectionService
     /// <param name="db">The database context.</param>
     /// <param name="ar">The sales ledger, which writes off the invoices.</param>
     /// <param name="numbers">The number sequences.</param>
-    public DebtCollectionService(One4AllDbContext db, ISalesLedgerService ar, INumberSequenceService numbers)
+    public DebtCollectionService(One4AllDbContext db, ISalesLedgerService ar, INumberSequenceService numbers, Lazy<Application.Abstractions.Workflow.IWorkflowService>? workflow = null)
     {
+        _workflow = workflow;
         _db = db;
         _ar = ar;
         _numbers = numbers;
@@ -118,8 +120,60 @@ public sealed class DebtCollectionService : IDebtCollectionService
     }
 
     /// <inheritdoc />
-    public Task<Result<CaseWriteOff>> ApproveWriteOffAsync(long companyId, string caseNumber, long approverUserId, DateOnly date, string badDebtAccountCode, CancellationToken ct = default)
-        => _db.AtomicAsync(() => ApproveWriteOffCoreAsync(companyId, caseNumber, approverUserId, date, badDebtAccountCode, ct), ct);
+    public async Task<Result<CaseWriteOff>> ApproveWriteOffAsync(long companyId, string caseNumber, long approverUserId, DateOnly date, string badDebtAccountCode, CancellationToken ct = default)
+        => await Workflow.WorkflowGate.InProgressAsync(_db, companyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.WriteOff, caseNumber, ct).ConfigureAwait(false)
+            ? Workflow.WorkflowGate.Governed("Write-off of case", caseNumber)
+            : await _db.AtomicAsync(() => ApproveWriteOffCoreAsync(companyId, caseNumber, approverUserId, date, badDebtAccountCode, ct), ct).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public Task<Result> RequestWriteOffAsync(long companyId, string caseNumber, long userId, string reason, string badDebtAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            if (string.IsNullOrWhiteSpace(badDebtAccountCode))
+            {
+                return Result.Failure(Error.Validation("Debt.AccountRequired", "Give the bad-debt account the write-off goes to."));
+            }
+
+            Result requested = await RequestWriteOffAsync(companyId, caseNumber, userId, reason, ct).ConfigureAwait(false);
+            if (requested.IsFailure)
+            {
+                return requested;
+            }
+
+            DebtCase debtCase = await _db.Set<DebtCase>().FirstAsync(c => c.CompanyId == companyId && c.CaseNumber == caseNumber, ct).ConfigureAwait(false);
+            debtCase.WriteOffAccountCode = badDebtAccountCode.Trim().ToUpperInvariant();
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            decimal owed = await _db.OpenItems.Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == debtCase.CustomerId
+                    && i.Sign == LedgerSign.Debit && i.OutstandingTransaction > 0m).SumAsync(i => i.OutstandingBase, ct).ConfigureAwait(false);
+            Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, companyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.WriteOff, caseNumber, owed, userId, ct)
+                .ConfigureAwait(false);
+            return governed.IsFailure ? Result.Failure(governed.Error) : Result.Success();
+        }, ct);
+
+    /// <summary>Applies a write-off workflow's end: approved → written off today to the requested account; otherwise the request is withdrawn.</summary>
+    internal async Task<Result> ConcludeWriteOffAsync(long companyId, string caseNumber, bool approved, long decidedByUserId, DateOnly date, CancellationToken ct)
+    {
+        DebtCase? debtCase = await _db.Set<DebtCase>().FirstOrDefaultAsync(c => c.CompanyId == companyId && c.CaseNumber == caseNumber, ct).ConfigureAwait(false);
+        if (debtCase is null || !debtCase.IsOpen || debtCase.WriteOffRequestedByUserId is null)
+        {
+            return Result.Success();
+        }
+
+        if (!approved)
+        {
+            debtCase.ClearWriteOffRequest();
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result.Success();
+        }
+
+        if (debtCase.WriteOffAccountCode is not string account)
+        {
+            return Result.Failure(Error.Rule("Debt.AccountRequired", $"Case {caseNumber}'s write-off request has no bad-debt account."));
+        }
+
+        Result<CaseWriteOff> written = await ApproveWriteOffCoreAsync(companyId, caseNumber, decidedByUserId, date, account, ct).ConfigureAwait(false);
+        return written.IsFailure ? Result.Failure(written.Error) : Result.Success();
+    }
 
     // One unit: every invoice written off and the case closed, or nothing.
     private async Task<Result<CaseWriteOff>> ApproveWriteOffCoreAsync(long companyId, string caseNumber, long approverUserId, DateOnly date, string badDebtAccountCode, CancellationToken ct)
@@ -197,4 +251,22 @@ public sealed class DebtCollectionService : IDebtCollectionService
 
         return debtCase;
     }
+}
+
+/// <summary>Applies the end of a write-off workflow: approved → the debt is written off; rejected or returned → the request is withdrawn.</summary>
+internal sealed class WriteOffWorkflowHandler : Application.Abstractions.Workflow.IWorkflowDocumentHandler
+{
+    private readonly DebtCollectionService _debts;
+    private readonly One4All.Licensing.Core.IClock _clock;
+
+    public WriteOffWorkflowHandler(DebtCollectionService debts, One4All.Licensing.Core.IClock clock)
+    {
+        _debts = debts;
+        _clock = clock;
+    }
+
+    public string DocumentType => Application.Abstractions.Workflow.WorkflowDocumentTypes.WriteOff;
+
+    public Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+        => _debts.ConcludeWriteOffAsync(companyId, documentReference, outcome == Core.Workflow.WorkflowStatus.Approved, decidedByUserId, DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime), ct);
 }

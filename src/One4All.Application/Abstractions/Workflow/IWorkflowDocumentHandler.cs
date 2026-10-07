@@ -32,4 +32,16 @@ public static class WorkflowDocumentTypes
 
     /// <summary>Manual journals held for approval.</summary>
     public const string Journal = "Journal";
+
+    /// <summary>Saved supplier payment runs (reference: the run number).</summary>
+    public const string PaymentRun = "PaymentRun";
+
+    /// <summary>Proposed municipal billing runs (reference: the run number).</summary>
+    public const string BillingRun = "BillingRun";
+
+    /// <summary>Customer credit notes held for approval (reference: the credit note number).</summary>
+    public const string CreditNote = "CreditNote";
+
+    /// <summary>Debt write-off requests (reference: the debt case number).</summary>
+    public const string WriteOff = "WriteOff";
 }

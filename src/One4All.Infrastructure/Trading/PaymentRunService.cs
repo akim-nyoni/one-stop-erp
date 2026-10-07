@@ -13,6 +13,7 @@ namespace One4All.Infrastructure.Trading;
 public sealed class PaymentRunService : IPaymentRunService
 {
     private readonly One4AllDbContext _db;
+    private readonly Lazy<Application.Abstractions.Workflow.IWorkflowService>? _workflow;
     private readonly IPurchaseLedgerService _purchaseLedger;
     private readonly IAllocationService _allocationService;
 
@@ -20,8 +21,9 @@ public sealed class PaymentRunService : IPaymentRunService
     /// <param name="db">The database context.</param>
     /// <param name="purchaseLedger">The AP posting service.</param>
     /// <param name="allocationService">The allocation service.</param>
-    public PaymentRunService(One4AllDbContext db, IPurchaseLedgerService purchaseLedger, IAllocationService allocationService)
+    public PaymentRunService(One4AllDbContext db, IPurchaseLedgerService purchaseLedger, IAllocationService allocationService, Lazy<Application.Abstractions.Workflow.IWorkflowService>? workflow = null)
     {
+        _workflow = workflow;
         _db = db;
         _purchaseLedger = purchaseLedger;
         _allocationService = allocationService;
@@ -210,7 +212,10 @@ public sealed class PaymentRunService : IPaymentRunService
     }
 
     /// <inheritdoc />
-    public async Task<Result<SavedPaymentRun>> SaveProposalAsync(PaymentRunRequest request, long proposedByUserId, CancellationToken ct = default)
+    public Task<Result<SavedPaymentRun>> SaveProposalAsync(PaymentRunRequest request, long proposedByUserId, CancellationToken ct = default)
+        => _db.AtomicAsync(() => SaveProposalCoreAsync(request, proposedByUserId, ct), ct);
+
+    private async Task<Result<SavedPaymentRun>> SaveProposalCoreAsync(PaymentRunRequest request, long proposedByUserId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.BankAccountCode))
         {
@@ -244,7 +249,11 @@ public sealed class PaymentRunService : IPaymentRunService
 
         _db.Set<PaymentRunBatch>().Add(batch);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return View(batch);
+
+        // The company's payment-run workflow, when defined, governs the approval from here.
+        Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, request.CompanyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.PaymentRun, batch.Number,
+            batch.Lines.Where(l => l.Included).Sum(l => l.Amount), proposedByUserId, ct).ConfigureAwait(false);
+        return governed.IsFailure ? governed.Error : View(batch);
     }
 
     /// <inheritdoc />
@@ -279,7 +288,16 @@ public sealed class PaymentRunService : IPaymentRunService
     }
 
     /// <inheritdoc />
-    public Task<Result<PaymentRunResult>> ApproveAsync(long companyId, string runNumber, long approvedByUserId, CancellationToken ct = default)
+    public async Task<Result<PaymentRunResult>> ApproveAsync(long companyId, string runNumber, long approvedByUserId, CancellationToken ct = default)
+    {
+        string number = (runNumber ?? string.Empty).Trim().ToUpperInvariant();
+        return await Workflow.WorkflowGate.InProgressAsync(_db, companyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.PaymentRun, number, ct).ConfigureAwait(false)
+            ? Workflow.WorkflowGate.Governed("Payment run", number)
+            : await ApproveFromWorkflowAsync(companyId, number, approvedByUserId, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Approves and pays a run (also the end of its workflow).</summary>
+    internal Task<Result<PaymentRunResult>> ApproveFromWorkflowAsync(long companyId, string runNumber, long approvedByUserId, CancellationToken ct)
         => _db.AtomicAsync(async () =>
         {
             Result<PaymentRunBatch> found = await ProposedAsync(companyId, runNumber, ct).ConfigureAwait(false);
@@ -325,6 +343,18 @@ public sealed class PaymentRunService : IPaymentRunService
 
     /// <inheritdoc />
     public async Task<Result> CancelAsync(long companyId, string runNumber, CancellationToken ct = default)
+    {
+        string governedNumber = (runNumber ?? string.Empty).Trim().ToUpperInvariant();
+        if (await Workflow.WorkflowGate.InProgressAsync(_db, companyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.PaymentRun, governedNumber, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Workflow.WorkflowGate.Governed("Payment run", governedNumber));
+        }
+
+        return await CancelFromWorkflowAsync(companyId, runNumber, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Withdraws a run (also a rejected workflow's end).</summary>
+    internal async Task<Result> CancelFromWorkflowAsync(long companyId, string runNumber, CancellationToken ct)
     {
         Result<PaymentRunBatch> found = await ProposedAsync(companyId, runNumber, ct).ConfigureAwait(false);
         if (found.IsFailure)
@@ -442,5 +472,27 @@ public sealed class PaymentRunService : IPaymentRunService
         }
 
         return Encoding.UTF8.GetBytes(sb.ToString());
+    }
+}
+
+/// <summary>Applies the end of a payment run's workflow: approved → paid as approved by the last approver; rejected or returned → withdrawn.</summary>
+internal sealed class PaymentRunWorkflowHandler : Application.Abstractions.Workflow.IWorkflowDocumentHandler
+{
+    private readonly PaymentRunService _runs;
+
+    public PaymentRunWorkflowHandler(PaymentRunService runs) => _runs = runs;
+
+    public string DocumentType => Application.Abstractions.Workflow.WorkflowDocumentTypes.PaymentRun;
+
+    public async Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+    {
+        if (outcome != Core.Workflow.WorkflowStatus.Approved)
+        {
+            Result cancelled = await _runs.CancelFromWorkflowAsync(companyId, documentReference, ct).ConfigureAwait(false);
+            return cancelled.IsFailure && cancelled.Error.Code == "Ap.RunNotFound" ? Result.Success() : cancelled;
+        }
+
+        Result<PaymentRunResult> paid = await _runs.ApproveFromWorkflowAsync(companyId, documentReference, decidedByUserId, ct).ConfigureAwait(false);
+        return paid.IsFailure && paid.Error.Code != "Ap.RunNotFound" ? Result.Failure(paid.Error) : Result.Success();
     }
 }

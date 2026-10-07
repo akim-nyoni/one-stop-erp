@@ -1951,8 +1951,10 @@ app.MapGet("/api/ar/summons-register", async (long companyId, One4All.Applicatio
 .RequireAuthorization()
 .WithName("SummonsRegister");
 
-app.MapPost("/api/ar/debt-cases/{caseNumber}/write-off/request", async (string caseNumber, long companyId, long userId, string reason, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
-    ActionResponse(await debts.RequestWriteOffAsync(companyId, caseNumber, userId, reason, ct).ConfigureAwait(false)))
+app.MapPost("/api/ar/debt-cases/{caseNumber}/write-off/request", async (string caseNumber, long companyId, long userId, string reason, string? badDebtAccountCode, One4All.Application.Abstractions.Trading.IDebtCollectionService debts, CancellationToken ct) =>
+    ActionResponse(string.IsNullOrWhiteSpace(badDebtAccountCode)
+        ? await debts.RequestWriteOffAsync(companyId, caseNumber, userId, reason, ct).ConfigureAwait(false)
+        : await debts.RequestWriteOffAsync(companyId, caseNumber, userId, reason, badDebtAccountCode, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("RequestDebtWriteOff");
 

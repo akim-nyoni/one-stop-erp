@@ -124,6 +124,17 @@ public sealed class DebtCase : AuditableEntity, ICompanyScoped
         WriteOffReason = reason;
     }
 
+    /// <summary>The bad-debt account a requested write-off goes to (so its workflow can apply it).</summary>
+    public string? WriteOffAccountCode { get; set; }
+
+    /// <summary>Withdraws a write-off request (rejected in its workflow).</summary>
+    public void ClearWriteOffRequest()
+    {
+        WriteOffRequestedByUserId = null;
+        WriteOffReason = null;
+        WriteOffAccountCode = null;
+    }
+
     /// <summary>Records the approved write-off and closes the case.</summary>
     /// <param name="userId">The approver.</param>
     /// <param name="date">When.</param>
