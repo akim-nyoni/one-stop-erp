@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-540 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+546 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -295,6 +295,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
 | DB256 | Municipal Executive Dashboard | Billed and collected this year, collection rate, debtors and over-90s, indigent households, disconnections, open faults and licences due. | AsAtDate (Date, optional) | Measure, Value | — | — |
+| M144 | Consumer / Ratepayer Statement | Per property: the ratepayer's account with the services connected, opening balance, charges, payments and interest in the period, closing balance and ageing; one stand, or every stand for bulk (burst) printing. | StandNumber (String, optional), FromDate (Date, optional), ToDate (Date, optional) | Account, Section, Date, Type, Document, Debit, Credit, Balance | — | Sum(Balance) |
 | M146 | Billing Run Summary & Control | Each billing run: service, period, ward, lines billed and excluded, total billed against the previous run, proposer and approver. | — | Run, Service, Period, Ward, Status, Lines, Excluded, Previous, Approver, Billed | — | Sum(Billed) |
 | M147 | Billing Exceptions Report | Lines of every billing run flagged as already billed, nothing to bill, failed or a large change on last time. | — | Run, Stand, Exceptions, Message, Included, Previous, Charge | — | Sum(Charge) |
 | M148 | Aged Debtors by Ward, Category and Service | Ratepayers' open items as at the date, aged 30/60/90/120+, grouped by ward, consumer category and service. | AsAtDate (Date, optional) | Ward, Category, Service, Accounts, Current, D30, D60, D90, D120, Over120, Total | — | Sum(Total) |
@@ -432,9 +433,11 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | AP-DUE | Payments Due | Outstanding supplier invoices ordered by due date, with days until due (negative when overdue). | AsAtDate (Date, optional) | SupplierCode, SupplierName, DocumentNumber, DueDate, DaysUntilDue, Outstanding | — | Sum(Outstanding) |
 | AP-RECUR | Recurring Purchases | Standing recurring supplier-invoice templates with amount, tax, interval, next run date and active flag. | — | Reference, Supplier, NetAmount, TaxAmount, IntervalMonths, NextRunDate, Active | — | Sum(IntervalMonths) |
 | AP-SUP | Supplier Register | Supplier master: code, name, currency, payment terms and on-hold flag. | — | Code, Name, Currency, TermsDays, OnHold | — | Sum(TermsDays) |
+| AP51 | Supplier Statement / Remittance Statement | Our view of a supplier's account for confirmation: opening balance, every document in the period with running balance, closing balance and what is outstanding aged by due date. | SupplierCode (String, optional), FromDate (Date, optional), ToDate (Date, optional) | Account, Section, Date, Type, Document, Debit, Credit, Balance | — | Sum(Balance) |
 | AP53 | Supplier Ledger | One supplier's documents in date order with running balance and what is still outstanding on each. | SupplierCode (String, optional) | Date, Type, Document, Due, Debit, Credit, Balance, Outstanding | — | Sum(Outstanding) |
 | AP54 | Purchase Day Book | Supplier invoices, credit notes and debit notes posted in the period, in transaction and base currency. | FromDate (Date, optional), ToDate (Date, optional) | Date, Document, Type, Supplier, Currency, Transaction, Base | — | Sum(Base) |
 | AP55 | Purchase Analysis by Supplier and Item | Order lines placed in the period (cancelled orders excluded) by supplier and item: quantity, average price and value. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Item, Orders, Quantity, AveragePrice, Currency, Value | — | Sum(Value) |
+| AP56 | Cash Requirement Forecast / Payment Due Report | What must be paid to suppliers by week of due date and currency — overdue, each of the coming weeks and later — net of unallocated payments and debit notes. | AsAtDate (Date, optional), Weeks (Integer, optional) | Currency, Week, From, To, Suppliers, Documents, Amount, Base | — | Sum(Base) |
 | AP58 | Payments Made | Payments to suppliers in the period (payment runs and single payments) with tax withheld. | FromDate (Date, optional), ToDate (Date, optional) | Date, Document, Supplier, Currency, Transaction, Withheld, Base | — | Sum(Base) |
 | AP59 | Goods Received Not Invoiced (GRNI) | Order lines received but not yet invoiced: the GRNI accrual by order and item, with its age. | AsAtDate (Date, optional) | Order, Supplier, Item, Received, Invoiced, Price, LastReceipt, Days, Value | — | Sum(Value) |
 | AP60 | Invoice Matching Exceptions | Supplier invoices disputed against their order: reason, status and resolution. | — | Invoice, Date, Supplier, Order, Reason, Status, Resolution, Value | — | Sum(Value) |
@@ -524,6 +527,8 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | AR28 | Customer Statement — Consolidated Group | Per group (parent account and its branches): each account's opening balance, debits and credits in the period and closing balance, with the group total. | FromDate (Date, optional), ToDate (Date, optional) | Group, Account, Opening, Debits, Credits, Closing | — | Sum(Closing) |
 | AR37 | Credit Notes & Returns Analysis | Credit notes raised in the period by reason code, with customer and narrative. | FromDate (Date, optional), ToDate (Date, optional) | Reason, Date, Number, Customer, Narrative, Amount | — | Sum(Amount) |
 | AR38 | Receipts / Collections Report | Customer receipts in the period by day, bank account (method), currency and the user who posted them. | FromDate (Date, optional), ToDate (Date, optional) | Date, Method, Currency, User, Count, Amount, Base | — | Sum(Base) |
+| AR42 | Dunning / Reminder Letters | Every customer with overdue debt at the date, at its reminder level (first, second, final), with the letter itself — overdue amount after unallocated credits and the oldest days overdue. | AsAtDate (Date, optional), FirstDays (Integer, optional), SecondDays (Integer, optional), FinalDays (Integer, optional) | Customer, Level, Stage, Overdue, OldestDays, Letter | — | — |
+| AR46 | Sales Agent Commission Statement & Accrual Schedule | Per sales rep for the period: commission earned on each customer's base, the rep's total to accrue, optionally for one rep. | FromDate (Date, optional), ToDate (Date, optional), RepCode (String, optional) | Rep, Customer, Base, Commission | — | Sum(Commission) |
 
 ## Restaurant
 
@@ -588,6 +593,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
+| SC173 | Student Fee Statement | Per student (and the guardian or sponsor who pays): fees billed by term, payments allocated, arrears brought forward and carried, aged; one student or the whole school. | AdmissionNumber (String, optional), FromDate (Date, optional), ToDate (Date, optional) | Account, Section, Date, Type, Document, Debit, Credit, Balance | — | Sum(Balance) |
 | SC175 | Fee Billing Run Summary | Fees billed in the period by term and grade: students billed and the amount. | FromDate (Date, optional), ToDate (Date, optional) | Term, Grade, Students, Boarders, Billed | — | Sum(Billed) |
 | SC176 | Fee Arrears by Grade | Unpaid fee invoices as at the date per student, aged, grouped by grade. | AsAtDate (Date, optional) | Grade, Student, Guardian, Invoices, Oldest, Band, Outstanding | — | Sum(Outstanding) |
 | SC177 | Fee Collection Report | Receipts from guardians in the period, with the students they pay for. | FromDate (Date, optional), ToDate (Date, optional) | Date, Receipt, Guardian, Students, Amount | — | Sum(Amount) |

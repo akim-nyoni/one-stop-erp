@@ -149,6 +149,12 @@ public static class SystemReportCatalogue
             yield return definition;
         }
 
+        // Statements and letters (brief §14 B, C, I and J).
+        foreach (ReportDefinition definition in StatementReports.All())
+        {
+            yield return definition;
+        }
+
         // Cash book & treasury additions (brief §14 D, CB + item number).
         foreach (ReportDefinition definition in CashBookReports.All())
         {
