@@ -92,7 +92,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, customer.RateType).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, customer.RateType, (request.RateOverrideByUserId, request.DocumentNumber)).ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -532,7 +532,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.ReceiptDate, ct, customer.RateType).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.ReceiptDate, ct, customer.RateType, (request.RateOverrideByUserId, request.DocumentNumber)).ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -571,7 +571,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, customer.RateType).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, customer.RateType, (request.RateOverrideByUserId, request.DocumentNumber)).ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -626,7 +626,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, supplier.RateType).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, supplier.RateType, (request.RateOverrideByUserId, request.DocumentNumber)).ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -704,7 +704,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, supplier.RateType).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, supplier.RateType, (request.RateOverrideByUserId, request.DocumentNumber)).ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -769,7 +769,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.PaymentDate, ct, supplier.RateType).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.PaymentDate, ct, supplier.RateType, (request.RateOverrideByUserId, request.DocumentNumber)).ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -1148,7 +1148,8 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     // The rate given on the document; else the trader's own rate type (a contract or bank rate) when one is found; else the daily rate.
-    private async Task<Result<decimal>> ResolveRateAsync(long companyId, CurrencyCode currency, decimal? explicitRate, DateOnly date, CancellationToken ct, ExchangeRateType? traderRateType = null)
+    private async Task<Result<decimal>> ResolveRateAsync(long companyId, CurrencyCode currency, decimal? explicitRate, DateOnly date, CancellationToken ct, ExchangeRateType? traderRateType = null,
+        (long? ByUserId, string DocumentNumber)? keyed = null)
     {
         Company company = await _db.Companies.FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         if (currency == company.BaseCurrency)
@@ -1158,6 +1159,20 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
         if (explicitRate is { } r and > 0m)
         {
+            // A keyed rate on a document, when the company controls overrides: only someone allowed to, and recorded against the table's rate.
+            if (company.RateOverrideControl && keyed is { } document)
+            {
+                if (document.ByUserId is not long user || _permissions is null
+                    || !(await _permissions.ResolveAsync(user, ct).ConfigureAwait(false)).Has("System.ExchangeRate", Core.Security.OperationFlags.OverridePrice))
+                {
+                    return Error.Forbidden("Trading.RateOverrideNotAllowed", $"Keying the rate on {document.DocumentNumber} needs the exchange-rate override permission.");
+                }
+
+                decimal? table = await Accounting.ExchangeRateResolver.FindAsync(_db, currency, company.BaseCurrency, traderRateType ?? ExchangeRateType.Daily, date, ct).ConfigureAwait(false)
+                    ?? await Accounting.ExchangeRateResolver.FindAsync(_db, currency, company.BaseCurrency, ExchangeRateType.Daily, date, ct).ConfigureAwait(false);
+                _db.Set<ExchangeRateOverride>().Add(new ExchangeRateOverride(companyId, document.DocumentNumber, currency.Value, date, r, table, user, DateTimeOffset.UtcNow));
+            }
+
             return r;
         }
 

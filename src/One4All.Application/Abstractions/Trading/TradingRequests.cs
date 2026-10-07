@@ -57,6 +57,9 @@ public sealed class SalesInvoiceRequest
     /// <summary>Optional explicit exchange rate; otherwise the daily rate is used.</summary>
     public decimal? ExchangeRate { get; init; }
 
+    /// <summary>Who keyed <see cref="ExchangeRate"/> (needs System › Exchange Rates override when the company controls rate overrides).</summary>
+    public long? RateOverrideByUserId { get; init; }
+
     /// <summary>Optional narrative.</summary>
     /// <summary>Gets when the goods or service were delivered (sets the tax point; null: the invoice date).</summary>
     public DateOnly? DeliveryDate { get; init; }
@@ -95,6 +98,9 @@ public sealed class ReceiptRequest
 
     /// <summary>Optional explicit exchange rate.</summary>
     public decimal? ExchangeRate { get; init; }
+
+    /// <summary>Who keyed <see cref="ExchangeRate"/> (needs System › Exchange Rates override when the company controls rate overrides).</summary>
+    public long? RateOverrideByUserId { get; init; }
 
     /// <summary>Optional narrative.</summary>
     public string? Narrative { get; init; }
@@ -135,6 +141,9 @@ public sealed class PurchaseInvoiceRequest
 
     /// <summary>Optional explicit exchange rate.</summary>
     public decimal? ExchangeRate { get; init; }
+
+    /// <summary>Who keyed <see cref="ExchangeRate"/> (needs System › Exchange Rates override when the company controls rate overrides).</summary>
+    public long? RateOverrideByUserId { get; init; }
 
     /// <summary>Optional narrative.</summary>
     public string? Narrative { get; init; }
@@ -182,6 +191,9 @@ public sealed class SalesCreditNoteRequest
     /// <summary>Optional explicit exchange rate.</summary>
     public decimal? ExchangeRate { get; init; }
 
+    /// <summary>Who keyed <see cref="ExchangeRate"/> (needs System › Exchange Rates override when the company controls rate overrides).</summary>
+    public long? RateOverrideByUserId { get; init; }
+
     /// <summary>Optional narrative.</summary>
     public string? Narrative { get; init; }
 }
@@ -219,6 +231,9 @@ public sealed class PurchaseCreditNoteRequest
     /// <summary>Optional explicit exchange rate.</summary>
     public decimal? ExchangeRate { get; init; }
 
+    /// <summary>Who keyed <see cref="ExchangeRate"/> (needs System › Exchange Rates override when the company controls rate overrides).</summary>
+    public long? RateOverrideByUserId { get; init; }
+
     /// <summary>Optional narrative.</summary>
     public string? Narrative { get; init; }
 }
@@ -249,6 +264,9 @@ public sealed class PaymentRequest
 
     /// <summary>Optional explicit exchange rate.</summary>
     public decimal? ExchangeRate { get; init; }
+
+    /// <summary>Who keyed <see cref="ExchangeRate"/> (needs System › Exchange Rates override when the company controls rate overrides).</summary>
+    public long? RateOverrideByUserId { get; init; }
 
     /// <summary>Optional narrative.</summary>
     public string? Narrative { get; init; }

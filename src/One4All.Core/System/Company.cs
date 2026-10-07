@@ -120,6 +120,9 @@ public sealed class Company : SoftDeletableEntity
     /// </summary>
     public int? BackDateAllowanceDays { get; set; }
 
+    /// <summary>Whether a rate keyed on a customer or supplier document needs the rate-override permission and is recorded (brief §3.3).</summary>
+    public bool RateOverrideControl { get; set; }
+
     /// <summary>The company's logo (PNG or JPEG) for report layouts (expression <c>CompanyLogo</c>).</summary>
     public byte[]? Logo { get; set; }
 

@@ -1,5 +1,6 @@
 using System.Text;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Housing;
 using One4All.Application.Abstractions.Reporting;
@@ -97,7 +98,20 @@ public sealed class AllocationControlReportsTests
         string quota = await Render("H37");
         quota.Should().Contain($"{scheme.Code},Youth,1,1,100.0,50.0,+50.0,Met").And.Contain($"{scheme.Code},Women,1,0,0.0,30.0,-30.0,Short");
 
-        (await Render("H91")).Should().Contain($"Allocation run,{run.RunNumber},user 71,user 72,").And.Contain(",2026-03-02,");
+        // Requested and approved by users 71 and 72 (shown by name when such users exist in the shared database, else "user 71").
+        string h91 = await Render("H91");
+        string line = h91.Split(Environment.NewLine.ToCharArray(), StringSplitOptions.RemoveEmptyEntries).Single(l => l.StartsWith($"Allocation run,{run.RunNumber},", StringComparison.Ordinal));
+        string[] cells = line.Split(',');
+        (cells[2], cells[3]).Should().Be((await Name(71), await Name(72)));
+        line.Should().Contain(",2026-03-02,");
         (await Render("H93")).Should().Contain("Offer without an approved price").And.Contain(approved.Lines[0].CertificateNumber!);
+    }
+
+    private async Task<string> Name(long id)
+    {
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        string? name = await scope.ServiceProvider.GetRequiredService<One4AllDbContext>().Users.AsNoTracking().Where(u => u.Id == id).Select(u => u.Username).FirstOrDefaultAsync();
+        return name ?? $"user {id}";
     }
 }

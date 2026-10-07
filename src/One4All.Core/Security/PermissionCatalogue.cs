@@ -44,7 +44,7 @@ public static class PermissionCatalogue
         Add(sys, LicenceModules.Core, "Branch", "Branches / Sites", master);
         Add(sys, LicenceModules.Core, "Period", "Accounting Periods", master | OperationFlags.Post);
         Add(sys, LicenceModules.Core, "Currency", "Currencies", master);
-        Add(sys, LicenceModules.Core, "ExchangeRate", "Exchange Rates", master | OperationFlags.BackDate);
+        Add(sys, LicenceModules.Core, "ExchangeRate", "Exchange Rates (override = key a rate on a document)", master | OperationFlags.BackDate | OperationFlags.OverridePrice);
         Add(sys, LicenceModules.Core, "NumberSequence", "Number Sequences", master);
         Add(sys, LicenceModules.Core, "TaxCode", "Tax Codes", master);
         Add(sys, LicenceModules.Core, "DocumentLayout", "Document Layouts", master);

@@ -107,6 +107,20 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// A save refused by a licence limit is the caller's problem (403), not a server fault.
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next(context).ConfigureAwait(false);
+    }
+    catch (One4All.Infrastructure.Licensing.LicenceLimitException limit) when (!context.Response.HasStarted)
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(new { code = "Licence.LimitReached", message = limit.Message }).ConfigureAwait(false);
+    }
+});
 app.UseAuthentication();
 app.UseAuthorization();
 

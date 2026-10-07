@@ -26493,6 +26493,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("raise_payroll_remittances");
 
+                    b.Property<bool>("RateOverrideControl")
+                        .HasColumnType("boolean")
+                        .HasColumnName("rate_override_control");
+
                     b.Property<string>("RegistrationNumber")
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)")
@@ -26736,6 +26740,66 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_exchange_rate_from_currency_to_currency_rate_type_effective");
 
                     b.ToTable("exchange_rate", "sys");
+                });
+
+            modelBuilder.Entity("One4All.Core.System.ExchangeRateOverride", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("document_number");
+
+                    b.Property<decimal>("KeyedRate")
+                        .HasPrecision(19, 8)
+                        .HasColumnType("numeric(19,8)")
+                        .HasColumnName("keyed_rate");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal?>("TableRate")
+                        .HasPrecision(19, 8)
+                        .HasColumnType("numeric(19,8)")
+                        .HasColumnName("table_rate");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rate_override");
+
+                    b.HasIndex("CompanyId", "Date")
+                        .HasDatabaseName("ix_rate_override_company_id_date");
+
+                    b.ToTable("rate_override", "sys");
                 });
 
             modelBuilder.Entity("One4All.Core.System.FiscalPeriod", b =>
