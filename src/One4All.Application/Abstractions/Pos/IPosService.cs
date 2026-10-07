@@ -25,7 +25,8 @@ public readonly record struct PosSaleLineRequest(long ItemId, string Description
 /// <param name="AccountCode">The GL account for the tender.</param>
 /// <param name="IsChange">True when this is change given.</param>
 /// <param name="ExchangeRate">Optional explicit rate (else the daily rate / 1 for base).</param>
-public readonly record struct PosTenderRequest(TenderType TenderType, CurrencyCode Currency, decimal Amount, string AccountCode, bool IsChange, decimal? ExchangeRate = null, long? StaffEmployeeId = null);
+public readonly record struct PosTenderRequest(TenderType TenderType, CurrencyCode Currency, decimal Amount, string AccountCode, bool IsChange, decimal? ExchangeRate = null, long? StaffEmployeeId = null,
+    string? VoucherNumber = null);
 
 /// <summary>A request to complete a POS sale.</summary>
 public sealed class CompleteSaleRequest
@@ -72,6 +73,23 @@ public sealed class CompleteSaleRequest
 /// <param name="JournalNumber">The sale GL journal number.</param>
 /// <param name="TotalGross">The gross total.</param>
 public readonly record struct CompleteSaleResult(long SaleId, string JournalNumber, decimal TotalGross);
+
+/// <summary>
+/// One basket split into several sales, each paid on its own (brief §4.1 split bill). The basket and its checks are as for
+/// <see cref="CompleteSaleRequest"/>; each part says which lines (or how much of them) it takes and how it is paid. The parts are
+/// numbered <c>{SaleNumber}-1</c>, <c>-2</c>, ... and either all complete or none do.
+/// </summary>
+public sealed class SplitBillRequest
+{
+    /// <summary>The basket and everything but the tenders (its <see cref="CompleteSaleRequest.Tenders"/> are ignored).</summary>
+    public required CompleteSaleRequest Basket { get; init; }
+
+    /// <summary>Each part's shares of the basket's lines (see <see cref="Application.Pos.SplitBill.Evenly"/> for an even split).</summary>
+    public IReadOnlyList<IReadOnlyList<Application.Pos.SplitShare>> Parts { get; init; } = [];
+
+    /// <summary>Each part's tenders, in the same order as <see cref="Parts"/>.</summary>
+    public IReadOnlyList<IReadOnlyList<PosTenderRequest>> Tenders { get; init; } = [];
+}
 
 /// <summary>A till read (X mid-shift or Z end-of-shift).</summary>
 /// <param name="SaleCount">Number of sales.</param>
@@ -133,6 +151,12 @@ public interface IPosService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The sale result, or an error.</returns>
     Task<Result<CompleteSaleResult>> CompleteSaleAsync(CompleteSaleRequest request, CancellationToken ct = default);
+
+    /// <summary>Splits one basket into several sales, each with its own tenders, all in one unit of work.</summary>
+    /// <param name="request">The basket, the parts and their tenders.</param>
+    /// <param name="ct">A cancellation token.</param>
+    /// <returns>Each part's sale.</returns>
+    Task<Result<IReadOnlyList<CompleteSaleResult>>> SplitBillAsync(SplitBillRequest request, CancellationToken ct = default);
 
     /// <summary>
     /// Voids/refunds a completed sale: posts the exact inverse of the sale's tender/revenue/tax journal

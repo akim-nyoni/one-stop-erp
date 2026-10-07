@@ -99,6 +99,42 @@ public sealed class PosService : IPosService
                 line.PromotionDiscount, line.PromotionDiscount > 0m ? line.DiscountAccountCode : null, line.PromotionCode));
         }
 
+        // Vouchers: each card must be active, unexpired, in the tender's currency and cover what is taken from it; no change is given from a voucher.
+        Dictionary<string, (Core.Vouchers.GiftCard Card, decimal Amount)> vouchers = new(StringComparer.Ordinal);
+        foreach (PosTenderRequest tender in request.Tenders.Where(t => t.TenderType == TenderType.Voucher))
+        {
+            if (tender.IsChange || string.IsNullOrWhiteSpace(tender.VoucherNumber) || tender.Amount <= 0m)
+            {
+                return Error.Validation("Pos.VoucherTender", "A voucher tender needs the gift card number and a positive amount, and gives no change.");
+            }
+
+            string number = tender.VoucherNumber.Trim().ToUpperInvariant();
+            Core.Vouchers.GiftCard? card = vouchers.TryGetValue(number, out var held) ? held.Card
+                : await _db.Set<Core.Vouchers.GiftCard>().FirstOrDefaultAsync(g => g.CompanyId == request.CompanyId && g.CardNumber == number, ct).ConfigureAwait(false);
+            if (card is null)
+            {
+                return Error.NotFound("Voucher.NotFound", $"Gift card {number} not found.");
+            }
+
+            if (card.Status != Core.Vouchers.GiftCardStatus.Active || (card.ExpiryDate is DateOnly expiry && expiry < request.SaleDate))
+            {
+                return Error.Rule("Pos.VoucherNotUsable", $"Gift card {number} is {(card.Status != Core.Vouchers.GiftCardStatus.Active ? card.Status.ToString() : "expired")}.");
+            }
+
+            if (card.Currency != tender.Currency)
+            {
+                return Error.Rule("Pos.VoucherCurrency", $"Gift card {number} is in {card.Currency.Value}, not {tender.Currency.Value}.");
+            }
+
+            decimal taken = (held.Card is null ? 0m : held.Amount) + tender.Amount;
+            if (taken > card.Balance)
+            {
+                return Error.Rule("Voucher.InsufficientBalance", $"Gift card {number} has {card.Balance:0.00}, which does not cover {taken:0.00}.");
+            }
+
+            vouchers[number] = (card, taken);
+        }
+
         List<JournalLineRequest> journalLines = [];
         foreach (PosTenderRequest tender in request.Tenders)
         {
@@ -124,7 +160,8 @@ public sealed class PosService : IPosService
 
             decimal rate = rateResult.Value;
             decimal baseAmount = decimal.Round(tender.Amount * rate, 4, MidpointRounding.ToEven);
-            sale.AddTender(new SaleTender(tender.TenderType, tender.Currency, tender.Amount, rate, baseAmount, tender.AccountCode, tender.IsChange, tender.StaffEmployeeId));
+            sale.AddTender(new SaleTender(tender.TenderType, tender.Currency, tender.Amount, rate, baseAmount, tender.AccountCode, tender.IsChange, tender.StaffEmployeeId,
+                tender.TenderType == TenderType.Voucher ? tender.VoucherNumber!.Trim().ToUpperInvariant() : null));
 
             journalLines.Add(new JournalLineRequest { AccountCode = tender.AccountCode, Side = tender.IsChange ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = baseAmount });
         }
@@ -143,6 +180,11 @@ public sealed class PosService : IPosService
         if (sale.TotalTax != 0m && request.TaxAccountCode is not null)
         {
             journalLines.Add(new JournalLineRequest { AccountCode = request.TaxAccountCode, Side = JournalSide.Credit, TransactionAmount = sale.TotalTax });
+        }
+
+        if (sale.Tenders.Where(t => t.TenderType == TenderType.Voucher).Sum(t => t.BaseAmount) > sale.TotalGross + 0.0001m)
+        {
+            return Error.Rule("Pos.VoucherOverpays", "Vouchers cannot pay more than the sale; no change is given from a voucher.");
         }
 
         decimal difference = sale.NetTenderedBase - sale.TotalGross;
@@ -183,6 +225,20 @@ public sealed class PosService : IPosService
 
         sale.JournalEntryId = posting.Value.JournalId;
         _db.Set<Sale>().Add(sale);
+
+        // The cards are charged only once the sale has posted.
+        foreach ((string number, (Core.Vouchers.GiftCard card, decimal amount)) in vouchers)
+        {
+            Result redeemed = card.Redeem(amount);
+            if (redeemed.IsFailure)
+            {
+                return redeemed.Error;
+            }
+
+            _db.Set<Core.Vouchers.GiftCardTransaction>().Add(new Core.Vouchers.GiftCardTransaction(card.CompanyId, card.Id, request.SaleDate, Core.Vouchers.GiftCardEvent.Redeemed, -amount, card.Balance,
+                $"POS sale {request.SaleNumber}"));
+        }
+
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         // Cost of sales: issue stock for stock-tracked lines.
@@ -218,6 +274,57 @@ public sealed class PosService : IPosService
         }
 
         return new CompleteSaleResult(sale.Id, posting.Value.JournalNumber, sale.TotalGross);
+    }
+
+    /// <inheritdoc />
+    public Task<Result<IReadOnlyList<CompleteSaleResult>>> SplitBillAsync(SplitBillRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => SplitBillCoreAsync(request, ct), ct);
+
+    // Every part completes as its own sale inside one unit of work: one part refused undoes them all.
+    private async Task<Result<IReadOnlyList<CompleteSaleResult>>> SplitBillCoreAsync(SplitBillRequest request, CancellationToken ct)
+    {
+        if (request.Tenders.Count != request.Parts.Count)
+        {
+            return Error.Validation("Pos.SplitTenders", "Each part of a split bill needs its own tenders.");
+        }
+
+        // The basket's own limits are checked on the whole basket, before it is divided.
+        List<long> soldIds = [.. request.Basket.Lines.Select(l => l.ItemId).Distinct()];
+        Dictionary<long, Application.Pos.ItemSaleLimits> limits = await _db.Items.AsNoTracking()
+            .Where(i => soldIds.Contains(i.Id) && (i.MinimumAge != null || i.MaxQuantityPerSale != null || i.RequiresPrescription))
+            .Select(i => new Application.Pos.ItemSaleLimits(i.Id, i.Code, i.MinimumAge, i.MaxQuantityPerSale, i.RequiresPrescription))
+            .ToDictionaryAsync(l => l.ItemId, ct).ConfigureAwait(false);
+        Result allowed = Application.Pos.ItemSaleRules.Check(request.Basket.Lines.Select(l => (l.ItemId, l.Quantity)), limits, request.Basket.AgeVerified, request.Basket.PrescriptionReference);
+        if (allowed.IsFailure)
+        {
+            return allowed.Error;
+        }
+
+        Result<IReadOnlyList<IReadOnlyList<PosSaleLineRequest>>> plan = Application.Pos.SplitBill.Plan(request.Basket.Lines, request.Parts);
+        if (plan.IsFailure)
+        {
+            return plan.Error;
+        }
+
+        List<CompleteSaleResult> results = [];
+        for (int i = 0; i < plan.Value.Count; i++)
+        {
+            CompleteSaleRequest basket = request.Basket;
+            Result<CompleteSaleResult> part = await CompleteSaleCoreAsync(new CompleteSaleRequest
+            {
+                CompanyId = basket.CompanyId, TerminalId = basket.TerminalId, TillSessionId = basket.TillSessionId, CashierUserId = basket.CashierUserId,
+                SaleNumber = $"{basket.SaleNumber}-{i + 1}", SaleDate = basket.SaleDate, WarehouseId = basket.WarehouseId, TaxAccountCode = basket.TaxAccountCode,
+                Lines = plan.Value[i], AgeVerified = basket.AgeVerified, PrescriptionReference = basket.PrescriptionReference, Tenders = request.Tenders[i],
+            }, ct).ConfigureAwait(false);
+            if (part.IsFailure)
+            {
+                return new Error(part.Error.Code, $"Part {i + 1}: {part.Error.Message}", part.Error.Type);
+            }
+
+            results.Add(part.Value);
+        }
+
+        return results;
     }
 
     /// <inheritdoc />
@@ -286,6 +393,19 @@ public sealed class PosService : IPosService
         if (posting.IsFailure)
         {
             return posting.Error;
+        }
+
+        // Give back what the sale took from gift cards.
+        foreach (IGrouping<string, SaleTender> paid in sale.Tenders.Where(t => t.TenderType == TenderType.Voucher && t.VoucherNumber is not null).GroupBy(t => t.VoucherNumber!))
+        {
+            Core.Vouchers.GiftCard? card = await _db.Set<Core.Vouchers.GiftCard>().FirstOrDefaultAsync(g => g.CompanyId == companyId && g.CardNumber == paid.Key, ct).ConfigureAwait(false);
+            if (card is not null)
+            {
+                decimal amount = paid.Sum(t => t.Amount);
+                card.Reinstate(amount);
+                _db.Set<Core.Vouchers.GiftCardTransaction>().Add(new Core.Vouchers.GiftCardTransaction(companyId, card.Id, date, Core.Vouchers.GiftCardEvent.Reinstated, amount, card.Balance,
+                    $"Void POS sale {sale.SaleNumber}"));
+            }
         }
 
         // Reverse the cost-of-sales stock issues raised by the sale.

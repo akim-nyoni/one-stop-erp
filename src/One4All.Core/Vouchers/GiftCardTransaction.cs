@@ -23,6 +23,9 @@ public enum GiftCardEvent
     /// <summary>Issued as a replacement, taking over a blocked card's balance.</summary>
     ReplacedIn = 6,
 
+    /// <summary>A redemption given back (the sale it paid for was voided).</summary>
+    Reinstated = 7,
+
     /// <summary>Expired, its balance recognised as breakage.</summary>
     Breakage = 7,
 

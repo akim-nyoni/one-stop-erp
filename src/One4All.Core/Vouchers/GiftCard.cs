@@ -167,6 +167,10 @@ public sealed class GiftCard : AuditableEntity, ICompanyScoped
         }
     }
 
+    /// <summary>Gives back an amount redeemed from the card (the sale it paid for was voided); a card emptied by it becomes active again.</summary>
+    /// <param name="amount">The amount.</param>
+    public void Reinstate(decimal amount) => TopUp(amount);
+
     /// <summary>Blocks the card (lost/stolen).</summary>
     public void Block() => Status = GiftCardStatus.Blocked;
 

@@ -19037,6 +19037,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("tender_type");
 
+                    b.Property<string>("VoucherNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("voucher_number");
+
                     b.HasKey("Id")
                         .HasName("pk_sale_tender");
 
@@ -19045,6 +19050,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("StaffEmployeeId")
                         .HasDatabaseName("ix_sale_tender_staff_employee_id");
+
+                    b.HasIndex("VoucherNumber")
+                        .HasDatabaseName("ix_sale_tender_voucher_number");
 
                     b.ToTable("sale_tender", "pos");
                 });

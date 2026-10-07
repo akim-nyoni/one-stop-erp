@@ -130,6 +130,14 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [ObservableProperty]
     private string _mobileMoneyAccountCode = string.Empty;
 
+    /// <summary>The gift card liability account a voucher tender posts to.</summary>
+    [ObservableProperty]
+    private string _giftCardAccountCode = string.Empty;
+
+    /// <summary>The gift card number for a voucher tender (typed or scanned).</summary>
+    [ObservableProperty]
+    private string _voucherNumber = string.Empty;
+
     /// <summary>The GL account manual discounts post to.</summary>
     [ObservableProperty]
     private string _discountAccountCode = string.Empty;
@@ -351,6 +359,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         OverShortAccountCode = FindByName(accounts, "over", "short", "variance") ?? OverShortAccountCode;
         DiscountAccountCode = FindByName(accounts, "discount allowed", "discounts allowed", "sales discount") ?? DiscountAccountCode;
         MobileMoneyAccountCode = FindByName(accounts, "mobile money", "ecocash", "wallet") ?? MobileMoneyAccountCode;
+        GiftCardAccountCode = FindByName(accounts, "gift card", "voucher") ?? GiftCardAccountCode;
     }
 
     private static string? FindByName(IEnumerable<LedgerAccount> accounts, params string[] keywords) =>
@@ -680,6 +689,57 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [RelayCommand]
     private void TenderMobileMoney() => AddTender(TenderType.MobileMoney, allowOverTender: false);
 
+    /// <summary>
+    /// Pays from a gift card: the entered amount (or the balance due) up to what the card holds; the card is charged only when the sale
+    /// completes, and gives no change.
+    /// </summary>
+    [RelayCommand]
+    private async Task TenderVoucherAsync()
+    {
+        if (!IsSessionOpen || _ticket.Lines.Count == 0)
+        {
+            return;
+        }
+
+        string number = VoucherNumber.Trim().ToUpperInvariant();
+        if (number.Length == 0)
+        {
+            StatusMessage = "Scan or type the gift card number first.";
+            return;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        Result<Application.Abstractions.Vouchers.GiftCardResult> card = await scope.ServiceProvider.GetRequiredService<Application.Abstractions.Vouchers.IVoucherService>()
+            .GetBalanceAsync(_companyId, number).ConfigureAwait(true);
+        if (card.IsFailure)
+        {
+            StatusMessage = card.Error.Message;
+            return;
+        }
+
+        decimal alreadyTaken = _ticket.Tenders.Where(t => t.VoucherNumber == number).Sum(t => t.Amount);
+        decimal available = card.Value.Balance - alreadyTaken;
+        decimal wanted = string.IsNullOrWhiteSpace(TenderEntry) ? _ticket.BalanceDue : TryEntry(out decimal typed) ? typed : 0m;
+        decimal amount = Math.Min(Math.Min(wanted, _ticket.BalanceDue), available);
+        if (amount <= 0m)
+        {
+            StatusMessage = available <= 0m ? $"Gift card {number} has nothing left to spend." : "Enter a valid amount.";
+            return;
+        }
+
+        Result added = _ticket.AddTender(TenderType.Voucher, amount, number);
+        if (added.IsFailure)
+        {
+            StatusMessage = added.Error.Message;
+            return;
+        }
+
+        TenderEntry = string.Empty;
+        VoucherNumber = string.Empty;
+        RefreshTotals();
+        StatusMessage = (_ticket.IsFullyTendered ? "Paid. Press Pay to complete." : $"Balance {BalanceText} due.") + $" Gift card {number}: {available - amount:N2} left after this sale.";
+    }
+
     /// <summary>Discounts the selected line by the percentage on the pad (a supervisor above the cashier's limit).</summary>
     [RelayCommand]
     private async Task DiscountLineAsync()
@@ -899,6 +959,11 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(MobileMoneyAccountCode))
         {
             tenderAccounts[TenderType.MobileMoney] = MobileMoneyAccountCode.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(GiftCardAccountCode))
+        {
+            tenderAccounts[TenderType.Voucher] = GiftCardAccountCode.Trim();
         }
 
         string saleNumber = $"POS{_terminalId}-{DateTime.Now:yyMMddHHmmss}-{++_saleSequence}";

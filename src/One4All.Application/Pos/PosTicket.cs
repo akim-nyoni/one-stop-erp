@@ -123,7 +123,7 @@ public sealed class PosTicketLine
 /// <summary>A tender taken against a ticket.</summary>
 /// <param name="Type">The tender type.</param>
 /// <param name="Amount">The amount taken (in the ticket currency).</param>
-public readonly record struct PosTicketTender(TenderType Type, decimal Amount);
+public readonly record struct PosTicketTender(TenderType Type, decimal Amount, string? VoucherNumber = null);
 
 /// <summary>Rounds POS money to two decimals (customer-facing minor units), half away from zero.</summary>
 public static class PosMoney
@@ -317,14 +317,20 @@ public sealed class PosTicket
     /// <param name="type">The tender type.</param>
     /// <param name="amount">The amount (must be positive).</param>
     /// <returns>Success, or a validation error.</returns>
-    public Result AddTender(TenderType type, decimal amount)
+    /// <param name="voucherNumber">For a voucher tender, the gift card it is paid from.</param>
+    public Result AddTender(TenderType type, decimal amount, string? voucherNumber = null)
     {
         if (amount <= 0m)
         {
             return Result.Failure(Error.Validation("Pos.Tender", "A tender amount must be positive."));
         }
 
-        _tenders.Add(new PosTicketTender(type, PosMoney.Round(amount)));
+        if (type == TenderType.Voucher && string.IsNullOrWhiteSpace(voucherNumber))
+        {
+            return Result.Failure(Error.Validation("Pos.VoucherTender", "A voucher tender needs the gift card number."));
+        }
+
+        _tenders.Add(new PosTicketTender(type, PosMoney.Round(amount), type == TenderType.Voucher ? voucherNumber!.Trim().ToUpperInvariant() : null));
         return Result.Success();
     }
 
@@ -372,7 +378,7 @@ public sealed class PosTicket
                 return Error.Validation("Pos.TenderAccount", $"No GL account is configured for {tender.Type} tenders.");
             }
 
-            tenders.Add(new PosTenderRequest(tender.Type, context.Currency, tender.Amount, account, IsChange: false));
+            tenders.Add(new PosTenderRequest(tender.Type, context.Currency, tender.Amount, account, IsChange: false, VoucherNumber: tender.VoucherNumber));
         }
 
         if (ChangeDue > 0m)

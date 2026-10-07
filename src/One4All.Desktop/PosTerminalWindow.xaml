@@ -204,6 +204,10 @@
                                     <TextBlock Text="Mobile money a/c" Foreground="{DynamicResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding MobileMoneyAccountCode}" />
                                 </StackPanel>
+                                <StackPanel Margin="2">
+                                    <TextBlock Text="Gift card a/c" Foreground="{DynamicResource Muted}" FontSize="11" />
+                                    <TextBox Text="{Binding GiftCardAccountCode}" />
+                                </StackPanel>
                             </UniformGrid>
                             <UniformGrid Columns="2" Margin="0,4,0,0">
                                 <CheckBox Margin="2" VerticalAlignment="Bottom" Foreground="{DynamicResource Muted}" Content="Age checked" IsChecked="{Binding AgeVerified}" />
@@ -327,10 +331,15 @@
                         <!-- Tender / complete -->
                         <StackPanel Grid.Column="1">
                             <Button Content="CASH" Style="{StaticResource PadButton}" Height="64" Background="#2980B9" Command="{Binding TenderCashCommand}" />
-                            <UniformGrid Columns="2">
+                            <UniformGrid Columns="3">
                                 <Button Content="CARD" Style="{StaticResource PadButton}" Height="64" Background="#8E44AD" Command="{Binding TenderCardCommand}" />
                                 <Button Content="MOBILE" Style="{StaticResource PadButton}" Height="64" Background="#117A65" Command="{Binding TenderMobileMoneyCommand}" />
+                                <Button Content="VOUCHER" Style="{StaticResource PadButton}" Height="64" Background="#B9770E" Command="{Binding TenderVoucherCommand}" />
                             </UniformGrid>
+                            <DockPanel Margin="2,0,2,4">
+                                <TextBlock Text="Gift card no." Foreground="{DynamicResource Muted}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBox Text="{Binding VoucherNumber, UpdateSourceTrigger=PropertyChanged}" />
+                            </DockPanel>
                             <Button Content="PAY / COMPLETE" Style="{StaticResource PadButton}" Height="72" FontSize="22" Background="#27AE60" Command="{Binding PayCommand}" />
                             <UniformGrid Columns="2">
                                 <Button Content="Clear Tenders" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#7F8C8D" Command="{Binding ClearTendersCommand}" />
