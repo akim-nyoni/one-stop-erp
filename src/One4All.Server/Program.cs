@@ -2330,6 +2330,12 @@ app.MapGet("/api/system/licence", async (One4All.Application.Abstractions.Licens
         ["companies"] = await db.Companies.CountAsync(ct).ConfigureAwait(false),
         ["named_users"] = await db.Users.CountAsync(u => u.IsActive, ct).ConfigureAwait(false),
         ["pos_terminals"] = await db.PosTerminals.CountAsync(t => t.IsActive, ct).ConfigureAwait(false),
+        ["warehouses"] = await db.Warehouses.CountAsync(ct).ConfigureAwait(false),
+        ["properties"] = await db.Properties.CountAsync(ct).ConfigureAwait(false),
+        ["stands"] = await db.HousingStands.CountAsync(ct).ConfigureAwait(false),
+        ["waiting_list"] = await db.HousingApplicants.CountAsync(ct).ConfigureAwait(false),
+        ["students"] = await db.Students.CountAsync(ct).ConfigureAwait(false),
+        ["employees"] = await db.Employees.CountAsync(e => e.Status != One4All.Core.Payroll.EmployeeStatus.Terminated, ct).ConfigureAwait(false),
     };
     return Results.Ok(new
     {

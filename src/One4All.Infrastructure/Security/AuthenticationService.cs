@@ -167,6 +167,19 @@ public sealed class AuthenticationService : IAuthenticationService
             }
         }
 
+        // The licence's concurrent-user limit: everyone else signed in now, plus this user.
+        if (_licence is { Enforced: true } && _licence.GetLimit("concurrent_users") is int concurrentLimit)
+        {
+            List<LoginEvent> everyone = await _db.LoginEvents.Where(l => l.SessionId != null && l.EndedOnUtc == null && l.UserId != user.Id).ToListAsync(ct).ConfigureAwait(false);
+            int others = (_options.SessionIdleTimeout is TimeSpan idleFor ? everyone.Where(l => (l.LastSeenUtc ?? l.OccurredOnUtc) + idleFor >= now) : everyone)
+                .Select(l => l.UserId).Distinct().Count();
+            if (others + 1 > concurrentLimit)
+            {
+                return await LogAsync(AuthenticationResult.Failure(AuthenticationOutcome.TooManySessions,
+                    $"The licence allows {concurrentLimit} user(s) signed in at once and that many are; try again when someone signs out.")).ConfigureAwait(false);
+            }
+        }
+
         user.RegisterSuccessfulLogin(now);
         bool expired = !usePin && _options.PasswordMaxAge is TimeSpan maxAge && (user.PasswordChangedUtc ?? DateTimeOffset.MinValue) + maxAge < now;
         EffectivePermissions permissions = await _permissions.ResolveAsync(user.Id, ct).ConfigureAwait(false);

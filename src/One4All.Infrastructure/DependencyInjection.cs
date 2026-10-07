@@ -49,9 +49,10 @@ public static class DependencyInjection
 
         // Persistence + audit interceptor (scoped, so it sees the ambient user).
         services.AddScoped<AuditingInterceptor>();
+        services.AddScoped<Licensing.LicenceLimitInterceptor>();
         services.AddDbContext<One4AllDbContext>((sp, options) =>
             options.UseOne4All(connectionString)
-                   .AddInterceptors(sp.GetRequiredService<AuditingInterceptor>()));
+                   .AddInterceptors(sp.GetRequiredService<AuditingInterceptor>(), sp.GetRequiredService<Licensing.LicenceLimitInterceptor>()));
 
         // Security services.
         services.AddSingleton<IPasswordHasher, Argon2PasswordHasher>();
