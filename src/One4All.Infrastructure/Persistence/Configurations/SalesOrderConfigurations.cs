@@ -163,3 +163,16 @@ internal sealed class DropShipmentLineConfiguration : IEntityTypeConfiguration<D
         b.Property(x => x.UnitCost).HasPrecision(19, 4);
     }
 }
+
+internal sealed class SalesOrderRevisionConfiguration : IEntityTypeConfiguration<SalesOrderRevision>
+{
+    public void Configure(EntityTypeBuilder<SalesOrderRevision> b)
+    {
+        b.ToTable("sales_order_revision", Schemas.SalesOrders);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.TotalNet).HasPrecision(19, 4);
+        b.Property(x => x.LinesSnapshot).HasColumnType("jsonb");
+        b.Property(x => x.Reason).HasMaxLength(500);
+        b.HasIndex(x => new { x.SalesOrderId, x.Version }).IsUnique();
+    }
+}

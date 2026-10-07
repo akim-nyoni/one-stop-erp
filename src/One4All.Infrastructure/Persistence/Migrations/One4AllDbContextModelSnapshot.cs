@@ -24859,6 +24859,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("customer_id");
 
+                    b.Property<long?>("LastAmendedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_amended_by_user_id");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -24890,6 +24894,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
 
                     b.HasKey("Id")
                         .HasName("pk_sales_order");
@@ -24968,6 +24976,84 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_sales_order_line_sales_order_id");
 
                     b.ToTable("sales_order_line", "sop");
+                });
+
+            modelBuilder.Entity("One4All.Core.SalesOrders.SalesOrderRevision", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AmendedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amended_by_user_id");
+
+                    b.Property<DateOnly>("AmendedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("amended_on");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("LinesSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("jsonb")
+                        .HasColumnName("lines_snapshot");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("SalesOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sales_order_id");
+
+                    b.Property<decimal>("TotalNet")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("total_net");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sales_order_revision");
+
+                    b.HasIndex("SalesOrderId", "Version")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sales_order_revision_sales_order_id_version");
+
+                    b.ToTable("sales_order_revision", "sop");
                 });
 
             modelBuilder.Entity("One4All.Core.Schools.FeeItem", b =>

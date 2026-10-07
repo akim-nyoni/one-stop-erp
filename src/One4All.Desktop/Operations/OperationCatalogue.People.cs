@@ -891,6 +891,41 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Amend a sales order", ListTitle = "Sales order amendments",
+            Description = "Changes ordered quantities and prices as a new version of the order, keeping the earlier one with the reason. Quantities cannot go below what has been despatched or invoiced; invoiced prices cannot change.",
+            Fields = [Req("Order", "Sales order number"), Req("Lines", "Lines: ITEM:quantity:unit price; …"), Req("Reason", "Reason"), Today()],
+            Run = async (c, i) =>
+            {
+                var order = await c.Db.SalesOrders.AsNoTracking().Include(o => o.Lines).FirstOrDefaultAsync(o => o.CompanyId == c.CompanyId && o.OrderNumber == i.Text("Order").ToUpper()).ConfigureAwait(true)
+                    ?? throw new OperationException($"No sales order '{i.Text("Order")}'.");
+                List<SalesOrderLineChange> lines = [];
+                foreach (string part in i.Text("Lines").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                    if (bits.Length != 3 || !decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal quantity)
+                        || !decimal.TryParse(bits[2], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal price))
+                    {
+                        throw new OperationException($"'{part}' should look like ITEM:quantity:unit price.");
+                    }
+
+                    long item = await ItemAsync(c, bits[0]).ConfigureAwait(true);
+                    long line = order.Lines.FirstOrDefault(l => l.ItemId == item)?.Id ?? throw new OperationException($"{bits[0]} is not on order {order.OrderNumber}.");
+                    lines.Add(new SalesOrderLineChange(line, quantity, price));
+                }
+
+                SalesOrderAmendmentResult done = Check(await c.Get<ISalesOrderAmendmentService>().AmendAsync(c.CompanyId, order.Id,
+                    new SalesOrderAmendment(i.Date("Date"), c.UserId, i.Text("Reason"), lines)).ConfigureAwait(true));
+                return $"Order {order.OrderNumber} is now version {done.Version}: {M(done.TotalBefore)} → {M(done.TotalAfter)}.";
+            },
+            List = async c => Table(await (from r in c.Db.SalesOrderRevisions.AsNoTracking()
+                                           join o in c.Db.SalesOrders.AsNoTracking() on r.SalesOrderId equals o.Id
+                                           where r.CompanyId == c.CompanyId
+                                           orderby r.Id descending
+                                           select new { o.OrderNumber, r.Version, r.TotalNet, r.Reason, r.AmendedOn }).Take(50).ToListAsync().ConfigureAwait(true),
+                ("Order", r => r.OrderNumber), ("Version replaced", r => r.Version.ToString(CultureInfo.InvariantCulture)), ("Value then", r => M(r.TotalNet)), ("Reason", r => r.Reason), ("On", r => D(r.AmendedOn))),
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Save a delivery zone rate", ListTitle = "Delivery zone rates",
             Description = "A zone's charge per delivery plus per kg and per m³ of goods sent (from item weights and volumes), free above a goods value.",
             Fields = [Req("Zone", "Zone"), Num("Base", "Charge per delivery", "0"), Num("PerKg", "Per kg", "0"), Num("PerM3", "Per m³", "0"), OptNum("Free", "Free above goods value")],

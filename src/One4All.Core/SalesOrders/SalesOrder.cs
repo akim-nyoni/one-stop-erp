@@ -74,6 +74,70 @@ public sealed class SalesOrder : AuditableEntity, ICompanyScoped
     /// <summary>The order lines.</summary>
     public IReadOnlyList<SalesOrderLine> Lines => _lines.AsReadOnly();
 
+    /// <summary>The amendment version (1 as first entered; each amendment adds one, the earlier version kept as a revision).</summary>
+    public int Version { get; private set; } = 1;
+
+    /// <summary>Who last amended it.</summary>
+    public long? LastAmendedByUserId { get; private set; }
+
+    /// <summary>The order's value net of tax.</summary>
+    public decimal TotalNet => _lines.Sum(l => l.OrderedQuantity * l.UnitPrice);
+
+    /// <summary>
+    /// Amends a line: its quantity can never go below what has been despatched or invoiced, and its price cannot change once anything on it
+    /// has been invoiced (brief §4.13 order amendment history).
+    /// </summary>
+    /// <param name="lineId">The line.</param>
+    /// <param name="quantity">The new ordered quantity.</param>
+    /// <param name="unitPrice">The new unit price.</param>
+    /// <returns>Success or the rule broken.</returns>
+    public Result AmendLine(long lineId, decimal quantity, decimal unitPrice)
+    {
+        Result allowed = CheckAmendment(lineId, quantity, unitPrice);
+        if (allowed.IsFailure)
+        {
+            return allowed;
+        }
+
+        _lines.First(l => l.Id == lineId).Amend(quantity, unitPrice);
+        return Result.Success();
+    }
+
+    /// <summary>Whether a line may be amended so, without changing it (lets a multi-line amendment be checked whole before any line moves).</summary>
+    /// <param name="lineId">The line.</param>
+    /// <param name="quantity">The new ordered quantity.</param>
+    /// <param name="unitPrice">The new unit price.</param>
+    /// <returns>Success or the rule broken.</returns>
+    public Result CheckAmendment(long lineId, decimal quantity, decimal unitPrice)
+    {
+        SalesOrderLine? line = _lines.FirstOrDefault(l => l.Id == lineId);
+        if (line is null)
+        {
+            return Result.Failure(Error.NotFound("Sop.LineNotFound", $"Order line {lineId} not found."));
+        }
+
+        decimal floor = Math.Max(line.DespatchedQuantity, line.InvoicedQuantity);
+        if (quantity <= 0m || quantity < floor || unitPrice < 0m)
+        {
+            return Result.Failure(Error.Rule("Sop.AmendQuantity", $"Order line '{line.Description}' cannot go below the {floor:0.###} already despatched or invoiced."));
+        }
+
+        if (unitPrice != line.UnitPrice && line.InvoicedQuantity > 0m)
+        {
+            return Result.Failure(Error.Rule("Sop.AmendPrice", $"Order line '{line.Description}' has been invoiced, so its price cannot change."));
+        }
+
+        return Result.Success();
+    }
+
+    /// <summary>Records an amendment: the next version.</summary>
+    /// <param name="userId">Who amended it.</param>
+    public void MarkAmended(long userId)
+    {
+        Version++;
+        LastAmendedByUserId = userId;
+    }
+
     /// <summary>Adds an order line.</summary>
     /// <param name="itemId">The item.</param>
     /// <param name="description">The description.</param>
@@ -194,6 +258,15 @@ public sealed class SalesOrderLine : Entity
     /// <summary>Records a despatched quantity.</summary>
     /// <param name="quantity">The quantity.</param>
     public void Despatch(decimal quantity) => DespatchedQuantity += quantity;
+
+    /// <summary>Changes the ordered quantity and price (checked by the order).</summary>
+    /// <param name="quantity">The quantity.</param>
+    /// <param name="unitPrice">The unit price.</param>
+    internal void Amend(decimal quantity, decimal unitPrice)
+    {
+        OrderedQuantity = quantity;
+        UnitPrice = unitPrice;
+    }
 
     /// <summary>Returns a despatched (not-yet-invoiced) quantity, reducing the despatched total.</summary>
     /// <param name="quantity">The quantity returned.</param>
