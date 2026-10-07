@@ -2,6 +2,7 @@ using System.Data;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Trading;
 using One4All.Core.Accounting;
+using One4All.Core.System;
 using One4All.Core.Trading;
 using static One4All.Desktop.Operations.Ops;
 
@@ -15,6 +16,37 @@ public static partial class OperationCatalogue
         foreach (string module in new[] { "Customers", "Suppliers" })
         {
             TradingLedger ledger = module == "Customers" ? TradingLedger.AccountsReceivable : TradingLedger.AccountsPayable;
+            yield return new Operation
+            {
+                Module = module, Title = "Exchange-rate type", ListTitle = module == "Customers" ? "Customers on their own rate" : "Suppliers on their own rate",
+                Description = "The rate type this trader's foreign documents convert at (e.g. a contract or bank rate kept in the rate table). Daily (or blank) uses the daily rate; "
+                    + "a document dated before any rate of the type falls back to the daily rate.",
+                Fields = [Req("Code", module == "Customers" ? "Customer code" : "Supplier code"), Pick("RateType", "Rate type", Enum.GetNames<ExchangeRateType>())],
+                Run = async (c, i) =>
+                {
+                    string code = i.Text("Code").Trim().ToUpperInvariant();
+                    ExchangeRateType type = Enum.Parse<ExchangeRateType>(i.Text("RateType"));
+                    ExchangeRateType? stored = type == ExchangeRateType.Daily ? null : type;
+                    if (module == "Customers")
+                    {
+                        Customer customer = await c.Db.Customers.FirstOrDefaultAsync(x => x.CompanyId == c.CompanyId && x.Code == code).ConfigureAwait(true) ?? throw new OperationException($"No customer {code}.");
+                        customer.RateType = stored;
+                    }
+                    else
+                    {
+                        Supplier supplier = await c.Db.Suppliers.FirstOrDefaultAsync(x => x.CompanyId == c.CompanyId && x.Code == code).ConfigureAwait(true) ?? throw new OperationException($"No supplier {code}.");
+                        supplier.RateType = stored;
+                    }
+
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"{code} now converts at the {type} rate.";
+                },
+                List = async c => module == "Customers"
+                    ? Table(await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.RateType != null).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                        ("Code", x => x.Code), ("Name", x => x.Name), ("Currency", x => x.Currency), ("Rate type", x => x.RateType))
+                    : Table(await c.Db.Suppliers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.RateType != null).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                        ("Code", x => x.Code), ("Name", x => x.Name), ("Currency", x => x.Currency), ("Rate type", x => x.RateType)),
+            };
             yield return new Operation
             {
                 Module = module, Title = "Addresses and contacts", ListTitle = "Directory",

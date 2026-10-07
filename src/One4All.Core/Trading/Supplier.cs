@@ -123,4 +123,7 @@ public sealed class Supplier : SoftDeletableEntity, ICompanyScoped
     /// <param name="documentDate">The document date.</param>
     /// <returns>The due date.</returns>
     public DateOnly DueDateFor(DateOnly documentDate) => documentDate.AddDays(PaymentTermsDays);
+
+    /// <summary>The exchange-rate type this supplier's foreign documents convert at (e.g. a contract or bank rate); null: the daily rate. Falls back to the daily rate when none is found.</summary>
+    public One4All.Core.System.ExchangeRateType? RateType { get; set; }
 }

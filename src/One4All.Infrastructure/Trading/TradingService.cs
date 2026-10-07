@@ -89,7 +89,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, customer.RateType).ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -512,7 +512,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.ReceiptDate, ct).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.ReceiptDate, ct, customer.RateType).ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -551,7 +551,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, customer.RateType).ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -606,7 +606,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, supplier.RateType).ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -684,7 +684,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, supplier.RateType).ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -749,7 +749,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.PaymentDate, ct).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.PaymentDate, ct, supplier.RateType).ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -884,7 +884,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(companyId, currency, exchangeRate, date, ct).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(companyId, currency, exchangeRate, date, ct, customer.RateType).ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -1127,7 +1127,8 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             : code;
     }
 
-    private async Task<Result<decimal>> ResolveRateAsync(long companyId, CurrencyCode currency, decimal? explicitRate, DateOnly date, CancellationToken ct)
+    // The rate given on the document; else the trader's own rate type (a contract or bank rate) when one is found; else the daily rate.
+    private async Task<Result<decimal>> ResolveRateAsync(long companyId, CurrencyCode currency, decimal? explicitRate, DateOnly date, CancellationToken ct, ExchangeRateType? traderRateType = null)
     {
         Company company = await _db.Companies.FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         if (currency == company.BaseCurrency)
@@ -1140,7 +1141,10 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return r;
         }
 
-        decimal? rate = await Accounting.ExchangeRateResolver.FindAsync(_db, currency, company.BaseCurrency, ExchangeRateType.Daily, date, ct).ConfigureAwait(false);
+        decimal? rate = traderRateType is ExchangeRateType own && own != ExchangeRateType.Daily
+            ? await Accounting.ExchangeRateResolver.FindAsync(_db, currency, company.BaseCurrency, own, date, ct).ConfigureAwait(false)
+            : null;
+        rate ??= await Accounting.ExchangeRateResolver.FindAsync(_db, currency, company.BaseCurrency, ExchangeRateType.Daily, date, ct).ConfigureAwait(false);
         if (rate is null)
         {
             return Error.Rule("Trading.NoRate", $"No daily rate from {currency} to {company.BaseCurrency} on or before {date:yyyy-MM-dd}.");

@@ -27562,6 +27562,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("price_list_id");
 
+                    b.Property<int?>("RateType")
+                        .HasColumnType("integer")
+                        .HasColumnName("rate_type");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -28720,6 +28724,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("PaymentTermsDays")
                         .HasColumnType("integer")
                         .HasColumnName("payment_terms_days");
+
+                    b.Property<int?>("RateType")
+                        .HasColumnType("integer")
+                        .HasColumnName("rate_type");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
