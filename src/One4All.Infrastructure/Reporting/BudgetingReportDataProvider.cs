@@ -846,7 +846,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         List<IReadOnlyDictionary<string, object?>> rows =
         [
             Row(("Account", "SEAL"), ("Name", $"{budget.Label} v{budget.VersionNumber} {c.Year.Code} — {(intact ? "seal verified, exactly as approved" : "SEAL BROKEN — lines differ from those approved")}"),
-                ("CostCentre", budget.SealHash![..Math.Min(16, budget.SealHash.Length)] + "…"), ("Q1", string.Empty), ("Q2", string.Empty), ("Q3", string.Empty), ("Q4", string.Empty), ("Total", null)),
+                ("CostCentre", budget.SealHash![..Math.Min(16, budget.SealHash!.Length)] + "…"), ("Q1", string.Empty), ("Q2", string.Empty), ("Q3", string.Empty), ("Q4", string.Empty), ("Total", null)),
         ];
         rows.AddRange(budget.Lines.GroupBy(l => (l.AccountCode, CostCentre: l.CostCentre ?? string.Empty)).OrderBy(g => g.Key.AccountCode, StringComparer.Ordinal).ThenBy(g => g.Key.CostCentre, StringComparer.Ordinal)
             .Select(g => Row(("Account", g.Key.AccountCode), ("Name", names.GetValueOrDefault(g.Key.AccountCode, "?")), ("CostCentre", g.Key.CostCentre.Length == 0 ? "—" : g.Key.CostCentre),

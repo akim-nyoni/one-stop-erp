@@ -106,7 +106,8 @@ public sealed class ReportRunner : IReportRunner
                 definitions[code] = child;
             }
 
-            IEnumerable<IReadOnlyDictionary<string, object?>?> sources = perRow ? rows : [null];
+            IReadOnlyDictionary<string, object?>?[] single = [null];
+            IEnumerable<IReadOnlyDictionary<string, object?>?> sources = perRow ? rows.Cast<IReadOnlyDictionary<string, object?>?>() : single;
             foreach (IReadOnlyDictionary<string, object?>? row in sources)
             {
                 IReadOnlyDictionary<string, object?> childParameters = SubReports.ParametersFor(element, parameters, row);

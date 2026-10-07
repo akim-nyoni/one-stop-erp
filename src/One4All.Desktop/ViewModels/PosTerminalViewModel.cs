@@ -26,6 +26,12 @@ namespace One4All.Desktop.ViewModels;
 /// <summary>A product button on the terminal grid (a priced, sellable menu item).</summary>
 public sealed class PosProductVm
 {
+    /// <summary>The stock item the tile sells (stock and cost of sales follow it).</summary>
+    public long ItemId { get; init; }
+
+    /// <summary>The tile as the catalogue gave it, for searching.</summary>
+    public PosTile? Tile { get; init; }
+
     /// <summary>The menu name shown on the button.</summary>
     public required string Name { get; init; }
 
@@ -265,7 +271,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         _terminalId = await ResolveTerminalAsync(db, ct).ConfigureAwait(true);
 
         await LoadTaxRatesAsync(db, ct).ConfigureAwait(true);
-        await LoadProductsAsync(db, ct).ConfigureAwait(true);
+        await LoadProductsAsync(scope.ServiceProvider.GetRequiredService<IPosCatalogueService>(), ct).ConfigureAwait(true);
         await PrefillAccountsAsync(db, ct).ConfigureAwait(true);
         await RefreshParkedAsync().ConfigureAwait(true);
 
@@ -312,25 +318,23 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
     }
 
-    private async Task LoadProductsAsync(One4AllDbContext db, CancellationToken ct)
+    // Tiles come from the item master (not the restaurant menu), so a tapped sale issues stock and posts its cost like a scanned one.
+    private async Task LoadProductsAsync(IPosCatalogueService catalogue, CancellationToken ct)
     {
-        List<MenuItem> items = await db.Set<MenuItem>()
-            .Where(m => m.CompanyId == _companyId && m.IsAvailable)
-            .OrderBy(m => m.Category).ThenBy(m => m.Name)
-            .ToListAsync(ct).ConfigureAwait(true);
-
+        IReadOnlyList<PosTile> tiles = await catalogue.TilesAsync(_companyId, ct).ConfigureAwait(true);
         _allProducts.Clear();
-        foreach (MenuItem item in items)
+        foreach (PosTile tile in tiles)
         {
-            string category = string.IsNullOrWhiteSpace(item.Category) ? "General" : item.Category!;
-            decimal rate = item.TaxCode is not null && _taxRates.TryGetValue(item.TaxCode, out decimal r) ? r : 0m;
+            decimal rate = tile.TaxCode is not null && _taxRates.TryGetValue(tile.TaxCode, out decimal r) ? r : 0m;
             _allProducts.Add(new PosProductVm
             {
-                Name = item.Name,
-                Category = category,
-                Price = item.Price,
-                RevenueAccountCode = item.RevenueAccountCode,
-                TaxCode = item.TaxCode,
+                ItemId = tile.ItemId,
+                Tile = tile,
+                Name = tile.Name,
+                Category = tile.Category,
+                Price = tile.UnitPrice,
+                RevenueAccountCode = tile.RevenueAccountCode,
+                TaxCode = tile.TaxCode,
                 TaxRate = rate,
             });
         }
@@ -367,12 +371,14 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
     partial void OnSelectedCategoryChanged(string value) => ApplyCategoryFilter();
 
+    // Typing in the scan box narrows the tiles as you type (code, name, barcode or PLU); Enter still adds the exact match.
+    partial void OnScanEntryChanged(string value) => ApplyCategoryFilter();
+
     private void ApplyCategoryFilter()
     {
         Products.Clear();
-        IEnumerable<PosProductVm> filtered = SelectedCategory == "All"
-            ? _allProducts
-            : _allProducts.Where(p => p.Category == SelectedCategory);
+        IEnumerable<PosProductVm> filtered = (SelectedCategory == "All" ? _allProducts : _allProducts.Where(p => p.Category == SelectedCategory))
+            .Where(p => p.Tile?.Matches(ScanEntry) ?? true);
         foreach (PosProductVm product in filtered)
         {
             Products.Add(product);
@@ -424,7 +430,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             return;
         }
 
-        _ticket.AddLine(itemId: 0, product.Name, product.Price, product.TaxRate, product.RevenueAccountCode, product.TaxCode);
+        _ticket.AddLine(product.ItemId, product.Name, product.Price, product.TaxRate, product.RevenueAccountCode, product.TaxCode);
+        ScanEntry = string.Empty;
         RebuildCart();
     }
 
