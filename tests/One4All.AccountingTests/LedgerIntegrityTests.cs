@@ -101,14 +101,14 @@ public sealed class LedgerIntegrityTests
             tamperedLineId = await db.Set<Core.Accounting.JournalLine>()
                 .Where(l => db.Journals.Any(j => j.Id == l.JournalEntryId && j.CompanyId == companyId && j.DocumentNumber == "CHK-LAST") && l.AccountCode == "1000")
                 .Select(l => l.Id).SingleAsync();
-            await db.Database.ExecuteSqlRawAsync("ALTER TABLE gl.journal_line DISABLE TRIGGER trg_journal_line_posted_guard");
+            await db.Database.ExecuteSqlRawAsync("ALTER TABLE gl.journal_line DISABLE TRIGGER trg_journal_line_posted_guard, DISABLE TRIGGER trg_journal_line_balanced");
             try
             {
                 await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE gl.journal_line SET base_debit = 7, transaction_debit = 7 WHERE id = {tamperedLineId}");
             }
             finally
             {
-                await db.Database.ExecuteSqlRawAsync("ALTER TABLE gl.journal_line ENABLE TRIGGER trg_journal_line_posted_guard");
+                await db.Database.ExecuteSqlRawAsync("ALTER TABLE gl.journal_line ENABLE TRIGGER trg_journal_line_posted_guard, ENABLE TRIGGER trg_journal_line_balanced");
             }
         }
 
