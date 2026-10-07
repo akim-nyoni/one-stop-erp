@@ -108,18 +108,23 @@ public static partial class OperationCatalogue
                 ("When", x => x.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Operation", x => x.Operation), ("Table", x => x.TableName), ("Row", x => x.RowId),
                 ("Database user", x => x.DbUser), ("Application", x => x.ApplicationName), ("Client", x => x.ClientAddress)),
         };
-        string[] imports = ["Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance"];
+        string[] imports = ["Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "Properties", "Students"];
         yield return new Operation
         {
             Module = module, Title = "Import master data or opening balances", ListTitle = "Opening balance reconciliation",
             Description = "Loads a CSV template (header row; dates yyyy-MM-dd). Untick Commit to preview: nothing is written while any row has an error. "
                 + "Customers/Suppliers: code,name,currency[,credit_limit]. Items: code,description[,type,revenue_account,cost_account,category]. Stock: item,warehouse,quantity,unit_cost. "
-                + "Receivables/Payables: trader,document,date,amount (negative = credit). TrialBalance: account,debit,credit.",
+                + "Receivables/Payables: trader,document,date,amount (negative = credit). TrialBalance: account,debit,credit. "
+                + "FixedAssets: asset_number,description,class,acquired,cost,accumulated,life_months,cost_account,accum_account,expense_account[,residual,method,rate]. "
+                + "Employees: employee_number,name,basic_salary,engaged[,national_id,department,cost_centre,grade]. StaffLoans: employee_number,reference,outstanding,instalment,loan_account. "
+                + "Properties: stand,ward,ratepayer[,valuation,size,connected,services e.g. Water:WAT1;Refuse:REF1]. Students: admission,name,grade,guardian[,boarder,admitted]. "
+                + "The list also shows the fixed asset and staff loan registers against their accounts.",
             Fields = [Pick("Kind", "What", imports), Req("File", "CSV file path"), Today("Date", "Opening date"), Req("Suspense", "Migration suspense account", "2900"), Tick("Commit", "Commit")],
             Run = async (c, i) =>
             {
                 string csv = await System.IO.File.ReadAllTextAsync(i.Text("File")).ConfigureAwait(true);
                 IOpeningBalanceService ob = c.Get<IOpeningBalanceService>();
+                IVerticalImportService registers = c.Get<IVerticalImportService>();
                 bool commit = i.Flag("Commit");
                 ImportReport report = i.Text("Kind") switch
                 {
@@ -129,6 +134,11 @@ public static partial class OperationCatalogue
                     "Stock" => await ob.ImportStockAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),
                     "Receivables" => await ob.ImportOpenItemsAsync(c.CompanyId, Core.Trading.TradingLedger.AccountsReceivable, csv, i.Text("Suspense"), commit).ConfigureAwait(true),
                     "Payables" => await ob.ImportOpenItemsAsync(c.CompanyId, Core.Trading.TradingLedger.AccountsPayable, csv, i.Text("Suspense"), commit).ConfigureAwait(true),
+                    "FixedAssets" => await registers.ImportFixedAssetsAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),
+                    "Employees" => await registers.ImportEmployeesAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
+                    "StaffLoans" => await registers.ImportEmployeeLoansAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),
+                    "Properties" => await registers.ImportPropertiesAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
+                    "Students" => await registers.ImportStudentsAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     _ => await ob.ImportTrialBalanceAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),
                 };
                 string head = $"{report.Rows} row(s): {(report.Committed ? $"{report.Created} written" : "nothing written")}, {report.Skipped} already there, {report.Errors.Count} error(s).";
@@ -547,7 +557,14 @@ public static partial class OperationCatalogue
             ("Trial balance loaded", r.TrialBalanceLoaded ? "yes" : "no", string.Empty, r.TrialBalanceLoaded ? "OK" : "Load it"),
             ($"Suspense {r.SuspenseAccountCode}", M(r.SuspenseBalance), string.Empty, Math.Abs(r.SuspenseBalance) < 0.01m ? "OK" : "Investigate"),
             .. r.Controls.Select(x => (x.Ledger, M(x.ControlBalance), M(x.SubLedgerBalance), x.Agrees ? "OK" : "Differs")),
-            ("Ready to go live", r.Ready ? "yes" : "no", string.Empty, string.Empty),
+        ];
+        IReadOnlyList<RegisterCheck> registers = (await c.Get<IVerticalImportService>().ReconcileRegistersAsync(c.CompanyId).ConfigureAwait(true)).Value;
+        bool registersAgree = registers.All(x => x.Agrees);
+        rows =
+        [
+            .. rows,
+            .. registers.Select(x => (x.Register, M(x.LedgerBalance), M(x.RegisterBalance), x.Agrees ? "OK" : "Differs")),
+            ("Ready to go live", r.Ready && registersAgree ? "yes" : "no", string.Empty, string.Empty),
         ];
         return Table(rows, ("Check", x => x.Check), ("Ledger / balance", x => x.Ledger), ("Sub-ledger", x => x.Sub), ("Status", x => x.Status));
     }
