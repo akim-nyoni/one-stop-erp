@@ -20067,6 +20067,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<long?>("OverReceiptAuthorisedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("over_receipt_authorised_by_user_id");
+
                     b.Property<long>("PurchaseOrderId")
                         .HasColumnType("bigint")
                         .HasColumnName("purchase_order_id");
@@ -26459,6 +26463,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<decimal>("OverReceiptTolerancePercent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("over_receipt_tolerance_percent");
+
                     b.Property<bool>("PaymentRunApprovalRequired")
                         .HasColumnType("boolean")
                         .HasColumnName("payment_run_approval_required");
@@ -28720,6 +28729,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("OnHold")
                         .HasColumnType("boolean")
                         .HasColumnName("on_hold");
+
+                    b.Property<decimal?>("OverReceiptTolerancePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("over_receipt_tolerance_percent");
 
                     b.Property<int>("PaymentTermsDays")
                         .HasColumnType("integer")

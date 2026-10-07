@@ -203,7 +203,41 @@ public sealed class ProcurementService : IProcurementService
             return Error.Rule("Pop.NoGrni", "No goods-received-not-invoiced control account is configured.");
         }
 
-        GoodsReceivedNote grn = new(request.CompanyId, order.SupplierId, order.Id, request.GrnNumber, request.Date);
+        // Over-receipt: within the supplier's (else the company's) tolerance of each line, or authorised by a supervisor who may.
+        decimal tolerance = await _db.Suppliers.Where(s => s.Id == order.SupplierId).Select(s => s.OverReceiptTolerancePercent).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+            ?? await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.OverReceiptTolerancePercent).FirstAsync(ct).ConfigureAwait(false);
+        List<string> over = [];
+        foreach (IGrouping<long, ReceiveLine> receiving in request.Lines.GroupBy(l => l.PurchaseOrderLineId))
+        {
+            if (order.Lines.FirstOrDefault(l => l.Id == receiving.Key) is PurchaseOrderLine ordered
+                && ordered.ReceivedQuantity + receiving.Sum(r => r.Quantity) > ordered.OrderedQuantity * (1m + tolerance / 100m))
+            {
+                over.Add($"{ordered.Description}: {ordered.ReceivedQuantity + receiving.Sum(r => r.Quantity):0.###} of {ordered.OrderedQuantity:0.###} ordered");
+            }
+        }
+
+        if (over.Count > 0)
+        {
+            if (request.OverReceiptAuthorisedByUserId is not long authoriser)
+            {
+                return Error.Rule("Pop.OverReceipt", $"More than ordered (tolerance {tolerance:0.##}%): {string.Join("; ", over)}. A supervisor must authorise it.");
+            }
+
+            if (authoriser == request.ReceivedByUserId && request.ReceivedByUserId != 0)
+            {
+                return Error.Rule("Pop.OverReceiptSelf", "The receiver cannot authorise their own over-receipt.");
+            }
+
+            if (_permissions is null || !(await _permissions.ResolveAsync(authoriser, ct).ConfigureAwait(false)).Has("Procurement.Grn", One4All.Core.Security.OperationFlags.AuthoriseLevel1))
+            {
+                return Error.Forbidden("Pop.OverReceiptNotAuthorised", "Only a user who may authorise goods received notes can accept more than was ordered.");
+            }
+        }
+
+        GoodsReceivedNote grn = new(request.CompanyId, order.SupplierId, order.Id, request.GrnNumber, request.Date)
+        {
+            OverReceiptAuthorisedByUserId = over.Count > 0 ? request.OverReceiptAuthorisedByUserId : null,
+        };
         decimal accrued = 0m;
 
         foreach (ReceiveLine received in request.Lines)

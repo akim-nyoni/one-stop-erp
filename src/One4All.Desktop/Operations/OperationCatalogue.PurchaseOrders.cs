@@ -107,7 +107,8 @@ public static partial class OperationCatalogue
             Module = module, Title = "Receive goods", ListTitle = "Purchase orders",
             Description = "Books a goods received note against an order into a warehouse (stock in, goods-received-not-invoiced accrued). Leave Lines blank to receive everything still outstanding; "
                 + "otherwise ITEM:quantity; ITEM:quantity.",
-            Fields = [Req("Order", "Order number"), Req("Warehouse", "Warehouse code"), Req("Grn", "GRN number"), Opt("Lines", "Lines (blank: all outstanding)"), Today("Date", "Date")],
+            Fields = [Req("Order", "Order number"), Req("Warehouse", "Warehouse code"), Req("Grn", "GRN number"), Opt("Lines", "Lines (blank: all outstanding)"), Today("Date", "Date"),
+                Opt("Supervisor", "Supervisor authorising an over-receipt (user name)")],
             Run = async (c, i) =>
             {
                 long orderId = OrderId(c, i.Text("Order"));
@@ -118,7 +119,8 @@ public static partial class OperationCatalogue
                 GrnResult grn = Check(await c.Get<IProcurementService>().ReceiveGoodsAsync(new ReceiveGoodsRequest
                 {
                     CompanyId = c.CompanyId, PurchaseOrderId = order.Id, WarehouseId = await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true), GrnNumber = i.Text("Grn"),
-                    Date = i.Date("Date"), Lines = lines,
+                    Date = i.Date("Date"), Lines = lines, ReceivedByUserId = c.UserId,
+                    OverReceiptAuthorisedByUserId = await OptionalUserAsync(c, i.Optional("Supervisor")).ConfigureAwait(true),
                 }).ConfigureAwait(true));
                 return $"GRN {i.Text("Grn")} booked: {lines.Count} line(s), {M(grn.AccruedValue)} accrued.";
             },

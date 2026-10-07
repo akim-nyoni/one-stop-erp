@@ -66,6 +66,12 @@ public sealed class ReceiveGoodsRequest
 
     /// <summary>The received lines.</summary>
     public IReadOnlyList<ReceiveLine> Lines { get; init; } = [];
+
+    /// <summary>The supervisor authorising a receipt beyond the over-receipt tolerance (needs Procurement › GRN authorise; not the receiver).</summary>
+    public long? OverReceiptAuthorisedByUserId { get; init; }
+
+    /// <summary>Who is receiving (refused as their own over-receipt authoriser).</summary>
+    public long ReceivedByUserId { get; init; }
 }
 
 /// <summary>An invoiced line for a three-way match.</summary>

@@ -117,7 +117,7 @@ public static class PermissionCatalogue
         Add(proc, LicenceModules.Procurement, "Requisition", "Requisitions", txn | auth | OperationFlags.OverrideDiscount);
         Add(proc, LicenceModules.Procurement, "Rfq", "RFQ / Tender", txn | auth);
         Add(proc, LicenceModules.Procurement, "PurchaseOrder", "Purchase Orders", txn | auth);
-        Add(proc, LicenceModules.Procurement, "Grn", "Goods Received Notes", txn);
+        Add(proc, LicenceModules.Procurement, "Grn", "Goods Received Notes", txn | OperationFlags.AuthoriseLevel1);
         Add(proc, LicenceModules.Procurement, "InvoiceMatch", "3-Way Invoice Matching", OperationFlags.View | OperationFlags.Edit | OperationFlags.Post | OperationFlags.Approve);
 
         // ---- Sales Order Processing ----

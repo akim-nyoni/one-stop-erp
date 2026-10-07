@@ -47,6 +47,9 @@ public sealed class GoodsReceivedNote : AuditableEntity, ICompanyScoped
     /// <summary>The GRN lines.</summary>
     public IReadOnlyList<GrnLine> Lines => _lines.AsReadOnly();
 
+    /// <summary>The supervisor who authorised receiving more than the order allows, if anyone did.</summary>
+    public long? OverReceiptAuthorisedByUserId { get; set; }
+
     /// <summary>Adds a received line.</summary>
     /// <param name="purchaseOrderLineId">The PO line received against.</param>
     /// <param name="itemId">The item.</param>

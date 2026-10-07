@@ -111,6 +111,9 @@ public sealed class Company : SoftDeletableEntity
     /// <summary>Whether supplier payment runs must be saved, reviewed and approved by a second person before they pay (brief §4.6).</summary>
     public bool PaymentRunApprovalRequired { get; set; }
 
+    /// <summary>How far (percent of the ordered quantity) a goods receipt may go over a purchase order line without a supervisor (brief §4.3).</summary>
+    public decimal OverReceiptTolerancePercent { get; set; }
+
     /// <summary>The company's logo (PNG or JPEG) for report layouts (expression <c>CompanyLogo</c>).</summary>
     public byte[]? Logo { get; set; }
 

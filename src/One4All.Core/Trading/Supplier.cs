@@ -126,4 +126,7 @@ public sealed class Supplier : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>The exchange-rate type this supplier's foreign documents convert at (e.g. a contract or bank rate); null: the daily rate. Falls back to the daily rate when none is found.</summary>
     public One4All.Core.System.ExchangeRateType? RateType { get; set; }
+
+    /// <summary>This supplier's over-receipt tolerance (percent), when it differs from the company's.</summary>
+    public decimal? OverReceiptTolerancePercent { get; set; }
 }
