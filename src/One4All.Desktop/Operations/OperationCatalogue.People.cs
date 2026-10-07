@@ -598,6 +598,31 @@ public static partial class OperationCatalogue
         const string module = "Banking";
         yield return new Operation
         {
+            Module = module, Title = "Cash-flow forecast", ListTitle = "Bank accounts",
+            Description = "Week by week from the bank balances: receivables and payables by due date, saved payment runs on their dates, open sales and purchase orders on "
+                + "delivery plus terms, standing orders and payroll (repeating the last regular run). Weeks where cash would fall below the minimum are marked.",
+            Fields = [Today("From", "From"), Num("Weeks", "Weeks", "13"), Num("Minimum", "Minimum cash to hold", "0"), Tick("Detail", "Show every flow")],
+            Run = async (c, i) =>
+            {
+                Application.Banking.CashForecast f = await c.Get<Application.Abstractions.Banking.ICashForecastService>().ForecastAsync(c.CompanyId, i.Date("From"), i.Whole("Weeks"), i.Number("Minimum"))
+                    .ConfigureAwait(true);
+                List<string> text =
+                [
+                    $"Opening {M(f.OpeningBalance)}; lowest {M(f.LowestClosing)}" + (f.FirstShortfall is DateOnly shortfall ? $"; below {M(f.Minimum)} from the week of {D(shortfall)}." : "."),
+                    .. f.Weeks.Select(w => $"{D(w.WeekStart)}  in {M(w.Inflows),14}  out {M(w.Outflows),14}  closing {M(w.Closing),14}{(w.BelowMinimum ? "  ← below minimum" : string.Empty)}"),
+                ];
+                if (i.Flag("Detail"))
+                {
+                    text.AddRange(f.Lines.Select(l => $"  {D(l.Date)}  {l.Source,-15} {M(l.Amount),14}  {l.Reference}"));
+                }
+
+                return string.Join(Environment.NewLine, text);
+            },
+            List = async c => Table(await c.Db.BankAccounts.AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderBy(b => b.Code).ToListAsync().ConfigureAwait(true),
+                ("Bank", b => b.Code), ("Name", b => b.Name), ("Currency", b => b.Currency), ("Ledger account", b => b.GlAccountCode)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set up a standing order", ListTitle = "Standing orders and direct debits",
             Description = "A fixed payment out of the bank on a schedule: to a supplier (purchase ledger) or to a GL account. Give a supplier or an account, not both.",
             Fields = [Req("Reference", "Reference"), Req("Bank", "Bank account", "1100"), Num("Amount", "Amount"), Pick("Frequency", "Frequency", Enum.GetNames<RecurrenceFrequency>()),
