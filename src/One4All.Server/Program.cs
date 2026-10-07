@@ -1190,6 +1190,36 @@ app.MapPost("/api/housing/rent-runs", async (long companyId, DateOnly month, One
 .RequireAuthorization()
 .WithName("RunRent");
 
+app.MapPost("/api/housing/rental-units/{unitCode}/max-occupants", async (string unitCode, long companyId, int? maxOccupants, One4All.Application.Abstractions.Housing.IRentalOccupancyService occupancy, CancellationToken ct) =>
+    ActionResponse(await occupancy.SetMaxOccupantsAsync(companyId, unitCode, maxOccupants, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SetUnitMaxOccupants");
+
+app.MapPost("/api/housing/tenancies/{tenancyNumber}/occupants", async (string tenancyNumber, long companyId, string fullName, string? idNumber, string relationship, DateOnly movedInOn, One4All.Application.Abstractions.Housing.IRentalOccupancyService occupancy, CancellationToken ct) =>
+    ValueResponse(await occupancy.AddOccupantAsync(companyId, tenancyNumber, fullName, idNumber, relationship, movedInOn, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("AddTenancyOccupant");
+
+app.MapPost("/api/housing/tenancies/{tenancyNumber}/occupants/{occupantId:long}/move-out", async (string tenancyNumber, long occupantId, long companyId, DateOnly movedOutOn, One4All.Application.Abstractions.Housing.IRentalOccupancyService occupancy, CancellationToken ct) =>
+    ActionResponse(await occupancy.RemoveOccupantAsync(companyId, tenancyNumber, occupantId, movedOutOn, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("MoveOutTenancyOccupant");
+
+app.MapGet("/api/housing/tenancies/{tenancyNumber}/occupancy", async (string tenancyNumber, long companyId, DateOnly date, One4All.Application.Abstractions.Housing.IRentalOccupancyService occupancy, CancellationToken ct) =>
+    ValueResponse(await occupancy.OccupancyAsync(companyId, tenancyNumber, date, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("TenancyOccupancy");
+
+app.MapPost("/api/housing/lodger-permits", async (One4All.Application.Abstractions.Housing.LodgerPermitRequest request, One4All.Application.Abstractions.Housing.IRentalOccupancyService occupancy, CancellationToken ct) =>
+    ValueResponse(await occupancy.IssueLodgerPermitAsync(request, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("IssueLodgerPermit");
+
+app.MapPost("/api/housing/lodger-permits/{permitNumber}/revoke", async (string permitNumber, long companyId, DateOnly lastDay, string reason, One4All.Application.Abstractions.Housing.IRentalOccupancyService occupancy, CancellationToken ct) =>
+    ActionResponse(await occupancy.RevokeLodgerPermitAsync(companyId, permitNumber, lastDay, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RevokeLodgerPermit");
+
 app.MapPost("/api/housing/tenancies/{tenancyNumber}/end", async (string tenancyNumber, long companyId, DateOnly endDate, string refundBankAccountCode, One4All.Application.Abstractions.Housing.IRentalHousingService rentals, CancellationToken ct) =>
     ValueResponse(await rentals.EndTenancyAsync(companyId, tenancyNumber, endDate, refundBankAccountCode, ct).ConfigureAwait(false)))
 .RequireAuthorization()

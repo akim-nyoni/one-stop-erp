@@ -223,6 +223,8 @@ internal sealed class TenancyConfiguration : IEntityTypeConfiguration<Tenancy>
         b.HasIndex(x => x.TenantCustomerId);
         b.HasMany(x => x.RentChanges).WithOne().HasForeignKey(x => x.TenancyId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.RentChanges).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasMany(x => x.Occupants).WithOne().HasForeignKey(x => x.TenancyId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Occupants).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
 }
 
@@ -1286,5 +1288,36 @@ internal sealed class CompensationStepConfiguration : IEntityTypeConfiguration<C
         b.Property(x => x.Party).HasMaxLength(200);
         b.Property(x => x.Amount).HasPrecision(19, 4);
         b.Property(x => x.Note).HasMaxLength(1000);
+    }
+}
+
+internal sealed class TenancyOccupantConfiguration : IEntityTypeConfiguration<TenancyOccupant>
+{
+    public void Configure(EntityTypeBuilder<TenancyOccupant> b)
+    {
+        b.ToTable("tenancy_occupant", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.FullName).HasMaxLength(200);
+        b.Property(x => x.IdNumber).HasMaxLength(40);
+        b.Property(x => x.Relationship).HasMaxLength(60);
+    }
+}
+
+internal sealed class LodgerPermitConfiguration : IEntityTypeConfiguration<LodgerPermit>
+{
+    public void Configure(EntityTypeBuilder<LodgerPermit> b)
+    {
+        b.ToTable("lodger_permit", Schemas.Housing, t => t.HasCheckConstraint("ck_lodger_permit_terms", "rooms >= 1 AND monthly_fee >= 0 AND expires_on >= issued_on"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PermitNumber).HasMaxLength(50);
+        b.Property(x => x.LodgerName).HasMaxLength(200);
+        b.Property(x => x.IdNumber).HasMaxLength(40);
+        b.Property(x => x.MonthlyFee).HasPrecision(19, 4);
+        b.Property(x => x.FeeAccountCode).HasMaxLength(20);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.RevokedReason).HasMaxLength(300);
+        b.Ignore(x => x.LastDay);
+        b.HasOne<Tenancy>().WithMany().HasForeignKey(x => x.TenancyId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.PermitNumber }).IsUnique();
     }
 }

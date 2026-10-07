@@ -80,6 +80,9 @@ public sealed class RentalUnit : AuditableEntity, ICompanyScoped
     /// <summary>The first day it has been empty, or null while let.</summary>
     public DateOnly? VacantSince { get; private set; }
 
+    /// <summary>The most people who may live in it (tenant, occupants and lodgers); null: no limit set.</summary>
+    public int? MaxOccupants { get; set; }
+
     /// <summary>Whether it is let.</summary>
     public bool IsLet => VacantSince is null;
 
@@ -108,6 +111,7 @@ public enum TenancyStatus
 public sealed class Tenancy : AuditableEntity, ICompanyScoped
 {
     private readonly List<TenancyRentChange> _rentChanges = [];
+    private readonly List<TenancyOccupant> _occupants = [];
 
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private Tenancy()
@@ -182,12 +186,33 @@ public sealed class Tenancy : AuditableEntity, ICompanyScoped
     /// <param name="monthlyRent">The new monthly rent.</param>
     public void ChangeRent(DateOnly effectiveFrom, decimal monthlyRent) => _rentChanges.Add(new TenancyRentChange(effectiveFrom, monthlyRent));
 
-    /// <summary>Ends it.</summary>
+    /// <summary>The people living in the unit besides the tenant (household members), with when they moved in and out.</summary>
+    public IReadOnlyList<TenancyOccupant> Occupants => _occupants.AsReadOnly();
+
+    /// <summary>Adds an occupant.</summary>
+    /// <param name="occupant">The occupant.</param>
+    /// <returns>The occupant.</returns>
+    public TenancyOccupant AddOccupant(TenancyOccupant occupant)
+    {
+        _occupants.Add(occupant);
+        return occupant;
+    }
+
+    /// <summary>The occupants living there on a date.</summary>
+    /// <param name="date">The date.</param>
+    /// <returns>How many.</returns>
+    public int OccupantsOn(DateOnly date) => _occupants.Count(o => o.MovedInOn <= date && (o.MovedOutOn is null || o.MovedOutOn > date));
+
+    /// <summary>Ends it; the household moves out with the tenant.</summary>
     /// <param name="endDate">The last day.</param>
     public void End(DateOnly endDate)
     {
         EndDate = endDate;
         Status = TenancyStatus.Ended;
+        foreach (TenancyOccupant occupant in _occupants.Where(o => o.MovedOutOn is null))
+        {
+            occupant.MoveOut(endDate.AddDays(1));
+        }
     }
 }
 
@@ -216,4 +241,151 @@ public sealed class TenancyRentChange : Entity
 
     /// <summary>The new monthly rent.</summary>
     public decimal MonthlyRent { get; private set; }
+}
+
+/// <summary>A household member living in a let unit (<c>hse.tenancy_occupant</c>, brief §4.10.7 occupants list).</summary>
+public sealed class TenancyOccupant : Entity
+{
+    private TenancyOccupant()
+    {
+        FullName = string.Empty;
+        Relationship = string.Empty;
+    }
+
+    /// <summary>Records an occupant.</summary>
+    /// <param name="fullName">The name.</param>
+    /// <param name="idNumber">The national ID, if any.</param>
+    /// <param name="relationship">Their relationship to the tenant.</param>
+    /// <param name="movedInOn">When they moved in.</param>
+    public TenancyOccupant(string fullName, string? idNumber, string relationship, DateOnly movedInOn)
+    {
+        FullName = fullName;
+        IdNumber = idNumber;
+        Relationship = relationship;
+        MovedInOn = movedInOn;
+    }
+
+    /// <summary>The tenancy.</summary>
+    public long TenancyId { get; private set; }
+
+    /// <summary>The name.</summary>
+    public string FullName { get; private set; }
+
+    /// <summary>The national ID, if any.</summary>
+    public string? IdNumber { get; private set; }
+
+    /// <summary>Their relationship to the tenant.</summary>
+    public string Relationship { get; private set; }
+
+    /// <summary>When they moved in.</summary>
+    public DateOnly MovedInOn { get; private set; }
+
+    /// <summary>The first day they no longer live there.</summary>
+    public DateOnly? MovedOutOn { get; private set; }
+
+    /// <summary>Records the move out.</summary>
+    /// <param name="date">The first day they no longer live there.</param>
+    public void MoveOut(DateOnly date) => MovedOutOn = date;
+}
+
+/// <summary>Where a lodger permit stands.</summary>
+public enum LodgerPermitStatus
+{
+    /// <summary>In force until it expires.</summary>
+    Active = 0,
+
+    /// <summary>Revoked (or ended with the tenancy).</summary>
+    Revoked = 1,
+}
+
+/// <summary>
+/// A permit for a tenant to take in a lodger (<c>hse.lodger_permit</c>, brief §4.10.6/§4.10.7 subletting and lodger rules): the lodger, the rooms let to them,
+/// the period, and a monthly lodger fee billed with the rent.
+/// </summary>
+public sealed class LodgerPermit : AuditableEntity, ICompanyScoped
+{
+    private LodgerPermit()
+    {
+        PermitNumber = string.Empty;
+        LodgerName = string.Empty;
+    }
+
+    /// <summary>Issues the permit.</summary>
+    public LodgerPermit(long companyId, string permitNumber, long tenancyId, string lodgerName, string? idNumber, int rooms, decimal monthlyFee, string? feeAccountCode,
+        DateOnly issuedOn, DateOnly expiresOn)
+    {
+        CompanyId = companyId;
+        PermitNumber = permitNumber;
+        TenancyId = tenancyId;
+        LodgerName = lodgerName;
+        IdNumber = idNumber;
+        Rooms = rooms;
+        MonthlyFee = monthlyFee;
+        FeeAccountCode = feeAccountCode;
+        IssuedOn = issuedOn;
+        ExpiresOn = expiresOn;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The permit number.</summary>
+    public string PermitNumber { get; private set; }
+
+    /// <summary>The tenancy.</summary>
+    public long TenancyId { get; private set; }
+
+    /// <summary>The lodger.</summary>
+    public string LodgerName { get; private set; }
+
+    /// <summary>The lodger's national ID, if any.</summary>
+    public string? IdNumber { get; private set; }
+
+    /// <summary>Rooms let to the lodger.</summary>
+    public int Rooms { get; private set; }
+
+    /// <summary>The monthly lodger fee (0: none).</summary>
+    public decimal MonthlyFee { get; private set; }
+
+    /// <summary>The income account the fee goes to.</summary>
+    public string? FeeAccountCode { get; private set; }
+
+    /// <summary>When it was issued.</summary>
+    public DateOnly IssuedOn { get; private set; }
+
+    /// <summary>The last day it is in force.</summary>
+    public DateOnly ExpiresOn { get; private set; }
+
+    /// <summary>Where it stands.</summary>
+    public LodgerPermitStatus Status { get; private set; }
+
+    /// <summary>The last day it was in force, when revoked.</summary>
+    public DateOnly? RevokedOn { get; private set; }
+
+    /// <summary>Why it was revoked.</summary>
+    public string? RevokedReason { get; private set; }
+
+    /// <summary>The last day it is (or was) in force.</summary>
+    public DateOnly LastDay => RevokedOn is DateOnly revoked && revoked < ExpiresOn ? revoked : ExpiresOn;
+
+    /// <summary>Whether it is in force on a date.</summary>
+    /// <param name="date">The date.</param>
+    /// <returns>True when in force.</returns>
+    public bool InForceOn(DateOnly date) => IssuedOn <= date && date <= LastDay;
+
+    /// <summary>Whether it is in force at any time between two dates.</summary>
+    /// <param name="from">The first day.</param>
+    /// <param name="to">The last day.</param>
+    /// <returns>True when it overlaps.</returns>
+    public bool InForceBetween(DateOnly from, DateOnly to) => IssuedOn <= to && LastDay >= from;
+
+    /// <summary>Revokes it.</summary>
+    /// <param name="lastDay">The last day in force.</param>
+    /// <param name="reason">Why.</param>
+    public void Revoke(DateOnly lastDay, string reason)
+    {
+        Status = LodgerPermitStatus.Revoked;
+        RevokedOn = lastDay;
+        RevokedReason = reason;
+    }
 }

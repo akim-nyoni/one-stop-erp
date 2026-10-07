@@ -147,7 +147,8 @@ public sealed class RentalHousingService : IRentalHousingService
     private async Task<Result<TenancyEnded>> EndCoreAsync(long companyId, string tenancyNumber, DateOnly endDate, string refundBankAccountCode, CancellationToken ct)
     {
         string number = (tenancyNumber ?? string.Empty).Trim();
-        Tenancy? tenancy = await _db.Set<Tenancy>().Include(t => t.RentChanges).FirstOrDefaultAsync(t => t.CompanyId == companyId && t.TenancyNumber == number, ct).ConfigureAwait(false);
+        Tenancy? tenancy = await _db.Set<Tenancy>().Include(t => t.RentChanges).Include(t => t.Occupants).FirstOrDefaultAsync(t => t.CompanyId == companyId && t.TenancyNumber == number, ct)
+            .ConfigureAwait(false);
         if (tenancy is null)
         {
             return Error.NotFound("Hse.TenancyNotFound", $"Tenancy {number} not found.");
@@ -208,6 +209,15 @@ public sealed class RentalHousingService : IRentalHousingService
             if (refunded.IsFailure)
             {
                 return refunded.Error;
+            }
+        }
+
+        // Lodger permits end with the tenancy.
+        foreach (LodgerPermit permit in await _db.Set<LodgerPermit>().Where(p => p.TenancyId == tenancy.Id && p.Status == LodgerPermitStatus.Active).ToListAsync(ct).ConfigureAwait(false))
+        {
+            if (permit.LastDay > endDate)
+            {
+                permit.Revoke(endDate, $"Tenancy {tenancy.TenancyNumber} ended");
             }
         }
 
@@ -277,17 +287,24 @@ public sealed class RentalHousingService : IRentalHousingService
         Customer tenant = await _db.Customers.AsNoTracking().FirstAsync(c => c.Id == tenancy.TenantCustomerId, ct).ConfigureAwait(false);
         (DateOnly monthStart, DateOnly monthEnd) = ProRata.Month(month);
         DateOnly billDate = tenancy.StartDate > monthStart ? tenancy.StartDate : monthStart;
+
+        // Lodger fees: each permit in force during the month adds its fee, to its own income account.
+        List<RevenueLine> fees = [.. (await _db.Set<LodgerPermit>().AsNoTracking().Where(p => p.TenancyId == tenancy.Id && p.MonthlyFee > 0m).ToListAsync(ct).ConfigureAwait(false))
+            .Where(p => p.InForceBetween(monthStart, monthEnd)).GroupBy(p => p.FeeAccountCode!, StringComparer.Ordinal).Select(g => new RevenueLine(g.Key, g.Sum(p => p.MonthlyFee)))];
+        decimal feeTotal = fees.Sum(f => f.NetAmount);
+        List<RevenueLine> revenue = feeTotal == 0m ? [] : [new RevenueLine(unit.RentAccountCode, rent), .. fees];
         Result<TradingPostingResult> invoiced = await _ar.PostInvoiceAsync(new SalesInvoiceRequest
         {
             CompanyId = tenancy.CompanyId, CustomerId = tenant.Id, DocumentNumber = document, DocumentDate = billDate, Currency = tenant.Currency,
-            NetAmount = rent, SalesAccountCode = unit.RentAccountCode, Narrative = $"Rent {monthStart:MMM yyyy}, unit {unit.Code} to {monthEnd:dd MMM}",
+            NetAmount = rent + feeTotal, SalesAccountCode = unit.RentAccountCode, RevenueLines = revenue,
+            Narrative = $"Rent {monthStart:MMM yyyy}, unit {unit.Code} to {monthEnd:dd MMM}" + (feeTotal > 0m ? FormattableString.Invariant($" + lodger fees {feeTotal:0.00}") : string.Empty),
         }, ct).ConfigureAwait(false);
         if (invoiced.IsFailure)
         {
             return invoiced.Error;
         }
 
-        return rent;
+        return rent + feeTotal;
     }
 
     private async Task<Result<PostingReceipt>> PostAsync(long companyId, DateOnly date, string document, string narrative, string debitAccount, string creditAccount, decimal amount, CancellationToken ct)
