@@ -15547,6 +15547,18 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<int>("Cycle")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("cycle");
+
+                    b.Property<int>("CycleStartMonth")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("cycle_start_month");
+
                     b.Property<long?>("DeletedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("deleted_by_user_id");
@@ -15563,6 +15575,12 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("fixed_charge");
+
+                    b.Property<int>("Instalments")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("instalments");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")

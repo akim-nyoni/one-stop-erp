@@ -94,6 +94,18 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Tariff billing cycle", ListTitle = "Tariffs",
+            Description = "How often a tariff is billed: monthly, quarterly, half-yearly or annually from a start month (e.g. 7 for a July rates year). Its amounts are per period; a period's "
+                + "charge is raised once by the first run in the period, or over monthly instalments from its start (the last takes the rounding), pro rata to the days the service is in place.",
+            Fields = [Req("Tariff", "Tariff code"), Pick("Cycle", "Cycle", Enum.GetNames<BillingCycle>()), Num("Start", "Start month (1–12)", "1"), Num("Instalments", "Instalments per period", "1")],
+            Run = async (c, i) => Check(await c.Get<IMunicipalBillingService>().SetBillingCycleAsync(c.CompanyId, i.Text("Tariff"), Enum.Parse<BillingCycle>(i.Text("Cycle")), i.Whole("Start"),
+                i.Whole("Instalments")).ConfigureAwait(true), "Billing cycle saved."),
+            List = async c => Table(await c.Db.Set<Tariff>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Code).ThenBy(t => t.EffectiveFrom).ToListAsync().ConfigureAwait(true),
+                ("Tariff", t => t.Code), ("Name", t => t.Name), ("Service", t => t.ServiceType), ("From", t => t.EffectiveFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+                ("Cycle", t => t.Cycle), ("Start month", t => t.CycleStartMonth), ("Instalments", t => t.Instalments)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Billing run", ListTitle = "Billing runs",
             Description = "Propose a run for a service (and ward), review its exceptions, include or exclude stands, then approve to post the bills — someone other than the proposer approves.",
             Fields = [Pick("Step", "Step", ["Propose", "Show exceptions", "Exclude a stand", "Include a stand", "Approve", "Resume posting", "Cancel"]), Pick("Service", "Service", Enum.GetNames<ServiceType>()),

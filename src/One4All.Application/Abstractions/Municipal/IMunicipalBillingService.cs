@@ -54,6 +54,19 @@ public interface IMunicipalBillingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The number of properties billed and the total charged, or an error.</returns>
     Task<Result<MunicipalBillingRunResult>> RunFixedChargeBillingAsync(long companyId, ServiceType serviceType, DateOnly date, string invoicePrefix, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sets how often a tariff (every version of its code) is billed: monthly, quarterly, half-yearly or annually from a start month, a period's
+    /// charge raised once or over monthly instalments (brief §4.9).
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="tariffCode">The tariff code.</param>
+    /// <param name="cycle">The cycle.</param>
+    /// <param name="startMonth">The month the cycle starts in.</param>
+    /// <param name="instalments">Monthly instalments per period (1 = all at once).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> SetBillingCycleAsync(long companyId, string tariffCode, BillingCycle cycle, int startMonth, int instalments, CancellationToken ct = default);
 }
 
 /// <summary>The result of a fixed-charge municipal billing run.</summary>

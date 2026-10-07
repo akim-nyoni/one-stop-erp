@@ -131,6 +131,31 @@ public sealed class Tariff : SoftDeletableEntity, ICompanyScoped
     /// <summary>The ward the tariff applies to, or null for the whole council.</summary>
     public string? Ward { get; set; }
 
+    /// <summary>How often the charge is billed (brief §4.9): its amounts are per billing period of this cycle.</summary>
+    public BillingCycle Cycle { get; private set; } = BillingCycle.Monthly;
+
+    /// <summary>The month the cycle starts in (e.g. 7 for a July–June rates year).</summary>
+    public int CycleStartMonth { get; private set; } = 1;
+
+    /// <summary>For a quarterly, half-yearly or annual charge: billed over this many monthly instalments from the start of the period (1 = all at once).</summary>
+    public int Instalments { get; private set; } = 1;
+
+    /// <summary>Sets the billing cycle.</summary>
+    /// <param name="cycle">How often.</param>
+    /// <param name="startMonth">The month the cycle starts in (1–12).</param>
+    /// <param name="instalments">Monthly instalments within a period (1 to the months in the period).</param>
+    public void SetCycle(BillingCycle cycle, int startMonth, int instalments)
+    {
+        if (startMonth is < 1 or > 12 || instalments < 1 || instalments > (int)cycle)
+        {
+            throw new ArgumentOutOfRangeException(nameof(instalments), "The start month is 1–12 and instalments run from 1 to the months in the period.");
+        }
+
+        Cycle = cycle;
+        CycleStartMonth = startMonth;
+        Instalments = instalments;
+    }
+
     /// <summary>The stepped-tariff blocks (used when <see cref="TariffType"/> is <see cref="TariffType.Stepped"/>).</summary>
     public IReadOnlyList<TariffBlock> Blocks => _blocks.OrderBy(x => x.FromUnit).ToList();
 
@@ -317,4 +342,20 @@ public sealed class TariffSeason : Entity
 
     /// <summary>The per-unit rate in that season.</summary>
     public decimal PerUnitRate { get; private set; }
+}
+
+/// <summary>How often a municipal charge is billed; the value is the months in a period.</summary>
+public enum BillingCycle
+{
+    /// <summary>Every month.</summary>
+    Monthly = 1,
+
+    /// <summary>Every three months.</summary>
+    Quarterly = 3,
+
+    /// <summary>Every six months.</summary>
+    HalfYearly = 6,
+
+    /// <summary>Once a year.</summary>
+    Annual = 12,
 }

@@ -15,6 +15,12 @@ namespace One4All.Infrastructure.Municipal;
 /// <param name="Charge">The charge.</param>
 internal sealed record ComputedCharge(Property Property, Tariff Tariff, decimal Charge)
 {
+    /// <summary>The month the bill number carries (the bill date's month for monthly charges).</summary>
+    public DateOnly? BillMonth { get; init; }
+
+    /// <summary>A note for a cycle bill (period, instalment).</summary>
+    public string? CycleNote { get; init; }
+
     /// <summary>The narrative the bill carries.</summary>
     public string Narrative => ValuationHistory.BillNarrative(Tariff.Name, Property.StandNumber);
 }
@@ -94,6 +100,29 @@ internal static class MunicipalCharges
 
         // The value in force on the bill date, from the valuation roll (the register value when there is no history).
         decimal valuation = ValuationRoll.ValueAt(await ValuationHistory.LoadAsync(db, property.Id, ct).ConfigureAwait(false), date, property.Valuation);
+        if (prorate && tariff.Cycle != BillingCycle.Monthly)
+        {
+            // A quarterly / half-yearly / annual charge: billed for the period (or in its instalments), pro rata to the days the service is in place in it.
+            CycleSlot slot = BillingCycles.Slot(tariff.Cycle, tariff.CycleStartMonth, tariff.Instalments, date);
+            if (slot.Instalment == 0)
+            {
+                return Error.Rule("Mun.NotDueThisCycle", $"{tariff.Code} is billed in {slot.Instalments} instalments from {slot.PeriodStart:yyyy-MM}; nothing is due in {date:yyyy-MM}.");
+            }
+
+            PropertyServiceLink inPlace = property.Services.Where(s => s.ServiceType == serviceType)
+                .OrderByDescending(s => BillingCycles.Share(slot, s.StartDate, s.EndDate)).First();
+            decimal share = BillingCycles.Share(slot, inPlace.StartDate, inPlace.EndDate);
+            decimal periodCharge = ProRata.Apply(tariff.CalculateCharge(consumption, valuation, property.SizeSquareMetres, slot.PeriodStart.Month), share);
+            decimal billed = BillingCycles.InstalmentAmount(periodCharge, slot);
+            if (billed <= 0m)
+            {
+                return Error.Rule("Mun.NothingToBill", $"Computed charge for {serviceType} on {property.StandNumber} is zero.");
+            }
+
+            string note = $"{tariff.Cycle} {slot.PeriodStart:yyyy-MM} to {slot.PeriodEnd:yyyy-MM}" + (slot.Instalments > 1 ? $", instalment {slot.Instalment} of {slot.Instalments}" : string.Empty);
+            return new ComputedCharge(property, tariff, billed) { BillMonth = slot.BillMonth(date), CycleNote = note };
+        }
+
         decimal charge = ProRata.Apply(tariff.CalculateCharge(consumption, valuation, property.SizeSquareMetres, date.Month), fraction);
         if (charge <= 0m)
         {

@@ -66,6 +66,21 @@ public sealed class BillingRunService : IBillingRunService
         {
             string invoice = numbers[propertyId];
             Result<ComputedCharge> computed = await MunicipalCharges.ComputeAsync(_db, proposal.CompanyId, propertyId, proposal.ServiceType, 0m, proposal.BillDate, prorate: true, ct).ConfigureAwait(false);
+            if (computed.IsFailure && computed.Error.Code == "Mun.NotDueThisCycle")
+            {
+                continue;
+            }
+
+            // A cycle charge carries its period (or instalment month): already raised for the period means nothing to bill this run.
+            if (computed.IsSuccess && computed.Value.BillMonth is DateOnly billMonth)
+            {
+                invoice = $"{prefix}-{propertyId}-{billMonth:yyyyMM}";
+                if ((await MunicipalCharges.AlreadyRaisedAsync(_db, proposal.CompanyId, [invoice], ct).ConfigureAwait(false)).Count > 0)
+                {
+                    continue;
+                }
+            }
+
             if (computed.IsFailure)
             {
                 var property = await _db.Properties.AsNoTracking().Where(p => p.Id == propertyId).Select(p => new { p.StandNumber, p.RatepayerCustomerId }).FirstAsync(ct).ConfigureAwait(false);
@@ -92,7 +107,7 @@ public sealed class BillingRunService : IBillingRunService
             }
 
             run.AddLine(new BillingRunLine(propertyId, bill.Property.StandNumber, bill.Property.RatepayerCustomerId, invoice, bill.Charge, previous,
-                bill.Tariff.RevenueAccountCode, bill.Narrative, exceptions, message));
+                bill.Tariff.RevenueAccountCode, bill.Narrative, exceptions, message ?? bill.CycleNote));
         }
 
         _db.Set<BillingRun>().Add(run);

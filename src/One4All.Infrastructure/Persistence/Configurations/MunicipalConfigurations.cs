@@ -312,6 +312,9 @@ internal sealed class TariffConfiguration : IEntityTypeConfiguration<Tariff>
         b.Navigation(x => x.Blocks).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasMany(x => x.Seasons).WithOne().HasForeignKey(x => x.TariffId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Seasons).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.Property(x => x.Cycle).HasConversion<int>().HasDefaultValue(BillingCycle.Monthly);
+        b.Property(x => x.CycleStartMonth).HasDefaultValue(1);
+        b.Property(x => x.Instalments).HasDefaultValue(1);
         // A tariff code has effective-dated versions: one per code and effective date.
         b.HasIndex(x => new { x.CompanyId, x.Code, x.EffectiveFrom }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);

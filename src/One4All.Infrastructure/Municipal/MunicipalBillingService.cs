@@ -81,7 +81,14 @@ public sealed class MunicipalBillingService : IMunicipalBillingService
                 continue;
             }
 
-            Result<BillingResult> result = await _db.AtomicAsync(() => BillServiceCoreAsync(companyId, propertyId, serviceType, 0m, invoiceNumber, date, 0m, null, ct, prorate: true), ct).ConfigureAwait(false);
+            Result<BillingResult> result = await _db.AtomicAsync(() => BillServiceCoreAsync(companyId, propertyId, serviceType, 0m, invoiceNumber, date, 0m, null, ct, prorate: true, runPrefix: prefix), ct)
+                .ConfigureAwait(false);
+            if (result.IsFailure && result.Error.Code is "Mun.NotDueThisCycle" or "Mun.CycleBilled")
+            {
+                skipped++;
+                continue;
+            }
+
             if (result.IsFailure)
             {
                 return result.Error;
@@ -98,9 +105,34 @@ public sealed class MunicipalBillingService : IMunicipalBillingService
     public Task<Result<BillingResult>> BillServiceAsync(long companyId, long propertyId, ServiceType serviceType, decimal consumption, string invoiceNumber, DateOnly date, decimal taxAmount = 0m, string? taxAccountCode = null, CancellationToken ct = default)
         => _db.AtomicAsync(() => BillServiceCoreAsync(companyId, propertyId, serviceType, consumption, invoiceNumber, date, taxAmount, taxAccountCode, ct, prorate: false), ct);
 
+    /// <inheritdoc />
+    public async Task<Result> SetBillingCycleAsync(long companyId, string tariffCode, BillingCycle cycle, int startMonth, int instalments, CancellationToken ct = default)
+    {
+        if (!Enum.IsDefined(cycle) || startMonth is < 1 or > 12 || instalments < 1 || instalments > (int)cycle)
+        {
+            return Result.Failure(Error.Validation("Mun.Cycle", $"A {cycle} cycle starts in a month 1–12 and is billed in 1 to {(int)cycle} instalment(s)."));
+        }
+
+        string code = (tariffCode ?? string.Empty).Trim().ToUpperInvariant();
+        List<Tariff> versions = await _db.Set<Tariff>().Where(t => t.CompanyId == companyId && t.Code == code).ToListAsync(ct).ConfigureAwait(false);
+        if (versions.Count == 0)
+        {
+            return Result.Failure(Error.NotFound("Mun.TariffNotFound", $"Tariff {code} not found."));
+        }
+
+        foreach (Tariff version in versions)
+        {
+            version.SetCycle(cycle, startMonth, instalments);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
     // One unit of work: its postings and record changes commit together or not at all.
     // With prorate, the link may have ended within the bill's month and the charge covers only the days it was in place.
-    private async Task<Result<BillingResult>> BillServiceCoreAsync(long companyId, long propertyId, ServiceType serviceType, decimal consumption, string invoiceNumber, DateOnly date, decimal taxAmount, string? taxAccountCode, CancellationToken ct, bool prorate)
+    private async Task<Result<BillingResult>> BillServiceCoreAsync(long companyId, long propertyId, ServiceType serviceType, decimal consumption, string invoiceNumber, DateOnly date, decimal taxAmount, string? taxAccountCode, CancellationToken ct, bool prorate,
+        string? runPrefix = null)
     {
         Result<ComputedCharge> computed = await MunicipalCharges.ComputeAsync(_db, companyId, propertyId, serviceType, consumption, date, prorate, ct).ConfigureAwait(false);
         if (computed.IsFailure)
@@ -109,6 +141,17 @@ public sealed class MunicipalBillingService : IMunicipalBillingService
         }
 
         ComputedCharge bill = computed.Value;
+
+        // In a run, a cycle charge's bill carries its period (or instalment month), so it is raised once per period.
+        if (runPrefix is not null && bill.BillMonth is DateOnly billMonth)
+        {
+            invoiceNumber = $"{runPrefix}-{propertyId}-{billMonth:yyyyMM}";
+            if ((await MunicipalCharges.AlreadyRaisedAsync(_db, companyId, [invoiceNumber], ct).ConfigureAwait(false)).Count > 0)
+            {
+                return Error.Rule("Mun.CycleBilled", $"{invoiceNumber} is already raised for this period.");
+            }
+        }
+
         Result<TradingPostingResult> posted = await MunicipalCharges.PostAsync(_db, _salesLedger, companyId, bill.Property.RatepayerCustomerId, invoiceNumber, date,
             bill.Charge, taxAmount, bill.Tariff.RevenueAccountCode, taxAccountCode, bill.Narrative, ct).ConfigureAwait(false);
         if (posted.IsFailure)
