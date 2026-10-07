@@ -124,6 +124,20 @@ app.Use(async (context, next) =>
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Who and where: the signed-in caller (and the client's address, also for sign-in attempts) for the audit and login trails (brief §5.2, §6).
+app.Use(async (context, next) =>
+{
+    One4All.Infrastructure.Security.CurrentUserContext caller = context.RequestServices.GetRequiredService<One4All.Infrastructure.Security.CurrentUserContext>();
+    caller.SetClientAddress(context.Connection.RemoteIpAddress?.ToString());
+    if (SignedInUser(context.User) is long callerId)
+    {
+        caller.SignIn(callerId, context.User.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.UniqueName) ?? context.User.Identity?.Name ?? $"user {callerId}",
+            One4All.Core.Security.EffectivePermissions.None, terminal: "api");
+    }
+
+    await next(context).ConfigureAwait(false);
+});
+
 // Every signed-in API request is checked against the user's permissions for its area, the company it names and the user it says is
 // acting (brief §5.1); an acting user left out is filled in from the token.
 app.Use(async (context, next) =>

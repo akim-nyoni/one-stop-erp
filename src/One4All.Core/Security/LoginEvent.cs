@@ -65,6 +65,9 @@ public sealed class LoginEvent : Entity
     /// <summary>Gets when the session was last active (null: at sign-in).</summary>
     public DateTimeOffset? LastSeenUtc { get; private set; }
 
+    /// <summary>Where the attempt came from: the client IP address (API) or the machine name (desktop) (brief §5.2).</summary>
+    public string? SourceAddress { get; set; }
+
     /// <summary>Records activity on the session.</summary>
     /// <param name="at">When.</param>
     public void Touch(DateTimeOffset at) => LastSeenUtc = at;

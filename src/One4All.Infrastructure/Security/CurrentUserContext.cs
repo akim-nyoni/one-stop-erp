@@ -43,6 +43,13 @@ public sealed class CurrentUserContext : ICurrentUser
         Terminal = terminal;
     }
 
+    /// <inheritdoc />
+    public string? ClientAddress { get; private set; }
+
+    /// <summary>Records where the request comes from (an IP address or machine name).</summary>
+    /// <param name="address">The address.</param>
+    public void SetClientAddress(string? address) => ClientAddress = string.IsNullOrWhiteSpace(address) ? null : address.Trim();
+
     /// <summary>Switches the active company for the signed-in principal.</summary>
     /// <param name="companyId">The company id.</param>
     public void SetCompany(long? companyId) => CompanyId = companyId;

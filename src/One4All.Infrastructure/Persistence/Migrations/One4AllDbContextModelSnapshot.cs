@@ -25674,6 +25674,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("session_id");
 
+                    b.Property<string>("SourceAddress")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("source_address");
+
                     b.Property<string>("Terminal")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)")

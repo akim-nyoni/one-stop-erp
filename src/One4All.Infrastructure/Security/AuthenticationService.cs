@@ -42,6 +42,7 @@ public sealed class AuthenticationOptions
 public sealed class AuthenticationService : IAuthenticationService
 {
     private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
+    private readonly ICurrentUser? _currentUser;
     private readonly One4AllDbContext _db;
     private readonly IPasswordHasher _hasher;
     private readonly IPermissionService _permissions;
@@ -60,8 +61,10 @@ public sealed class AuthenticationService : IAuthenticationService
         IPermissionService permissions,
         IClock clock,
         AuthenticationOptions? options = null,
-        Application.Abstractions.Licensing.ILicenceService? licence = null)
+        Application.Abstractions.Licensing.ILicenceService? licence = null,
+        ICurrentUser? currentUser = null)
     {
+        _currentUser = currentUser;
         _licence = licence;
         _db = db;
         _hasher = hasher;
@@ -93,7 +96,7 @@ public sealed class AuthenticationService : IAuthenticationService
         string method = usePin ? "PIN" : "Password";
         async Task<AuthenticationResult> LogAsync(AuthenticationResult result, string? sessionId = null)
         {
-            _db.LoginEvents.Add(new LoginEvent(user?.Id, username.Trim(), now, terminal, method, result.Outcome.ToString(), sessionId));
+            _db.LoginEvents.Add(new LoginEvent(user?.Id, username.Trim(), now, terminal, method, result.Outcome.ToString(), sessionId) { SourceAddress = _currentUser?.ClientAddress });
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             return result;
         }

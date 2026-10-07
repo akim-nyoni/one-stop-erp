@@ -138,7 +138,8 @@ public sealed class AuditingInterceptor : SaveChangesInterceptor
                     oldValues: pending.Snapshot.OldValues,
                     newValues: pending.Snapshot.NewValues,
                     changedFields: pending.Snapshot.ChangedFields,
-                    terminal: _currentUser.Terminal);
+                    terminal: _currentUser.Terminal,
+                    ipAddress: _currentUser.ClientAddress);
 
                 lastHashByCompany[companyKey] = log.RowHash;
                 context.Set<ChangeLogEntry>().Add(log);

@@ -44,6 +44,7 @@ public partial class App : System.Windows.Application
             services.AddSingleton(PosDevices());
             services.AddTransient<ViewModels.LoginViewModel>();
             services.AddSingleton<DesktopSession>();
+            services.AddScoped<Application.Abstractions.Security.ICurrentUser>(sp => new DesktopCurrentUser(sp.GetRequiredService<DesktopSession>()));
             _services = services.BuildServiceProvider();
 
             await InitialiseAsync().ConfigureAwait(true);
