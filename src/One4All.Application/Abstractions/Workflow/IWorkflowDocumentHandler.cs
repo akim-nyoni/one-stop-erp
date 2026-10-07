@@ -47,4 +47,7 @@ public static class WorkflowDocumentTypes
 
     /// <summary>Purchase orders raised directly (reference: the order number).</summary>
     public const string PurchaseOrder = "PurchaseOrder";
+
+    /// <summary>A school bursary request.</summary>
+    public const string Bursary = "Bursary";
 }

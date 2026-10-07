@@ -332,6 +332,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Students.</summary>
     public DbSet<Core.Schools.Student> Students => Set<Core.Schools.Student>();
 
+    /// <summary>Bursary requests and their decisions.</summary>
+    public DbSet<Core.Schools.BursaryAward> BursaryAwards => Set<Core.Schools.BursaryAward>();
+
     /// <summary>Gets the school transport routes.</summary>
     public DbSet<Core.Schools.TransportRoute> TransportRoutes => Set<Core.Schools.TransportRoute>();
 

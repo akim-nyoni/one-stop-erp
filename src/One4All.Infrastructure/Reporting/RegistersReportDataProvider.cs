@@ -24,7 +24,14 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
 
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
-    public RegistersReportDataProvider(One4AllDbContext db) => _db = db;
+    /// <param name="currentUser">The reader (do-not-disclose students are withheld from anyone without the restricted-records permission).</param>
+    public RegistersReportDataProvider(One4AllDbContext db, One4All.Application.Abstractions.Security.ICurrentUser? currentUser = null)
+    {
+        _db = db;
+        _seeRestricted = currentUser?.Permissions.Has("School.Restricted") == true;
+    }
+
+    private readonly bool _seeRestricted;
 
     /// <inheritdoc />
     public bool CanHandle(string command) => Commands.Contains(command);
@@ -579,7 +586,7 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
         return students.Select(s => Row(new()
         {
             ["AdmissionNumber"] = s.AdmissionNumber,
-            ["FullName"] = s.FullName,
+            ["FullName"] = s.ShownName(_seeRestricted),
             ["Grade"] = s.Grade,
             ["Boarder"] = s.IsBoarder ? "Yes" : "No",
             ["BursaryValue"] = s.BursaryValue,

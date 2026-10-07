@@ -84,6 +84,29 @@ public sealed class Student : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the student is currently enrolled.</summary>
     public bool IsEnrolled { get; private set; }
 
+    /// <summary>The staff member whose child this is (fees take the staff-child discount while they are employed); null: none.</summary>
+    public long? StaffEmployeeId { get; set; }
+
+    /// <summary>Do not disclose: the student's identity is withheld from reports for anyone without the restricted-records permission.</summary>
+    public bool DoNotDisclose { get; private set; }
+
+    /// <summary>Why (court order, protection…), seen only by those allowed.</summary>
+    public string? DisclosureNote { get; private set; }
+
+    /// <summary>Sets or lifts do-not-disclose.</summary>
+    /// <param name="doNotDisclose">Whether to withhold.</param>
+    /// <param name="note">Why.</param>
+    public void SetDisclosure(bool doNotDisclose, string? note)
+    {
+        DoNotDisclose = doNotDisclose;
+        DisclosureNote = doNotDisclose ? note?.Trim() : null;
+    }
+
+    /// <summary>The name a reader may see: withheld for a do-not-disclose student unless they may see restricted records.</summary>
+    /// <param name="canSeeRestricted">Whether the reader may see restricted records.</param>
+    /// <returns>The name, or a placeholder.</returns>
+    public string ShownName(bool canSeeRestricted) => !DoNotDisclose || canSeeRestricted ? FullName : "Restricted record";
+
     /// <summary>The bursary/scholarship type.</summary>
     public BursaryType BursaryType { get; private set; }
 

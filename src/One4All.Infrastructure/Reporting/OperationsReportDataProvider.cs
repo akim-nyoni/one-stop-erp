@@ -19,7 +19,14 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
 
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
-    public OperationsReportDataProvider(One4AllDbContext db) => _db = db;
+    /// <param name="currentUser">The reader (do-not-disclose students are withheld from anyone without the restricted-records permission).</param>
+    public OperationsReportDataProvider(One4AllDbContext db, One4All.Application.Abstractions.Security.ICurrentUser? currentUser = null)
+    {
+        _db = db;
+        _seeRestricted = currentUser?.Permissions.Has("School.Restricted") == true;
+    }
+
+    private readonly bool _seeRestricted;
 
     /// <inheritdoc />
     public bool CanHandle(string command) => command.StartsWith("Ops", StringComparison.OrdinalIgnoreCase);
@@ -108,7 +115,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         Dictionary<string, List<OpenItemAsAt>> open = await OpenFeesAsync(companyId, asAt, ct).ConfigureAwait(false);
         return [.. open.Where(o => students.ContainsKey(o.Key)).Select(o => (Student: students[o.Key], Items: o.Value, Oldest: o.Value.Min(i => i.Item.DueDate)))
             .Where(x => x.Oldest < asAt).OrderBy(x => x.Student.Grade, StringComparer.Ordinal).ThenBy(x => x.Student.FullName, StringComparer.Ordinal)
-            .Select(x => Row(("Grade", x.Student.Stream is null ? x.Student.Grade : $"{x.Student.Grade} {x.Student.Stream}"), ("Student", $"{x.Student.FullName} ({x.Student.AdmissionNumber})"), ("Guardian", guardians.GetValueOrDefault(x.Student.GuardianCustomerId, "?")),
+            .Select(x => Row(("Grade", x.Student.Stream is null ? x.Student.Grade : $"{x.Student.Grade} {x.Student.Stream}"), ("Student", $"{x.Student.ShownName(_seeRestricted)} ({x.Student.AdmissionNumber})"), ("Guardian", guardians.GetValueOrDefault(x.Student.GuardianCustomerId, "?")),
                 ("Invoices", x.Items.Count), ("Oldest", Date(x.Oldest)), ("Band", DebtorAgeing.Bands[DebtorAgeing.Band(x.Oldest, asAt)]), ("Outstanding", x.Items.Sum(i => i.OutstandingBase))))];
     }
 
@@ -121,7 +128,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         List<OpenItem> receipts = await _db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.ItemType == OpenItemType.Receipt
             && ids.Contains(i.TraderId) && i.DocumentDate >= fromDate && i.DocumentDate <= toDate).OrderBy(i => i.DocumentDate).ThenBy(i => i.DocumentNumber).ToListAsync(ct).ConfigureAwait(false);
         return [.. receipts.Select(r => Row(("Date", Date(r.DocumentDate)), ("Receipt", r.DocumentNumber), ("Guardian", guardians.GetValueOrDefault(r.TraderId, "?")),
-            ("Students", string.Join(", ", students.Where(s => s.GuardianCustomerId == r.TraderId).Select(s => s.FullName).Order(StringComparer.Ordinal))), ("Amount", r.OriginalBase)))];
+            ("Students", string.Join(", ", students.Where(s => s.GuardianCustomerId == r.TraderId).Select(s => s.ShownName(_seeRestricted)).Order(StringComparer.Ordinal))), ("Amount", r.OriginalBase)))];
     }
 
     // A bursary is worth its percentage of, or its fixed value against, the compulsory fees of the student's grade (the latest structure).
@@ -134,7 +141,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         {
             decimal gradeFees = fees.GetValueOrDefault(s.Grade);
             decimal worth = s.BursaryType == BursaryType.Percentage ? Math.Round(gradeFees * s.BursaryValue / 100m, 2, MidpointRounding.AwayFromZero) : Math.Min(s.BursaryValue, gradeFees);
-            return Row(("Student", $"{s.FullName} ({s.AdmissionNumber})"), ("Grade", s.Grade), ("Type", s.BursaryType.ToString()),
+            return Row(("Student", $"{s.ShownName(_seeRestricted)} ({s.AdmissionNumber})"), ("Grade", s.Grade), ("Type", s.BursaryType.ToString()),
                 ("Rate", s.BursaryType == BursaryType.Percentage ? $"{s.BursaryValue:0.##}%" : Money(s.BursaryValue)), ("Fees", Money(gradeFees)), ("Worth", worth));
         })];
     }
@@ -150,7 +157,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         Dictionary<long, string> guardians = await GuardiansAsync(companyId, ct).ConfigureAwait(false);
         Dictionary<string, List<OpenItemAsAt>> open = await OpenFeesAsync(companyId, asAt, ct).ConfigureAwait(false);
         return [.. students.Values.OrderBy(s => s.Grade, StringComparer.Ordinal).ThenBy(s => s.FullName, StringComparer.Ordinal)
-            .Select(s => Row(("Admission", s.AdmissionNumber), ("Student", s.FullName), ("Grade", s.Grade), ("Guardian", guardians.GetValueOrDefault(s.GuardianCustomerId, "?")),
+            .Select(s => Row(("Admission", s.AdmissionNumber), ("Student", s.ShownName(_seeRestricted)), ("Grade", s.Grade), ("Guardian", guardians.GetValueOrDefault(s.GuardianCustomerId, "?")),
                 ("Status", s.IsEnrolled ? "Enrolled" : "Left"), ("Balance", open.TryGetValue(s.AdmissionNumber, out List<OpenItemAsAt>? items) ? items.Sum(i => i.OutstandingBase) : 0m)))];
     }
 
@@ -347,7 +354,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         return [.. sponsors.OrderBy(id => names.GetValueOrDefault(id), StringComparer.Ordinal).Select(id =>
         {
             List<OpenItem> inPeriod = [.. items.Where(i => i.TraderId == id && i.DocumentDate >= fromDate)];
-            return Row(("Sponsor", names.GetValueOrDefault(id, "?")), ("Students", string.Join(", ", sponsored.Where(s => s.SponsorCustomerId == id).Select(s => $"{s.FullName} ({s.AdmissionNumber})").Order(StringComparer.Ordinal))),
+            return Row(("Sponsor", names.GetValueOrDefault(id, "?")), ("Students", string.Join(", ", sponsored.Where(s => s.SponsorCustomerId == id).Select(s => $"{s.ShownName(_seeRestricted)} ({s.AdmissionNumber})").Order(StringComparer.Ordinal))),
                 ("Billed", Money(inPeriod.Where(i => i.ItemType == OpenItemType.Invoice).Sum(i => i.OriginalBase))), ("Received", Money(inPeriod.Where(i => i.ItemType == OpenItemType.Receipt).Sum(i => Math.Abs(i.OriginalBase)))),
                 ("Balance", open.Where(o => o.Item.TraderId == id).Sum(o => o.Signed(LedgerSign.Debit))));
         })];
@@ -399,7 +406,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             {
                 List<StudentWalletEntry> inPeriod = [.. x.Entries.Where(w => w.Date >= fromDate)];
                 decimal opening = x.Entries.Where(w => w.Date < fromDate).Sum(w => w.Amount);
-                return Row(("Student", x.Student is null ? "?" : $"{x.Student.FullName} ({x.Student.AdmissionNumber})"), ("Grade", x.Student?.Grade ?? "?"), ("Opening", Money(opening)),
+                return Row(("Student", x.Student is null ? "?" : $"{x.Student.ShownName(_seeRestricted)} ({x.Student.AdmissionNumber})"), ("Grade", x.Student?.Grade ?? "?"), ("Opening", Money(opening)),
                     ("TopUps", Money(inPeriod.Where(w => w.Amount > 0m).Sum(w => w.Amount))), ("Spend", Money(-inPeriod.Where(w => w.Amount < 0m).Sum(w => w.Amount))),
                     ("Days", inPeriod.Where(w => w.Amount < 0m).Select(w => w.Date).Distinct().Count()), ("Closing", opening + inPeriod.Sum(w => w.Amount)));
             })];

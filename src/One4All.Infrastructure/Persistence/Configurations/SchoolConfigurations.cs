@@ -116,3 +116,18 @@ internal sealed class StudentFeeOptionConfiguration : IEntityTypeConfiguration<S
         b.HasIndex(x => new { x.StudentId, x.FeeItemId }).IsUnique();
     }
 }
+
+internal sealed class BursaryAwardConfiguration : IEntityTypeConfiguration<BursaryAward>
+{
+    public void Configure(EntityTypeBuilder<BursaryAward> b)
+    {
+        b.ToTable("bursary_award", Schemas.School);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.Property(x => x.Value).HasPrecision(19, 4);
+        b.Property(x => x.Reason).HasMaxLength(500);
+        b.Property(x => x.DecisionNote).HasMaxLength(500);
+        b.HasIndex(x => new { x.CompanyId, x.Reference }).IsUnique();
+        b.HasIndex(x => x.StudentId);
+    }
+}

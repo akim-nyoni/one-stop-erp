@@ -188,13 +188,23 @@ public sealed class SchoolBillingService : ISchoolBillingService
             siblingPercent = SiblingDiscount.PercentFor(rules, ordinal);
         }
 
-        (decimal bursary, decimal sibling) = student.ComputeDiscounts(gross, siblingPercent);
-        decimal discount = bursary + sibling;
+        // A staff member's child takes the staff discount while the parent is employed — the better of it and the sibling discount.
+        decimal staffPercent = 0m;
+        if (student.StaffEmployeeId is long parent && company.StaffChildDiscountPercent > 0m
+            && await _db.Employees.AnyAsync(e => e.Id == parent && e.Status != Core.Payroll.EmployeeStatus.Terminated, ct).ConfigureAwait(false))
+        {
+            staffPercent = company.StaffChildDiscountPercent;
+        }
+
+        (decimal bursary, decimal familyDiscount) = student.ComputeDiscounts(gross, Math.Max(siblingPercent, staffPercent));
+        bool staffWins = staffPercent > siblingPercent;
+        decimal sibling = staffWins ? 0m : familyDiscount, staffDiscount = staffWins ? familyDiscount : 0m;
+        decimal discount = bursary + familyDiscount;
         decimal compulsoryNet = Math.Max(0m, gross - discount);
         decimal net = compulsoryNet + optionalTotal;
         if (net <= 0m)
         {
-            return new StudentBillResult(student.Id, gross, discount, 0m, null, null, sibling) { ShareOfTerm = share };
+            return new StudentBillResult(student.Id, gross, discount, 0m, null, null, sibling) { ShareOfTerm = share, StaffDiscount = staffDiscount };
         }
 
         // Optional items go to their own revenue accounts (deferred fees: all through deferred income).
@@ -234,7 +244,7 @@ public sealed class SchoolBillingService : ISchoolBillingService
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
-        return new StudentBillResult(student.Id, gross, discount, net, posted.Value.OpenItemId, posted.Value.JournalNumber, sibling) { OptionalFees = optionalTotal, ShareOfTerm = share };
+        return new StudentBillResult(student.Id, gross, discount, net, posted.Value.OpenItemId, posted.Value.JournalNumber, sibling) { OptionalFees = optionalTotal, ShareOfTerm = share, StaffDiscount = staffDiscount };
     }
 
     /// <inheritdoc />

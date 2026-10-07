@@ -167,6 +167,7 @@ public static class PermissionCatalogue
         Add(sch, LicenceModules.School, "Bursary", "Bursaries / Discounts", OperationFlags.View | OperationFlags.Create | OperationFlags.Approve | auth);
         Add(sch, LicenceModules.School, "BillingRun", "Fee Billing Runs", OperationFlags.View | OperationFlags.Create | OperationFlags.Post | OperationFlags.Approve);
         Add(sch, LicenceModules.School, "Statement", "Fee Statements", ro | OperationFlags.Reprint);
+        Add(sch, LicenceModules.School, "Restricted", "Restricted Student Records", ro);
 
         // ---- Job Costing / Construction ----
         const string job = "JobCosting";

@@ -812,6 +812,63 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Bursaries", ListTitle = "Bursary requests",
+            Description = "Request a bursary (percentage or value off compulsory fees) — it reduces fees only once approved by someone else with the bursary approval right, "
+                + "or through the approval workflow when one is defined for bursaries. Decide approves or rejects a pending request by its reference.",
+            Fields = [Pick("Step", "Step", ["Request", "Approve", "Reject"]), Opt("Student", "Admission number (request)"), Pick("Type", "Type", ["Percentage", "Value"]),
+                OptNum("Value", "Percentage or value (request)"), Opt("Reason", "Reason / decision note"), Opt("Reference", "Reference (decide)"), Today()],
+            Run = async (c, i) =>
+            {
+                ISchoolBursaryService bursaries = c.Get<ISchoolBursaryService>();
+                if (i.Text("Step") == "Request")
+                {
+                    long student = await FindAsync(c.Db.Students, s => s.CompanyId == c.CompanyId && s.AdmissionNumber == (i.Optional("Student") ?? string.Empty).ToUpper(), s => s.Id, "student",
+                        i.Optional("Student") ?? string.Empty).ConfigureAwait(true);
+                    BursaryRequestResult asked = Check(await bursaries.RequestAsync(c.CompanyId, student, Enum.Parse<Core.Schools.BursaryType>(i.Text("Type")), i.OptionalNumber("Value") ?? 0m,
+                        i.Optional("Reason") ?? string.Empty, c.UserId, i.Date("Date")).ConfigureAwait(true));
+                    return asked.InWorkflow ? $"{asked.Reference} is in its approval workflow." : $"{asked.Reference} awaits approval.";
+                }
+
+                return Check(await bursaries.DecideAsync(c.CompanyId, i.Text("Reference"), i.Text("Step") == "Approve", c.UserId, i.Date("Date"), i.Optional("Reason")).ConfigureAwait(true),
+                    $"Bursary {i.Text("Reference").ToUpperInvariant()} {(i.Text("Step") == "Approve" ? "approved and applied" : "rejected")}.");
+            },
+            List = async c => Table(await (from a in c.Db.BursaryAwards.AsNoTracking()
+                                           join s in c.Db.Students.AsNoTracking() on a.StudentId equals s.Id
+                                           where a.CompanyId == c.CompanyId
+                                           orderby a.Id descending
+                                           select new { a.Reference, s.AdmissionNumber, a.Type, a.Value, a.Reason, a.Status, a.RequestedOn }).Take(100).ToListAsync().ConfigureAwait(true),
+                ("Reference", a => a.Reference), ("Student", a => a.AdmissionNumber), ("Type", a => a.Type), ("Value", a => Q(a.Value)), ("Reason", a => a.Reason), ("Status", a => a.Status),
+                ("Requested", a => D(a.RequestedOn))),
+        };
+        yield return new Operation
+        {
+            Module = "Sales & Schools", Title = "Staff children and restricted students",
+            Description = "Staff discount: the percentage off compulsory fees for staff children while the parent is employed (the better of it and the sibling discount). "
+                + "Staff parent links a student to the employee (blank removes). Do not disclose withholds the student's name from reports for anyone without the restricted-records permission.",
+            Fields = [Pick("Step", "Step", ["Staff discount", "Staff parent", "Do not disclose", "Disclose"]), OptNum("Percent", "Staff discount %"), Opt("Student", "Admission number"),
+                Opt("Employee", "Employee number (staff parent)"), Opt("Note", "Why withheld")],
+            Run = async (c, i) =>
+            {
+                ISchoolBursaryService service = c.Get<ISchoolBursaryService>();
+                if (i.Text("Step") == "Staff discount")
+                {
+                    return Check(await service.SetStaffChildDiscountAsync(c.CompanyId, i.OptionalNumber("Percent") ?? 0m).ConfigureAwait(true), "Staff-child discount saved.");
+                }
+
+                long student = await FindAsync(c.Db.Students, s => s.CompanyId == c.CompanyId && s.AdmissionNumber == (i.Optional("Student") ?? string.Empty).ToUpper(), s => s.Id, "student",
+                    i.Optional("Student") ?? string.Empty).ConfigureAwait(true);
+                if (i.Text("Step") == "Staff parent")
+                {
+                    long? employee = i.Optional("Employee") is string number ? await EmployeeAsync(c, number).ConfigureAwait(true) : null;
+                    return Check(await service.SetStaffParentAsync(c.CompanyId, student, employee).ConfigureAwait(true), employee is null ? "Staff parent removed." : "Staff parent linked.");
+                }
+
+                bool withhold = i.Text("Step") == "Do not disclose";
+                return Check(await service.SetDisclosureAsync(c.CompanyId, student, withhold, i.Optional("Note")).ConfigureAwait(true), withhold ? "Student's details withheld." : "Student's details disclosed.");
+            },
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Set a sibling discount", ListTitle = "Sibling discounts",
             Description = "A family's children (sharing a guardian, in admission order) get this percentage off from the given child on, after any bursary. 0 removes the rule.",
             Fields = [Num("From", "From child (2 = second)", "2"), Num("Percent", "Discount %")],

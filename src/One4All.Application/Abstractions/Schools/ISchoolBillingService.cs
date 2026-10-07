@@ -16,6 +16,9 @@ public readonly record struct StudentBillResult(long StudentId, decimal GrossFee
 
     /// <summary>The share of the term billed (1 for the whole term).</summary>
     public decimal ShareOfTerm { get; init; }
+
+    /// <summary>The staff-child discount (when it beat the sibling discount).</summary>
+    public decimal StaffDiscount { get; init; }
 }
 
 /// <summary>A withdrawal and its pro-rata credit.</summary>
