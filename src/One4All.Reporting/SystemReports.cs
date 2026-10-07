@@ -219,6 +219,26 @@ public static class SystemReports
         [new Column("Category", "Section", 120), new Column("AccountName", "Account", 250), new Column("Amount", "Amount", 100, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
+    /// <summary>The code of the statement laid out by a reporting tree.</summary>
+    public const string TreeStatementCode = "GL-TREE";
+
+    /// <summary>Builds the reporting-tree statement: any tree's headings with their rolled-up amounts for a period (or a balance to a date).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition TreeStatement()
+    {
+        ReportDefinition definition = Listing(TreeStatementCode, "Statement by Reporting Tree", "GeneralLedger",
+            "A financial statement laid out by a reporting tree (statutory, management or consolidation): each heading with everything mapped beneath it rolled up.", "TreeRollup",
+            [new Column("Code", "Code", 110), new Column("Heading", "Heading", 300), new Column("Amount", "Amount", 120, true)],
+            [("TreeCode", ParameterType.String), ("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        ReportBand detail = definition.BandOfType(BandType.Detail)!;
+        foreach (ReportElement element in detail.Elements)
+        {
+            element.ConditionalFormats.Add(new ConditionalFormat { Condition = "!IsLeaf", Bold = true });
+        }
+
+        return definition;
+    }
+
     /// <summary>Builds the Journal Daybook definition (audit journal listing).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition JournalDaybook() => Listing(JournalDaybookCode, "Journal Daybook", "GeneralLedger",

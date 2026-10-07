@@ -52,6 +52,47 @@ internal sealed class FundConfiguration : IEntityTypeConfiguration<Fund>
     }
 }
 
+internal sealed class ReportingTreeConfiguration : IEntityTypeConfiguration<ReportingTree>
+{
+    public void Configure(EntityTypeBuilder<ReportingTree> b)
+    {
+        b.ToTable("reporting_tree", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.Purpose).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+        b.HasMany(x => x.Nodes).WithOne().HasForeignKey(x => x.ReportingTreeId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Nodes).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class ReportingNodeConfiguration : IEntityTypeConfiguration<ReportingNode>
+{
+    public void Configure(EntityTypeBuilder<ReportingNode> b)
+    {
+        b.ToTable("reporting_node", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(40);
+        b.Property(x => x.Name).HasMaxLength(160);
+        b.Property(x => x.ParentCode).HasMaxLength(40);
+        b.HasIndex(x => new { x.ReportingTreeId, x.Code }).IsUnique();
+        b.HasMany(x => x.Ranges).WithOne().HasForeignKey(x => x.ReportingNodeId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Ranges).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class ReportingAccountRangeConfiguration : IEntityTypeConfiguration<ReportingAccountRange>
+{
+    public void Configure(EntityTypeBuilder<ReportingAccountRange> b)
+    {
+        b.ToTable("reporting_account_range", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.FromCode).HasMaxLength(8);
+        b.Property(x => x.ToCode).HasMaxLength(8);
+    }
+}
+
 internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
 {
     public void Configure(EntityTypeBuilder<Project> b)

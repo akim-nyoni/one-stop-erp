@@ -80,6 +80,47 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Reporting trees", ListTitle = "Reporting trees",
+            Description = "Statement layouts independent of account codes (statutory, management, consolidation): create a tree (optionally started from the chart's types and categories), "
+                + "add headings under parents, map account ranges, check every account is mapped once, and show the rolled-up statement (Statement by Reporting Tree, GL-TREE, prints it).",
+            Fields = [Pick("Step", "Step", ["Create", "Create from chart", "Heading", "Map accounts", "Check", "Show statement"]), Req("Tree", "Tree code"), Opt("Name", "Tree / heading name"),
+                Pick("Purpose", "Purpose", Enum.GetNames<ReportingTreePurpose>()), Opt("Node", "Heading code"), Opt("Parent", "Parent heading"), Num("Order", "Order", "10"),
+                Tick("Credit", "Show credit-positive"), Opt("From", "From account"), Opt("To", "To account"), Opt("Start", "From date (blank: balance)"), Today("End", "To date")],
+            Run = async (c, i) =>
+            {
+                IReportingTreeService trees = c.Get<IReportingTreeService>();
+                string tree = i.Text("Tree");
+                switch (i.Text("Step"))
+                {
+                    case "Create":
+                    case "Create from chart":
+                        _ = Check(await trees.CreateTreeAsync(c.CompanyId, tree, i.Optional("Name") ?? tree, Enum.Parse<ReportingTreePurpose>(i.Text("Purpose"))).ConfigureAwait(true));
+                        return i.Text("Step") == "Create" ? $"Tree {tree.ToUpperInvariant()} created." : $"Tree {tree.ToUpperInvariant()} created with {Check(await trees.SeedFromChartAsync(c.CompanyId, tree).ConfigureAwait(true))} heading(s).";
+                    case "Heading":
+                        _ = Check(await trees.SaveNodeAsync(c.CompanyId, tree, i.Text("Node"), i.Optional("Name") ?? i.Text("Node"), i.Optional("Parent"), i.Whole("Order"), i.Flag("Credit")).ConfigureAwait(true), string.Empty);
+                        return "Heading saved.";
+                    case "Map accounts":
+                        _ = Check(await trees.MapAsync(c.CompanyId, tree, i.Text("Node"), i.Text("From"), i.Optional("To")).ConfigureAwait(true), string.Empty);
+                        return "Accounts mapped.";
+                    case "Check":
+                        ReportingTreeCheck check = Check(await trees.CheckAsync(c.CompanyId, tree).ConfigureAwait(true));
+                        return check.IsComplete ? "Every active account is mapped exactly once." : string.Join(Environment.NewLine, new[]
+                        {
+                            check.Unmapped.Count == 0 ? null : $"Not mapped: {string.Join(", ", check.Unmapped)}",
+                            check.MappedTwice.Count == 0 ? null : "Mapped twice: " + string.Join("; ", check.MappedTwice.Select(m => $"{m.Account} ({string.Join(", ", m.Nodes)})")),
+                            check.Orphans.Count == 0 ? null : $"Headings without their parent: {string.Join(", ", check.Orphans)}",
+                        }.Where(l => l is not null));
+                    default:
+                        DateOnly? start = i.Optional("Start") is string s ? DateOnly.ParseExact(s, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null;
+                        IReadOnlyList<ReportingTreeLine> lines = Check(await trees.RollupAsync(c.CompanyId, tree, start, i.Date("End")).ConfigureAwait(true));
+                        return string.Join(Environment.NewLine, lines.Select(l => $"{new string(' ', l.Level * 4)}{l.Name,-50} {M(l.Amount),16}"));
+                }
+            },
+            List = async c => Table(await c.Db.ReportingTrees.AsNoTracking().Include(t => t.Nodes).Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Code).ToListAsync().ConfigureAwait(true),
+                ("Tree", t => t.Code), ("Name", t => t.Name), ("Purpose", t => t.Purpose), ("Headings", t => t.Nodes.Count)),
+        };
+        yield return new Operation
+        {
             Module = "Budgeting", Title = "Budget vs actual by fund, project or branch", ListTitle = "Budgets in preparation",
             Description = "The active budget against posted actuals for each fund, project or branch and account, up to a period (one value only, or all).",
             Fields = [Num("Year", "Fiscal year (start year)", DateTime.Today.Year.ToString(CultureInfo.InvariantCulture)), Pick("Type", "Budget type", Enum.GetNames<BudgetType>()),

@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-534 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+535 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -110,6 +110,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | GL-TB | Trial Balance | Account balances as at a date; debits must equal credits. | AsAtDate (Date) | AccountCode, AccountName, Debit, Credit | — | Sum(Debit), Sum(Credit) |
 | GL-TBMOV | Trial Balance Movement | Per account: opening balance brought forward, debits and credits in the period, and the closing balance. | FromDate (Date, optional), ToDate (Date, optional) | AccountCode, AccountName, Opening, Debit, Credit, Closing | — | Sum(Closing) |
 | GL-TBTYPE | Trial Balance by Type | The trial balance summarised to one line per account type, with debit and credit totals that balance. | AsAtDate (Date, optional) | Type, Debit, Credit | — | Sum(Credit) |
+| GL-TREE | Statement by Reporting Tree | A financial statement laid out by a reporting tree (statutory, management or consolidation): each heading with everything mapped beneath it rolled up. | TreeCode (String, optional), FromDate (Date, optional), ToDate (Date, optional) | Code, Heading, Amount | — | Sum(Amount) |
 | GL-VAT | VAT Return | Output tax on sales less input tax on purchases for a period, giving the net VAT payable. | FromDate (Date, optional), ToDate (Date, optional) | Metric, Amount | — | Sum(Amount) |
 | GL-VATC | VAT Return by Code | Output and input tax by tax code for a period, with the net per code — the multi-rate VAT breakdown. | FromDate (Date, optional), ToDate (Date, optional) | TaxCode, OutputTax, InputTax, Net | — | Sum(Net) |
 | GL10 | Notes to the Accounts Schedules | Accounts grouped by their note reference: opening balance, the period's movement and closing balance, with a total per note. | FromDate (Date, optional), ToDate (Date, optional) | Note, Account, Name, Opening, Movement, Closing | — | Sum(Closing) |

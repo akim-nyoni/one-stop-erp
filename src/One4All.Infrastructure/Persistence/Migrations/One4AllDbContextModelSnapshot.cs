@@ -1180,6 +1180,161 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("recurring_journal_line", "gl");
                 });
 
+            modelBuilder.Entity("One4All.Core.Accounting.ReportingAccountRange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("FromCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("from_code");
+
+                    b.Property<long>("ReportingNodeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reporting_node_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("ToCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("to_code");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reporting_account_range");
+
+                    b.HasIndex("ReportingNodeId")
+                        .HasDatabaseName("ix_reporting_account_range_reporting_node_id");
+
+                    b.ToTable("reporting_account_range", "gl");
+                });
+
+            modelBuilder.Entity("One4All.Core.Accounting.ReportingNode", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ParentCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("parent_code");
+
+                    b.Property<long>("ReportingTreeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reporting_tree_id");
+
+                    b.Property<bool>("ReverseSign")
+                        .HasColumnType("boolean")
+                        .HasColumnName("reverse_sign");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reporting_node");
+
+                    b.HasIndex("ReportingTreeId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_reporting_node_reporting_tree_id_code");
+
+                    b.ToTable("reporting_node", "gl");
+                });
+
+            modelBuilder.Entity("One4All.Core.Accounting.ReportingTree", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer")
+                        .HasColumnName("purpose");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_reporting_tree");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_reporting_tree_company_id_code");
+
+                    b.ToTable("reporting_tree", "gl");
+                });
+
             modelBuilder.Entity("One4All.Core.Accounting.TaxCode", b =>
                 {
                     b.Property<long>("Id")
@@ -28292,6 +28447,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_recurring_journal_line_recurring_journals_recurring_journal");
                 });
 
+            modelBuilder.Entity("One4All.Core.Accounting.ReportingAccountRange", b =>
+                {
+                    b.HasOne("One4All.Core.Accounting.ReportingNode", null)
+                        .WithMany("Ranges")
+                        .HasForeignKey("ReportingNodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_reporting_account_range_reporting_node_reporting_node_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Accounting.ReportingNode", b =>
+                {
+                    b.HasOne("One4All.Core.Accounting.ReportingTree", null)
+                        .WithMany("Nodes")
+                        .HasForeignKey("ReportingTreeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_reporting_node_reporting_trees_reporting_tree_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Accounting.TaxRate", b =>
                 {
                     b.HasOne("One4All.Core.Accounting.TaxCode", null)
@@ -29984,6 +30159,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Accounting.RecurringJournal", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Accounting.ReportingNode", b =>
+                {
+                    b.Navigation("Ranges");
+                });
+
+            modelBuilder.Entity("One4All.Core.Accounting.ReportingTree", b =>
+                {
+                    b.Navigation("Nodes");
                 });
 
             modelBuilder.Entity("One4All.Core.Accounting.TaxCode", b =>

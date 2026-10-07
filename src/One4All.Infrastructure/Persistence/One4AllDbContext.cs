@@ -98,6 +98,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the projects.</summary>
     public DbSet<Project> Projects => Set<Project>();
 
+    /// <summary>Gets the reporting hierarchies.</summary>
+    public DbSet<ReportingTree> ReportingTrees => Set<ReportingTree>();
+
     /// <summary>Departments (GL analysis dimension).</summary>
     public DbSet<Department> Departments => Set<Department>();
 

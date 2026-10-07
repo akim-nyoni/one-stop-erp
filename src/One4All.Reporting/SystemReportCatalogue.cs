@@ -20,6 +20,7 @@ public static class SystemReportCatalogue
         yield return SystemReports.DepartmentalIncomeStatement();
         yield return SystemReports.TrialBalanceByType();
         yield return SystemReports.JournalDaybook();
+        yield return SystemReports.TreeStatement();
         yield return SystemReports.TrialBalanceMovement();
         yield return SystemReports.ChartOfAccounts();
         yield return SystemReports.FinancialSnapshot();
