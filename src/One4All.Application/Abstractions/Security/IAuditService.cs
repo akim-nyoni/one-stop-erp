@@ -28,6 +28,9 @@ public sealed record AuditQuery
 
     /// <summary>The most entries to return (newest first); capped at 5,000.</summary>
     public int Take { get; init; } = 500;
+
+    /// <summary>Gets a value indicating whether entries that belong to no company (users, roles, permissions) are included.</summary>
+    public bool IncludeUnscoped { get; init; }
 }
 
 /// <summary>One audit-trail entry for display.</summary>
@@ -83,6 +86,21 @@ public sealed record AuditEvent(long? CompanyId, long? UserId, string UserName, 
 public sealed record DatabaseChangeView(long Id, DateTimeOffset OccurredOnUtc, string TableName, string Operation, string? RowId, string DbUser, string? ApplicationName, string? ClientAddress,
     bool OutsideApplication);
 
+/// <summary>Everything known about who touched one record.</summary>
+/// <param name="EntityType">The record type.</param>
+/// <param name="EntityId">The record id.</param>
+/// <param name="Created">Who created it and when, if the log has it.</param>
+/// <param name="LastChanged">The latest change.</param>
+/// <param name="Users">Everyone who touched it, in order of first touch.</param>
+/// <param name="Entries">Every application log entry (changes, prints, exports, approvals...), newest first.</param>
+/// <param name="DatabaseChanges">Changes the database's own trigger saw on the record's row (including any made outside the application), newest first.</param>
+public sealed record RecordHistory(string EntityType, string EntityId, AuditEntryView? Created, AuditEntryView? LastChanged, IReadOnlyList<string> Users,
+    IReadOnlyList<AuditEntryView> Entries, IReadOnlyList<DatabaseChangeView> DatabaseChanges)
+{
+    /// <summary>Gets the database changes made outside the application (direct SQL, other tools).</summary>
+    public IReadOnlyList<DatabaseChangeView> OutsideApplication => [.. DatabaseChanges.Where(c => c.OutsideApplication)];
+}
+
 public interface IAuditService
 {
     /// <summary>
@@ -108,6 +126,29 @@ public interface IAuditService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The matching entries.</returns>
     Task<IReadOnlyList<AuditEntryView>> QueryAsync(AuditQuery query, CancellationToken ct = default);
+
+    /// <summary>"Who touched this record" (brief §6): created by, last changed by, everyone involved, every log entry, and the database's own record of its row.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="entityType">The record type (e.g. Customer).</param>
+    /// <param name="entityId">The record id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The history.</returns>
+    Task<RecordHistory> RecordHistoryAsync(long companyId, string entityType, string entityId, CancellationToken ct = default);
+
+    /// <summary>The record types the company's log mentions (for choosing one).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The types, sorted.</returns>
+    Task<IReadOnlyList<string>> EntityTypesAsync(long companyId, CancellationToken ct = default);
+
+    /// <summary>Exports log entries (CSV, Excel or PDF); the export itself is logged.</summary>
+    /// <param name="query">What to export.</param>
+    /// <param name="format">Csv, Xlsx or Pdf.</param>
+    /// <param name="userId">Who exports.</param>
+    /// <param name="userName">Their name.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The document, or why not.</returns>
+    Task<Core.Common.Result<Reporting.RenderedDocument>> ExportAsync(AuditQuery query, Reporting.ReportFormat format, long? userId, string userName, CancellationToken ct = default);
 
     /// <summary>
     /// Walks a company's chain in order, recomputing each entry's hash from the previous entry's stored hash

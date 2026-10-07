@@ -39,6 +39,10 @@
         <Border DockPanel.Dock="Top" Style="{StaticResource ChainBanner}">
             <DockPanel>
                 <Button DockPanel.Dock="Right" Content="Verify chain" Padding="12,4" Command="{Binding VerifyCommand}" />
+                <Button DockPanel.Dock="Right" Content="Export PDF…" Padding="10,4" Margin="0,0,6,0" Tag="Pdf" Click="Export_Click" />
+                <Button DockPanel.Dock="Right" Content="Export Excel…" Padding="10,4" Margin="0,0,6,0" Tag="Xlsx" Click="Export_Click" />
+                <Button DockPanel.Dock="Right" Content="Export CSV…" Padding="10,4" Margin="0,0,6,0" Tag="Csv" Click="Export_Click" />
+                <Button DockPanel.Dock="Right" Content="Who touched this record?" Padding="10,4" Margin="0,0,6,0" Click="WhoTouched_Click" />
                 <TextBlock Text="{Binding ChainStatus}" FontWeight="SemiBold" Foreground="#1E3A2E" VerticalAlignment="Center" TextWrapping="Wrap" />
             </DockPanel>
         </Border>

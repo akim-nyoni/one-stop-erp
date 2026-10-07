@@ -122,6 +122,8 @@ public partial class ShellWindow : Window
         audit.Show();
     }
 
+    private void OpenRecordHistory_Click(object sender, RoutedEventArgs e) => new RecordHistoryWindow(_services) { Owner = this }.Show();
+
     private void OpenGroupConsolidation_Click(object sender, RoutedEventArgs e)
     {
         GroupConsolidationWindow consolidation = new(_services) { Owner = this };

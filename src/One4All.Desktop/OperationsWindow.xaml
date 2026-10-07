@@ -108,9 +108,15 @@
                     <Button DockPanel.Dock="Right" Content="Refresh" Padding="12,4" Command="{Binding RefreshCommand}" />
                     <TextBlock Text="{Binding Selected.ListTitle}" FontWeight="SemiBold" Foreground="#445" VerticalAlignment="Center" />
                 </DockPanel>
-                <DataGrid Grid.Row="3" ItemsSource="{Binding List}" AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False"
+                <DataGrid x:Name="ListGrid" Grid.Row="3" ItemsSource="{Binding List}" AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False"
                           HeadersVisibility="Column" GridLinesVisibility="Horizontal" Background="White" BorderBrush="#D9E0D9"
-                          RowBackground="White" AlternatingRowBackground="#F7FAF7" />
+                          RowBackground="White" AlternatingRowBackground="#F7FAF7">
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Who touched this record?" Click="WhoTouched_Click" />
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                </DataGrid>
             </Grid>
         </Grid>
     </DockPanel>

@@ -20,7 +20,7 @@ public sealed class AuditService : IAuditService
     /// <inheritdoc />
     public async Task<IReadOnlyList<AuditEntryView>> QueryAsync(AuditQuery query, CancellationToken ct = default)
     {
-        IQueryable<ChangeLogEntry> q = _db.ChangeLog.AsNoTracking().Where(c => c.CompanyId == query.CompanyId);
+        IQueryable<ChangeLogEntry> q = _db.ChangeLog.AsNoTracking().Where(c => c.CompanyId == query.CompanyId || (query.IncludeUnscoped && c.CompanyId == null));
 
         if (query.From is { } from)
         {
@@ -130,5 +130,85 @@ public sealed class AuditService : IAuditService
         return [.. (await q.OrderByDescending(c => c.Id).Take(take).ToListAsync(ct).ConfigureAwait(false))
             .Select(c => new DatabaseChangeView(c.Id, c.OccurredOnUtc, c.TableName, c.Operation, c.RowId, c.DbUser, c.ApplicationName, c.ClientAddress,
                 c.ApplicationName != Persistence.One4AllDbContextOptions.ApplicationName))];
+    }
+
+    /// <inheritdoc />
+    public async Task<RecordHistory> RecordHistoryAsync(long companyId, string entityType, string entityId, CancellationToken ct = default)
+    {
+        string type = (entityType ?? string.Empty).Trim(), id = (entityId ?? string.Empty).Trim();
+        IReadOnlyList<AuditEntryView> entries = await QueryAsync(new AuditQuery { CompanyId = companyId, EntityType = type, EntityId = id, Take = MaxTake, IncludeUnscoped = true }, ct).ConfigureAwait(false);
+        List<AuditEntryView> oldestFirst = [.. entries.OrderBy(e => e.OccurredOnUtc).ThenBy(e => e.Id)];
+
+        // The database trigger names rows by schema.table: find the record type's table in the model.
+        Microsoft.EntityFrameworkCore.Metadata.IEntityType? mapped = _db.Model.GetEntityTypes().FirstOrDefault(e => e.ClrType.Name == type && e.GetTableName() is not null);
+        List<DatabaseChangeView> database = [];
+        if (mapped is not null)
+        {
+            string table = $"{mapped.GetSchema() ?? "public"}.{mapped.GetTableName()}";
+            database = [.. (await _db.DatabaseChanges.AsNoTracking().Where(c => c.TableName == table && c.RowId == id).OrderByDescending(c => c.Id).Take(MaxTake).ToListAsync(ct).ConfigureAwait(false))
+                .Select(c => new DatabaseChangeView(c.Id, c.OccurredOnUtc, c.TableName, c.Operation, c.RowId, c.DbUser, c.ApplicationName, c.ClientAddress,
+                    c.ApplicationName != Persistence.One4AllDbContextOptions.ApplicationName))];
+        }
+
+        return new RecordHistory(type, id, oldestFirst.FirstOrDefault(e => e.Action == AuditAction.Insert),
+            oldestFirst.LastOrDefault(e => e.Action is AuditAction.Insert or AuditAction.Update or AuditAction.Delete),
+            [.. oldestFirst.Select(e => e.UserName).Distinct(StringComparer.OrdinalIgnoreCase)], entries, database);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> EntityTypesAsync(long companyId, CancellationToken ct = default)
+        => await _db.ChangeLog.AsNoTracking().Where(c => c.CompanyId == companyId || c.CompanyId == null).Select(c => c.EntityType).Distinct().OrderBy(t => t).ToListAsync(ct).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<Result<Application.Abstractions.Reporting.RenderedDocument>> ExportAsync(AuditQuery query, Application.Abstractions.Reporting.ReportFormat format, long? userId, string userName,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (format is not (Application.Abstractions.Reporting.ReportFormat.Csv or Application.Abstractions.Reporting.ReportFormat.Xlsx or Application.Abstractions.Reporting.ReportFormat.Pdf))
+        {
+            return Error.Validation("Audit.ExportFormat", "The audit trail exports as CSV, Excel or PDF.");
+        }
+
+        IReadOnlyList<AuditEntryView> entries = await QueryAsync(query, ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [.. entries.Select(e => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
+        {
+            ["When"] = e.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) + "Z",
+            ["User"] = e.UserName,
+            ["Action"] = e.Action.ToString(),
+            ["Record"] = string.IsNullOrEmpty(e.EntityId) ? e.EntityType : $"{e.EntityType} #{e.EntityId}",
+            ["Fields"] = string.Join(", ", e.ChangedFields),
+            ["Reason"] = e.Reason,
+            ["Terminal"] = e.Terminal,
+        })];
+
+        string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmm", System.Globalization.CultureInfo.InvariantCulture);
+        Application.Abstractions.Reporting.RenderedDocument document;
+        switch (format)
+        {
+            case Application.Abstractions.Reporting.ReportFormat.Csv:
+                document = new(new One4All.Reporting.Engine.CsvReportExporter().Export(rows), "text/csv", $"audit-trail-{stamp}.csv");
+                break;
+            case Application.Abstractions.Reporting.ReportFormat.Xlsx:
+                document = new(new One4All.Reporting.Engine.XlsxReportExporter().Export(rows, "Audit trail"), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"audit-trail-{stamp}.xlsx");
+                break;
+            default:
+                One4All.Reporting.Model.ReportDefinition listing = One4All.Reporting.SystemReports.Listing("AUDIT-EXPORT", "Audit Trail", "Security", "Audit trail export", "AuditExport",
+                    [new("When", "When (UTC)", 95), new("User", "User", 70), new("Action", "Action", 55), new("Record", "Record", 110), new("Fields", "Changed fields", 140),
+                        new("Reason", "Reason", 90)], []);
+                listing.Page.Orientation = One4All.Reporting.Model.ReportOrientation.Landscape;
+                One4All.Reporting.Engine.RenderModel model = new One4All.Reporting.Engine.ReportEngine().Build(new One4All.Reporting.Engine.ReportInput
+                {
+                    Definition = listing, Rows = rows, UserName = userName,
+                    CompanyName = await _db.Companies.Where(c => c.Id == query.CompanyId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? string.Empty,
+                });
+                document = new(new One4All.Reporting.Engine.PdfReportRenderer().Render(model), "application/pdf", $"audit-trail-{stamp}.pdf");
+                break;
+        }
+
+        // An export of the audit trail is itself audited.
+        Result<long> logged = await RecordAsync(new AuditEvent(query.CompanyId, userId, userName, "Audit", "AuditTrail", null, AuditAction.Export,
+            $"{entries.Count} entr{(entries.Count == 1 ? "y" : "ies")} exported as {format} ({query.EntityType ?? "all records"}{(query.EntityId is null ? string.Empty : $" #{query.EntityId}")})"), ct)
+            .ConfigureAwait(false);
+        return logged.IsFailure ? logged.Error : document;
     }
 }

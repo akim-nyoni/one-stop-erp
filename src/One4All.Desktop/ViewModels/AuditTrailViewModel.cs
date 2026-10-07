@@ -123,7 +123,23 @@ public sealed partial class AuditTrailViewModel : ObservableObject
         }
     }
 
+    /// <summary>Exports what the filters select (CSV, Excel or PDF); the export is itself logged.</summary>
+    /// <param name="format">The format.</param>
+    /// <returns>The document, or why not.</returns>
+    public async Task<Core.Common.Result<Application.Abstractions.Reporting.RenderedDocument>> ExportAsync(Application.Abstractions.Reporting.ReportFormat format)
+    {
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        DesktopSession? session = _services.GetService<DesktopSession>();
+        return await scope.ServiceProvider.GetRequiredService<IAuditService>().ExportAsync(new AuditQuery
+        {
+            CompanyId = _companyId, From = FromDate is { } f ? DateOnly.FromDateTime(f) : null, To = ToDate is { } t ? DateOnly.FromDateTime(t) : null, EntityType = EntityType,
+            EntityId = EntityId, UserName = UserName, Action = Action, Take = 10_000,
+        }, format, session?.UserId, session?.UserName ?? "desktop").ConfigureAwait(true);
+    }
+
     /// <summary>Runs the search.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task.</returns>
     [RelayCommand(CanExecute = nameof(CanRun))]
     public async Task SearchAsync(CancellationToken ct = default)
     {
