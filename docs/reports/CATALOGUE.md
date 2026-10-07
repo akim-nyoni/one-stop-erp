@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-535 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+540 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -64,7 +64,9 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 |---|---|---|---|---|---|---|
 | CB-FLOW | Cash-Flow Forecast | Expected receipts and payments from open receivables and payables, bucketed by due date, with the running net. | AsAtDate (Date, optional) | Bucket, Inflow, Outflow, Net, RunningNet | — | Sum(RunningNet) |
 | CB68 | Cash Book Listing | Every posting to a bank account's ledger in the period with running balance and whether it is reconciled. | BankCode (String, optional), FromDate (Date, optional), ToDate (Date, optional) | Bank, Date, Journal, Document, Narrative, Receipts, Payments, Balance, Reconciled | — | — |
+| CB69 | Bank Reconciliation Statement | For a bank account at a date: the statement balance, less payments not yet presented, plus receipts not yet on the ledger, against the cash book balance, with any difference left. | BankCode (String, optional), AsAtDate (Date, optional) | Section, Date, Description, Amount | — | Sum(Amount) |
 | CB70 | Unpresented & Uncleared Items Ageing | Ledger postings not yet on a bank statement and statement lines not yet on the ledger, aged at the date. | AsAtDate (Date, optional) | Bank, Kind, Date, Reference, Days, Band, Amount | — | Sum(Amount) |
+| CB71 | Bank Account Balances Summary | Every bank account and wallet at a date: currency, cash book balance, statement lines still to reconcile and when it was last reconciled. | AsAtDate (Date, optional) | Code, Name, Currency, GlAccount, Unreconciled, ReconciledTo, Balance | — | Sum(Balance) |
 | CB72 | 13-Week Cash Flow Forecast by Currency | From today's bank balances, week by week: customer receipts and supplier payments falling due, and the closing cash, per currency. | AsAtDate (Date, optional) | Week, Currency, Opening, Receipts, Payments, Closing | — | — |
 | CB73 | Petty Cash & Imprest Report | Disbursements and top-ups on the petty cash account in the period with its running balance. | AccountCode (String, optional), FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Document, Narrative, In, Out, Balance | — | — |
 | CB74 | Inter-account Transfers | Transfers between bank accounts in the period, with the amount out, the amount in and any exchange difference. | FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Document, From, To, Out, In, Difference | — | Sum(Difference) |
@@ -403,6 +405,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | Code | Name | Purpose | Parameters | Columns | Grouping | Totals |
 |---|---|---|---|---|---|---|
 | POS-SUM | POS Sales Summary | Point-of-sale transactions with net, tax and gross for a period. | FromDate (Date, optional), ToDate (Date, optional) | SaleNumber, SaleDate, TotalNet, TotalTax, TotalGross | — | Sum(TotalGross) |
+| POS102 | POS Z-Read / X-Read by Till & Cashier | Every till session in the period: till, cashier, opened and closed, Z-read number (open sessions are an X-read so far), float, sales, and the takings per tender and currency. | FromDate (Date, optional), ToDate (Date, optional) | Till, Cashier, Opened, Closed, Read, Float, Sales, Tender, Currency, Amount, Base | — | Sum(Base) |
 | POS103 | Daily Sales Summary | Per day, till and cashier: sales, voids, net, tax, the tender split and gross takings. | FromDate (Date, optional), ToDate (Date, optional) | Date, Till, Cashier, Sales, Voided, Net, Tax, Tenders, Gross | — | Sum(Gross) |
 | POS104 | Cashier Performance | Per cashier over the period: sessions, sales, items, average basket, voids, cash-up variance and net sales. | FromDate (Date, optional), ToDate (Date, optional) | Cashier, Sessions, Sales, Items, AverageBasket, Voids, Variance, Net | — | Sum(Net) |
 | POS105 | Till Variance & Cash-up Report | Each closed till session: float, cash taken, change given, expected, counted and the over or short. | FromDate (Date, optional), ToDate (Date, optional) | Session, Till, Cashier, Closed, Float, CashIn, Change, Expected, Counted, Variance | — | Sum(Variance) |
@@ -608,6 +611,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | DB254 | Branch Comparison League Table | Branches ranked by POS net sales in the period, with transactions, average basket and share. | FromDate (Date, optional), ToDate (Date, optional) | Rank, Branch, Transactions, AverageBasket, Share, Sales | — | Sum(Sales) |
 | DB255 | Trend & Seasonality Analysis | Revenue, expenses and profit month by month for the 24 months to the date, with each month against the same month a year before. | AsAtDate (Date, optional) | Month, Revenue, Expenses, LastYear, YearOnYear, Profit | — | Sum(Profit) |
 | SYS-PERIOD | Period Status | Accounting periods with their open/closed status for the key ledgers (GL, AR, AP) — a month-end close aid. | — | Period, Start, End, GL, AR, AP | — | — |
+| SYS235 | Audit Trail Report | Every audit-logged action in the period — who, when, what record, which fields and why — optionally for one record type or user. | FromDate (Date, optional), ToDate (Date, optional), EntityType (String, optional), UserName (String, optional) | When, User, Action, Record, Fields, Reason | — | — |
 | SYS236 | User Activity Report | Per user over the period: sign-ins, failed attempts, lockouts, first and last sign-in, hours in closed sessions, terminals used and reports run. | FromDate (Date, optional), ToDate (Date, optional) | User, Logins, Failed, Lockouts, First, Last, Hours, Terminals, Reports | — | — |
 | SYS237 | Permission Matrix | Every role with each permission it grants and the operations allowed. | — | Role, Module, Permission, Name, Operations | — | — |
 | SYS238 | User, Role & Group Membership | Every user with direct roles, groups, roles held through groups and individual overrides. | — | User, Name, Status, Roles, Groups, GroupRoles, Overrides | — | — |
@@ -618,6 +622,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | SYS243 | Deleted & Voided Documents | Records deleted or retired in the period, and journals reversed or cancelled, with who and why. | FromDate (Date, optional), ToDate (Date, optional) | When, Kind, Entity, Id, User, Reason | — | — |
 | SYS244 | Document Numbering Gaps | Missing runs in each year's journal numbering. | — | Year, From, To, Missing, Description | — | — |
 | SYS245 | Unposted & Deferred Batches | Journals still draft, deferred or awaiting approval, with who prepared them. | — | Journal, Posting, Status, Source, Document, PreparedBy, Narrative | — | — |
+| SYS246 | Data Integrity & System Health | The data-health checks at a date — orphan records, unbalanced batches, control-account variances, negative stock and the rest — each with its status, count, value and first findings. | AsAtDate (Date, optional) | Check, Status, Count, Value, Findings | — | — |
 | SYS247 | Audit Trail Hash-Chain Verification | Recomputes the audit trail's hash chain for the company and for system-wide entries and says whether it is intact or where it first breaks. | — | Scope, Checked, Intact, FirstBroken, Message | — | — |
 | SYS248 | Licence Installation History | Licences installed, when and by whom, and which is active (token fingerprint only). | — | Installed, By, Active, Fingerprint | — | — |
 | SYS249 | Login Session & Concurrency Report | Every session opened in the period: user, terminal, start, end and duration, flagging sessions open at the same time as another of the same user on a different terminal. | FromDate (Date, optional), ToDate (Date, optional) | User, Terminal, Method, Start, End, Minutes, Concurrent | — | — |

@@ -4,6 +4,7 @@ using One4All.Application.Abstractions.Reporting;
 using One4All.Application.Housing;
 using One4All.Core.Accounting;
 using One4All.Core.Banking;
+using One4All.Core.Common;
 using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
 using One4All.Infrastructure.Trading;
@@ -14,14 +15,20 @@ namespace One4All.Infrastructure.Reporting;
 public sealed class CashBookReportDataProvider : IReportDataProvider
 {
     private readonly One4AllDbContext _db;
+    private readonly Application.Abstractions.Banking.IBankReconciliationService? _reconciliation;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
-    public CashBookReportDataProvider(One4AllDbContext db) => _db = db;
+    /// <param name="reconciliation">The bank reconciliation service (statement and balances).</param>
+    public CashBookReportDataProvider(One4AllDbContext db, Application.Abstractions.Banking.IBankReconciliationService? reconciliation = null)
+    {
+        _db = db;
+        _reconciliation = reconciliation;
+    }
 
     /// <inheritdoc />
     public bool CanHandle(string command) => command.StartsWith("Cash", StringComparison.OrdinalIgnoreCase)
-        && command.ToUpperInvariant() is "CASHBOOKLISTING" or "CASHUNRECONCILED" or "CASHFORECAST" or "CASHPETTY" or "CASHTRANSFERS" or "CASHCHEQUES" or "CASHWALLETS";
+        && command.ToUpperInvariant() is "CASHBOOKLISTING" or "CASHUNRECONCILED" or "CASHFORECAST" or "CASHPETTY" or "CASHTRANSFERS" or "CASHCHEQUES" or "CASHWALLETS" or "CASHRECSTATEMENT" or "CASHBALANCES";
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GetRowsAsync(long companyId, string command, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct = default)
@@ -35,7 +42,9 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
             "CASHCHEQUES" => await ChequesAsync(companyId, fromDate, toDate, parameters.TryGetValue("StaleMonths", out object? stale) && stale is not null and not "" ? Convert.ToInt32(stale, CultureInfo.InvariantCulture) : 6, ct)
                 .ConfigureAwait(false),
             "CASHWALLETS" => await WalletsAsync(companyId, DateParameter(parameters, "AsAtDate") ?? toDate, ct).ConfigureAwait(false),
-            "CASHBOOKLISTING" => await ListingAsync(companyId, Text(parameters, "BankCode"), fromDate, toDate, ct).ConfigureAwait(false),
+            "CASHBOOKLISTING" => await ListingAsync(companyId, Text(parameters, "BankCode")?.ToUpperInvariant(), fromDate, toDate, ct).ConfigureAwait(false),
+            "CASHRECSTATEMENT" => await RecStatementAsync(companyId, Text(parameters, "BankCode")?.ToUpperInvariant(), asAt, ct).ConfigureAwait(false),
+            "CASHBALANCES" => await BalancesAsync(companyId, asAt, ct).ConfigureAwait(false),
             "CASHUNRECONCILED" => await UnreconciledAsync(companyId, asAt, ct).ConfigureAwait(false),
             "CASHFORECAST" => await ForecastAsync(companyId, asAt, ct).ConfigureAwait(false),
             "CASHPETTY" => await PettyCashAsync(companyId, Text(parameters, "AccountCode"), fromDate, toDate, ct).ConfigureAwait(false),
@@ -207,6 +216,52 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
         }
 
         return rows;
+    }
+
+    // The classic statement: bank balance, less unpresented payments, plus uncleared receipts, equals the cash book (with any difference shown).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RecStatementAsync(long companyId, string? bankCode, DateOnly asAt, CancellationToken ct)
+    {
+        if (_reconciliation is null)
+        {
+            return [];
+        }
+
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (BankAccount bank in await _db.BankAccounts.AsNoTracking().Where(b => b.CompanyId == companyId && b.IsActive && (bankCode == null || b.Code == bankCode)).OrderBy(b => b.Code)
+                     .ToListAsync(ct).ConfigureAwait(false))
+        {
+            Result<Application.Abstractions.Banking.BankReconciliationReport> result = await _reconciliation.GetReconciliationAsync(companyId, bank.Id, asAt, ct).ConfigureAwait(false);
+            if (result.IsFailure)
+            {
+                continue;
+            }
+
+            Application.Abstractions.Banking.BankReconciliationReport rec = result.Value;
+            string Head(string text) => $"{bank.Code} — {text}";
+            rows.Add(Row(("Section", Head("Balance per bank statement")), ("Date", asAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Description", bank.Name), ("Amount", rec.StatementBalance)));
+            rows.AddRange(rec.UnpresentedGlItems.Where(i => i.Amount < 0m).Select(i => Row(("Section", Head("Less: payments not yet presented")), ("Date", i.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+                ("Description", i.Description), ("Amount", i.Amount))));
+            rows.AddRange(rec.UnpresentedGlItems.Where(i => i.Amount > 0m).Select(i => Row(("Section", Head("Add: receipts not yet on the statement")), ("Date", i.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+                ("Description", i.Description), ("Amount", i.Amount))));
+            rows.AddRange(rec.UnmatchedStatementItems.Select(i => Row(("Section", Head("Less: statement items not yet in the cash book")), ("Date", i.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+                ("Description", i.Description), ("Amount", -i.Amount))));
+            rows.Add(Row(("Section", Head("Balance per cash book")), ("Date", asAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Description", bank.GlAccountCode), ("Amount", rec.GlBalance)));
+            rows.Add(Row(("Section", Head(rec.Difference == 0m ? "Reconciled — no difference" : "UNEXPLAINED DIFFERENCE")), ("Date", string.Empty), ("Description", string.Empty), ("Amount", rec.Difference)));
+        }
+
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BalancesAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        if (_reconciliation is null || await _reconciliation.CashPositionAsync(companyId, asAt, ct).ConfigureAwait(false) is not { IsSuccess: true } position)
+        {
+            return [];
+        }
+
+        Dictionary<string, DateOnly?> reconciledTo = await _db.BankAccounts.AsNoTracking().Where(b => b.CompanyId == companyId).ToDictionaryAsync(b => b.Code, b => b.ReconciledTo, ct).ConfigureAwait(false);
+        return [.. position.Value.Rows.Select(r => Row(("Code", r.Code), ("Name", r.Name), ("Currency", r.Currency), ("GlAccount", r.GlAccountCode), ("Unreconciled", r.UnreconciledLines),
+            ("ReconciledTo", reconciledTo.GetValueOrDefault(r.Code)?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "never"), ("Balance", r.Balance)))];
     }
 
     private static string? Text(IReadOnlyDictionary<string, object?> parameters, string name)

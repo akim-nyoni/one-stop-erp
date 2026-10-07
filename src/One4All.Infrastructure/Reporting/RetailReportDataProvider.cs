@@ -30,6 +30,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
         return command.ToUpperInvariant() switch
         {
             "RETLDAILY" => await DailyAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "RETLZREAD" => await ZReadAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLCASHIERS" => await CashiersAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLCASHUP" => await CashUpAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLHEATMAP" => await HeatmapAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -291,5 +292,40 @@ public sealed class RetailReportDataProvider : IReportDataProvider
         }
 
         return row;
+    }
+
+    // One row per session and tender (a session with no sales still shows, with its float).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ZReadAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        DateTimeOffset start = new(fromDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero), end = new(toDate.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
+        List<Core.Pos.TillSession> sessions = await _db.TillSessions.AsNoTracking().Where(s => s.CompanyId == companyId && s.OpenedOnUtc >= start && s.OpenedOnUtc <= end)
+            .OrderBy(s => s.OpenedOnUtc).ToListAsync(ct).ConfigureAwait(false);
+        List<long> ids = [.. sessions.Select(s => s.Id)];
+        List<Core.Pos.Sale> sales = await _db.Sales.AsNoTracking().Include(s => s.Tenders).Where(s => ids.Contains(s.TillSessionId) && s.Status == Core.Pos.SaleStatus.Completed)
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<long> terminals = [.. sessions.Select(s => s.TerminalId).Distinct()], cashiers = [.. sessions.Select(s => s.CashierUserId).Distinct()];
+        Dictionary<long, string> tills = await _db.PosTerminals.AsNoTracking().Where(t => terminals.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.Code, ct).ConfigureAwait(false);
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().Where(u => cashiers.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (Core.Pos.TillSession session in sessions)
+        {
+            List<Core.Pos.Sale> mine = [.. sales.Where(s => s.TillSessionId == session.Id)];
+            var tenders = mine.SelectMany(s => s.Tenders).GroupBy(t => (t.TenderType, Currency: t.Currency.Value))
+                .Select(g => new { g.Key.TenderType, g.Key.Currency, Amount = g.Sum(t => t.IsChange ? -t.Amount : t.Amount), Base = g.Sum(t => t.IsChange ? -t.BaseAmount : t.BaseAmount) })
+                .OrderBy(t => t.TenderType).ThenBy(t => t.Currency).ToList();
+            string read = session.ZReadNumber is int z ? $"Z{z}" : "X (open)";
+            IReadOnlyDictionary<string, object?> Line(string tender, string currency, decimal amount, decimal baseAmount) => Row(("Till", tills.GetValueOrDefault(session.TerminalId, "?")),
+                ("Cashier", users.GetValueOrDefault(session.CashierUserId, "?")), ("Opened", session.OpenedOnUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)),
+                ("Closed", session.ClosedOnUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "—"), ("Read", read), ("Float", session.OpeningFloat), ("Sales", mine.Count),
+                ("Tender", tender), ("Currency", currency), ("Amount", amount), ("Base", baseAmount));
+            if (tenders.Count == 0)
+            {
+                rows.Add(Line("—", string.Empty, 0m, 0m));
+            }
+
+            rows.AddRange(tenders.Select(t => Line(t.TenderType.ToString(), t.Currency, t.Amount, t.Base)));
+        }
+
+        return rows;
     }
 }

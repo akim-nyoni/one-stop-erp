@@ -17,6 +17,10 @@ public static class ControlReports
     public static IEnumerable<ReportDefinition> All()
     {
         // Audit, security & compliance.
+        yield return Listing("SYS235", "Audit Trail Report", "System", "Every audit-logged action in the period — who, when, what record, which fields and why — optionally for one record type or user.",
+            "SysrAuditTrail", [new Column("When", "When (UTC)", 110), new Column("User", "User", 80), new Column("Action", "Action", 60), new Column("Record", "Record", 130),
+             new Column("Fields", "Changed fields", 180), new Column("Reason", "Reason", 150)],
+            [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("EntityType", ParameterType.String), ("UserName", ParameterType.String)]);
         yield return Listing("SYS236", "User Activity Report", "System", "Per user over the period: sign-ins, failed attempts, lockouts, first and last sign-in, hours in closed sessions, terminals used and reports run.",
             "SysrUserActivity", [new Column("User", "User", 100), new Column("Logins", "Sign-ins", 55), new Column("Failed", "Failed", 50), new Column("Lockouts", "Lockouts", 55), new Column("First", "First", 115),
              new Column("Last", "Last", 115), new Column("Hours", "Hours active", 70), new Column("Terminals", "Terminals", 150), new Column("Reports", "Reports run", 65)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
@@ -46,6 +50,10 @@ public static class ControlReports
         yield return Listing("SYS245", "Unposted & Deferred Batches", "System", "Journals still draft, deferred or awaiting approval, with who prepared them.",
             "SysrUnposted", [new Column("Journal", "Journal", 100), new Column("Posting", "Posting date", 80), new Column("Status", "Status", 110), new Column("Source", "Source", 60),
              new Column("Document", "Document", 120), new Column("PreparedBy", "Prepared by", 90), new Column("Narrative", "Narrative", 200)], []);
+        yield return Listing("SYS246", "Data Integrity & System Health", "System", "The data-health checks at a date — orphan records, unbalanced batches, control-account variances, negative stock and "
+            + "the rest — each with its status, count, value and first findings.", "SysrHealth",
+            [new Column("Check", "Check", 160), new Column("Status", "Status", 60), new Column("Count", "Count", 50), new Column("Value", "Value", 90), new Column("Findings", "Findings", 300)],
+            [("AsAtDate", ParameterType.Date)]);
         yield return Listing("SYS247", "Audit Trail Hash-Chain Verification", "System", "Recomputes the audit trail's hash chain for the company and for system-wide entries and says whether it is intact or where it first breaks.",
             "SysrHashChain", [new Column("Scope", "Scope", 120), new Column("Checked", "Entries checked", 90), new Column("Intact", "Intact", 60), new Column("FirstBroken", "First broken entry", 100),
              new Column("Message", "Result", 300)], []);

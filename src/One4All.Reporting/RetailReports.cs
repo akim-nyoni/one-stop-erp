@@ -15,6 +15,11 @@ public static class RetailReports
     /// <returns>The definitions, in brief order.</returns>
     public static IEnumerable<ReportDefinition> All()
     {
+        yield return Listing("POS102", "POS Z-Read / X-Read by Till & Cashier", "PointOfSale", "Every till session in the period: till, cashier, opened and closed, Z-read number (open sessions are an "
+            + "X-read so far), float, sales, and the takings per tender and currency.", "RetlZRead",
+            [new Column("Till", "Till", 60), new Column("Cashier", "Cashier", 90), new Column("Opened", "Opened", 95), new Column("Closed", "Closed", 95), new Column("Read", "Read", 55),
+             new Column("Float", "Float", 70), new Column("Sales", "Sales", 45), new Column("Tender", "Tender", 80), new Column("Currency", "Currency", 50), new Column("Amount", "Amount", 85),
+             new Column("Base", "Base", 90, true)], Period);
         yield return Listing("POS103", "Daily Sales Summary", "PointOfSale", "Per day, till and cashier: sales, voids, net, tax, the tender split and gross takings.",
             "RetlDaily", [new Column("Date", "Date", 75), new Column("Till", "Till", 70), new Column("Cashier", "Cashier", 90), new Column("Sales", "Sales", 50), new Column("Voided", "Voided", 50),
              new Column("Net", "Net", 90), new Column("Tax", "Tax", 80), new Column("Tenders", "Tenders", 220), new Column("Gross", "Gross", 95, true)], Period);

@@ -103,6 +103,7 @@ public sealed class ControlReportDataProvider : IReportDataProvider
     ];
 
     private readonly One4AllDbContext _db;
+    private readonly Application.Abstractions.Accounting.IDataHealthService? _health;
     private readonly IPermissionService _permissions;
     private readonly IAuditService _audit;
 
@@ -110,8 +111,9 @@ public sealed class ControlReportDataProvider : IReportDataProvider
     /// <param name="db">The database context.</param>
     /// <param name="permissions">The permission resolver (for separation of duties).</param>
     /// <param name="audit">The audit trail (for hash-chain verification).</param>
-    public ControlReportDataProvider(One4AllDbContext db, IPermissionService permissions, IAuditService audit)
+    public ControlReportDataProvider(One4AllDbContext db, IPermissionService permissions, IAuditService audit, Application.Abstractions.Accounting.IDataHealthService? health = null)
     {
+        _health = health;
         _db = db;
         _permissions = permissions;
         _audit = audit;
@@ -130,6 +132,8 @@ public sealed class ControlReportDataProvider : IReportDataProvider
         return command.ToUpperInvariant() switch
         {
             "SYSRPERMISSIONMATRIX" => await PermissionMatrixAsync(ct).ConfigureAwait(false),
+            "SYSRAUDITTRAIL" => await AuditTrailAsync(companyId, fromDate, toDate, parameters, ct).ConfigureAwait(false),
+            "SYSRHEALTH" => await HealthAsync(companyId, DateParameter(parameters, "AsAtDate") ?? today, ct).ConfigureAwait(false),
             "SYSRMEMBERSHIP" => await MembershipAsync(ct).ConfigureAwait(false),
             "SYSRSOD" => await SodAsync(ct).ConfigureAwait(false),
             "SYSRMASTERCHANGES" => await MasterChangesAsync(companyId, start, end, ct).ConfigureAwait(false),
@@ -334,5 +338,33 @@ public sealed class ControlReportDataProvider : IReportDataProvider
         }
 
         return row;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AuditTrailAsync(long companyId, DateOnly fromDate, DateOnly toDate, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        string? Text(string name) => parameters.GetValueOrDefault(name) is string text && text.Trim().Length > 0 ? text.Trim() : null;
+        IReadOnlyList<AuditEntryView> entries = await _audit.QueryAsync(new AuditQuery
+        {
+            CompanyId = companyId, From = fromDate, To = toDate, EntityType = Text("EntityType"), UserName = Text("UserName"), Take = 5_000, IncludeUnscoped = true,
+        }, ct).ConfigureAwait(false);
+        return [.. entries.Select(e => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
+        {
+            ["When"] = e.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture), ["User"] = e.UserName, ["Action"] = e.Action.ToString(),
+            ["Record"] = string.IsNullOrEmpty(e.EntityId) ? e.EntityType : $"{e.EntityType} #{e.EntityId}", ["Fields"] = string.Join(", ", e.ChangedFields), ["Reason"] = e.Reason ?? string.Empty,
+            ["EntityType"] = e.EntityType, ["EntityId"] = e.EntityId,
+        })];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> HealthAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        if (_health is null || await _health.SnapshotAsync(companyId, asAt, ct).ConfigureAwait(false) is not { IsSuccess: true } snapshot)
+        {
+            return [];
+        }
+
+        return [.. snapshot.Value.Indicators.Select(i => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
+        {
+            ["Check"] = i.Kind.ToString(), ["Status"] = i.Status.ToString(), ["Count"] = i.Count, ["Value"] = i.Value, ["Findings"] = string.Join("; ", i.Items.Take(5)),
+        })];
     }
 }

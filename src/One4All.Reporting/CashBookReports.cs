@@ -19,9 +19,17 @@ public static class CashBookReports
             "CashBookListing", [new Column("Bank", "Bank", 70), new Column("Date", "Date", 75), new Column("Journal", "Journal", 100), new Column("Document", "Document", 130), new Column("Narrative", "Narrative", 200),
              new Column("Receipts", "Receipts", 90), new Column("Payments", "Payments", 90), new Column("Balance", "Balance", 95), new Column("Reconciled", "Reconciled", 65)],
             [("BankCode", ParameterType.String), ("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        yield return Listing("CB69", "Bank Reconciliation Statement", "CashBook", "For a bank account at a date: the statement balance, less payments not yet presented, plus receipts not yet "
+            + "on the ledger, against the cash book balance, with any difference left.", "CashRecStatement",
+            [new Column("Section", "Section", 170), new Column("Date", "Date", 75), new Column("Description", "Description", 230), new Column("Amount", "Amount", 110, true)],
+            [("BankCode", ParameterType.String), ("AsAtDate", ParameterType.Date)]);
         yield return Listing("CB70", "Unpresented & Uncleared Items Ageing", "CashBook", "Ledger postings not yet on a bank statement and statement lines not yet on the ledger, aged at the date.",
             "CashUnreconciled", [new Column("Bank", "Bank", 70), new Column("Kind", "Kind", 150), new Column("Date", "Date", 75), new Column("Reference", "Reference", 180), new Column("Days", "Days", 45),
              new Column("Band", "Age", 60), new Column("Amount", "Amount", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("CB71", "Bank Account Balances Summary", "CashBook", "Every bank account and wallet at a date: currency, cash book balance, statement lines still to reconcile and when it "
+            + "was last reconciled.", "CashBalances",
+            [new Column("Code", "Account", 70), new Column("Name", "Name", 180), new Column("Currency", "Currency", 55), new Column("GlAccount", "GL account", 70),
+             new Column("Unreconciled", "Lines to reconcile", 80), new Column("ReconciledTo", "Reconciled to", 80), new Column("Balance", "Balance", 110, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("CB72", "13-Week Cash Flow Forecast by Currency", "CashBook", "From today's bank balances, week by week: customer receipts and supplier payments falling due, and the closing cash, per currency.",
             "CashForecast", [new Column("Week", "Week starting", 85), new Column("Currency", "Currency", 55), new Column("Opening", "Opening", 100), new Column("Receipts", "Receipts due", 100),
              new Column("Payments", "Payments due", 100), new Column("Closing", "Closing", 100)], [("AsAtDate", ParameterType.Date)]);
