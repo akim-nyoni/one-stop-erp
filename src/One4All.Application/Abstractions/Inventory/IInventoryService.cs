@@ -54,6 +54,15 @@ public sealed class IssueStockRequest
     /// <summary>When true, allows the issue to take the balance negative (backorder); otherwise an over-issue is refused.</summary>
     public bool AllowNegative { get; init; }
 
+    /// <summary>Why the issue may take the balance negative (required under the company's negative-stock control).</summary>
+    public string? NegativeReason { get; init; }
+
+    /// <summary>The supervisor allowing it (needs Inventory › Stock Issue authorise under the control; ignored for till sales).</summary>
+    public long? NegativeAuthorisedByUserId { get; init; }
+
+    /// <summary>Whether this is a till sale (let through under the control, recorded for review).</summary>
+    public bool FromTill { get; init; }
+
     /// <summary>
     /// The account the issue is charged to, for internal consumption (a department's supplies expense, say); null to
     /// charge the item's cost of sales.

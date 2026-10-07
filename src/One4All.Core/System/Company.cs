@@ -123,6 +123,12 @@ public sealed class Company : SoftDeletableEntity
     /// <summary>Whether a rate keyed on a customer or supplier document needs the rate-override permission and is recorded (brief §3.3).</summary>
     public bool RateOverrideControl { get; set; }
 
+    /// <summary>
+    /// Whether stock may go negative only by exception (brief §3.6): an issue doing so needs a reason and a supervisor with Inventory › Stock Issue
+    /// authorise; a till sale doing so is let through but recorded for review; each is kept (and corrected when the receipt lands).
+    /// </summary>
+    public bool NegativeStockControl { get; set; }
+
     /// <summary>The company's logo (PNG or JPEG) for report layouts (expression <c>CompanyLogo</c>).</summary>
     public byte[]? Logo { get; set; }
 

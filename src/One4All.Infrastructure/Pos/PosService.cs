@@ -323,7 +323,7 @@ public sealed class PosService : IPosService
                     Date = request.SaleDate,
                     Quantity = line.Quantity,
                     Reference = request.SaleNumber,
-                    AllowNegative = true, // the sale is committed; let stock go negative and reconcile by stocktake
+                    AllowNegative = true, FromTill = true, // the sale is committed; let stock go negative (recorded under the company's control) and reconcile by stocktake
                 }, ct).ConfigureAwait(false);
 
                 if (issue.IsFailure)

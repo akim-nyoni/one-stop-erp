@@ -11525,6 +11525,78 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("item_warehouse_level", "inv");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.NegativeStockEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("AuthorisedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("authorised_by_user_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("CorrectionJournalNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("correction_journal_number");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<bool>("FromTill")
+                        .HasColumnType("boolean")
+                        .HasColumnName("from_till");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal>("ShortQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("short_quantity");
+
+                    b.Property<decimal>("UnitCostUsed")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("unit_cost_used");
+
+                    b.Property<long>("WarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_negative_stock_event");
+
+                    b.HasIndex("CompanyId", "ItemId", "WarehouseId")
+                        .HasDatabaseName("ix_negative_stock_event_company_id_item_id_warehouse_id");
+
+                    b.ToTable("negative_stock_event", "inv");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.PriceList", b =>
                 {
                     b.Property<long>("Id")
@@ -26466,6 +26538,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
+
+                    b.Property<bool>("NegativeStockControl")
+                        .HasColumnType("boolean")
+                        .HasColumnName("negative_stock_control");
 
                     b.Property<decimal>("OverReceiptTolerancePercent")
                         .HasPrecision(19, 4)

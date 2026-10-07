@@ -105,7 +105,7 @@ public static class PermissionCatalogue
         Add(inv, LicenceModules.Inventory, "Item", "Item Master", master | OperationFlags.ViewCost | OperationFlags.ViewMargin);
         Add(inv, LicenceModules.Inventory, "Warehouse", "Warehouses / Bins", master);
         Add(inv, LicenceModules.Inventory, "GoodsReceipt", "Goods Receipt", txn);
-        Add(inv, LicenceModules.Inventory, "Issue", "Stock Issue", txn);
+        Add(inv, LicenceModules.Inventory, "Issue", "Stock Issue (authorise = let stock go negative)", txn | OperationFlags.AuthoriseLevel1);
         Add(inv, LicenceModules.Inventory, "Transfer", "Stock Transfer", txn);
         Add(inv, LicenceModules.Inventory, "Adjustment", "Stock Adjustment", txn | OperationFlags.AuthoriseLevel1);
         Add(inv, LicenceModules.Inventory, "StockTake", "Stock Take / Count", OperationFlags.View | OperationFlags.Create | OperationFlags.Edit | OperationFlags.Post | OperationFlags.Approve | OperationFlags.Print);

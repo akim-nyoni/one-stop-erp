@@ -16,13 +16,15 @@ namespace One4All.Infrastructure.Inventory;
 public sealed class InventoryService : IInventoryService
 {
     private readonly One4AllDbContext _db;
+    private readonly Application.Abstractions.Security.IPermissionService? _permissions;
     private readonly IPostingEngine _postingEngine;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="postingEngine">The posting engine.</param>
-    public InventoryService(One4AllDbContext db, IPostingEngine postingEngine)
+    public InventoryService(One4AllDbContext db, IPostingEngine postingEngine, Application.Abstractions.Security.IPermissionService? permissions = null)
     {
+        _permissions = permissions;
         _db = db;
         _postingEngine = postingEngine;
     }
@@ -85,7 +87,46 @@ public sealed class InventoryService : IInventoryService
         }
 
         StockBalance balance = await LoadOrCreateBalanceAsync(request.CompanyId, request.ItemId, request.WarehouseId, ct).ConfigureAwait(false);
+        decimal shortfall = item.CostingMethod == CostingMethod.WeightedAverage && balance.QuantityOnHand < 0m
+            && await _db.Companies.AnyAsync(c => c.Id == request.CompanyId && c.NegativeStockControl, ct).ConfigureAwait(false)
+            ? Math.Min(-balance.QuantityOnHand, request.Quantity) : 0m;
+        decimal costUsed = balance.AverageCost;
         StockCosting.Receive(_db, item, balance, request.Date, request.Reference, request.Quantity, value);
+
+        // Goods sold short went out at the old average: the units now received cover them, so their cost is put right (cost of sales against
+        // stock) instead of being spread over what is left.
+        if (shortfall > 0m)
+        {
+            decimal correction = decimal.Round(shortfall * (unitCost - costUsed), 4, MidpointRounding.ToEven);
+            string correctionJournal = string.Empty;
+            if (correction != 0m && !string.IsNullOrEmpty(item.CostOfSalesAccountCode))
+            {
+                Result<PostingReceipt> corrected = await _postingEngine.PostAsync(new JournalRequest
+                {
+                    CompanyId = request.CompanyId, SourceModule = "INV", PostingDate = request.Date, TransactionCurrency = currency, EnforceManualJournalRules = false,
+                    DocumentType = "NegativeStockCorrection", DocumentNumber = request.Reference, Narrative = $"Cost of {shortfall:0.###} {item.Code} sold short, corrected to the receipt cost",
+                    Lines =
+                    [
+                        new JournalLineRequest { AccountCode = item.CostOfSalesAccountCode, Side = correction > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(correction) },
+                        new JournalLineRequest { AccountCode = stockCode, Side = correction > 0m ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = Math.Abs(correction) },
+                    ],
+                }, ct).ConfigureAwait(false);
+                if (corrected.IsFailure)
+                {
+                    return corrected.Error;
+                }
+
+                balance.AddValue(-correction);
+                correctionJournal = corrected.Value.JournalNumber;
+            }
+
+            foreach (NegativeStockEvent open in await _db.Set<NegativeStockEvent>()
+                .Where(e => e.CompanyId == request.CompanyId && e.ItemId == request.ItemId && e.WarehouseId == request.WarehouseId && e.CorrectionJournalNumber == null)
+                .ToListAsync(ct).ConfigureAwait(false))
+            {
+                open.Correct(correctionJournal);
+            }
+        }
 
         StockMovement movement = new(request.CompanyId, request.ItemId, request.WarehouseId, request.Date, StockMovementType.Receipt, request.Quantity, unitCost, value, request.Reference)
         {
@@ -123,6 +164,28 @@ public sealed class InventoryService : IInventoryService
             return Error.Rule("Inv.InsufficientStock", $"Item '{item.Code}' has {balance.QuantityOnHand} on hand, less than the {request.Quantity} to issue.");
         }
 
+        // Negative stock by exception: a reason and an authorised supervisor (a till sale is let through), and the event is kept.
+        NegativeStockEvent? negative = null;
+        decimal shortBy = request.Quantity - Math.Max(0m, balance.QuantityOnHand);
+        if (item.IsStockTracked && shortBy > 0m && await _db.Companies.AnyAsync(c => c.Id == request.CompanyId && c.NegativeStockControl, ct).ConfigureAwait(false))
+        {
+            if (!request.FromTill)
+            {
+                if (string.IsNullOrWhiteSpace(request.NegativeReason) || request.NegativeAuthorisedByUserId is not long authoriser)
+                {
+                    return Error.Rule("Inv.NegativeNeedsAuthority", $"Issuing {request.Quantity} of '{item.Code}' with {balance.QuantityOnHand} on hand needs a reason and a supervisor's authority.");
+                }
+
+                if (_permissions is null || !(await _permissions.ResolveAsync(authoriser, ct).ConfigureAwait(false)).Has("Inventory.Issue", Core.Security.OperationFlags.AuthoriseLevel1))
+                {
+                    return Error.Forbidden("Inv.NegativeNotAllowed", "Only a user who may authorise stock issues can let stock go negative.");
+                }
+            }
+
+            negative = new NegativeStockEvent(request.CompanyId, request.ItemId, request.WarehouseId, request.Date, shortBy, balance.AverageCost, request.Reference,
+                request.FromTill ? "Sold at the till with none on hand" : request.NegativeReason!.Trim(), request.FromTill ? null : request.NegativeAuthorisedByUserId, request.FromTill);
+        }
+
         // Work out the cost without touching the balance: it changes only once the journal has posted, so a refused
         // posting (a closed period, say) leaves nothing behind for a later save to persist.
         StockIssue issue = await StockCosting.PlanIssueAsync(_db, item, balance, request.Quantity, ct).ConfigureAwait(false);
@@ -151,6 +214,11 @@ public sealed class InventoryService : IInventoryService
         }
 
         issue.Apply();
+        if (negative is not null)
+        {
+            _db.Set<NegativeStockEvent>().Add(negative);
+        }
+
         StockMovement movement = new(request.CompanyId, request.ItemId, request.WarehouseId, request.Date, StockMovementType.Issue, -request.Quantity, issue.UnitCost, -cost, request.Reference)
         {
             JournalEntryId = posting.Value.JournalId,
