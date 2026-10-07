@@ -17,14 +17,16 @@ public sealed class AuditedReportRunner : IAuditedReportRunner
     private readonly IReportRunner _runner;
     private readonly IPermissionService _permissions;
     private readonly IAuditService? _audit;
+    private readonly IDataScopeService? _scopes;
 
     /// <summary>Creates the runner.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="runner">The generic report runner.</param>
     /// <param name="permissions">The permission resolver.</param>
     /// <param name="audit">Records prints and exports in the change log.</param>
-    public AuditedReportRunner(One4AllDbContext db, IReportRunner runner, IPermissionService permissions, IAuditService? audit = null)
+    public AuditedReportRunner(One4AllDbContext db, IReportRunner runner, IPermissionService permissions, IAuditService? audit = null, IDataScopeService? scopes = null)
     {
+        _scopes = scopes;
         _audit = audit;
         _db = db;
         _runner = runner;
@@ -43,7 +45,7 @@ public sealed class AuditedReportRunner : IAuditedReportRunner
             : 0;
         (ReportRunPurpose recorded, int? copy) = ReportRunAudit.Classify(purpose, earlierPrints);
 
-        IReadOnlySet<Application.Security.SensitiveField> hidden = new HashSet<Application.Security.SensitiveField>();
+        Application.Reporting.ReportAccess access = Application.Reporting.ReportAccess.Unrestricted;
         if (userId is long user)
         {
             Core.Security.EffectivePermissions permissions = await _permissions.ResolveAsync(user, ct).ConfigureAwait(false);
@@ -52,11 +54,12 @@ public sealed class AuditedReportRunner : IAuditedReportRunner
                 return Error.Rule("Rpt.NotAuthorised", $"You may not {recorded.ToString().ToLowerInvariant()} reports.");
             }
 
-            // Restricted columns (cost, margin, salary, credit limit) are left out for users who may not see them.
-            hidden = Application.Security.FieldSensitivity.HiddenFor(permissions);
+            // Restricted columns (cost, margin, salary, credit limit) are left out, the module's reports right is needed, and rows are cut to the user's scope.
+            Application.Security.DataScope scope = _scopes is null ? Application.Security.DataScope.Everything : await _scopes.ForUserAsync(user, ct).ConfigureAwait(false);
+            access = Application.Reporting.ReportAccess.For(permissions, scope);
         }
 
-        Result<RenderedDocument> rendered = await _runner.RenderAsync(companyId, code, parameters, format, hidden, ct).ConfigureAwait(false);
+        Result<RenderedDocument> rendered = await _runner.RenderAsync(companyId, code, parameters, format, access, ct).ConfigureAwait(false);
         if (rendered.IsFailure)
         {
             return rendered.Error;

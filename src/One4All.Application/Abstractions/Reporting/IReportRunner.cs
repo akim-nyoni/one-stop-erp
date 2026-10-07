@@ -30,4 +30,19 @@ public interface IReportRunner
     Task<Result<RenderedDocument>> RenderAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, ReportFormat format,
         IReadOnlySet<One4All.Application.Security.SensitiveField> hiddenFields, CancellationToken ct = default)
         => RenderAsync(companyId, reportCode, parameters, format, ct);
+
+    /// <summary>
+    /// Renders a report for a user: refused when they may not run its module's reports (or its own required permission), restricted
+    /// columns left out, and rows cut to their data scope (brief §13.3).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="reportCode">The report code.</param>
+    /// <param name="parameters">The run-time report parameters.</param>
+    /// <param name="format">The output format.</param>
+    /// <param name="access">What the user may run and see.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The rendered document, or an error.</returns>
+    Task<Result<RenderedDocument>> RenderAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, ReportFormat format,
+        One4All.Application.Reporting.ReportAccess access, CancellationToken ct = default)
+        => RenderAsync(companyId, reportCode, parameters, format, access.Hidden, ct);
 }

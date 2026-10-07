@@ -123,6 +123,9 @@ public sealed class ReportDefinition
     /// <summary>The module this report belongs to.</summary>
     public string? Module { get; set; }
 
+    /// <summary>A permission the user must hold to run the report (on top of the general reporting right and the module's reports right).</summary>
+    public string? RequiredPermission { get; set; }
+
     /// <summary>The definition version.</summary>
     public int Version { get; set; } = 1;
 
