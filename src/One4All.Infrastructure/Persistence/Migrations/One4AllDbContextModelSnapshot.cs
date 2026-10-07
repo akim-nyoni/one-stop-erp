@@ -16127,6 +16127,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnName("old_value")
                         .HasAnnotation("One4All:Encrypted", true);
 
+                    b.Property<long?>("RequestedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_by_user_id");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()

@@ -134,6 +134,9 @@ public sealed class DetailChangeRequest : AuditableEntity, ICompanyScoped
     /// <summary>The decision note.</summary>
     public string? Note { get; private set; }
 
+    /// <summary>Who asked for the change (the employee through self-service, or an HR officer); they cannot approve it.</summary>
+    public long? RequestedByUserId { get; set; }
+
     /// <summary>Records the decision.</summary>
     /// <param name="approved">Whether approved.</param>
     /// <param name="userId">Who decided.</param>

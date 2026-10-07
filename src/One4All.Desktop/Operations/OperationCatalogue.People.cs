@@ -21,6 +21,130 @@ public static partial class OperationCatalogue
         const string module = "HR & Attendance";
         yield return new Operation
         {
+            Module = module, Title = "Employee record", ListTitle = "Employees",
+            Description = "Engage an employee, or update one (blank fields stay as they are). Bank details are set at engagement; later changes go through 'Bank detail change' "
+                + "and a second person's approval.",
+            Fields = [Pick("Step", "Step", ["Engage", "Update"]), Req("Number", "Employee number"), Opt("Name", "Full name"), OptNum("Basic", "Basic salary"), Today("Engaged", "Engagement date"),
+                Pick("Type", "Employment", Enum.GetNames<EmploymentType>()), Opt("Department", "Department"), Opt("CostCentre", "Cost centre"), Opt("PayGroup", "Pay group"), Opt("Grade", "Grade"),
+                Opt("NationalId", "National ID"), Opt("TaxNumber", "Tax number"), Opt("ContractEnd", "Contract end (yyyy-MM-dd)"), Pick("Method", "Paid by", Enum.GetNames<PayMethod>()),
+                Opt("Bank", "Bank (engage only)"), Opt("Branch", "Branch (engage only)"), Opt("Account", "Account number (engage only)"), Opt("Mobile", "Mobile money (engage only)"), Opt("Email", "Email")],
+            Run = async (c, i) =>
+            {
+                IPayrollSetupService setup = c.Get<IPayrollSetupService>();
+                DateOnly? contractEnd = i.Optional("ContractEnd") is string end ? DateOnly.ParseExact(end, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null;
+                EmploymentType type = Enum.Parse<EmploymentType>(i.Text("Type"));
+                PayMethod method = Enum.Parse<PayMethod>(i.Text("Method"));
+                if (i.Text("Step") == "Update")
+                {
+                    _ = Check(await setup.UpdateEmployeeAsync(c.CompanyId, i.Text("Number"), new EmployeeUpdate
+                    {
+                        FullName = i.Optional("Name"), BasicSalary = i.OptionalNumber("Basic"), EmploymentType = type, Department = i.Optional("Department"), CostCentre = i.Optional("CostCentre"),
+                        PayGroup = i.Optional("PayGroup"), Grade = i.Optional("Grade"), NationalIdNumber = i.Optional("NationalId"), TaxNumber = i.Optional("TaxNumber"), ContractEndDate = contractEnd,
+                        PaymentMethod = method, Email = i.Optional("Email"),
+                    }).ConfigureAwait(true), string.Empty);
+                    return $"Employee {i.Text("Number").ToUpperInvariant()} updated.";
+                }
+
+                long id = Check(await setup.CreateEmployeeAsync(c.CompanyId, new NewEmployee(i.Text("Number"), i.Optional("Name") ?? string.Empty, i.OptionalNumber("Basic") ?? 0m, i.Date("Engaged"))
+                {
+                    EmploymentType = type, Department = i.Optional("Department"), CostCentre = i.Optional("CostCentre"), PayGroup = i.Optional("PayGroup"), Grade = i.Optional("Grade"),
+                    NationalIdNumber = i.Optional("NationalId"), TaxNumber = i.Optional("TaxNumber"), ContractEndDate = contractEnd, PaymentMethod = method, BankName = i.Optional("Bank"),
+                    BankBranch = i.Optional("Branch"), BankAccountNumber = i.Optional("Account"), MobileMoneyNumber = i.Optional("Mobile"), Email = i.Optional("Email"),
+                }).ConfigureAwait(true));
+                return $"Employee {i.Text("Number").ToUpperInvariant()} engaged (id {id}).";
+            },
+            List = async c => Table(await c.Db.Employees.AsNoTracking().Where(e => e.CompanyId == c.CompanyId).OrderBy(e => e.EmployeeNumber).Take(500).ToListAsync().ConfigureAwait(true),
+                ("Number", e => e.EmployeeNumber), ("Name", e => e.FullName), ("Department", e => e.Department ?? string.Empty), ("Grade", e => e.Grade ?? string.Empty),
+                ("Type", e => e.EmploymentType), ("Status", e => e.Status), ("Engaged", e => D(e.EngagementDate))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Pay elements and tax tables", ListTitle = "Pay elements",
+            Description = "Create a pay element, assign one to (or end one for) an employee, create a tax table — bands as 'from-to:rate' separated by ';', the last open-ended, e.g. "
+                + "'0-100:0; 100-300:20; 300-:30' — or add the standard elements (BASIC, OVERTIME, HOUSING, TRANSPORT, PAYE on the tax table).",
+            Fields = [Pick("Step", "Step", ["Create element", "Assign to employee", "End for employee", "Create tax table", "Add standard elements"]), Opt("Code", "Element / table code"),
+                Opt("Name", "Element name"), Pick("Type", "Element type", Enum.GetNames<PayElementType>()), Pick("Basis", "Calculation", Enum.GetNames<CalculationBasis>()), OptNum("Sequence", "Sequence"),
+                Opt("Account", "Account (salaries expense for the standard set)"), Opt("Liability", "PAYE liability account (standard set)"), OptNum("Amount", "Fixed / override amount"),
+                OptNum("Rate", "Rate / override rate"), OptNum("Units", "Units"), Opt("Formula", "Formula"), Tick("Taxable", "Taxable"), Opt("TaxTable", "Tax table code"),
+                Opt("Employee", "Employee number"), Today("From", "Tax table effective from"), Opt("Bands", "Tax bands")],
+            Run = async (c, i) =>
+            {
+                IPayrollSetupService setup = c.Get<IPayrollSetupService>();
+                switch (i.Text("Step"))
+                {
+                    case "Assign to employee":
+                        _ = Check(await setup.AssignElementAsync(c.CompanyId, i.Optional("Employee") ?? string.Empty, i.Optional("Code") ?? string.Empty, i.OptionalNumber("Amount"), i.OptionalNumber("Rate"),
+                            i.OptionalNumber("Units")).ConfigureAwait(true), string.Empty);
+                        return "Element assigned.";
+                    case "End for employee":
+                        _ = Check(await setup.EndElementAsync(c.CompanyId, i.Optional("Employee") ?? string.Empty, i.Optional("Code") ?? string.Empty).ConfigureAwait(true), string.Empty);
+                        return "Element ended.";
+                    case "Create tax table":
+                        List<TaxBandInput> bands = [];
+                        foreach (string band in (i.Optional("Bands") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            string[] parts = band.Split(':', StringSplitOptions.TrimEntries);
+                            string[] range = parts[0].Split('-', StringSplitOptions.TrimEntries);
+                            if (parts.Length != 2 || range.Length != 2)
+                            {
+                                throw new OperationException($"'{band}' is not from-to:rate.");
+                            }
+
+                            bands.Add(new TaxBandInput(decimal.Parse(range[0], CultureInfo.InvariantCulture), range[1].Length == 0 ? null : decimal.Parse(range[1], CultureInfo.InvariantCulture),
+                                decimal.Parse(parts[1], CultureInfo.InvariantCulture)));
+                        }
+
+                        long table = Check(await setup.CreateTaxTableAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Date("From"), null, bands).ConfigureAwait(true));
+                        return $"Tax table created (id {table}).";
+                    case "Add standard elements":
+                        IReadOnlyList<string> added = Check(await setup.SeedStandardElementsAsync(c.CompanyId, i.Optional("Account") ?? string.Empty, i.Optional("Liability") ?? string.Empty,
+                            i.Optional("TaxTable") ?? "PAYE").ConfigureAwait(true));
+                        return added.Count == 0 ? "The standard elements are all there already." : $"Added {string.Join(", ", added)}.";
+                    default:
+                        long element = Check(await setup.CreatePayElementAsync(c.CompanyId, new NewPayElement(i.Optional("Code") ?? string.Empty, i.Optional("Name") ?? string.Empty,
+                            Enum.Parse<PayElementType>(i.Text("Type")), Enum.Parse<CalculationBasis>(i.Text("Basis")), (int)(i.OptionalNumber("Sequence") ?? 10), i.Optional("Account") ?? string.Empty)
+                        {
+                            FixedAmount = i.OptionalNumber("Amount") ?? 0m, Rate = i.OptionalNumber("Rate") ?? 0m, Formula = i.Optional("Formula"), Taxable = i.Flag("Taxable"), TaxTableCode = i.Optional("TaxTable"),
+                        }).ConfigureAwait(true));
+                        return $"Pay element created (id {element}).";
+                }
+            },
+            List = async c => Table(await c.Db.PayElements.AsNoTracking().Where(e => e.CompanyId == c.CompanyId).OrderBy(e => e.Sequence).ThenBy(e => e.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", e => e.Code), ("Name", e => e.Name), ("Type", e => e.Type), ("Basis", e => e.Basis), ("Sequence", e => e.Sequence), ("Account", e => e.AccountCode),
+                ("Taxable", e => e.Taxable), ("Formula / table", e => e.Formula ?? e.TaxTableCode ?? string.Empty)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Bank detail change", ListTitle = "Bank changes awaiting approval",
+            Description = "Ask for a change of an employee's bank or mobile-money details; a different person approves or rejects it before it takes effect (blank fields are left as they are).",
+            Fields = [Pick("Step", "Step", ["Request", "Approve", "Reject"]), Opt("Number", "Employee number"), Opt("Bank", "Bank"), Opt("Branch", "Branch"), Opt("Account", "Account number"),
+                Opt("Mobile", "Mobile money number"), OptNum("Id", "Request id (approve / reject)"), Opt("Note", "Note")],
+            Run = async (c, i) =>
+            {
+                IPayrollSetupService setup = c.Get<IPayrollSetupService>();
+                if (i.Text("Step") != "Request")
+                {
+                    _ = Check(await setup.DecideBankChangeAsync(c.CompanyId, (long)(i.OptionalNumber("Id") ?? 0), i.Text("Step") == "Approve", c.UserId, i.Optional("Note")).ConfigureAwait(true), string.Empty);
+                    return i.Text("Step") == "Approve" ? "Change approved and applied." : "Change rejected.";
+                }
+
+                Dictionary<string, string> changes = [];
+                foreach ((string field, string input) in new[] { ("BankName", "Bank"), ("BankBranch", "Branch"), ("BankAccountNumber", "Account"), ("MobileMoneyNumber", "Mobile") })
+                {
+                    if (i.Optional(input) is string value)
+                    {
+                        changes[field] = value;
+                    }
+                }
+
+                IReadOnlyList<long> ids = Check(await setup.RequestBankChangeAsync(c.CompanyId, i.Optional("Number") ?? string.Empty, changes, c.UserId).ConfigureAwait(true));
+                return $"Change requested ({string.Join(", ", ids)}); someone else must approve it.";
+            },
+            List = async c => Table(await c.Get<IPayrollSetupService>().PendingBankChangesAsync(c.CompanyId).ConfigureAwait(true),
+                ("Id", r => r.RequestId), ("Employee", r => r.EmployeeNumber), ("Field", r => r.Field), ("From", r => r.OldValue ?? string.Empty), ("To", r => r.NewValue)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Record an attendance day", ListTitle = "Overtime awaiting approval", Description = "One record per employee per day: status, clock times, lateness and overtime.",
             Fields = [Req("Employee", "Employee number"), Today(), Pick("Status", "Status", Enum.GetNames<AttendanceStatus>()), Opt("In", "Clock in (HH:mm)"), Opt("Out", "Clock out (HH:mm)"),
                 Num("Late", "Minutes late", "0"), Num("Overtime", "Overtime hours", "0"), Num("Multiplier", "Overtime multiplier", "1.5")],

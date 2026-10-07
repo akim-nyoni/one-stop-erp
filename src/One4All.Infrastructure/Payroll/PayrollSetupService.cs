@@ -1,0 +1,365 @@
+using Microsoft.EntityFrameworkCore;
+using One4All.Application.Abstractions.Payroll;
+using One4All.Core.Accounting;
+using One4All.Core.Common;
+using One4All.Core.Payroll;
+using One4All.Infrastructure.Persistence;
+
+namespace One4All.Infrastructure.Payroll;
+
+/// <summary>Payroll master data: employees, pay elements, tax tables, the standard element set and approved bank-detail changes.</summary>
+public sealed class PayrollSetupService : IPayrollSetupService
+{
+    /// <summary>The bank and mobile-money details that change only through an approved request.</summary>
+    public static readonly IReadOnlySet<string> BankFields = new HashSet<string>(StringComparer.Ordinal) { "BankName", "BankBranch", "BankAccountNumber", "MobileMoneyNumber" };
+
+    private readonly One4AllDbContext _db;
+
+    /// <summary>Creates the service.</summary>
+    /// <param name="db">The database context.</param>
+    public PayrollSetupService(One4AllDbContext db) => _db = db;
+
+    /// <inheritdoc />
+    public async Task<Result<long>> CreateEmployeeAsync(long companyId, NewEmployee employee, CancellationToken ct = default)
+    {
+        string number = (employee.EmployeeNumber ?? string.Empty).Trim().ToUpperInvariant();
+        if (number.Length == 0 || string.IsNullOrWhiteSpace(employee.FullName))
+        {
+            return Error.Validation("Payroll.EmployeeRequired", "An employee needs a number and a name.");
+        }
+
+        if (employee.BasicSalary < 0m)
+        {
+            return Error.Validation("Payroll.SalaryNegative", "The basic salary cannot be negative.");
+        }
+
+        if (employee.EmploymentType == EmploymentType.Contract && employee.ContractEndDate is null)
+        {
+            return Error.Validation("Payroll.ContractEnd", "A contract employee needs the contract's end date.");
+        }
+
+        List<string> numbers = await _db.Employees.Where(e => e.CompanyId == companyId).Select(e => e.EmployeeNumber).ToListAsync(ct).ConfigureAwait(false);
+        if (numbers.Any(n => string.Equals(n, number, StringComparison.OrdinalIgnoreCase)))
+        {
+            return Error.Conflict("Payroll.EmployeeExists", $"Employee {number} already exists.");
+        }
+
+        Employee created = new(companyId, number, employee.FullName.Trim(), employee.BasicSalary, employee.EngagementDate)
+        {
+            EmploymentType = employee.EmploymentType, Department = Clean(employee.Department), CostCentre = Clean(employee.CostCentre), PayGroup = Clean(employee.PayGroup),
+            Grade = Clean(employee.Grade), Notch = employee.Notch, NationalIdNumber = Clean(employee.NationalIdNumber), TaxNumber = Clean(employee.TaxNumber), Gender = employee.Gender,
+            DateOfBirth = employee.DateOfBirth, ContractEndDate = employee.ContractEndDate, ProbationEndDate = employee.ProbationEndDate, PaymentMethod = employee.PaymentMethod,
+            BankName = Clean(employee.BankName), BankBranch = Clean(employee.BankBranch), BankAccountNumber = Clean(employee.BankAccountNumber),
+            MobileMoneyNumber = Clean(employee.MobileMoneyNumber), Email = Clean(employee.Email),
+        };
+        _db.Employees.Add(created);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return created.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> UpdateEmployeeAsync(long companyId, string employeeNumber, EmployeeUpdate update, CancellationToken ct = default)
+    {
+        if (await EmployeeAsync(companyId, employeeNumber, ct).ConfigureAwait(false) is not Employee employee)
+        {
+            return Result.Failure(EmployeeNotFound(employeeNumber));
+        }
+
+        if (update.BasicSalary is < 0m)
+        {
+            return Result.Failure(Error.Validation("Payroll.SalaryNegative", "The basic salary cannot be negative."));
+        }
+
+        if (update.FullName is string name && name.Trim().Length > 0)
+        {
+            employee.FullName = name.Trim();
+        }
+
+        employee.BasicSalary = update.BasicSalary ?? employee.BasicSalary;
+        employee.EmploymentType = update.EmploymentType ?? employee.EmploymentType;
+        employee.Department = update.Department is null ? employee.Department : Clean(update.Department);
+        employee.CostCentre = update.CostCentre is null ? employee.CostCentre : Clean(update.CostCentre);
+        employee.PayGroup = update.PayGroup is null ? employee.PayGroup : Clean(update.PayGroup);
+        employee.Grade = update.Grade is null ? employee.Grade : Clean(update.Grade);
+        employee.Notch = update.Notch ?? employee.Notch;
+        employee.NationalIdNumber = update.NationalIdNumber is null ? employee.NationalIdNumber : Clean(update.NationalIdNumber);
+        employee.TaxNumber = update.TaxNumber is null ? employee.TaxNumber : Clean(update.TaxNumber);
+        employee.ContractEndDate = update.ContractEndDate ?? employee.ContractEndDate;
+        employee.ProbationEndDate = update.ProbationEndDate ?? employee.ProbationEndDate;
+        employee.WorkPermitExpiry = update.WorkPermitExpiry ?? employee.WorkPermitExpiry;
+        employee.PaymentMethod = update.PaymentMethod ?? employee.PaymentMethod;
+        employee.Email = update.Email is null ? employee.Email : Clean(update.Email);
+        if (employee.EmploymentType == EmploymentType.Contract && employee.ContractEndDate is null)
+        {
+            return Result.Failure(Error.Validation("Payroll.ContractEnd", "A contract employee needs the contract's end date."));
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> CreatePayElementAsync(long companyId, NewPayElement element, CancellationToken ct = default)
+    {
+        string code = (element.Code ?? string.Empty).Trim().ToUpperInvariant();
+        if (code.Length == 0 || string.IsNullOrWhiteSpace(element.Name) || string.IsNullOrWhiteSpace(element.AccountCode))
+        {
+            return Error.Validation("Payroll.ElementRequired", "A pay element needs a code, a name and the account it posts to.");
+        }
+
+        if (element.Basis == CalculationBasis.Formula && string.IsNullOrWhiteSpace(element.Formula))
+        {
+            return Error.Validation("Payroll.FormulaRequired", "A formula element needs its formula.");
+        }
+
+        if (element.Type == PayElementType.EmployerContribution && string.IsNullOrWhiteSpace(element.ContributionExpenseAccountCode))
+        {
+            return Error.Validation("Payroll.ContributionAccount", "An employer contribution needs the expense account it is charged to.");
+        }
+
+        string account = element.AccountCode.Trim().ToUpperInvariant();
+        if (!await _db.Accounts.AnyAsync(a => a.CompanyId == companyId && a.AccountCode == account, ct).ConfigureAwait(false))
+        {
+            return Error.NotFound("Payroll.AccountNotFound", $"Account {account} does not exist.");
+        }
+
+        if (await _db.PayElements.AnyAsync(p => p.CompanyId == companyId && p.Code == code, ct).ConfigureAwait(false))
+        {
+            return Error.Conflict("Payroll.ElementExists", $"Pay element {code} already exists.");
+        }
+
+        PayElement created = new(companyId, code, element.Name.Trim(), element.Type, element.Basis, element.Sequence, account)
+        {
+            FixedAmount = element.FixedAmount, Rate = element.Rate, Formula = Clean(element.Formula), Taxable = element.Taxable, TaxTableCode = Clean(element.TaxTableCode)?.ToUpperInvariant(),
+            ContributionExpenseAccountCode = Clean(element.ContributionExpenseAccountCode)?.ToUpperInvariant(),
+        };
+        _db.PayElements.Add(created);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return created.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> UpdatePayElementAsync(long companyId, string code, decimal? fixedAmount, decimal? rate, string? formula, bool? taxable, CancellationToken ct = default)
+    {
+        string key = (code ?? string.Empty).Trim().ToUpperInvariant();
+        PayElement? element = await _db.PayElements.FirstOrDefaultAsync(p => p.CompanyId == companyId && p.Code == key, ct).ConfigureAwait(false);
+        if (element is null)
+        {
+            return Result.Failure(Error.NotFound("Payroll.ElementNotFound", $"Pay element {key} not found."));
+        }
+
+        element.FixedAmount = fixedAmount ?? element.FixedAmount;
+        element.Rate = rate ?? element.Rate;
+        element.Formula = formula is null ? element.Formula : Clean(formula);
+        element.Taxable = taxable ?? element.Taxable;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> AssignElementAsync(long companyId, string employeeNumber, string elementCode, decimal? overrideAmount = null, decimal? overrideRate = null, decimal? units = null,
+        CancellationToken ct = default)
+    {
+        if (await EmployeeAsync(companyId, employeeNumber, ct).ConfigureAwait(false) is not Employee employee)
+        {
+            return Result.Failure(EmployeeNotFound(employeeNumber));
+        }
+
+        string key = (elementCode ?? string.Empty).Trim().ToUpperInvariant();
+        PayElement? element = await _db.PayElements.FirstOrDefaultAsync(p => p.CompanyId == companyId && p.Code == key, ct).ConfigureAwait(false);
+        if (element is null)
+        {
+            return Result.Failure(Error.NotFound("Payroll.ElementNotFound", $"Pay element {key} not found."));
+        }
+
+        if (employee.PayElements.Any(p => p.PayElementId == element.Id && p.IsActive))
+        {
+            return Result.Failure(Error.Conflict("Payroll.ElementAssigned", $"{employee.EmployeeNumber} already has {key}; end it first to change it."));
+        }
+
+        employee.AssignPayElement(element.Id, overrideAmount, overrideRate, units);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> EndElementAsync(long companyId, string employeeNumber, string elementCode, CancellationToken ct = default)
+    {
+        if (await EmployeeAsync(companyId, employeeNumber, ct).ConfigureAwait(false) is not Employee employee)
+        {
+            return Result.Failure(EmployeeNotFound(employeeNumber));
+        }
+
+        string key = (elementCode ?? string.Empty).Trim().ToUpperInvariant();
+        long? elementId = await _db.PayElements.Where(p => p.CompanyId == companyId && p.Code == key).Select(p => (long?)p.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        List<EmployeePayElement> active = [.. employee.PayElements.Where(p => p.PayElementId == elementId && p.IsActive)];
+        if (active.Count == 0)
+        {
+            return Result.Failure(Error.NotFound("Payroll.ElementNotAssigned", $"{employee.EmployeeNumber} does not have {key}."));
+        }
+
+        active.ForEach(p => p.IsActive = false);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> CreateTaxTableAsync(long companyId, string code, DateOnly effectiveFrom, CurrencyCode? currency, IReadOnlyList<TaxBandInput> bands, CancellationToken ct = default)
+    {
+        string key = (code ?? string.Empty).Trim().ToUpperInvariant();
+        if (key.Length == 0 || bands.Count == 0)
+        {
+            return Error.Validation("Payroll.TaxTableRequired", "A tax table needs a code and at least one band.");
+        }
+
+        List<TaxBandInput> ordered = [.. bands.OrderBy(b => b.From)];
+        if (ordered[0].From != 0m || ordered.Any(b => b.RatePercent is < 0m or > 100m || (b.To is decimal to && to <= b.From)))
+        {
+            return Error.Validation("Payroll.TaxBands", "Bands start at nil, each ends above where it starts, and rates are between 0 and 100%.");
+        }
+
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            bool last = i == ordered.Count - 1;
+            if (last ? ordered[i].To is not null : ordered[i].To != ordered[i + 1].From)
+            {
+                return Error.Validation("Payroll.TaxBands", last ? "The last band is open-ended (no upper limit)." : $"Band {i + 2} must start where band {i + 1} ends ({ordered[i].To}).");
+            }
+        }
+
+        if (await _db.Set<TaxTable>().AnyAsync(t => t.CompanyId == companyId && t.Code == key && t.EffectiveFrom == effectiveFrom, ct).ConfigureAwait(false))
+        {
+            return Error.Conflict("Payroll.TaxTableExists", $"Tax table {key} already has bands from {effectiveFrom:yyyy-MM-dd}.");
+        }
+
+        TaxTable table = new(companyId, key, effectiveFrom, currency);
+        ordered.ForEach(b => table.AddBand(b.From, b.To, b.RatePercent));
+        _db.Set<TaxTable>().Add(table);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return table.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<string>>> SeedStandardElementsAsync(long companyId, string salaryExpenseAccount, string payeLiabilityAccount, string taxTableCode, CancellationToken ct = default)
+    {
+        NewPayElement[] standard =
+        [
+            new("BASIC", "Basic salary", PayElementType.Earning, CalculationBasis.Formula, 1, salaryExpenseAccount) { Formula = "BASIC", Taxable = true },
+            new("OVERTIME", "Overtime", PayElementType.Earning, CalculationBasis.RatePerUnit, 2, salaryExpenseAccount) { Taxable = true },
+            new("HOUSING", "Housing allowance", PayElementType.Earning, CalculationBasis.FixedAmount, 3, salaryExpenseAccount) { Taxable = true },
+            new("TRANSPORT", "Transport allowance", PayElementType.Earning, CalculationBasis.FixedAmount, 4, salaryExpenseAccount) { Taxable = true },
+            new("PAYE", "PAYE", PayElementType.Deduction, CalculationBasis.TaxTable, 50, payeLiabilityAccount) { TaxTableCode = taxTableCode },
+        ];
+        List<string> created = [];
+        foreach (NewPayElement element in standard)
+        {
+            if (await _db.PayElements.AnyAsync(p => p.CompanyId == companyId && p.Code == element.Code, ct).ConfigureAwait(false))
+            {
+                continue;
+            }
+
+            Result<long> added = await CreatePayElementAsync(companyId, element, ct).ConfigureAwait(false);
+            if (added.IsFailure)
+            {
+                return added.Error;
+            }
+
+            created.Add(element.Code);
+        }
+
+        return created;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<long>>> RequestBankChangeAsync(long companyId, string employeeNumber, IReadOnlyDictionary<string, string> changes, long requestedByUserId, CancellationToken ct = default)
+    {
+        if (await EmployeeAsync(companyId, employeeNumber, ct).ConfigureAwait(false) is not Employee employee)
+        {
+            return EmployeeNotFound(employeeNumber);
+        }
+
+        if (changes.Count == 0 || changes.Keys.Any(k => !BankFields.Contains(k)) || changes.Values.Any(string.IsNullOrWhiteSpace))
+        {
+            return Error.Validation("Payroll.BankFields", $"Only {string.Join(", ", BankFields)} can be changed this way, each to a value.");
+        }
+
+        List<DetailChangeRequest> requests = [.. changes.Select(c => new DetailChangeRequest(companyId, employee.Id, c.Key, Current(employee, c.Key), c.Value.Trim()) { RequestedByUserId = requestedByUserId })];
+        _db.DetailChangeRequests.AddRange(requests);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return requests.Select(r => r.Id).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<BankChangeRequest>> PendingBankChangesAsync(long companyId, CancellationToken ct = default)
+    {
+        List<string> fields = [.. BankFields];
+        return await (from r in _db.DetailChangeRequests.AsNoTracking()
+                      join e in _db.Employees.AsNoTracking() on r.EmployeeId equals e.Id
+                      where r.CompanyId == companyId && r.Status == SelfServiceStatus.Pending && fields.Contains(r.Field)
+                      orderby r.Id
+                      select new BankChangeRequest(r.Id, e.EmployeeNumber, r.Field, r.OldValue, r.NewValue, r.RequestedByUserId)).ToListAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> DecideBankChangeAsync(long companyId, long requestId, bool approve, long decidedByUserId, string? note, CancellationToken ct = default)
+    {
+        DetailChangeRequest? request = await _db.DetailChangeRequests.FirstOrDefaultAsync(r => r.Id == requestId && r.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (request is null || request.Status != SelfServiceStatus.Pending || !BankFields.Contains(request.Field))
+        {
+            return Result.Failure(Error.NotFound("Payroll.ChangeNotPending", $"No pending bank-detail change {requestId}."));
+        }
+
+        if (request.RequestedByUserId == decidedByUserId)
+        {
+            return Result.Failure(Error.Rule("Payroll.SelfApproval", "The person who asked for a bank-detail change cannot approve it."));
+        }
+
+        request.Decide(approve, decidedByUserId, note);
+        if (approve)
+        {
+            Employee employee = await _db.Employees.SingleAsync(e => e.Id == request.EmployeeId, ct).ConfigureAwait(false);
+            Apply(employee, request.Field, request.NewValue);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <summary>Writes an approved bank or mobile-money detail onto the employee.</summary>
+    internal static void Apply(Employee employee, string field, string value)
+    {
+        switch (field)
+        {
+            case "BankName":
+                employee.BankName = value;
+                break;
+            case "BankBranch":
+                employee.BankBranch = value;
+                break;
+            case "BankAccountNumber":
+                employee.BankAccountNumber = value;
+                break;
+            case "MobileMoneyNumber":
+                employee.MobileMoneyNumber = value;
+                break;
+        }
+    }
+
+    private static string? Current(Employee employee, string field) => field switch
+    {
+        "BankName" => employee.BankName,
+        "BankBranch" => employee.BankBranch,
+        "BankAccountNumber" => employee.BankAccountNumber,
+        _ => employee.MobileMoneyNumber,
+    };
+
+    private async Task<Employee?> EmployeeAsync(long companyId, string employeeNumber, CancellationToken ct)
+    {
+        string number = (employeeNumber ?? string.Empty).Trim().ToUpperInvariant();
+        return await _db.Employees.Include(e => e.PayElements).FirstOrDefaultAsync(e => e.CompanyId == companyId && e.EmployeeNumber.ToUpper() == number, ct).ConfigureAwait(false);
+    }
+
+    private static Error EmployeeNotFound(string number) => Error.NotFound("Payroll.EmployeeNotFound", $"Employee {number} not found.");
+
+    private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+}
