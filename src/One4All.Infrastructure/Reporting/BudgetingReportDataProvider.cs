@@ -76,6 +76,12 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
             "BGTVERSIONS" => await VersionsAsync(context, ct).ConfigureAwait(false),
             "BGTMULTIYEAR" => await MultiYearAsync(context, ct).ConfigureAwait(false),
             "BGTREGISTER" => await RegisterAsync(context, ct).ConfigureAwait(false),
+            "BGTVERSIONREGISTER" => await VersionRegisterAsync(context, ct).ConfigureAwait(false),
+            "BGTARCHIVE" => await ArchiveAsync(context, parameters.TryGetValue("BudgetLabel", out object? label) && label is string text && text.Trim().Length > 0 ? text.Trim() : null,
+                parameters.TryGetValue("Version", out object? version) && version is not null and not "" ? Convert.ToInt32(version, CultureInfo.InvariantCulture) : null, ct).ConfigureAwait(false),
+            "BGTAVAILABLE" => await AvailableAsync(context, parameters.TryGetValue("Level", out object? lv) && lv is string lvl && lvl.Length > 0 ? lvl : "Account",
+                parameters.TryGetValue("Basis", out object? bs) && bs is string basis && basis.Length > 0 ? basis : "YTD", ct).ConfigureAwait(false),
+            "BGTREVENUEPERFORMANCE" => await RevenuePerformanceAsync(context, ct).ConfigureAwait(false),
             "BGTLINECHANGES" => await ChangesAsync(context, ["BudgetLine"], false, ct).ConfigureAwait(false),
             "BGTVIREMENTS" => await VirementsAsync(context, ct).ConfigureAwait(false),
             "BGTVOTEBOOK" => await VoteBookAsync(context, ct).ConfigureAwait(false),
@@ -796,5 +802,122 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         }
 
         return row;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VersionRegisterAsync(Context c, CancellationToken ct)
+    {
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (Budget b in (await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false)).OrderBy(b => b.Label, StringComparer.Ordinal).ThenBy(b => b.Department, StringComparer.Ordinal)
+                     .ThenBy(b => b.VersionNumber))
+        {
+            string verified = "—";
+            if (b.SealHash is not null)
+            {
+                var check = await _control.VerifySealAsync(c.CompanyId, b.Id, ct).ConfigureAwait(false);
+                verified = check.IsSuccess && check.Value ? "Yes" : "BROKEN";
+            }
+
+            string User(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "—";
+            rows.Add(Row(("Budget", b.Label + (b.Department is null ? string.Empty : $" ({b.Department})")), ("Version", b.VersionNumber), ("Type", b.Type.ToString()), ("Status", b.Status.ToString()),
+                ("Author", User(b.CreatedByUserId == 0 ? null : b.CreatedByUserId)), ("Created", b.CreatedOnUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Reason", b.Reason ?? string.Empty),
+                ("ApprovedBy", User(b.ApprovedByUserId)), ("Resolution", b.ResolutionReference ?? "—"), ("Seal", b.SealHash is null ? "not sealed" : b.SealHash[..Math.Min(16, b.SealHash.Length)] + "…"),
+                ("Verified", verified)));
+        }
+
+        return rows;
+    }
+
+    // A sealed budget exactly as approved, after checking its seal against the lines held today.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ArchiveAsync(Context c, string? label, int? version, CancellationToken ct)
+    {
+        Budget? budget = (await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false))
+            .Where(b => b.SealHash is not null && (label == null || string.Equals(b.Label, label, StringComparison.OrdinalIgnoreCase)) && (version == null || b.VersionNumber == version))
+            .OrderByDescending(b => b.VersionNumber).FirstOrDefault();
+        if (budget is null)
+        {
+            return [];
+        }
+
+        var check = await _control.VerifySealAsync(c.CompanyId, budget.Id, ct).ConfigureAwait(false);
+        bool intact = check.IsSuccess && check.Value;
+        Dictionary<string, string> names = await NamesAsync(c.CompanyId, ct).ConfigureAwait(false);
+        decimal Quarter(IEnumerable<BudgetLine> lines, int q) => lines.Where(l => (l.Period - 1) / 3 == q).Sum(l => l.Amount);
+        List<IReadOnlyDictionary<string, object?>> rows =
+        [
+            Row(("Account", "SEAL"), ("Name", $"{budget.Label} v{budget.VersionNumber} {c.Year.Code} — {(intact ? "seal verified, exactly as approved" : "SEAL BROKEN — lines differ from those approved")}"),
+                ("CostCentre", budget.SealHash![..Math.Min(16, budget.SealHash.Length)] + "…"), ("Q1", string.Empty), ("Q2", string.Empty), ("Q3", string.Empty), ("Q4", string.Empty), ("Total", null)),
+        ];
+        rows.AddRange(budget.Lines.GroupBy(l => (l.AccountCode, CostCentre: l.CostCentre ?? string.Empty)).OrderBy(g => g.Key.AccountCode, StringComparer.Ordinal).ThenBy(g => g.Key.CostCentre, StringComparer.Ordinal)
+            .Select(g => Row(("Account", g.Key.AccountCode), ("Name", names.GetValueOrDefault(g.Key.AccountCode, "?")), ("CostCentre", g.Key.CostCentre.Length == 0 ? "—" : g.Key.CostCentre),
+                ("Q1", Money(Quarter(g, 0))), ("Q2", Money(Quarter(g, 1))), ("Q3", Money(Quarter(g, 2))), ("Q4", Money(Quarter(g, 3))), ("Total", g.Sum(l => l.Amount)))));
+        rows.Add(Row(("Account", "TOTAL"), ("Name", string.Empty), ("CostCentre", string.Empty), ("Q1", Money(Quarter(budget.Lines, 0))), ("Q2", Money(Quarter(budget.Lines, 1))),
+            ("Q3", Money(Quarter(budget.Lines, 2))), ("Q4", Money(Quarter(budget.Lines, 3))), ("Total", budget.Lines.Sum(l => l.Amount))));
+        return rows;
+    }
+
+    // Budget, actual, commitments and what is left, for the period, year to date or full year, rolled up to the level asked for.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AvailableAsync(Context c, string level, string basis, CancellationToken ct)
+    {
+        bool periodOnly = basis.Equals("Period", StringComparison.OrdinalIgnoreCase), fullYear = basis.Equals("FullYear", StringComparison.OrdinalIgnoreCase);
+        int fromPeriod = periodOnly ? c.Period : 1, toPeriod = fullYear ? int.MaxValue : c.Period;
+        DateOnly from = periodOnly ? new DateOnly(c.AsAt.Year, c.AsAt.Month, 1) : c.Year.StartDate;
+        var budgeted = (await BudgetsAsync(c.CompanyId, c.Year.Id, true, ct).ConfigureAwait(false))
+            .SelectMany(b => b.Lines.Where(l => l.Period >= fromPeriod && l.Period <= toPeriod).Select(l => (Key: (Account: l.AccountCode, Department: b.Department ?? string.Empty), l.Amount)))
+            .GroupBy(x => x.Key).ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
+        var actuals = await ActualsAsync(c.CompanyId, from, c.AsAt, ct).ConfigureAwait(false);
+        List<BudgetCommitment> commitments = [.. (await OpenCommitmentsAsync(c, ct).ConfigureAwait(false)).Where(x => x.Period >= fromPeriod && x.Period <= toPeriod)];
+        Dictionary<string, string> names = await NamesAsync(c.CompanyId, ct).ConfigureAwait(false);
+        Dictionary<string, string> divisions = level.Equals("Division", StringComparison.OrdinalIgnoreCase)
+            ? await _db.DepartmentUnits.AsNoTracking().Where(u => u.CompanyId == c.CompanyId).ToDictionaryAsync(u => u.Department, u => u.Division ?? "(unplaced)", ct).ConfigureAwait(false)
+            : [];
+        string Group((string Account, string Department) key) => level.ToUpperInvariant() switch
+        {
+            "DEPARTMENT" => key.Department.Length == 0 ? "All departments" : key.Department,
+            "DIVISION" => key.Department.Length == 0 ? "All departments" : divisions.GetValueOrDefault(key.Department, key.Department),
+            _ => key.Account,
+        };
+
+        return [.. budgeted.Select(b => new
+            {
+                Group = Group(b.Key), Budget = b.Value, Actual = ActualFor(actuals, b.Key),
+                Postings = b.Key.Department.Length == 0 ? actuals.Where(a => a.Key.Account == b.Key.Account).Sum(a => a.Value.Postings) : actuals.GetValueOrDefault(b.Key).Postings,
+                Committed = commitments.Where(x => x.AccountCode == b.Key.Account && (b.Key.Department.Length == 0 || x.Department == b.Key.Department)).Sum(x => x.Amount),
+            })
+            .GroupBy(x => x.Group).OrderBy(g => g.Key, StringComparer.Ordinal).Select(g =>
+            {
+                decimal budget = g.Sum(x => x.Budget), actual = g.Sum(x => x.Actual), committed = g.Sum(x => x.Committed);
+                return Row(("Level", g.Key), ("Name", level.Equals("Account", StringComparison.OrdinalIgnoreCase) || level.Length == 0 ? names.GetValueOrDefault(g.Key, "?") : basis),
+                    ("Budget", Money(budget)), ("Actual", Money(actual)), ("Committed", Money(committed)), ("Available", Money(budget - actual - committed)),
+                    ("Used", budget == 0m ? "—" : ((actual + committed) * 100m / budget).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Postings", g.Sum(x => x.Postings)));
+            })];
+    }
+
+    // Billed is the income actual; collected is each sales invoice's credit to the account times the share of the invoice since paid.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RevenuePerformanceAsync(Context c, CancellationToken ct)
+    {
+        Dictionary<string, string> names = await NamesAsync(c.CompanyId, ct).ConfigureAwait(false);
+        HashSet<string> income = [.. await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == c.CompanyId && a.Type == AccountType.Income).Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false)];
+        Dictionary<string, decimal> budget = (await BudgetedAsync(c.CompanyId, c.Year.Id, c.Period, ct).ConfigureAwait(false)).Where(b => income.Contains(b.Key.Account))
+            .GroupBy(b => b.Key.Account).ToDictionary(g => g.Key, g => g.Sum(x => x.Value));
+        Dictionary<string, decimal> billed = (await ActualsAsync(c.CompanyId, c.Year.StartDate, c.AsAt, ct).ConfigureAwait(false)).Where(a => income.Contains(a.Key.Account))
+            .GroupBy(a => a.Key.Account).ToDictionary(g => g.Key, g => g.Sum(x => x.Value.Amount));
+        var invoices = await (from i in _db.OpenItems.AsNoTracking()
+                              join l in _db.Set<JournalLine>().AsNoTracking() on i.JournalEntryId equals l.JournalEntryId
+                              where i.CompanyId == c.CompanyId && i.Ledger == Core.Trading.TradingLedger.AccountsReceivable && i.ItemType == Core.Trading.OpenItemType.Invoice
+                                    && i.DocumentDate >= c.Year.StartDate && i.DocumentDate <= c.AsAt && l.BaseCredit > 0m
+                              select new { i.Id, i.OriginalBase, l.AccountCode, l.BaseCredit }).ToListAsync(ct).ConfigureAwait(false);
+        List<long> ids = [.. invoices.Select(i => i.Id).Distinct()];
+        Dictionary<long, decimal> paid = await _db.Allocations.AsNoTracking().Where(a => ids.Contains(a.DebitItemId) && a.AllocationDate <= c.AsAt && (!a.IsReversed || a.ReversedOn > c.AsAt))
+            .GroupBy(a => a.DebitItemId).Select(g => new { g.Key, Paid = g.Sum(a => a.DebitBase) }).ToDictionaryAsync(x => x.Key, x => x.Paid, ct).ConfigureAwait(false);
+        Dictionary<string, decimal> collected = invoices.Where(i => income.Contains(i.AccountCode) && i.OriginalBase != 0m).GroupBy(i => i.AccountCode)
+            .ToDictionary(g => g.Key, g => Math.Round(g.Sum(i => i.BaseCredit * Math.Min(1m, paid.GetValueOrDefault(i.Id) / i.OriginalBase)), 2, MidpointRounding.AwayFromZero));
+        static string Pct(decimal part, decimal whole) => whole == 0m ? "—" : (part * 100m / whole).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+        return [.. budget.Keys.Union(billed.Keys).Where(k => budget.GetValueOrDefault(k) != 0m || billed.GetValueOrDefault(k) != 0m).Order(StringComparer.Ordinal).Select(account =>
+        {
+            decimal b = budget.GetValueOrDefault(account), actual = billed.GetValueOrDefault(account), cash = collected.GetValueOrDefault(account);
+            return Row(("Account", account), ("Name", names.GetValueOrDefault(account, "?")), ("Budget", Money(b)), ("Billed", Money(actual)), ("BilledPct", Pct(actual, b)),
+                ("Collected", Money(cash)), ("CollectionPct", Pct(cash, actual)));
+        })];
     }
 }

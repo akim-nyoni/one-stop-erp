@@ -48,6 +48,11 @@ public static class BudgetingReports
         yield return Listing("B10", "Revenue Budget Build-up", "Budget", "Driver-based revenue lines: the volume each is built on, the implied rate and the amount.",
             "BgtRevenueBuild", [new Column("Budget", "Budget", 110), new Column("Account", "Account", 70), new Column("Name", "Name", 140), new Column("Driver", "Driver", 70), new Column("Volume", "Volume", 80),
              new Column("Rate", "Rate", 80), new Column("Amount", "Amount", 100, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("B11", "Budget Version Register", "Budget", "Every budget version of the year ever created: number, type, status, author and date, why it was raised, "
+            + "who approved it under which resolution, and its seal hash with whether it still verifies.", "BgtVersionRegister",
+            [new Column("Budget", "Budget", 130), new Column("Version", "Ver", 40), new Column("Type", "Type", 100), new Column("Status", "Status", 75), new Column("Author", "Author", 80),
+             new Column("Created", "Created", 75), new Column("Reason", "Reason", 140), new Column("ApprovedBy", "Approved by", 80), new Column("Resolution", "Resolution", 90),
+             new Column("Seal", "Seal hash", 110), new Column("Verified", "Verifies", 60)], AsAt);
         yield return Listing("B12", "Budget Version Comparison", "Budget", "For each budget with more than one version: the latest against the one before, per account.",
             "BgtVersions", [new Column("Budget", "Budget", 130), new Column("Versions", "Versions", 70), new Column("Account", "Account", 65), new Column("Name", "Name", 150), new Column("Previous", "Previous", 95),
              new Column("Current", "Current", 95), new Column("Percent", "Change %", 65), new Column("Change", "Change", 95, true)], AsAt);
@@ -59,6 +64,11 @@ public static class BudgetingReports
         yield return Listing("B15", "Multi-Year Budget & Actual Comparison", "Budget", "Each budgeted account's budget and actual for this year and the two before.",
             "BgtMultiYear", [new Column("Account", "Account", 65), new Column("Name", "Name", 150), new Column("Budget2", "Budget Y-2", 90), new Column("Actual2", "Actual Y-2", 90), new Column("Budget1", "Budget Y-1", 90),
              new Column("Actual1", "Actual Y-1", 90), new Column("Budget0", "Budget this year", 95), new Column("Actual0", "Actual to date", 95, true)], AsAt);
+        yield return Listing("B16", "Archived Budget Retrieval", "Budget", "Any sealed budget of the date's year in full, exactly as approved — every account by quarter — headed by "
+            + "its seal hash re-verified against the lines. Choose the budget by label and version (latest sealed by default).", "BgtArchive",
+            [new Column("Account", "Account", 65), new Column("Name", "Name", 150), new Column("CostCentre", "Cost centre", 75), new Column("Q1", "Q1", 85), new Column("Q2", "Q2", 85),
+             new Column("Q3", "Q3", 85), new Column("Q4", "Q4", 85), new Column("Total", "Total", 100, true)],
+            [("AsAtDate", ParameterType.Date), ("BudgetLabel", ParameterType.String), ("Version", ParameterType.Integer)]);
         yield return Listing("B17", "Budget Versions, Seals & Superseded Budgets", "Budget", "Every budget held: type, version, status, why it was revised, and whether its seal still verifies.",
             "BgtRegister", [new Column("Budget", "Budget", 130), new Column("Year", "Year", 55), new Column("Type", "Type", 110), new Column("Version", "Ver", 40), new Column("Status", "Status", 80),
              new Column("Active", "Active", 50), new Column("Reason", "Reason", 160), new Column("Seal", "Seal", 110), new Column("Total", "Total", 100, true)], AsAt);
@@ -96,6 +106,11 @@ public static class BudgetingReports
         yield return Listing("B29", "Year-End Commitment Carry-Forward Schedule", "Budget", "Commitments of the year that lapsed or were carried into the next year at year end, with who approved the carry-forward.",
             "BgtCarryForward", [new Column("Reference", "Reference", 100), new Column("Account", "Account", 70), new Column("Department", "Department", 100), new Column("Period", "Period", 50), new Column("Outcome", "Outcome", 100),
              new Column("ApprovedBy", "Approved by", 90), new Column("Amount", "Amount", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("B31", "Budget vs Actual vs Commitment vs Available", "Budget", "At account, department or division level, for the date's period, the year to date or the "
+            + "full year: budget, actual, open commitments, what is available and the share used, with the number of postings behind each actual.", "BgtAvailable",
+            [new Column("Level", "Level", 140), new Column("Name", "Name", 150), new Column("Budget", "Budget", 100), new Column("Actual", "Actual", 95), new Column("Committed", "Committed", 95),
+             new Column("Available", "Available", 100), new Column("Used", "Used %", 55), new Column("Postings", "Postings", 55, true)],
+            [("AsAtDate", ParameterType.Date), ("Level", ParameterType.String), ("Basis", ParameterType.String)]);
         yield return Listing("B32", "Budget Holder Statement", "Budget", "Per budget holder: their department's votes — budget, spent and committed to date, available and utilisation.",
             "BgtHolders", [new Column("Holder", "Budget holder", 130), new Column("Department", "Department", 100), new Column("Account", "Vote", 70), new Column("Budget", "Budget", 95), new Column("Actual", "Spent", 95),
              new Column("Committed", "Committed", 90), new Column("Used", "Used %", 60), new Column("Available", "Available", 95, true)], [("AsAtDate", ParameterType.Date)]);
@@ -128,6 +143,10 @@ public static class BudgetingReports
         yield return Listing("B42", "Capital Project Budget vs Actual vs Commitment", "Budget", "Each capital project: budget, cost to date, commitments, the share spent and the cost to complete.",
             "BgtCapitalProjects", [new Column("Project", "Project", 80), new Column("Name", "Name", 150), new Column("Status", "Status", 90), new Column("Budget", "Budget", 95), new Column("Actual", "Actual", 95),
              new Column("Committed", "Committed", 90), new Column("Spent", "Spent %", 60), new Column("ToComplete", "Cost to complete", 100, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("B43", "Revenue Budget Performance", "Budget", "Per revenue source (income account), year to date: budget, billed, collected (the share of the billed "
+            + "invoices since paid), billed against budget and the collection rate.", "BgtRevenuePerformance",
+            [new Column("Account", "Source", 65), new Column("Name", "Name", 150), new Column("Budget", "Budget YTD", 100), new Column("Billed", "Billed", 100), new Column("BilledPct", "Billed vs budget", 70),
+             new Column("Collected", "Collected", 100), new Column("CollectionPct", "Collection rate", 70, true)], AsAt);
         yield return Listing("B44", "Budget Accuracy Review", "Budget", "For the year before the as-at date's year: each account's full-year budget against actual, the variance and how accurate the budget was.",
             "BgtAccuracy", [new Column("Account", "Account", 65), new Column("Name", "Name", 150), new Column("Budget", "Budget", 95), new Column("Actual", "Actual", 95), new Column("Percent", "Variance %", 70),
              new Column("Accuracy", "Accuracy", 80), new Column("Variance", "Variance", 95, true)], AsAt);

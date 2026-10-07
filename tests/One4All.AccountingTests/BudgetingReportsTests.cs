@@ -126,6 +126,49 @@ public sealed class BudgetingReportsTests
         string rolling = await Render("B40");
         rolling.Should().Contain("6000,").And.Contain(",2026-04,Reforecast,150").And.Contain(",2026-06,Reforecast,150").And.NotContain("2026-07");
 
+        // B11 version register, B16 archived retrieval, B31 available by basis and level, B43 revenue performance.
+        async Task<string> RenderWith(string code, Dictionary<string, object?> parameters)
+        {
+            parameters["AsAtDate"] = new DateOnly(2026, 3, 31);
+            var rendered = await runner.RenderAsync(companyId, code, parameters, ReportFormat.Csv);
+            rendered.IsSuccess.Should().BeTrue(rendered.IsFailure ? $"{code}: {rendered.Error.Message}" : null);
+            return Encoding.UTF8.GetString(rendered.Value.Content);
+        }
+
+        string versions = await Render("B11");
+        versions.Should().Contain("OPEX,1,OriginalApproved,Superseded").And.Contain("OPEX,2,SupplementaryRevised,Active").And.Contain("Yes").And.Contain("not sealed");
+        string archive = await RenderWith("B16", new() { ["BudgetLabel"] = "opex" });
+        archive.Should().Contain("OPEX v2 2026 — seal verified").And.Contain("TOTAL").And.Contain("1440");
+        (await RenderWith("B16", new() { ["BudgetLabel"] = "OPEX", ["Version"] = 1 })).Should().Contain("OPEX v1 2026").And.Contain("1200");
+        (await RenderWith("B16", new() { ["BudgetLabel"] = "WORKS" })).Should().NotContain("WORKS v");
+        (await RenderWith("B31", new() { ["Level"] = "Account", ["Basis"] = "YTD" })).Should().Contain("6000,").And.Contain("360.00,450.00,0.00,-90.00,125.0%,3");
+        (await RenderWith("B31", new() { ["Level"] = "Account", ["Basis"] = "FullYear" })).Should().Contain("\"1,440.00\",450.00,0.00,990.00,31.3%,3");
+        (await RenderWith("B31", new() { ["Level"] = "Account", ["Basis"] = "Period" })).Should().Contain("120.00,150.00,0.00,-30.00,125.0%,1");
+        (await RenderWith("B31", new() { ["Level"] = "Department", ["Basis"] = "YTD" })).Should().Contain("All departments,YTD,");
+
+        Budget revenue = new(companyId, yearId, "REVENUE", BudgetType.OriginalApproved, null, 1);
+        for (int period = 1; period <= 12; period++)
+        {
+            revenue.AddLine("4000", period, 200m);
+        }
+
+        revenue.Approve();
+        revenue.Activate();
+        One4All.Core.Trading.Customer payer = new(companyId, "BG-PAYER", "Revenue Payer", Scenario.Usd);
+        db.AddRange(revenue, payer);
+        await db.SaveChangesAsync();
+        One4All.Application.Abstractions.Trading.ISalesLedgerService ar = scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Trading.ISalesLedgerService>();
+        long invoice = (await ar.PostInvoiceAsync(new One4All.Application.Abstractions.Trading.SalesInvoiceRequest
+        {
+            CompanyId = companyId, CustomerId = payer.Id, DocumentNumber = "BG-INV", DocumentDate = new DateOnly(2026, 2, 1), Currency = Scenario.Usd, NetAmount = 400m, SalesAccountCode = "4000",
+        })).Value.OpenItemId;
+        (await ar.PostReceiptAsync(new One4All.Application.Abstractions.Trading.ReceiptRequest { CompanyId = companyId, CustomerId = payer.Id, DocumentNumber = "BG-REC", ReceiptDate = new DateOnly(2026, 2, 20), Currency = Scenario.Usd, Amount = 100m, BankAccountCode = "1100" }))
+            .IsSuccess.Should().BeTrue();
+        long receipt = await db.OpenItems.Where(i => i.CompanyId == companyId && i.DocumentNumber == "BG-REC").Select(i => i.Id).SingleAsync();
+        (await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Trading.IAllocationService>()
+            .AllocateAsync(companyId, One4All.Core.Trading.TradingLedger.AccountsReceivable, invoice, receipt, 100m, new DateOnly(2026, 2, 20))).IsSuccess.Should().BeTrue();
+        (await Render("B43")).Should().Contain("4000,").And.Contain("600.00,400.00,66.7%,100.00,25.0%");
+
         foreach (string code in BudgetingReports.All().Select(r => r.Code))
         {
             await Render(code);
