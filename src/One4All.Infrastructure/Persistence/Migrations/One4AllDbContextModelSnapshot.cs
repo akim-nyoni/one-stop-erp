@@ -11636,6 +11636,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<DateOnly?>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
                     b.Property<long>("ItemId")
                         .HasColumnType("bigint")
                         .HasColumnName("item_id");
@@ -11663,9 +11667,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_price_list_line");
 
-                    b.HasIndex("PriceListId", "ItemId", "MinimumQuantity")
+                    b.HasIndex("PriceListId", "ItemId", "MinimumQuantity", "EffectiveFrom")
                         .IsUnique()
-                        .HasDatabaseName("ix_price_list_line_price_list_id_item_id_minimum_quantity");
+                        .HasDatabaseName("ix_price_list_line_price_list_id_item_id_minimum_quantity_effe");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("PriceListId", "ItemId", "MinimumQuantity", "EffectiveFrom"), false);
 
                     b.ToTable("price_list_line", "inv");
                 });

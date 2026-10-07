@@ -64,7 +64,8 @@ public sealed class PricingService : IPricingService
 
         HashSet<long>? only = itemIds is null ? null : [.. itemIds];
         int changed = 0;
-        foreach (PriceListLine line in list.Lines.ToList())
+        DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+        foreach (PriceListLine line in list.InForce(today).ToList())
         {
             if (only is not null && !only.Contains(line.ItemId))
             {
@@ -74,7 +75,8 @@ public sealed class PricingService : IPricingService
             decimal adjusted = One4All.Application.Inventory.PriceAdjustment.Apply(line.UnitPrice, percent, roundTo, rounding);
             if (adjusted != line.UnitPrice)
             {
-                list.SetPrice(line.ItemId, line.MinimumQuantity, adjusted);
+                // The price in force today changes: a standing price in place, a dated one by a new price from today (its history kept).
+                list.SetPrice(line.ItemId, line.MinimumQuantity, adjusted, line.EffectiveFrom is null ? null : today);
                 changed++;
             }
         }
@@ -111,7 +113,7 @@ public sealed class PricingService : IPricingService
         PriceList copy = await _db.PriceLists.Include(p => p.Lines).FirstAsync(p => p.Id == created.Value, ct).ConfigureAwait(false);
         foreach (PriceListLine line in source.Lines)
         {
-            copy.SetPrice(line.ItemId, line.MinimumQuantity, One4All.Application.Inventory.PriceAdjustment.Apply(line.UnitPrice, percent, roundTo, rounding));
+            copy.SetPrice(line.ItemId, line.MinimumQuantity, One4All.Application.Inventory.PriceAdjustment.Apply(line.UnitPrice, percent, roundTo, rounding), line.EffectiveFrom);
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -143,7 +145,10 @@ public sealed class PricingService : IPricingService
             return Result.Failure(Error.NotFound("Inv.ItemNotFound", $"Item {itemId} not found."));
         }
 
-        list.SetPrice(itemId, minimumQuantity, unitPrice);
+        // Once a dated price is in force, an immediate change is a new price from today (earlier prices kept as history).
+        DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+        bool datedInForce = list.Lines.Any(l => l.ItemId == itemId && l.MinimumQuantity == minimumQuantity && l.EffectiveFrom is DateOnly from && from <= today);
+        list.SetPrice(itemId, minimumQuantity, unitPrice, datedInForce ? today : null);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
@@ -177,7 +182,11 @@ public sealed class PricingService : IPricingService
     }
 
     /// <inheritdoc />
-    public async Task<Result<ResolvedPrice>> PriceAsync(long companyId, long? customerId, long itemId, decimal quantity, CancellationToken ct = default)
+    public Task<Result<ResolvedPrice>> PriceAsync(long companyId, long? customerId, long itemId, decimal quantity, CancellationToken ct = default)
+        => PriceAsync(companyId, customerId, itemId, quantity, DateOnly.FromDateTime(DateTime.Today), ct);
+
+    /// <inheritdoc />
+    public async Task<Result<ResolvedPrice>> PriceAsync(long companyId, long? customerId, long itemId, decimal quantity, DateOnly asAt, CancellationToken ct = default)
     {
         if (quantity <= 0m)
         {
@@ -200,10 +209,10 @@ public sealed class PricingService : IPricingService
         if (customerListId is { } own)
         {
             PriceList? mine = await LoadActiveListAsync(companyId, p => p.Id == own, itemId, ct).ConfigureAwait(false);
-            PriceListLine? line = mine?.Resolve(itemId, quantity);
+            PriceListLine? line = mine?.Resolve(itemId, quantity, asAt);
             if (mine is not null && line is not null)
             {
-                return new ResolvedPrice(itemId, quantity, line.UnitPrice, mine.Currency, mine.Id, mine.Code, line.MinimumQuantity, FromCustomerList: true);
+                return new ResolvedPrice(itemId, quantity, line.UnitPrice, mine.Currency, mine.Id, mine.Code, line.MinimumQuantity, FromCustomerList: true) { EffectiveFrom = line.EffectiveFrom };
             }
 
             if (mine is { CostPlusBasis: not CostPlusBasis.None } && await FromCostAsync(companyId, mine, itemId, ct).ConfigureAwait(false) is decimal costPlus)
@@ -214,7 +223,7 @@ public sealed class PricingService : IPricingService
 
         // Then the company default.
         PriceList? fallback = await LoadActiveListAsync(companyId, p => p.IsDefault, itemId, ct).ConfigureAwait(false);
-        PriceListLine? resolved = fallback?.Resolve(itemId, quantity);
+        PriceListLine? resolved = fallback?.Resolve(itemId, quantity, asAt);
         if (fallback is not null && resolved is null && fallback.CostPlusBasis != CostPlusBasis.None
             && await FromCostAsync(companyId, fallback, itemId, ct).ConfigureAwait(false) is decimal defaultCostPlus)
         {
@@ -226,8 +235,79 @@ public sealed class PricingService : IPricingService
             return Error.NotFound("Price.NoPrice", $"No selling price is set for item {itemId} at quantity {quantity}.");
         }
 
-        return new ResolvedPrice(itemId, quantity, resolved.UnitPrice, fallback.Currency, fallback.Id, fallback.Code, resolved.MinimumQuantity, FromCustomerList: false);
+        return new ResolvedPrice(itemId, quantity, resolved.UnitPrice, fallback.Currency, fallback.Id, fallback.Code, resolved.MinimumQuantity, FromCustomerList: false)
+        {
+            EffectiveFrom = resolved.EffectiveFrom,
+        };
     }
+
+    /// <inheritdoc />
+    public async Task<Result> SchedulePriceAsync(long companyId, long priceListId, long itemId, decimal minimumQuantity, decimal unitPrice, DateOnly effectiveFrom, DateOnly today,
+        CancellationToken ct = default)
+    {
+        if (minimumQuantity < 1m || unitPrice < 0m)
+        {
+            return Result.Failure(Error.Validation("Price.Line", "A price needs a minimum quantity of at least 1 and a unit price of nil or more."));
+        }
+
+        if (effectiveFrom <= today)
+        {
+            return Result.Failure(Error.Rule("Price.EffectiveInPast", $"A scheduled price takes effect after today ({today:yyyy-MM-dd}); change today's price directly."));
+        }
+
+        PriceList? list = await _db.PriceLists.Include(p => p.Lines).FirstOrDefaultAsync(p => p.Id == priceListId && p.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (list is null)
+        {
+            return Result.Failure(Error.NotFound("Price.ListNotFound", $"Price list {priceListId} not found."));
+        }
+
+        if (!await _db.Items.AnyAsync(i => i.Id == itemId && i.CompanyId == companyId, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.NotFound("Inv.ItemNotFound", $"Item {itemId} not found."));
+        }
+
+        list.SetPrice(itemId, minimumQuantity, unitPrice, effectiveFrom);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<int>> ScheduleAdjustmentAsync(long companyId, long priceListId, decimal percent, decimal roundTo, One4All.Application.Inventory.PriceRounding rounding,
+        DateOnly effectiveFrom, DateOnly today, CancellationToken ct = default)
+    {
+        if (percent <= -100m)
+        {
+            return Error.Validation("Price.Percent", "A price cannot be reduced by 100% or more.");
+        }
+
+        if (effectiveFrom <= today)
+        {
+            return Error.Rule("Price.EffectiveInPast", $"A scheduled change takes effect after today ({today:yyyy-MM-dd}); adjust today's prices directly.");
+        }
+
+        PriceList? list = await _db.PriceLists.Include(p => p.Lines).FirstOrDefaultAsync(p => p.Id == priceListId && p.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (list is null)
+        {
+            return Error.NotFound("Price.ListNotFound", $"Price list {priceListId} not found.");
+        }
+
+        // Each price in force the day before becomes the base for the new one from that day.
+        int scheduled = 0;
+        foreach (PriceListLine line in list.InForce(effectiveFrom.AddDays(-1)).ToList())
+        {
+            list.SetPrice(line.ItemId, line.MinimumQuantity, One4All.Application.Inventory.PriceAdjustment.Apply(line.UnitPrice, percent, roundTo, rounding), effectiveFrom);
+            scheduled++;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return scheduled;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<(decimal MinimumQuantity, decimal UnitPrice, DateOnly? EffectiveFrom)>> PriceHistoryAsync(long companyId, long priceListId, long itemId, CancellationToken ct = default)
+        => [.. (await _db.PriceLists.AsNoTracking().Where(p => p.Id == priceListId && p.CompanyId == companyId).SelectMany(p => p.Lines).Where(l => l.ItemId == itemId)
+                .ToListAsync(ct).ConfigureAwait(false))
+            .OrderBy(l => l.MinimumQuantity).ThenBy(l => l.EffectiveFrom ?? DateOnly.MinValue).Select(l => (l.MinimumQuantity, l.UnitPrice, l.EffectiveFrom))];
 
     /// <inheritdoc />
     public async Task<Result> SetCostPlusAsync(long companyId, long priceListId, CostPlusBasis basis, decimal percent, decimal roundTo, PriceRounding rounding, CancellationToken ct = default)

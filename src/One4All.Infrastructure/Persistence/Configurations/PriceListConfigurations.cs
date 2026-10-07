@@ -32,6 +32,6 @@ internal sealed class PriceListLineConfiguration : IEntityTypeConfiguration<Pric
         b.HasKey(x => x.Id);
         b.Property(x => x.MinimumQuantity).HasPrecision(19, 4);
         b.Property(x => x.UnitPrice).HasPrecision(19, 4);
-        b.HasIndex(x => new { x.PriceListId, x.ItemId, x.MinimumQuantity }).IsUnique();
+        b.HasIndex(x => new { x.PriceListId, x.ItemId, x.MinimumQuantity, x.EffectiveFrom }).IsUnique().AreNullsDistinct(false);
     }
 }

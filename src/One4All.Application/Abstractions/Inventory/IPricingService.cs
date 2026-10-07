@@ -13,7 +13,11 @@ namespace One4All.Application.Abstractions.Inventory;
 /// <param name="PriceListCode">That list's code.</param>
 /// <param name="MinimumQuantity">The quantity break that applied.</param>
 /// <param name="FromCustomerList">True when the customer's own list supplied the price (false = the default list).</param>
-public sealed record ResolvedPrice(long ItemId, decimal Quantity, decimal UnitPrice, CurrencyCode Currency, long PriceListId, string PriceListCode, decimal MinimumQuantity, bool FromCustomerList, bool FromCost = false);
+public sealed record ResolvedPrice(long ItemId, decimal Quantity, decimal UnitPrice, CurrencyCode Currency, long PriceListId, string PriceListCode, decimal MinimumQuantity, bool FromCustomerList, bool FromCost = false)
+{
+    /// <summary>The day the price came into force (null: the standing price).</summary>
+    public DateOnly? EffectiveFrom { get; init; }
+}
 
 /// <summary>
 /// Selling-price resolution (brief §4.13): looks up an item's price for a customer and quantity, from the
@@ -70,6 +74,22 @@ public interface IPricingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
     Task<Result> SetPriceAsync(long companyId, long priceListId, long itemId, decimal minimumQuantity, decimal unitPrice, CancellationToken ct = default);
+
+    /// <summary>
+    /// Schedules a price from a date (brief §4.13 effective dating): it takes over from whatever is in force on that day; orders and sales
+    /// dated before it keep the earlier price. Re-scheduling the same day replaces it; a date in the past is refused (history is kept).
+    /// </summary>
+    Task<Result> SchedulePriceAsync(long companyId, long priceListId, long itemId, decimal minimumQuantity, decimal unitPrice, DateOnly effectiveFrom, DateOnly today, CancellationToken ct = default);
+
+    /// <summary>Schedules a percentage change of a list's prices in force on a date, from that date (e.g. an annual increase), leaving today's prices alone.</summary>
+    Task<Result<int>> ScheduleAdjustmentAsync(long companyId, long priceListId, decimal percent, decimal roundTo, One4All.Application.Inventory.PriceRounding rounding, DateOnly effectiveFrom,
+        DateOnly today, CancellationToken ct = default);
+
+    /// <summary>An item's price history on a list: every scheduled and standing price with its quantity break and date.</summary>
+    Task<IReadOnlyList<(decimal MinimumQuantity, decimal UnitPrice, DateOnly? EffectiveFrom)>> PriceHistoryAsync(long companyId, long priceListId, long itemId, CancellationToken ct = default);
+
+    /// <summary>Resolves the price as at a date (the order or sale date): a price scheduled for later does not apply yet.</summary>
+    Task<Result<ResolvedPrice>> PriceAsync(long companyId, long? customerId, long itemId, decimal quantity, DateOnly asAt, CancellationToken ct = default);
 
     /// <summary>Links a customer to a price list (null = use the default list).</summary>
     /// <param name="companyId">The company.</param>

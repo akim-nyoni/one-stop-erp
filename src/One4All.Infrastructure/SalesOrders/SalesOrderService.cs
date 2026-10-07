@@ -78,7 +78,7 @@ public sealed class SalesOrderService : ISalesOrderService
             else
             {
                 // No price keyed: take it from the customer's price list (then the default list) for this quantity.
-                Result<ResolvedPrice> price = await _pricing.PriceAsync(request.CompanyId, request.CustomerId, line.ItemId, line.Quantity, ct).ConfigureAwait(false);
+                Result<ResolvedPrice> price = await _pricing.PriceAsync(request.CompanyId, request.CustomerId, line.ItemId, line.Quantity, request.OrderDate, ct).ConfigureAwait(false);
                 if (price.IsFailure)
                 {
                     return price.Error;

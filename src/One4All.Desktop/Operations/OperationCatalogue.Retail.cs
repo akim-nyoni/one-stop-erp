@@ -293,6 +293,35 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Future prices", ListTitle = "Price lists",
+            Description = "Schedules a price from a date, or a percentage change of the whole list from a date (e.g. 1 July); orders and sales dated before it keep the earlier price. "
+                + "History lists an item's standing and dated prices.",
+            Fields = [Pick("Step", "Step", ["Schedule price", "Schedule list change", "History"]), Req("List", "Price list code"), Opt("Item", "Item code"), Num("MinQty", "From quantity", "1"),
+                OptNum("Price", "Unit price"), OptNum("Percent", "Change %"), Num("RoundTo", "Price point", "0.05"), Pick("Rounding", "Rounding", Enum.GetNames<PriceRounding>()), Today("From", "Effective from")],
+            Run = async (c, i) =>
+            {
+                IPricingService pricing = c.Get<IPricingService>();
+                long list = await FindAsync(c.Db.PriceLists, p => p.CompanyId == c.CompanyId && p.Code.ToUpper() == i.Text("List").ToUpper(), p => p.Id, "price list", i.Text("List")).ConfigureAwait(true);
+                DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+                switch (i.Text("Step"))
+                {
+                    case "Schedule price":
+                        return Check(await pricing.SchedulePriceAsync(c.CompanyId, list, await ItemAsync(c, i.Optional("Item") ?? string.Empty).ConfigureAwait(true), i.Number("MinQty"), i.Number("Price"),
+                            i.Date("From"), today).ConfigureAwait(true), $"Price scheduled from {D(i.Date("From"))}.");
+                    case "Schedule list change":
+                        int count = Check(await pricing.ScheduleAdjustmentAsync(c.CompanyId, list, i.Number("Percent"), i.Number("RoundTo"), Enum.Parse<PriceRounding>(i.Text("Rounding")), i.Date("From"), today)
+                            .ConfigureAwait(true));
+                        return $"{count} price(s) scheduled from {D(i.Date("From"))}.";
+                    default:
+                        var history = await pricing.PriceHistoryAsync(c.CompanyId, list, await ItemAsync(c, i.Optional("Item") ?? string.Empty).ConfigureAwait(true)).ConfigureAwait(true);
+                        return history.Count == 0 ? "No prices." : string.Join(Environment.NewLine, history.Select(h => $"from qty {Q(h.MinimumQuantity),8}  {M(h.UnitPrice),12}  {(h.EffectiveFrom is DateOnly d ? "from " + D(d) : "standing")}"));
+                }
+            },
+            List = async c => Table(await c.Db.PriceLists.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.Code).ToListAsync().ConfigureAwait(true),
+                ("List", p => p.Code), ("Name", p => p.Name), ("Currency", p => p.Currency.Value), ("Default", p => p.IsDefault)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set item sale limits", ListTitle = "Items with sale limits",
             Description = "Age-restricted items need the till's age check, a per-sale limit caps the quantity in one sale, and prescription-only items need a prescription reference.",
             Fields = [Req("Item", "Item code"), OptNum("Age", "Minimum age"), OptNum("Max", "Most per sale"), Tick("Rx", "Prescription only")],

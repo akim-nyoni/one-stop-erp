@@ -86,8 +86,9 @@ public sealed class PriceList : SoftDeletableEntity, ICompanyScoped
     /// <param name="itemId">The item.</param>
     /// <param name="minimumQuantity">The quantity from which this price applies (≥ 1).</param>
     /// <param name="unitPrice">The unit price (≥ 0).</param>
+    /// <param name="effectiveFrom">The day the price takes effect (null: in force from the start, the standing price).</param>
     /// <returns>The line.</returns>
-    public PriceListLine SetPrice(long itemId, decimal minimumQuantity, decimal unitPrice)
+    public PriceListLine SetPrice(long itemId, decimal minimumQuantity, decimal unitPrice, DateOnly? effectiveFrom = null)
     {
         if (minimumQuantity < 1m)
         {
@@ -99,14 +100,14 @@ public sealed class PriceList : SoftDeletableEntity, ICompanyScoped
             throw new ArgumentOutOfRangeException(nameof(unitPrice), "The unit price cannot be negative.");
         }
 
-        PriceListLine? existing = _lines.FirstOrDefault(l => l.ItemId == itemId && l.MinimumQuantity == minimumQuantity);
+        PriceListLine? existing = _lines.FirstOrDefault(l => l.ItemId == itemId && l.MinimumQuantity == minimumQuantity && l.EffectiveFrom == effectiveFrom);
         if (existing is not null)
         {
             existing.UnitPrice = unitPrice;
             return existing;
         }
 
-        PriceListLine line = new(itemId, minimumQuantity, unitPrice);
+        PriceListLine line = new(itemId, minimumQuantity, unitPrice) { EffectiveFrom = effectiveFrom };
         _lines.Add(line);
         return line;
     }
@@ -123,10 +124,28 @@ public sealed class PriceList : SoftDeletableEntity, ICompanyScoped
     /// <param name="itemId">The item.</param>
     /// <param name="quantity">The quantity sold.</param>
     /// <returns>The resolved line, or null.</returns>
-    public PriceListLine? Resolve(long itemId, decimal quantity) => _lines
+    public PriceListLine? Resolve(long itemId, decimal quantity) => Resolve(itemId, quantity, DateOnly.FromDateTime(DateTime.Today));
+
+    /// <summary>
+    /// Resolves the unit price for an item at a quantity on a date: for each quantity break the price in force that day (the latest one
+    /// effective on or before it; an undated price stands until a dated one takes over), then the highest break not above the quantity.
+    /// </summary>
+    /// <param name="itemId">The item.</param>
+    /// <param name="quantity">The quantity sold.</param>
+    /// <param name="asAt">The date (the order or sale date).</param>
+    /// <returns>The resolved line, or null.</returns>
+    public PriceListLine? Resolve(long itemId, decimal quantity, DateOnly asAt) => InForce(asAt)
         .Where(l => l.ItemId == itemId && l.MinimumQuantity <= quantity)
         .OrderByDescending(l => l.MinimumQuantity)
         .FirstOrDefault();
+
+    /// <summary>The lines in force on a date: per item and quantity break, the latest effective on or before it.</summary>
+    /// <param name="asAt">The date.</param>
+    /// <returns>The lines.</returns>
+    public IReadOnlyList<PriceListLine> InForce(DateOnly asAt) => [.. _lines
+        .Where(l => l.EffectiveFrom is null || l.EffectiveFrom <= asAt)
+        .GroupBy(l => (l.ItemId, l.MinimumQuantity))
+        .Select(g => g.OrderByDescending(l => l.EffectiveFrom ?? DateOnly.MinValue).First())];
 }
 
 /// <summary>A quantity-break price for one item on a <see cref="PriceList"/> (<c>inv.price_list_line</c>).</summary>
@@ -159,4 +178,7 @@ public sealed class PriceListLine : Entity
 
     /// <summary>The unit price.</summary>
     public decimal UnitPrice { get; internal set; }
+
+    /// <summary>The day the price takes effect (null: the standing price, until a dated one takes over).</summary>
+    public DateOnly? EffectiveFrom { get; internal set; }
 }
