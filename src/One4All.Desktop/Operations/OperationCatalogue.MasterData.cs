@@ -194,6 +194,23 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Set the reporting currency", ListTitle = "Company currencies",
+            Description = "A second currency every posting is also kept in (e.g. USD beside ZWG), each at the base→reporting rate of its day, so statements can be drawn in it "
+                + "(General Ledger report GL2R). It applies to postings from now on — posted journals cannot change — so set it before go-live. Leave blank to stop keeping it.",
+            Fields = [Opt("Currency", "Reporting currency (blank: none)")],
+            Run = async (c, i) =>
+            {
+                Company company = await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                CurrencyCode? currency = i.Optional("Currency") is string code ? CurrencyCode.Parse(code) : null;
+                company.SetReportingCurrency(currency);
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return currency is CurrencyCode set ? $"Postings are now also kept in {set.Value}." : "No reporting currency is kept.";
+            },
+            List = async c => Table(await c.Db.Companies.AsNoTracking().Where(x => x.Id == c.CompanyId).ToListAsync().ConfigureAwait(true),
+                ("Company", x => x.Name), ("Base", x => x.BaseCurrency.Value), ("Reporting", x => x.ReportingCurrency?.Value ?? "—")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Create a fiscal year", ListTitle = "Fiscal years",
             Description = "Monthly periods from the start date (any month — e.g. July to June), or a 4-4-5 week calendar; optionally an adjustment (13th) period on the last day for audit "
                 + "and year-end adjustments. Tick to open the periods for every ledger at once.",

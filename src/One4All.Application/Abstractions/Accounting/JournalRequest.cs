@@ -105,6 +105,9 @@ public sealed class JournalLineRequest
     /// </summary>
     public decimal? BaseAmount { get; init; }
 
+    /// <summary>The amount in the company's reporting currency, when it must be exactly this (a reversal repeats the original); otherwise it is worked out.</summary>
+    public decimal? ReportingAmount { get; init; }
+
     /// <summary>Optional line narrative.</summary>
     /// <summary>Gets the project (analysis).</summary>
     public string? Project { get; init; }

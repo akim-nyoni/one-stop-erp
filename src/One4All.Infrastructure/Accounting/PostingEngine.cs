@@ -148,6 +148,13 @@ public sealed class PostingEngine : IPostingEngine
             }
         }
 
+        // Rule 4: the reporting currency, when the company has one, is kept on every posting.
+        if (company.ReportingCurrency is CurrencyCode reportingCurrency
+            && await ApplyReportingAmountsAsync(journal, request, baseCurrency, reportingCurrency, ct).ConfigureAwait(false) is Error reportingError)
+        {
+            return reportingError;
+        }
+
         // Maker-checker: a manual journal above the company's threshold must go through approval.
         if (request.EnforceManualJournalRules && request.SubmittedByUserId is null
             && company.ManualJournalApprovalThreshold is decimal threshold && totalBaseDebit > threshold)
@@ -332,6 +339,7 @@ public sealed class PostingEngine : IPostingEngine
             TransactionAmount = l.TransactionDebit != 0m ? l.TransactionDebit : l.TransactionCredit,
             ExchangeRate = l.ExchangeRate,
             BaseAmount = l.TransactionDebit != 0m ? l.BaseDebit : l.BaseCredit,
+            ReportingAmount = l.ReportingDebit != 0m || l.ReportingCredit != 0m ? l.ReportingDebit + l.ReportingCredit : null,
         }).ToList();
 
         // A journal in the adjustment period is reversed there when reversed on the same day.
@@ -497,6 +505,67 @@ public sealed class PostingEngine : IPostingEngine
                 return (Error.Rule("Posting.NoAppropriation",
                     $"Account '{line.AccountCode}' has no appropriation in this year's active budget; fund control does not allow expenditure against it."), line.AccountCode);
             }
+        }
+
+        return null;
+    }
+
+    // Each line's reporting amount: given (a reversal), the transaction amount when the line is in the reporting currency, the base
+    // amount when reporting is the base currency, else the base amount at the base→reporting rate on the posting date. Rounding is
+    // evened out on the largest computed line so the journal balances in the reporting currency too.
+    private async Task<Error?> ApplyReportingAmountsAsync(JournalEntry journal, JournalRequest request, CurrencyCode baseCurrency, CurrencyCode reportingCurrency, CancellationToken ct)
+    {
+        List<JournalLine> lines = [.. journal.Lines];
+        decimal? rate = null;
+        List<(JournalLine Line, decimal Amount, bool Computed)> amounts = [];
+        for (int i = 0; i < lines.Count; i++)
+        {
+            JournalLine line = lines[i];
+            decimal baseAmount = line.BaseDebit != 0m ? line.BaseDebit : line.BaseCredit;
+            decimal transaction = line.TransactionDebit != 0m ? line.TransactionDebit : line.TransactionCredit;
+            if (i < request.Lines.Count && request.Lines[i].ReportingAmount is decimal given)
+            {
+                amounts.Add((line, given, false));
+            }
+            else if (reportingCurrency == baseCurrency)
+            {
+                amounts.Add((line, baseAmount, false));
+            }
+            else if (line.TransactionCurrency == reportingCurrency)
+            {
+                amounts.Add((line, transaction, false));
+            }
+            else
+            {
+                if (rate is null)
+                {
+                    Result<decimal> found = await LookupRateAsync(baseCurrency, reportingCurrency, request.PostingDate, ct).ConfigureAwait(false);
+                    if (found.IsFailure)
+                    {
+                        return Error.Rule("Posting.NoReportingRate",
+                            $"No {baseCurrency.Value}→{reportingCurrency.Value} rate on {request.PostingDate:yyyy-MM-dd} for the reporting currency: capture the day's rate first.");
+                    }
+
+                    rate = found.Value;
+                }
+
+                amounts.Add((line, decimal.Round(baseAmount * rate.Value, Money.StorageScale, MidpointRounding.ToEven), true));
+            }
+        }
+
+        decimal Signed((JournalLine Line, decimal Amount, bool Computed) a) => a.Line.BaseDebit != 0m || a.Line.TransactionDebit != 0m ? a.Amount : -a.Amount;
+        decimal difference = amounts.Sum(Signed);
+        if (difference != 0m && amounts.Where(a => a.Computed).OrderByDescending(a => a.Amount).FirstOrDefault() is { Line: not null } largest)
+        {
+            int at = amounts.IndexOf(largest);
+            bool debit = largest.Line.BaseDebit != 0m || largest.Line.TransactionDebit != 0m;
+            amounts[at] = (largest.Line, largest.Amount - (debit ? difference : -difference), true);
+        }
+
+        foreach ((JournalLine line, decimal amount, bool _) in amounts)
+        {
+            bool debit = line.BaseDebit != 0m || line.TransactionDebit != 0m;
+            line.SetReportingAmounts(debit ? amount : 0m, debit ? 0m : amount);
         }
 
         return null;

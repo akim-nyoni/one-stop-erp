@@ -42,6 +42,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
         {
             "GLEDCLOSESTATUS" => await CloseStatusAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDMULTICURRENCYTB" => await MultiCurrencyTbAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "GLEDREPORTINGTB" => await ReportingTbAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDJOURNALS" => await JournalsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDEQUITY" => await EquityAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDBUDGETCOMMITMENT" => await BudgetCommitmentAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -76,6 +77,24 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             .ToListAsync(ct).ConfigureAwait(false);
         return [.. balances.Where(b => b.Transaction != 0m || b.Base != 0m).OrderBy(b => b.AccountCode, StringComparer.Ordinal).ThenBy(b => b.Currency.Value, StringComparer.Ordinal)
             .Select(b => Row(("Account", b.AccountCode), ("Name", names.GetValueOrDefault(b.AccountCode, "?")), ("Currency", b.Currency.Value), ("Transaction", Money(b.Transaction)), ("Base", b.Base)))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReportingTbAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        string? currency = (await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.ReportingCurrency).FirstOrDefaultAsync(ct).ConfigureAwait(false))?.Value;
+        if (currency is null)
+        {
+            return [];
+        }
+
+        Dictionary<string, string> names = await AccountNamesAsync(companyId, ct).ConfigureAwait(false);
+        var balances = await PostedLines(companyId, DateOnly.MinValue, asAt).GroupBy(l => l.AccountCode)
+            .Select(g => new { AccountCode = g.Key, Base = g.Sum(l => l.BaseDebit - l.BaseCredit), Reporting = g.Sum(l => l.ReportingDebit - l.ReportingCredit) })
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [.. balances.Where(b => b.Base != 0m || b.Reporting != 0m).OrderBy(b => b.AccountCode, StringComparer.Ordinal)
+            .Select(b => Row(("Account", b.AccountCode), ("Name", names.GetValueOrDefault(b.AccountCode, "?")), ("Base", Money(b.Base)), ("Currency", currency), ("Reporting", b.Reporting)))];
+        rows.Add(Row(("Account", "TOTAL"), ("Name", "Difference (should be nil)"), ("Base", Money(balances.Sum(b => b.Base))), ("Currency", currency), ("Reporting", balances.Sum(b => b.Reporting))));
+        return rows;
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> JournalsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
