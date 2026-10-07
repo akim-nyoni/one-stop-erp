@@ -95,7 +95,73 @@ public sealed class PosRefundRequest
 
     /// <summary>Gets a value indicating whether the goods go back on the shelf (reversing cost of sales at the original cost).</summary>
     public bool Restock { get; init; }
+
+    /// <summary>Gets the open till session the cash is paid out of (null when not paid from a drawer, e.g. back to a card).</summary>
+    public long? TillSessionId { get; init; }
 }
+
+/// <summary>
+/// An exchange at the till: goods from an earlier sale come back and new goods go out in one unit; the returned value pays towards the new
+/// sale and only the difference changes hands.
+/// </summary>
+public sealed class PosExchangeRequest
+{
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>Gets the original sale.</summary>
+    public long OriginalSaleId { get; init; }
+
+    /// <summary>Gets the till.</summary>
+    public long TerminalId { get; init; }
+
+    /// <summary>Gets the open till session.</summary>
+    public long TillSessionId { get; init; }
+
+    /// <summary>Gets the cashier.</summary>
+    public long CashierUserId { get; init; }
+
+    /// <summary>Gets the supervisor authorising the return.</summary>
+    public long? AuthorisedByUserId { get; init; }
+
+    /// <summary>Gets the date.</summary>
+    public DateOnly Date { get; init; }
+
+    /// <summary>Gets the reason.</summary>
+    public string Reason { get; init; } = string.Empty;
+
+    /// <summary>Gets the lines coming back.</summary>
+    public IReadOnlyList<PosRefundLine> Returns { get; init; } = [];
+
+    /// <summary>Gets a value indicating whether the returned goods go back on the shelf.</summary>
+    public bool Restock { get; init; } = true;
+
+    /// <summary>Gets the till's cash account (the returned value passes through it).</summary>
+    public string CashAccountCode { get; init; } = string.Empty;
+
+    /// <summary>Gets the output-tax account.</summary>
+    public string? TaxAccountCode { get; init; }
+
+    /// <summary>Gets the new sale's number.</summary>
+    public string NewSaleNumber { get; init; } = string.Empty;
+
+    /// <summary>Gets the warehouse the new goods leave from.</summary>
+    public long WarehouseId { get; init; }
+
+    /// <summary>Gets the new goods.</summary>
+    public IReadOnlyList<PosSaleLineRequest> NewLines { get; init; } = [];
+
+    /// <summary>Gets the tenders paying any balance (none: the balance is paid in cash; ignored when the returned value covers the new goods: the rest is given back as cash).</summary>
+    public IReadOnlyList<PosTenderRequest> BalanceTenders { get; init; } = [];
+}
+
+/// <summary>A completed exchange.</summary>
+/// <param name="RefundJournalNumber">The return's journal.</param>
+/// <param name="Returned">The value returned (tax included).</param>
+/// <param name="NewSaleId">The new sale.</param>
+/// <param name="NewSaleGross">The new sale's value.</param>
+/// <param name="Difference">What the customer paid (+) or was given back (−).</param>
+public readonly record struct PosExchangeResult(string RefundJournalNumber, decimal Returned, long NewSaleId, decimal NewSaleGross, decimal Difference);
 
 /// <summary>A refund without a receipt.</summary>
 public sealed class UnreceiptedRefundRequest
@@ -138,6 +204,9 @@ public sealed class UnreceiptedRefundRequest
 
     /// <summary>Gets the warehouse the goods go back into (null: not restocked).</summary>
     public long? RestockWarehouseId { get; init; }
+
+    /// <summary>Gets the open till session the cash is paid out of (null when not paid from a drawer).</summary>
+    public long? TillSessionId { get; init; }
 }
 
 /// <summary>The posted refund.</summary>
@@ -173,4 +242,13 @@ public interface IPosEventService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The refund.</returns>
     Task<Result<PosRefundResult>> RefundWithoutReceiptAsync(UnreceiptedRefundRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Exchanges goods: the return is refunded through the till's cash account and the same value tenders the new sale, all in one unit;
+    /// the customer pays any balance with the given tenders, or is given the excess back in cash. The drawer moves only by the difference.
+    /// </summary>
+    /// <param name="request">The exchange.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The exchange.</returns>
+    Task<Result<PosExchangeResult>> ExchangeAsync(PosExchangeRequest request, CancellationToken ct = default);
 }

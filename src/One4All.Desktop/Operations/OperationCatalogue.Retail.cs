@@ -99,7 +99,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Till pickup / paid-out / float top-up", ListTitle = "Open till sessions",
             Description = "Cash in or out of a drawer other than by sales; posted, and counted in the cash expected at cash-up. A paid-out needs a different supervisor.",
-            Fields = [Num("Session", "Till session id (from the list)"), Pick("Kind", "Kind", Enum.GetNames<TillCashKind>()), Num("Amount", "Amount"), Req("Cash", "Till cash account", "1000"),
+            Fields = [Num("Session", "Till session id (from the list)"), Pick("Kind", "Kind", [.. Enum.GetNames<TillCashKind>().Where(k => k != nameof(TillCashKind.Refund))]), Num("Amount", "Amount"), Req("Cash", "Till cash account", "1000"),
                 Req("Other", "Safe / bank, expense or float source account"), Req("Reason", "Reason"), Opt("Supervisor", "Supervisor (user name)"), Today()],
             Run = async (c, i) => $"Posted: {Check(await c.Get<ITillCashService>().RecordAsync(new TillCashRequest((long)i.Number("Session"), Enum.Parse<TillCashKind>(i.Text("Kind")), i.Number("Amount"),
                 i.Text("Cash"), i.Text("Other"), i.Text("Reason"), c.UserId, await OptionalUserAsync(c, i.Optional("Supervisor")).ConfigureAwait(true), i.Date("Date"))).ConfigureAwait(true))}.",
@@ -144,7 +144,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Refund without a receipt", Description = "Goods brought back with no receipt: a different supervisor authorises it, within the company's limit; optionally restocked.",
             Fields = [Num("Terminal", "Till id"), Req("Item", "Item code"), Num("Quantity", "Quantity", "1"), Num("Price", "Unit price refunded (excl. tax)"), Num("Tax", "Tax refunded", "0"),
                 Opt("TaxAccount", "Output tax account"), Req("RefundAccount", "Paid from (cash) account", "1000"), Req("Reason", "Reason"), Req("Supervisor", "Supervisor (user name)"),
-                Opt("Warehouse", "Restock into warehouse"), Today()],
+                Opt("Warehouse", "Restock into warehouse"), OptNum("Session", "Paid from till session (cash)"), Today()],
             Run = async (c, i) =>
             {
                 PosRefundResult refund = Check(await c.Get<IPosEventService>().RefundWithoutReceiptAsync(new UnreceiptedRefundRequest
@@ -153,6 +153,7 @@ public static partial class OperationCatalogue
                     ItemId = await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), Quantity = i.Number("Quantity"), UnitPrice = i.Number("Price"), TaxAmount = i.Number("Tax"), TaxAccountCode = i.Optional("TaxAccount"),
                     RefundAccountCode = i.Text("RefundAccount"), Reason = i.Text("Reason"),
                     RestockWarehouseId = i.Optional("Warehouse") is string w ? await WarehouseAsync(c, w).ConfigureAwait(true) : null,
+                    TillSessionId = i.OptionalNumber("Session") is decimal session ? (long)session : null,
                 }).ConfigureAwait(true));
                 return $"Refunded {M(refund.Gross)} ({refund.JournalNumber}).";
             },
@@ -192,7 +193,8 @@ public static partial class OperationCatalogue
             Module = module, Title = "Refund sale lines", ListTitle = "Recent till events",
             Description = "Refunds units of a completed sale's line (by item code): revenue and tax back, money out of the refund account, goods back on the shelf if ticked. Needs a supervisor other than you.",
             Fields = [Req("Sale", "Sale number"), Req("Item", "Item code"), Num("Quantity", "Quantity"), Req("Terminal", "Till code"), Today(), Req("RefundAccount", "Refund paid from (account)", "1000"),
-                Opt("TaxAccount", "Output tax account", "2200"), Req("Reason", "Reason"), Req("AuthorisedBy", "Authorised by (user name)"), Tick("Restock", "Put the goods back in stock", true)],
+                Opt("TaxAccount", "Output tax account", "2200"), Req("Reason", "Reason"), Req("AuthorisedBy", "Authorised by (user name)"), Tick("Restock", "Put the goods back in stock", true),
+                OptNum("Session", "Paid from till session (cash out of the drawer)")],
             Run = async (c, i) =>
             {
                 Sale sale = await c.Db.Sales.AsNoTracking().Include(s => s.Lines).FirstOrDefaultAsync(s => s.CompanyId == c.CompanyId && s.SaleNumber == i.Text("Sale")).ConfigureAwait(true)
@@ -205,8 +207,41 @@ public static partial class OperationCatalogue
                     CompanyId = c.CompanyId, SaleId = sale.Id, TerminalId = terminal, CashierUserId = c.UserId, AuthorisedByUserId = await UserAsync(c, i.Text("AuthorisedBy")).ConfigureAwait(true),
                     Date = i.Date("Date"), RefundAccountCode = i.Text("RefundAccount"), TaxAccountCode = i.Optional("TaxAccount"), Reason = i.Text("Reason"),
                     Lines = [new PosRefundLine(line.Id, i.Number("Quantity"))], Restock = i.Flag("Restock"),
+                    TillSessionId = i.OptionalNumber("Session") is decimal session ? (long)session : null,
                 }).ConfigureAwait(true));
                 return $"Refunded {M(refund.Gross)} on {sale.SaleNumber} — journal {refund.JournalNumber}.";
+            },
+            List = RecentTillEventsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Exchange goods", ListTitle = "Recent till events",
+            Description = "Takes back units of a sale's line and sells new goods in one go: the returned value pays towards the new goods and only the difference changes hands "
+                + "(the customer pays it in cash, or is given the excess back). Returns are checked like a refund and need a supervisor other than you.",
+            Fields = [Req("Sale", "Original sale number"), Req("Item", "Item coming back"), Num("Quantity", "Quantity coming back", "1"), Req("NewItem", "Item going out"),
+                Num("NewQuantity", "Quantity going out", "1"), Num("NewPrice", "Unit price going out (excl. tax)"), Num("NewTax", "Tax on the new goods", "0"), Req("NewSale", "New sale number"),
+                Req("Terminal", "Till code"), Num("Session", "Till session"), Req("Warehouse", "Warehouse"), Req("Cash", "Till cash account", "1000"), Opt("TaxAccount", "Output tax account", "2200"),
+                Req("Reason", "Reason"), Req("AuthorisedBy", "Authorised by (user name)"), Today()],
+            Run = async (c, i) =>
+            {
+                Sale sale = await c.Db.Sales.AsNoTracking().Include(s => s.Lines).FirstOrDefaultAsync(s => s.CompanyId == c.CompanyId && s.SaleNumber == i.Text("Sale")).ConfigureAwait(true)
+                    ?? throw new OperationException($"No sale {i.Text("Sale")}.");
+                long itemId = await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), newItem = await ItemAsync(c, i.Text("NewItem")).ConfigureAwait(true);
+                SaleLine line = sale.Lines.FirstOrDefault(l => l.ItemId == itemId) ?? throw new OperationException($"{i.Text("Item")} is not on sale {sale.SaleNumber}.");
+                Core.Inventory.Item goods = await c.Db.Items.AsNoTracking().SingleAsync(x => x.Id == newItem).ConfigureAwait(true);
+                long terminal = await FindAsync(c.Db.Set<PosTerminal>(), t => t.CompanyId == c.CompanyId && t.Code.ToUpper() == i.Text("Terminal").ToUpper(), t => t.Id, "till", i.Text("Terminal")).ConfigureAwait(true);
+                decimal net = decimal.Round(i.Number("NewQuantity") * i.Number("NewPrice"), 2, MidpointRounding.AwayFromZero), tax = i.Number("NewTax");
+                PosExchangeResult done = Check(await c.Get<IPosEventService>().ExchangeAsync(new PosExchangeRequest
+                {
+                    CompanyId = c.CompanyId, OriginalSaleId = sale.Id, TerminalId = terminal, TillSessionId = (long)i.Number("Session"), CashierUserId = c.UserId,
+                    AuthorisedByUserId = await UserAsync(c, i.Text("AuthorisedBy")).ConfigureAwait(true), Date = i.Date("Date"), Reason = i.Text("Reason"),
+                    Returns = [new PosRefundLine(line.Id, i.Number("Quantity"))], CashAccountCode = i.Text("Cash"), TaxAccountCode = i.Optional("TaxAccount"), NewSaleNumber = i.Text("NewSale"),
+                    WarehouseId = await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true),
+                    NewLines = [new PosSaleLineRequest(newItem, goods.Description, i.Number("NewQuantity"), i.Number("NewPrice"), net, tax, goods.RevenueAccountCode ?? "4000")],
+                }).ConfigureAwait(true));
+                return done.Difference >= 0m
+                    ? $"Exchanged: {M(done.Returned)} returned towards {M(done.NewSaleGross)}; customer paid {M(done.Difference)}."
+                    : $"Exchanged: {M(done.Returned)} returned towards {M(done.NewSaleGross)}; {M(-done.Difference)} given back.";
             },
             List = RecentTillEventsAsync,
         };

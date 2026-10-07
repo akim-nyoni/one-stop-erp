@@ -18,6 +18,7 @@ public sealed class PosEventService : IPosEventService
 {
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _postingEngine;
+    private readonly IPosService? _pos;
     private readonly IInventoryService _inventory;
     private readonly IClock _clock;
 
@@ -26,8 +27,9 @@ public sealed class PosEventService : IPosEventService
     /// <param name="postingEngine">Posts the refund journal.</param>
     /// <param name="inventory">Returns restocked goods.</param>
     /// <param name="clock">Stamps the events.</param>
-    public PosEventService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock)
+    public PosEventService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, IPosService? pos = null)
     {
+        _pos = pos;
         _db = db;
         _postingEngine = postingEngine;
         _inventory = inventory;
@@ -193,8 +195,92 @@ public sealed class PosEventService : IPosEventService
             Reason = request.Reason.Trim(), AuthorisedByUserId = request.AuthorisedByUserId, Reference = posting.Value.JournalNumber, Outcome = request.Restock ? "Restocked" : "Not restocked",
         })];
         _db.PosEvents.AddRange(events);
+        Result drawer = await PaidFromDrawerAsync(request.CompanyId, request.TillSessionId, gross, request.RefundAccountCode, $"Refund on {sale.SaleNumber}", request.CashierUserId,
+            request.AuthorisedByUserId, request.Date, posting.Value.JournalNumber, ct).ConfigureAwait(false);
+        if (drawer.IsFailure)
+        {
+            return drawer.Error;
+        }
+
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new PosRefundResult(events[0].Id, posting.Value.JournalNumber, gross);
+    }
+
+    /// <inheritdoc />
+    public Task<Result<PosExchangeResult>> ExchangeAsync(PosExchangeRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            if (_pos is null)
+            {
+                return Error.Rule("Pos.ExchangeUnavailable", "Exchanges need the till service.");
+            }
+
+            if (request.NewLines.Count == 0 || string.IsNullOrWhiteSpace(request.CashAccountCode) || string.IsNullOrWhiteSpace(request.NewSaleNumber))
+            {
+                return Error.Validation("Pos.Exchange", "An exchange needs the goods going out, the new sale number and the till's cash account (the returns are checked like a refund).");
+            }
+
+            // The return, refunded through the drawer: the same value then tenders the new sale, so the drawer moves only by the difference.
+            Result<PosRefundResult> returned = await RefundCoreAsync(new PosRefundRequest
+            {
+                CompanyId = request.CompanyId, SaleId = request.OriginalSaleId, TerminalId = request.TerminalId, CashierUserId = request.CashierUserId, AuthorisedByUserId = request.AuthorisedByUserId,
+                Date = request.Date, RefundAccountCode = request.CashAccountCode, TaxAccountCode = request.TaxAccountCode, Reason = $"Exchange: {request.Reason}".Trim(), Lines = request.Returns,
+                Restock = request.Restock, TillSessionId = request.TillSessionId,
+            }, ct).ConfigureAwait(false);
+            if (returned.IsFailure)
+            {
+                return returned.Error;
+            }
+
+            decimal value = returned.Value.Gross;
+            decimal newGross = request.NewLines.Sum(l => l.LineNet + l.TaxAmount);
+            CurrencyCode currency = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.BaseCurrency).SingleAsync(ct).ConfigureAwait(false);
+            List<PosTenderRequest> tenders = [new PosTenderRequest(TenderType.Cash, currency, value, request.CashAccountCode, IsChange: false)];
+            if (value >= newGross)
+            {
+                if (value > newGross)
+                {
+                    tenders.Add(new PosTenderRequest(TenderType.Cash, currency, value - newGross, request.CashAccountCode, IsChange: true));
+                }
+            }
+            else if (request.BalanceTenders.Count > 0)
+            {
+                tenders.AddRange(request.BalanceTenders);
+            }
+            else
+            {
+                tenders.Add(new PosTenderRequest(TenderType.Cash, currency, newGross - value, request.CashAccountCode, IsChange: false));
+            }
+
+            Result<CompleteSaleResult> sold = await _pos.CompleteSaleAsync(new CompleteSaleRequest
+            {
+                CompanyId = request.CompanyId, TerminalId = request.TerminalId, TillSessionId = request.TillSessionId, CashierUserId = request.CashierUserId, SaleNumber = request.NewSaleNumber.Trim(),
+                SaleDate = request.Date, WarehouseId = request.WarehouseId, TaxAccountCode = request.TaxAccountCode, Lines = request.NewLines, Tenders = tenders,
+            }, ct).ConfigureAwait(false);
+            if (sold.IsFailure)
+            {
+                return sold.Error;
+            }
+
+            return Result<PosExchangeResult>.Success(new PosExchangeResult(returned.Value.JournalNumber, value, sold.Value.SaleId, sold.Value.TotalGross, sold.Value.TotalGross - value));
+        }, ct);
+
+    // Cash paid out of an open drawer for a refund counts against the cash the drawer should hold at cash-up.
+    private async Task<Result> PaidFromDrawerAsync(long companyId, long? tillSessionId, decimal amount, string accountCode, string reason, long userId, long? authorisedBy, DateOnly date,
+        string journalNumber, CancellationToken ct)
+    {
+        if (tillSessionId is not long sessionId || amount <= 0m)
+        {
+            return Result.Success();
+        }
+
+        if (!await _db.Set<TillSession>().AnyAsync(s => s.Id == sessionId && s.CompanyId == companyId && s.Status == TillSessionStatus.Open, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.Rule("Pos.SessionClosed", $"Till session {sessionId} is not open."));
+        }
+
+        _db.TillCashMovements.Add(new TillCashMovement(companyId, sessionId, TillCashKind.Refund, amount, accountCode, reason, userId, authorisedBy, date, journalNumber));
+        return Result.Success();
     }
 
     /// <inheritdoc />
@@ -281,6 +367,13 @@ public sealed class PosEventService : IPosEventService
             Outcome = request.RestockWarehouseId is null ? "Not restocked" : "Restocked",
         };
         _db.PosEvents.Add(refund);
+        Result drawer = await PaidFromDrawerAsync(request.CompanyId, request.TillSessionId, gross, request.RefundAccountCode, $"Refund without receipt: {item.Description}", request.CashierUserId,
+            request.AuthorisedByUserId, request.Date, posting.Value.JournalNumber, ct).ConfigureAwait(false);
+        if (drawer.IsFailure)
+        {
+            return drawer.Error;
+        }
+
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new PosRefundResult(refund.Id, posting.Value.JournalNumber, gross);
     }

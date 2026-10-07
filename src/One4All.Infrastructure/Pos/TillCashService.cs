@@ -34,6 +34,11 @@ public sealed class TillCashService : ITillCashService
             return Error.Validation("Pos.TillCashInvalid", "A till cash movement needs a positive amount, a reason and both accounts.");
         }
 
+        if (request.Kind == TillCashKind.Refund)
+        {
+            return Error.Rule("Pos.RefundThroughService", "Refunds from the drawer are recorded by the refund itself.");
+        }
+
         if (request.Kind == TillCashKind.PaidOut && (request.AuthorisedByUserId is null || request.AuthorisedByUserId == request.UserId))
         {
             return Error.Rule("Pos.AuthorisationRequired", "A paid-out needs a supervisor other than the cashier to authorise it.");

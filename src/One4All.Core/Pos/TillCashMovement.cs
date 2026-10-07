@@ -13,6 +13,9 @@ public enum TillCashKind
 
     /// <summary>Cash added to the drawer's float.</summary>
     FloatTopUp = 3,
+
+    /// <summary>Cash paid back to a customer from the drawer for a refund (posted by the refund itself).</summary>
+    Refund = 4,
 }
 
 /// <summary>
