@@ -89,6 +89,9 @@ public sealed class PosTerminal : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Whether the terminal is active.</summary>
     public bool IsActive { get; set; }
+
+    /// <summary>Whether the till is cashed up blind (brief §4.1): the cashier declares the count before seeing what was expected.</summary>
+    public bool BlindCashUp { get; set; }
 }
 
 /// <summary>

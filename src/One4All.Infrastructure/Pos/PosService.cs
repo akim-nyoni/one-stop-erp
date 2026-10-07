@@ -532,7 +532,11 @@ public sealed class PosService : IPosService
     public Task<Result<TillRead>> XReadAsync(long tillSessionId, CancellationToken ct = default) => ReadAsync(tillSessionId, close: false, ct);
 
     /// <inheritdoc />
-    public Task<Result<TillRead>> CloseTillAsync(long tillSessionId, CancellationToken ct = default) => ReadAsync(tillSessionId, close: true, ct);
+    public async Task<Result<TillRead>> CloseTillAsync(long tillSessionId, CancellationToken ct = default)
+    {
+        bool blind = await _db.Set<TillSession>().Where(s => s.Id == tillSessionId).Join(_db.PosTerminals, s => s.TerminalId, t => t.Id, (s, t) => t.BlindCashUp).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return blind ? Error.Rule("Pos.BlindCountMissing", "This till is cashed up blind: close it with a cash-up.") : await ReadAsync(tillSessionId, close: true, ct).ConfigureAwait(false);
+    }
 
     private async Task<Result<TillRead>> ReadAsync(long tillSessionId, bool close, CancellationToken ct)
     {
@@ -592,28 +596,60 @@ public sealed class PosService : IPosService
             return Error.Rule("Pos.SessionClosed", "The till session is already closed.");
         }
 
-        List<SaleTender> cashTenders = await _db.Set<Sale>()
-            .Where(s => s.TillSessionId == session.Id && s.Status == SaleStatus.Completed)
-            .SelectMany(s => s.Tenders)
-            .Where(t => t.TenderType == TenderType.Cash)
-            .ToListAsync(ct).ConfigureAwait(false);
-
-        decimal cashReceived = cashTenders.Where(t => !t.IsChange).Sum(t => t.BaseAmount);
-        decimal changeGiven = cashTenders.Where(t => t.IsChange).Sum(t => t.BaseAmount);
-        // Pickups and paid-outs left the drawer; float top-ups went in.
-        decimal movements = (await _db.TillCashMovements.Where(m => m.TillSessionId == session.Id).ToListAsync(ct).ConfigureAwait(false)).Sum(m => m.DrawerEffect);
-        CashUpCalculation cashUp = new(session.OpeningFloat, cashReceived, changeGiven, request.CountedCash, movements);
-
-        string? varianceJournal = null;
-        if (!cashUp.Balances)
+        Company company = await _db.Companies.FirstAsync(c => c.Id == session.CompanyId, ct).ConfigureAwait(false);
+        bool blind = await _db.PosTerminals.AnyAsync(t => t.Id == session.TerminalId && t.BlindCashUp, ct).ConfigureAwait(false);
+        List<TillCashCount> declared = await _db.Set<TillCashCount>().Where(c => c.TillSessionId == session.Id).ToListAsync(ct).ConfigureAwait(false);
+        IReadOnlyList<CashCount> counts;
+        if (declared.Count > 0)
         {
-            Company company = await _db.Companies.FirstAsync(c => c.Id == session.CompanyId, ct).ConfigureAwait(false);
-            decimal amount = Math.Abs(cashUp.Variance);
+            if (request.Counts.Count > 0 || request.CountedCash != 0m)
+            {
+                return Error.Rule("Pos.CountDeclared", "The count was already declared; it cannot be changed at close.");
+            }
 
-            // Overage: cash is really higher than the books → Dr cash, Cr over/short (a gain).
-            // Shortage: cash is really lower → Dr over/short (a loss), Cr cash.
-            JournalSide cashSide = cashUp.IsOver ? JournalSide.Debit : JournalSide.Credit;
-            JournalSide overShortSide = cashUp.IsOver ? JournalSide.Credit : JournalSide.Debit;
+            counts = [.. declared.Select(c => new CashCount(c.Currency, c.Amount))];
+        }
+        else if (blind)
+        {
+            return Error.Rule("Pos.BlindCountMissing", "This till is cashed up blind: declare the count before closing.");
+        }
+        else
+        {
+            Result<IReadOnlyList<CashCount>> given = CleanCounts(request.Counts.Count > 0 ? request.Counts : [new CashCount(company.BaseCurrency.Value, request.CountedCash)]);
+            if (given.IsFailure)
+            {
+                return given.Error;
+            }
+
+            counts = given.Value;
+            foreach (CashCount count in counts)
+            {
+                _db.Set<TillCashCount>().Add(new TillCashCount(session.CompanyId, session.Id, count.Currency, count.Amount, request.CountedByUserId, _clock.UtcNow, blind: false));
+            }
+        }
+
+        Result<CashPosition> position = await PositionAsync(session, company.BaseCurrency.Value, counts, request.Date, ct).ConfigureAwait(false);
+        if (position.IsFailure)
+        {
+            return position.Error;
+        }
+
+        IReadOnlyList<CurrencyCashUp> byCurrency = position.Value.ByCurrency;
+        decimal varianceBase = byCurrency.Sum(c => c.VarianceBase);
+        string? varianceJournal = null;
+        if (byCurrency.Any(c => c.VarianceBase != 0m))
+        {
+            // Per currency: overage → Dr that currency's cash account; shortage → Cr it. The net goes to over/short (a gain or a loss).
+            List<JournalLineRequest> lines = [.. byCurrency.Where(c => c.VarianceBase != 0m).Select(c => new JournalLineRequest
+            {
+                AccountCode = position.Value.CashAccounts.GetValueOrDefault(c.Currency) ?? request.CashAccountCode,
+                Side = c.VarianceBase > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(c.VarianceBase),
+                Narrative = $"{c.Currency} {(c.Variance > 0m ? "over" : "short")} {Math.Abs(c.Variance):0.00}",
+            })];
+            if (varianceBase != 0m)
+            {
+                lines.Add(new JournalLineRequest { AccountCode = request.OverShortAccountCode, Side = varianceBase > 0m ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = Math.Abs(varianceBase) });
+            }
 
             Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
             {
@@ -624,12 +660,8 @@ public sealed class PosService : IPosService
                 EnforceManualJournalRules = false,
                 DocumentType = "PosCashUp",
                 DocumentNumber = $"CASHUP-{session.Id}",
-                Narrative = $"Cash-up variance for till session {session.Id} ({(cashUp.IsOver ? "over" : "short")} {amount:0.00})",
-                Lines =
-                [
-                    new JournalLineRequest { AccountCode = request.CashAccountCode, Side = cashSide, TransactionAmount = amount },
-                    new JournalLineRequest { AccountCode = request.OverShortAccountCode, Side = overShortSide, TransactionAmount = amount },
-                ],
+                Narrative = $"Cash-up variance for till session {session.Id} ({(varianceBase >= 0m ? "over" : "short")} {Math.Abs(varianceBase):0.00})",
+                Lines = lines,
             }, ct).ConfigureAwait(false);
 
             if (posting.IsFailure)
@@ -639,6 +671,9 @@ public sealed class PosService : IPosService
 
             varianceJournal = posting.Value.JournalNumber;
         }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        CashUpCalculation cashUp = new(session.OpeningFloat, 0m, 0m, position.Value.ExpectedBase + varianceBase, position.Value.ExpectedBase - session.OpeningFloat);
 
         Result<TillRead> read = await ReadAsync(session.Id, close: true, ct).ConfigureAwait(false);
         if (read.IsFailure)
@@ -663,7 +698,150 @@ public sealed class PosService : IPosService
             cashUp.CountedCash,
             cashUp.Variance,
             varianceJournal,
-            read.Value);
+            read.Value)
+        {
+            ByCurrency = byCurrency,
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> DeclareCountAsync(long tillSessionId, IReadOnlyList<CashCount> counts, long userId, CancellationToken ct = default)
+    {
+        TillSession? session = await _db.Set<TillSession>().FirstOrDefaultAsync(s => s.Id == tillSessionId, ct).ConfigureAwait(false);
+        if (session is null)
+        {
+            return Result.Failure(Error.NotFound("Pos.SessionNotFound", $"Till session {tillSessionId} not found."));
+        }
+
+        if (session.Status != TillSessionStatus.Open)
+        {
+            return Result.Failure(Error.Rule("Pos.SessionClosed", "The till session is already closed."));
+        }
+
+        if (await _db.Set<TillCashCount>().AnyAsync(c => c.TillSessionId == tillSessionId, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.Rule("Pos.CountDeclared", "The count for this till was already declared."));
+        }
+
+        Result<IReadOnlyList<CashCount>> clean = CleanCounts(counts);
+        if (clean.IsFailure)
+        {
+            return Result.Failure(clean.Error);
+        }
+
+        bool blind = await _db.PosTerminals.AnyAsync(t => t.Id == session.TerminalId && t.BlindCashUp, ct).ConfigureAwait(false);
+        foreach (CashCount count in clean.Value)
+        {
+            _db.Set<TillCashCount>().Add(new TillCashCount(session.CompanyId, session.Id, count.Currency, count.Amount, userId, _clock.UtcNow, blind));
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<CurrencyCashUp>>> ExpectedCashAsync(long tillSessionId, CancellationToken ct = default)
+    {
+        TillSession? session = await _db.Set<TillSession>().AsNoTracking().FirstOrDefaultAsync(s => s.Id == tillSessionId, ct).ConfigureAwait(false);
+        if (session is null)
+        {
+            return Error.NotFound("Pos.SessionNotFound", $"Till session {tillSessionId} not found.");
+        }
+
+        List<CashCount> declared = await _db.Set<TillCashCount>().AsNoTracking().Where(c => c.TillSessionId == tillSessionId).Select(c => new CashCount(c.Currency, c.Amount))
+            .ToListAsync(ct).ConfigureAwait(false);
+        if (declared.Count == 0 && session.Status == TillSessionStatus.Open
+            && await _db.PosTerminals.AnyAsync(t => t.Id == session.TerminalId && t.BlindCashUp, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Pos.BlindCountMissing", "This till is cashed up blind: the expected cash is shown once the count is declared.");
+        }
+
+        string baseCurrency = (await _db.Companies.AsNoTracking().FirstAsync(c => c.Id == session.CompanyId, ct).ConfigureAwait(false)).BaseCurrency.Value;
+        Result<CashPosition> position = await PositionAsync(session, baseCurrency, declared, DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime), ct).ConfigureAwait(false);
+        return position.IsFailure ? position.Error : Result<IReadOnlyList<CurrencyCashUp>>.Success(position.Value.ByCurrency);
+    }
+
+    private sealed record CashPosition(IReadOnlyList<CurrencyCashUp> ByCurrency, decimal ExpectedBase, IReadOnlyDictionary<string, string> CashAccounts);
+
+    private static Result<IReadOnlyList<CashCount>> CleanCounts(IReadOnlyList<CashCount> counts)
+    {
+        List<CashCount> clean = [];
+        foreach (CashCount count in counts)
+        {
+            string currency = (count.Currency ?? string.Empty).Trim().ToUpperInvariant();
+            if (currency.Length != 3 || count.Amount < 0m)
+            {
+                return Error.Validation("Pos.CashCount", $"A cash count needs a 3-letter currency and an amount of zero or more ({count.Currency} {count.Amount}).");
+            }
+
+            if (clean.Any(c => c.Currency == currency))
+            {
+                return Error.Validation("Pos.CashCount", $"{currency} is counted twice.");
+            }
+
+            clean.Add(new CashCount(currency, count.Amount));
+        }
+
+        return clean.Count == 0 ? Error.Validation("Pos.CashCount", "Nothing was counted.") : clean;
+    }
+
+    // What the drawer should hold in each currency: the float, pickups / paid-outs / top-ups (base), and cash taken less change in the
+    // currency it changed hands in. A foreign currency's variance is valued at the session's average rate for it (else the day's rate).
+    private async Task<Result<CashPosition>> PositionAsync(TillSession session, string baseCurrency, IReadOnlyList<CashCount> counts, DateOnly date, CancellationToken ct)
+    {
+        List<SaleTender> cashTenders = await _db.Set<Sale>().AsNoTracking()
+            .Where(s => s.TillSessionId == session.Id && s.Status == SaleStatus.Completed)
+            .SelectMany(s => s.Tenders)
+            .Where(t => t.TenderType == TenderType.Cash)
+            .ToListAsync(ct).ConfigureAwait(false);
+        decimal movements = (await _db.TillCashMovements.AsNoTracking().Where(m => m.TillSessionId == session.Id).ToListAsync(ct).ConfigureAwait(false)).Sum(m => m.DrawerEffect);
+
+        Dictionary<string, List<SaleTender>> byCurrency = cashTenders.GroupBy(t => t.Currency.Value, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+        SortedSet<string> currencies = new(StringComparer.Ordinal) { baseCurrency };
+        currencies.UnionWith(byCurrency.Keys);
+        currencies.UnionWith(counts.Select(c => c.Currency));
+
+        List<CurrencyCashUp> lines = [];
+        Dictionary<string, string> accounts = new(StringComparer.Ordinal);
+        decimal expectedBase = session.OpeningFloat + movements;
+        foreach (string currency in currencies)
+        {
+            List<SaleTender> tenders = byCurrency.GetValueOrDefault(currency) ?? [];
+            decimal expected = tenders.Sum(t => t.IsChange ? -t.Amount : t.Amount) + (currency == baseCurrency ? session.OpeningFloat + movements : 0m);
+            expectedBase += tenders.Sum(t => t.IsChange ? -t.BaseAmount : t.BaseAmount);
+            decimal rate = 1m;
+            if (currency != baseCurrency)
+            {
+                decimal amount = tenders.Sum(t => t.Amount);
+                if (amount != 0m)
+                {
+                    rate = tenders.Sum(t => t.BaseAmount) / amount;
+                }
+                else
+                {
+                    Result<decimal> day = await ResolveRateAsync(CurrencyCode.Parse(baseCurrency), CurrencyCode.Parse(currency), null, date, ct).ConfigureAwait(false);
+                    if (day.IsFailure)
+                    {
+                        return day.Error;
+                    }
+
+                    rate = day.Value;
+                }
+            }
+
+            if (tenders.Count > 0)
+            {
+                accounts[currency] = tenders.GroupBy(t => t.AccountCode, StringComparer.Ordinal).OrderByDescending(g => g.Count()).First().Key;
+            }
+
+            decimal counted = counts.Where(c => c.Currency == currency).Sum(c => c.Amount);
+            if (expected != 0m || counted != 0m || currency == baseCurrency)
+            {
+                lines.Add(new CurrencyCashUp(currency, expected, counted, rate));
+            }
+        }
+
+        return new CashPosition(lines, expectedBase, accounts);
     }
 
     private async Task<Result<decimal>> ResolveRateAsync(CurrencyCode baseCurrency, CurrencyCode tenderCurrency, decimal? explicitRate, DateOnly date, CancellationToken ct)

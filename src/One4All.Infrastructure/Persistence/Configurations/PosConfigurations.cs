@@ -227,3 +227,15 @@ internal sealed class ParkedSaleConfiguration : IEntityTypeConfiguration<ParkedS
         b.HasIndex(x => new { x.CompanyId, x.Status });
     }
 }
+
+internal sealed class TillCashCountConfiguration : IEntityTypeConfiguration<TillCashCount>
+{
+    public void Configure(EntityTypeBuilder<TillCashCount> b)
+    {
+        b.ToTable("till_cash_count", Schemas.PointOfSale);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Currency).HasMaxLength(3);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.TillSessionId, x.Currency }).IsUnique();
+    }
+}

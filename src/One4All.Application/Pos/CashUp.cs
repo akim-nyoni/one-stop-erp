@@ -28,6 +28,61 @@ public readonly record struct CashUpCalculation(decimal OpeningFloat, decimal Ca
     public bool Balances => Variance == 0m;
 }
 
+/// <summary>Cash counted in one currency.</summary>
+/// <param name="Currency">The currency (ISO code).</param>
+/// <param name="Amount">The amount counted.</param>
+public readonly record struct CashCount(string Currency, decimal Amount);
+
+/// <summary>One currency's cash-up: what the drawer should hold in it, what was counted, and the variance in base at the session's rate.</summary>
+/// <param name="Currency">The currency.</param>
+/// <param name="Expected">Expected in the currency.</param>
+/// <param name="Counted">Counted in the currency.</param>
+/// <param name="Rate">The rate to base (the session's average for its tenders; 1 for base).</param>
+public sealed record CurrencyCashUp(string Currency, decimal Expected, decimal Counted, decimal Rate)
+{
+    /// <summary>Counted − expected, in the currency.</summary>
+    public decimal Variance => Counted - Expected;
+
+    /// <summary>The variance in base currency.</summary>
+    public decimal VarianceBase => decimal.Round(Variance * Rate, 2, MidpointRounding.AwayFromZero);
+}
+
+/// <summary>Reads a till count typed as "120" (base) or "120; ZAR 500; EUR 20" (brief §4.1).</summary>
+public static class CashCounts
+{
+    /// <summary>Parses the count.</summary>
+    /// <param name="text">The typed count.</param>
+    /// <param name="baseCurrency">The base currency, for an amount typed without one.</param>
+    /// <param name="counts">The counts, one per currency.</param>
+    /// <returns>False when a part cannot be read or a currency is repeated.</returns>
+    public static bool TryParse(string? text, string baseCurrency, out IReadOnlyList<CashCount> counts)
+    {
+        List<CashCount> list = [];
+        counts = list;
+        foreach (string part in (text ?? string.Empty).Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] bits = part.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            string currency = bits.Length == 2 ? (char.IsLetter(bits[0][0]) ? bits[0] : bits[1]) : baseCurrency;
+            string amount = bits.Length == 2 ? (char.IsLetter(bits[0][0]) ? bits[1] : bits[0]) : bits[0];
+            if (bits.Length > 2 || currency.Length != 3 || !currency.All(char.IsLetter)
+                || !decimal.TryParse(amount, global::System.Globalization.NumberStyles.Number, global::System.Globalization.CultureInfo.InvariantCulture, out decimal value) || value < 0m)
+            {
+                return false;
+            }
+
+            currency = currency.ToUpperInvariant();
+            if (list.Any(c => c.Currency == currency))
+            {
+                return false;
+            }
+
+            list.Add(new CashCount(currency, value));
+        }
+
+        return list.Count > 0;
+    }
+}
+
 /// <summary>Cash rounding when the smallest coins are scarce (brief §4.1).</summary>
 public static class CashRounding
 {

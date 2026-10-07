@@ -112,8 +112,14 @@ public sealed class CashUpRequest
     /// <summary>The till session to close.</summary>
     public long TillSessionId { get; init; }
 
-    /// <summary>The cash physically counted in the drawer.</summary>
+    /// <summary>The cash physically counted in the drawer (base currency; used when <see cref="Counts"/> is empty).</summary>
     public decimal CountedCash { get; init; }
+
+    /// <summary>The cash counted per currency (a currency not listed counts as none). Empty for a blind cash-up (the declared count is used).</summary>
+    public IReadOnlyList<One4All.Application.Pos.CashCount> Counts { get; init; } = [];
+
+    /// <summary>Who counted (recorded with the count).</summary>
+    public long CountedByUserId { get; init; }
 
     /// <summary>The posting date for any variance journal.</summary>
     public DateOnly Date { get; init; }
@@ -140,7 +146,11 @@ public sealed record CashUpResult(
     decimal CountedCash,
     decimal Variance,
     string? VarianceJournalNumber,
-    TillRead Read);
+    TillRead Read)
+{
+    /// <summary>The cash-up per currency (expected, counted, variance); totals above are in base.</summary>
+    public IReadOnlyList<One4All.Application.Pos.CurrencyCashUp> ByCurrency { get; init; } = [];
+}
 
 /// <summary>The Point of Sale service (brief §4.1): till sessions, sales with multi-currency tendering, and X/Z reads.</summary>
 public interface IPosService
@@ -214,6 +224,20 @@ public interface IPosService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The cash-up result (Z-read, expected/counted/variance, variance journal).</returns>
     Task<Result<CashUpResult>> CashUpAndCloseAsync(CashUpRequest request, CancellationToken ct = default);
+
+    /// <summary>Declares a till's cash count before the expected cash is seen (blind cash-up); final once declared.</summary>
+    /// <param name="tillSessionId">The till session.</param>
+    /// <param name="counts">The cash counted per currency.</param>
+    /// <param name="userId">Who counted.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> DeclareCountAsync(long tillSessionId, IReadOnlyList<One4All.Application.Pos.CashCount> counts, long userId, CancellationToken ct = default);
+
+    /// <summary>The cash a till should hold per currency, with what was declared (refused for a blind till until the count is declared).</summary>
+    /// <param name="tillSessionId">The till session.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The per-currency position.</returns>
+    Task<Result<IReadOnlyList<One4All.Application.Pos.CurrencyCashUp>>> ExpectedCashAsync(long tillSessionId, CancellationToken ct = default);
 }
 
 /// <summary>A till cash movement to record.</summary>

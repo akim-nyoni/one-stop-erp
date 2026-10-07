@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Inventory;
 using One4All.Application.Abstractions.Pos;
+using One4All.Application.Pos;
 using One4All.Application.Inventory;
 using One4All.Core.Inventory;
 using One4All.Core.Pos;
@@ -104,6 +105,30 @@ public static partial class OperationCatalogue
                 i.Text("Cash"), i.Text("Other"), i.Text("Reason"), c.UserId, await OptionalUserAsync(c, i.Optional("Supervisor")).ConfigureAwait(true), i.Date("Date"))).ConfigureAwait(true))}.",
             List = async c => Table(await c.Db.Set<TillSession>().AsNoTracking().Where(s => s.CompanyId == c.CompanyId && s.Status == TillSessionStatus.Open).OrderBy(s => s.Id).ToListAsync().ConfigureAwait(true),
                 ("Session", s => s.Id), ("Terminal", s => s.TerminalId), ("Opened", s => s.OpenedOnUtc.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)), ("Float", s => M(s.OpeningFloat))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Till cash-up position", ListTitle = "Tills",
+            Description = "A blind till's cashier declares the count (\"120; ZAR 500; EUR 20\") before the cash expected is shown; the position shows expected, counted and the "
+                + "variance per currency (a blind till's only after its count is declared). Blind on / off is per till.",
+            Fields = [Pick("Step", "Step", ["Position", "Blind on", "Blind off"]), OptNum("Session", "Till session id (position)"), Opt("Terminal", "Till code (blind on / off)")],
+            Run = async (c, i) =>
+            {
+                if (i.Text("Step") == "Position")
+                {
+                    IReadOnlyList<CurrencyCashUp> position = Check(await c.Get<IPosService>().ExpectedCashAsync((long)i.Number("Session")).ConfigureAwait(true));
+                    return string.Join(Environment.NewLine, position.Select(p => $"{p.Currency}  expected {M(p.Expected),14}  counted {M(p.Counted),14}  variance {M(p.Variance),12}  ({M(p.VarianceBase)} base)"));
+                }
+
+                string code = (i.Optional("Terminal") ?? throw new OperationException("Type the till code.")).ToUpperInvariant();
+                PosTerminal terminal = await c.Db.Set<PosTerminal>().FirstOrDefaultAsync(t => t.CompanyId == c.CompanyId && t.Code.ToUpper() == code).ConfigureAwait(true)
+                    ?? throw new OperationException($"Till {code} not found.");
+                terminal.BlindCashUp = i.Text("Step") == "Blind on";
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Till {terminal.Code} is {(terminal.BlindCashUp ? "now cashed up blind" : "no longer blind")}.";
+            },
+            List = async c => Table(await c.Db.Set<PosTerminal>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Code).ToListAsync().ConfigureAwait(true),
+                ("Till", t => t.Code), ("Name", t => t.Name), ("Active", t => t.IsActive), ("Blind cash-up", t => t.BlindCashUp)),
         };
         yield return new Operation
         {

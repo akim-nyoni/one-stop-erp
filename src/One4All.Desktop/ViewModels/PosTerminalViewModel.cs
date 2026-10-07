@@ -1344,16 +1344,29 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         IPosService pos = scope.ServiceProvider.GetRequiredService<IPosService>();
 
-        bool doCashUp = decimal.TryParse(CountedCash, NumberStyles.Number, CultureInfo.CurrentCulture, out decimal counted)
+        // The count ("120" or "120; ZAR 500; EUR 20") is declared before anything expected is shown, which is what a blind till needs.
+        bool doCashUp = !string.IsNullOrWhiteSpace(CountedCash)
             && !string.IsNullOrWhiteSpace(CashAccountCode)
             && !string.IsNullOrWhiteSpace(OverShortAccountCode);
 
         if (doCashUp)
         {
+            if (!CashCounts.TryParse(CountedCash, _currency.Value, out IReadOnlyList<CashCount> counts))
+            {
+                StatusMessage = "Type the count as an amount, or per currency: 120; ZAR 500; EUR 20.";
+                return;
+            }
+
+            Result declared = await pos.DeclareCountAsync(TillSessionId, counts, _cashierUserId).ConfigureAwait(true);
+            if (declared.IsFailure && declared.Error.Code != "Pos.CountDeclared")
+            {
+                StatusMessage = declared.Error.Message;
+                return;
+            }
+
             Result<CashUpResult> cashUp = await pos.CashUpAndCloseAsync(new CashUpRequest
             {
                 TillSessionId = TillSessionId,
-                CountedCash = counted,
                 Date = DateOnly.FromDateTime(DateTime.Today),
                 CashAccountCode = CashAccountCode.Trim(),
                 OverShortAccountCode = OverShortAccountCode.Trim(),
@@ -1368,7 +1381,10 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             string variance = r.Variance == 0m ? "balanced"
                 : r.Variance > 0m ? $"over {r.Variance:N2}"
                 : $"short {Math.Abs(r.Variance):N2}";
-            StatusMessage = $"Z-read #{r.ZReadNumber}: expected {r.ExpectedCash:N2}, counted {r.CountedCash:N2} ({variance}). Till closed.";
+            string currencies = r.ByCurrency.Count > 1
+                ? " " + string.Join("; ", r.ByCurrency.Select(c => $"{c.Currency} expected {c.Expected:N2} counted {c.Counted:N2}"))
+                : string.Empty;
+            StatusMessage = $"Z-read #{r.ZReadNumber}: expected {r.ExpectedCash:N2}, counted {r.CountedCash:N2} ({variance}).{currencies} Till closed.";
         }
         else
         {

@@ -18762,6 +18762,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<bool>("BlindCashUp")
+                        .HasColumnType("boolean")
+                        .HasColumnName("blind_cash_up");
+
                     b.Property<long>("BranchId")
                         .HasColumnType("bigint")
                         .HasColumnName("branch_id");
@@ -19289,6 +19293,60 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_sale_tender_voucher_number");
 
                     b.ToTable("sale_tender", "pos");
+                });
+
+            modelBuilder.Entity("One4All.Core.Pos.TillCashCount", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<bool>("Blind")
+                        .HasColumnType("boolean")
+                        .HasColumnName("blind");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CountedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("counted_by_user_id");
+
+                    b.Property<DateTimeOffset>("CountedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("counted_on_utc");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("TillSessionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("till_session_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_till_cash_count");
+
+                    b.HasIndex("TillSessionId", "Currency")
+                        .IsUnique()
+                        .HasDatabaseName("ix_till_cash_count_till_session_id_currency");
+
+                    b.ToTable("till_cash_count", "pos");
                 });
 
             modelBuilder.Entity("One4All.Core.Pos.TillCashMovement", b =>
