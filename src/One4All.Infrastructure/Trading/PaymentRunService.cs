@@ -215,12 +215,11 @@ public sealed class PaymentRunService : IPaymentRunService
     // valid tax clearance on the payment date, otherwise none — the same rule the purchase ledger applies.
     private async Task<decimal> WithholdingOnAsync(PaymentRunRequest request, Supplier supplier, decimal amount, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.WithholdingTaxCode) || (supplier.TaxClearanceExpiry is { } expiry && expiry >= request.PaymentDate))
+        if (await TraderCertificates.WithholdingCodeAsync(_db, request.CompanyId, supplier, request.PaymentDate, request.WithholdingTaxCode, ct).ConfigureAwait(false) is not string code)
         {
             return 0m;
         }
 
-        string code = request.WithholdingTaxCode.Trim().ToUpperInvariant();
         Core.Accounting.TaxCode? tax = await _db.TaxCodes.Include(t => t.Rates)
             .FirstOrDefaultAsync(t => t.CompanyId == request.CompanyId && t.Code == code && t.IsActive, ct).ConfigureAwait(false);
         return tax is null ? 0m : decimal.Round(amount * tax.RateOn(request.PaymentDate) / 100m, 4, MidpointRounding.ToEven);

@@ -61,6 +61,7 @@ internal sealed class TaxExemptionCertificateConfiguration : IEntityTypeConfigur
         b.Property(x => x.Ledger).HasConversion<int>();
         b.Property(x => x.CertificateNumber).HasMaxLength(60);
         b.Property(x => x.IssuedBy).HasMaxLength(120);
+        b.Property(x => x.Purpose).HasConversion<int>().HasDefaultValue(CertificatePurpose.TaxExemption);
         b.HasIndex(x => new { x.CompanyId, x.Ledger, x.TraderId });
         b.HasIndex(x => new { x.CompanyId, x.ValidTo });
     }

@@ -1486,6 +1486,12 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<int>("Purpose")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("purpose");
+
                     b.Property<DateOnly?>("RevokedOn")
                         .HasColumnType("date")
                         .HasColumnName("revoked_on");
@@ -25562,6 +25568,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("unreceipted_refund_limit");
+
+                    b.Property<string>("WithholdingWithoutClearanceTaxCode")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("withholding_without_clearance_tax_code");
 
                     b.HasKey("Id")
                         .HasName("pk_company");

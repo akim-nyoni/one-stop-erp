@@ -12,7 +12,8 @@ namespace One4All.Application.Abstractions.Accounting;
 /// <param name="CertificateNumber">Its number.</param>
 /// <param name="ValidTo">Its last day.</param>
 /// <param name="DaysLeft">Days left (negative: expired).</param>
-public sealed record ExpiringCertificate(long CertificateId, TradingLedger Ledger, string TraderCode, string TraderName, string CertificateNumber, DateOnly ValidTo, int DaysLeft);
+public sealed record ExpiringCertificate(long CertificateId, TradingLedger Ledger, string TraderCode, string TraderName, string CertificateNumber, DateOnly ValidTo, int DaysLeft,
+    CertificatePurpose Purpose = CertificatePurpose.TaxExemption);
 
 /// <summary>A VAT return worked out on the company's tax point basis.</summary>
 /// <param name="Basis">The basis.</param>
@@ -47,7 +48,21 @@ public interface ITaxComplianceService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The certificate id, or why not.</returns>
     Task<Result<long>> RecordCertificateAsync(long companyId, TradingLedger ledger, string traderCode, string certificateNumber, DateOnly validFrom, DateOnly validTo, string? issuedBy,
-        CancellationToken ct = default);
+        CancellationToken ct = default) => RecordCertificateAsync(companyId, ledger, traderCode, certificateNumber, validFrom, validTo, issuedBy, CertificatePurpose.TaxExemption, ct);
+
+    /// <summary>Records a certificate for a purpose: an exemption (customer or supplier) or a supplier's tax clearance.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="ledger">Customer or supplier.</param>
+    /// <param name="traderCode">The trader's code.</param>
+    /// <param name="certificateNumber">The certificate's number.</param>
+    /// <param name="validFrom">Valid from.</param>
+    /// <param name="validTo">Valid to.</param>
+    /// <param name="issuedBy">Who issued it.</param>
+    /// <param name="purpose">What it is for (a tax clearance is for suppliers only).</param>
+    /// <param name="ct">A cancellation token.</param>
+    /// <returns>The certificate id.</returns>
+    Task<Result<long>> RecordCertificateAsync(long companyId, TradingLedger ledger, string traderCode, string certificateNumber, DateOnly validFrom, DateOnly validTo, string? issuedBy,
+        CertificatePurpose purpose, CancellationToken ct = default);
 
     /// <summary>Withdraws a certificate from a day.</summary>
     /// <param name="companyId">The company.</param>

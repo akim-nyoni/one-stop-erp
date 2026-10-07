@@ -664,6 +664,20 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return Error.Conflict("Ap.DuplicateInvoice", $"Supplier {supplier.Code} invoice {request.DocumentNumber} has already been entered (as {clash}).");
         }
 
+        // Exemption certificates on purchases: a supply under a certificate carries no tax, and an exempt tax code needs a valid certificate.
+        bool certified = await TraderCertificates.HoldsAsync(_db, request.CompanyId, TradingLedger.AccountsPayable, supplier.Id, CertificatePurpose.TaxExemption, request.DocumentDate, ct)
+            .ConfigureAwait(false);
+        if (certified && request.TaxAmount != 0m)
+        {
+            return Error.Rule("Tax.SupplierExempt", $"Purchases from {supplier.Code} are covered by a tax exemption certificate on {request.DocumentDate:yyyy-MM-dd}: enter the invoice without tax.");
+        }
+
+        if (!certified && request.TaxCode is string purchaseTaxCode
+            && await _db.TaxCodes.AnyAsync(t => t.CompanyId == request.CompanyId && t.Code == purchaseTaxCode && t.Type == TaxType.Exempt, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Tax.CertificateRequired", $"Supplier {supplier.Code} has no valid exemption certificate on {request.DocumentDate:yyyy-MM-dd}, so {purchaseTaxCode} cannot be used.");
+        }
+
         Result<string> controlResult = await ControlCodeAsync(request.CompanyId, ControlAccountType.AccountsPayable, ct).ConfigureAwait(false);
         if (controlResult.IsFailure)
         {
@@ -725,11 +739,10 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         decimal rate = rateResult.Value;
         decimal baseAmount = Round(request.Amount * rate);
 
-        // Withholding tax applies to a supplier without a valid tax clearance on the payment date.
+        // Withholding tax applies to a supplier without a valid tax clearance on the payment date: the code asked for, else the company's default.
         TaxCode? withholding = null;
-        if (!string.IsNullOrWhiteSpace(request.WithholdingTaxCode) && !(supplier.TaxClearanceExpiry is { } expiry && expiry >= request.PaymentDate))
+        if (await TraderCertificates.WithholdingCodeAsync(_db, request.CompanyId, supplier, request.PaymentDate, request.WithholdingTaxCode, ct).ConfigureAwait(false) is string code)
         {
-            string code = request.WithholdingTaxCode.Trim().ToUpperInvariant();
             withholding = await _db.TaxCodes.Include(t => t.Rates)
                 .FirstOrDefaultAsync(t => t.CompanyId == request.CompanyId && t.Code == code && t.IsActive, ct).ConfigureAwait(false);
             if (withholding is null || withholding.Type != TaxType.Withholding || string.IsNullOrWhiteSpace(withholding.OutputAccountCode))

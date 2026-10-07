@@ -44,6 +44,16 @@ public static class TaxPoints
     }
 }
 
+/// <summary>What a certificate a trader holds is for.</summary>
+public enum CertificatePurpose
+{
+    /// <summary>Supplies to or from the trader are exempt from tax (an exempt tax code needs one; a certified trader is not charged tax).</summary>
+    TaxExemption = 1,
+
+    /// <summary>A supplier's tax clearance: while valid, no withholding tax is deducted from payments to it.</summary>
+    TaxClearance = 2,
+}
+
 /// <summary>
 /// A tax exemption certificate held for a customer or supplier (<c>gl.tax_exemption_certificate</c>): while valid, the trader is not
 /// charged tax; without one, an exempt supply cannot be invoiced as exempt.
@@ -60,8 +70,10 @@ public sealed class TaxExemptionCertificate : AuditableEntity, ICompanyScoped
     /// <param name="certificateNumber">Its number.</param>
     /// <param name="validFrom">First day.</param>
     /// <param name="validTo">Last day.</param>
-    public TaxExemptionCertificate(long companyId, TradingLedger ledger, long traderId, string certificateNumber, DateOnly validFrom, DateOnly validTo)
+    public TaxExemptionCertificate(long companyId, TradingLedger ledger, long traderId, string certificateNumber, DateOnly validFrom, DateOnly validTo,
+        CertificatePurpose purpose = CertificatePurpose.TaxExemption)
     {
+        Purpose = purpose;
         CompanyId = companyId;
         Ledger = ledger;
         TraderId = traderId;
@@ -93,6 +105,9 @@ public sealed class TaxExemptionCertificate : AuditableEntity, ICompanyScoped
 
     /// <summary>Gets when it was withdrawn, if it was.</summary>
     public DateOnly? RevokedOn { get; private set; }
+
+    /// <summary>What the certificate is for.</summary>
+    public CertificatePurpose Purpose { get; private set; } = CertificatePurpose.TaxExemption;
 
     /// <summary>Whether it covers a day.</summary>
     /// <param name="date">The day.</param>

@@ -122,12 +122,28 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Tax exemption certificates", ListTitle = "Certificates expiring within 30 days (or lately expired)",
-            Description = "Record a customer's or supplier's exemption certificate (while valid they are not charged tax; exempt invoicing needs one), or withdraw one by its id.",
-            Fields = [Pick("Step", "Step", ["Record", "Withdraw"]), Pick("Ledger", "Who", ["Customer", "Supplier"]), Opt("Trader", "Customer / supplier code"), Opt("Number", "Certificate number"),
-                Today("From", "Valid from"), Opt("To", "Valid to (yyyy-MM-dd)"), Opt("IssuedBy", "Issued by"), OptNum("Id", "Certificate id (withdraw)")],
+            Description = "Record a customer's or supplier's exemption certificate (while valid no tax is charged either way; an exempt tax code needs one), or a supplier's tax clearance "
+                + "(while valid no withholding is deducted from payments), or withdraw one by its id.",
+            Fields = [Pick("Step", "Step", ["Record", "Withdraw", "Set default withholding"]), Pick("Ledger", "Who", ["Customer", "Supplier"]), Pick("Purpose", "For", ["Tax exemption", "Tax clearance (supplier)"]),
+                Opt("Trader", "Customer / supplier code"), Opt("Number", "Certificate number"),
+                Today("From", "Valid from"), Opt("To", "Valid to (yyyy-MM-dd)"), Opt("IssuedBy", "Issued by"), OptNum("Id", "Certificate id (withdraw)"),
+                Opt("Wht", "Withholding code for suppliers without clearance (blank: none)")],
             Run = async (c, i) =>
             {
                 ITaxComplianceService tax = c.Get<ITaxComplianceService>();
+                if (i.Text("Step") == "Set default withholding")
+                {
+                    string? wht = i.Optional("Wht")?.Trim().ToUpperInvariant();
+                    if (wht is not null && !await c.Db.TaxCodes.AnyAsync(t => t.CompanyId == c.CompanyId && t.Code == wht && t.Type == TaxType.Withholding && t.IsActive).ConfigureAwait(true))
+                    {
+                        throw new OperationException($"{wht} is not an active withholding tax code.");
+                    }
+
+                    (await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true)).WithholdingWithoutClearanceTaxCode = wht;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return wht is null ? "Payments withhold tax only where they ask for it." : $"Payments to suppliers without a valid tax clearance now withhold {wht} unless they name another code.";
+                }
+
                 if (i.Text("Step") == "Withdraw")
                 {
                     _ = Check(await tax.RevokeCertificateAsync(c.CompanyId, (long)(i.OptionalNumber("Id") ?? 0), i.Date("From")).ConfigureAwait(true), string.Empty);
@@ -135,11 +151,13 @@ public static partial class OperationCatalogue
                 }
 
                 long id = Check(await tax.RecordCertificateAsync(c.CompanyId, i.Text("Ledger") == "Customer" ? Core.Trading.TradingLedger.AccountsReceivable : Core.Trading.TradingLedger.AccountsPayable,
-                    i.Text("Trader"), i.Text("Number"), i.Date("From"), DateOnly.ParseExact(i.Text("To"), "yyyy-MM-dd", CultureInfo.InvariantCulture), i.Optional("IssuedBy")).ConfigureAwait(true));
+                    i.Text("Trader"), i.Text("Number"), i.Date("From"), DateOnly.ParseExact(i.Text("To"), "yyyy-MM-dd", CultureInfo.InvariantCulture), i.Optional("IssuedBy"),
+                    i.Text("Purpose").StartsWith("Tax clearance", StringComparison.Ordinal) ? CertificatePurpose.TaxClearance : CertificatePurpose.TaxExemption).ConfigureAwait(true));
                 return $"Certificate {id} recorded.";
             },
             List = async c => Table(await c.Get<ITaxComplianceService>().ExpiringAsync(c.CompanyId, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true),
-                ("Id", e => e.CertificateId), ("Who", e => e.Ledger == Core.Trading.TradingLedger.AccountsReceivable ? "Customer" : "Supplier"), ("Code", e => e.TraderCode), ("Name", e => e.TraderName),
+                ("Id", e => e.CertificateId), ("Who", e => e.Ledger == Core.Trading.TradingLedger.AccountsReceivable ? "Customer" : "Supplier"), ("For", e => e.Purpose == CertificatePurpose.TaxClearance ? "Clearance" : "Exemption"),
+                ("Code", e => e.TraderCode), ("Name", e => e.TraderName),
                 ("Certificate", e => e.CertificateNumber), ("Valid to", e => D(e.ValidTo)), ("Days left", e => e.DaysLeft)),
         };
         yield return new Operation

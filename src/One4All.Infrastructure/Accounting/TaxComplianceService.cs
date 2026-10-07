@@ -19,11 +19,16 @@ public sealed class TaxComplianceService : ITaxComplianceService
 
     /// <inheritdoc />
     public async Task<Result<long>> RecordCertificateAsync(long companyId, TradingLedger ledger, string traderCode, string certificateNumber, DateOnly validFrom, DateOnly validTo, string? issuedBy,
-        CancellationToken ct = default)
+        CertificatePurpose purpose, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(certificateNumber) || validTo < validFrom)
         {
             return Error.Validation("Tax.CertificateInvalid", "A certificate needs a number and a validity that does not end before it starts.");
+        }
+
+        if (purpose == CertificatePurpose.TaxClearance && ledger != TradingLedger.AccountsPayable)
+        {
+            return Error.Validation("Tax.ClearanceForSuppliers", "A tax clearance certificate is recorded for a supplier.");
         }
 
         string code = (traderCode ?? string.Empty).Trim().ToUpperInvariant();
@@ -35,7 +40,7 @@ public sealed class TaxComplianceService : ITaxComplianceService
             return Error.NotFound("Tax.TraderNotFound", $"{(ledger == TradingLedger.AccountsReceivable ? "Customer" : "Supplier")} {code} not found.");
         }
 
-        TaxExemptionCertificate certificate = new(companyId, ledger, trader.Value, certificateNumber.Trim(), validFrom, validTo) { IssuedBy = issuedBy?.Trim() };
+        TaxExemptionCertificate certificate = new(companyId, ledger, trader.Value, certificateNumber.Trim(), validFrom, validTo, purpose) { IssuedBy = issuedBy?.Trim() };
         _db.TaxExemptionCertificates.Add(certificate);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return certificate.Id;
@@ -69,11 +74,11 @@ public sealed class TaxComplianceService : ITaxComplianceService
         List<long> supplierIds = [.. due.Where(c => c.Ledger == TradingLedger.AccountsPayable).Select(c => c.TraderId)];
         Dictionary<long, (string Code, string Name)> customers = await _db.Customers.AsNoTracking().Where(c => customerIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => (c.Code, c.Name), ct).ConfigureAwait(false);
         Dictionary<long, (string Code, string Name)> suppliers = await _db.Suppliers.AsNoTracking().Where(s => supplierIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => (s.Code, s.Name), ct).ConfigureAwait(false);
-        return [.. due.Where(c => !later.Any(l => l.Ledger == c.Ledger && l.TraderId == c.TraderId && l.ValidFrom <= c.ValidTo.AddDays(1)))
+        return [.. due.Where(c => !later.Any(l => l.Ledger == c.Ledger && l.TraderId == c.TraderId && l.Purpose == c.Purpose && l.ValidFrom <= c.ValidTo.AddDays(1)))
             .Select(c =>
             {
                 (string code, string name) = (c.Ledger == TradingLedger.AccountsReceivable ? customers : suppliers).GetValueOrDefault(c.TraderId, ("?", "?"));
-                return new ExpiringCertificate(c.Id, c.Ledger, code, name, c.CertificateNumber, c.ValidTo, c.ValidTo.DayNumber - asAt.DayNumber);
+                return new ExpiringCertificate(c.Id, c.Ledger, code, name, c.CertificateNumber, c.ValidTo, c.ValidTo.DayNumber - asAt.DayNumber, c.Purpose);
             })];
     }
 

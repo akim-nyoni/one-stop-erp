@@ -164,7 +164,8 @@ public sealed class SubcontractService : ISubcontractService
         // Withholding applies unless the subcontractor's tax clearance is valid on the certificate date.
         TaxCode? withholding = null;
         Core.Trading.Supplier supplier = await _db.Suppliers.SingleAsync(s => s.Id == subcontract.SupplierId, ct).ConfigureAwait(false);
-        if (subcontract.WithholdingTaxCode is string whtCode && !(supplier.TaxClearanceExpiry is { } expiry && expiry >= request.Date))
+        if (subcontract.WithholdingTaxCode is string requested
+            && await Trading.TraderCertificates.WithholdingCodeAsync(_db, request.CompanyId, supplier, request.Date, requested, ct).ConfigureAwait(false) is string whtCode)
         {
             withholding = await _db.TaxCodes.Include(t => t.Rates).FirstOrDefaultAsync(t => t.CompanyId == request.CompanyId && t.Code == whtCode && t.IsActive, ct).ConfigureAwait(false);
             if (withholding is null || withholding.Type != TaxType.Withholding || string.IsNullOrWhiteSpace(withholding.OutputAccountCode))

@@ -102,6 +102,12 @@ public sealed class Company : SoftDeletableEntity
     /// <summary>Gets or sets the account cash rounding differences post to.</summary>
     public string? CashRoundingAccountCode { get; set; }
 
+    /// <summary>
+    /// The withholding tax code deducted from any payment to a supplier without a valid tax clearance on the payment date when the
+    /// payment names none itself (brief §3.5). Null: withholding only where a payment asks for it.
+    /// </summary>
+    public string? WithholdingWithoutClearanceTaxCode { get; set; }
+
     /// <summary>Gets or sets the most a refund without a receipt may pay out (null: such refunds are not allowed).</summary>
     public decimal? UnreceiptedRefundLimit { get; set; }
 
