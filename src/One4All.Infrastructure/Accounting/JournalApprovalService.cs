@@ -15,16 +15,45 @@ public sealed class JournalApprovalService : IJournalApprovalService
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="engine">The posting engine.</param>
-    public JournalApprovalService(One4AllDbContext db, IPostingEngine engine)
+    /// <param name="workflow">The approval workflow, when the company defines one for journals.</param>
+    public JournalApprovalService(One4AllDbContext db, IPostingEngine engine, Lazy<Application.Abstractions.Workflow.IWorkflowService>? workflow = null)
     {
         _db = db;
         _engine = engine;
+        _workflow = workflow;
     }
+
+    private readonly Lazy<Application.Abstractions.Workflow.IWorkflowService>? _workflow;
 
     /// <inheritdoc />
     public Task<Result<PostingReceipt>> SubmitAsync(JournalRequest request, long preparedByUserId, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);
+        return _db.AtomicAsync(async () =>
+        {
+            Result<PostingReceipt> held = await HoldAsync(request, preparedByUserId, ct).ConfigureAwait(false);
+            if (held.IsFailure || !held.Value.Deferred || _workflow is null
+                || !await _db.WorkflowDefinitions.AnyAsync(d => d.CompanyId == request.CompanyId && d.DocumentType == Application.Abstractions.Workflow.WorkflowDocumentTypes.Journal && d.IsActive, ct).ConfigureAwait(false))
+            {
+                return held;
+            }
+
+            // The company's journal workflow governs the approval from here.
+            string reference = held.Value.JournalId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (await _db.WorkflowInstances.AnyAsync(i => i.CompanyId == request.CompanyId && i.DocumentType == Application.Abstractions.Workflow.WorkflowDocumentTypes.Journal && i.DocumentReference == reference, ct)
+                    .ConfigureAwait(false))
+            {
+                return held;
+            }
+
+            Result<Application.Abstractions.Workflow.WorkflowStartResult> started = await _workflow.Value.StartAsync(request.CompanyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.Journal,
+                reference, held.Value.TotalBase, preparedByUserId, ct).ConfigureAwait(false);
+            return started.IsFailure ? started.Error : held;
+        }, ct);
+    }
+
+    private Task<Result<PostingReceipt>> HoldAsync(JournalRequest request, long preparedByUserId, CancellationToken ct)
+    {
         JournalRequest held = new()
         {
             CompanyId = request.CompanyId,
@@ -53,8 +82,25 @@ public sealed class JournalApprovalService : IJournalApprovalService
             .ToListAsync(ct).ConfigureAwait(false);
 
     /// <inheritdoc />
-    public Task<Result<PostingReceipt>> ApproveAsync(long companyId, long journalId, long approverUserId, CancellationToken ct = default)
+    public async Task<Result<PostingReceipt>> ApproveAsync(long companyId, long journalId, long approverUserId, CancellationToken ct = default)
+        => await GovernedAsync(companyId, journalId, ct).ConfigureAwait(false) is Error governed ? governed : await ApproveFromWorkflowAsync(companyId, journalId, approverUserId, ct).ConfigureAwait(false);
+
+    /// <summary>Whether the company has the journal held for approval.</summary>
+    internal Task<bool> IsHeldAsync(long companyId, long journalId, CancellationToken ct) => _db.Journals.AnyAsync(j => j.Id == journalId && j.CompanyId == companyId && j.AwaitingApproval, ct);
+
+    /// <summary>Approves and posts without the workflow check (the workflow itself calls this when it ends approved).</summary>
+    internal Task<Result<PostingReceipt>> ApproveFromWorkflowAsync(long companyId, long journalId, long approverUserId, CancellationToken ct)
         => _db.AtomicAsync(() => ApproveCoreAsync(companyId, journalId, approverUserId, ct), ct);
+
+    // A journal under a workflow in progress is approved or rejected only through it.
+    private async Task<Error?> GovernedAsync(long companyId, long journalId, CancellationToken ct)
+    {
+        string reference = journalId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return await _db.WorkflowInstances.AnyAsync(i => i.CompanyId == companyId && i.DocumentType == Application.Abstractions.Workflow.WorkflowDocumentTypes.Journal
+                && i.DocumentReference == reference && i.Status == Core.Workflow.WorkflowStatus.InProgress, ct).ConfigureAwait(false)
+            ? Error.Rule("Workflow.Governs", "This journal is going through its approval workflow; approve or reject it there.")
+            : null;
+    }
 
     // One unit: the approval is kept only if the journal then posts.
     private async Task<Result<PostingReceipt>> ApproveCoreAsync(long companyId, long journalId, long approverUserId, CancellationToken ct)
@@ -74,7 +120,11 @@ public sealed class JournalApprovalService : IJournalApprovalService
     }
 
     /// <inheritdoc />
-    public Task<Result> RejectAsync(long companyId, long journalId, string reason, CancellationToken ct = default)
+    public async Task<Result> RejectAsync(long companyId, long journalId, string reason, CancellationToken ct = default)
+        => await GovernedAsync(companyId, journalId, ct).ConfigureAwait(false) is Error governed ? Result.Failure(governed) : await RejectFromWorkflowAsync(companyId, journalId, reason, ct).ConfigureAwait(false);
+
+    /// <summary>Rejects without the workflow check (the workflow itself calls this when it ends rejected or returned).</summary>
+    internal Task<Result> RejectFromWorkflowAsync(long companyId, long journalId, string reason, CancellationToken ct)
         => _db.AtomicAsync(() => RejectCoreAsync(companyId, journalId, reason, ct), ct);
 
     private async Task<Result> RejectCoreAsync(long companyId, long journalId, string reason, CancellationToken ct)
@@ -109,5 +159,32 @@ public sealed class JournalApprovalService : IJournalApprovalService
         }
 
         return journal;
+    }
+}
+
+/// <summary>Applies the end of a journal's approval workflow: approved → the journal is approved by the last approver and posts; rejected or returned → rejected.</summary>
+internal sealed class JournalWorkflowHandler : Application.Abstractions.Workflow.IWorkflowDocumentHandler
+{
+    private readonly JournalApprovalService _journals;
+
+    public JournalWorkflowHandler(JournalApprovalService journals) => _journals = journals;
+
+    public string DocumentType => Application.Abstractions.Workflow.WorkflowDocumentTypes.Journal;
+
+    public async Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+    {
+        // A workflow started on its own (its reference is not one of this company's held journals) has nothing to apply.
+        if (!long.TryParse(documentReference, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long id) || !await _journals.IsHeldAsync(companyId, id, ct).ConfigureAwait(false))
+        {
+            return Result.Success();
+        }
+
+        if (outcome != Core.Workflow.WorkflowStatus.Approved)
+        {
+            return await _journals.RejectFromWorkflowAsync(companyId, id, string.IsNullOrWhiteSpace(comment) ? $"{outcome} in the approval workflow" : comment!, ct).ConfigureAwait(false);
+        }
+
+        Result<PostingReceipt> posted = await _journals.ApproveFromWorkflowAsync(companyId, id, decidedByUserId, ct).ConfigureAwait(false);
+        return posted.IsFailure ? Result.Failure(posted.Error) : Result.Success();
     }
 }

@@ -12,14 +12,21 @@ public sealed class WorkflowService : IWorkflowService
 {
     private readonly One4AllDbContext _db;
     private readonly IClock _clock;
+    private readonly IEnumerable<IWorkflowDocumentHandler> _handlers;
+    private readonly Application.Abstractions.Communications.INotificationService? _notifications;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="clock">The clock.</param>
-    public WorkflowService(One4AllDbContext db, IClock clock)
+    /// <param name="handlers">What each module does when its document's workflow ends.</param>
+    /// <param name="notifications">Tells approvers a document is waiting, and the requester the outcome.</param>
+    public WorkflowService(One4AllDbContext db, IClock clock, IEnumerable<IWorkflowDocumentHandler>? handlers = null,
+        Application.Abstractions.Communications.INotificationService? notifications = null)
     {
         _db = db;
         _clock = clock;
+        _handlers = handlers ?? [];
+        _notifications = notifications;
     }
 
     /// <inheritdoc />
@@ -49,6 +56,10 @@ public sealed class WorkflowService : IWorkflowService
         };
         _db.WorkflowInstances.Add(instance);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (instance.Status == WorkflowStatus.InProgress && applicable.FirstOrDefault(s => s.Sequence == instance.CurrentStageSequence) is WorkflowStage first)
+        {
+            await NotifyApproversAsync(instance, first, ct).ConfigureAwait(false);
+        }
 
         return new WorkflowStartResult(instance.Id, instance.Status);
     }
@@ -102,7 +113,11 @@ public sealed class WorkflowService : IWorkflowService
     }
 
     /// <inheritdoc />
-    public async Task<Result<WorkflowStatus>> ActAsync(long instanceId, long userId, WorkflowActionType action, string? comment, CancellationToken ct = default)
+    public Task<Result<WorkflowStatus>> ActAsync(long instanceId, long userId, WorkflowActionType action, string? comment, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ActCoreAsync(instanceId, userId, action, comment, ct), ct);
+
+    // One unit: the decision is kept only if the document can follow it.
+    private async Task<Result<WorkflowStatus>> ActCoreAsync(long instanceId, long userId, WorkflowActionType action, string? comment, CancellationToken ct)
     {
         WorkflowInstance? instance = await _db.WorkflowInstances
             .Include(i => i.Approvals)
@@ -156,8 +171,47 @@ public sealed class WorkflowService : IWorkflowService
             return result;
         }
 
+        // The workflow has ended: the document's module applies the outcome (in this same unit of work).
+        if (result.Value != WorkflowStatus.InProgress
+            && _handlers.FirstOrDefault(h => string.Equals(h.DocumentType, instance.DocumentType, StringComparison.OrdinalIgnoreCase)) is IWorkflowDocumentHandler handler)
+        {
+            Result concluded = await handler.ConcludeAsync(instance.CompanyId, instance.DocumentReference, result.Value, userId, comment, ct).ConfigureAwait(false);
+            if (concluded.IsFailure)
+            {
+                return concluded.Error;
+            }
+        }
+
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (result.Value == WorkflowStatus.InProgress)
+        {
+            if (instance.CurrentStageSequence != currentStage?.Sequence && applicable.FirstOrDefault(s => s.Sequence == instance.CurrentStageSequence) is WorkflowStage next)
+            {
+                await NotifyApproversAsync(instance, next, ct).ConfigureAwait(false);
+            }
+        }
+        else if (_notifications is not null && instance.InitiatedByUserId > 0)
+        {
+            await _notifications.NotifyUserAsync(instance.CompanyId, instance.InitiatedByUserId, $"{instance.DocumentType} {instance.DocumentReference} {result.Value.ToString().ToLowerInvariant()}",
+                string.IsNullOrWhiteSpace(comment) ? $"Your {instance.DocumentType} {instance.DocumentReference} was {result.Value.ToString().ToLowerInvariant()}." : comment!, ct).ConfigureAwait(false);
+        }
+
         return result.Value;
+    }
+
+    // Everyone who may act at a stage is told something is waiting for them (an open stage names nobody, so nobody is told).
+    private async Task NotifyApproversAsync(WorkflowInstance instance, WorkflowStage stage, CancellationToken ct)
+    {
+        if (_notifications is null)
+        {
+            return;
+        }
+
+        foreach (long user in (await ApproversAsync(instance, stage, ct).ConfigureAwait(false)).Where(u => u != instance.InitiatedByUserId))
+        {
+            await _notifications.NotifyUserAsync(instance.CompanyId, user, $"Approval needed: {instance.DocumentType} {instance.DocumentReference}",
+                $"{instance.DocumentType} {instance.DocumentReference} ({instance.Value:N2}) is waiting for your approval at stage '{stage.Name}'.", ct).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
@@ -237,6 +291,26 @@ public sealed class WorkflowService : IWorkflowService
 
     // Whether a user may act at a stage: named on it (or it names nobody), added to this instance's stage, or the delegate of someone who
     // may — then acting on their behalf.
+    // The named approvers of a stage: its users, those added to this instance, the holders of its role and (when asked) the requester's manager.
+    private async Task<IReadOnlyList<long>> ApproversAsync(WorkflowInstance instance, WorkflowStage stage, CancellationToken ct)
+    {
+        List<long> users = [.. stage.EligibleUserIds];
+        users.AddRange(await _db.WorkflowInstanceApprovers.Where(a => a.WorkflowInstanceId == instance.Id && a.StageSequence == stage.Sequence).Select(a => a.UserId).ToListAsync(ct).ConfigureAwait(false));
+        if (!string.IsNullOrWhiteSpace(stage.RequiredRoleName))
+        {
+            string role = stage.RequiredRoleName.Trim().ToUpperInvariant();
+            users.AddRange(await (from ur in _db.Set<Core.Security.UserRole>() join r in _db.Roles on ur.RoleId equals r.Id where r.NormalizedName == role select ur.UserId).ToListAsync(ct).ConfigureAwait(false));
+        }
+
+        if (stage.DynamicApprover == DynamicApprover.RequesterManager
+            && await _db.Users.Where(u => u.Id == instance.InitiatedByUserId).Select(u => u.ManagerUserId).FirstOrDefaultAsync(ct).ConfigureAwait(false) is long manager)
+        {
+            users.Add(manager);
+        }
+
+        return [.. users.Distinct()];
+    }
+
     private async Task<(bool Eligible, long? OnBehalfOf)> EligibilityAsync(WorkflowInstance instance, WorkflowStage stage, long userId, CancellationToken ct)
     {
         List<long> extra = await _db.WorkflowInstanceApprovers.Where(a => a.WorkflowInstanceId == instance.Id && a.StageSequence == stage.Sequence).Select(a => a.UserId).ToListAsync(ct).ConfigureAwait(false);

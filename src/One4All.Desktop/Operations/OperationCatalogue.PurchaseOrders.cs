@@ -43,7 +43,7 @@ public static partial class OperationCatalogue
                 switch (i.Text("Step"))
                 {
                     case "Submit":
-                        _ = Check(await requisitions.SubmitAsync(c.CompanyId, requisition).ConfigureAwait(true), string.Empty);
+                        _ = Check(await requisitions.SubmitAsync(c.CompanyId, requisition, c.UserId).ConfigureAwait(true), string.Empty);
                         return "Submitted for approval.";
                     case "Approve":
                         _ = Check(await requisitions.ApproveAsync(c.CompanyId, requisition, c.UserId).ConfigureAwait(true), string.Empty);

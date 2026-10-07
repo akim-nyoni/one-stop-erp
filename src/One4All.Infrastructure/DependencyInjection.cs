@@ -68,7 +68,10 @@ public static class DependencyInjection
 
         // Accounting.
         services.AddScoped<IPostingEngine, PostingEngine>();
-        services.AddScoped<IJournalApprovalService, Accounting.JournalApprovalService>();
+        services.AddScoped<Accounting.JournalApprovalService>();
+        services.AddScoped<IJournalApprovalService>(sp => sp.GetRequiredService<Accounting.JournalApprovalService>());
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Accounting.JournalWorkflowHandler>();
+        services.AddScoped(sp => new Lazy<Application.Abstractions.Workflow.IWorkflowService>(() => sp.GetRequiredService<Application.Abstractions.Workflow.IWorkflowService>()));
         services.AddScoped<IOverheadAllocationService, Accounting.OverheadAllocationService>();
         services.AddScoped<IHyperinflationService, Accounting.HyperinflationService>();
         services.AddScoped<IJournalImportService, Accounting.JournalImportService>();
@@ -289,7 +292,9 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Inventory.IStockTransferService, Inventory.StockTransferService>();
         services.AddScoped<Application.Abstractions.Inventory.IAssemblyService, Inventory.AssemblyService>();
         services.AddScoped<Application.Abstractions.Procurement.IProcurementService, Procurement.ProcurementService>();
-        services.AddScoped<Application.Abstractions.Procurement.IPurchaseRequisitionService, Procurement.PurchaseRequisitionService>();
+        services.AddScoped<Procurement.PurchaseRequisitionService>();
+        services.AddScoped<Application.Abstractions.Procurement.IPurchaseRequisitionService>(sp => sp.GetRequiredService<Procurement.PurchaseRequisitionService>());
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Procurement.PurchaseRequisitionWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Pos.IPosService, Pos.PosService>();
         services.AddScoped<Application.Abstractions.Pos.IPosCatalogueService, Pos.PosCatalogueService>();
         services.AddScoped<Application.Abstractions.Integration.IIdempotencyStore, Integration.IdempotencyStore>();

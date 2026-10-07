@@ -35,6 +35,14 @@ public interface IPurchaseRequisitionService
     /// <param name="ct">Cancellation token.</param>
     Task<Result> SubmitAsync(long companyId, long requisitionId, CancellationToken ct = default);
 
+    /// <summary>Submits a requisition for approval by the user raising it: when the company defines a <c>PurchaseRequisition</c> workflow, it starts and governs the approval.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="requisitionId">The requisition.</param>
+    /// <param name="submittedByUserId">Who submits it (the workflow's requester).</param>
+    /// <param name="ct">A cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> SubmitAsync(long companyId, long requisitionId, long submittedByUserId, CancellationToken ct = default);
+
     /// <summary>Approves a submitted requisition.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="requisitionId">The requisition.</param>

@@ -22,9 +22,11 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
     /// <param name="procurement">The procurement service (conversion target).</param>
     /// <param name="budget">Checks and commits the budget at submission, approval and conversion.</param>
     /// <param name="permissions">Checks an approver may override a budget block.</param>
+    /// <param name="workflow">The approval workflow, when the company defines one for requisitions.</param>
     public PurchaseRequisitionService(One4AllDbContext db, IProcurementService procurement, Application.Abstractions.Budgeting.IBudgetGateService? budget = null,
-        Application.Abstractions.Security.IPermissionService? permissions = null)
+        Application.Abstractions.Security.IPermissionService? permissions = null, Lazy<Application.Abstractions.Workflow.IWorkflowService>? workflow = null)
     {
+        _workflow = workflow;
         _db = db;
         _procurement = procurement;
         _budget = budget;
@@ -32,6 +34,7 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
     }
 
     private readonly Application.Abstractions.Budgeting.IBudgetGateService? _budget;
+    private readonly Lazy<Application.Abstractions.Workflow.IWorkflowService>? _workflow;
     private readonly Application.Abstractions.Security.IPermissionService? _permissions;
 
     /// <inheritdoc />
@@ -70,7 +73,27 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
     }
 
     /// <inheritdoc />
-    public async Task<Result> SubmitAsync(long companyId, long requisitionId, CancellationToken ct = default)
+    public Task<Result> SubmitAsync(long companyId, long requisitionId, CancellationToken ct = default) => SubmitAsync(companyId, requisitionId, 0, ct);
+
+    /// <inheritdoc />
+    public Task<Result> SubmitAsync(long companyId, long requisitionId, long submittedByUserId, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            Result submitted = await SubmitCoreAsync(companyId, requisitionId, ct).ConfigureAwait(false);
+            if (submitted.IsFailure || _workflow is null
+                || !await _db.WorkflowDefinitions.AnyAsync(d => d.CompanyId == companyId && d.DocumentType == Application.Abstractions.Workflow.WorkflowDocumentTypes.PurchaseRequisition && d.IsActive, ct).ConfigureAwait(false))
+            {
+                return submitted;
+            }
+
+            // The company's requisition workflow governs the approval from here.
+            PurchaseRequisition req = await _db.Set<PurchaseRequisition>().Include(r => r.Lines).SingleAsync(r => r.Id == requisitionId, ct).ConfigureAwait(false);
+            Result<Application.Abstractions.Workflow.WorkflowStartResult> started = await _workflow.Value.StartAsync(companyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.PurchaseRequisition,
+                requisitionId.ToString(System.Globalization.CultureInfo.InvariantCulture), req.Lines.Sum(l => l.Quantity * l.UnitPrice), submittedByUserId, ct).ConfigureAwait(false);
+            return started.IsFailure ? Result.Failure(started.Error) : Result.Success();
+        }, ct);
+
+    private async Task<Result> SubmitCoreAsync(long companyId, long requisitionId, CancellationToken ct)
     {
         // The budget gate at submission (brief §4.18.5): a block refuses it; a warning or an approval need travels with it.
         Result<Core.Budgeting.BudgetAction> gate = await GateAsync(companyId, requisitionId, null, ct).ConfigureAwait(false);
@@ -81,7 +104,24 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
     }
 
     /// <inheritdoc />
-    public Task<Result> ApproveAsync(long companyId, long requisitionId, long approvedByUserId, CancellationToken ct = default)
+    public async Task<Result> ApproveAsync(long companyId, long requisitionId, long approvedByUserId, CancellationToken ct = default)
+        => await GovernedAsync(companyId, requisitionId, ct).ConfigureAwait(false) is Error governed ? Result.Failure(governed) : await ApproveCoreAsync(companyId, requisitionId, approvedByUserId, ct).ConfigureAwait(false);
+
+    // A requisition under a workflow in progress is approved or rejected only through it.
+    private async Task<Error?> GovernedAsync(long companyId, long requisitionId, CancellationToken ct)
+    {
+        string reference = requisitionId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return await _db.WorkflowInstances.AnyAsync(i => i.CompanyId == companyId && i.DocumentType == Application.Abstractions.Workflow.WorkflowDocumentTypes.PurchaseRequisition
+                && i.DocumentReference == reference && i.Status == Core.Workflow.WorkflowStatus.InProgress, ct).ConfigureAwait(false)
+            ? Error.Rule("Workflow.Governs", "This requisition is going through its approval workflow; approve or reject it there.")
+            : null;
+    }
+
+    /// <summary>Whether the company has the requisition.</summary>
+    internal Task<bool> ExistsAsync(long companyId, long requisitionId, CancellationToken ct) => _db.Set<PurchaseRequisition>().AnyAsync(r => r.Id == requisitionId && r.CompanyId == companyId, ct);
+
+    /// <summary>Approves without the workflow check (the workflow itself calls this when it ends approved).</summary>
+    internal Task<Result> ApproveCoreAsync(long companyId, long requisitionId, long approvedByUserId, CancellationToken ct)
         => _db.AtomicAsync(async () =>
         {
             // Checked again at approval, when the budget may have moved; an overrun needing approval needs someone who may override.
@@ -139,7 +179,11 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
     }
 
     /// <inheritdoc />
-    public Task<Result> RejectAsync(long companyId, long requisitionId, CancellationToken ct = default)
+    public async Task<Result> RejectAsync(long companyId, long requisitionId, CancellationToken ct = default)
+        => await GovernedAsync(companyId, requisitionId, ct).ConfigureAwait(false) is Error governed ? Result.Failure(governed) : await RejectCoreAsync(companyId, requisitionId, ct).ConfigureAwait(false);
+
+    /// <summary>Rejects without the workflow check (the workflow itself calls this when it ends rejected).</summary>
+    internal Task<Result> RejectCoreAsync(long companyId, long requisitionId, CancellationToken ct)
         => TransitionAsync(companyId, requisitionId, r => r.Status is PurchaseRequisitionStatus.Draft or PurchaseRequisitionStatus.Submitted, r => r.Reject(), "Only a draft or submitted requisition can be rejected.", ct);
 
     /// <inheritdoc />
@@ -207,4 +251,20 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
+}
+
+/// <summary>Applies the end of a requisition's approval workflow: approved → the requisition is approved (budget checked and committed); rejected or returned → rejected.</summary>
+internal sealed class PurchaseRequisitionWorkflowHandler : Application.Abstractions.Workflow.IWorkflowDocumentHandler
+{
+    private readonly PurchaseRequisitionService _requisitions;
+
+    public PurchaseRequisitionWorkflowHandler(PurchaseRequisitionService requisitions) => _requisitions = requisitions;
+
+    public string DocumentType => Application.Abstractions.Workflow.WorkflowDocumentTypes.PurchaseRequisition;
+
+    // A workflow started on its own (its reference is not one of this company's requisitions) has nothing to apply.
+    public async Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+        => !long.TryParse(documentReference, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long id) || !await _requisitions.ExistsAsync(companyId, id, ct).ConfigureAwait(false)
+            ? Result.Success()
+            : outcome == Core.Workflow.WorkflowStatus.Approved ? await _requisitions.ApproveCoreAsync(companyId, id, decidedByUserId, ct).ConfigureAwait(false) : await _requisitions.RejectCoreAsync(companyId, id, ct).ConfigureAwait(false);
 }
