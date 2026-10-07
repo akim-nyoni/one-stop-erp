@@ -281,6 +281,9 @@ public enum ExclusionReason
 
     /// <summary>Already holds a live allocation (proposed, offered or accepted) from another run.</summary>
     LiveAllocation = 2,
+
+    /// <summary>The spouse already holds a stand or a live allocation (one household, one stand).</summary>
+    SpouseHolds = 3,
 }
 
 /// <summary>A listed applicant left out of an allocation run, recorded when the run is proposed (<c>hse.allocation_exclusion</c>).</summary>

@@ -19,6 +19,154 @@ public enum StandStatus
 
     /// <summary>Ownership transferred/ceded to a subsequent holder.</summary>
     Transferred = 4,
+
+    /// <summary>Raw land, not yet planned.</summary>
+    RawLand = 10,
+
+    /// <summary>On an approved layout plan.</summary>
+    Planned = 11,
+
+    /// <summary>Surveyed and pegged.</summary>
+    Surveyed = 12,
+
+    /// <summary>Being serviced.</summary>
+    UnderServicing = 13,
+
+    /// <summary>Serviced, not yet released for sale.</summary>
+    Serviced = 14,
+
+    /// <summary>Held back for a purpose (e.g. a cooperative or an institution) while still free.</summary>
+    Reserved = 15,
+
+    /// <summary>Offered to a beneficiary outside an allocation run, awaiting acceptance.</summary>
+    Offered = 16,
+
+    /// <summary>Paid in full by its holder.</summary>
+    FullyPaid = 18,
+
+    /// <summary>Title applied for.</summary>
+    TitleApplied = 19,
+
+    /// <summary>Title registered.</summary>
+    TitleRegistered = 20,
+
+    /// <summary>Title deed handed over (the end of the line).</summary>
+    TitleHandedOver = 21,
+
+    /// <summary>Withheld or blocked by a dispute or caveat; released back to where it was.</summary>
+    Withheld = 30,
+
+    /// <summary>Surrendered by its holder to council.</summary>
+    Surrendered = 32,
+
+    /// <summary>An offer was cancelled.</summary>
+    OfferCancelled = 33,
+
+    /// <summary>Merged into another stand (consolidation); no longer exists on its own.</summary>
+    ConsolidatedAway = 34,
+
+    /// <summary>Split into new stands (re-subdivision); no longer exists on its own.</summary>
+    ReSubdivided = 35,
+}
+
+/// <summary>
+/// The stand status state machine (brief §4.10.2): which moves are allowed, so no state is jumped. The main line runs raw land → planned →
+/// surveyed → under servicing → serviced → available → (reserved / offered) → allocated → sold (under agreement; transferred after a cession)
+/// → fully paid → title applied → registered → handed over, with side branches for a hold, surrender, a cancelled offer, consolidation and
+/// re-subdivision. Repossession returns a stand straight to available (its own document).
+/// </summary>
+public static class StandLifecycle
+{
+    private static readonly Dictionary<StandStatus, StandStatus[]> Moves = new()
+    {
+        [StandStatus.RawLand] = [StandStatus.Planned],
+        [StandStatus.Planned] = [StandStatus.Surveyed],
+        [StandStatus.Surveyed] = [StandStatus.UnderServicing],
+        [StandStatus.UnderServicing] = [StandStatus.Serviced],
+        [StandStatus.Serviced] = [StandStatus.Available],
+        [StandStatus.Available] = [StandStatus.Reserved, StandStatus.Offered, StandStatus.Allocated],
+        [StandStatus.Reserved] = [StandStatus.Available, StandStatus.Offered, StandStatus.Allocated],
+        [StandStatus.Offered] = [StandStatus.Allocated, StandStatus.OfferCancelled],
+        [StandStatus.OfferCancelled] = [StandStatus.Available],
+        [StandStatus.Allocated] = [StandStatus.Sold, StandStatus.Available, StandStatus.Surrendered],
+        [StandStatus.Sold] = [StandStatus.Transferred, StandStatus.FullyPaid, StandStatus.Available, StandStatus.Surrendered],
+        [StandStatus.Transferred] = [StandStatus.Transferred, StandStatus.FullyPaid, StandStatus.Available, StandStatus.Surrendered],
+        [StandStatus.FullyPaid] = [StandStatus.TitleApplied, StandStatus.Transferred],
+        [StandStatus.TitleApplied] = [StandStatus.TitleRegistered],
+        [StandStatus.TitleRegistered] = [StandStatus.TitleHandedOver],
+        [StandStatus.Surrendered] = [StandStatus.Available],
+    };
+
+    /// <summary>States a stand can be consolidated or re-subdivided from (nobody holds or is promised it).</summary>
+    public static readonly IReadOnlySet<StandStatus> Unencumbered = new HashSet<StandStatus>
+    {
+        StandStatus.RawLand, StandStatus.Planned, StandStatus.Surveyed, StandStatus.UnderServicing, StandStatus.Serviced, StandStatus.Available,
+    };
+
+    /// <summary>States that end a stand's life.</summary>
+    public static readonly IReadOnlySet<StandStatus> Final = new HashSet<StandStatus> { StandStatus.TitleHandedOver, StandStatus.ConsolidatedAway, StandStatus.ReSubdivided };
+
+    /// <summary>Whether a stand may move from one state to another (a hold is possible from any live state and returns where it was).</summary>
+    /// <param name="from">Where it is.</param>
+    /// <param name="to">Where it would go.</param>
+    /// <returns>True when allowed.</returns>
+    public static bool CanMove(StandStatus from, StandStatus to)
+        => to == StandStatus.Withheld ? from != StandStatus.Withheld && !Final.Contains(from)
+            : to is StandStatus.ConsolidatedAway or StandStatus.ReSubdivided ? Unencumbered.Contains(from)
+            : Moves.TryGetValue(from, out StandStatus[]? next) && next.Contains(to);
+
+    /// <summary>Where a stand may go from here.</summary>
+    /// <param name="from">Where it is.</param>
+    /// <returns>The allowed next states.</returns>
+    public static IReadOnlyList<StandStatus> Next(StandStatus from)
+        => [.. Enum.GetValues<StandStatus>().Where(to => to != from && CanMove(from, to))];
+}
+
+/// <summary>One audited move of a stand's status (<c>hse.stand_status_change</c>): who, when and on what authority.</summary>
+public sealed class StandStatusChange : Entity
+{
+    private StandStatusChange()
+    {
+        Authority = string.Empty;
+    }
+
+    /// <summary>Records the move.</summary>
+    /// <param name="from">Where it was.</param>
+    /// <param name="to">Where it went.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="userId">Who moved it (null when a document did, e.g. an approved allocation run).</param>
+    /// <param name="authority">The authority (resolution, minute, document number or process).</param>
+    /// <param name="reason">Why.</param>
+    public StandStatusChange(StandStatus from, StandStatus to, DateOnly date, long? userId, string authority, string? reason)
+    {
+        From = from;
+        To = to;
+        Date = date;
+        UserId = userId;
+        Authority = authority;
+        Reason = reason;
+    }
+
+    /// <summary>The stand.</summary>
+    public long HousingStandId { get; private set; }
+
+    /// <summary>Where it was.</summary>
+    public StandStatus From { get; private set; }
+
+    /// <summary>Where it went.</summary>
+    public StandStatus To { get; private set; }
+
+    /// <summary>The date.</summary>
+    public DateOnly Date { get; private set; }
+
+    /// <summary>Who moved it.</summary>
+    public long? UserId { get; private set; }
+
+    /// <summary>The authority.</summary>
+    public string Authority { get; private set; }
+
+    /// <summary>Why.</summary>
+    public string? Reason { get; private set; }
 }
 
 /// <summary>The kind of ownership event recorded on a stand's chain (brief §4.10.6).</summary>
@@ -38,6 +186,9 @@ public enum OwnershipChangeType
 
     /// <summary>Repossessed by the council from a defaulting holder (brief §4.10.5 / §4.10.9).</summary>
     Repossession = 4,
+
+    /// <summary>Surrendered by its holder to council.</summary>
+    Surrender = 5,
 }
 
 /// <summary>
@@ -47,6 +198,7 @@ public enum OwnershipChangeType
 public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
 {
     private readonly List<OwnershipRecord> _ownership = [];
+    private readonly List<StandStatusChange> _statusChanges = [];
 
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private HousingStand() => StandNumber = string.Empty;
@@ -59,15 +211,22 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
     /// <param name="sizeSquareMetres">The size in square metres.</param>
     /// <param name="allocatedCost">The cost apportioned from the parcel.</param>
     /// <param name="createdOn">When the stand was created (the subdivision date; today when not given).</param>
-    public HousingStand(long companyId, long landParcelId, long? schemeId, string standNumber, decimal sizeSquareMetres, decimal allocatedCost, DateOnly? createdOn = null)
+    /// <param name="initialStatus">Where it starts: available, or an earlier planning / survey / servicing state.</param>
+    public HousingStand(long companyId, long landParcelId, long? schemeId, string standNumber, decimal sizeSquareMetres, decimal allocatedCost, DateOnly? createdOn = null,
+        StandStatus initialStatus = StandStatus.Available)
     {
+        if (!StandLifecycle.Unencumbered.Contains(initialStatus))
+        {
+            throw new ArgumentOutOfRangeException(nameof(initialStatus), initialStatus, "A new stand starts as raw land, planned, surveyed, under servicing, serviced or available.");
+        }
+
         CompanyId = companyId;
         LandParcelId = landParcelId;
         SchemeId = schemeId;
         StandNumber = standNumber.Trim().ToUpperInvariant();
         SizeSquareMetres = sizeSquareMetres;
         AllocatedCost = allocatedCost;
-        Status = StandStatus.Available;
+        Status = initialStatus;
         AppendOwnership(OwnershipChangeType.Origination, null, "Municipality/Developer", createdOn ?? DateOnly.FromDateTime(DateTime.UtcNow), 0m);
     }
 
@@ -94,6 +253,18 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>The stand status.</summary>
     public StandStatus Status { get; private set; }
+
+    /// <summary>Where a withheld stand was before the hold (it returns there on release).</summary>
+    public StandStatus? StatusBeforeHold { get; private set; }
+
+    /// <summary>The stand this one was re-subdivided from.</summary>
+    public long? ParentStandId { get; private set; }
+
+    /// <summary>The stand this one was consolidated into.</summary>
+    public long? ConsolidatedIntoStandId { get; private set; }
+
+    /// <summary>Every status move, as audited.</summary>
+    public IReadOnlyList<StandStatusChange> StatusChanges => _statusChanges.AsReadOnly();
 
     /// <summary>The current holder (customer) account, once allocated/sold.</summary>
     public long? CurrentHolderCustomerId { get; private set; }
@@ -128,7 +299,95 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
     public void Map(MappedBoundary boundary) => Boundary = boundary;
 
     /// <summary>Marks the stand allocated to a beneficiary under an approved allocation (brief §4.10.4).</summary>
-    public void MarkAllocated() => Status = StandStatus.Allocated;
+    public void MarkAllocated() => SetStatus(StandStatus.Allocated, Today, null, "Allocation", null);
+
+    /// <summary>Moves the stand along its lifecycle, refusing a jump (brief §4.10.2).</summary>
+    /// <param name="to">Where it goes.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="userId">Who moves it.</param>
+    /// <param name="authority">The authority (resolution, minute or document).</param>
+    /// <param name="reason">Why.</param>
+    /// <returns>Success, or why not.</returns>
+    public Result MoveTo(StandStatus to, DateOnly date, long userId, string authority, string? reason)
+    {
+        if (string.IsNullOrWhiteSpace(authority))
+        {
+            return Result.Failure(Error.Validation("Hse.StandAuthority", $"Moving stand {StandNumber} needs the authority for it."));
+        }
+
+        if (Status == StandStatus.Withheld)
+        {
+            if (to != StatusBeforeHold)
+            {
+                return Result.Failure(Error.Rule("Hse.StandWithheld", $"Stand {StandNumber} is withheld: release it (back to {StatusBeforeHold}) first."));
+            }
+
+            StatusBeforeHold = null;
+            SetStatus(to, date, userId, authority.Trim(), reason);
+            return Result.Success();
+        }
+
+        if (!StandLifecycle.CanMove(Status, to))
+        {
+            return Result.Failure(Error.Rule("Hse.StandMove", $"Stand {StandNumber} cannot go from {Status} to {to}; next can be: {string.Join(", ", StandLifecycle.Next(Status))}."));
+        }
+
+        if (to == StandStatus.Withheld)
+        {
+            StatusBeforeHold = Status;
+        }
+
+        if (to == StandStatus.Surrendered)
+        {
+            CurrentHolderCustomerId = null;
+            AppendOwnership(OwnershipChangeType.Surrender, null, "Council (surrendered)", date, 0m);
+        }
+
+        SetStatus(to, date, userId, authority.Trim(), reason);
+        return Result.Success();
+    }
+
+    /// <summary>Retires the stand into a consolidated stand, its cost moving with it.</summary>
+    /// <param name="intoStandId">The consolidated stand.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="userId">Who did it.</param>
+    /// <param name="authority">The authority.</param>
+    /// <returns>The cost moved.</returns>
+    public decimal ConsolidateInto(long intoStandId, DateOnly date, long userId, string authority)
+    {
+        decimal cost = AllocatedCost;
+        ConsolidatedIntoStandId = intoStandId;
+        AllocatedCost = 0m;
+        SetStatus(StandStatus.ConsolidatedAway, date, userId, authority, FormattableString.Invariant($"Cost {cost:0.00} moved to the consolidated stand"));
+        return cost;
+    }
+
+    /// <summary>Retires the stand into the stands it was re-subdivided into, its cost moving with them.</summary>
+    /// <param name="date">The date.</param>
+    /// <param name="userId">Who did it.</param>
+    /// <param name="authority">The authority.</param>
+    /// <param name="children">The new stand numbers.</param>
+    public void Resubdivide(DateOnly date, long userId, string authority, IEnumerable<string> children)
+    {
+        decimal cost = AllocatedCost;
+        AllocatedCost = 0m;
+        SetStatus(StandStatus.ReSubdivided, date, userId, authority, FormattableString.Invariant($"Cost {cost:0.00} split into {string.Join(", ", children)}"));
+    }
+
+    /// <summary>Records that this stand came from re-subdividing another.</summary>
+    /// <param name="parentStandId">The parent stand.</param>
+    public void SetParent(long parentStandId) => ParentStandId = parentStandId;
+
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
+
+    private void SetStatus(StandStatus to, DateOnly date, long? userId, string authority, string? reason)
+    {
+        if (to != Status)
+        {
+            _statusChanges.Add(new StandStatusChange(Status, to, date, userId, authority, reason));
+            Status = to;
+        }
+    }
 
     /// <summary>
     /// Takes the stand back from a defaulting holder: it returns to the available pool at its new carrying amount (the
@@ -140,7 +399,7 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
     {
         AllocatedCost = carryingAmount;
         CurrentHolderCustomerId = null;
-        Status = StandStatus.Available;
+        SetStatus(StandStatus.Available, date, null, "Repossession", "Repossessed and back in stock");
         AppendOwnership(OwnershipChangeType.Repossession, null, "Council (repossessed)", date, 0m);
     }
 
@@ -149,7 +408,7 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
     {
         if (Status == StandStatus.Allocated)
         {
-            Status = StandStatus.Available;
+            SetStatus(StandStatus.Available, Today, null, "Allocation released", "Offer declined or lapsed");
         }
     }
 
@@ -162,7 +421,7 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
     {
         SellingPrice = sellingPrice;
         CurrentHolderCustomerId = buyerCustomerId;
-        Status = StandStatus.Sold;
+        SetStatus(StandStatus.Sold, date, null, "Sale", null);
         AppendOwnership(OwnershipChangeType.Sale, buyerCustomerId, buyerName, date, sellingPrice);
     }
 
@@ -174,7 +433,7 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
     public void Cede(long newHolderCustomerId, string newHolderName, decimal consideration, DateOnly date)
     {
         CurrentHolderCustomerId = newHolderCustomerId;
-        Status = StandStatus.Transferred;
+        SetStatus(StandStatus.Transferred, date, null, "Cession", null);
         AppendOwnership(OwnershipChangeType.Cession, newHolderCustomerId, newHolderName, date, consideration);
     }
 

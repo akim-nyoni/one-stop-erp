@@ -167,6 +167,11 @@ public sealed class HousingService : IHousingService
             return Error.Rule("Housing.AlreadySold", $"Stand {stand.StandNumber} has already been sold or transferred.");
         }
 
+        if (stand.Status is not (StandStatus.Available or StandStatus.Offered or StandStatus.Allocated or StandStatus.Withheld))
+        {
+            return Error.Rule("Housing.StandNotForSale", $"Stand {stand.StandNumber} is {stand.Status} and cannot be sold.");
+        }
+
         if (await StandClaims.AnyBlockedAsync(_db, [standId], ct).ConfigureAwait(false))
         {
             return Error.Rule("Housing.StandBlocked", $"Stand {stand.StandNumber} is blocked by a caveat or an open land dispute and cannot be sold.");

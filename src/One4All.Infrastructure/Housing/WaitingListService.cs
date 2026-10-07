@@ -76,9 +76,32 @@ public sealed class WaitingListService : IWaitingListService
             return Error.Conflict("Hse.DuplicateApplicant", $"ID {idNumber} is already on the list as {existing.WaitingListNumber}.");
         }
 
+        // One household, one stand: the spouse is checked like the applicant, and neither may already be on the list through the other.
+        string? spouseId = string.IsNullOrWhiteSpace(application.SpouseIdNumber) ? null : NormaliseId(application.SpouseIdNumber);
+        if (spouseId == idNumber)
+        {
+            return Error.Validation("Hse.SpouseSelf", "The spouse's ID is the applicant's own.");
+        }
+
+        if (spouseId is not null && application.MaritalStatus is not (MaritalStatus.Married or MaritalStatus.Cohabiting))
+        {
+            return Error.Validation("Hse.SpouseStatus", "A spouse is recorded only for a married or cohabiting applicant.");
+        }
+
+        ApplicantStatus[] onList = [ApplicantStatus.Active, ApplicantStatus.Suspended, ApplicantStatus.Allocated];
+        string? household = await _db.HousingApplicants.AsNoTracking()
+            .Where(a => a.CompanyId == application.CompanyId && a.IdNumber != idNumber && a.WaitingListNumber != null && onList.Contains(a.Status)
+                && ((spouseId != null && (a.IdNumber == spouseId || a.SpouseIdNumber == spouseId)) || a.SpouseIdNumber == idNumber))
+            .Select(a => a.WaitingListNumber).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (household is not null)
+        {
+            return Error.Conflict("Hse.SpouseOnList", $"This household is already on the list or allocated as {household} (through the spouse).");
+        }
+
         WaitingListTerms terms = await TermsAsync(application.CompanyId, ct).ConfigureAwait(false);
         ApplicantFacts facts = new(application.DateOfBirth, application.ResidentSince, application.RegistrationDate, application.Dependants, application.HasDisability, application.MonthlyIncome, application.Tenure);
-        bool ownsProperty = await OwnsPropertyAsync(application.CompanyId, idNumber, ct).ConfigureAwait(false);
+        bool ownsProperty = await OwnsPropertyAsync(application.CompanyId, idNumber, ct).ConfigureAwait(false)
+            || (spouseId is not null && await OwnsPropertyAsync(application.CompanyId, spouseId, ct).ConfigureAwait(false));
         bool previouslyAllocated = existing?.Status == ApplicantStatus.Allocated;
         IReadOnlyList<string> problems = WaitingListRules.Problems(facts, terms, ownsProperty, previouslyAllocated, application.RegistrationDate);
         if (problems.Count > 0)
@@ -100,6 +123,7 @@ public sealed class WaitingListService : IWaitingListService
 
         applicant.FullName = application.FullName.Trim();
         applicant.SetDetails(application.Category, application.DateOfBirth, application.ResidentSince, application.Dependants, application.HasDisability, application.MonthlyIncome, application.Tenure);
+        applicant.SetSpouse(application.MaritalStatus, application.MaritalRegime, spouseId, application.SpouseName);
         applicant.Register(number.Value, application.RegistrationDate);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new WaitingListRegistration(number.Value, WaitingListRules.Score(facts, terms, application.RegistrationDate));

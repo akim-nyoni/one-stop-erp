@@ -6678,6 +6678,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("last_confirmed_on");
 
+                    b.Property<int?>("MaritalRegime")
+                        .HasColumnType("integer")
+                        .HasColumnName("marital_regime");
+
+                    b.Property<int>("MaritalStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("marital_status");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -6705,6 +6713,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<string>("SpouseIdNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("spouse_id_number");
+
+                    b.Property<string>("SpouseName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("spouse_name");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");
@@ -6727,6 +6745,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_applicant_company_id_id_number")
                         .HasFilter("is_deleted = false");
+
+                    b.HasIndex("CompanyId", "SpouseIdNumber")
+                        .HasDatabaseName("ix_applicant_company_id_spouse_id_number");
 
                     b.HasIndex("CompanyId", "WaitingListNumber")
                         .IsUnique()
@@ -6948,6 +6969,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<long?>("ConsolidatedIntoStandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("consolidated_into_stand_id");
+
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("created_by_user_id");
@@ -6989,6 +7014,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<long?>("ParentStandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("parent_stand_id");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -7019,6 +7048,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("status");
 
+                    b.Property<int?>("StatusBeforeHold")
+                        .HasColumnType("integer")
+                        .HasColumnName("status_before_hold");
+
                     b.Property<decimal?>("ZoningWeight")
                         .HasPrecision(9, 4)
                         .HasColumnType("numeric(9,4)")
@@ -7026,6 +7059,12 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_stand");
+
+                    b.HasIndex("ConsolidatedIntoStandId")
+                        .HasDatabaseName("ix_stand_consolidated_into_stand_id");
+
+                    b.HasIndex("ParentStandId")
+                        .HasDatabaseName("ix_stand_parent_stand_id");
 
                     b.HasIndex("CompanyId", "StandNumber")
                         .IsUnique()
@@ -9545,6 +9584,61 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_stand_pricing_rule_company_id_effective_from");
 
                     b.ToTable("stand_pricing_rule", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandStatusChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Authority")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("authority");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<int>("From")
+                        .HasColumnType("integer")
+                        .HasColumnName("from");
+
+                    b.Property<long>("HousingStandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("housing_stand_id");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("To")
+                        .HasColumnType("integer")
+                        .HasColumnName("to");
+
+                    b.Property<long?>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stand_status_change");
+
+                    b.HasIndex("HousingStandId")
+                        .HasDatabaseName("ix_stand_status_change_housing_stand_id");
+
+                    b.ToTable("stand_status_change", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.StandSurveyStep", b =>
@@ -30118,6 +30212,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_stand_pricing_rule_stand_stand_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.StandStatusChange", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany("StatusChanges")
+                        .HasForeignKey("HousingStandId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_stand_status_change_housing_stands_housing_stand_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.StandSurveyStep", b =>
                 {
                     b.HasOne("One4All.Core.Housing.HousingStand", null)
@@ -31149,6 +31253,8 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Housing.HousingStand", b =>
                 {
                     b.Navigation("Ownership");
+
+                    b.Navigation("StatusChanges");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.InstalmentAgreement", b =>

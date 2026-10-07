@@ -52,6 +52,11 @@ internal sealed class HousingStandConfiguration : IEntityTypeConfiguration<Housi
         b.Property(x => x.Status).HasConversion<int>();
         b.HasMany(x => x.Ownership).WithOne().HasForeignKey(x => x.HousingStandId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Ownership).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.Property(x => x.StatusBeforeHold).HasConversion<int?>();
+        b.HasMany(x => x.StatusChanges).WithOne().HasForeignKey(x => x.HousingStandId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.StatusChanges).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasIndex(x => x.ParentStandId);
+        b.HasIndex(x => x.ConsolidatedIntoStandId);
         b.Property(x => x.FrontageMetres).HasPrecision(19, 4);
         b.Property(x => x.ZoningWeight).HasPrecision(9, 4);
         b.OwnsOne(x => x.Boundary, o =>
@@ -86,6 +91,11 @@ internal sealed class HousingApplicantConfiguration : IEntityTypeConfiguration<H
     {
         b.ToTable("applicant", Schemas.Housing);
         b.HasKey(x => x.Id);
+        b.Property(x => x.SpouseIdNumber).HasMaxLength(30);
+        b.Property(x => x.SpouseName).HasMaxLength(200);
+        b.Property(x => x.MaritalStatus).HasConversion<int>();
+        b.Property(x => x.MaritalRegime).HasConversion<int?>();
+        b.HasIndex(x => new { x.CompanyId, x.SpouseIdNumber });
         b.Property(x => x.IdNumber).HasMaxLength(40);
         b.Property(x => x.FullName).HasMaxLength(200);
         b.Property(x => x.WaitingListNumber).HasMaxLength(30);
@@ -1243,5 +1253,18 @@ internal sealed class SchemeCostConfiguration : IEntityTypeConfiguration<SchemeC
         b.Property(x => x.JournalNumber).HasMaxLength(40);
         b.HasOne<HousingScheme>().WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.SchemeId, x.Date });
+    }
+}
+
+internal sealed class StandStatusChangeConfiguration : IEntityTypeConfiguration<StandStatusChange>
+{
+    public void Configure(EntityTypeBuilder<StandStatusChange> b)
+    {
+        b.ToTable("stand_status_change", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.From).HasConversion<int>();
+        b.Property(x => x.To).HasConversion<int>();
+        b.Property(x => x.Authority).HasMaxLength(120);
+        b.Property(x => x.Reason).HasMaxLength(300);
     }
 }

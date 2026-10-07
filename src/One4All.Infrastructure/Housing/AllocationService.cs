@@ -56,8 +56,21 @@ public sealed class AllocationService : IAllocationService
 
         var listed = await _db.HousingApplicants.AsNoTracking()
             .Where(a => a.CompanyId == proposal.CompanyId && a.Category == proposal.Category && a.WaitingListNumber != null && (a.Status == ApplicantStatus.Active || a.Status == ApplicantStatus.Suspended))
-            .Select(a => new { a.Id, Number = a.WaitingListNumber!, a.Status }).ToListAsync(ct).ConfigureAwait(false);
-        var applicants = listed.Where(a => a.Status == ApplicantStatus.Active && !liveApplicants.Contains(a.Id)).ToList();
+            .Select(a => new { a.Id, Number = a.WaitingListNumber!, a.Status, a.IdNumber, a.SpouseIdNumber }).ToListAsync(ct).ConfigureAwait(false);
+
+        // One household, one stand: whoever's spouse holds a stand, or is an applicant with a live or completed allocation, is left out.
+        HashSet<string> householdIds = [.. listed.SelectMany(a => new[] { a.IdNumber, a.SpouseIdNumber }).OfType<string>()];
+        HashSet<string> holdingIds = [.. await _db.Customers.AsNoTracking()
+            .Where(c => c.CompanyId == proposal.CompanyId && c.NationalIdNumber != null && householdIds.Contains(c.NationalIdNumber)
+                && _db.HousingStands.Any(s => s.CompanyId == proposal.CompanyId && s.CurrentHolderCustomerId == c.Id))
+            .Select(c => c.NationalIdNumber!).ToListAsync(ct).ConfigureAwait(false)];
+        holdingIds.UnionWith(await _db.HousingApplicants.AsNoTracking()
+            .Where(a => a.CompanyId == proposal.CompanyId && householdIds.Contains(a.IdNumber)
+                && (a.Status == ApplicantStatus.Allocated || _db.Set<StandAllocation>().Any(x => x.ApplicantId == a.Id && Live.Contains(x.Status))))
+            .Select(a => a.IdNumber).ToListAsync(ct).ConfigureAwait(false));
+        HashSet<long> spouseHolds = [.. listed.Where(a => (a.SpouseIdNumber is string spouse && holdingIds.Contains(spouse))
+            || listed.Any(o => o.SpouseIdNumber == a.IdNumber && liveApplicants.Contains(o.Id))).Select(a => a.Id)];
+        var applicants = listed.Where(a => a.Status == ApplicantStatus.Active && !liveApplicants.Contains(a.Id) && !spouseHolds.Contains(a.Id)).ToList();
         Dictionary<string, long> applicantIds = applicants.ToDictionary(a => a.Number, a => a.Id, StringComparer.Ordinal);
 
         // The canonical candidate list: ranked for seniority and score, waiting-list-number order for a ballot.
@@ -100,7 +113,8 @@ public sealed class AllocationService : IAllocationService
 
         foreach (var left in listed.Where(a => !applicantIds.ContainsKey(a.Number)).OrderBy(a => a.Number, StringComparer.Ordinal))
         {
-            run.Exclude(left.Id, left.Status == ApplicantStatus.Suspended ? ExclusionReason.Suspended : ExclusionReason.LiveAllocation);
+            run.Exclude(left.Id, left.Status == ApplicantStatus.Suspended ? ExclusionReason.Suspended
+                : spouseHolds.Contains(left.Id) && !liveApplicants.Contains(left.Id) ? ExclusionReason.SpouseHolds : ExclusionReason.LiveAllocation);
         }
 
         _db.Set<AllocationRun>().Add(run);

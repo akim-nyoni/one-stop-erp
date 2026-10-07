@@ -25,7 +25,8 @@ internal static class StandClaims
         => await db.Set<StandBlock>().AnyAsync(b => standIds.Contains(b.StandId) && b.LiftedOn == null, ct).ConfigureAwait(false)
             || await db.Set<LandEncumbrance>().AnyAsync(e => e.Type == EncumbranceType.Caveat && e.LiftedOn == null
                 && db.HousingStands.Any(s => standIds.Contains(s.Id) && s.LandParcelId == e.LandParcelId), ct).ConfigureAwait(false)
-            || await db.Set<LandDispute>().AnyAsync(d => d.StandId != null && standIds.Contains(d.StandId.Value) && d.Stage != LandDisputeStage.Resolved, ct).ConfigureAwait(false);
+            || await db.Set<LandDispute>().AnyAsync(d => d.StandId != null && standIds.Contains(d.StandId.Value) && d.Stage != LandDisputeStage.Resolved, ct).ConfigureAwait(false)
+            || await db.HousingStands.AnyAsync(s => standIds.Contains(s.Id) && s.Status == StandStatus.Withheld, ct).ConfigureAwait(false);
 
     /// <summary>Every stand of a council that is blocked or already promised through any route (for picking free stands).</summary>
     /// <param name="db">The database context.</param>

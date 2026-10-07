@@ -137,6 +137,31 @@ public sealed class HousingApplicant : SoftDeletableEntity, ICompanyScoped
     /// <summary>The beneficiary groups the applicant declared and proved (age and disability groups are also derived).</summary>
     public BeneficiaryGroups DeclaredGroups { get; private set; }
 
+    /// <summary>The applicant's marital status.</summary>
+    public MaritalStatus MaritalStatus { get; private set; } = MaritalStatus.Single;
+
+    /// <summary>The marriage regime, when married.</summary>
+    public MaritalRegime? MaritalRegime { get; private set; }
+
+    /// <summary>The spouse / co-applicant's national ID (checked like the applicant's: one household, one stand).</summary>
+    public string? SpouseIdNumber { get; private set; }
+
+    /// <summary>The spouse / co-applicant's name.</summary>
+    public string? SpouseName { get; private set; }
+
+    /// <summary>Records the applicant's marital status and spouse / co-applicant.</summary>
+    /// <param name="status">The marital status.</param>
+    /// <param name="regime">The marriage regime.</param>
+    /// <param name="spouseIdNumber">The spouse's national ID.</param>
+    /// <param name="spouseName">The spouse's name.</param>
+    public void SetSpouse(MaritalStatus status, MaritalRegime? regime, string? spouseIdNumber, string? spouseName)
+    {
+        MaritalStatus = status;
+        MaritalRegime = regime;
+        SpouseIdNumber = string.IsNullOrWhiteSpace(spouseIdNumber) ? null : spouseIdNumber;
+        SpouseName = string.IsNullOrWhiteSpace(spouseName) ? null : spouseName.Trim();
+    }
+
     /// <summary>Records the beneficiary groups the applicant declared and proved.</summary>
     /// <param name="groups">The groups.</param>
     public void DeclareGroups(BeneficiaryGroups groups) => DeclaredGroups = groups;
@@ -208,4 +233,36 @@ public sealed class HousingApplicant : SoftDeletableEntity, ICompanyScoped
 
         RegistrationDate = change.NewDate;
     }
+}
+
+/// <summary>An applicant's marital status (brief §4.10.3).</summary>
+public enum MaritalStatus
+{
+    /// <summary>Single.</summary>
+    Single = 1,
+
+    /// <summary>Married (civil or customary).</summary>
+    Married = 2,
+
+    /// <summary>Living together, not married.</summary>
+    Cohabiting = 3,
+
+    /// <summary>Divorced.</summary>
+    Divorced = 4,
+
+    /// <summary>Widowed.</summary>
+    Widowed = 5,
+}
+
+/// <summary>The marriage regime, which decides whether the spouse shares the stand (brief §4.10.3).</summary>
+public enum MaritalRegime
+{
+    /// <summary>In community of property.</summary>
+    InCommunity = 1,
+
+    /// <summary>Out of community of property.</summary>
+    OutOfCommunity = 2,
+
+    /// <summary>Customary marriage.</summary>
+    Customary = 3,
 }

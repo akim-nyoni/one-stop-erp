@@ -39,6 +39,18 @@ public sealed class WaitingListApplication
 
     /// <summary>The registration date (it sets seniority).</summary>
     public DateOnly RegistrationDate { get; init; }
+
+    /// <summary>The marital status.</summary>
+    public MaritalStatus MaritalStatus { get; init; } = MaritalStatus.Single;
+
+    /// <summary>The marriage regime, when married.</summary>
+    public MaritalRegime? MaritalRegime { get; init; }
+
+    /// <summary>The spouse / co-applicant's national ID.</summary>
+    public string? SpouseIdNumber { get; init; }
+
+    /// <summary>The spouse / co-applicant's name.</summary>
+    public string? SpouseName { get; init; }
 }
 
 /// <summary>A council's waiting-list policy as entered.</summary>
