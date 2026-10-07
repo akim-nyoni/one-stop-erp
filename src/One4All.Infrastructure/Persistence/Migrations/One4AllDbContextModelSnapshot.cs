@@ -18106,6 +18106,178 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("tax_table", "hr");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.Termination", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<decimal>("Gratuity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("gratuity");
+
+                    b.Property<string>("JournalNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<DateOnly>("LastDay")
+                        .HasColumnType("date")
+                        .HasColumnName("last_day");
+
+                    b.Property<decimal>("Leave")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("leave");
+
+                    b.Property<decimal>("LeaveDays")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("leave_days");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("NetPay")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("net_pay");
+
+                    b.Property<decimal>("Notice")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("notice");
+
+                    b.Property<decimal>("OrdinaryTax")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("ordinary_tax");
+
+                    b.Property<decimal>("ProRataSalary")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("pro_rata_salary");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<decimal>("Recoveries")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("recoveries");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal>("Severance")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("severance");
+
+                    b.Property<decimal>("TerminalTax")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("terminal_tax");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
+                        .HasColumnName("type");
+
+                    b.Property<decimal>("UnrecoveredLoans")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("unrecovered_loans");
+
+                    b.Property<int>("YearsOfService")
+                        .HasColumnType("integer")
+                        .HasColumnName("years_of_service");
+
+                    b.HasKey("Id")
+                        .HasName("pk_termination");
+
+                    b.HasIndex("CompanyId", "EmployeeId")
+                        .HasDatabaseName("ix_termination_company_id_employee_id");
+
+                    b.ToTable("termination", "pay");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.TerminationClearanceItem", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ClearedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cleared_by_user_id");
+
+                    b.Property<DateOnly?>("ClearedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("cleared_on");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsCleared")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_cleared");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("TerminationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("termination_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_termination_clearance");
+
+                    b.HasIndex("TerminationId")
+                        .HasDatabaseName("ix_termination_clearance_termination_id");
+
+                    b.ToTable("termination_clearance", "pay");
+                });
+
             modelBuilder.Entity("One4All.Core.Payroll.TrainingRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -30095,6 +30267,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_tax_band_tax_table_tax_table_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.TerminationClearanceItem", b =>
+                {
+                    b.HasOne("One4All.Core.Payroll.Termination", null)
+                        .WithMany("Clearance")
+                        .HasForeignKey("TerminationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_termination_clearance_termination_termination_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Pos.LoyaltyTier", b =>
                 {
                     b.HasOne("One4All.Core.Pos.LoyaltyScheme", null)
@@ -30842,6 +31024,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Payroll.TaxTable", b =>
                 {
                     b.Navigation("Bands");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.Termination", b =>
+                {
+                    b.Navigation("Clearance");
                 });
 
             modelBuilder.Entity("One4All.Core.Pos.LoyaltyScheme", b =>

@@ -33,7 +33,7 @@ public sealed class PayrollSetupTests
         // Employees.
         (await setup.CreateEmployeeAsync(companyId, new NewEmployee("ps-001", "Chipo Moyo", 500m, new DateOnly(2025, 6, 1))
         {
-            Department = "Finance", Grade = "C2", NationalIdNumber = "63-123456-A-42", BankName = "CBZ", BankAccountNumber = "0011223344",
+            Department = "FIN", Grade = "C2", NationalIdNumber = "63-123456-A-42", BankName = "CBZ", BankAccountNumber = "0011223344",
         })).IsSuccess.Should().BeTrue();
         (await setup.CreateEmployeeAsync(companyId, new NewEmployee("PS-001", "Duplicate", 100m, new DateOnly(2025, 6, 1)))).Error.Code.Should().Be("Payroll.EmployeeExists");
         (await setup.CreateEmployeeAsync(companyId, new NewEmployee("PS-002", "Contract worker", 100m, new DateOnly(2025, 6, 1)) { EmploymentType = EmploymentType.Contract }))
@@ -41,7 +41,8 @@ public sealed class PayrollSetupTests
         (await setup.UpdateEmployeeAsync(companyId, "PS-001", new EmployeeUpdate { Grade = "C3", BasicSalary = 600m })).IsSuccess.Should().BeTrue();
         (await setup.UpdateEmployeeAsync(companyId, "NOPE", new EmployeeUpdate())).Error.Code.Should().Be("Payroll.EmployeeNotFound");
         Employee chipo = await db.Employees.AsNoTracking().SingleAsync(e => e.CompanyId == companyId && e.EmployeeNumber == "PS-001");
-        (chipo.Grade, chipo.BasicSalary, chipo.Department, chipo.BankAccountNumber).Should().Be(("C3", 600m, "Finance", "0011223344"));
+        (chipo.Grade, chipo.BasicSalary, chipo.Department, chipo.BankAccountNumber).Should().Be(("C3", 600m, "FIN", "0011223344"));
+        (await setup.UpdateEmployeeAsync(companyId, "PS-001", new EmployeeUpdate { Department = "Finance" })).Error.Code.Should().Be("Payroll.DimensionCode");
 
         // Tax table: bands must follow on.
         (await setup.CreateTaxTableAsync(companyId, "PAYE", new DateOnly(2026, 1, 1), null, [new TaxBandInput(0m, 100m, 0m), new TaxBandInput(150m, null, 20m)]))

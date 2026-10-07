@@ -21,11 +21,51 @@ public static partial class OperationCatalogue
         const string module = "HR & Attendance";
         yield return new Operation
         {
+            Module = module, Title = "Termination and final pay", ListTitle = "Clearance checklist",
+            Description = "Preview the final pay (last month pro rata, notice, leave, gratuity, severance by the termination type; PAYE on ordinary pay, the terminal rate on benefits; loans "
+                + "recovered as far as the pay allows), then terminate — the final pay posts in one journal and later runs leave the employee out. Clear checklist items by id; print the certificate.",
+            Fields = [Pick("Step", "Step", ["Preview", "Terminate", "Clear item", "Certificate of service"]), Req("Number", "Employee number"), Pick("Type", "Type", Enum.GetNames<Application.Payroll.TerminationType>()),
+                Today("LastDay", "Last day"), Opt("Reason", "Reason"), Num("NoticeMonths", "Notice (months)", "1"), Num("WorkingDays", "Working days a month", "22"), Num("GratuityWeeks", "Gratuity weeks a year", "2"),
+                Num("SeveranceWeeks", "Severance weeks a year", "4"), Num("TerminalTax", "Terminal benefits tax %", "0"), Req("Salary", "Salary expense account", "6100"),
+                Req("Benefits", "Terminal benefits account", "6100"), Req("Paye", "PAYE liability account", "2400"), Req("NetPay", "Net pay account", "2420"), OptNum("Item", "Checklist item id")],
+            Run = async (c, i) =>
+            {
+                ITerminationService terminations = c.Get<ITerminationService>();
+                switch (i.Text("Step"))
+                {
+                    case "Clear item":
+                        _ = Check(await terminations.ClearItemAsync(c.CompanyId, (long)(i.OptionalNumber("Item") ?? 0), c.UserId, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true), string.Empty);
+                        return "Item cleared.";
+                    case "Certificate of service":
+                        return Check(await terminations.CertificateOfServiceAsync(c.CompanyId, i.Text("Number")).ConfigureAwait(true));
+                }
+
+                TerminationRequest request = new(c.CompanyId, i.Text("Number"), Enum.Parse<Application.Payroll.TerminationType>(i.Text("Type")), i.Date("LastDay"), i.Optional("Reason") ?? string.Empty)
+                {
+                    Policy = new Application.Payroll.TerminalPolicy(i.Number("NoticeMonths"), i.Number("WorkingDays"), i.Number("GratuityWeeks"), i.Number("SeveranceWeeks"), i.Number("TerminalTax")),
+                    SalaryExpenseAccount = i.Text("Salary"), TerminalBenefitsAccount = i.Text("Benefits"), PayeLiabilityAccount = i.Text("Paye"), NetPayAccount = i.Text("NetPay"), ApprovedByUserId = c.UserId,
+                };
+                Application.Payroll.FinalPayStatement statement = i.Text("Step") == "Preview"
+                    ? Check(await terminations.PreviewAsync(request).ConfigureAwait(true))
+                    : Check(await terminations.TerminateAsync(request).ConfigureAwait(true)).Statement;
+                string earned = FormattableString.Invariant(
+                    $"{statement.YearsOfService} year(s). Salary {statement.ProRataSalary:N2} + notice {statement.Notice:N2} + leave ({statement.LeaveDays:0.##} days) {statement.Leave:N2} + gratuity {statement.Gratuity:N2} + severance {statement.Severance:N2} ");
+                string less = FormattableString.Invariant($"− PAYE {statement.OrdinaryTax:N2} − terminal tax {statement.TerminalTax:N2} − loans {statement.Recoveries:N2} = net {statement.Net:N2}");
+                string owed = statement.UnrecoveredLoans > 0m ? FormattableString.Invariant($"; loans still owed {statement.UnrecoveredLoans:N2}.") : ".";
+                string working = earned + less + owed;
+                return i.Text("Step") == "Preview" ? "Preview: " + working : "Terminated. " + working;
+            },
+            List = async c => Table(await c.Db.Set<Termination>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderByDescending(t => t.Id).Take(50)
+                    .SelectMany(t => t.Clearance.Select(item => new { t.EmployeeId, t.LastDay, item.Id, item.Description, item.IsCleared })).ToListAsync().ConfigureAwait(true),
+                ("Item", x => x.Id), ("Employee id", x => x.EmployeeId), ("Left", x => D(x.LastDay)), ("To clear", x => x.Description), ("Cleared", x => x.IsCleared)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Employee record", ListTitle = "Employees",
             Description = "Engage an employee, or update one (blank fields stay as they are). Bank details are set at engagement; later changes go through 'Bank detail change' "
                 + "and a second person's approval.",
             Fields = [Pick("Step", "Step", ["Engage", "Update"]), Req("Number", "Employee number"), Opt("Name", "Full name"), OptNum("Basic", "Basic salary"), Today("Engaged", "Engagement date"),
-                Pick("Type", "Employment", Enum.GetNames<EmploymentType>()), Opt("Department", "Department"), Opt("CostCentre", "Cost centre"), Opt("PayGroup", "Pay group"), Opt("Grade", "Grade"),
+                Pick("Type", "Employment", Enum.GetNames<EmploymentType>()), Opt("Department", "Department code (3)"), Opt("CostCentre", "Cost centre code (3)"), Opt("PayGroup", "Pay group"), Opt("Grade", "Grade"),
                 Opt("NationalId", "National ID"), Opt("TaxNumber", "Tax number"), Opt("ContractEnd", "Contract end (yyyy-MM-dd)"), Pick("Method", "Paid by", Enum.GetNames<PayMethod>()),
                 Opt("Bank", "Bank (engage only)"), Opt("Branch", "Branch (engage only)"), Opt("Account", "Account number (engage only)"), Opt("Mobile", "Mobile money (engage only)"), Opt("Email", "Email")],
             Run = async (c, i) =>

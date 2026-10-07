@@ -38,6 +38,11 @@ public sealed class PayrollSetupService : IPayrollSetupService
             return Error.Validation("Payroll.ContractEnd", "A contract employee needs the contract's end date.");
         }
 
+        if (DimensionProblem(employee.Department, employee.CostCentre) is Error dimension)
+        {
+            return dimension;
+        }
+
         List<string> numbers = await _db.Employees.Where(e => e.CompanyId == companyId).Select(e => e.EmployeeNumber).ToListAsync(ct).ConfigureAwait(false);
         if (numbers.Any(n => string.Equals(n, number, StringComparison.OrdinalIgnoreCase)))
         {
@@ -68,6 +73,11 @@ public sealed class PayrollSetupService : IPayrollSetupService
         if (update.BasicSalary is < 0m)
         {
             return Result.Failure(Error.Validation("Payroll.SalaryNegative", "The basic salary cannot be negative."));
+        }
+
+        if (DimensionProblem(update.Department, update.CostCentre) is Error dimension)
+        {
+            return Result.Failure(dimension);
         }
 
         if (update.FullName is string name && name.Trim().Length > 0)
@@ -362,4 +372,10 @@ public sealed class PayrollSetupService : IPayrollSetupService
     private static Error EmployeeNotFound(string number) => Error.NotFound("Payroll.EmployeeNotFound", $"Employee {number} not found.");
 
     private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+    // Pay is posted to the employee's department and cost centre, which the ledger keys by codes of up to three characters.
+    private static Error? DimensionProblem(string? department, string? costCentre)
+        => new[] { department, costCentre }.Any(d => d is not null && d.Trim().Length > 3)
+            ? Error.Validation("Payroll.DimensionCode", "Department and cost centre are the ledger's codes (up to 3 characters), e.g. FIN or WKS.")
+            : null;
 }

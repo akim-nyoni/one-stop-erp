@@ -477,3 +477,27 @@ internal sealed class DetailChangeRequestConfiguration : IEntityTypeConfiguratio
         b.HasIndex(x => new { x.CompanyId, x.Status });
     }
 }
+
+internal sealed class TerminationConfiguration : IEntityTypeConfiguration<Termination>
+{
+    public void Configure(EntityTypeBuilder<Termination> b)
+    {
+        b.ToTable("termination", Schemas.Payroll);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reason).HasMaxLength(300);
+        b.Property(x => x.JournalNumber).HasMaxLength(30);
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId });
+        b.HasMany(x => x.Clearance).WithOne().HasForeignKey(x => x.TerminationId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Clearance).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class TerminationClearanceItemConfiguration : IEntityTypeConfiguration<TerminationClearanceItem>
+{
+    public void Configure(EntityTypeBuilder<TerminationClearanceItem> b)
+    {
+        b.ToTable("termination_clearance", Schemas.Payroll);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Description).HasMaxLength(200);
+    }
+}
