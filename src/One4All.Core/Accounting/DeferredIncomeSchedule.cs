@@ -100,4 +100,13 @@ public sealed class DeferredIncomeSchedule : AuditableEntity, ICompanyScoped
     /// <summary>Records revenue recognised (negative when a later run finds less earned, e.g. after a date correction).</summary>
     /// <param name="amount">The amount recognised by this run.</param>
     public void Recognise(decimal amount) => RecognisedAmount += amount;
+
+    /// <summary>Cuts the schedule short (e.g. a student leaving): it now ends on the date, its amount reduced by what was credited back.</summary>
+    /// <param name="endDate">The new last day.</param>
+    /// <param name="credited">The amount credited back.</param>
+    public void Curtail(DateOnly endDate, decimal credited)
+    {
+        Amount -= credited;
+        EndDate = endDate < StartDate ? StartDate : endDate < EndDate ? endDate : EndDate;
+    }
 }

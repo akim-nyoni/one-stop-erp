@@ -9,7 +9,19 @@ namespace One4All.Application.Abstractions.Schools;
 /// <param name="NetFees">The net billed to the guardian.</param>
 /// <param name="OpenItemId">The AR open item raised, or null when nothing was billable.</param>
 /// <param name="JournalNumber">The AR journal number, or null when nothing was billable.</param>
-public readonly record struct StudentBillResult(long StudentId, decimal GrossFees, decimal Discount, decimal NetFees, long? OpenItemId, string? JournalNumber, decimal SiblingDiscount = 0m);
+public readonly record struct StudentBillResult(long StudentId, decimal GrossFees, decimal Discount, decimal NetFees, long? OpenItemId, string? JournalNumber, decimal SiblingDiscount = 0m)
+{
+    /// <summary>The optional items the student took (included in <see cref="NetFees"/>, not discounted).</summary>
+    public decimal OptionalFees { get; init; }
+
+    /// <summary>The share of the term billed (1 for the whole term).</summary>
+    public decimal ShareOfTerm { get; init; }
+}
+
+/// <summary>A withdrawal and its pro-rata credit.</summary>
+/// <param name="CreditNoteNumber">The credit note (null when nothing was credited).</param>
+/// <param name="Credited">The amount credited for the unused part of the term.</param>
+public readonly record struct WithdrawalResult(string? CreditNoteNumber, decimal Credited);
 
 /// <summary>The result of a term billing run.</summary>
 /// <param name="Bills">The per-student results.</param>
@@ -65,4 +77,16 @@ public interface ISchoolBillingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or why not.</returns>
     Task<Result> SetSiblingDiscountAsync(long companyId, int fromChild, decimal percent, CancellationToken ct = default);
+
+    /// <summary>Sets a fee structure's term dates and whether joiners and leavers pay pro rata (brief §4.11).</summary>
+    Task<Result> SetTermAsync(long companyId, long feeStructureId, DateOnly termStart, DateOnly termEnd, bool proRata, CancellationToken ct = default);
+
+    /// <summary>Puts a student on, or takes them off, an optional fee item (billed with the term, undiscounted).</summary>
+    Task<Result> SetOptionAsync(long companyId, long studentId, long feeItemId, bool taking, CancellationToken ct = default);
+
+    /// <summary>
+    /// Withdraws a student from a date; when the term is pro rata and the term invoice (prefix + admission number) was raised, credits the
+    /// unused part of it (deferred fees: from deferred income, the recognition schedule cut short).
+    /// </summary>
+    Task<Result<WithdrawalResult>> WithdrawAsync(long companyId, long studentId, DateOnly leftOn, long feeStructureId, string invoiceNumberPrefix, CancellationToken ct = default);
 }

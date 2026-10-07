@@ -93,6 +93,45 @@ public sealed class FeeStructure : SoftDeletableEntity, ICompanyScoped
     }
 
     /// <summary>The fee items.</summary>
+    /// <summary>Whether a student who joins or leaves during the term pays only for the days enrolled (needs the term dates).</summary>
+    public bool ProRata { get; private set; }
+
+    /// <summary>Sets the term dates and whether joiners and leavers pay pro rata.</summary>
+    /// <param name="termStart">The first day of term.</param>
+    /// <param name="termEnd">The last day of term.</param>
+    /// <param name="proRata">Whether to pro-rate.</param>
+    public void SetTerm(DateOnly termStart, DateOnly termEnd, bool proRata)
+    {
+        if (termEnd < termStart)
+        {
+            throw new ArgumentException("The term cannot end before it starts.", nameof(termEnd));
+        }
+
+        TermStart = termStart;
+        TermEnd = termEnd;
+        ProRata = proRata;
+    }
+
+    /// <summary>The share of the term a student enrolled from one date to another pays (1 when not pro rata or the term dates are not set).</summary>
+    /// <param name="from">Enrolled from (null: the whole term).</param>
+    /// <param name="to">Enrolled to (null: the whole term).</param>
+    /// <returns>The share, 0–1, to four places.</returns>
+    public decimal ShareOfTerm(DateOnly? from, DateOnly? to)
+    {
+        if (!ProRata || TermStart is not DateOnly start || TermEnd is not DateOnly end)
+        {
+            return 1m;
+        }
+
+        DateOnly first = from is DateOnly f && f > start ? f : start, last = to is DateOnly t && t < end ? t : end;
+        if (last < first)
+        {
+            return 0m;
+        }
+
+        return decimal.Round((decimal)(last.DayNumber - first.DayNumber + 1) / (end.DayNumber - start.DayNumber + 1), 4, MidpointRounding.AwayFromZero);
+    }
+
     public IReadOnlyList<FeeItem> Items => _items.AsReadOnly();
 
     /// <summary>The total of the compulsory items — the default term charge before discounts.</summary>
@@ -103,9 +142,9 @@ public sealed class FeeStructure : SoftDeletableEntity, ICompanyScoped
     /// <param name="amount">The amount.</param>
     /// <param name="isCompulsory">Whether the item is compulsory.</param>
     /// <returns>The created item.</returns>
-    public FeeItem AddItem(string description, decimal amount, bool isCompulsory)
+    public FeeItem AddItem(string description, decimal amount, bool isCompulsory, string? revenueAccountCode = null)
     {
-        FeeItem item = new(description, amount, isCompulsory);
+        FeeItem item = new(description, amount, isCompulsory) { RevenueAccountCode = string.IsNullOrWhiteSpace(revenueAccountCode) ? null : revenueAccountCode.Trim() };
         _items.Add(item);
         return item;
     }
@@ -139,4 +178,35 @@ public sealed class FeeItem : Entity
 
     /// <summary>Whether the item is compulsory (billed by default) or optional (opt-in).</summary>
     public bool IsCompulsory { get; private set; }
+
+    /// <summary>The revenue account for an optional item (the structure's when blank).</summary>
+    public string? RevenueAccountCode { get; set; }
+}
+
+/// <summary>A student taking an optional fee item (lunches, a club, a trip), billed with the term (<c>sch.fee_option</c>, brief §4.11).</summary>
+public sealed class StudentFeeOption : Entity, ICompanyScoped
+{
+    private StudentFeeOption()
+    {
+    }
+
+    /// <summary>Records the choice.</summary>
+    /// <param name="companyId">The school.</param>
+    /// <param name="studentId">The student.</param>
+    /// <param name="feeItemId">The optional item.</param>
+    public StudentFeeOption(long companyId, long studentId, long feeItemId)
+    {
+        CompanyId = companyId;
+        StudentId = studentId;
+        FeeItemId = feeItemId;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The student.</summary>
+    public long StudentId { get; private set; }
+
+    /// <summary>The optional item.</summary>
+    public long FeeItemId { get; private set; }
 }

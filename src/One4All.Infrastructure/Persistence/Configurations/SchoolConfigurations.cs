@@ -32,6 +32,7 @@ internal sealed class FeeItemConfiguration : IEntityTypeConfiguration<FeeItem>
         b.ToTable("fee_item", Schemas.School);
         b.HasKey(x => x.Id);
         b.Property(x => x.Description).HasMaxLength(200);
+        b.Property(x => x.RevenueAccountCode).HasMaxLength(20);
     }
 }
 
@@ -103,5 +104,15 @@ internal sealed class SiblingDiscountConfiguration : IEntityTypeConfiguration<Si
         b.HasKey(x => x.Id);
         b.Property(x => x.Percent).HasPrecision(9, 4);
         b.HasIndex(x => new { x.CompanyId, x.FromChild }).IsUnique();
+    }
+}
+
+internal sealed class StudentFeeOptionConfiguration : IEntityTypeConfiguration<StudentFeeOption>
+{
+    public void Configure(EntityTypeBuilder<StudentFeeOption> b)
+    {
+        b.ToTable("fee_option", Schemas.School);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.StudentId, x.FeeItemId }).IsUnique();
     }
 }

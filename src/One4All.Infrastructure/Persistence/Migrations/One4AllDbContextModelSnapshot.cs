@@ -24609,6 +24609,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_compulsory");
 
+                    b.Property<string>("RevenueAccountCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("revenue_account_code");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -24687,6 +24692,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)")
                         .HasColumnName("name");
+
+                    b.Property<bool>("ProRata")
+                        .HasColumnType("boolean")
+                        .HasColumnName("pro_rata");
 
                     b.Property<string>("RevenueAccountCode")
                         .IsRequired()
@@ -24832,6 +24841,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("admission_number");
 
+                    b.Property<DateOnly?>("AdmittedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("admitted_on");
+
                     b.Property<int>("BursaryType")
                         .HasColumnType("integer")
                         .HasColumnName("bursary_type");
@@ -24898,6 +24911,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_enrolled");
 
+                    b.Property<DateOnly?>("LeftOn")
+                        .HasColumnType("date")
+                        .HasColumnName("left_on");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -24937,6 +24954,41 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_student_company_id_grade");
 
                     b.ToTable("student", "sch");
+                });
+
+            modelBuilder.Entity("One4All.Core.Schools.StudentFeeOption", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("FeeItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fee_item_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("StudentId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("student_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_fee_option");
+
+                    b.HasIndex("StudentId", "FeeItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_fee_option_student_id_fee_item_id");
+
+                    b.ToTable("fee_option", "sch");
                 });
 
             modelBuilder.Entity("One4All.Core.Schools.StudentWalletEntry", b =>

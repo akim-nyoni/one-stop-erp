@@ -102,6 +102,20 @@ public sealed class Student : SoftDeletableEntity, ICompanyScoped
     /// <summary>Withdraws the student from enrolment.</summary>
     public void Withdraw() => IsEnrolled = false;
 
+    /// <summary>When the student joined (a later date than the term start is billed pro rata).</summary>
+    public DateOnly? AdmittedOn { get; set; }
+
+    /// <summary>When the student left, once withdrawn.</summary>
+    public DateOnly? LeftOn { get; private set; }
+
+    /// <summary>Withdraws the student from a date.</summary>
+    /// <param name="leftOn">The last day enrolled.</param>
+    public void Withdraw(DateOnly leftOn)
+    {
+        IsEnrolled = false;
+        LeftOn = leftOn;
+    }
+
     /// <summary>The bursary, then the sibling percentage on what is left.</summary>
     /// <param name="compulsoryTotal">The compulsory fees.</param>
     /// <param name="siblingPercent">The sibling discount percentage.</param>

@@ -19,12 +19,14 @@ public sealed class SchoolBillingService : ISchoolBillingService
 {
     private readonly One4AllDbContext _db;
     private readonly ISalesLedgerService _salesLedger;
+    private readonly IAllocationService? _allocations;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="salesLedger">The AR ledger fees are raised on.</param>
-    public SchoolBillingService(One4AllDbContext db, ISalesLedgerService salesLedger)
+    public SchoolBillingService(One4AllDbContext db, ISalesLedgerService salesLedger, IAllocationService? allocations = null)
     {
+        _allocations = allocations;
         _db = db;
         _salesLedger = salesLedger;
     }
@@ -163,8 +165,20 @@ public sealed class SchoolBillingService : ISchoolBillingService
             return extras.Error;
         }
 
+        // A joiner pays from the day they joined when the term is pro rata.
+        decimal share = structure.ShareOfTerm(student.AdmittedOn, student.LeftOn);
+        if (share == 0m)
+        {
+            return new StudentBillResult(student.Id, 0m, 0m, 0m, null, null) { ShareOfTerm = 0m };
+        }
+
+        List<long> optionIds = await _db.Set<StudentFeeOption>().AsNoTracking().Where(o => o.StudentId == student.Id).Select(o => o.FeeItemId).ToListAsync(ct).ConfigureAwait(false);
+        List<(string Account, decimal Amount)> optional = [.. structure.Items.Where(i => !i.IsCompulsory && optionIds.Contains(i.Id))
+            .Select(i => (i.RevenueAccountCode ?? structure.RevenueAccountCode, decimal.Round(i.Amount * share, 2, MidpointRounding.AwayFromZero)))];
+        decimal optionalTotal = optional.Sum(o => o.Amount);
+
         // Siblings: enrolled students sharing the guardian, in admission (id) order.
-        decimal gross = structure.CompulsoryTotal;
+        decimal gross = decimal.Round(structure.CompulsoryTotal * share, 2, MidpointRounding.AwayFromZero);
         List<SiblingDiscount> rules = await _db.Set<SiblingDiscount>().AsNoTracking().Where(r => r.CompanyId == company.Id).ToListAsync(ct).ConfigureAwait(false);
         decimal siblingPercent = 0m;
         if (rules.Count > 0)
@@ -176,10 +190,20 @@ public sealed class SchoolBillingService : ISchoolBillingService
 
         (decimal bursary, decimal sibling) = student.ComputeDiscounts(gross, siblingPercent);
         decimal discount = bursary + sibling;
-        decimal net = gross - discount;
+        decimal compulsoryNet = Math.Max(0m, gross - discount);
+        decimal net = compulsoryNet + optionalTotal;
         if (net <= 0m)
         {
-            return new StudentBillResult(student.Id, gross, discount, 0m, null, null, sibling);
+            return new StudentBillResult(student.Id, gross, discount, 0m, null, null, sibling) { ShareOfTerm = share };
+        }
+
+        // Optional items go to their own revenue accounts (deferred fees: all through deferred income).
+        List<RevenueLine> revenue = structure.DefersIncome ? []
+            : [.. new[] { (Account: structure.RevenueAccountCode, Amount: compulsoryNet) }.Concat(optional).Where(r => r.Amount > 0m)
+                .GroupBy(r => r.Account, StringComparer.Ordinal).Select(g => new RevenueLine(g.Key, g.Sum(r => r.Amount)))];
+        if (revenue.Count == 1)
+        {
+            revenue = [];
         }
 
         Result<TradingPostingResult> posted = await _salesLedger.PostInvoiceAsync(new SalesInvoiceRequest
@@ -192,7 +216,8 @@ public sealed class SchoolBillingService : ISchoolBillingService
             NetAmount = net,
             TaxAmount = 0m,
             SalesAccountCode = structure.DefersIncome ? structure.DeferredIncomeAccountCode! : structure.RevenueAccountCode,
-            Narrative = $"{structure.Term} fees — {student.FullName} ({student.AdmissionNumber})",
+            RevenueLines = revenue,
+            Narrative = $"{structure.Term} fees — {student.FullName} ({student.AdmissionNumber})" + (share < 1m ? FormattableString.Invariant($" [{share:P0} of term]") : string.Empty),
         }, ct).ConfigureAwait(false);
 
         if (posted.IsFailure)
@@ -209,8 +234,136 @@ public sealed class SchoolBillingService : ISchoolBillingService
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
-        return new StudentBillResult(student.Id, gross, discount, net, posted.Value.OpenItemId, posted.Value.JournalNumber, sibling);
+        return new StudentBillResult(student.Id, gross, discount, net, posted.Value.OpenItemId, posted.Value.JournalNumber, sibling) { OptionalFees = optionalTotal, ShareOfTerm = share };
     }
+
+    /// <inheritdoc />
+    public async Task<Result> SetTermAsync(long companyId, long feeStructureId, DateOnly termStart, DateOnly termEnd, bool proRata, CancellationToken ct = default)
+    {
+        if (termEnd < termStart)
+        {
+            return Result.Failure(Error.Validation("School.TermDates", "The term cannot end before it starts."));
+        }
+
+        FeeStructure? structure = await _db.Set<FeeStructure>().FirstOrDefaultAsync(f => f.Id == feeStructureId && f.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (structure is null)
+        {
+            return Result.Failure(Error.NotFound("School.FeeStructureNotFound", $"Fee structure {feeStructureId} not found."));
+        }
+
+        if (structure.DefersIncome && (structure.TermStart != termStart || structure.TermEnd != termEnd))
+        {
+            structure.DeferOverTerm(termStart, termEnd, structure.DeferredIncomeAccountCode!);
+        }
+
+        structure.SetTerm(termStart, termEnd, proRata);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetOptionAsync(long companyId, long studentId, long feeItemId, bool taking, CancellationToken ct = default)
+    {
+        bool optionalItem = await (from item in _db.Set<FeeItem>()
+                                   join structure in _db.Set<FeeStructure>() on item.FeeStructureId equals structure.Id
+                                   where item.Id == feeItemId && structure.CompanyId == companyId && !item.IsCompulsory
+                                   select item.Id).AnyAsync(ct).ConfigureAwait(false);
+        if (!optionalItem)
+        {
+            return Result.Failure(Error.NotFound("School.OptionNotFound", $"Fee item {feeItemId} is not an optional item of this school."));
+        }
+
+        if (!await _db.Set<Student>().AnyAsync(s => s.Id == studentId && s.CompanyId == companyId, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.NotFound("School.StudentNotFound", $"Student {studentId} not found."));
+        }
+
+        StudentFeeOption? option = await _db.Set<StudentFeeOption>().FirstOrDefaultAsync(o => o.StudentId == studentId && o.FeeItemId == feeItemId, ct).ConfigureAwait(false);
+        if (taking && option is null)
+        {
+            _db.Set<StudentFeeOption>().Add(new StudentFeeOption(companyId, studentId, feeItemId));
+        }
+        else if (!taking && option is not null)
+        {
+            _db.Set<StudentFeeOption>().Remove(option);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public Task<Result<WithdrawalResult>> WithdrawAsync(long companyId, long studentId, DateOnly leftOn, long feeStructureId, string invoiceNumberPrefix, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            Student? student = await _db.Set<Student>().FirstOrDefaultAsync(s => s.Id == studentId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+            if (student is null)
+            {
+                return Error.NotFound("School.StudentNotFound", $"Student {studentId} not found.");
+            }
+
+            if (!student.IsEnrolled)
+            {
+                return Error.Rule("School.NotEnrolled", $"{student.AdmissionNumber} is not enrolled.");
+            }
+
+            FeeStructure? structure = await _db.Set<FeeStructure>().AsNoTracking().FirstOrDefaultAsync(f => f.Id == feeStructureId && f.CompanyId == companyId, ct).ConfigureAwait(false);
+            if (structure is null)
+            {
+                return Error.NotFound("School.FeeStructureNotFound", $"Fee structure {feeStructureId} not found.");
+            }
+
+            student.Withdraw(leftOn);
+            string invoiceNumber = (invoiceNumberPrefix ?? string.Empty).Trim() + student.AdmissionNumber;
+            OpenItem? invoice = await _db.OpenItems.AsNoTracking().FirstOrDefaultAsync(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.DocumentNumber == invoiceNumber, ct)
+                .ConfigureAwait(false);
+            decimal credit = 0m;
+            string? creditNumber = null;
+            if (invoice is not null && structure.ProRata && structure.TermStart is not null)
+            {
+                // The unused share of what was billed for the days the student was enrolled this term.
+                decimal billedShare = structure.ShareOfTerm(student.AdmittedOn, null);
+                decimal usedShare = structure.ShareOfTerm(student.AdmittedOn, leftOn);
+                decimal billed = invoice.OriginalTransaction;
+                credit = billedShare <= 0m ? 0m : billed - decimal.Round(billed * usedShare / billedShare, 2, MidpointRounding.AwayFromZero);
+            }
+
+            if (credit > 0m)
+            {
+                Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+                creditNumber = invoiceNumber + "-CR";
+                Result<TradingPostingResult> posted = await _salesLedger.PostCreditNoteAsync(new SalesCreditNoteRequest
+                {
+                    CompanyId = companyId, CustomerId = invoice!.TraderId, DocumentNumber = creditNumber, DocumentDate = leftOn, Currency = company.BaseCurrency, NetAmount = credit,
+                    SalesAccountCode = structure.DefersIncome ? structure.DeferredIncomeAccountCode! : structure.RevenueAccountCode,
+                    Narrative = $"{structure.Term} fees — {student.FullName} ({student.AdmissionNumber}) [left {leftOn:yyyy-MM-dd}]",
+                }, ct).ConfigureAwait(false);
+                if (posted.IsFailure)
+                {
+                    return posted.Error;
+                }
+
+                // Set straight against the term invoice, so the family's account shows what is still owed.
+                if (_allocations is not null && invoice.OutstandingTransaction > 0m)
+                {
+                    Result<AllocationResult> allocated = await _allocations.AllocateAsync(companyId, TradingLedger.AccountsReceivable, invoice.Id, posted.Value.OpenItemId,
+                        Math.Min(credit, invoice.OutstandingTransaction), leftOn, ct).ConfigureAwait(false);
+                    if (allocated.IsFailure)
+                    {
+                        return allocated.Error;
+                    }
+                }
+
+                if (structure.DefersIncome
+                    && await _db.Set<DeferredIncomeSchedule>().FirstOrDefaultAsync(x => x.CompanyId == companyId && x.Reference == invoiceNumber, ct).ConfigureAwait(false) is DeferredIncomeSchedule schedule)
+                {
+                    schedule.Curtail(leftOn, credit);
+                }
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result<WithdrawalResult>.Success(new WithdrawalResult(creditNumber, credit));
+        }, ct);
 
     // Transport and boarding are billed on their own invoices (-TR, -HS) to their own revenue accounts, without bursary discounts;
     // the narrative keeps the fee pattern so arrears and collections see them, tagged with the route or hostel.

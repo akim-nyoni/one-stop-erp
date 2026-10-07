@@ -691,6 +691,49 @@ public static partial class OperationCatalogue
     {
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Term dates, optional fees and leavers", ListTitle = "Optional fee items",
+            Description = "Term dates (with pro rata, a joiner pays from the admission date and a leaver is credited the unused part of the term invoice); a student taking or "
+                + "dropping an optional item (lunches, clubs, trips — billed with the term, not discounted); a student's admission date; withdrawing a student.",
+            Fields = [Pick("Step", "Step", ["Term dates", "Take option", "Drop option", "Admission date", "Withdraw"]), Opt("Structure", "Fee structure code"),
+                Opt("Student", "Admission number"), OptNum("Item", "Optional fee item id (from the list)"), Opt("Start", "Term start / admission date (yyyy-MM-dd)"),
+                Opt("End", "Term end (yyyy-MM-dd)"), Tick("ProRata", "Pro rata joiners and leavers", true), Opt("Prefix", "Term invoice prefix (withdraw)"), Today("Date", "Left on (withdraw)")],
+            Run = async (c, i) =>
+            {
+                ISchoolBillingService billing = c.Get<ISchoolBillingService>();
+                async Task<long> StructureAsync() => await FindAsync(c.Db.Set<Core.Schools.FeeStructure>(), f => f.CompanyId == c.CompanyId && f.Code == (i.Optional("Structure") ?? string.Empty).ToUpper(),
+                    f => f.Id, "fee structure", i.Optional("Structure") ?? string.Empty).ConfigureAwait(true);
+                async Task<long> StudentAsync() => await FindAsync(c.Db.Set<Core.Schools.Student>(), s => s.CompanyId == c.CompanyId && s.AdmissionNumber == (i.Optional("Student") ?? string.Empty).ToUpper(),
+                    s => s.Id, "student", i.Optional("Student") ?? string.Empty).ConfigureAwait(true);
+                switch (i.Text("Step"))
+                {
+                    case "Term dates":
+                        return Check(await billing.SetTermAsync(c.CompanyId, await StructureAsync().ConfigureAwait(true), Day(i.Optional("Start") ?? string.Empty), Day(i.Optional("End") ?? string.Empty),
+                            i.Flag("ProRata")).ConfigureAwait(true), "Term dates saved.");
+                    case "Take option":
+                    case "Drop option":
+                        return Check(await billing.SetOptionAsync(c.CompanyId, await StudentAsync().ConfigureAwait(true), (long)i.Number("Item"), i.Text("Step") == "Take option").ConfigureAwait(true),
+                            "Option saved.");
+                    case "Admission date":
+                        long id = await StudentAsync().ConfigureAwait(true);
+                        Core.Schools.Student student = await c.Db.Set<Core.Schools.Student>().SingleAsync(s => s.Id == id).ConfigureAwait(true);
+                        student.AdmittedOn = Day(i.Optional("Start") ?? string.Empty);
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return "Admission date saved.";
+                    default:
+                        WithdrawalResult left = Check(await billing.WithdrawAsync(c.CompanyId, await StudentAsync().ConfigureAwait(true), i.Date("Date"), await StructureAsync().ConfigureAwait(true),
+                            i.Optional("Prefix") ?? string.Empty).ConfigureAwait(true));
+                        return left.CreditNoteNumber is null ? "Withdrawn; nothing to credit." : $"Withdrawn; credit note {left.CreditNoteNumber} for {M(left.Credited)}.";
+                }
+            },
+            List = async c => Table(await (from item in c.Db.Set<Core.Schools.FeeItem>().AsNoTracking()
+                                           join structure in c.Db.Set<Core.Schools.FeeStructure>().AsNoTracking() on item.FeeStructureId equals structure.Id
+                                           where structure.CompanyId == c.CompanyId && !item.IsCompulsory
+                                           orderby structure.Code, item.Id
+                                           select new { item.Id, structure.Code, item.Description, item.Amount, item.RevenueAccountCode }).ToListAsync().ConfigureAwait(true),
+                ("Item", x => x.Id), ("Structure", x => x.Code), ("Description", x => x.Description), ("Amount", x => M(x.Amount)), ("Revenue", x => x.RevenueAccountCode)),
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Set a sibling discount", ListTitle = "Sibling discounts",
             Description = "A family's children (sharing a guardian, in admission order) get this percentage off from the given child on, after any bursary. 0 removes the rule.",
             Fields = [Num("From", "From child (2 = second)", "2"), Num("Percent", "Discount %")],
