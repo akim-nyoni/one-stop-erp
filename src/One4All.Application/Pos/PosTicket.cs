@@ -97,8 +97,20 @@ public sealed class PosTicketLine
     /// <summary>The quantity sold (settable so the terminal can +/- a line).</summary>
     public decimal Quantity { get; set; }
 
+    /// <summary>Gets the promotion discount the basket's running promotions give this line (none while it carries a manual discount or override).</summary>
+    public decimal PromotionDiscount { get; private set; }
+
+    /// <summary>Gets the promotion code(s) behind <see cref="PromotionDiscount"/>.</summary>
+    public string? PromotionCode { get; private set; }
+
+    /// <summary>Gets the account the promotion discount posts to.</summary>
+    public string? PromotionAccountCode { get; private set; }
+
+    /// <summary>Gets a value indicating whether promotions may price this line (no manual discount and no price override).</summary>
+    public bool TakesPromotions => Discount == 0m && !IsOverridden;
+
     /// <summary>The net line value (quantity × unit price, less any discount), rounded to two decimals.</summary>
-    public decimal LineNet => LineNetBeforeDiscount - Discount;
+    public decimal LineNet => LineNetBeforeDiscount - Discount - PromotionDiscount;
 
     /// <summary>The tax on the line, rounded to two decimals.</summary>
     public decimal TaxAmount => PosMoney.Round(LineNet * TaxRate);
@@ -110,9 +122,21 @@ public sealed class PosTicketLine
     {
         DiscountPercent = percent;
         DiscountAmount = amount;
+        SetPromotion(0m, null, null);
     }
 
-    internal void SetPrice(decimal unitPriceNet) => UnitPriceNet = unitPriceNet;
+    internal void SetPrice(decimal unitPriceNet)
+    {
+        UnitPriceNet = unitPriceNet;
+        SetPromotion(0m, null, null);
+    }
+
+    internal void SetPromotion(decimal discount, string? code, string? accountCode)
+    {
+        PromotionDiscount = Math.Min(Math.Max(0m, discount), LineNetBeforeDiscount);
+        PromotionCode = PromotionDiscount > 0m ? code : null;
+        PromotionAccountCode = PromotionDiscount > 0m ? accountCode : null;
+    }
 
     internal void Restore(decimal listUnitPriceNet, decimal discount)
     {
@@ -315,8 +339,42 @@ public sealed class PosTicket
     /// <param name="discountAccountCode">The account discounts post to (needed when any line is discounted).</param>
     /// <returns>The lines.</returns>
     public IReadOnlyList<PosSaleLineRequest> SaleLines(string? discountAccountCode = null)
-        => [.. _lines.Select(l => new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPriceNet, l.LineNet, l.TaxAmount, l.RevenueAccountCode,
-            l.Discount, l.Discount > 0m ? discountAccountCode : null, l.Discount > 0m ? (l.IsOverridden ? "OVERRIDE+DISC" : "MANUAL") : null))];
+        => [.. _lines.Select(l => l.PromotionDiscount > 0m
+            ? new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPriceNet, l.LineNet, l.TaxAmount, l.RevenueAccountCode, l.PromotionDiscount, l.PromotionAccountCode, l.PromotionCode)
+            : new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPriceNet, l.LineNet, l.TaxAmount, l.RevenueAccountCode,
+                l.Discount, l.Discount > 0m ? discountAccountCode : null, l.Discount > 0m ? (l.IsOverridden ? "OVERRIDE+DISC" : "MANUAL") : null))];
+
+    /// <summary>The lines promotions may price (no manual discount or override), as the promotion engine's basket, in ticket order.</summary>
+    /// <returns>The basket items.</returns>
+    public IReadOnlyList<One4All.Application.Abstractions.Pos.BasketItem> PromotionBasket()
+        => [.. _lines.Where(l => l.TakesPromotions && l.ItemId != 0).Select(l => new One4All.Application.Abstractions.Pos.BasketItem(l.ItemId, l.Quantity, l.UnitPriceNet))];
+
+    /// <summary>
+    /// Applies the promotion engine's pricing of <see cref="PromotionBasket"/> (same lines, same order): each line takes its promotion
+    /// discount; lines outside the basket keep none.
+    /// </summary>
+    /// <param name="pricing">The basket pricing.</param>
+    /// <returns>The total saving.</returns>
+    public decimal ApplyPromotions(One4All.Application.Abstractions.Pos.BasketPricing pricing)
+    {
+        ArgumentNullException.ThrowIfNull(pricing);
+        List<PosTicketLine> eligible = [.. _lines.Where(l => l.TakesPromotions && l.ItemId != 0)];
+        foreach (PosTicketLine line in _lines)
+        {
+            line.SetPromotion(0m, null, null);
+        }
+
+        for (int i = 0; i < eligible.Count && i < pricing.Lines.Count; i++)
+        {
+            One4All.Application.Abstractions.Pos.PricedLine priced = pricing.Lines[i];
+            if (priced.ItemId == eligible[i].ItemId && priced.Discount > 0m)
+            {
+                eligible[i].SetPromotion(PosMoney.Round(priced.Discount), string.Join('+', priced.PromotionCodes), priced.DiscountAccountCode);
+            }
+        }
+
+        return _lines.Sum(l => l.PromotionDiscount);
+    }
 
     /// <summary>Loads parked lines back onto an empty ticket (prices, discounts and quantities as parked; tax rates looked up again).</summary>
     /// <param name="lines">The parked lines.</param>

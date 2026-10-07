@@ -74,6 +74,7 @@ public sealed class PosCartLineVm(PosTicketLine line)
     {
         Line.IsOverridden ? $"price {Line.ListUnitPriceNet.ToString("N2", CultureInfo.CurrentCulture)} → {Line.UnitPriceNet.ToString("N2", CultureInfo.CurrentCulture)}" : null,
         Line.Discount > 0m ? $"less {Line.Discount.ToString("N2", CultureInfo.CurrentCulture)}{(Line.DiscountPercent is decimal p ? $" ({p:0.##}%)" : string.Empty)}" : null,
+        Line.PromotionDiscount > 0m ? $"{Line.PromotionCode} −{Line.PromotionDiscount.ToString("N2", CultureInfo.CurrentCulture)}" : null,
     }.Where(t => t is not null));
 
     /// <summary>Gets or sets a value indicating whether this row is selected for an adjustment.</summary>
@@ -127,6 +128,14 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     /// <summary>The GL account cash (and change) posts to.</summary>
     [ObservableProperty]
     private string _cashAccountCode = string.Empty;
+
+    /// <summary>A coupon code typed at the till.</summary>
+    [ObservableProperty]
+    private string _couponEntry = string.Empty;
+
+    private readonly List<string> _coupons = [];
+    private bool _repricing;
+    private long? _branchId;
 
     /// <summary>The GL account card tenders post to.</summary>
     [ObservableProperty]
@@ -683,7 +692,10 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
         else
         {
-            Result<ResolvedPrice> price = await scope.ServiceProvider.GetRequiredService<IPricingService>().PriceAsync(_companyId, null, item.Id, quantity).ConfigureAwait(true);
+            // The account customer's own price list when one is set on the sale, else the default list.
+            long? customerId = await AccountCustomerIdAsync().ConfigureAwait(true);
+            Result<ResolvedPrice> price = await scope.ServiceProvider.GetRequiredService<IPricingService>().PriceAsync(_companyId, customerId, item.Id, quantity, DateOnly.FromDateTime(DateTime.Today))
+                .ConfigureAwait(true);
             if (price.IsFailure)
             {
                 StatusMessage = $"{item.Description}: {price.Error.Message}";
@@ -1225,6 +1237,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             await ShowOnDisplayAsync(devices, "Thank you - change", change).ConfigureAwait(true);
 
             _ticket.Clear();
+            _coupons.Clear();
             AgeVerified = false;
             PrescriptionReference = string.Empty;
             AccountCustomer = string.Empty;
@@ -1407,7 +1420,69 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         CountedCash = string.Empty;
     }
 
+    // Promotions are re-priced whenever the basket changes, until payment starts (a tender fixes the total).
     private void RebuildCart()
+    {
+        RenderCart();
+        if (!_repricing && _ticket.Tenders.Count == 0 && _ticket.Lines.Count > 0)
+        {
+            _ = RepriceAsync();
+        }
+    }
+
+    /// <summary>Takes a coupon code for the running promotions.</summary>
+    [RelayCommand]
+    private async Task ApplyCouponAsync()
+    {
+        string code = CouponEntry.Trim().ToUpperInvariant();
+        if (code.Length == 0)
+        {
+            return;
+        }
+
+        if (!_coupons.Contains(code, StringComparer.Ordinal))
+        {
+            _coupons.Add(code);
+        }
+
+        CouponEntry = string.Empty;
+        decimal before = _ticket.Lines.Sum(l => l.PromotionDiscount);
+        await RepriceAsync().ConfigureAwait(true);
+        StatusMessage = _ticket.Lines.Sum(l => l.PromotionDiscount) > before ? $"Coupon {code} applied." : $"Coupon {code} gives nothing on this basket (yet).";
+    }
+
+    private async Task RepriceAsync()
+    {
+        if (_ticket.Tenders.Count > 0)
+        {
+            return;
+        }
+
+        _repricing = true;
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            if (_branchId is null)
+            {
+                long terminal = _terminalId;
+                _branchId = await scope.ServiceProvider.GetRequiredService<One4All.Infrastructure.Persistence.One4AllDbContext>().PosTerminals.AsNoTracking()
+                    .Where(t => t.Id == terminal).Select(t => (long?)t.BranchId).FirstOrDefaultAsync().ConfigureAwait(true);
+            }
+
+            IReadOnlyList<BasketItem> basket = _ticket.PromotionBasket();
+            BasketPricing pricing = basket.Count == 0 ? new BasketPricing([], [])
+                : await scope.ServiceProvider.GetRequiredService<IPromotionService>().PriceBasketAsync(new BasketRequest(_companyId, _branchId, DateTime.Now, IsMember: false, _coupons, basket))
+                    .ConfigureAwait(true);
+            _ticket.ApplyPromotions(pricing);
+            RenderCart();
+        }
+        finally
+        {
+            _repricing = false;
+        }
+    }
+
+    private void RenderCart()
     {
         Cart.Clear();
         PosTicketLine? selected = SelectedCartLine?.Line;
