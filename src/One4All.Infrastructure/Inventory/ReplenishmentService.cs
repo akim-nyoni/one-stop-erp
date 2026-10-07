@@ -36,7 +36,7 @@ public sealed class ReplenishmentService : IReplenishmentService
             : [];
         List<long> levelled = [.. levels.Keys];
         List<Item> items = await _db.Items
-            .Where(i => i.CompanyId == companyId && i.IsActive && (i.ReorderLevel > 0m || levelled.Contains(i.Id)))
+            .Where(i => i.CompanyId == companyId && i.IsActive && (i.ReorderLevel > 0m || i.ForecastWindowDays > 0 || levelled.Contains(i.Id)))
             .OrderBy(i => i.Code)
             .ToListAsync(ct).ConfigureAwait(false);
         items = items.Where(i => i.IsStockTracked).ToList();
@@ -72,6 +72,7 @@ public sealed class ReplenishmentService : IReplenishmentService
             .ToDictionaryAsync(x => x.ItemId, x => x.Qty, ct).ConfigureAwait(false);
 
         Dictionary<long, (decimal Price, long SupplierId)> last = await LastPurchasesAsync(companyId, ids, ct).ConfigureAwait(false);
+        Dictionary<long, decimal> usage = await DailyUsageAsync(companyId, warehouseId, items.Where(i => i.ForecastWindowDays > 0).ToList(), ct).ConfigureAwait(false);
 
         List<ReplenishmentSuggestion> suggestions = [];
         // The preferred supplier on the item's supplier links wins over the last one bought from.
@@ -81,6 +82,10 @@ public sealed class ReplenishmentService : IReplenishmentService
         {
             decimal level = levels.TryGetValue(item.Id, out ItemWarehouseLevel? own) ? own.ReorderLevel : item.ReorderLevel;
             decimal reorderQuantity = own?.ReorderQuantity ?? item.ReorderQuantity;
+            decimal daily = usage.GetValueOrDefault(item.Id);
+
+            // The forecast reorder point: the moving-average usage over the lead time (never below the set minimum).
+            level = Math.Max(level, Math.Ceiling(daily * item.LeadTimeDays));
             decimal hand = onHand.GetValueOrDefault(item.Id);
             decimal order = onOrder.GetValueOrDefault(item.Id);
             decimal available = hand + order;
@@ -89,11 +94,11 @@ public sealed class ReplenishmentService : IReplenishmentService
                 continue;
             }
 
-            decimal suggested = reorderQuantity > 0m ? reorderQuantity : level - available;
+            decimal suggested = item.MaximumStock > available ? item.MaximumStock - available : reorderQuantity > 0m ? reorderQuantity : level - available;
             last.TryGetValue(item.Id, out (decimal Price, long SupplierId) lastBuy);
             long? supplier = preferred.TryGetValue(item.Id, out ItemSupplier? link) ? link.SupplierId : last.ContainsKey(item.Id) ? lastBuy.SupplierId : null;
             decimal price = link?.LastCost ?? lastBuy.Price;
-            suggestions.Add(new ReplenishmentSuggestion(item.Id, item.Code, item.Description, hand, order, available, level, suggested, price, supplier));
+            suggestions.Add(new ReplenishmentSuggestion(item.Id, item.Code, item.Description, hand, order, available, level, suggested, price, supplier, item.MaximumStock, Math.Round(daily, 4)));
         }
 
         return suggestions;
@@ -147,6 +152,70 @@ public sealed class ReplenishmentService : IReplenishmentService
         }, ct).ConfigureAwait(false);
 
         return po.IsFailure ? po.Error : po.Value.PurchaseOrderId;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetPolicyAsync(long companyId, long itemId, ReplenishmentPolicy policy, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        if (policy.ReorderLevel < 0m || policy.ReorderQuantity < 0m || policy.MaximumStock < 0m || policy.LeadTimeDays < 0 || policy.ForecastWindowDays < 0)
+        {
+            return Result.Failure(Error.Validation("Replenish.PolicyNegative", "Replenishment levels, lead time and forecast window cannot be negative."));
+        }
+
+        if (policy.MaximumStock > 0m && policy.MaximumStock <= policy.ReorderLevel)
+        {
+            return Result.Failure(Error.Validation("Replenish.MaxBelowMin", $"The maximum ({policy.MaximumStock:0.###}) must be above the reorder level ({policy.ReorderLevel:0.###})."));
+        }
+
+        if (policy.ForecastWindowDays > 0 && policy.LeadTimeDays == 0)
+        {
+            return Result.Failure(Error.Validation("Replenish.LeadTime", "A usage forecast needs the lead time it has to cover."));
+        }
+
+        Item? item = await _db.Items.FirstOrDefaultAsync(i => i.Id == itemId && i.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (item is null)
+        {
+            return Result.Failure(Error.NotFound("Inv.ItemNotFound", $"Item {itemId} not found."));
+        }
+
+        item.ReorderLevel = policy.ReorderLevel;
+        item.ReorderQuantity = policy.ReorderQuantity;
+        item.MaximumStock = policy.MaximumStock;
+        item.LeadTimeDays = policy.LeadTimeDays;
+        item.ForecastWindowDays = policy.ForecastWindowDays;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    // Moving-average daily usage: the quantity issued (reversed issues excluded) over each item's window up to yesterday, per day.
+    private async Task<Dictionary<long, decimal>> DailyUsageAsync(long companyId, long? warehouseId, List<Item> forecast, CancellationToken ct)
+    {
+        if (forecast.Count == 0)
+        {
+            return [];
+        }
+
+        DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+        DateOnly earliest = today.AddDays(-forecast.Max(i => i.ForecastWindowDays));
+        List<long> ids = [.. forecast.Select(i => i.Id)];
+        IQueryable<StockMovement> issues = _db.StockMovements.Where(m => m.CompanyId == companyId && ids.Contains(m.ItemId) && m.Type == StockMovementType.Issue && !m.IsReversed
+            && m.Date >= earliest && m.Date < today);
+        if (warehouseId is long wh)
+        {
+            issues = issues.Where(m => m.WarehouseId == wh);
+        }
+
+        var rows = await issues.Select(m => new { m.ItemId, m.Date, m.Quantity }).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, decimal> usage = [];
+        foreach (Item item in forecast)
+        {
+            DateOnly from = today.AddDays(-item.ForecastWindowDays);
+            decimal issued = -rows.Where(r => r.ItemId == item.Id && r.Date >= from).Sum(r => r.Quantity);
+            usage[item.Id] = Math.Max(issued, 0m) / item.ForecastWindowDays;
+        }
+
+        return usage;
     }
 
     // The unit price and supplier on the most recent (by date, then id) purchase order line for each item.

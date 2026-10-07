@@ -13,7 +13,18 @@ namespace One4All.Application.Abstractions.Inventory;
 /// <param name="SuggestedQuantity">The quantity to order: the item's reorder quantity, or enough to reach the reorder level.</param>
 /// <param name="LastUnitPrice">The unit price on the most recent purchase order for the item (0 when never ordered).</param>
 /// <param name="LastSupplierId">The supplier on that order (null when never ordered).</param>
-public sealed record ReplenishmentSuggestion(long ItemId, string ItemCode, string Description, decimal OnHand, decimal OnOrder, decimal Available, decimal ReorderLevel, decimal SuggestedQuantity, decimal LastUnitPrice, long? LastSupplierId);
+/// <param name="MaximumStock">The order-up-to maximum (0: none).</param>
+/// <param name="AverageDailyUsage">The moving-average daily usage over the forecast window (0 when not forecast).</param>
+public sealed record ReplenishmentSuggestion(long ItemId, string ItemCode, string Description, decimal OnHand, decimal OnOrder, decimal Available, decimal ReorderLevel, decimal SuggestedQuantity, decimal LastUnitPrice, long? LastSupplierId,
+    decimal MaximumStock = 0m, decimal AverageDailyUsage = 0m);
+
+/// <summary>An item's replenishment policy.</summary>
+/// <param name="ReorderLevel">The minimum: at or below it (on hand plus on order) a reorder is suggested.</param>
+/// <param name="ReorderQuantity">A fixed quantity to order (used when there is no maximum).</param>
+/// <param name="MaximumStock">Order up to this (0: none).</param>
+/// <param name="LeadTimeDays">Days from order to receipt.</param>
+/// <param name="ForecastWindowDays">Days of issues the moving-average forecast looks back over (0: none); the reorder point rises to cover the lead time's usage.</param>
+public sealed record ReplenishmentPolicy(decimal ReorderLevel, decimal ReorderQuantity, decimal MaximumStock, int LeadTimeDays, int ForecastWindowDays);
 
 /// <summary>An item and quantity to include on a replenishment purchase order.</summary>
 /// <param name="ItemId">The item.</param>
@@ -29,14 +40,23 @@ public readonly record struct ReplenishmentLine(long ItemId, decimal Quantity, d
 public interface IReplenishmentService
 {
     /// <summary>
-    /// Lists the active, stock-tracked items with a reorder level whose available quantity (on hand plus on
-    /// open purchase orders) is at or below that level.
+    /// Lists the active, stock-tracked items with a reorder level (or a usage forecast) whose available quantity (on hand plus on
+    /// open purchase orders) is at or below that level. With a forecast window the level rises to the moving-average daily usage over the
+    /// lead time; with a maximum the suggestion orders up to it.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="warehouseId">Optional warehouse to measure on-hand in (on-order is company-wide).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The suggestions, by item code.</returns>
     Task<IReadOnlyList<ReplenishmentSuggestion>> SuggestAsync(long companyId, long? warehouseId = null, CancellationToken ct = default);
+
+    /// <summary>Sets an item's min/max, lead time and forecast window (brief §4.3 replenishment).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="itemId">The item.</param>
+    /// <param name="policy">The policy.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why the policy is invalid.</returns>
+    Task<Result> SetPolicyAsync(long companyId, long itemId, ReplenishmentPolicy policy, CancellationToken ct = default);
 
     /// <summary>
     /// Raises one purchase order on a supplier for the given items, pricing each line at the given price or,

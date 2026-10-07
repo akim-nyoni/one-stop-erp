@@ -76,6 +76,15 @@ public sealed class Item : SoftDeletableEntity, ICompanyScoped
     /// <summary>Reorder quantity.</summary>
     public decimal ReorderQuantity { get; set; }
 
+    /// <summary>The most to hold (min/max replenishment orders up to it once stock falls to the reorder level); 0: none.</summary>
+    public decimal MaximumStock { get; set; }
+
+    /// <summary>Days from order to receipt (the forecast reorder point covers the usage over it).</summary>
+    public int LeadTimeDays { get; set; }
+
+    /// <summary>Days of issues the moving-average usage forecast looks back over; 0: no forecast.</summary>
+    public int ForecastWindowDays { get; set; }
+
     /// <summary>The minimum age a buyer must be (the till asks for the age check); null: none.</summary>
     public int? MinimumAge { get; set; }
 

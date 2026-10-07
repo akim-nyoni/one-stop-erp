@@ -81,6 +81,7 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
         b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
         b.Property(x => x.ReorderLevel).HasPrecision(19, 4);
         b.Property(x => x.ReorderQuantity).HasPrecision(19, 4);
+        b.Property(x => x.MaximumStock).HasPrecision(19, 4);
         b.Ignore(x => x.IsStockTracked);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);

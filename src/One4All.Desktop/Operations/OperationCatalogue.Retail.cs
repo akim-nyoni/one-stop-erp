@@ -408,6 +408,21 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Set an item's replenishment policy", ListTitle = "Replenishment policies",
+            Description = "Min/max and forecast: at or below the reorder level (on hand plus on order) a reorder is suggested, up to the maximum if set, else the reorder quantity. "
+                + "With a forecast window, the reorder level rises to the average daily issues over that window times the lead time.",
+            Fields = [Req("Item", "Item code"), Num("Level", "Reorder level (minimum)", "0"), Num("Quantity", "Reorder quantity", "0"), Num("Maximum", "Maximum stock", "0"),
+                Num("LeadTime", "Lead time (days)", "0"), Num("Window", "Forecast window (days, 0 = none)", "0")],
+            Run = async (c, i) => Check(await c.Get<IReplenishmentService>().SetPolicyAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true),
+                new ReplenishmentPolicy(i.Number("Level"), i.Number("Quantity"), i.Number("Maximum"), (int)i.Number("LeadTime"), (int)i.Number("Window"))).ConfigureAwait(true),
+                "Replenishment policy saved."),
+            List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && (x.ReorderLevel > 0m || x.MaximumStock > 0m || x.ForecastWindowDays > 0))
+                    .OrderBy(x => x.Code).Take(200).ToListAsync().ConfigureAwait(true),
+                ("Item", x => x.Code), ("Minimum", x => Q(x.ReorderLevel)), ("Reorder qty", x => Q(x.ReorderQuantity)), ("Maximum", x => Q(x.MaximumStock)),
+                ("Lead time", x => x.LeadTimeDays), ("Window", x => x.ForecastWindowDays)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Classify items A / B / C", Description = "A: the items making the first 80% of the value issued in the period, B the next 15%, C the rest and unmoved stock.",
             Fields = [Today("From", "From"), Today("To", "To")],
             Run = async (c, i) =>

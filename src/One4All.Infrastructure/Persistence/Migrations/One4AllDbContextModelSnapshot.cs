@@ -11187,6 +11187,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("description");
 
+                    b.Property<int>("ForecastWindowDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("forecast_window_days");
+
                     b.Property<string>("HsCode")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -11204,10 +11208,19 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("item_type");
 
+                    b.Property<int>("LeadTimeDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("lead_time_days");
+
                     b.Property<decimal?>("MaxQuantityPerSale")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("max_quantity_per_sale");
+
+                    b.Property<decimal>("MaximumStock")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("maximum_stock");
 
                     b.Property<int?>("MinimumAge")
                         .HasColumnType("integer")
