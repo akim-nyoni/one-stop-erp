@@ -108,7 +108,7 @@ public static partial class OperationCatalogue
             Description = "Posts a sales invoice or credit note to a customer's account (the customer's currency unless another is given; tax at the tax code's account).",
             Fields = [Pick("Document", "Document", ["Invoice", "Credit note"]), Req("Customer", "Customer code"), Req("Number", "Document number"), Today("Date", "Date"), Num("Net", "Net amount"),
                 Num("Tax", "Tax amount", "0"), Req("Account", "Sales account"), Opt("TaxAccount", "Tax account"), Opt("TaxCode", "Tax code"), Opt("Currency", "Currency (blank: the customer's)"),
-                Opt("Reason", "Reason code (credit note)"), Opt("Narrative", "Narrative")],
+                Opt("Reason", "Reason code (credit note)"), Opt("Narrative", "Narrative"), Opt("Override", "Supervisor allowing it over the credit limit (user name)")],
             Run = async (c, i) =>
             {
                 long customer = await CustomerAsync(c, i.Text("Customer")).ConfigureAwait(true);
@@ -129,6 +129,7 @@ public static partial class OperationCatalogue
                 {
                     CompanyId = c.CompanyId, CustomerId = customer, DocumentNumber = i.Text("Number"), DocumentDate = i.Date("Date"), Currency = currency, NetAmount = i.Number("Net"),
                     TaxAmount = i.Number("Tax"), SalesAccountCode = i.Text("Account"), TaxAccountCode = i.Optional("TaxAccount"), TaxCode = i.Optional("TaxCode"), Narrative = i.Optional("Narrative"),
+                    EnteredByUserId = c.UserId, CreditLimitOverrideByUserId = await OptionalUserAsync(c, i.Optional("Override")).ConfigureAwait(true),
                 }).ConfigureAwait(true));
                 return $"Invoice {i.Text("Number")} posted: {M(posted.BaseAmount)} base (journal {posted.JournalNumber}).";
             },

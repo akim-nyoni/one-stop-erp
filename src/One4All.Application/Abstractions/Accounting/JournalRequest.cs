@@ -59,6 +59,9 @@ public sealed class JournalRequest
     /// </summary>
     public long? SubmittedByUserId { get; init; }
 
+    /// <summary>The user posting it, when a person does (checked for the back-date permission beyond the company's allowance).</summary>
+    public long? PostedByUserId { get; init; }
+
     /// <summary>An idempotency key so a retried post (e.g. POS sync) does not double-post.</summary>
     public string? IdempotencyKey { get; init; }
 

@@ -26366,6 +26366,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("allow_future_period_posting");
 
+                    b.Property<int?>("BackDateAllowanceDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("back_date_allowance_days");
+
                     b.Property<string>("BaseCurrency")
                         .IsRequired()
                         .HasMaxLength(3)
@@ -27368,6 +27372,64 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_commission_accrual_company_id_sales_rep_id_month");
 
                     b.ToTable("commission_accrual", "ar");
+                });
+
+            modelBuilder.Entity("One4All.Core.Trading.CreditLimitOverride", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<long>("AuthorisedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("authorised_by_user_id");
+
+                    b.Property<decimal>("BalanceAfter")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("balance_after");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("CreditLimit")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("credit_limit");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("document_number");
+
+                    b.Property<long?>("EnteredByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("entered_by_user_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_credit_limit_override");
+
+                    b.HasIndex("CompanyId", "CustomerId")
+                        .HasDatabaseName("ix_credit_limit_override_company_id_customer_id");
+
+                    b.ToTable("credit_limit_override", "ar");
                 });
 
             modelBuilder.Entity("One4All.Core.Trading.CreditLimitRequest", b =>

@@ -33,6 +33,12 @@ public sealed class SalesInvoiceRequest
     /// <summary>The tax amount.</summary>
     public decimal TaxAmount { get; init; }
 
+    /// <summary>The supervisor allowing this invoice over the customer's credit limit (needs Sales › Customers credit-limit override).</summary>
+    public long? CreditLimitOverrideByUserId { get; init; }
+
+    /// <summary>The user raising it (refused as their own credit-limit override; checked for back-dating).</summary>
+    public long? EnteredByUserId { get; init; }
+
     /// <summary>The revenue account code (credited) — used when <see cref="RevenueLines"/> is empty.</summary>
     public string SalesAccountCode { get; init; } = string.Empty;
 

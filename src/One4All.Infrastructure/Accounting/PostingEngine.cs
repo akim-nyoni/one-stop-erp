@@ -27,14 +27,19 @@ public sealed class PostingEngine : IPostingEngine
     /// <param name="db">The database context.</param>
     /// <param name="scopes">Opens a separate unit of work to record a fund-control block that outlives the refused posting.</param>
     /// <param name="licence">The licence: nothing posts while it is read-only or unusable.</param>
-    public PostingEngine(One4AllDbContext db, IServiceScopeFactory? scopes = null, Application.Abstractions.Licensing.ILicenceService? licence = null)
+    public PostingEngine(One4AllDbContext db, IServiceScopeFactory? scopes = null, Application.Abstractions.Licensing.ILicenceService? licence = null,
+        Application.Abstractions.Security.IPermissionService? permissions = null, One4All.Licensing.Core.IClock? clock = null)
     {
+        _permissions = permissions;
+        _clock = clock;
         _db = db;
         _scopes = scopes;
         _licence = licence;
     }
 
     private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
+    private readonly Application.Abstractions.Security.IPermissionService? _permissions;
+    private readonly One4All.Licensing.Core.IClock? _clock;
 
     /// <inheritdoc />
     public Task<Result<PostingReceipt>> PostAsync(JournalRequest request, CancellationToken ct = default)
@@ -66,6 +71,18 @@ public sealed class PostingEngine : IPostingEngine
         }
 
         CurrencyCode baseCurrency = company.BaseCurrency;
+
+        // Back-dating: a person posting further back than the company allows needs the back-date permission (brief §5.1).
+        if (company.BackDateAllowanceDays is int allowance && (request.PostedByUserId ?? request.SubmittedByUserId) is long actor)
+        {
+            DateOnly today = DateOnly.FromDateTime((_clock?.UtcNow ?? DateTimeOffset.UtcNow).UtcDateTime);
+            if (request.PostingDate < today.AddDays(-allowance)
+                && (_permissions is null || !(await _permissions.ResolveAsync(actor, ct).ConfigureAwait(false)).Has("GeneralLedger.Journal", Core.Security.OperationFlags.BackDate)))
+            {
+                return Error.Forbidden("Posting.BackDateNotAllowed",
+                    $"{request.PostingDate:yyyy-MM-dd} is more than {allowance} day(s) back: only a user with the back-date permission may post it.");
+            }
+        }
 
         // Resolve the open period for the posting module.
         Result<(FiscalYear year, FiscalPeriod period)> periodResult =

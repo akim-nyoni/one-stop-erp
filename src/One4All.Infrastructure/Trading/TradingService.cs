@@ -18,14 +18,17 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 {
     private const int Scale = 4;
     private readonly One4AllDbContext _db;
+    private readonly Application.Abstractions.Security.IPermissionService? _permissions;
     private readonly IPostingEngine _postingEngine;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="postingEngine">The posting engine.</param>
     /// <param name="webhooks">Publishes invoice and payment events.</param>
-    public TradingService(One4AllDbContext db, IPostingEngine postingEngine, Application.Abstractions.Integration.IWebhookService? webhooks = null)
+    public TradingService(One4AllDbContext db, IPostingEngine postingEngine, Application.Abstractions.Integration.IWebhookService? webhooks = null,
+        Application.Abstractions.Security.IPermissionService? permissions = null)
     {
+        _permissions = permissions;
         _db = db;
         _postingEngine = postingEngine;
         _webhooks = webhooks;
@@ -113,7 +116,24 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             decimal outstanding = debits - credits;
             if (outstanding + baseGross > customer.CreditLimit)
             {
-                return Error.Rule("Ar.CreditLimitExceeded", $"Customer {customer.Code}: this invoice would take the balance to {outstanding + baseGross:0.00}, over the credit limit of {customer.CreditLimit:0.00}.");
+                // Only a supervisor who may override credit limits (not whoever raised the invoice) lets it through, and the override is kept.
+                if (request.CreditLimitOverrideByUserId is not long overrider)
+                {
+                    return Error.Rule("Ar.CreditLimitExceeded", $"Customer {customer.Code}: this invoice would take the balance to {outstanding + baseGross:0.00}, over the credit limit of {customer.CreditLimit:0.00}.");
+                }
+
+                if (overrider == request.EnteredByUserId)
+                {
+                    return Error.Rule("Ar.CreditOverrideSelf", "The person raising the invoice cannot override the credit limit for it.");
+                }
+
+                if (_permissions is null || !(await _permissions.ResolveAsync(overrider, ct).ConfigureAwait(false)).Has("Sales.Customer", Core.Security.OperationFlags.OverrideCreditLimit))
+                {
+                    return Error.Forbidden("Ar.CreditOverrideNotAllowed", "Only a user who may override credit limits can let this invoice through.");
+                }
+
+                _db.Set<CreditLimitOverride>().Add(new CreditLimitOverride(request.CompanyId, customer.Id, request.DocumentNumber, customer.CreditLimit, outstanding + baseGross, overrider,
+                    request.EnteredByUserId, DateTimeOffset.UtcNow));
             }
         }
 
