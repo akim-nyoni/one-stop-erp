@@ -116,6 +116,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Tax codes.</summary>
     public DbSet<TaxCode> TaxCodes => Set<TaxCode>();
 
+    /// <summary>Gets the tax exemption certificates.</summary>
+    public DbSet<TaxExemptionCertificate> TaxExemptionCertificates => Set<TaxExemptionCertificate>();
+
     /// <summary>Stored report definitions.</summary>
     public DbSet<Core.Reporting.ReportDefinitionRecord> ReportDefinitions => Set<Core.Reporting.ReportDefinitionRecord>();
 

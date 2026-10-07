@@ -52,6 +52,9 @@ public sealed class SalesInvoiceRequest
     public decimal? ExchangeRate { get; init; }
 
     /// <summary>Optional narrative.</summary>
+    /// <summary>Gets when the goods or service were delivered (sets the tax point; null: the invoice date).</summary>
+    public DateOnly? DeliveryDate { get; init; }
+
     public string? Narrative { get; init; }
 }
 

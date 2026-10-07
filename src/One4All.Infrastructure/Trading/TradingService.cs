@@ -63,6 +63,20 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return Error.Rule("Ar.CustomerOnHold", $"Customer {customer.Code} is on hold; no new invoices can be posted.");
         }
 
+        // Exemption certificates: a certified customer is not charged tax, and an exempt supply needs a valid certificate.
+        bool certified = await _db.TaxExemptionCertificates.AnyAsync(c => c.CompanyId == request.CompanyId && c.Ledger == TradingLedger.AccountsReceivable && c.TraderId == customer.Id
+            && c.ValidFrom <= request.DocumentDate && c.ValidTo >= request.DocumentDate && (c.RevokedOn == null || c.RevokedOn > request.DocumentDate), ct).ConfigureAwait(false);
+        if (certified && request.TaxAmount != 0m)
+        {
+            return Error.Rule("Tax.CustomerExempt", $"Customer {customer.Code} holds a valid tax exemption certificate: invoice without tax.");
+        }
+
+        if (!certified && request.TaxCode is string taxCode
+            && await _db.TaxCodes.AnyAsync(t => t.CompanyId == request.CompanyId && t.Code == taxCode && t.Type == TaxType.Exempt, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Tax.CertificateRequired", $"Customer {customer.Code} has no valid exemption certificate on {request.DocumentDate:yyyy-MM-dd}, so {taxCode} cannot be used.");
+        }
+
         if (request.RevenueLines.Count > 0
             && (request.RevenueLines.Sum(r => r.NetAmount) != request.NetAmount || request.RevenueLines.Any(r => string.IsNullOrWhiteSpace(r.AccountCode))))
         {
@@ -126,9 +140,19 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             lines.Add(Line(request.TaxAccountCode, JournalSide.Credit, request.TaxAmount, rate, baseTax, request.TaxCode));
         }
 
-        return await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.Invoice,
+        Result<TradingPostingResult> opened = await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.Invoice,
             LedgerSign.Debit, request.DocumentNumber, request.DocumentDate, customer.DueDateFor(request.DocumentDate),
             request.Currency, rate, gross, baseGross, request.Narrative, lines, ct).ConfigureAwait(false);
+
+        // The tax point, when delivery moves it off the invoice date.
+        if (opened.IsSuccess && request.DeliveryDate is DateOnly delivered && TaxPoints.Determine(request.DocumentDate, delivered) is DateOnly point && point != request.DocumentDate)
+        {
+            OpenItem item = await _db.OpenItems.SingleAsync(o => o.Id == opened.Value.OpenItemId, ct).ConfigureAwait(false);
+            item.TaxPointDate = point;
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
+        return opened;
     }
 
     /// <inheritdoc />

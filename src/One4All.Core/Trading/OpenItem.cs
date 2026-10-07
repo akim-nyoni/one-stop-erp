@@ -109,6 +109,9 @@ public sealed class OpenItem : AuditableEntity, ICompanyScoped
     /// <summary>Optional narrative.</summary>
     public string? Narrative { get; set; }
 
+    /// <summary>Gets or sets the tax point when it differs from the document date (a delivery before or long after the invoice).</summary>
+    public DateOnly? TaxPointDate { get; set; }
+
     /// <summary>Gets or sets the reason code a credit note was raised under.</summary>
     public string? ReasonCode { get; set; }
 

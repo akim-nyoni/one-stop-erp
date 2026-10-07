@@ -52,6 +52,20 @@ internal sealed class FundConfiguration : IEntityTypeConfiguration<Fund>
     }
 }
 
+internal sealed class TaxExemptionCertificateConfiguration : IEntityTypeConfiguration<TaxExemptionCertificate>
+{
+    public void Configure(EntityTypeBuilder<TaxExemptionCertificate> b)
+    {
+        b.ToTable("tax_exemption_certificate", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Ledger).HasConversion<int>();
+        b.Property(x => x.CertificateNumber).HasMaxLength(60);
+        b.Property(x => x.IssuedBy).HasMaxLength(120);
+        b.HasIndex(x => new { x.CompanyId, x.Ledger, x.TraderId });
+        b.HasIndex(x => new { x.CompanyId, x.ValidTo });
+    }
+}
+
 internal sealed class ReportingTreeConfiguration : IEntityTypeConfiguration<ReportingTree>
 {
     public void Configure(EntityTypeBuilder<ReportingTree> b)

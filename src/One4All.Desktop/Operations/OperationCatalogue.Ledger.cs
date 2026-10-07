@@ -121,6 +121,55 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Tax exemption certificates", ListTitle = "Certificates expiring within 30 days (or lately expired)",
+            Description = "Record a customer's or supplier's exemption certificate (while valid they are not charged tax; exempt invoicing needs one), or withdraw one by its id.",
+            Fields = [Pick("Step", "Step", ["Record", "Withdraw"]), Pick("Ledger", "Who", ["Customer", "Supplier"]), Opt("Trader", "Customer / supplier code"), Opt("Number", "Certificate number"),
+                Today("From", "Valid from"), Opt("To", "Valid to (yyyy-MM-dd)"), Opt("IssuedBy", "Issued by"), OptNum("Id", "Certificate id (withdraw)")],
+            Run = async (c, i) =>
+            {
+                ITaxComplianceService tax = c.Get<ITaxComplianceService>();
+                if (i.Text("Step") == "Withdraw")
+                {
+                    _ = Check(await tax.RevokeCertificateAsync(c.CompanyId, (long)(i.OptionalNumber("Id") ?? 0), i.Date("From")).ConfigureAwait(true), string.Empty);
+                    return "Certificate withdrawn from that date.";
+                }
+
+                long id = Check(await tax.RecordCertificateAsync(c.CompanyId, i.Text("Ledger") == "Customer" ? Core.Trading.TradingLedger.AccountsReceivable : Core.Trading.TradingLedger.AccountsPayable,
+                    i.Text("Trader"), i.Text("Number"), i.Date("From"), DateOnly.ParseExact(i.Text("To"), "yyyy-MM-dd", CultureInfo.InvariantCulture), i.Optional("IssuedBy")).ConfigureAwait(true));
+                return $"Certificate {id} recorded.";
+            },
+            List = async c => Table(await c.Get<ITaxComplianceService>().ExpiringAsync(c.CompanyId, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true),
+                ("Id", e => e.CertificateId), ("Who", e => e.Ledger == Core.Trading.TradingLedger.AccountsReceivable ? "Customer" : "Supplier"), ("Code", e => e.TraderCode), ("Name", e => e.TraderName),
+                ("Certificate", e => e.CertificateNumber), ("Valid to", e => D(e.ValidTo)), ("Days left", e => e.DaysLeft)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "VAT return by tax point basis", ListTitle = "Journals awaiting approval",
+            Description = "The VAT due for a period on the company's basis — invoice date (the ledger), tax point (deliveries move invoices between periods), or cash accounting (invoice VAT due as it "
+                + "is paid) — with every adjustment off the ledger listed. Tick 'Make it the company's basis' to change the basis used from now on.",
+            Fields = [Opt("From", "From (yyyy-MM-dd)"), Today("To", "To"), Pick("Basis", "Basis", Enum.GetNames<TaxPointBasis>()), Tick("Adopt", "Make it the company's basis")],
+            Run = async (c, i) =>
+            {
+                TaxPointBasis basis = Enum.Parse<TaxPointBasis>(i.Text("Basis"));
+                if (i.Flag("Adopt"))
+                {
+                    (await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true)).TaxPointBasis = basis;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                }
+
+                DateOnly to = i.Date("To");
+                DateOnly from = i.Optional("From") is string f ? DateOnly.ParseExact(f, "yyyy-MM-dd", CultureInfo.InvariantCulture) : new DateOnly(to.Year, to.Month, 1);
+                BasisVatReturn vat = await c.Get<ITaxComplianceService>().VatReturnAsync(c.CompanyId, from, to, basis).ConfigureAwait(true);
+                return string.Join(Environment.NewLine, vat.Adjustments.Select(a => $"  {a.Document,-14} {a.Reason,-40} output {M(a.Output),12}  input {M(a.Input),12}")
+                    .Prepend($"{vat.Basis} basis, {D(vat.FromDate)} to {D(vat.ToDate)}: ledger output {M(vat.LedgerOutput)}, input {M(vat.LedgerInput)}")
+                    .Append($"Output tax {M(vat.OutputTax)} − input tax {M(vat.InputTax)} = {(vat.NetPayable >= 0 ? "payable" : "refundable")} {M(Math.Abs(vat.NetPayable))}"
+                        + (i.Flag("Adopt") ? $" ({basis} is now the company's basis)" : string.Empty)));
+            },
+            List = async c => Table(await c.Get<IJournalApprovalService>().AwaitingApprovalAsync(c.CompanyId).ConfigureAwait(true), ("Journal", j => j.JournalNumber), ("Date", j => D(j.PostingDate)),
+                ("Narrative", j => j.Narrative), ("Value", j => M(j.TotalBaseDebit))),
+        };
+        yield return new Operation
+        {
             Module = "Budgeting", Title = "Budget vs actual by fund, project or branch", ListTitle = "Budgets in preparation",
             Description = "The active budget against posted actuals for each fund, project or branch and account, up to a period (one value only, or all).",
             Fields = [Num("Year", "Fiscal year (start year)", DateTime.Today.Year.ToString(CultureInfo.InvariantCulture)), Pick("Type", "Budget type", Enum.GetNames<BudgetType>()),

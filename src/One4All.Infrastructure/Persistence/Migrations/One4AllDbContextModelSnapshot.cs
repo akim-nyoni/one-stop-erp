@@ -1442,6 +1442,84 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("tax_code", "sys");
                 });
 
+            modelBuilder.Entity("One4All.Core.Accounting.TaxExemptionCertificate", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CertificateNumber")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("certificate_number");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("IssuedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("issued_by");
+
+                    b.Property<int>("Ledger")
+                        .HasColumnType("integer")
+                        .HasColumnName("ledger");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly?>("RevokedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("revoked_on");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<long>("TraderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("trader_id");
+
+                    b.Property<DateOnly>("ValidFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("valid_from");
+
+                    b.Property<DateOnly>("ValidTo")
+                        .HasColumnType("date")
+                        .HasColumnName("valid_to");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tax_exemption_certificate");
+
+                    b.HasIndex("CompanyId", "ValidTo")
+                        .HasDatabaseName("ix_tax_exemption_certificate_company_id_valid_to");
+
+                    b.HasIndex("CompanyId", "Ledger", "TraderId")
+                        .HasDatabaseName("ix_tax_exemption_certificate_company_id_ledger_trader_id");
+
+                    b.ToTable("tax_exemption_certificate", "gl");
+                });
+
             modelBuilder.Entity("One4All.Core.Accounting.TaxRate", b =>
                 {
                     b.Property<long>("Id")
@@ -25457,6 +25535,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(60)")
                         .HasColumnName("tax_number");
 
+                    b.Property<int>("TaxPointBasis")
+                        .HasColumnType("integer")
+                        .HasColumnName("tax_point_basis");
+
                     b.Property<string>("TimeZoneId")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -26798,6 +26880,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("Sign")
                         .HasColumnType("integer")
                         .HasColumnName("sign");
+
+                    b.Property<DateOnly?>("TaxPointDate")
+                        .HasColumnType("date")
+                        .HasColumnName("tax_point_date");
 
                     b.Property<long>("TraderId")
                         .HasColumnType("bigint")
