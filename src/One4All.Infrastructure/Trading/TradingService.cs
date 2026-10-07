@@ -690,6 +690,16 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return rateResult.Error;
         }
 
+        Core.JobCosting.JobContract? job = null;
+        if (request.JobContractId is long jobId)
+        {
+            job = await _db.Set<Core.JobCosting.JobContract>().FirstOrDefaultAsync(c => c.Id == jobId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
+            if (job is null || job.Status != Core.JobCosting.JobStatus.Open)
+            {
+                return Error.Rule("Job.ContractNotOpen", "The invoice is charged to a job that is not found or not open.");
+            }
+        }
+
         decimal rate = rateResult.Value;
         decimal gross = request.NetAmount + request.TaxAmount;
         decimal baseNet = Round(request.NetAmount * rate);
@@ -706,9 +716,18 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             lines.Add(Line(request.TaxAccountCode, JournalSide.Debit, request.TaxAmount, rate, baseTax, request.TaxCode));
         }
 
-        return await PostAndOpenAsync(request.CompanyId, "AP", TradingLedger.AccountsPayable, supplier.Id, OpenItemType.Invoice,
+        Result<TradingPostingResult> posted = await PostAndOpenAsync(request.CompanyId, "AP", TradingLedger.AccountsPayable, supplier.Id, OpenItemType.Invoice,
             LedgerSign.Credit, request.DocumentNumber, request.DocumentDate, supplier.DueDateFor(request.DocumentDate),
             request.Currency, rate, gross, baseGross, request.Narrative, lines, ct).ConfigureAwait(false);
+        if (posted.IsSuccess && job is not null)
+        {
+            // Charged to a job: its net (base) goes on the job's cost, with any overhead rate on purchases.
+            await JobCosting.JobCosts.CaptureAsync(_db, job, string.IsNullOrWhiteSpace(request.JobCostHead) ? "Purchases" : request.JobCostHead.Trim(),
+                Core.JobCosting.JobCostSource.PurchaseInvoice, baseNet, request.DocumentDate, $"{supplier.Code} {request.DocumentNumber}", ct).ConfigureAwait(false);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
+        return posted;
     }
 
     /// <inheritdoc />

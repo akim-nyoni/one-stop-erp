@@ -35,6 +35,46 @@ public enum JobCostSource
 
     /// <summary>An overhead allocation.</summary>
     Overhead = 6,
+
+    /// <summary>Goods received on a purchase order line for the job (delivered to site).</summary>
+    GoodsReceived = 7,
+}
+
+/// <summary>
+/// An overhead recovery rate (<c>job.overhead_rate</c>, brief §4.12): a percentage added to the job on top of a kind of direct cost (e.g. 35%
+/// on labour, 10% on plant) as the cost is captured, under its own cost head.
+/// </summary>
+public sealed class JobOverheadRate : AuditableEntity, ICompanyScoped
+{
+    private JobOverheadRate()
+    {
+        CostHead = string.Empty;
+    }
+
+    /// <summary>Creates the rate.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="appliesTo">The direct cost it is charged on.</param>
+    /// <param name="percent">The percentage.</param>
+    /// <param name="costHead">The cost head the overhead goes to.</param>
+    public JobOverheadRate(long companyId, JobCostSource appliesTo, decimal percent, string costHead)
+    {
+        CompanyId = companyId;
+        AppliesTo = appliesTo;
+        Percent = percent;
+        CostHead = costHead;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The direct cost it is charged on.</summary>
+    public JobCostSource AppliesTo { get; private set; }
+
+    /// <summary>The percentage.</summary>
+    public decimal Percent { get; set; }
+
+    /// <summary>The cost head the overhead goes to.</summary>
+    public string CostHead { get; set; }
 }
 
 /// <summary>

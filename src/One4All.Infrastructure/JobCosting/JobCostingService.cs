@@ -55,7 +55,7 @@ public sealed class JobCostingService : IJobCostingService
             return Result.Failure(Error.NotFound("Job.ContractNotFound", $"Contract {contractId} not found."));
         }
 
-        contract.CaptureCost(costHead, source, amount, date, reference);
+        await JobCosts.CaptureAsync(_db, contract, costHead, source, amount, date, reference, ct).ConfigureAwait(false);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
@@ -151,7 +151,49 @@ public sealed class JobCostingService : IJobCostingService
             return Error.NotFound("Job.ContractNotFound", $"Contract {contractId} not found.");
         }
 
-        return new JobProfitability(contract.ContractValue, contract.BudgetCost, contract.ActualCost, contract.CertifiedToDate, contract.PercentComplete);
+        // Committed: ordered for the job on live purchase orders and not yet received.
+        decimal committed = (await (from line in _db.Set<Core.Procurement.PurchaseOrderLine>()
+                                    join order in _db.Set<Core.Procurement.PurchaseOrder>() on line.PurchaseOrderId equals order.Id
+                                    where line.JobContractId == contractId && order.CompanyId == companyId
+                                        && order.Status != Core.Procurement.PurchaseOrderStatus.Cancelled && order.Status != Core.Procurement.PurchaseOrderStatus.Closed
+                                        && line.OrderedQuantity > line.ReceivedQuantity
+                                    select new { line.OrderedQuantity, line.ReceivedQuantity, line.UnitPrice }).ToListAsync(ct).ConfigureAwait(false))
+            .Sum(l => decimal.Round((l.OrderedQuantity - l.ReceivedQuantity) * l.UnitPrice, 2, MidpointRounding.AwayFromZero));
+        return new JobProfitability(contract.ContractValue, contract.BudgetCost, contract.ActualCost, contract.CertifiedToDate, contract.PercentComplete)
+        {
+            CommittedCost = committed,
+            Overheads = contract.Costs.Where(c => c.Source == JobCostSource.Overhead).Sum(c => c.Amount),
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetOverheadRateAsync(long companyId, JobCostSource appliesTo, decimal percent, string costHead, CancellationToken ct = default)
+    {
+        if (appliesTo == JobCostSource.Overhead || percent < 0m || percent > 500m || (percent > 0m && string.IsNullOrWhiteSpace(costHead)))
+        {
+            return Result.Failure(Error.Validation("Job.OverheadRate", "An overhead rate is 0-500% on a direct cost (not on overheads), with the cost head it goes to."));
+        }
+
+        JobOverheadRate? rate = await _db.Set<JobOverheadRate>().FirstOrDefaultAsync(r => r.CompanyId == companyId && r.AppliesTo == appliesTo, ct).ConfigureAwait(false);
+        if (percent == 0m)
+        {
+            if (rate is not null)
+            {
+                _db.Set<JobOverheadRate>().Remove(rate);
+            }
+        }
+        else if (rate is null)
+        {
+            _db.Set<JobOverheadRate>().Add(new JobOverheadRate(companyId, appliesTo, percent, costHead.Trim()));
+        }
+        else
+        {
+            rate.Percent = percent;
+            rate.CostHead = costHead.Trim();
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 
     /// <inheritdoc />

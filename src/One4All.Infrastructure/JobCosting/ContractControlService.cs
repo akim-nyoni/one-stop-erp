@@ -183,7 +183,7 @@ public sealed class ContractControlService : IContractControlService
         }
 
         string itemCode = await _db.Items.Where(i => i.Id == itemId).Select(i => i.Code).SingleAsync(ct).ConfigureAwait(false);
-        contract.CaptureCost("Materials", JobCostSource.StockIssue, issue.Value.Value, date, $"{itemCode} × {quantity:0.###}");
+        await JobCosts.CaptureAsync(_db, contract, "Materials", JobCostSource.StockIssue, issue.Value.Value, date, $"{itemCode} × {quantity:0.###}", ct).ConfigureAwait(false);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return issue.Value.Value;
     }
@@ -220,7 +220,7 @@ public sealed class ContractControlService : IContractControlService
 
         JobTimesheet sheet = new(companyId, contractId, employeeId, date, hours, hourlyCost, costHead);
         _db.JobTimesheets.Add(sheet);
-        contract.CaptureCost(costHead, JobCostSource.Labour, sheet.Cost, date, $"TS {employee.EmployeeNumber}");
+        await JobCosts.CaptureAsync(_db, contract, costHead, JobCostSource.Labour, sheet.Cost, date, $"TS {employee.EmployeeNumber}", ct).ConfigureAwait(false);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return sheet.Id;
     }

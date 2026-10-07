@@ -12621,6 +12621,64 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("cost_entry", "job");
                 });
 
+            modelBuilder.Entity("One4All.Core.JobCosting.JobOverheadRate", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("AppliesTo")
+                        .HasColumnType("integer")
+                        .HasColumnName("applies_to");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("CostHead")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("cost_head");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("Percent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("percent");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_overhead_rate");
+
+                    b.HasIndex("CompanyId", "AppliesTo")
+                        .IsUnique()
+                        .HasDatabaseName("ix_overhead_rate_company_id_applies_to");
+
+                    b.ToTable("overhead_rate", "job");
+                });
+
             modelBuilder.Entity("One4All.Core.JobCosting.JobTimesheet", b =>
                 {
                     b.Property<long>("Id")
@@ -20161,6 +20219,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("ItemId")
                         .HasColumnType("bigint")
                         .HasColumnName("item_id");
+
+                    b.Property<long?>("JobContractId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("job_contract_id");
+
+                    b.Property<string>("JobCostHead")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("job_cost_head");
 
                     b.Property<decimal>("OrderedQuantity")
                         .HasPrecision(19, 4)

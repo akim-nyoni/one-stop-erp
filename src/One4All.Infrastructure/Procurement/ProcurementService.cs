@@ -108,10 +108,30 @@ public sealed class ProcurementService : IProcurementService
             }
         }
 
+        // A line bought for a job is received straight to the job's WIP account: it needs that account and an open job.
+        List<long> jobIds = [.. request.Lines.Where(l => l.JobContractId is not null).Select(l => l.JobContractId!.Value).Distinct()];
+        if (jobIds.Count > 0)
+        {
+            if (request.Lines.Any(l => l.JobContractId is not null && string.IsNullOrWhiteSpace(l.ExpenseAccountCode)))
+            {
+                return Error.Validation("Pop.JobLineAccount", "A line bought for a job needs the job's WIP account as its expense account.");
+            }
+
+            int open = await _db.Set<Core.JobCosting.JobContract>().CountAsync(c => c.CompanyId == request.CompanyId && jobIds.Contains(c.Id) && c.Status == Core.JobCosting.JobStatus.Open, ct)
+                .ConfigureAwait(false);
+            if (open != jobIds.Count)
+            {
+                return Error.Rule("Job.ContractNotOpen", "A purchase order line is for a job that is not found or not open.");
+            }
+        }
+
         PurchaseOrder order = new(request.CompanyId, request.SupplierId, orderNumber, request.OrderDate, request.Currency) { RequiredBy = request.RequiredBy, FrameworkAgreementId = request.FrameworkAgreementId };
         foreach (PurchaseOrderLineRequest line in request.Lines)
         {
-            order.AddLine(line.ItemId, line.Description, line.Quantity, line.UnitPrice).ExpenseAccountCode = string.IsNullOrWhiteSpace(line.ExpenseAccountCode) ? null : line.ExpenseAccountCode.Trim().ToUpperInvariant();
+            PurchaseOrderLine added = order.AddLine(line.ItemId, line.Description, line.Quantity, line.UnitPrice);
+            added.ExpenseAccountCode = string.IsNullOrWhiteSpace(line.ExpenseAccountCode) ? null : line.ExpenseAccountCode.Trim().ToUpperInvariant();
+            added.JobContractId = line.JobContractId;
+            added.JobCostHead = line.JobContractId is null ? null : string.IsNullOrWhiteSpace(line.JobCostHead) ? "Materials" : line.JobCostHead.Trim();
         }
 
         _db.Set<PurchaseOrder>().Add(order);
@@ -212,6 +232,29 @@ public sealed class ProcurementService : IProcurementService
                 return receipt.Error;
             }
 
+            // Bought for a job: delivered to site, so straight out of stock to the job's WIP account and onto the job's cost.
+            if (line.JobContractId is long jobId)
+            {
+                Core.JobCosting.JobContract? job = await _db.Set<Core.JobCosting.JobContract>().FirstOrDefaultAsync(c => c.Id == jobId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
+                if (job is null || job.Status != Core.JobCosting.JobStatus.Open)
+                {
+                    return Error.Rule("Job.ContractNotOpen", $"PO line {line.Id} is for a job that is not open.");
+                }
+
+                Result<StockMovementResult> toJob = await _inventory.IssueAsync(new IssueStockRequest
+                {
+                    CompanyId = request.CompanyId, ItemId = line.ItemId, WarehouseId = request.WarehouseId, Date = request.Date, Quantity = received.Quantity,
+                    Reference = $"{request.GrnNumber} {job.ContractNumber}", ChargeAccountCode = line.ExpenseAccountCode!,
+                }, ct).ConfigureAwait(false);
+                if (toJob.IsFailure)
+                {
+                    return toJob.Error;
+                }
+
+                await JobCosting.JobCosts.CaptureAsync(_db, job, line.JobCostHead ?? "Materials", Core.JobCosting.JobCostSource.GoodsReceived, toJob.Value.Value, request.Date,
+                    $"{request.GrnNumber} {line.Description}", ct).ConfigureAwait(false);
+            }
+
             line.Receive(received.Quantity);
             grn.AddLine(line.Id, line.ItemId, received.Quantity, line.UnitPrice);
             accrued += decimal.Round(received.Quantity * line.UnitPrice, 4, MidpointRounding.ToEven);
@@ -270,6 +313,7 @@ public sealed class ProcurementService : IProcurementService
         decimal invoiceValue = 0m;
         decimal accruedValue = 0m;
         List<(string Account, decimal Committed, decimal Invoiced)> spent = [];
+        List<(PurchaseOrderLine Line, decimal Difference)> jobDifferences = [];
         foreach (InvoiceMatchLine invLine in request.Lines)
         {
             PurchaseOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == invLine.PurchaseOrderLineId);
@@ -296,6 +340,10 @@ public sealed class ProcurementService : IProcurementService
 
             invoiceValue += decimal.Round(invLine.Quantity * invLine.UnitPrice, 4, MidpointRounding.ToEven);
             accruedValue += decimal.Round(invLine.Quantity * line.UnitPrice, 4, MidpointRounding.ToEven);
+            if (line.JobContractId is not null && invLine.UnitPrice != line.UnitPrice)
+            {
+                jobDifferences.Add((line, decimal.Round(invLine.Quantity * invLine.UnitPrice, 4, MidpointRounding.ToEven) - decimal.Round(invLine.Quantity * line.UnitPrice, 4, MidpointRounding.ToEven)));
+            }
             if (line.ExpenseAccountCode is not null)
             {
                 spent.Add((line.ExpenseAccountCode, invLine.Quantity * line.UnitPrice, invLine.Quantity * invLine.UnitPrice));
@@ -318,7 +366,7 @@ public sealed class ProcurementService : IProcurementService
 
         // Clear GRNI at what was accrued (the order price) and owe the supplier the invoice price; any difference is a
         // purchase price variance, so GRNI clears exactly.
-        decimal variance = invoiceValue - accruedValue;
+        decimal variance = invoiceValue - accruedValue - jobDifferences.Sum(d => d.Difference);
         if (variance != 0m && string.IsNullOrWhiteSpace(request.PriceVarianceAccountCode))
         {
             return Error.Rule("Pop.NoPriceVarianceAccount", "The invoice is priced differently from the order: give a purchase price variance account.");
@@ -334,6 +382,15 @@ public sealed class ProcurementService : IProcurementService
             matchLines.Add(new JournalLineRequest
             {
                 AccountCode = request.PriceVarianceAccountCode!.Trim(), Side = variance > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(variance),
+            });
+        }
+
+        foreach ((PurchaseOrderLine line, decimal difference) in jobDifferences.Where(d => d.Difference != 0m))
+        {
+            matchLines.Add(new JournalLineRequest
+            {
+                AccountCode = line.ExpenseAccountCode!, Side = difference > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(difference),
+                Narrative = $"Price difference to job ({line.Description})",
             });
         }
 
@@ -366,6 +423,13 @@ public sealed class ProcurementService : IProcurementService
             Narrative = $"Matched to {order.OrderNumber}",
         };
         _db.OpenItems.Add(openItem);
+
+        foreach ((PurchaseOrderLine line, decimal difference) in jobDifferences.Where(d => d.Difference != 0m))
+        {
+            Core.JobCosting.JobContract job = await _db.Set<Core.JobCosting.JobContract>().FirstAsync(c => c.Id == line.JobContractId, ct).ConfigureAwait(false);
+            await JobCosting.JobCosts.CaptureAsync(_db, job, line.JobCostHead ?? "Materials", Core.JobCosting.JobCostSource.PurchaseInvoice, decimal.Round(difference * rate, 2, MidpointRounding.AwayFromZero),
+                request.Date, $"{request.InvoiceNumber} price difference", ct).ConfigureAwait(false);
+        }
 
         order.RecomputeStatus();
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

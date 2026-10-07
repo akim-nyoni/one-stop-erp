@@ -7,7 +7,8 @@ namespace One4All.Application.Abstractions.Procurement;
 /// <param name="Description">The description.</param>
 /// <param name="Quantity">The quantity.</param>
 /// <param name="UnitPrice">The unit price.</param>
-public readonly record struct PurchaseOrderLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice, string? ExpenseAccountCode = null);
+public readonly record struct PurchaseOrderLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice, string? ExpenseAccountCode = null, long? JobContractId = null,
+    string? JobCostHead = null);
 
 /// <summary>A request to create a purchase order.</summary>
 public sealed class CreatePurchaseOrderRequest

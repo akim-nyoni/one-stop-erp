@@ -66,16 +66,20 @@ public static partial class OperationCatalogue
             Module = module, Title = "Purchase order", ListTitle = "Purchase orders",
             Description = "Raise an order directly (budget-checked; over-budget needs an approver), cancel one, or print it. " + LinesHelp,
             Fields = [Pick("Step", "Step", ["Create", "Print", "Cancel"]), Req("Number", "Order number"), Opt("Supplier", "Supplier code (create)"), Opt("Currency", "Currency", "USD"),
-                Opt("Lines", "Lines (create)"), Opt("RequiredBy", "Required by (yyyy-MM-dd)"), Opt("BudgetApprover", "Budget approver user (over budget)"), Opt("Reason", "Reason (cancel)"), Today("Date", "Order date")],
+                Opt("Lines", "Lines (create)"), Opt("RequiredBy", "Required by (yyyy-MM-dd)"), Opt("BudgetApprover", "Budget approver user (over budget)"), Opt("Reason", "Reason (cancel)"), Today("Date", "Order date"),
+                Opt("Job", "For job (contract number): received straight to the job"), Opt("JobAccount", "Job WIP account"), Opt("JobHead", "Job cost head", "Materials")],
             Run = async (c, i) =>
             {
                 IProcurementService procurement = c.Get<IProcurementService>();
                 if (i.Text("Step") == "Create")
                 {
+                    long? job = i.Optional("Job") is string jobNumber
+                        ? await FindAsync(c.Db.JobContracts, j => j.CompanyId == c.CompanyId && j.ContractNumber.ToUpper() == jobNumber.ToUpper(), j => j.Id, "contract", jobNumber).ConfigureAwait(true)
+                        : null;
                     List<PurchaseOrderLineRequest> lines = [];
                     foreach ((long item, string description, decimal quantity, decimal price) in await OrderLinesAsync(c, i.Text("Lines")).ConfigureAwait(true))
                     {
-                        lines.Add(new PurchaseOrderLineRequest(item, description, quantity, price));
+                        lines.Add(new PurchaseOrderLineRequest(item, description, quantity, price, job is null ? null : i.Optional("JobAccount"), job, i.Optional("JobHead")));
                     }
 
                     PurchaseOrderResult created = Check(await procurement.CreatePurchaseOrderAsync(new CreatePurchaseOrderRequest

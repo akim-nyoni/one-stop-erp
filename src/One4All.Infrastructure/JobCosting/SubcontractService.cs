@@ -243,7 +243,7 @@ public sealed class SubcontractService : ISubcontractService
         }
 
         JobContract contract = await _db.JobContracts.Include(c => c.Costs).SingleAsync(c => c.Id == subcontract.JobContractId, ct).ConfigureAwait(false);
-        contract.CaptureCost(subcontract.CostHead, JobCostSource.Subcontractor, gross, request.Date, invoiceNumber);
+        await JobCosts.CaptureAsync(_db, contract, subcontract.CostHead, JobCostSource.Subcontractor, gross, request.Date, invoiceNumber, ct).ConfigureAwait(false);
         subcontract.AddCertificate(new SubcontractCertificate(request.Number.Trim().ToUpperInvariant(), request.Date, request.WorkDoneToDate, gross, retention, invoiceNumber)
         {
             AdvanceRecovered = recovery, Withheld = withheld,
@@ -325,7 +325,7 @@ public sealed class SubcontractService : ISubcontractService
 
         decimal charge = Math.Round(hours * plant.HireRatePerHour, 2, MidpointRounding.AwayFromZero);
         _db.PlantLogs.Add(new PlantLog(companyId, plantItemId, date, contractId, hours, charge, 0m, $"{hours:0.##} h on {contract.ContractNumber}"));
-        contract.CaptureCost("Plant", JobCostSource.Plant, charge, date, plant.Code);
+        await JobCosts.CaptureAsync(_db, contract, "Plant", JobCostSource.Plant, charge, date, plant.Code, ct).ConfigureAwait(false);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }

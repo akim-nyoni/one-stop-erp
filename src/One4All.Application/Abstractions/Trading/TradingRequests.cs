@@ -132,6 +132,12 @@ public sealed class PurchaseInvoiceRequest
 
     /// <summary>Optional narrative.</summary>
     public string? Narrative { get; init; }
+
+    /// <summary>The job the invoice is charged to (its net base amount is captured as job cost).</summary>
+    public long? JobContractId { get; init; }
+
+    /// <summary>The job cost head.</summary>
+    public string? JobCostHead { get; init; }
 }
 
 /// <summary>A request to post a credit note to a customer (AR) — reduces the debtor balance.</summary>

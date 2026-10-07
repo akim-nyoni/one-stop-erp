@@ -197,6 +197,35 @@ public static partial class OperationCatalogue
         const string module = "Contracts";
         yield return new Operation
         {
+            Module = module, Title = "Job cost position and overhead rates", ListTitle = "Overhead rates",
+            Description = "A job's actual cost (purchases, goods received for it, stock issues, labour, plant, subcontractors, overheads), what is still on order for it, and the "
+                + "forecast. Overhead rates add a percentage on a kind of direct cost (e.g. 35% on labour) as it is captured; 0% removes a rate.",
+            Fields = [Pick("Step", "Step", ["Position", "Set overhead rate"]), Opt("Contract", "Contract number (position)"),
+                Pick("On", "Overhead charged on", [.. Enum.GetNames<Core.JobCosting.JobCostSource>().Where(n => n != nameof(Core.JobCosting.JobCostSource.Overhead))]),
+                OptNum("Percent", "Overhead %"), Opt("Head", "Overhead cost head", "Overheads")],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.JobCosting.IJobCostingService jobs = c.Get<Application.Abstractions.JobCosting.IJobCostingService>();
+                if (i.Text("Step") == "Set overhead rate")
+                {
+                    return Check(await jobs.SetOverheadRateAsync(c.CompanyId, Enum.Parse<Core.JobCosting.JobCostSource>(i.Text("On")), i.OptionalNumber("Percent") ?? 0m, i.Optional("Head") ?? string.Empty)
+                        .ConfigureAwait(true), "Overhead rate saved.");
+                }
+
+                string number = i.Optional("Contract") ?? throw new OperationException("Type the contract number.");
+                long contract = await FindAsync(c.Db.JobContracts, j => j.CompanyId == c.CompanyId && j.ContractNumber.ToUpper() == number.ToUpper(), j => j.Id, "contract", number).ConfigureAwait(true);
+                Application.Abstractions.JobCosting.JobProfitability p = Check(await jobs.GetProfitabilityAsync(c.CompanyId, contract).ConfigureAwait(true));
+                var bySource = await c.Db.JobContracts.AsNoTracking().Where(j => j.Id == contract).SelectMany(j => j.Costs).GroupBy(e => e.Source)
+                    .Select(g => new { g.Key, Amount = g.Sum(e => e.Amount) }).ToListAsync().ConfigureAwait(true);
+                return $"Value {M(p.ContractValue)}, budget {M(p.BudgetCost)}, actual {M(p.ActualCost)} (overheads {M(p.Overheads)}), on order {M(p.CommittedCost)}, "
+                    + $"actual + committed {M(p.CostToDateAndCommitted)}, {p.PercentComplete:0.##}% complete{Environment.NewLine}"
+                    + string.Join(Environment.NewLine, bySource.OrderBy(x => x.Key).Select(x => $"  {x.Key,-16} {M(x.Amount),14}"));
+            },
+            List = async c => Table(await c.Db.Set<Core.JobCosting.JobOverheadRate>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.AppliesTo).ToListAsync().ConfigureAwait(true),
+                ("On", r => r.AppliesTo), ("Percent", r => r.Percent), ("Cost head", r => r.CostHead)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Add a WBS element", ListTitle = "Work breakdown structure",
             Description = "Phases (no cost head) group activities; an activity carries a budget and the cost head its costs are captured under. Codes are dotted: 1, 1.2, 1.2.3.",
             Fields = [Req("Contract", "Contract number"), Req("Code", "WBS code"), Req("Name", "Name"), OptNum("Budget", "Budget (activities)"), Opt("CostHead", "Cost head (activities)")],

@@ -21,6 +21,15 @@ public readonly record struct CertificateResult(long CertificateId, decimal Gros
 /// <param name="PercentComplete">The cost-to-cost percentage complete.</param>
 public readonly record struct JobProfitability(decimal ContractValue, decimal BudgetCost, decimal ActualCost, decimal CertifiedToDate, decimal PercentComplete)
 {
+    /// <summary>Ordered on purchase orders for the job and not yet received.</summary>
+    public decimal CommittedCost { get; init; }
+
+    /// <summary>Overheads recovered into the job.</summary>
+    public decimal Overheads { get; init; }
+
+    /// <summary>Actual plus committed.</summary>
+    public decimal CostToDateAndCommitted => ActualCost + CommittedCost;
+
     /// <summary>The forecast margin (contract value − budget cost).</summary>
     public decimal ForecastMargin => ContractValue - BudgetCost;
 }
@@ -77,6 +86,15 @@ public interface IJobCostingService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The profitability snapshot.</returns>
     Task<Result<JobProfitability>> GetProfitabilityAsync(long companyId, long contractId, CancellationToken ct = default);
+
+    /// <summary>Sets (or, at 0%, removes) the overhead recovery rate charged on a kind of direct cost.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="appliesTo">The direct cost (labour, plant, materials, purchases...).</param>
+    /// <param name="percent">The percentage (0 removes it).</param>
+    /// <param name="costHead">The cost head the overhead goes to.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> SetOverheadRateAsync(long companyId, JobCostSource appliesTo, decimal percent, string costHead, CancellationToken ct = default);
 
     /// <summary>
     /// Releases held retention on a contract (e.g. at the end of the defects-liability period): moves the amount

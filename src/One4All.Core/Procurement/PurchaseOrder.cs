@@ -256,6 +256,12 @@ public sealed class PurchaseOrderLine : Entity
     /// <summary>Gets or sets the expense account the line is budgeted (and committed) against, if any.</summary>
     public string? ExpenseAccountCode { get; set; }
 
+    /// <summary>The job the line is bought for (received straight to the job's WIP account and charged to it).</summary>
+    public long? JobContractId { get; set; }
+
+    /// <summary>The job cost head it is charged to.</summary>
+    public string? JobCostHead { get; set; }
+
     /// <summary>Records a received quantity.</summary>
     /// <param name="quantity">The quantity received.</param>
     public void Receive(decimal quantity) => ReceivedQuantity += quantity;

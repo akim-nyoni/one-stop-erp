@@ -242,3 +242,16 @@ internal sealed class JobWbsElementConfiguration : IEntityTypeConfiguration<JobW
         b.HasIndex(x => new { x.JobContractId, x.Code }).IsUnique();
     }
 }
+
+internal sealed class JobOverheadRateConfiguration : IEntityTypeConfiguration<JobOverheadRate>
+{
+    public void Configure(EntityTypeBuilder<JobOverheadRate> b)
+    {
+        b.ToTable("overhead_rate", Schemas.JobCosting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AppliesTo).HasConversion<int>();
+        b.Property(x => x.Percent).HasPrecision(9, 4);
+        b.Property(x => x.CostHead).HasMaxLength(60);
+        b.HasIndex(x => new { x.CompanyId, x.AppliesTo }).IsUnique();
+    }
+}
