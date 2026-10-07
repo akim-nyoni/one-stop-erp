@@ -137,6 +137,8 @@ internal sealed class BoqItemConfiguration : IEntityTypeConfiguration<BoqItem>
         b.Property(x => x.Quantity).HasPrecision(19, 4);
         b.Property(x => x.Rate).HasPrecision(19, 4);
         b.Property(x => x.MeasuredQuantity).HasPrecision(19, 4);
+        b.Property(x => x.CostHead).HasMaxLength(60);
+        b.Ignore(x => x.Value);
         b.HasIndex(x => new { x.JobContractId, x.ItemCode }).IsUnique();
     }
 }

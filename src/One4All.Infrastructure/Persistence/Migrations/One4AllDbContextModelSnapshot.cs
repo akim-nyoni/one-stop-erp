@@ -12868,6 +12868,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<string>("CostHead")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("cost_head");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(300)

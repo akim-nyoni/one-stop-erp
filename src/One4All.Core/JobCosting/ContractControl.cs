@@ -140,6 +140,12 @@ public sealed class BoqItem : Entity, ICompanyScoped
     /// <summary>Gets the rate.</summary>
     public decimal Rate { get; private set; }
 
+    /// <summary>The cost head the work is budgeted under (null: none).</summary>
+    public string? CostHead { get; set; }
+
+    /// <summary>The billed value (quantity × rate).</summary>
+    public decimal Value => decimal.Round(Quantity * Rate, 2, MidpointRounding.AwayFromZero);
+
     /// <summary>Gets the quantity measured to date.</summary>
     public decimal MeasuredQuantity { get; private set; }
 

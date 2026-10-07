@@ -318,6 +318,33 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Import a BOQ", Description = "A CSV file (or lines separated by ';'): item, description, unit, quantity, rate, cost head (optional); a header row and "
+                + "quoted descriptions are fine. Untick 'Import' to preview the errors first; any error stops the import. 'By cost head' shows the BOQ budget against measured value and cost.",
+            Fields = [Req("Contract", "Contract number"), Opt("File", "CSV file path"), Opt("Lines", "Or lines: ITEM,description,unit,qty,rate,head; …"), Tick("Import", "Import (otherwise preview)"),
+                Tick("Heads", "By cost head instead")],
+            Run = async (c, i) =>
+            {
+                IContractControlService service = c.Get<IContractControlService>();
+                long contract = await ContractAsync(c, i.Text("Contract")).ConfigureAwait(true);
+                if (i.Flag("Heads"))
+                {
+                    IReadOnlyList<BoqCostHeadRow> heads = Check(await service.BoqByCostHeadAsync(c.CompanyId, contract).ConfigureAwait(true));
+                    return string.Join(Environment.NewLine, heads.Select(h => $"{h.CostHead,-20} BOQ {M(h.BoqValue),14}  measured {M(h.MeasuredValue),14}  cost {M(h.ActualCost),14}"));
+                }
+
+                string csv = i.Optional("File") is string path ? await System.IO.File.ReadAllTextAsync(path).ConfigureAwait(true) : (i.Optional("Lines") ?? string.Empty).Replace(';', '\n');
+                if (i.Flag("Import"))
+                {
+                    return $"{Check(await service.ImportBoqAsync(c.CompanyId, contract, csv).ConfigureAwait(true))} BOQ line(s) imported.";
+                }
+
+                BoqImportPreview preview = Check(await service.PreviewBoqImportAsync(c.CompanyId, contract, csv).ConfigureAwait(true));
+                return $"{preview.Lines.Count} line(s), {preview.ErrorCount} with errors, value {M(preview.TotalValue)}:" + Environment.NewLine + string.Join(Environment.NewLine, preview.Lines.Select(l =>
+                    $"{l.Line,4}  {l.ItemCode,-10} {l.Description,-30} {l.Unit,-6} {(l.Quantity is decimal q ? Q(q) : "-"),10} {(l.Rate is decimal r ? M(r) : "-"),12} {l.CostHead ?? "",-12} {l.Error ?? "OK"}"));
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Measure a BOQ line", Description = "Records the quantity measured to date (never earlier than the last measurement).",
             Fields = [Req("Contract", "Contract number"), Req("Item", "BOQ item ref"), Num("Quantity", "Measured to date"), Today()],
             Run = async (c, i) =>
