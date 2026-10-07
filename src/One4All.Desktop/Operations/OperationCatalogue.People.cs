@@ -201,6 +201,38 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Leave policies", ListTitle = "Leave policies",
+            Description = "Per leave type: yearly days (service bands \"5:24;10:30\" raise them after so many completed years), earned monthly or granted at the leave-year start, "
+                + "joiners pro rata, and a carry-over cap applied as the leave year turns (the excess is forfeited). Run month accrues for a month; the scheduled task does the month just ended.",
+            Fields = [Pick("Step", "Step", ["Save policy", "Run month"]), Req("Type", "Leave type", "ANNUAL"), OptNum("Days", "Days a year"), Tick("Monthly", "Earned monthly", true),
+                Num("Start", "Leave year starts (month)", "1"), OptNum("Cap", "Carry-over cap (days, blank: none)"), Tick("ProRata", "Joiners pro rata", true), Opt("Bands", "Service bands (years:days;...)"),
+                Today("Month", "Month to run")],
+            Run = async (c, i) =>
+            {
+                ILeavePolicyService policies = c.Get<ILeavePolicyService>();
+                if (i.Text("Step") == "Run month")
+                {
+                    LeaveAccrualRun run = Check(await policies.RunMonthAsync(c.CompanyId, i.Date("Month")).ConfigureAwait(true));
+                    return $"{run.Period}: {run.Accrued} balance(s) earned {Q(run.DaysAccrued)} day(s); {Q(run.DaysForfeited)} forfeited; {run.AlreadyRun} already run.";
+                }
+
+                List<(int, decimal)> bands = [];
+                foreach (string band in (i.Optional("Bands") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    string[] bits = band.Split(':', StringSplitOptions.TrimEntries);
+                    bands.Add(bits.Length == 2 && int.TryParse(bits[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int years)
+                        && decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal days) ? (years, days) : throw new OperationException($"Write each band as years:days (\"{band}\")."));
+                }
+
+                return Check(await policies.SavePolicyAsync(new LeavePolicyRequest(c.CompanyId, i.Text("Type"), i.OptionalNumber("Days") ?? 0m, i.Flag("Monthly"), i.Whole("Start"), i.OptionalNumber("Cap"),
+                    i.Flag("ProRata"), bands)).ConfigureAwait(true), "Leave policy saved.");
+            },
+            List = async c => Table(await c.Db.Set<Core.Payroll.LeavePolicy>().AsNoTracking().Include(p => p.Bands).Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.LeaveType).ToListAsync().ConfigureAwait(true),
+                ("Type", p => p.LeaveType), ("Days", p => Q(p.AnnualDays)), ("Monthly", p => p.AccruesMonthly), ("Year starts", p => p.LeaveYearStartMonth), ("Cap", p => p.CarryOverCapDays),
+                ("Bands", p => string.Join("; ", p.Bands.Select(b => $"{b.FromYears}y:{Q(b.AnnualDays)}")))),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Accrue leave", ListTitle = "Leave balances", Description = "Adds days to an employee's leave balance.",
             Fields = [Req("Employee", "Employee number"), Req("Type", "Leave type", "ANNUAL"), Num("Days", "Days")],
             Run = async (c, i) => $"Balance now {Q(Check(await c.Get<ILeaveService>().AccrueAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Type"), i.Number("Days")).ConfigureAwait(true)))} days.",

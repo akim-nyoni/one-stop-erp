@@ -306,6 +306,8 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Reporting.IReportBurstService, Reporting.ReportBurstService>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Pos.FiscalRetryTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Integration.IdempotencyPurgeTask>();
+        services.AddScoped<Application.Abstractions.Payroll.ILeavePolicyService, Payroll.LeavePolicyService>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Payroll.LeaveAccrualTask>();
         services.AddScoped<Application.Abstractions.Pos.IPosEventService, Pos.PosEventService>();
         services.AddScoped<Application.Abstractions.Pos.IPosReceiptService, Pos.PosReceiptService>();
         services.AddScoped<Application.Abstractions.Vouchers.IVoucherService, Vouchers.VoucherService>();
