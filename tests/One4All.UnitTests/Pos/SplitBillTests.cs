@@ -59,4 +59,17 @@ public sealed class SplitBillTests
             new Dictionary<Core.Pos.TenderType, string> { [Core.Pos.TenderType.Voucher] = "2300", [Core.Pos.TenderType.Cash] = "1000" })).Value;
         request.Tenders.Should().Contain(t => t.TenderType == Core.Pos.TenderType.Voucher && t.VoucherNumber == "GC-9" && t.AccountCode == "2300" && t.Amount == 15m);
     }
+
+    [Fact]
+    public void The_basket_needs_no_tenders_and_splits_like_the_sale()
+    {
+        PosTicket ticket = new();
+        ticket.AddLine(0, "Meal", 20.00m, 0.15m, "4000", quantity: 2m);
+        PosSaleContext context = new(1, 1, 1, 1, "S2", new DateOnly(2026, 6, 1), 1, Core.Accounting.CurrencyCode.Parse("USD"), "2200", "1000", new Dictionary<Core.Pos.TenderType, string>());
+        ticket.BuildSale(context).Error.Code.Should().Be("Pos.Underpaid");
+        CompleteSaleRequest basket = ticket.BuildBasket(context).Value;
+        basket.Tenders.Should().BeEmpty();
+        SplitBill.Plan(basket.Lines, SplitBill.Evenly(basket.Lines, 2)).Value.Select(SplitBill.Gross).Should().Equal(23m, 23m);
+        new PosTicket().BuildBasket(context).Error.Code.Should().Be("Pos.Empty");
+    }
 }

@@ -343,6 +343,7 @@
                             <Button Content="PAY / COMPLETE" Style="{StaticResource PadButton}" Height="72" FontSize="22" Background="#27AE60" Command="{Binding PayCommand}" />
                             <UniformGrid Columns="2">
                                 <Button Content="Clear Tenders" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#7F8C8D" Command="{Binding ClearTendersCommand}" />
+                                <Button Content="Split Bill" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#B9770E" Click="SplitBill_Click" />
                                 <Button Content="New Sale" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#7F8C8D" Command="{Binding NewSaleCommand}" />
                                 <Button Content="X-Read" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#34495E" Command="{Binding XReadCommand}" />
                                 <Button Content="Z / Close" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#C0392B" Command="{Binding CloseTillCommand}" />

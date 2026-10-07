@@ -67,6 +67,20 @@ public partial class PosTerminalWindow : Window
 
     private void SetBrush(string key, Color color) => Resources[key] = new SolidColorBrush(color);
 
+    private async void SplitBill_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.SplitBasket() is not { } lines)
+        {
+            return;
+        }
+
+        SplitBillWindow dialog = new(lines) { Owner = this };
+        if (dialog.ShowDialog() == true)
+        {
+            await _viewModel.CompleteSplitAsync(dialog.Parts, dialog.Payments).ConfigureAwait(true);
+        }
+    }
+
     private async void PrintReceipt_Click(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(_viewModel.LastReceiptText))

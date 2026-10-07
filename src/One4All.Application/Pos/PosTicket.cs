@@ -353,22 +353,16 @@ public sealed class PosTicket
     /// <returns>The request, or an error when the ticket is empty, underpaid, or a tender account is missing.</returns>
     public Result<CompleteSaleRequest> BuildSale(PosSaleContext context)
     {
-        if (_lines.Count == 0)
-        {
-            return Error.Validation("Pos.Empty", "The ticket has no lines.");
-        }
-
-        if (!IsFullyTendered)
+        if (_lines.Count > 0 && !IsFullyTendered)
         {
             return Error.Rule("Pos.Underpaid", $"The ticket is short by {BalanceDue:0.00}.");
         }
 
-        if (_lines.Any(l => l.Discount > 0m) && string.IsNullOrWhiteSpace(context.DiscountAccountCode))
+        Result<CompleteSaleRequest> basket = BuildBasket(context);
+        if (basket.IsFailure)
         {
-            return Error.Validation("Pos.DiscountAccount", "No discount account is configured for discounted lines.");
+            return basket;
         }
-
-        List<PosSaleLineRequest> lines = [.. SaleLines(context.DiscountAccountCode)];
 
         List<PosTenderRequest> tenders = [];
         foreach (PosTicketTender tender in _tenders)
@@ -391,6 +385,32 @@ public sealed class PosTicket
             tenders.Add(new PosTenderRequest(TenderType.Cash, context.Currency, ChangeDue, context.ChangeAccountCode, IsChange: true));
         }
 
+        CompleteSaleRequest sale = basket.Value;
+        return new CompleteSaleRequest
+        {
+            CompanyId = sale.CompanyId, TerminalId = sale.TerminalId, TillSessionId = sale.TillSessionId, CashierUserId = sale.CashierUserId, SaleNumber = sale.SaleNumber,
+            SaleDate = sale.SaleDate, WarehouseId = sale.WarehouseId, TaxAccountCode = sale.TaxAccountCode, AgeVerified = sale.AgeVerified,
+            PrescriptionReference = sale.PrescriptionReference, Lines = sale.Lines, Tenders = tenders,
+        };
+    }
+
+    /// <summary>The ticket's lines as a sale with no tenders yet — the basket a split bill shares out among its payers.</summary>
+    /// <param name="context">The surrounding session and account mapping.</param>
+    /// <returns>The basket, or an error when the ticket is empty or a discounted line has no discount account.</returns>
+    public Result<CompleteSaleRequest> BuildBasket(PosSaleContext context)
+    {
+        if (_lines.Count == 0)
+        {
+            return Error.Validation("Pos.Empty", "The ticket has no lines.");
+        }
+
+        if (_lines.Any(l => l.Discount > 0m) && string.IsNullOrWhiteSpace(context.DiscountAccountCode))
+        {
+            return Error.Validation("Pos.DiscountAccount", "No discount account is configured for discounted lines.");
+        }
+
+        List<PosSaleLineRequest> lines = [.. SaleLines(context.DiscountAccountCode)];
+
         return new CompleteSaleRequest
         {
             CompanyId = context.CompanyId,
@@ -404,7 +424,6 @@ public sealed class PosTicket
             AgeVerified = context.AgeVerified,
             PrescriptionReference = context.PrescriptionReference,
             Lines = lines,
-            Tenders = tenders,
         };
     }
 }

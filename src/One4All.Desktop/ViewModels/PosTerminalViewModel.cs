@@ -945,6 +945,124 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             return;
         }
 
+        string saleNumber = $"POS{_terminalId}-{DateTime.Now:yyMMddHHmmss}-{++_saleSequence}";
+        PosSaleContext context = SaleContext(saleNumber);
+        Result<CompleteSaleRequest> build = _ticket.BuildSale(context);
+        if (build.IsFailure)
+        {
+            StatusMessage = build.Error.Message;
+            return;
+        }
+
+        CompleteSaleRequest request = build.Value;
+        decimal change = _ticket.ChangeDue;
+        await CompleteAsync(request, saleNumber, change).ConfigureAwait(true);
+    }
+
+    /// <summary>The basket to split among payers, or null (with the reason shown) when there is nothing to split.</summary>
+    /// <returns>The basket's lines.</returns>
+    public IReadOnlyList<PosSaleLineRequest>? SplitBasket()
+    {
+        if (!IsSessionOpen || _ticket.Lines.Count == 0)
+        {
+            StatusMessage = "Add items first.";
+            return null;
+        }
+
+        Result<CompleteSaleRequest> basket = _ticket.BuildBasket(SaleContext("split"));
+        if (basket.IsFailure)
+        {
+            StatusMessage = basket.Error.Message;
+            return null;
+        }
+
+        return basket.Value.Lines;
+    }
+
+    /// <summary>
+    /// Completes a split bill: each payer's share becomes its own sale, paid in full by the payer's tender (cash and card take the exact
+    /// amount), all posted together; their receipts follow one another. Needs the connection.
+    /// </summary>
+    /// <param name="parts">Each payer's shares of the lines.</param>
+    /// <param name="payments">How each payer pays.</param>
+    /// <returns>A task.</returns>
+    public async Task CompleteSplitAsync(IReadOnlyList<IReadOnlyList<SplitShare>> parts, IReadOnlyList<SplitPayment> payments)
+    {
+        string saleNumber = $"POS{_terminalId}-{DateTime.Now:yyMMddHHmmss}-{++_saleSequence}";
+        PosSaleContext context = SaleContext(saleNumber);
+        Result<CompleteSaleRequest> basket = _ticket.BuildBasket(context);
+        Result<IReadOnlyList<IReadOnlyList<PosSaleLineRequest>>> plan = basket.IsSuccess ? SplitBill.Plan(basket.Value.Lines, parts) : basket.Error;
+        if (plan.IsFailure)
+        {
+            StatusMessage = plan.Error.Message;
+            return;
+        }
+
+        List<IReadOnlyList<PosTenderRequest>> tenders = [];
+        for (int p = 0; p < parts.Count; p++)
+        {
+            if (!context.TenderAccounts.TryGetValue(payments[p].TenderType, out string? account))
+            {
+                StatusMessage = $"No GL account is configured for {payments[p].TenderType} tenders.";
+                return;
+            }
+
+            tenders.Add([new PosTenderRequest(payments[p].TenderType, _currency, SplitBill.Gross(plan.Value[p]), account, IsChange: false, VoucherNumber: payments[p].VoucherNumber)]);
+        }
+
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            Result<IReadOnlyList<CompleteSaleResult>> result = await scope.ServiceProvider.GetRequiredService<IPosService>()
+                .SplitBillAsync(new SplitBillRequest { Basket = basket.Value, Parts = parts, Tenders = tenders }).ConfigureAwait(true);
+            if (result.IsFailure)
+            {
+                StatusMessage = $"Split bill not posted: {result.Error.Message}";
+                return;
+            }
+
+            IPosReceiptService receipts = scope.ServiceProvider.GetRequiredService<IPosReceiptService>();
+            List<string> slips = [];
+            foreach (CompleteSaleResult sale in result.Value)
+            {
+                Result<string> receipt = await receipts.RenderReceiptTextAsync(context.CompanyId, sale.SaleId).ConfigureAwait(true);
+                if (receipt.IsSuccess)
+                {
+                    slips.Add(receipt.Value);
+                }
+            }
+
+            LastReceiptText = string.Join(Environment.NewLine + new string('-', 40) + Environment.NewLine, slips);
+            IDeviceProvider devices = scope.ServiceProvider.GetRequiredService<IDeviceProvider>();
+            string? printed = null;
+            if (devices.Printer is IReceiptPrinter printer)
+            {
+                foreach (string slip in slips)
+                {
+                    printed ??= await printer.PrintAsync(EscPosBuilder.Receipt(slip, false)).ConfigureAwait(true);
+                }
+            }
+
+            _ticket.Clear();
+            AgeVerified = false;
+            PrescriptionReference = string.Empty;
+            RebuildCart();
+            StatusMessage = $"Bill split into {result.Value.Count} sales ({string.Join(", ", result.Value.Select(s => s.TotalGross.ToString("N2", CultureInfo.CurrentCulture)))})."
+                + (printed is null ? string.Empty : $" Receipts not printed: {printed}");
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            StatusMessage = "A split bill needs the connection; take one payment for the whole bill to sell offline.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Split bill not posted: {ex.Message}";
+        }
+    }
+
+    // The sale's session, accounts and checks as the till is set up now.
+    private PosSaleContext SaleContext(string saleNumber)
+    {
         Dictionary<TenderType, string> tenderAccounts = new();
         if (!string.IsNullOrWhiteSpace(CashAccountCode))
         {
@@ -966,8 +1084,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             tenderAccounts[TenderType.Voucher] = GiftCardAccountCode.Trim();
         }
 
-        string saleNumber = $"POS{_terminalId}-{DateTime.Now:yyMMddHHmmss}-{++_saleSequence}";
-        PosSaleContext context = new(
+        return new(
             _companyId, _terminalId, TillSessionId, _cashierUserId,
             saleNumber, DateOnly.FromDateTime(DateTime.Today), _warehouseId, _currency,
             TaxAccountCode: string.IsNullOrWhiteSpace(TaxAccountCode) ? null : TaxAccountCode.Trim(),
@@ -976,17 +1093,10 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             AgeVerified: AgeVerified,
             PrescriptionReference: string.IsNullOrWhiteSpace(PrescriptionReference) ? null : PrescriptionReference.Trim(),
             DiscountAccountCode: NullIfBlank(DiscountAccountCode));
+    }
 
-        Result<CompleteSaleRequest> build = _ticket.BuildSale(context);
-        if (build.IsFailure)
-        {
-            StatusMessage = build.Error.Message;
-            return;
-        }
-
-        CompleteSaleRequest request = build.Value;
-        decimal change = _ticket.ChangeDue;
-
+    private async Task CompleteAsync(CompleteSaleRequest request, string saleNumber, decimal change)
+    {
         try
         {
             await using AsyncServiceScope scope = _services.CreateAsyncScope();
@@ -1023,6 +1133,11 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             PrescriptionReference = string.Empty;
             RebuildCart();
             StatusMessage = $"Sale {saleNumber} posted (journal {result.Value.JournalNumber}). Change {change:N2}.{loyalty}{(printed is null ? string.Empty : $" Receipt not printed: {printed}")}";
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex) && request.Tenders.Any(t => t.TenderType == TenderType.Voucher))
+        {
+            // A gift card's balance cannot be checked or charged offline, so a voucher sale is not queued.
+            StatusMessage = "Offline: gift cards cannot be taken without the connection. Clear the voucher tender and take another payment.";
         }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
         {
