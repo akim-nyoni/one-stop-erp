@@ -121,4 +121,20 @@ public sealed class ReportElement
 
     /// <summary>Conditional-formatting rules applied in order.</summary>
     public List<ConditionalFormat> ConditionalFormats { get; set; } = [];
+
+    /// <summary>For a sub-report: the code of the report run inside this element.</summary>
+    public string? SubReportCode { get; set; }
+
+    /// <summary>For a sub-report: which of the child's parameters take which parent field (or parent parameter).</summary>
+    public List<SubReportLink> SubReportLinks { get; set; } = [];
+}
+
+/// <summary>Links one parameter of a sub-report to a field of the parent row (or a parent parameter of that name).</summary>
+public sealed class SubReportLink
+{
+    /// <summary>The child report's parameter.</summary>
+    public string ChildParameter { get; set; } = string.Empty;
+
+    /// <summary>The parent row's field (or parameter) whose value it takes.</summary>
+    public string ParentField { get; set; } = string.Empty;
 }

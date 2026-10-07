@@ -45,12 +45,7 @@ public sealed class ReportRunner : IReportRunner
             return Error.NotFound("Report.NotFound", $"No report definition found for code '{reportCode}'.");
         }
 
-        string command = definition.DataSources.Count == 0 ? reportCode : ReportCommands.For(definition);
-        IReportDataProvider? provider = _providers.FirstOrDefault(p => p.CanHandle(command));
-        IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = provider is null
-            ? []
-            : await provider.GetRowsAsync(companyId, command, parameters, ct).ConfigureAwait(false);
-        rows = Application.Security.FieldSensitivity.Strip(rows, hiddenFields);
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = await RowsAsync(companyId, reportCode, definition, parameters, hiddenFields, ct).ConfigureAwait(false);
 
         var company = await _db.Companies.Where(c => c.Id == companyId).Select(c => new { c.Name, c.Locale }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         Dictionary<string, string> terms = await _db.TerminologyOverrides.AsNoTracking().Where(t => t.CompanyId == companyId)
@@ -65,9 +60,79 @@ public sealed class ReportRunner : IReportRunner
             Parameters = parameters,
             Culture = company?.Locale is string locale ? System.Globalization.CultureInfo.GetCultureInfo(locale) : null,
             Terminology = terms,
+            SubReports = await SubReportsAsync(companyId, definition, rows, parameters, hiddenFields, 0, new SubReportBudget(), ct).ConfigureAwait(false),
         };
 
         return Render(input, format, reportCode.ToLowerInvariant());
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RowsAsync(long companyId, string reportCode, ReportDefinition definition, IReadOnlyDictionary<string, object?> parameters,
+        IReadOnlySet<Application.Security.SensitiveField> hiddenFields, CancellationToken ct)
+    {
+        string command = definition.DataSources.Count == 0 ? reportCode : ReportCommands.For(definition);
+        IReportDataProvider? provider = _providers.FirstOrDefault(p => p.CanHandle(command));
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = provider is null
+            ? []
+            : await provider.GetRowsAsync(companyId, command, parameters, ct).ConfigureAwait(false);
+        return Application.Security.FieldSensitivity.Strip(rows, hiddenFields);
+    }
+
+    // How many child runs one report may fetch in all, across every level of nesting.
+    private sealed class SubReportBudget
+    {
+        public int Remaining { get; set; } = 500;
+    }
+
+    // Each sub-report is fetched once per distinct parameter set (a per-row band links its parameters from every row), nested
+    // sub-reports in turn, so the engine can lay them out without touching the database.
+    private async Task<Func<string, IReadOnlyDictionary<string, object?>, ReportInput?>?> SubReportsAsync(long companyId, ReportDefinition definition,
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, IReadOnlyDictionary<string, object?> parameters, IReadOnlySet<Application.Security.SensitiveField> hiddenFields,
+        int depth, SubReportBudget budget, CancellationToken ct)
+    {
+        List<(ReportElement Element, bool PerRow)> elements = [.. SubReports.ElementsOf(definition)];
+        if (elements.Count == 0 || depth >= SubReports.MaxDepth)
+        {
+            return null;
+        }
+
+        Dictionary<string, ReportInput?> fetched = new(StringComparer.Ordinal);
+        Dictionary<string, ReportDefinition?> definitions = new(StringComparer.OrdinalIgnoreCase);
+        foreach ((ReportElement element, bool perRow) in elements)
+        {
+            string code = element.SubReportCode!.Trim();
+            if (!definitions.TryGetValue(code, out ReportDefinition? child))
+            {
+                child = await ResolveDefinitionAsync(companyId, code, ct).ConfigureAwait(false) ?? BuiltInDefinition(code);
+                definitions[code] = child;
+            }
+
+            IEnumerable<IReadOnlyDictionary<string, object?>?> sources = perRow ? rows : [null];
+            foreach (IReadOnlyDictionary<string, object?>? row in sources)
+            {
+                IReadOnlyDictionary<string, object?> childParameters = SubReports.ParametersFor(element, parameters, row);
+                string key = SubReports.Key(code, childParameters);
+                if (fetched.ContainsKey(key))
+                {
+                    continue;
+                }
+
+                if (child is null || budget.Remaining <= 0)
+                {
+                    fetched[key] = null;
+                    continue;
+                }
+
+                budget.Remaining--;
+                IReadOnlyList<IReadOnlyDictionary<string, object?>> childRows = await RowsAsync(companyId, code, child, childParameters, hiddenFields, ct).ConfigureAwait(false);
+                fetched[key] = new ReportInput
+                {
+                    Definition = child, Rows = childRows, Parameters = childParameters,
+                    SubReports = await SubReportsAsync(companyId, child, childRows, childParameters, hiddenFields, depth + 1, budget, ct).ConfigureAwait(false),
+                };
+            }
+        }
+
+        return (code, childParameters) => fetched.GetValueOrDefault(SubReports.Key(code, childParameters));
     }
 
     private Result<RenderedDocument> Render(ReportInput input, ReportFormat format, string baseName)

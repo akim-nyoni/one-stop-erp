@@ -135,20 +135,24 @@ public sealed class PdfReportRenderer : IReportRenderer
 
         aligned.Text(text =>
         {
-            TextSpanDescriptor span = text.Span(cell.Text).FontSize((float)cell.FontSize).FontColor(cell.Foreground);
-            if (cell.Bold)
+            IEnumerable<RichRun> runs = cell.Runs is { Count: > 0 } rich ? rich : [new RichRun(cell.Text, cell.Bold, cell.Italic, cell.Underline)];
+            foreach (RichRun run in runs)
             {
-                span.Bold();
-            }
+                TextSpanDescriptor span = text.Span(run.LineBreak ? "\n" : run.Text).FontSize((float)cell.FontSize).FontColor(cell.Foreground);
+                if (run.Bold || cell.Bold)
+                {
+                    span.Bold();
+                }
 
-            if (cell.Italic)
-            {
-                span.Italic();
-            }
+                if (run.Italic || cell.Italic)
+                {
+                    span.Italic();
+                }
 
-            if (cell.Underline)
-            {
-                span.Underline();
+                if (run.Underline || cell.Underline)
+                {
+                    span.Underline();
+                }
             }
         });
     }

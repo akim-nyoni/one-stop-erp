@@ -98,6 +98,12 @@ public enum ElementKind
 
     /// <summary>A bar chart of a value field by a category field over the band's scope (drawn as bars and labels, so every renderer shows it).</summary>
     Chart = 10,
+
+    /// <summary>Text with **bold**, *italic*, __underline__, line breaks and {Field} placeholders.</summary>
+    RichText = 11,
+
+    /// <summary>Another report run inside this one, its parameters linked from the parent row.</summary>
+    SubReport = 12,
 }
 
 /// <summary>Horizontal text alignment.</summary>

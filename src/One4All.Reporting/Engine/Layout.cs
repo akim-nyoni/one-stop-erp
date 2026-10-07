@@ -124,7 +124,23 @@ public static class ReportLayout
     {
         Kind = c.Kind, Text = text, X = c.X, Y = c.Y, Width = c.Width, Height = c.Height, FontFamily = c.FontFamily, FontSize = c.FontSize, Bold = c.Bold, Italic = c.Italic,
         Underline = c.Underline, Foreground = c.Foreground, Background = c.Background, HAlign = c.HAlign, BorderThickness = c.BorderThickness, BorderColor = c.BorderColor,
-        DrillTarget = c.DrillTarget, DrillKey = c.DrillKey,
+        DrillTarget = c.DrillTarget, DrillKey = c.DrillKey, Runs = c.Runs is null ? null : [new RichRun(text)],
+    };
+}
+
+/// <summary>Helpers for repositioning rendered cells.</summary>
+public static class Layouts
+{
+    /// <summary>A copy of a cell at a new position.</summary>
+    /// <param name="c">The cell.</param>
+    /// <param name="x">Its new left.</param>
+    /// <param name="y">Its new top.</param>
+    /// <returns>The moved cell.</returns>
+    public static RenderCell Moved(RenderCell c, double x, double y) => new()
+    {
+        Kind = c.Kind, Text = c.Text, X = x, Y = y, Width = c.Width, Height = c.Height, FontFamily = c.FontFamily, FontSize = c.FontSize, Bold = c.Bold, Italic = c.Italic,
+        Underline = c.Underline, Foreground = c.Foreground, Background = c.Background, HAlign = c.HAlign, BorderThickness = c.BorderThickness, BorderColor = c.BorderColor,
+        DrillTarget = c.DrillTarget, DrillKey = c.DrillKey, Runs = c.Runs,
     };
 }
 

@@ -31,6 +31,12 @@ public sealed class ReportInput
 
     /// <summary>Gets the company's terminology applied to labels (term → its word).</summary>
     public IReadOnlyDictionary<string, string>? Terminology { get; init; }
+
+    /// <summary>Supplies a sub-report's input for its code and parameters (null when it cannot be run); without it sub-reports show a note.</summary>
+    public Func<string, IReadOnlyDictionary<string, object?>, ReportInput?>? SubReports { get; init; }
+
+    /// <summary>How deep this report is nested as a sub-report (0 for the report itself).</summary>
+    public int Depth { get; init; }
 }
 
 /// <summary>A resolved, positioned cell ready to render.</summary>
@@ -89,6 +95,9 @@ public sealed class RenderCell
 
     /// <summary>Gets the key of the record it opens.</summary>
     public string? DrillKey { get; init; }
+
+    /// <summary>For rich text: the runs to draw (the plain text is in <see cref="Text"/>).</summary>
+    public IReadOnlyList<RichRun>? Runs { get; init; }
 }
 
 /// <summary>A resolved band ready to render.</summary>
@@ -98,7 +107,7 @@ public sealed class RenderBand
     public BandType Type { get; init; }
 
     /// <summary>The band height in points.</summary>
-    public double Height { get; init; }
+    public double Height { get; set; }
 
     /// <summary>The resolved cells.</summary>
     public List<RenderCell> Cells { get; init; } = [];

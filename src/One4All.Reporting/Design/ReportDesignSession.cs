@@ -63,7 +63,7 @@ public sealed class ReportDesignSession
         nameof(ReportElement.FontFamily), nameof(ReportElement.FontSize), nameof(ReportElement.Bold), nameof(ReportElement.Italic), nameof(ReportElement.Underline),
         nameof(ReportElement.Foreground), nameof(ReportElement.Background), nameof(ReportElement.HAlign), nameof(ReportElement.BorderThickness), nameof(ReportElement.BorderColor),
         nameof(ReportElement.SuppressWhen), nameof(ReportElement.DrillTarget), nameof(ReportElement.DrillField),
-        nameof(ReportElement.ChartCategoryField), nameof(ReportElement.ChartColor),
+        nameof(ReportElement.ChartCategoryField), nameof(ReportElement.ChartColor), nameof(ReportElement.SubReportCode), nameof(ReportElement.SubReportLinks),
     ];
 
     private const int MaxUndo = 200;
@@ -319,9 +319,35 @@ public sealed class ReportDesignSession
     /// <param name="property">The property.</param>
     /// <returns>The text, or null.</returns>
     public string? GetProperty(string name, string property)
-        => Find(name).Element is ReportElement element && Property(property) is PropertyInfo info
-            ? Convert.ToString(info.GetValue(element), CultureInfo.InvariantCulture)
+        => Find(name).Element is not ReportElement element ? null
+            : property == nameof(ReportElement.SubReportLinks) ? FormatLinks(element.SubReportLinks)
+            : Property(property) is PropertyInfo info ? Convert.ToString(info.GetValue(element), CultureInfo.InvariantCulture)
             : null;
+
+    /// <summary>Sub-report links as text: <c>ChildParameter=ParentField</c> pairs separated by semicolons.</summary>
+    /// <param name="links">The links.</param>
+    /// <returns>The text.</returns>
+    public static string FormatLinks(IEnumerable<SubReportLink> links) => string.Join("; ", links.Select(l => $"{l.ChildParameter}={l.ParentField}"));
+
+    /// <summary>Reads sub-report links from text (<c>ChildParameter=ParentField; ...</c>; a bare name links a parameter to the field of the same name).</summary>
+    /// <param name="text">The text.</param>
+    /// <returns>The links, or why the text is not valid.</returns>
+    public static (List<SubReportLink> Links, string? Problem) ParseLinks(string? text)
+    {
+        List<SubReportLink> links = [];
+        foreach (string part in (text ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] sides = part.Split('=', StringSplitOptions.TrimEntries);
+            if (sides.Length > 2 || sides.Any(s => s.Length == 0 || !s.All(c => char.IsLetterOrDigit(c) || c == '_')))
+            {
+                return ([], $"\"{part}\" is not Parameter=Field.");
+            }
+
+            links.Add(new SubReportLink { ChildParameter = sides[0], ParentField = sides.Length == 2 ? sides[1] : sides[0] });
+        }
+
+        return (links, null);
+    }
 
     /// <summary>Sets an editable property from text, converting to its type.</summary>
     /// <param name="name">The element.</param>
@@ -333,6 +359,19 @@ public sealed class ReportDesignSession
         if (Find(name) is not (ReportElement element, ReportBand band))
         {
             return $"No element {name}.";
+        }
+
+        if (property == nameof(ReportElement.SubReportLinks))
+        {
+            (List<SubReportLink> links, string? problem) = ParseLinks(value);
+            if (problem is not null)
+            {
+                return problem;
+            }
+
+            Checkpoint();
+            element.SubReportLinks = links;
+            return null;
         }
 
         if (Property(property) is not PropertyInfo info)

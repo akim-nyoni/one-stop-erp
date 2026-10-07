@@ -103,6 +103,26 @@ public sealed class HtmlReportRenderer : IReportRenderer
                 sb.Append(";border:").Append(Px(Math.Max(cell.BorderThickness, 1))).Append("px solid ").Append(cell.BorderColor);
             }
 
+            if (cell.Runs is { Count: > 0 } runs)
+            {
+                sb.Append(";overflow:hidden\">");
+                foreach (RichRun run in runs)
+                {
+                    if (run.LineBreak)
+                    {
+                        sb.Append("<br>");
+                        continue;
+                    }
+
+                    string open = (run.Bold ? "<strong>" : string.Empty) + (run.Italic ? "<em>" : string.Empty) + (run.Underline ? "<u>" : string.Empty);
+                    string close = (run.Underline ? "</u>" : string.Empty) + (run.Italic ? "</em>" : string.Empty) + (run.Bold ? "</strong>" : string.Empty);
+                    sb.Append(open).Append(Escape(run.Text)).Append(close);
+                }
+
+                sb.Append("</div>");
+                continue;
+            }
+
             sb.Append("\">").Append(Escape(cell.Text)).Append("</div>");
         }
 

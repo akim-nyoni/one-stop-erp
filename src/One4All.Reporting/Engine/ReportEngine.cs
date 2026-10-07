@@ -154,11 +154,22 @@ public sealed class ReportEngine
                 continue;
             }
 
+            if (element.Kind == ElementKind.SubReport)
+            {
+                PlaceSubReport(rendered, element, input, row);
+                continue;
+            }
+
+            IReadOnlyList<RichRun>? runs = element.Kind == ElementKind.RichText
+                ? RichText.Parse(Label(element, input), name => ctx.Fields.TryGetValue(name, out object? value) ? value : input.Parameters.GetValueOrDefault(name), element.Format, input.Culture)
+                : null;
+
             string text = element.Kind switch
             {
                 ElementKind.Checkbox => Truthy(ctx.Fields.GetValueOrDefault(element.FieldName ?? string.Empty)) ? "☑" : "☐",
                 ElementKind.Signature => Label(element, input) is { Length: > 0 } caption ? caption : "Signature",
                 ElementKind.Aggregate => NumberToWords.Format(ComputeAggregate(element, scope, row, input.Rows), element.Format, input.Culture),
+                ElementKind.RichText => RichText.Plain(runs!),
                 _ => ResolveText(element, ctx, scope, input),
             };
             (string foreground, string? background, bool bold) = ApplyConditionalFormats(element, ctx);
@@ -184,10 +195,38 @@ public sealed class ReportEngine
                 BorderColor = element.BorderColor,
                 DrillTarget = drillTarget,
                 DrillKey = drillKey,
+                Runs = runs,
             });
         }
 
         return rendered;
+    }
+
+    // The child report built with the linked parameters and laid into the element's box; the band grows to hold it.
+    private void PlaceSubReport(RenderBand band, ReportElement element, ReportInput input, IReadOnlyDictionary<string, object?>? row)
+    {
+        ReportInput? child = input.Depth >= SubReports.MaxDepth || input.SubReports is null
+            ? null
+            : input.SubReports(element.SubReportCode ?? string.Empty, SubReports.ParametersFor(element, input.Parameters, row));
+        if (child is null)
+        {
+            band.Cells.Add(new RenderCell
+            {
+                Kind = ElementKind.Label, Text = $"(sub-report {element.SubReportCode} not available)", X = element.X, Y = element.Y, Width = element.Width, Height = element.Height,
+                FontFamily = element.FontFamily, FontSize = element.FontSize, Italic = true, Foreground = "#808080",
+            });
+            return;
+        }
+
+        RenderModel built = Build(new ReportInput
+        {
+            Definition = child.Definition, Rows = child.Rows, Parameters = child.Parameters, UserName = input.UserName, CompanyName = input.CompanyName, PrintDate = input.PrintDate,
+            ToBase = child.ToBase ?? input.ToBase, Culture = child.Culture ?? input.Culture, Terminology = child.Terminology ?? input.Terminology, SubReports = child.SubReports ?? input.SubReports,
+            Depth = input.Depth + 1,
+        });
+        (List<RenderCell> cells, double height) = SubReports.Place(element, built);
+        band.Cells.AddRange(cells);
+        band.Height = Math.Max(band.Height, element.Y + Math.Max(height, 0));
     }
 
     private string ResolveText(ReportElement element, ReportExpressionContext ctx, IReadOnlyList<IReadOnlyDictionary<string, object?>> scope, ReportInput input) => element.Kind switch

@@ -183,6 +183,8 @@ public partial class BandedDesignerWindow : Window
             ElementKind.Checkbox => $"☐ [{element.FieldName}]",
             ElementKind.Signature => $"____________ {element.Text}",
             ElementKind.Chart => $"▇▅▃ chart of {element.AggregateField} by {element.ChartCategoryField ?? "(set ChartCategoryField)"}",
+            ElementKind.RichText => $"¶ {element.Text}",
+            ElementKind.SubReport => $"⧉ sub-report {element.SubReportCode ?? "(set SubReportCode)"} {ReportDesignSession.FormatLinks(element.SubReportLinks)}",
             _ => element.Text ?? string.Empty,
         };
         Grid visual = new() { Width = Math.Max(4, element.Width * Zoom), Height = Math.Max(element.Kind == ElementKind.Line ? 3 : 6, element.Height * Zoom), Tag = element.Name, Cursor = Cursors.SizeAll };
@@ -387,6 +389,10 @@ public partial class BandedDesignerWindow : Window
     private void AddSignature_Click(object sender, RoutedEventArgs e) => Add(ElementKind.Label, "Authorised signature", ElementKind.Signature, 200, 32);
 
     private void AddChart_Click(object sender, RoutedEventArgs e) => Add(ElementKind.Field, FieldList.SelectedItem as string, ElementKind.Chart, 360, 140);
+
+    private void AddRichText_Click(object sender, RoutedEventArgs e) => Add(ElementKind.Label, "**Bold** and *italic* text with {Field} values", ElementKind.RichText, 300, 40);
+
+    private void AddSubReport_Click(object sender, RoutedEventArgs e) => Add(ElementKind.Label, null, ElementKind.SubReport, 400, 60);
 
     private void Field_DoubleClick(object sender, MouseButtonEventArgs e)
     {
