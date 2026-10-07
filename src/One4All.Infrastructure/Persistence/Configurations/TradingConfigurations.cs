@@ -301,3 +301,36 @@ internal sealed class TraderContactConfiguration : IEntityTypeConfiguration<Trad
         b.HasIndex(x => new { x.CompanyId, x.Ledger, x.TraderId });
     }
 }
+
+internal sealed class PaymentRunBatchConfiguration : IEntityTypeConfiguration<PaymentRunBatch>
+{
+    public void Configure(EntityTypeBuilder<PaymentRunBatch> b)
+    {
+        b.ToTable("payment_run", Schemas.AccountsPayable, t => t.HasCheckConstraint("ck_payment_run_approver", "approved_by_user_id IS NULL OR approved_by_user_id <> proposed_by_user_id"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Number).HasMaxLength(30);
+        b.Property(x => x.BankAccountCode).HasMaxLength(20);
+        b.Property(x => x.WithholdingTaxCode).HasMaxLength(20);
+        b.Property(x => x.EftLayoutCode).HasMaxLength(20);
+        b.Property(x => x.Currency).HasMaxLength(3);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.Number }).IsUnique();
+        b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.PaymentRunBatchId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class PaymentRunBatchLineConfiguration : IEntityTypeConfiguration<PaymentRunBatchLine>
+{
+    public void Configure(EntityTypeBuilder<PaymentRunBatchLine> b)
+    {
+        b.ToTable("payment_run_line", Schemas.AccountsPayable);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.SupplierCode).HasMaxLength(20);
+        b.Property(x => x.Currency).HasMaxLength(3);
+        b.Property(x => x.Due).HasPrecision(19, 4);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Note).HasMaxLength(100);
+        b.Property(x => x.PaymentNumber).HasMaxLength(30);
+    }
+}

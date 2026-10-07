@@ -28,6 +28,9 @@ public sealed class PaymentRunRequest
 
     /// <summary>Gets the bank file layout the EFT file is written in (the generic pipe-delimited file when null).</summary>
     public string? EftLayoutCode { get; init; }
+
+    /// <summary>Only invoices in this currency (all when blank).</summary>
+    public string? Currency { get; init; }
 }
 
 /// <summary>One supplier's line in a payment run.</summary>
@@ -103,4 +106,38 @@ public interface IPaymentRunService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The proposal.</returns>
     Task<Result<PaymentRunProposal>> ProposeAsync(PaymentRunRequest request, CancellationToken ct = default);
+
+    /// <summary>Saves a proposed run for review: every supplier due, held ones left out with the reason.</summary>
+    /// <param name="request">The selection.</param>
+    /// <param name="proposedByUserId">Who proposes it.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The saved run.</returns>
+    Task<Result<SavedPaymentRun>> SaveProposalAsync(PaymentRunRequest request, long proposedByUserId, CancellationToken ct = default);
+
+    /// <summary>Leaves a supplier out of a saved run, puts them back, or part-pays them (up to what is due).</summary>
+    Task<Result<SavedPaymentRun>> SetLineAsync(long companyId, string runNumber, string supplierCode, string currency, bool included, decimal? amount, CancellationToken ct = default);
+
+    /// <summary>Approves a saved run (not by its proposer) and pays exactly what it holds.</summary>
+    Task<Result<PaymentRunResult>> ApproveAsync(long companyId, string runNumber, long approvedByUserId, CancellationToken ct = default);
+
+    /// <summary>Withdraws a saved run before approval.</summary>
+    Task<Result> CancelAsync(long companyId, string runNumber, CancellationToken ct = default);
+
+    /// <summary>A saved run.</summary>
+    Task<Result<SavedPaymentRun>> GetAsync(long companyId, string runNumber, CancellationToken ct = default);
 }
+
+/// <summary>A saved payment run and its lines.</summary>
+/// <param name="Number">Its number.</param>
+/// <param name="Status">Where it stands.</param>
+/// <param name="PaymentDate">The payment date.</param>
+/// <param name="Lines">The proposed payments.</param>
+public sealed record SavedPaymentRun(string Number, Core.Trading.PaymentRunStatus Status, DateOnly PaymentDate, IReadOnlyList<SavedPaymentLine> Lines)
+{
+    /// <summary>What it pays, by currency.</summary>
+    public IReadOnlyDictionary<string, decimal> TotalByCurrency => Lines.Where(l => l.Included).GroupBy(l => l.Currency, StringComparer.Ordinal)
+        .ToDictionary(g => g.Key, g => g.Sum(l => l.Amount), StringComparer.Ordinal);
+}
+
+/// <summary>One saved proposed payment.</summary>
+public sealed record SavedPaymentLine(string SupplierCode, string Currency, decimal Due, decimal Amount, bool Included, string? Note, string? PaymentNumber);

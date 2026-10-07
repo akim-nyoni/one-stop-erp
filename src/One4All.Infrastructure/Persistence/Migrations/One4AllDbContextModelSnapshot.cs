@@ -25762,6 +25762,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<bool>("PaymentRunApprovalRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("payment_run_approval_required");
+
                     b.Property<bool>("PayrollApprovalRequired")
                         .HasColumnType("boolean")
                         .HasColumnName("payroll_approval_required");
@@ -27380,6 +27384,165 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_payment_promise_company_id_status_pay_by");
 
                     b.ToTable("payment_promise", "ar");
+                });
+
+            modelBuilder.Entity("One4All.Core.Trading.PaymentRunBatch", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<string>("BankAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("bank_account_code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<DateOnly>("DueOnOrBefore")
+                        .HasColumnType("date")
+                        .HasColumnName("due_on_or_before");
+
+                    b.Property<string>("EftLayoutCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("eft_layout_code");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("number");
+
+                    b.Property<DateOnly>("PaymentDate")
+                        .HasColumnType("date")
+                        .HasColumnName("payment_date");
+
+                    b.Property<long>("ProposedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("proposed_by_user_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("WithholdingTaxCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("withholding_tax_code");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payment_run");
+
+                    b.HasIndex("CompanyId", "Number")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payment_run_company_id_number");
+
+                    b.ToTable("payment_run", "ap", t =>
+                        {
+                            t.HasCheckConstraint("ck_payment_run_approver", "approved_by_user_id IS NULL OR approved_by_user_id <> proposed_by_user_id");
+                        });
+                });
+
+            modelBuilder.Entity("One4All.Core.Trading.PaymentRunBatchLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<decimal>("Due")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("due");
+
+                    b.Property<bool>("Included")
+                        .HasColumnType("boolean")
+                        .HasColumnName("included");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("note");
+
+                    b.Property<string>("PaymentNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("payment_number");
+
+                    b.Property<long>("PaymentRunBatchId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("payment_run_batch_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("SupplierCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("supplier_code");
+
+                    b.Property<long>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payment_run_line");
+
+                    b.HasIndex("PaymentRunBatchId")
+                        .HasDatabaseName("ix_payment_run_line_payment_run_batch_id");
+
+                    b.ToTable("payment_run_line", "ap");
                 });
 
             modelBuilder.Entity("One4All.Core.Trading.RecurringPurchaseInvoice", b =>
@@ -30786,6 +30949,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_layby_line_layby_plan_layby_plan_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Trading.PaymentRunBatchLine", b =>
+                {
+                    b.HasOne("One4All.Core.Trading.PaymentRunBatch", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("PaymentRunBatchId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_payment_run_line_payment_run_payment_run_batch_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Vouchers.AccountingVoucherLine", b =>
                 {
                     b.HasOne("One4All.Core.Vouchers.AccountingVoucher", null)
@@ -31241,6 +31414,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("One4All.Core.Trading.LaybyPlan", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Trading.PaymentRunBatch", b =>
                 {
                     b.Navigation("Lines");
                 });

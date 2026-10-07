@@ -177,6 +177,52 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Suppliers", Title = "Payment run approval", ListTitle = "Saved payment runs",
+            Description = "Saves a proposed payment run for review: everyone due (held suppliers left out with the reason); lines can be left out or part-paid (oldest invoices "
+                + "first); someone other than the proposer approves it, which pays exactly what it holds. Require approval stops direct payment runs for the company.",
+            Fields = [Pick("Step", "Step", ["Save proposal", "Set line", "Approve", "Cancel", "Show", "Require approval", "Allow direct runs"]), Opt("Run", "Run number"),
+                Today("Date", "Payment date"), Today("Due", "Pay invoices due on or before"), Req("Bank", "Bank account", "1100"), Opt("Currency", "Currency (blank: all)"),
+                Opt("Wht", "Withholding tax code"), Opt("Layout", "Bank file layout"), Opt("Supplier", "Supplier code (set line)"), Tick("Include", "Pay this supplier", true),
+                OptNum("Amount", "Amount (blank: all due)")],
+            Run = async (c, i) =>
+            {
+                IPaymentRunService runs = c.Get<IPaymentRunService>();
+                string Show(SavedPaymentRun r) => $"Run {r.Number} ({r.Status}, {D(r.PaymentDate)}): "
+                    + string.Join("; ", r.TotalByCurrency.Select(t => $"{M(t.Value)} {t.Key}")) + Environment.NewLine
+                    + string.Join(Environment.NewLine, r.Lines.Select(l => $"  {l.SupplierCode,-12} {l.Currency} due {M(l.Due),14}  pay {(l.Included ? M(l.Amount) : "-"),14}  {l.Note}{l.PaymentNumber}"));
+                string run = i.Optional("Run") ?? string.Empty;
+                switch (i.Text("Step"))
+                {
+                    case "Require approval":
+                    case "Allow direct runs":
+                        bool required = i.Text("Step") == "Require approval";
+                        (await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true)).PaymentRunApprovalRequired = required;
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return required ? "Payment runs must now be saved and approved by a second person." : "Direct payment runs are allowed again.";
+                    case "Save proposal":
+                        return Show(Check(await runs.SaveProposalAsync(new PaymentRunRequest
+                        {
+                            CompanyId = c.CompanyId, PaymentDate = i.Date("Date"), DueOnOrBefore = i.Date("Due"), BankAccountCode = i.Text("Bank"), Currency = i.Optional("Currency"),
+                            WithholdingTaxCode = i.Optional("Wht"), EftLayoutCode = i.Optional("Layout"),
+                        }, c.UserId).ConfigureAwait(true)));
+                    case "Set line":
+                        return Show(Check(await runs.SetLineAsync(c.CompanyId, run, i.Text("Supplier"), i.Optional("Currency") ?? string.Empty, i.Flag("Include"), i.OptionalNumber("Amount"))
+                            .ConfigureAwait(true)));
+                    case "Approve":
+                        PaymentRunResult paid = Check(await runs.ApproveAsync(c.CompanyId, run, c.UserId).ConfigureAwait(true));
+                        return $"Run {run} approved: {paid.Lines.Count(l => l.PaymentNumber.Length > 0)} payment(s), {M(paid.Total)} base.";
+                    case "Cancel":
+                        return Check(await runs.CancelAsync(c.CompanyId, run).ConfigureAwait(true), $"Run {run} cancelled.");
+                    default:
+                        return Show(Check(await runs.GetAsync(c.CompanyId, run).ConfigureAwait(true)));
+                }
+            },
+            List = async c => Table(await c.Db.Set<PaymentRunBatch>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Take(200).ToListAsync().ConfigureAwait(true),
+                ("Run", b => b.Number), ("Status", b => b.Status), ("Pay date", b => D(b.PaymentDate)), ("Due by", b => D(b.DueOnOrBefore)), ("Bank", b => b.BankAccountCode),
+                ("Currency", b => b.Currency), ("Proposed by", b => b.ProposedByUserId), ("Approved by", b => b.ApprovedByUserId)),
+        };
+        yield return new Operation
+        {
             Module = "Suppliers", Title = "Supplier statement", ListTitle = "Open supplier items", Description = "The supplier account as we see it, as at a date.",
             Fields = [Req("Supplier", "Supplier code"), Today("AsAt", "As at")],
             Run = async (c, i) => Check(await c.Get<IStatementService>().RenderSupplierStatementTextAsync(c.CompanyId, await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true), i.Date("AsAt"), 72)

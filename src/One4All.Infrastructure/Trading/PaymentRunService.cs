@@ -34,6 +34,18 @@ public sealed class PaymentRunService : IPaymentRunService
     // One unit of work: every posting it makes commits together or not at all (joining a caller's transaction).
     private async Task<Result<PaymentRunResult>> RunCoreAsync(PaymentRunRequest request, CancellationToken ct)
     {
+        if (await _db.Companies.AnyAsync(c => c.Id == request.CompanyId && c.PaymentRunApprovalRequired, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Ap.RunApprovalRequired", "Payment runs must be saved and approved by a second person: save a proposal instead.");
+        }
+
+        return await PayAsync(request, null, ct).ConfigureAwait(false);
+    }
+
+    // Pays the run: everything due, or — for an approved saved run — only its included lines at their approved amounts (a part-payment
+    // settles the oldest invoices first).
+    private async Task<Result<PaymentRunResult>> PayAsync(PaymentRunRequest request, IReadOnlyDictionary<(long SupplierId, string Currency), decimal>? approved, CancellationToken ct)
+    {
         Core.Banking.BankFileLayout? layout = null;
         if (!string.IsNullOrWhiteSpace(request.EftLayoutCode))
         {
@@ -67,6 +79,17 @@ public sealed class PaymentRunService : IPaymentRunService
                 continue;
             }
 
+            decimal? cap = null;
+            if (approved is not null)
+            {
+                if (!approved.TryGetValue((group.Key.SupplierId, group.Key.Currency), out decimal agreed))
+                {
+                    continue;
+                }
+
+                cap = agreed;
+            }
+
             List<OpenItem> invoices = [.. group.OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)];
             CurrencyCode currency = invoices[0].Currency;
 
@@ -95,7 +118,7 @@ public sealed class PaymentRunService : IPaymentRunService
                 }
             }
 
-            decimal toPay = invoices.Sum(i => i.OutstandingTransaction);
+            decimal toPay = Math.Min(invoices.Sum(i => i.OutstandingTransaction), cap ?? decimal.MaxValue);
             if (toPay <= 0m)
             {
                 // Settled entirely by credits: nothing to pay.
@@ -128,16 +151,24 @@ public sealed class PaymentRunService : IPaymentRunService
                 return payment.Error;
             }
 
+            decimal unallocated = toPay;
             foreach (OpenItem invoice in invoices.Where(i => i.OutstandingTransaction > 0m))
             {
+                if (unallocated <= 0m)
+                {
+                    break;
+                }
+
+                decimal share = Math.Min(unallocated, invoice.OutstandingTransaction);
                 Result<AllocationResult> alloc = await _allocationService.AllocateAsync(
-                    request.CompanyId, TradingLedger.AccountsPayable, payment.Value.OpenItemId, invoice.Id, invoice.OutstandingTransaction, request.PaymentDate, ct)
+                    request.CompanyId, TradingLedger.AccountsPayable, payment.Value.OpenItemId, invoice.Id, share, request.PaymentDate, ct)
                     .ConfigureAwait(false);
                 if (alloc.IsFailure)
                 {
                     return alloc.Error;
                 }
 
+                unallocated -= share;
                 touched.Add(invoice.Id);
             }
 
@@ -178,6 +209,155 @@ public sealed class PaymentRunService : IPaymentRunService
         return new PaymentRunProposal(request.PaymentDate, [.. lines.OrderBy(l => l.SupplierCode, StringComparer.Ordinal).ThenBy(l => l.Currency, StringComparer.Ordinal)]);
     }
 
+    /// <inheritdoc />
+    public async Task<Result<SavedPaymentRun>> SaveProposalAsync(PaymentRunRequest request, long proposedByUserId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.BankAccountCode))
+        {
+            return Error.Validation("Ap.RunBank", "A payment run needs the bank account it pays from.");
+        }
+
+        Result<PaymentRunProposal> proposal = await ProposeAsync(request, ct).ConfigureAwait(false);
+        if (proposal.IsFailure)
+        {
+            return proposal.Error;
+        }
+
+        string prefix = $"PRUN-{request.PaymentDate:yyyyMMdd}-";
+        int count = await _db.Set<PaymentRunBatch>().CountAsync(b => b.CompanyId == request.CompanyId && b.Number.StartsWith(prefix), ct).ConfigureAwait(false);
+        PaymentRunBatch batch = new(request.CompanyId, $"{prefix}{count + 1:D3}", request.PaymentDate, request.DueOnOrBefore, request.BankAccountCode.Trim(), proposedByUserId)
+        {
+            WithholdingTaxCode = string.IsNullOrWhiteSpace(request.WithholdingTaxCode) ? null : request.WithholdingTaxCode.Trim(),
+            EftLayoutCode = string.IsNullOrWhiteSpace(request.EftLayoutCode) ? null : request.EftLayoutCode.Trim(),
+            Currency = string.IsNullOrWhiteSpace(request.Currency) ? null : request.Currency.Trim().ToUpperInvariant(),
+        };
+        foreach (PaymentProposalLine line in proposal.Value.Lines.Where(l => l.ToPay > 0m || l.OnHold || l.BankChangePending).OrderBy(l => l.SupplierCode, StringComparer.Ordinal))
+        {
+            string? held = line.OnHold ? "Supplier on hold" : line.BankChangePending ? "Bank details changing" : null;
+            batch.AddLine(new PaymentRunBatchLine(line.SupplierId, line.SupplierCode, line.Currency, line.ToPay, held is null && line.ToPay > 0m, held));
+        }
+
+        if (batch.Lines.Count == 0)
+        {
+            return Error.Rule("Ap.RunEmpty", $"Nothing is due on or before {request.DueOnOrBefore:yyyy-MM-dd}.");
+        }
+
+        _db.Set<PaymentRunBatch>().Add(batch);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return View(batch);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<SavedPaymentRun>> SetLineAsync(long companyId, string runNumber, string supplierCode, string currency, bool included, decimal? amount, CancellationToken ct = default)
+    {
+        Result<PaymentRunBatch> found = await ProposedAsync(companyId, runNumber, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return found.Error;
+        }
+
+        string code = (supplierCode ?? string.Empty).Trim().ToUpperInvariant(), cur = (currency ?? string.Empty).Trim().ToUpperInvariant();
+        PaymentRunBatchLine? line = found.Value.Lines.FirstOrDefault(l => l.SupplierCode.ToUpperInvariant() == code && l.Currency == cur);
+        if (line is null)
+        {
+            return Error.NotFound("Ap.RunLineNotFound", $"{code} ({cur}) is not in run {runNumber}.");
+        }
+
+        if (included && line.Note is not null)
+        {
+            return Error.Rule("Ap.RunLineHeld", $"{code} is held ({line.Note}); release it and propose again.");
+        }
+
+        Result set = line.Set(included, amount);
+        if (set.IsFailure)
+        {
+            return set.Error;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return View(found.Value);
+    }
+
+    /// <inheritdoc />
+    public Task<Result<PaymentRunResult>> ApproveAsync(long companyId, string runNumber, long approvedByUserId, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            Result<PaymentRunBatch> found = await ProposedAsync(companyId, runNumber, ct).ConfigureAwait(false);
+            if (found.IsFailure)
+            {
+                return found.Error;
+            }
+
+            PaymentRunBatch batch = found.Value;
+            if (batch.ProposedByUserId == approvedByUserId)
+            {
+                return Error.Rule("Ap.RunSelfApproval", $"Run {batch.Number} must be approved by someone other than who proposed it.");
+            }
+
+            Dictionary<(long SupplierId, string Currency), decimal> agreed = batch.Lines.Where(l => l.Included && l.Amount > 0m).ToDictionary(l => (l.SupplierId, l.Currency), l => l.Amount);
+            if (agreed.Count == 0)
+            {
+                return Error.Rule("Ap.RunEmpty", $"Run {batch.Number} pays nobody.");
+            }
+
+            Result<PaymentRunResult> paid = await PayAsync(new PaymentRunRequest
+            {
+                CompanyId = companyId, PaymentDate = batch.PaymentDate, DueOnOrBefore = batch.DueOnOrBefore, BankAccountCode = batch.BankAccountCode, SupplierIds = [.. agreed.Keys.Select(k => k.SupplierId).Distinct()],
+                WithholdingTaxCode = batch.WithholdingTaxCode, EftLayoutCode = batch.EftLayoutCode, Currency = batch.Currency,
+            }, agreed, ct).ConfigureAwait(false);
+            if (paid.IsFailure)
+            {
+                return paid.Error;
+            }
+
+            foreach (PaymentRunLine line in paid.Value.Lines.Where(l => l.PaymentNumber.Length > 0))
+            {
+                if (batch.Lines.FirstOrDefault(b => b.SupplierId == line.SupplierId && b.Currency == line.Currency) is PaymentRunBatchLine saved)
+                {
+                    saved.PaymentNumber = line.PaymentNumber;
+                }
+            }
+
+            batch.MarkPaid(approvedByUserId);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return paid;
+        }, ct);
+
+    /// <inheritdoc />
+    public async Task<Result> CancelAsync(long companyId, string runNumber, CancellationToken ct = default)
+    {
+        Result<PaymentRunBatch> found = await ProposedAsync(companyId, runNumber, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return Result.Failure(found.Error);
+        }
+
+        found.Value.Cancel();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<SavedPaymentRun>> GetAsync(long companyId, string runNumber, CancellationToken ct = default)
+    {
+        string number = (runNumber ?? string.Empty).Trim().ToUpperInvariant();
+        PaymentRunBatch? batch = await _db.Set<PaymentRunBatch>().AsNoTracking().Include(b => b.Lines).FirstOrDefaultAsync(b => b.CompanyId == companyId && b.Number == number, ct).ConfigureAwait(false);
+        return batch is null ? Error.NotFound("Ap.RunNotFound", $"Payment run {number} not found.") : View(batch);
+    }
+
+    private async Task<Result<PaymentRunBatch>> ProposedAsync(long companyId, string runNumber, CancellationToken ct)
+    {
+        string number = (runNumber ?? string.Empty).Trim().ToUpperInvariant();
+        PaymentRunBatch? batch = await _db.Set<PaymentRunBatch>().Include(b => b.Lines).FirstOrDefaultAsync(b => b.CompanyId == companyId && b.Number == number, ct).ConfigureAwait(false);
+        return batch is null ? Error.NotFound("Ap.RunNotFound", $"Payment run {number} not found.")
+            : batch.Status != PaymentRunStatus.Proposed ? Error.Rule("Ap.RunNotProposed", $"Payment run {number} is {batch.Status}.")
+            : batch;
+    }
+
+    private static SavedPaymentRun View(PaymentRunBatch batch)
+        => new(batch.Number, batch.Status, batch.PaymentDate, [.. batch.Lines.OrderBy(l => l.SupplierCode, StringComparer.Ordinal)
+            .Select(l => new SavedPaymentLine(l.SupplierCode, l.Currency, l.Due, l.Amount, l.Included, l.Note, l.PaymentNumber))]);
+
     private async Task<HashSet<long>> BankChangingAsync(long companyId, CancellationToken ct)
         => [.. await _db.Set<SupplierBankChange>().Where(c => c.CompanyId == companyId && c.Status == BankChangeStatus.Pending)
             .Select(c => c.SupplierId).ToListAsync(ct).ConfigureAwait(false)];
@@ -194,6 +374,12 @@ public sealed class PaymentRunService : IPaymentRunService
         {
             HashSet<long> filter = request.SupplierIds.ToHashSet();
             dueInvoices = dueInvoices.Where(i => filter.Contains(i.TraderId)).ToList();
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Currency))
+        {
+            string currency = request.Currency.Trim().ToUpperInvariant();
+            dueInvoices = [.. dueInvoices.Where(i => i.Currency.Value == currency)];
         }
 
         // Credit notes, debit notes and payments on account the supplier has not yet used: they reduce what is paid.
