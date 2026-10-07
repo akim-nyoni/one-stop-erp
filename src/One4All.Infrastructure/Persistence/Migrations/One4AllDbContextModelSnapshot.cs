@@ -4372,6 +4372,67 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("asset_disposal", "fa");
                 });
 
+            modelBuilder.Entity("One4All.Core.FixedAssets.AssetImpairment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<decimal>("CarryingAmountBefore")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("carrying_amount_before");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long>("FixedAssetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fixed_asset_id");
+
+                    b.Property<string>("JournalNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<decimal>("RecoverableAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("recoverable_amount");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_impairment");
+
+                    b.HasIndex("FixedAssetId")
+                        .HasDatabaseName("ix_impairment_fixed_asset_id");
+
+                    b.ToTable("impairment", "fa");
+                });
+
             modelBuilder.Entity("One4All.Core.FixedAssets.AssetMaintenance", b =>
                 {
                     b.Property<long>("Id")
@@ -4635,6 +4696,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(8)")
                         .HasColumnName("accumulated_depreciation_account_code");
 
+                    b.Property<decimal>("AccumulatedImpairment")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("accumulated_impairment");
+
                     b.Property<DateOnly>("AcquisitionDate")
                         .HasColumnType("date")
                         .HasColumnName("acquisition_date");
@@ -4802,6 +4868,102 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("asset", "fa");
+                });
+
+            modelBuilder.Entity("One4All.Core.FixedAssets.FixedAssetClass", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccumulatedDepreciationAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("accumulated_depreciation_account_code");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("CostAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cost_account_code");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("DepreciationExpenseAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("depreciation_expense_account_code");
+
+                    b.Property<string>("ImpairmentAccountCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("impairment_account_code");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer")
+                        .HasColumnName("method");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<decimal>("ReducingBalanceRatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("reducing_balance_rate_percent");
+
+                    b.Property<decimal>("ResidualPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("residual_percent");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("UsefulLifeMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("useful_life_months");
+
+                    b.HasKey("Id")
+                        .HasName("pk_asset_class");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_asset_class_company_id_code");
+
+                    b.ToTable("asset_class", "fa");
                 });
 
             modelBuilder.Entity("One4All.Core.FixedAssets.MaintenancePlan", b =>

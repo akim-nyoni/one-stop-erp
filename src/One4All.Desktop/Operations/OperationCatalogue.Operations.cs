@@ -68,6 +68,38 @@ public static partial class OperationCatalogue
         const string module = "Fixed Assets";
         yield return new Operation
         {
+            Module = module, Title = "Asset classes and impairment", ListTitle = "Asset classes",
+            Description = "Classes hold the defaults an asset registered in them takes (method, life, residual %, rate and accounts). An impairment test (IAS 36) books a "
+                + "recoverable amount below the carrying amount as a loss, or reverses an earlier loss when it recovers — never above what it would have been unimpaired.",
+            Fields = [Pick("Step", "Step", ["Save class", "Impairment test"]), Opt("Class", "Class code"), Opt("Name", "Class name"),
+                Pick("Method", "Method", Enum.GetNames<Core.FixedAssets.DepreciationMethod>()), OptNum("Life", "Useful life (months)"), OptNum("Residual", "Residual % of cost"),
+                OptNum("Rate", "Reducing-balance rate %"), Opt("CostAccount", "Cost account"), Opt("AccumAccount", "Accumulated depreciation account"), Opt("ExpenseAccount", "Depreciation expense account"),
+                Opt("ImpairmentAccount", "Impairment account"), Opt("Asset", "Asset number (test)"), OptNum("Recoverable", "Recoverable amount (test)"), Opt("Reason", "Indicator / reason (test)"),
+                Opt("Document", "Document number (test)"), Today()],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.FixedAssets.IFixedAssetService assets = c.Get<Application.Abstractions.FixedAssets.IFixedAssetService>();
+                if (i.Text("Step") == "Save class")
+                {
+                    return Check(await assets.SaveClassAsync(new Application.Abstractions.FixedAssets.AssetClassRequest(c.CompanyId, i.Optional("Class") ?? string.Empty, i.Optional("Name") ?? string.Empty,
+                        Enum.Parse<Core.FixedAssets.DepreciationMethod>(i.Text("Method")), (int)(i.OptionalNumber("Life") ?? 0m), i.OptionalNumber("Residual") ?? 0m, i.OptionalNumber("Rate") ?? 0m,
+                        i.Optional("CostAccount") ?? string.Empty, i.Optional("AccumAccount") ?? string.Empty, i.Optional("ExpenseAccount") ?? string.Empty, i.Optional("ImpairmentAccount")))
+                        .ConfigureAwait(true), "Asset class saved.");
+                }
+
+                string number = (i.Optional("Asset") ?? throw new OperationException("Type the asset number.")).ToUpperInvariant();
+                long asset = await FindAsync(c.Db.FixedAssets, a => a.CompanyId == c.CompanyId && a.AssetNumber == number, a => a.Id, "asset", number).ConfigureAwait(true);
+                Application.Abstractions.FixedAssets.ImpairmentResult r = Check(await assets.ImpairAsync(c.CompanyId, asset, i.Number("Recoverable"), i.Date("Date"), i.Optional("Reason") ?? string.Empty,
+                    i.Optional("Document") ?? string.Empty, i.Optional("ImpairmentAccount")).ConfigureAwait(true));
+                return r.Amount == 0m ? $"Nothing to book; carrying amount {M(r.CarryingAmount)}."
+                    : $"{(r.Amount > 0m ? "Impairment loss" : "Reversal")} of {M(Math.Abs(r.Amount))} (journal {r.JournalNumber}); carrying amount now {M(r.CarryingAmount)}.";
+            },
+            List = async c => Table(await c.Db.Set<Core.FixedAssets.FixedAssetClass>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                ("Class", x => x.Code), ("Name", x => x.Name), ("Method", x => x.Method), ("Life (months)", x => x.UsefulLifeMonths), ("Residual %", x => x.ResidualPercent),
+                ("Cost", x => x.CostAccountCode), ("Depreciation", x => x.AccumulatedDepreciationAccountCode), ("Expense", x => x.DepreciationExpenseAccountCode), ("Impairment", x => x.ImpairmentAccountCode)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Move an asset to another cost centre", Description = "Moves the asset's cost and accumulated depreciation to another cost centre / department; future depreciation follows.",
             Fields = [Req("Asset", "Asset number"), Opt("CostCentre", "Cost centre code"), Opt("Department", "Department code"), Today(), Req("Document", "Document number")],
             Run = async (c, i) =>

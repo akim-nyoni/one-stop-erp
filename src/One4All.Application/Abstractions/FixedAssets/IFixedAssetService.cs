@@ -98,6 +98,32 @@ public interface IFixedAssetService
     Task<Result<long>> RegisterAsync(RegisterAssetRequest request, CancellationToken ct = default);
 
     /// <summary>
+    /// Creates or updates an asset class: the method, life, residual percentage, rate and accounts an asset registered in it takes
+    /// wherever its own request leaves them blank (brief §4.13).
+    /// </summary>
+    /// <param name="request">The class.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> SaveClassAsync(AssetClassRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Tests an asset for impairment (IAS 36): a recoverable amount below the carrying amount books the loss (Dr impairment, Cr accumulated
+    /// depreciation and impairment); above it, an earlier loss is reversed — never beyond the loss held, nor above what the carrying amount
+    /// would have been with no impairment. Straight-line depreciation then spreads the new carrying amount over the life left.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="assetId">The asset.</param>
+    /// <param name="recoverableAmount">The recoverable amount.</param>
+    /// <param name="date">The test date.</param>
+    /// <param name="reason">The indicator (damage, idle, market fall...).</param>
+    /// <param name="documentNumber">The journal document number.</param>
+    /// <param name="impairmentAccountCode">The impairment account (blank: the asset class's).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The loss (+) or reversal (−) booked and the new carrying amount.</returns>
+    Task<Result<ImpairmentResult>> ImpairAsync(long companyId, long assetId, decimal recoverableAmount, DateOnly date, string reason, string documentNumber, string? impairmentAccountCode = null,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Runs one month's depreciation for every active asset, posting Dr depreciation expense, Cr
     /// accumulated depreciation for the period total. Full-month convention: an asset is charged from the
     /// month it was acquired in; assets acquired after the run month are skipped, and a month already charged
@@ -228,3 +254,24 @@ public sealed record DepreciationForecastPeriod(string Period, decimal Charge, d
 /// <param name="Months">The number of months projected.</param>
 /// <param name="Periods">The per-month rows.</param>
 public sealed record DepreciationForecastReport(DateOnly StartMonth, int Months, IReadOnlyList<DepreciationForecastPeriod> Periods);
+
+/// <summary>An asset class to save.</summary>
+/// <param name="CompanyId">The company.</param>
+/// <param name="Code">Its code.</param>
+/// <param name="Name">Its name.</param>
+/// <param name="Method">The default method.</param>
+/// <param name="UsefulLifeMonths">The default life in months.</param>
+/// <param name="ResidualPercent">The default residual as a % of cost.</param>
+/// <param name="ReducingBalanceRatePercent">The default reducing-balance rate.</param>
+/// <param name="CostAccountCode">The cost account.</param>
+/// <param name="AccumulatedDepreciationAccountCode">The accumulated depreciation account.</param>
+/// <param name="DepreciationExpenseAccountCode">The depreciation expense account.</param>
+/// <param name="ImpairmentAccountCode">The impairment account.</param>
+public sealed record AssetClassRequest(long CompanyId, string Code, string Name, DepreciationMethod Method, int UsefulLifeMonths, decimal ResidualPercent, decimal ReducingBalanceRatePercent,
+    string CostAccountCode, string AccumulatedDepreciationAccountCode, string DepreciationExpenseAccountCode, string? ImpairmentAccountCode);
+
+/// <summary>The outcome of an impairment test.</summary>
+/// <param name="Amount">The loss (+) or reversal (−) booked (0 when none).</param>
+/// <param name="CarryingAmount">The carrying amount after.</param>
+/// <param name="JournalNumber">The journal (empty when nothing was booked).</param>
+public sealed record ImpairmentResult(decimal Amount, decimal CarryingAmount, string JournalNumber);

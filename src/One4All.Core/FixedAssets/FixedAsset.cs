@@ -192,8 +192,12 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
             return 0m;
         }
 
+        // After an impairment (IAS 36) the reduced carrying amount is spread over the life that is left.
+        int monthsLeft = UsefulLifeMonths - MonthsDepreciated;
         decimal charge = Method switch
         {
+            DepreciationMethod.StraightLine when AccumulatedImpairment != 0m => monthsLeft <= 0 ? NetBookValue - ResidualValue
+                : decimal.Round((NetBookValue - ResidualValue) / monthsLeft, 4, MidpointRounding.ToEven),
             DepreciationMethod.StraightLine => UsefulLifeMonths <= 0 ? 0m : decimal.Round(DepreciableAmount / UsefulLifeMonths, 4, MidpointRounding.ToEven),
             DepreciationMethod.ReducingBalance => decimal.Round(NetBookValue * ReducingBalanceRatePercent / 100m, 4, MidpointRounding.ToEven),
             DepreciationMethod.UnitsOfProduction => TotalEstimatedUnits is > 0m and decimal total ? decimal.Round(DepreciableAmount * unitsUsed / total, 4, MidpointRounding.ToEven) : 0m,
@@ -264,6 +268,156 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
     /// </summary>
     /// <param name="delta">The change to the carrying amount (+ up, − down).</param>
     public void Revalue(decimal delta) => Cost += delta;
+
+    /// <summary>The impairment losses held (net of reversals), included in <see cref="AccumulatedDepreciation"/> (IAS 36).</summary>
+    public decimal AccumulatedImpairment { get; private set; }
+
+    /// <summary>The months depreciation has been charged for, from the acquisition month to the last period charged.</summary>
+    public int MonthsDepreciated => LastDepreciatedPeriod is int last
+        ? Math.Max(0, ((last / 100) - AcquisitionDate.Year) * 12 + (last % 100) - AcquisitionDate.Month + 1)
+        : 0;
+
+    /// <summary>
+    /// The carrying amount the asset would have had with no impairment ever recognised (straight-line: cost less the original schedule's
+    /// depreciation to date); a reversal can never take it above this. Other methods: the carrying amount plus the impairment held.
+    /// </summary>
+    public decimal CarryingAmountWithoutImpairment => Method == DepreciationMethod.StraightLine && UsefulLifeMonths > 0
+        ? Cost - Math.Min(DepreciableAmount, decimal.Round(DepreciableAmount * MonthsDepreciated / UsefulLifeMonths, 2, MidpointRounding.AwayFromZero))
+        : NetBookValue + AccumulatedImpairment;
+
+    /// <summary>Recognises an impairment loss (positive) or reverses one (negative), within accumulated depreciation and impairment.</summary>
+    /// <param name="amount">The loss (+) or reversal (−).</param>
+    public void Impair(decimal amount)
+    {
+        AccumulatedDepreciation += amount;
+        AccumulatedImpairment += amount;
+        if (amount < 0m && Status == FixedAssetStatus.FullyDepreciated && NetBookValue > ResidualValue)
+        {
+            Status = FixedAssetStatus.Active;
+        }
+        else if (NetBookValue <= ResidualValue && Status == FixedAssetStatus.Active)
+        {
+            Status = FixedAssetStatus.FullyDepreciated;
+        }
+    }
+}
+
+/// <summary>
+/// An asset class (<c>fa.asset_class</c>, brief §4.13): the defaults an asset registered in it takes — method, useful life, residual value
+/// as a percentage of cost, reducing-balance rate, and the cost, accumulated depreciation, depreciation expense and impairment accounts.
+/// </summary>
+public sealed class FixedAssetClass : AuditableEntity, ICompanyScoped
+{
+    private FixedAssetClass()
+    {
+        Code = string.Empty;
+        Name = string.Empty;
+        CostAccountCode = string.Empty;
+        AccumulatedDepreciationAccountCode = string.Empty;
+        DepreciationExpenseAccountCode = string.Empty;
+    }
+
+    /// <summary>Creates the class.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="code">Its code (what assets carry as their class).</param>
+    /// <param name="name">Its name.</param>
+    public FixedAssetClass(long companyId, string code, string name)
+    {
+        CompanyId = companyId;
+        Code = code.Trim().ToUpperInvariant();
+        Name = name;
+        CostAccountCode = string.Empty;
+        AccumulatedDepreciationAccountCode = string.Empty;
+        DepreciationExpenseAccountCode = string.Empty;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>Its code.</summary>
+    public string Code { get; private set; }
+
+    /// <summary>Its name.</summary>
+    public string Name { get; set; }
+
+    /// <summary>The default depreciation method.</summary>
+    public DepreciationMethod Method { get; set; } = DepreciationMethod.StraightLine;
+
+    /// <summary>The default useful life in months.</summary>
+    public int UsefulLifeMonths { get; set; }
+
+    /// <summary>The default residual value as a percentage of cost.</summary>
+    public decimal ResidualPercent { get; set; }
+
+    /// <summary>The default reducing-balance rate.</summary>
+    public decimal ReducingBalanceRatePercent { get; set; }
+
+    /// <summary>The cost account.</summary>
+    public string CostAccountCode { get; set; }
+
+    /// <summary>The accumulated depreciation (and impairment) account.</summary>
+    public string AccumulatedDepreciationAccountCode { get; set; }
+
+    /// <summary>The depreciation expense account.</summary>
+    public string DepreciationExpenseAccountCode { get; set; }
+
+    /// <summary>The impairment loss (and reversal) account.</summary>
+    public string? ImpairmentAccountCode { get; set; }
+}
+
+/// <summary>An impairment test's outcome on an asset (<c>fa.impairment</c>, IAS 36): the recoverable amount found and the loss or reversal booked.</summary>
+public sealed class AssetImpairment : Entity, ICompanyScoped
+{
+    private AssetImpairment()
+    {
+        Reason = string.Empty;
+        JournalNumber = string.Empty;
+    }
+
+    /// <summary>Records the test.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fixedAssetId">The asset.</param>
+    /// <param name="date">The test date.</param>
+    /// <param name="carryingAmountBefore">The carrying amount before.</param>
+    /// <param name="recoverableAmount">The recoverable amount (higher of fair value less costs of disposal and value in use).</param>
+    /// <param name="amount">The loss (+) or reversal (−) booked.</param>
+    /// <param name="reason">The indicator / reason.</param>
+    /// <param name="journalNumber">The posting.</param>
+    public AssetImpairment(long companyId, long fixedAssetId, DateOnly date, decimal carryingAmountBefore, decimal recoverableAmount, decimal amount, string reason, string journalNumber)
+    {
+        CompanyId = companyId;
+        FixedAssetId = fixedAssetId;
+        Date = date;
+        CarryingAmountBefore = carryingAmountBefore;
+        RecoverableAmount = recoverableAmount;
+        Amount = amount;
+        Reason = reason;
+        JournalNumber = journalNumber;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The asset.</summary>
+    public long FixedAssetId { get; private set; }
+
+    /// <summary>The test date.</summary>
+    public DateOnly Date { get; private set; }
+
+    /// <summary>The carrying amount before.</summary>
+    public decimal CarryingAmountBefore { get; private set; }
+
+    /// <summary>The recoverable amount.</summary>
+    public decimal RecoverableAmount { get; private set; }
+
+    /// <summary>The loss (+) or reversal (−).</summary>
+    public decimal Amount { get; private set; }
+
+    /// <summary>The indicator / reason.</summary>
+    public string Reason { get; private set; }
+
+    /// <summary>The posting.</summary>
+    public string JournalNumber { get; private set; }
 }
 
 /// <summary>Units an asset was used for in a month (<c>fa.usage_reading</c>), which a units-of-production asset is depreciated on.</summary>

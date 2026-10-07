@@ -15,6 +15,7 @@ internal sealed class FixedAssetConfiguration : IEntityTypeConfiguration<FixedAs
         b.Property(x => x.Department).HasMaxLength(3);
         b.HasIndex(x => x.ParentAssetId);
         b.HasKey(x => x.Id);
+        b.Property(x => x.AccumulatedImpairment).HasPrecision(19, 4);
         b.Property(x => x.Insurer).HasMaxLength(120);
         b.Property(x => x.PolicyNumber).HasMaxLength(60);
         b.Property(x => x.InsuredValue).HasPrecision(19, 4);
@@ -159,5 +160,39 @@ internal sealed class AssetUsageReadingConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.Units).HasPrecision(19, 4);
         b.Property(x => x.Reference).HasMaxLength(60);
         b.HasIndex(x => new { x.AssetId, x.Date });
+    }
+}
+
+internal sealed class FixedAssetClassConfiguration : IEntityTypeConfiguration<FixedAssetClass>
+{
+    public void Configure(EntityTypeBuilder<FixedAssetClass> b)
+    {
+        b.ToTable("asset_class", Schemas.FixedAssets);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.Method).HasConversion<int>();
+        b.Property(x => x.ResidualPercent).HasPrecision(9, 4);
+        b.Property(x => x.ReducingBalanceRatePercent).HasPrecision(9, 4);
+        b.Property(x => x.CostAccountCode).HasMaxLength(20);
+        b.Property(x => x.AccumulatedDepreciationAccountCode).HasMaxLength(20);
+        b.Property(x => x.DepreciationExpenseAccountCode).HasMaxLength(20);
+        b.Property(x => x.ImpairmentAccountCode).HasMaxLength(20);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class AssetImpairmentConfiguration : IEntityTypeConfiguration<AssetImpairment>
+{
+    public void Configure(EntityTypeBuilder<AssetImpairment> b)
+    {
+        b.ToTable("impairment", Schemas.FixedAssets);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.CarryingAmountBefore).HasPrecision(19, 4);
+        b.Property(x => x.RecoverableAmount).HasPrecision(19, 4);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Reason).HasMaxLength(300);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+        b.HasIndex(x => x.FixedAssetId);
     }
 }

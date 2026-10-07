@@ -39,6 +39,32 @@ public sealed class FixedAssetService : IFixedAssetService
             return Error.NotFound("Fa.CompanyNotFound", $"Company {request.CompanyId} not found.");
         }
 
+        // The asset class fills in whatever the request leaves blank: method, life, residual, rate and accounts.
+        string classCode = (request.AssetClass ?? string.Empty).Trim().ToUpperInvariant();
+        if (await _db.Set<FixedAssetClass>().AsNoTracking().FirstOrDefaultAsync(c => c.CompanyId == request.CompanyId && c.Code == classCode, ct).ConfigureAwait(false) is FixedAssetClass assetClass)
+        {
+            static string Pick(string given, string fallback) => string.IsNullOrWhiteSpace(given) ? fallback : given;
+            request = new RegisterAssetRequest
+            {
+                CompanyId = request.CompanyId, AssetNumber = request.AssetNumber, Description = request.Description, AssetClass = assetClass.Code, Cost = request.Cost,
+                ResidualValue = request.ResidualValue != 0m ? request.ResidualValue : decimal.Round(request.Cost * assetClass.ResidualPercent / 100m, 2, MidpointRounding.AwayFromZero),
+                AcquisitionDate = request.AcquisitionDate, Method = request.Method == default ? assetClass.Method : request.Method,
+                UsefulLifeMonths = request.UsefulLifeMonths > 0 ? request.UsefulLifeMonths : assetClass.UsefulLifeMonths,
+                ReducingBalanceRatePercent = request.ReducingBalanceRatePercent > 0m ? request.ReducingBalanceRatePercent : assetClass.ReducingBalanceRatePercent,
+                CostAccountCode = Pick(request.CostAccountCode, assetClass.CostAccountCode),
+                AccumulatedDepreciationAccountCode = Pick(request.AccumulatedDepreciationAccountCode, assetClass.AccumulatedDepreciationAccountCode),
+                DepreciationExpenseAccountCode = Pick(request.DepreciationExpenseAccountCode, assetClass.DepreciationExpenseAccountCode),
+                FundingAccountCode = request.FundingAccountCode, DocumentNumber = request.DocumentNumber, TotalEstimatedUnits = request.TotalEstimatedUnits,
+                ParentAssetNumber = request.ParentAssetNumber, CostCentre = request.CostCentre, Department = request.Department,
+            };
+        }
+
+        if (string.IsNullOrWhiteSpace(request.CostAccountCode) || string.IsNullOrWhiteSpace(request.AccumulatedDepreciationAccountCode) || string.IsNullOrWhiteSpace(request.DepreciationExpenseAccountCode)
+            || request.Method == default)
+        {
+            return Error.Validation("Fa.ClassDefaults", "An asset needs its method and cost, depreciation and expense accounts, given or from a known asset class.");
+        }
+
         Result<(string? CostCentre, string? Department)> analysis = await DimensionsAsync(request.CompanyId, request.CostCentre, request.Department, ct).ConfigureAwait(false);
         if (analysis.IsFailure)
         {
@@ -427,6 +453,111 @@ public sealed class FixedAssetService : IFixedAssetService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new RevaluationResult(delta, asset.NetBookValue, posted.Value.JournalNumber);
     }
+
+    /// <inheritdoc />
+    public async Task<Result> SaveClassAsync(AssetClassRequest request, CancellationToken ct = default)
+    {
+        string code = (request.Code ?? string.Empty).Trim().ToUpperInvariant();
+        if (code.Length == 0 || string.IsNullOrWhiteSpace(request.Name) || !Enum.IsDefined(request.Method) || request.UsefulLifeMonths < 0 || request.ResidualPercent is < 0m or >= 100m
+            || request.ReducingBalanceRatePercent < 0m || (request.Method == DepreciationMethod.StraightLine && request.UsefulLifeMonths == 0)
+            || (request.Method == DepreciationMethod.ReducingBalance && request.ReducingBalanceRatePercent == 0m))
+        {
+            return Result.Failure(Error.Validation("Fa.Class", "A class needs a code, a name, a method with its life (straight line) or rate (reducing balance), and a residual of 0–99%."));
+        }
+
+        string[] accounts = [.. new[] { request.CostAccountCode, request.AccumulatedDepreciationAccountCode, request.DepreciationExpenseAccountCode, request.ImpairmentAccountCode }
+            .Where(a => !string.IsNullOrWhiteSpace(a)).Select(a => a!.Trim().ToUpperInvariant())];
+        if (accounts.Length < 3)
+        {
+            return Result.Failure(Error.Validation("Fa.ClassAccounts", "A class needs its cost, accumulated depreciation and depreciation expense accounts."));
+        }
+
+        List<string> known = await _db.Accounts.Where(a => a.CompanyId == request.CompanyId && accounts.Contains(a.AccountCode)).Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false);
+        if (accounts.FirstOrDefault(a => !known.Contains(a)) is string unknown)
+        {
+            return Result.Failure(Error.NotFound("Fa.AccountNotFound", $"Account {unknown} does not exist."));
+        }
+
+        FixedAssetClass? assetClass = await _db.Set<FixedAssetClass>().FirstOrDefaultAsync(c => c.CompanyId == request.CompanyId && c.Code == code, ct).ConfigureAwait(false);
+        if (assetClass is null)
+        {
+            assetClass = new FixedAssetClass(request.CompanyId, code, request.Name.Trim());
+            _db.Set<FixedAssetClass>().Add(assetClass);
+        }
+
+        assetClass.Name = request.Name.Trim();
+        assetClass.Method = request.Method;
+        assetClass.UsefulLifeMonths = request.UsefulLifeMonths;
+        assetClass.ResidualPercent = request.ResidualPercent;
+        assetClass.ReducingBalanceRatePercent = request.ReducingBalanceRatePercent;
+        assetClass.CostAccountCode = request.CostAccountCode.Trim().ToUpperInvariant();
+        assetClass.AccumulatedDepreciationAccountCode = request.AccumulatedDepreciationAccountCode.Trim().ToUpperInvariant();
+        assetClass.DepreciationExpenseAccountCode = request.DepreciationExpenseAccountCode.Trim().ToUpperInvariant();
+        assetClass.ImpairmentAccountCode = string.IsNullOrWhiteSpace(request.ImpairmentAccountCode) ? null : request.ImpairmentAccountCode.Trim().ToUpperInvariant();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public Task<Result<ImpairmentResult>> ImpairAsync(long companyId, long assetId, decimal recoverableAmount, DateOnly date, string reason, string documentNumber, string? impairmentAccountCode = null,
+        CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            if (recoverableAmount < 0m || string.IsNullOrWhiteSpace(reason) || string.IsNullOrWhiteSpace(documentNumber))
+            {
+                return Error.Validation("Fa.Impairment", "An impairment test needs a recoverable amount of nil or more, the indicator that prompted it and a document number.");
+            }
+
+            FixedAsset? asset = await _db.Set<FixedAsset>().FirstOrDefaultAsync(a => a.Id == assetId && a.CompanyId == companyId, ct).ConfigureAwait(false);
+            if (asset is null)
+            {
+                return Error.NotFound("Fa.AssetNotFound", $"Asset {assetId} not found.");
+            }
+
+            if (asset.Status == FixedAssetStatus.Disposed)
+            {
+                return Error.Rule("Fa.AlreadyDisposed", $"Asset {asset.AssetNumber} is disposed.");
+            }
+
+            string? account = string.IsNullOrWhiteSpace(impairmentAccountCode)
+                ? await _db.Set<FixedAssetClass>().Where(c => c.CompanyId == companyId && c.Code == asset.AssetClass).Select(c => c.ImpairmentAccountCode).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+                : impairmentAccountCode.Trim().ToUpperInvariant();
+            if (account is null)
+            {
+                return Error.Validation("Fa.ImpairmentAccount", $"Give the impairment account, or set one on class {asset.AssetClass}.");
+            }
+
+            // A loss down to the recoverable amount; or a reversal of losses held, capped at the carrying amount with no impairment.
+            decimal before = asset.NetBookValue;
+            decimal amount = recoverableAmount < before ? before - recoverableAmount
+                : -Math.Max(0m, Math.Min(recoverableAmount - before, Math.Min(asset.AccumulatedImpairment, asset.CarryingAmountWithoutImpairment - before)));
+            string journal = string.Empty;
+            if (amount != 0m)
+            {
+                Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+                Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+                {
+                    CompanyId = companyId, SourceModule = "GL", PostingDate = date, TransactionCurrency = company.BaseCurrency, DocumentType = "FA-IMPAIR", DocumentNumber = documentNumber.Trim(),
+                    Narrative = $"{(amount > 0m ? "Impairment" : "Impairment reversal")} of asset {asset.AssetNumber}: {reason.Trim()}",
+                    Lines =
+                    [
+                        new JournalLineRequest { AccountCode = account, CostCentre = asset.CostCentre, Department = asset.Department, Side = amount > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(amount) },
+                        new JournalLineRequest { AccountCode = asset.AccumulatedDepreciationAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = amount > 0m ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = Math.Abs(amount) },
+                    ],
+                }, ct).ConfigureAwait(false);
+                if (posted.IsFailure)
+                {
+                    return posted.Error;
+                }
+
+                journal = posted.Value.JournalNumber;
+                asset.Impair(amount);
+            }
+
+            _db.Set<AssetImpairment>().Add(new AssetImpairment(companyId, asset.Id, date, before, recoverableAmount, amount, reason.Trim(), journal));
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result<ImpairmentResult>.Success(new ImpairmentResult(amount, asset.NetBookValue, journal));
+        }, ct);
 
     /// <inheritdoc />
     public async Task<Result> TransferAsync(long companyId, long assetId, string? newLocation, string? newCustodian, CancellationToken ct = default)
