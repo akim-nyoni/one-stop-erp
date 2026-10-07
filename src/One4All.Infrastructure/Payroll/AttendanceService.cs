@@ -68,6 +68,11 @@ public sealed class AttendanceService : IAttendanceService
             return taken.Error;
         }
 
+        if (taken.Value < 0m)
+        {
+            return Error.Rule("Hr.EncashAdvance", "Only leave already earned can be paid out, not leave taken in advance.");
+        }
+
         LeaveRecord record = new(companyId, employeeId, leaveType.Trim(), LeaveRecordKind.Encashed, date, date, days, Math.Round(days * dailyRate, 2, MidpointRounding.AwayFromZero));
         _db.LeaveRecords.Add(record);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

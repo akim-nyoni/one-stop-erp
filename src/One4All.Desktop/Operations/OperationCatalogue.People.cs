@@ -203,10 +203,14 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Leave policies", ListTitle = "Leave policies",
             Description = "Per leave type: yearly days (service bands \"5:24;10:30\" raise them after so many completed years), earned monthly or granted at the leave-year start, "
-                + "joiners pro rata, and a carry-over cap applied as the leave year turns (the excess is forfeited). Run month accrues for a month; the scheduled task does the month just ended.",
-            Fields = [Pick("Step", "Step", ["Save policy", "Run month"]), Req("Type", "Leave type", "ANNUAL"), OptNum("Days", "Days a year"), Tick("Monthly", "Earned monthly", true),
+                + "joiners pro rata, and a carry-over cap applied as the leave year turns (the excess is forfeited). A balance ceiling stops accrual; carried days can lapse so many months "
+                + "into the year; leave can be taken in advance down to so many days; sick tiers \"11:50;21:0\" pay so much from the nth sick day of the year. "
+                + "Run month accrues for a month (the scheduled task does the month just ended); Apply sick pay sets the period's deductions.",
+            Fields = [Pick("Step", "Step", ["Save policy", "Run month", "Apply sick pay"]), Req("Type", "Leave type", "ANNUAL"), OptNum("Days", "Days a year"), Tick("Monthly", "Earned monthly", true),
                 Num("Start", "Leave year starts (month)", "1"), OptNum("Cap", "Carry-over cap (days, blank: none)"), Tick("ProRata", "Joiners pro rata", true), Opt("Bands", "Service bands (years:days;...)"),
-                Today("Month", "Month to run")],
+                OptNum("Ceiling", "Balance ceiling (days, blank: none)"), OptNum("Lapse", "Carried days lapse after (months, blank: never)"), Num("Advance", "May go negative by (days)", "0"),
+                Opt("Tiers", "Sick tiers (from day:pay %;...)"), Today("Month", "Month to run"), Opt("Period", "Pay period (sick pay)"), Opt("Element", "Deduction element (sick pay)"),
+                Num("WorkDays", "Working days a month (sick pay)", "21.67")],
             Run = async (c, i) =>
             {
                 ILeavePolicyService policies = c.Get<ILeavePolicyService>();
@@ -214,6 +218,22 @@ public static partial class OperationCatalogue
                 {
                     LeaveAccrualRun run = Check(await policies.RunMonthAsync(c.CompanyId, i.Date("Month")).ConfigureAwait(true));
                     return $"{run.Period}: {run.Accrued} balance(s) earned {Q(run.DaysAccrued)} day(s); {Q(run.DaysForfeited)} forfeited; {run.AlreadyRun} already run.";
+                }
+
+                if (i.Text("Step") == "Apply sick pay")
+                {
+                    DateOnly month = i.Date("Month"), from = new(month.Year, month.Month, 1);
+                    IReadOnlyList<SickPayLine> sick = Check(await policies.ApplySickPayAsync(c.CompanyId, i.Text("Type"), i.Text("Period"), from, from.AddMonths(1).AddDays(-1), i.Text("Element"),
+                        i.Number("WorkDays")).ConfigureAwait(true));
+                    return $"{sick.Count} employee(s) off sick; {Q(sick.Sum(s => s.UnpaidDays))} unpaid day(s), {M(sick.Sum(s => s.Deduction))} deducted.";
+                }
+
+                List<(int, decimal)> tiers = [];
+                foreach (string tier in (i.Optional("Tiers") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    string[] bits = tier.Split(':', StringSplitOptions.TrimEntries);
+                    tiers.Add(bits.Length == 2 && int.TryParse(bits[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int day)
+                        && decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal pct) ? (day, pct) : throw new OperationException($"Write each tier as day:pay % (\"{tier}\")."));
                 }
 
                 List<(int, decimal)> bands = [];
@@ -225,7 +245,8 @@ public static partial class OperationCatalogue
                 }
 
                 return Check(await policies.SavePolicyAsync(new LeavePolicyRequest(c.CompanyId, i.Text("Type"), i.OptionalNumber("Days") ?? 0m, i.Flag("Monthly"), i.Whole("Start"), i.OptionalNumber("Cap"),
-                    i.Flag("ProRata"), bands)).ConfigureAwait(true), "Leave policy saved.");
+                    i.Flag("ProRata"), bands, i.OptionalNumber("Ceiling"), i.OptionalNumber("Lapse") is decimal lapse ? (int)lapse : null, i.Number("Advance"), tiers)).ConfigureAwait(true),
+                    "Leave policy saved.");
             },
             List = async c => Table(await c.Db.Set<Core.Payroll.LeavePolicy>().AsNoTracking().Include(p => p.Bands).Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.LeaveType).ToListAsync().ConfigureAwait(true),
                 ("Type", p => p.LeaveType), ("Days", p => Q(p.AnnualDays)), ("Monthly", p => p.AccruesMonthly), ("Year starts", p => p.LeaveYearStartMonth), ("Cap", p => p.CarryOverCapDays),

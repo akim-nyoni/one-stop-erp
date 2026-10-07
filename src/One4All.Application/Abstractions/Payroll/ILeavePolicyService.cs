@@ -12,7 +12,15 @@ namespace One4All.Application.Abstractions.Payroll;
 /// <param name="ProRataJoiners">Joiners pro rata.</param>
 /// <param name="Bands">Service bands: completed years → yearly days.</param>
 public sealed record LeavePolicyRequest(long CompanyId, string LeaveType, decimal AnnualDays, bool AccruesMonthly, int LeaveYearStartMonth, decimal? CarryOverCapDays, bool ProRataJoiners,
-    IReadOnlyList<(int FromYears, decimal AnnualDays)> Bands);
+    IReadOnlyList<(int FromYears, decimal AnnualDays)> Bands, decimal? MaxAccumulationDays = null, int? CarryOverExpiryMonths = null, decimal NegativeBalanceDays = 0m,
+    IReadOnlyList<(int FromDay, decimal PayPercent)>? SickTiers = null);
+
+/// <summary>One employee's sick pay for a period under the tiers.</summary>
+/// <param name="EmployeeId">The employee.</param>
+/// <param name="SickDays">Sick days starting in the period.</param>
+/// <param name="UnpaidDays">Their unpaid equivalent (a day at 50% counts a half).</param>
+/// <param name="Deduction">The pay deduction (unpaid days × basic ÷ working days).</param>
+public sealed record SickPayLine(long EmployeeId, decimal SickDays, decimal UnpaidDays, decimal Deduction);
 
 /// <summary>A month's leave policy run.</summary>
 /// <param name="Period">The month (yyyyMM).</param>
@@ -34,4 +42,20 @@ public interface ILeavePolicyService
 
     /// <summary>Runs the policies for a month: carry-over caps first when a leave year starts, then that month's accrual or grant.</summary>
     Task<Result<LeaveAccrualRun>> RunMonthAsync(long companyId, DateOnly month, CancellationToken ct = default);
+
+    /// <summary>
+    /// Applies a leave type's sick pay tiers to a pay period: each sick day taken from the period's start to its end is placed in the leave year
+    /// (days already taken that year count first), priced at its tier's share of pay, and the unpaid part is set as a deduction variable for the period.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="leaveType">The sick leave type (its policy carries the tiers).</param>
+    /// <param name="periodLabel">The pay period the deduction goes into.</param>
+    /// <param name="fromDate">The period's first day.</param>
+    /// <param name="toDate">The period's last day.</param>
+    /// <param name="deductionElementCode">The deduction pay element.</param>
+    /// <param name="workingDaysPerMonth">Working days a month (a day's pay is basic ÷ this).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The employees with sick days in the period.</returns>
+    Task<Result<IReadOnlyList<SickPayLine>>> ApplySickPayAsync(long companyId, string leaveType, string periodLabel, DateOnly fromDate, DateOnly toDate, string deductionElementCode,
+        decimal workingDaysPerMonth, CancellationToken ct = default);
 }

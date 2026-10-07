@@ -10,6 +10,7 @@ namespace One4All.Core.Payroll;
 public sealed class LeavePolicy : AuditableEntity, ICompanyScoped
 {
     private readonly List<LeaveServiceBand> _bands = [];
+    private readonly List<LeaveSickTier> _sickTiers = [];
 
     private LeavePolicy() => LeaveType = string.Empty;
 
@@ -44,6 +45,26 @@ public sealed class LeavePolicy : AuditableEntity, ICompanyScoped
 
     /// <summary>Whether a joiner earns only for the days employed in the first month (monthly) or the months left (yearly grant).</summary>
     public bool ProRataJoiners { get; set; } = true;
+
+    /// <summary>The most the balance may ever hold (accrual stops there; the rest is forfeited); null: no ceiling.</summary>
+    public decimal? MaxAccumulationDays { get; set; }
+
+    /// <summary>Months into the new leave year that carried-over days stay usable (any not taken by then expire); null: they never expire.</summary>
+    public int? CarryOverExpiryMonths { get; set; }
+
+    /// <summary>How far below nil leave may be taken in advance (0: not at all).</summary>
+    public decimal NegativeBalanceDays { get; set; }
+
+    /// <summary>Sick pay tiers: from the nth day taken in the leave year, the share of pay (days before the first tier are on full pay).</summary>
+    public IReadOnlyList<LeaveSickTier> SickTiers => _sickTiers.OrderBy(t => t.FromDay).ToList();
+
+    /// <summary>Replaces the sick pay tiers.</summary>
+    /// <param name="tiers">The tiers (from day → percentage of pay).</param>
+    public void SetSickTiers(IEnumerable<(int FromDay, decimal PayPercent)> tiers)
+    {
+        _sickTiers.Clear();
+        _sickTiers.AddRange(tiers.Select(t => new LeaveSickTier(t.FromDay, t.PayPercent)));
+    }
 
     /// <summary>Whether the policy is in use.</summary>
     public bool IsActive { get; set; } = true;
@@ -84,4 +105,30 @@ public sealed class LeaveServiceBand : Entity
 
     /// <summary>Days a year from then.</summary>
     public decimal AnnualDays { get; private set; }
+}
+
+/// <summary>A sick pay tier: from the nth sick day in the leave year, this share of pay.</summary>
+public sealed class LeaveSickTier : Entity
+{
+    private LeaveSickTier()
+    {
+    }
+
+    /// <summary>Creates the tier.</summary>
+    /// <param name="fromDay">The first day (1-based) in the leave year it applies from.</param>
+    /// <param name="payPercent">The percentage of pay for those days.</param>
+    public LeaveSickTier(int fromDay, decimal payPercent)
+    {
+        FromDay = fromDay;
+        PayPercent = payPercent;
+    }
+
+    /// <summary>The policy.</summary>
+    public long LeavePolicyId { get; private set; }
+
+    /// <summary>The first day (1-based) in the leave year it applies from.</summary>
+    public int FromDay { get; private set; }
+
+    /// <summary>The percentage of pay.</summary>
+    public decimal PayPercent { get; private set; }
 }

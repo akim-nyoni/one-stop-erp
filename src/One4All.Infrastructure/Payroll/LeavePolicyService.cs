@@ -11,10 +11,16 @@ namespace One4All.Infrastructure.Payroll;
 public sealed class LeavePolicyService : ILeavePolicyService
 {
     private readonly One4AllDbContext _db;
+    private readonly IPayrollVariableService _variables;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
-    public LeavePolicyService(One4AllDbContext db) => _db = db;
+    /// <param name="variables">Payroll variables (sick pay deductions).</param>
+    public LeavePolicyService(One4AllDbContext db, IPayrollVariableService variables)
+    {
+        _db = db;
+        _variables = variables;
+    }
 
     /// <inheritdoc />
     public async Task<Result> SavePolicyAsync(LeavePolicyRequest request, CancellationToken ct = default)
@@ -26,7 +32,14 @@ public sealed class LeavePolicyService : ILeavePolicyService
             return Result.Failure(Error.Validation("Pay.LeavePolicy", "A leave policy needs a leave type, days of nil or more, a start month 1–12, no negative carry-over cap and distinct service bands from one year."));
         }
 
-        LeavePolicy? policy = await _db.Set<LeavePolicy>().Include(p => p.Bands).FirstOrDefaultAsync(p => p.CompanyId == request.CompanyId && p.LeaveType == type, ct).ConfigureAwait(false);
+        IReadOnlyList<(int FromDay, decimal PayPercent)> tiers = request.SickTiers ?? [];
+        if (request.MaxAccumulationDays <= 0m || request.CarryOverExpiryMonths is < 1 or > 12 || request.NegativeBalanceDays < 0m
+            || tiers.Any(t => t.FromDay < 1 || t.PayPercent is < 0m or > 100m) || tiers.Select(t => t.FromDay).Distinct().Count() != tiers.Count)
+        {
+            return Result.Failure(Error.Validation("Pay.LeaveRules", "A balance ceiling must be positive, carried days must lapse 1–12 months into the year, advances cannot be negative, and sick tiers need distinct days from 1 at 0–100% pay."));
+        }
+
+        LeavePolicy? policy = await _db.Set<LeavePolicy>().Include(p => p.Bands).Include(p => p.SickTiers).FirstOrDefaultAsync(p => p.CompanyId == request.CompanyId && p.LeaveType == type, ct).ConfigureAwait(false);
         if (policy is null)
         {
             policy = new LeavePolicy(request.CompanyId, type, request.AnnualDays);
@@ -39,6 +52,10 @@ public sealed class LeavePolicyService : ILeavePolicyService
         policy.CarryOverCapDays = request.CarryOverCapDays;
         policy.ProRataJoiners = request.ProRataJoiners;
         policy.SetBands(request.Bands);
+        policy.MaxAccumulationDays = request.MaxAccumulationDays;
+        policy.CarryOverExpiryMonths = request.CarryOverExpiryMonths;
+        policy.NegativeBalanceDays = request.NegativeBalanceDays;
+        policy.SetSickTiers(tiers);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
@@ -71,11 +88,23 @@ public sealed class LeavePolicyService : ILeavePolicyService
                 {
                     balances.TryGetValue((employee.Id, policy.LeaveType), out EmployeeLeaveBalance? balance);
 
-                    // The leave year turns: only the capped balance carries on.
-                    if (balance is not null && month.Month == policy.LeaveYearStartMonth && policy.CarryOverCapDays is decimal cap && balance.LastYearEndApplied != month.Year
-                        && (balance.LastAccruedPeriod is null || balance.LastAccruedPeriod < period))
+                    bool notRun = balance is not null && (balance.LastAccruedPeriod is null || balance.LastAccruedPeriod < period);
+
+                    // Carried-over days not taken in time lapse.
+                    if (notRun && balance!.CarryExpiresOn is DateOnly lapse && lapse <= first)
                     {
-                        forfeited += balance.ApplyCarryOverCap(month.Year, cap);
+                        forfeited += balance.ExpireCarried();
+                    }
+
+                    // The leave year turns: only the capped balance carries on (and starts its clock to lapse, where it does).
+                    if (notRun && month.Month == policy.LeaveYearStartMonth && balance!.LastYearEndApplied != month.Year
+                        && (policy.CarryOverCapDays is not null || policy.CarryOverExpiryMonths is not null))
+                    {
+                        forfeited += balance.ApplyCarryOverCap(month.Year, policy.CarryOverCapDays);
+                        if (policy.CarryOverExpiryMonths is int months)
+                        {
+                            balance.StartCarry(first.AddMonths(months));
+                        }
                     }
 
                     decimal earned = LeavePolicyRules.DaysForMonth(policy, employee.EngagementDate, employee.TerminationDate, month);
@@ -97,7 +126,7 @@ public sealed class LeavePolicyService : ILeavePolicyService
                         continue;
                     }
 
-                    balance.AccrueFor(period, earned);
+                    forfeited += balance.AccrueFor(period, earned, policy.MaxAccumulationDays);
                     if (earned > 0m)
                     {
                         accrued++;
@@ -109,6 +138,70 @@ public sealed class LeavePolicyService : ILeavePolicyService
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             return Result<LeaveAccrualRun>.Success(new LeaveAccrualRun(period, accrued, days, forfeited, alreadyRun));
         }, ct);
+
+    /// <inheritdoc />
+    public Task<Result<IReadOnlyList<SickPayLine>>> ApplySickPayAsync(long companyId, string leaveType, string periodLabel, DateOnly fromDate, DateOnly toDate, string deductionElementCode,
+        decimal workingDaysPerMonth, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            string type = (leaveType ?? string.Empty).Trim().ToUpperInvariant();
+            if (workingDaysPerMonth <= 0m || toDate < fromDate)
+            {
+                return Error.Validation("Pay.SickPayPeriod", "Sick pay needs a period and a positive number of working days a month.");
+            }
+
+            LeavePolicy? policy = await _db.Set<LeavePolicy>().Include(p => p.SickTiers).FirstOrDefaultAsync(p => p.CompanyId == companyId && p.LeaveType == type, ct).ConfigureAwait(false);
+            if (policy is null || policy.SickTiers.Count == 0)
+            {
+                return Error.Rule("Pay.NoSickTiers", $"Leave type {type} has no sick pay tiers.");
+            }
+
+            // The leave year the period starts in.
+            DateOnly yearStart = new(fromDate.Month >= policy.LeaveYearStartMonth ? fromDate.Year : fromDate.Year - 1, policy.LeaveYearStartMonth, 1);
+            var records = await _db.LeaveRecords.AsNoTracking()
+                .Where(l => l.CompanyId == companyId && l.Kind == LeaveRecordKind.Taken && l.LeaveType.ToUpper() == type && l.FromDate >= yearStart && l.FromDate <= toDate)
+                .OrderBy(l => l.FromDate).ThenBy(l => l.Id).Select(l => new { l.EmployeeId, l.FromDate, l.Days }).ToListAsync(ct).ConfigureAwait(false);
+            List<long> ids = [.. records.Where(r => r.FromDate >= fromDate).Select(r => r.EmployeeId).Distinct()];
+            Dictionary<long, Employee> employees = await _db.Employees.Where(e => ids.Contains(e.Id)).ToDictionaryAsync(e => e.Id, ct).ConfigureAwait(false);
+
+            List<SickPayLine> lines = [];
+            foreach (long id in ids)
+            {
+                decimal before = records.Where(r => r.EmployeeId == id && r.FromDate < fromDate).Sum(r => r.Days);
+                decimal inPeriod = records.Where(r => r.EmployeeId == id && r.FromDate >= fromDate).Sum(r => r.Days);
+                decimal unpaid = UnpaidDays(policy.SickTiers, before, before + inPeriod);
+                decimal deduction = Math.Round(unpaid * employees[id].BasicSalary / workingDaysPerMonth, 2, MidpointRounding.AwayFromZero);
+                if (deduction > 0m)
+                {
+                    Result<long> set = await _variables.SetAsync(companyId, id, deductionElementCode, periodLabel, null, deduction, ct).ConfigureAwait(false);
+                    if (set.IsFailure)
+                    {
+                        return set.Error;
+                    }
+                }
+
+                lines.Add(new SickPayLine(id, inPeriod, unpaid, deduction));
+            }
+
+            return Result<IReadOnlyList<SickPayLine>>.Success(lines);
+        }, ct);
+
+    // The unpaid share of the sick days from position 'from' to 'to' in the leave year (day n spans n-1..n); days before the first tier are on full pay.
+    private static decimal UnpaidDays(IReadOnlyList<LeaveSickTier> tiers, decimal from, decimal to)
+    {
+        decimal unpaid = 0m;
+        for (int n = 0; n < tiers.Count; n++)
+        {
+            decimal start = tiers[n].FromDay - 1, end = n + 1 < tiers.Count ? tiers[n + 1].FromDay - 1 : decimal.MaxValue;
+            decimal overlap = Math.Min(to, end) - Math.Max(from, start);
+            if (overlap > 0m)
+            {
+                unpaid += overlap * (100m - tiers[n].PayPercent) / 100m;
+            }
+        }
+
+        return decimal.Round(unpaid, 4, MidpointRounding.AwayFromZero);
+    }
 }
 
 /// <summary>Scheduled task: runs the leave policies for the month just ended.</summary>

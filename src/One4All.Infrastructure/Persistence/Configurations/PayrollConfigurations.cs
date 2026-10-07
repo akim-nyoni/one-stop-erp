@@ -127,6 +127,7 @@ internal sealed class EmployeeLeaveBalanceConfiguration : IEntityTypeConfigurati
         b.Property(x => x.AccruedDays).HasPrecision(9, 4);
         b.Property(x => x.TakenDays).HasPrecision(9, 4);
         b.Property(x => x.ForfeitedDays).HasPrecision(9, 4);
+        b.Property(x => x.CarriedOverDays).HasPrecision(9, 4);
         b.Ignore(x => x.BalanceDays);
         b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.LeaveType }).IsUnique();
     }
@@ -512,7 +513,11 @@ internal sealed class LeavePolicyConfiguration : IEntityTypeConfiguration<LeaveP
         b.Property(x => x.LeaveType).HasMaxLength(20);
         b.Property(x => x.AnnualDays).HasPrecision(9, 4);
         b.Property(x => x.CarryOverCapDays).HasPrecision(9, 4);
+        b.Property(x => x.MaxAccumulationDays).HasPrecision(9, 4);
+        b.Property(x => x.NegativeBalanceDays).HasPrecision(9, 4);
         b.HasIndex(x => new { x.CompanyId, x.LeaveType }).IsUnique();
+        b.HasMany(x => x.SickTiers).WithOne().HasForeignKey(x => x.LeavePolicyId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.SickTiers).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasMany(x => x.Bands).WithOne().HasForeignKey(x => x.LeavePolicyId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Bands).UsePropertyAccessMode(PropertyAccessMode.Field);
     }
@@ -525,5 +530,15 @@ internal sealed class LeaveServiceBandConfiguration : IEntityTypeConfiguration<L
         b.ToTable("leave_service_band", Schemas.Payroll);
         b.HasKey(x => x.Id);
         b.Property(x => x.AnnualDays).HasPrecision(9, 4);
+    }
+}
+
+internal sealed class LeaveSickTierConfiguration : IEntityTypeConfiguration<LeaveSickTier>
+{
+    public void Configure(EntityTypeBuilder<LeaveSickTier> b)
+    {
+        b.ToTable("leave_sick_tier", Schemas.Payroll);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.PayPercent).HasPrecision(5, 2);
     }
 }

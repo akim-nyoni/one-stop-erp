@@ -65,9 +65,15 @@ public sealed class LeaveService : ILeaveService
             return balance.Error;
         }
 
-        if (days > balance.Value.BalanceDays)
+        // A policy may let leave be taken in advance, down to so many days below nil.
+        string type = balance.Value.LeaveType;
+        decimal advance = await _db.Set<LeavePolicy>().Where(p => p.CompanyId == companyId && p.LeaveType == type && p.IsActive)
+            .Select(p => (decimal?)p.NegativeBalanceDays).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? 0m;
+        if (days > balance.Value.BalanceDays + advance)
         {
-            return Error.Rule("Pay.InsufficientLeave", $"Only {balance.Value.BalanceDays} days of {balance.Value.LeaveType} leave are available.");
+            return Error.Rule("Pay.InsufficientLeave", advance > 0m
+                ? $"Only {balance.Value.BalanceDays} days of {type} leave are available, plus {advance} in advance."
+                : $"Only {balance.Value.BalanceDays} days of {type} leave are available.");
         }
 
         balance.Value.Take(days);

@@ -46,7 +46,37 @@ public sealed class EmployeeLeaveBalance : AuditableEntity, ICompanyScoped
 
     /// <summary>Records leave taken.</summary>
     /// <param name="days">The days taken.</param>
-    public void Take(decimal days) => TakenDays = decimal.Round(TakenDays + days, 4, MidpointRounding.ToEven);
+    public void Take(decimal days)
+    {
+        TakenDays = decimal.Round(TakenDays + days, 4, MidpointRounding.ToEven);
+        CarriedOverDays = Math.Max(0m, CarriedOverDays - days);
+    }
+
+    /// <summary>Days carried into this leave year still untaken (taken first; they lapse at <see cref="CarryExpiresOn"/>).</summary>
+    public decimal CarriedOverDays { get; private set; }
+
+    /// <summary>When the carried-over days lapse; null: they do not.</summary>
+    public DateOnly? CarryExpiresOn { get; private set; }
+
+    /// <summary>Marks what the year turned with as carried over, to lapse on a date.</summary>
+    /// <param name="expiresOn">When untaken carried days lapse.</param>
+    public void StartCarry(DateOnly expiresOn)
+    {
+        CarriedOverDays = Math.Max(0m, BalanceDays);
+        CarryExpiresOn = CarriedOverDays > 0m ? expiresOn : null;
+    }
+
+    /// <summary>Lapses the carried-over days still untaken.</summary>
+    /// <returns>The days forfeited.</returns>
+    public decimal ExpireCarried()
+    {
+        decimal lapsed = Math.Min(CarriedOverDays, Math.Max(0m, BalanceDays));
+        AccruedDays = decimal.Round(AccruedDays - lapsed, 4, MidpointRounding.ToEven);
+        ForfeitedDays = decimal.Round(ForfeitedDays + lapsed, 4, MidpointRounding.ToEven);
+        CarriedOverDays = 0m;
+        CarryExpiresOn = null;
+        return lapsed;
+    }
 
     /// <summary>The last month (yyyyMM) the policy run accrued or granted leave for.</summary>
     public int? LastAccruedPeriod { get; private set; }
@@ -60,20 +90,25 @@ public sealed class EmployeeLeaveBalance : AuditableEntity, ICompanyScoped
     /// <summary>Records a policy run's accrual for a month.</summary>
     /// <param name="period">The month (yyyyMM).</param>
     /// <param name="days">The days accrued (may be nil).</param>
-    public void AccrueFor(int period, decimal days)
+    /// <param name="ceiling">The most the balance may hold (null: no ceiling); what would go above it is forfeited.</param>
+    /// <returns>The days forfeited to the ceiling.</returns>
+    public decimal AccrueFor(int period, decimal days, decimal? ceiling = null)
     {
-        Accrue(days);
+        decimal lost = ceiling is decimal max ? Math.Clamp(BalanceDays + days - max, 0m, days) : 0m;
+        Accrue(days - lost);
+        ForfeitedDays = decimal.Round(ForfeitedDays + lost, 4, MidpointRounding.ToEven);
         LastAccruedPeriod = period;
+        return lost;
     }
 
     /// <summary>Applies the carry-over cap at a leave-year start: anything above it is forfeited.</summary>
     /// <param name="leaveYear">The leave year starting.</param>
-    /// <param name="cap">The most that may be carried.</param>
+    /// <param name="cap">The most that may be carried (null: all of it).</param>
     /// <returns>The days forfeited.</returns>
-    public decimal ApplyCarryOverCap(int leaveYear, decimal cap)
+    public decimal ApplyCarryOverCap(int leaveYear, decimal? cap)
     {
         LastYearEndApplied = leaveYear;
-        decimal excess = BalanceDays - cap;
+        decimal excess = cap is decimal c ? BalanceDays - c : 0m;
         if (excess <= 0m)
         {
             return 0m;

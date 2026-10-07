@@ -16946,6 +16946,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(9,4)")
                         .HasColumnName("accrued_days");
 
+                    b.Property<decimal>("CarriedOverDays")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("carried_over_days");
+
+                    b.Property<DateOnly?>("CarryExpiresOn")
+                        .HasColumnType("date")
+                        .HasColumnName("carry_expires_on");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -17421,6 +17430,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(9,4)")
                         .HasColumnName("carry_over_cap_days");
 
+                    b.Property<int?>("CarryOverExpiryMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("carry_over_expiry_months");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -17447,6 +17460,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("leave_year_start_month");
 
+                    b.Property<decimal?>("MaxAccumulationDays")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("max_accumulation_days");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -17454,6 +17472,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("NegativeBalanceDays")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("negative_balance_days");
 
                     b.Property<bool>("ProRataJoiners")
                         .HasColumnType("boolean")
@@ -17566,6 +17589,41 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_leave_service_band_leave_policy_id");
 
                     b.ToTable("leave_service_band", "pay");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.LeaveSickTier", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("FromDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("from_day");
+
+                    b.Property<long>("LeavePolicyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("leave_policy_id");
+
+                    b.Property<decimal>("PayPercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("pay_percent");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_leave_sick_tier");
+
+                    b.HasIndex("LeavePolicyId")
+                        .HasDatabaseName("ix_leave_sick_tier_leave_policy_id");
+
+                    b.ToTable("leave_sick_tier", "pay");
                 });
 
             modelBuilder.Entity("One4All.Core.Payroll.LegacyPayslipLine", b =>
@@ -31598,6 +31656,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_leave_service_band_leave_policy_leave_policy_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.LeaveSickTier", b =>
+                {
+                    b.HasOne("One4All.Core.Payroll.LeavePolicy", null)
+                        .WithMany("SickTiers")
+                        .HasForeignKey("LeavePolicyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_leave_sick_tier_leave_policy_leave_policy_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Payroll.PayslipLine", b =>
                 {
                     b.HasOne("One4All.Core.Payroll.Payslip", null)
@@ -32419,6 +32487,8 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Payroll.LeavePolicy", b =>
                 {
                     b.Navigation("Bands");
+
+                    b.Navigation("SickTiers");
                 });
 
             modelBuilder.Entity("One4All.Core.Payroll.Payslip", b =>
