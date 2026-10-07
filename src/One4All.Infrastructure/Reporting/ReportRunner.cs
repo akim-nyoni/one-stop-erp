@@ -52,14 +52,19 @@ public sealed class ReportRunner : IReportRunner
             : await provider.GetRowsAsync(companyId, command, parameters, ct).ConfigureAwait(false);
         rows = Application.Security.FieldSensitivity.Strip(rows, hiddenFields);
 
-        string companyName = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? string.Empty;
+        var company = await _db.Companies.Where(c => c.Id == companyId).Select(c => new { c.Name, c.Locale }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        Dictionary<string, string> terms = await _db.TerminologyOverrides.AsNoTracking().Where(t => t.CompanyId == companyId)
+            .ToDictionaryAsync(t => t.Term, t => t.Replacement, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
 
+        // The company's locale formats numbers and dates and picks label translations; its terms replace the standard words on labels.
         ReportInput input = new()
         {
             Definition = definition,
             Rows = rows,
-            CompanyName = companyName,
+            CompanyName = company?.Name ?? string.Empty,
             Parameters = parameters,
+            Culture = company?.Locale is string locale ? System.Globalization.CultureInfo.GetCultureInfo(locale) : null,
+            Terminology = terms,
         };
 
         return Render(input, format, reportCode.ToLowerInvariant());

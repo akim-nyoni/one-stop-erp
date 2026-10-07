@@ -109,8 +109,25 @@ public static class NumberToWords
     /// <param name="value">The value.</param>
     /// <param name="format">The format string, or null.</param>
     /// <returns>The formatted string.</returns>
-    public static string Format(object? value, string? format)
+    public static string Format(object? value, string? format) => Format(value, format, null);
+
+    /// <summary>Formats a value with a format string in a culture (null: invariant, and unformatted values as they are).</summary>
+    /// <param name="value">The value.</param>
+    /// <param name="format">The format.</param>
+    /// <param name="culture">The culture.</param>
+    /// <returns>The text.</returns>
+    public static string Format(object? value, string? format, CultureInfo? culture)
     {
+        if (culture is not null && value is IFormattable local && !string.IsNullOrEmpty(format))
+        {
+            return local.ToString(format, culture);
+        }
+
+        if (culture is not null && value is IFormattable unformatted && value is not string)
+        {
+            return unformatted.ToString(value is DateOnly or DateTime or DateTimeOffset ? "d" : null, culture);
+        }
+
         if (value is null)
         {
             return string.Empty;

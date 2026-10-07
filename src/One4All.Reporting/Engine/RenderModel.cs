@@ -25,6 +25,12 @@ public sealed class ReportInput
 
     /// <summary>Optional currency-to-base conversion helper.</summary>
     public Func<decimal, string, DateOnly, decimal>? ToBase { get; init; }
+
+    /// <summary>Gets the culture numbers and dates are formatted in, and labels translated to (null: invariant formats, labels as designed).</summary>
+    public System.Globalization.CultureInfo? Culture { get; init; }
+
+    /// <summary>Gets the company's terminology applied to labels (term → its word).</summary>
+    public IReadOnlyDictionary<string, string>? Terminology { get; init; }
 }
 
 /// <summary>A resolved, positioned cell ready to render.</summary>
@@ -103,6 +109,9 @@ public sealed class RenderModel
 {
     /// <summary>The report name.</summary>
     public string ReportName { get; init; } = string.Empty;
+
+    /// <summary>Gets or sets a value indicating whether the report reads right to left (an RTL culture).</summary>
+    public bool RightToLeft { get; set; }
 
     /// <summary>The page setup.</summary>
     public required PageSetup Page { get; init; }

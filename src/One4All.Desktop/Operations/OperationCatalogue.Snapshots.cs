@@ -22,6 +22,34 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Language and terminology", ListTitle = "The company's terms",
+            Description = "The company's locale (screen language where translated, and the date and number formats of its reports — e.g. en-ZW, pt-MZ) and its own words for standard terms "
+                + "(Stand → Erf) on screens and report labels. Sign in again to see the screens change.",
+            Fields = [Opt("Locale", "Locale (blank: keep; '-' for English / invariant)"), Opt("Term", "Standard word"), Opt("Replacement", "The company's word (blank removes it)")],
+            Run = async (c, i) =>
+            {
+                One4All.Application.Abstractions.System.ILocalizationService localization = c.Get<One4All.Application.Abstractions.System.ILocalizationService>();
+                List<string> done = [];
+                if (i.Optional("Locale") is string locale)
+                {
+                    _ = Check(await localization.SetLocaleAsync(c.CompanyId, locale == "-" ? null : locale).ConfigureAwait(true), string.Empty);
+                    done.Add(locale == "-" ? "Locale cleared." : $"Locale set to {locale}.");
+                }
+
+                if (i.Optional("Term") is string term)
+                {
+                    _ = Check(await localization.SetTermAsync(c.CompanyId, term, i.Optional("Replacement")).ConfigureAwait(true), string.Empty);
+                    done.Add(i.Optional("Replacement") is string word ? $"'{term}' now reads '{word}'." : $"'{term}' is back to standard.");
+                }
+
+                IReadOnlyList<string> cultures = One4All.Application.Localization.TextCatalog.Cultures;
+                return string.Join(" ", done.DefaultIfEmpty("Nothing changed.")) + $" Screen translations shipped: en, {string.Join(", ", cultures)}.";
+            },
+            List = async c => Table((await c.Get<One4All.Application.Abstractions.System.ILocalizationService>().TermsAsync(c.CompanyId).ConfigureAwait(true)).ToList(),
+                ("Standard word", t => t.Key), ("Company's word", t => t.Value)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Payroll encryption", ListTitle = "Values not yet under the active key",
             Description = "Salary, bank details, national ID and tax numbers are encrypted at rest. This shows what is still in plaintext (written before encryption) or under a retired key, "
                 + "and Encrypt now rewrites it with the active key (the scheduled task security.reencrypt-fields does the same).",

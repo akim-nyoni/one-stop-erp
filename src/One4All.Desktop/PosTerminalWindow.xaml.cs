@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Media;
 using Microsoft.Win32;
 using One4All.Desktop.ViewModels;
 
@@ -26,11 +27,45 @@ public partial class PosTerminalWindow : Window
 
         _viewModel.SupervisorPinCleared += () => SupervisorPinBox.Clear();
         Loaded += async (_, _) => await _viewModel.LoadAsync().ConfigureAwait(true);
+        FlowDirection = Localization.UiText.Direction;
+        try
+        {
+            ContrastToggle.IsChecked = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\One4All\Pos")?.GetValue("HighContrast") is 1
+                || SystemParameters.HighContrast;
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+        {
+            ContrastToggle.IsChecked = SystemParameters.HighContrast;
+        }
     }
 
     private void SupervisorPin_Changed(object sender, RoutedEventArgs e) => _viewModel.SupervisorPin = SupervisorPinBox.Password;
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
+
+    // The high-contrast palette (brief §15 accessibility): black, white and yellow, every button outlined.
+    private void Contrast_Changed(object sender, RoutedEventArgs e)
+    {
+        bool on = ContrastToggle.IsChecked == true;
+        SetBrush("WindowBg", on ? Colors.Black : Color.FromRgb(0x1E, 0x27, 0x2E));
+        SetBrush("Card", on ? Colors.Black : Color.FromRgb(0x1F, 0x2A, 0x33));
+        SetBrush("Bar", on ? Colors.Black : Color.FromRgb(0x0F, 0x15, 0x19));
+        SetBrush("Panel", on ? Colors.Black : Color.FromRgb(0x26, 0x31, 0x3A));
+        SetBrush("Ink", on ? Colors.White : Colors.White);
+        SetBrush("Muted", on ? Colors.Yellow : Color.FromRgb(0x9A, 0xA7, 0xB0));
+        SetBrush("EdgeBrush", on ? Colors.Yellow : Colors.Transparent);
+        Resources["Edge"] = new Thickness(on ? 3 : 0);
+        try
+        {
+            Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\One4All\Pos")?.SetValue("HighContrast", on ? 1 : 0);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+        {
+            // The choice is just not remembered.
+        }
+    }
+
+    private void SetBrush(string key, Color color) => Resources[key] = new SolidColorBrush(color);
 
     private async void PrintReceipt_Click(object sender, RoutedEventArgs e)
     {

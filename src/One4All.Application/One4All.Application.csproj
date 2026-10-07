@@ -5,6 +5,9 @@
     <ProjectReference Include="..\One4All.Licensing.Core\One4All.Licensing.Core.csproj" />
     <ProjectReference Include="..\One4All.Core\One4All.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Localization\Strings\*.json" WithCulture="false" />
+  </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>One4All.Application</RootNamespace>

@@ -117,6 +117,9 @@ public sealed class Company : SoftDeletableEntity
     /// <summary>Gets or sets a value indicating whether the company keeps fund accounts: every journal line names a fund and each fund balances within the journal.</summary>
     public bool FundAccounting { get; set; }
 
+    /// <summary>Gets or sets the company's locale (e.g. "en-ZW", "pt-MZ"): its screen language, and the date and number formats of its reports (null: English, invariant formats).</summary>
+    public string? Locale { get; set; }
+
     /// <summary>Gets or sets when VAT becomes due: invoice date, tax point, or cash accounting.</summary>
     public One4All.Core.Accounting.TaxPointBasis TaxPointBasis { get; set; } = One4All.Core.Accounting.TaxPointBasis.InvoiceDate;
 

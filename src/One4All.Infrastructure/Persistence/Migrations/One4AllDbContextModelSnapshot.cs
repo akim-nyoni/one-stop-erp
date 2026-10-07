@@ -25468,6 +25468,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<string>("Locale")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("locale");
+
                     b.Property<decimal?>("ManualJournalApprovalThreshold")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -26116,6 +26121,47 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_scheduled_job_is_enabled_next_run_at");
 
                     b.ToTable("scheduled_job", "sys");
+                });
+
+            modelBuilder.Entity("One4All.Core.System.TerminologyOverride", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Replacement")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("replacement");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Term")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("term");
+
+                    b.HasKey("Id")
+                        .HasName("pk_terminology_override");
+
+                    b.HasIndex("CompanyId", "Term")
+                        .IsUnique()
+                        .HasDatabaseName("ix_terminology_override_company_id_term");
+
+                    b.ToTable("terminology_override", "sys");
                 });
 
             modelBuilder.Entity("One4All.Core.Trading.Allocation", b =>

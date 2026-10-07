@@ -144,6 +144,9 @@ public sealed class ReportDefinition
     /// <summary>Gets or sets a cross-tab layout: when set, the rows are pivoted and the header and detail bands are generated from the columns found.</summary>
     public CrossTab? CrossTab { get; set; }
 
+    /// <summary>Gets or sets label translations: culture (e.g. "pt" or "pt-MZ") → element name → text.</summary>
+    public Dictionary<string, Dictionary<string, string>> LabelTranslations { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>Returns the first band of a given type, or null.</summary>
     /// <param name="type">The band type.</param>
     /// <returns>The band, or null.</returns>

@@ -5,7 +5,7 @@
         Title="One4All POS" Height="820" Width="1280"
         xmlns:local="clr-namespace:One4All.Desktop"
         WindowStartupLocation="CenterScreen" WindowState="Maximized"
-        Background="#1E272E" FontFamily="Segoe UI">
+        Background="{DynamicResource WindowBg}" FontFamily="Segoe UI">
     <Window.Resources>
         <local:CountToVisibilityConverter x:Key="CountToVis" />
         <!-- Touch-sized action button -->
@@ -16,12 +16,13 @@
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="White" />
             <Setter Property="Background" Value="#34495E" />
-            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="BorderThickness" Value="{DynamicResource Edge}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource EdgeBrush}" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="B" Background="{TemplateBinding Background}" CornerRadius="6">
+                        <Border x:Name="B" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -46,6 +47,12 @@
 
         <SolidColorBrush x:Key="Panel" Color="#26313A" />
         <SolidColorBrush x:Key="Muted" Color="#9AA7B0" />
+        <SolidColorBrush x:Key="WindowBg" Color="#1E272E" />
+        <SolidColorBrush x:Key="Card" Color="#1F2A33" />
+        <SolidColorBrush x:Key="Bar" Color="#0F1519" />
+        <SolidColorBrush x:Key="Ink" Color="White" />
+        <SolidColorBrush x:Key="EdgeBrush" Color="Transparent" />
+        <Thickness x:Key="Edge">0</Thickness>
     </Window.Resources>
 
     <Grid Margin="10">
@@ -57,13 +64,15 @@
 
         <!-- Header -->
         <DockPanel Grid.Row="0" Margin="4,0,4,10">
-            <TextBlock Text="One4All &#8226; Point of Sale" FontSize="22" FontWeight="Bold" Foreground="White" DockPanel.Dock="Left" VerticalAlignment="Center" />
+            <TextBlock Text="One4All &#8226; Point of Sale" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource Ink}" DockPanel.Dock="Left" VerticalAlignment="Center" />
             <Button Content="Close" Style="{StaticResource PadButton}" Width="110" Background="#7F8C8D" Click="Close_Click" DockPanel.Dock="Right" />
+            <ToggleButton x:Name="ContrastToggle" Content="High contrast" Width="150" Height="56" Margin="4" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Right"
+                          Checked="Contrast_Changed" Unchecked="Contrast_Changed" ToolTip="Black background, white and yellow text, outlined buttons (accessibility)" />
             <Border DockPanel.Dock="Right" Background="#E67E22" CornerRadius="12" Padding="12,4" Margin="0,0,12,0" VerticalAlignment="Center"
                     Visibility="{Binding PendingOfflineCount, Converter={StaticResource CountToVis}}">
-                <TextBlock Text="{Binding PendingOfflineCount, StringFormat='OFFLINE • {0} queued'}" Foreground="White" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding PendingOfflineCount, StringFormat='OFFLINE • {0} queued'}" Foreground="{DynamicResource Ink}" FontSize="13" FontWeight="SemiBold" />
             </Border>
-            <TextBlock Text="{Binding CashierName, StringFormat='Cashier: {0}'}" Foreground="{StaticResource Muted}" FontSize="14"
+            <TextBlock Text="{Binding CashierName, StringFormat='Cashier: {0}'}" Foreground="{DynamicResource Muted}" FontSize="14"
                        DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,16,0" />
         </DockPanel>
 
@@ -74,7 +83,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- Left: categories + products -->
-            <Border Grid.Column="0" Background="{StaticResource Panel}" CornerRadius="8" Padding="10" Margin="0,0,10,0">
+            <Border Grid.Column="0" Background="{DynamicResource Panel}" CornerRadius="8" Padding="10" Margin="0,0,10,0">
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Button Content="Weigh" Style="{StaticResource PadButton}" Height="36" Width="90" FontSize="14" Background="#6C3483" Command="{Binding WeighCommand}" DockPanel.Dock="Right" />
@@ -94,30 +103,30 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Padding="14,6" Margin="3" CornerRadius="14" Background="#34495E">
-                                    <TextBlock Text="{Binding}" Foreground="White" FontSize="14" />
+                                    <TextBlock Text="{Binding}" Foreground="{DynamicResource Ink}" FontSize="14" />
                                 </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
 
                     <!-- Till functions: adjustments (supervised), loyalty, park / resume -->
-                    <Border DockPanel.Dock="Bottom" Background="#1F2A33" CornerRadius="6" Padding="8" Margin="0,8,0,0">
+                    <Border DockPanel.Dock="Bottom" Background="{DynamicResource Card}" CornerRadius="6" Padding="8" Margin="0,8,0,0">
                         <StackPanel>
                             <UniformGrid Columns="4">
                                 <StackPanel Margin="2">
-                                    <TextBlock Text="Supervisor" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBlock Text="Supervisor" Foreground="{DynamicResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding SupervisorName}" />
                                 </StackPanel>
                                 <StackPanel Margin="2">
-                                    <TextBlock Text="Supervisor PIN" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBlock Text="Supervisor PIN" Foreground="{DynamicResource Muted}" FontSize="11" />
                                     <PasswordBox x:Name="SupervisorPinBox" PasswordChanged="SupervisorPin_Changed" />
                                 </StackPanel>
                                 <StackPanel Margin="2">
-                                    <TextBlock Text="Loyalty member" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBlock Text="Loyalty member" Foreground="{DynamicResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding LoyaltyMember}" />
                                 </StackPanel>
                                 <StackPanel Margin="2">
-                                    <TextBlock Text="Discount a/c" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBlock Text="Discount a/c" Foreground="{DynamicResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding DiscountAccountCode}" />
                                 </StackPanel>
                             </UniformGrid>
@@ -138,7 +147,7 @@
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
                             </DockPanel>
-                            <TextBlock Foreground="{StaticResource Muted}" FontSize="11" Margin="2,4,0,0" TextWrapping="Wrap"
+                            <TextBlock Foreground="{DynamicResource Muted}" FontSize="11" Margin="2,4,0,0" TextWrapping="Wrap"
                                        Text="Tap a cart line to select it, type the % or price on the pad, then press the button. Over the cashier's limit, and every price override, needs a supervisor's name and PIN." />
                         </StackPanel>
                     </Border>
@@ -166,7 +175,7 @@
             </Border>
 
             <!-- Right: setup + cart + totals + tender -->
-            <Border Grid.Column="1" Background="{StaticResource Panel}" CornerRadius="8" Padding="10">
+            <Border Grid.Column="1" Background="{DynamicResource Panel}" CornerRadius="8" Padding="10">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -176,45 +185,45 @@
                     </Grid.RowDefinitions>
 
                     <!-- Session / account setup -->
-                    <Border Grid.Row="0" Background="#1F2A33" CornerRadius="6" Padding="8" Margin="0,0,0,8">
+                    <Border Grid.Row="0" Background="{DynamicResource Card}" CornerRadius="6" Padding="8" Margin="0,0,0,8">
                         <StackPanel>
                             <UniformGrid Columns="4">
                                 <StackPanel Margin="2">
-                                    <TextBlock Text="Cash a/c" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBlock Text="Cash a/c" Foreground="{DynamicResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding CashAccountCode}" />
                                 </StackPanel>
                                 <StackPanel Margin="2">
-                                    <TextBlock Text="Card a/c" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBlock Text="Card a/c" Foreground="{DynamicResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding CardAccountCode}" />
                                 </StackPanel>
                                 <StackPanel Margin="2">
-                                    <TextBlock Text="Tax a/c" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBlock Text="Tax a/c" Foreground="{DynamicResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding TaxAccountCode}" />
                                 </StackPanel>
                                 <StackPanel Margin="2">
-                                    <TextBlock Text="Mobile money a/c" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBlock Text="Mobile money a/c" Foreground="{DynamicResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding MobileMoneyAccountCode}" />
                                 </StackPanel>
                             </UniformGrid>
                             <UniformGrid Columns="2" Margin="0,4,0,0">
-                                <CheckBox Margin="2" VerticalAlignment="Bottom" Foreground="{StaticResource Muted}" Content="Age checked" IsChecked="{Binding AgeVerified}" />
+                                <CheckBox Margin="2" VerticalAlignment="Bottom" Foreground="{DynamicResource Muted}" Content="Age checked" IsChecked="{Binding AgeVerified}" />
                                 <StackPanel Margin="2">
-                                    <TextBlock Text="Prescription ref" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBlock Text="Prescription ref" Foreground="{DynamicResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding PrescriptionReference}" />
                                 </StackPanel>
                             </UniformGrid>
                             <UniformGrid Columns="2" Margin="0,4,0,0">
                                 <StackPanel Margin="2">
-                                    <TextBlock Text="Over/short a/c" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBlock Text="Over/short a/c" Foreground="{DynamicResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding OverShortAccountCode}" />
                                 </StackPanel>
                                 <StackPanel Margin="2">
-                                    <TextBlock Text="Counted cash (Z)" Foreground="{StaticResource Muted}" FontSize="11" />
+                                    <TextBlock Text="Counted cash (Z)" Foreground="{DynamicResource Muted}" FontSize="11" />
                                     <TextBox Text="{Binding CountedCash}" />
                                 </StackPanel>
                             </UniformGrid>
                             <DockPanel Margin="0,6,0,0">
-                                <TextBlock Text="Float" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="2,0,6,0" />
+                                <TextBlock Text="Float" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="2,0,6,0" />
                                 <TextBox Width="90" Text="{Binding OpeningFloat}" DockPanel.Dock="Left" />
                                 <Button Content="Open Till" Style="{StaticResource PadButton}" Height="36" Width="120" Background="#27AE60"
                                         Command="{Binding OpenTillCommand}" DockPanel.Dock="Right" />
@@ -223,7 +232,7 @@
                     </Border>
 
                     <!-- Cart -->
-                    <Border Grid.Row="1" Background="#1F2A33" CornerRadius="6" Padding="4">
+                    <Border Grid.Row="1" Background="{DynamicResource Card}" CornerRadius="6" Padding="4">
                         <ItemsControl ItemsSource="{Binding Cart}">
                             <ItemsControl.Template>
                                 <ControlTemplate>
@@ -256,11 +265,11 @@
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Description}" Foreground="White" FontSize="15" />
-                                            <TextBlock Text="{Binding Quantity, StringFormat='× {0}'}" Foreground="{StaticResource Muted}" FontSize="12" />
+                                            <TextBlock Text="{Binding Description}" Foreground="{DynamicResource Ink}" FontSize="15" />
+                                            <TextBlock Text="{Binding Quantity, StringFormat='× {0}'}" Foreground="{DynamicResource Muted}" FontSize="12" />
                                             <TextBlock Text="{Binding Detail}" Foreground="#F5B041" FontSize="12" />
                                         </StackPanel>
-                                        <TextBlock Grid.Column="1" Text="{Binding LineGrossText}" Foreground="White" FontSize="15"
+                                        <TextBlock Grid.Column="1" Text="{Binding LineGrossText}" Foreground="{DynamicResource Ink}" FontSize="15"
                                                    VerticalAlignment="Center" Margin="6,0" MinWidth="64" TextAlignment="Right" />
                                         <Button Grid.Column="2" Content="&#8722;" Style="{StaticResource PadButton}" Width="40" Height="40" FontSize="22"
                                                 Command="{Binding DataContext.DecrementLineCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
@@ -275,15 +284,15 @@
                     </Border>
 
                     <!-- Totals -->
-                    <Border Grid.Row="2" Background="#1F2A33" CornerRadius="6" Padding="10" Margin="0,8,0,8">
+                    <Border Grid.Row="2" Background="{DynamicResource Card}" CornerRadius="6" Padding="10" Margin="0,8,0,8">
                         <StackPanel>
-                            <DockPanel><TextBlock Text="Subtotal" Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding SubtotalText}" Foreground="White" DockPanel.Dock="Right" /></DockPanel>
-                            <DockPanel Margin="0,2"><TextBlock Text="Tax" Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding TaxText}" Foreground="White" DockPanel.Dock="Right" /></DockPanel>
-                            <DockPanel Margin="0,2"><TextBlock Text="TOTAL" Foreground="White" FontWeight="Bold" FontSize="22" /><TextBlock Text="{Binding GrossText}" Foreground="#7FE0A0" FontWeight="Bold" FontSize="22" DockPanel.Dock="Right" /></DockPanel>
+                            <DockPanel><TextBlock Text="Subtotal" Foreground="{DynamicResource Muted}" /><TextBlock Text="{Binding SubtotalText}" Foreground="{DynamicResource Ink}" DockPanel.Dock="Right" /></DockPanel>
+                            <DockPanel Margin="0,2"><TextBlock Text="Tax" Foreground="{DynamicResource Muted}" /><TextBlock Text="{Binding TaxText}" Foreground="{DynamicResource Ink}" DockPanel.Dock="Right" /></DockPanel>
+                            <DockPanel Margin="0,2"><TextBlock Text="TOTAL" Foreground="{DynamicResource Ink}" FontWeight="Bold" FontSize="22" /><TextBlock Text="{Binding GrossText}" Foreground="#7FE0A0" FontWeight="Bold" FontSize="22" DockPanel.Dock="Right" /></DockPanel>
                             <Separator Margin="0,4" />
-                            <DockPanel><TextBlock Text="Tendered" Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding TenderedText}" Foreground="White" DockPanel.Dock="Right" /></DockPanel>
-                            <DockPanel Margin="0,2"><TextBlock Text="Balance" Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding BalanceText}" Foreground="#E67E22" FontWeight="SemiBold" DockPanel.Dock="Right" /></DockPanel>
-                            <DockPanel Margin="0,2"><TextBlock Text="Change" Foreground="{StaticResource Muted}" /><TextBlock Text="{Binding ChangeText}" Foreground="#7FE0A0" FontWeight="SemiBold" DockPanel.Dock="Right" /></DockPanel>
+                            <DockPanel><TextBlock Text="Tendered" Foreground="{DynamicResource Muted}" /><TextBlock Text="{Binding TenderedText}" Foreground="{DynamicResource Ink}" DockPanel.Dock="Right" /></DockPanel>
+                            <DockPanel Margin="0,2"><TextBlock Text="Balance" Foreground="{DynamicResource Muted}" /><TextBlock Text="{Binding BalanceText}" Foreground="#E67E22" FontWeight="SemiBold" DockPanel.Dock="Right" /></DockPanel>
+                            <DockPanel Margin="0,2"><TextBlock Text="Change" Foreground="{DynamicResource Muted}" /><TextBlock Text="{Binding ChangeText}" Foreground="#7FE0A0" FontWeight="SemiBold" DockPanel.Dock="Right" /></DockPanel>
                         </StackPanel>
                     </Border>
 
@@ -296,8 +305,8 @@
 
                         <!-- Numeric entry -->
                         <StackPanel Grid.Column="0">
-                            <Border Background="#0F1519" CornerRadius="6" Padding="8" Margin="4">
-                                <TextBlock Text="{Binding TenderEntry}" Foreground="White" FontSize="22" TextAlignment="Right" MinHeight="26" />
+                            <Border Background="{DynamicResource Bar}" CornerRadius="6" Padding="8" Margin="4">
+                                <TextBlock Text="{Binding TenderEntry}" Foreground="{DynamicResource Ink}" FontSize="22" TextAlignment="Right" MinHeight="26" />
                             </Border>
                             <UniformGrid Columns="3">
                                 <Button Content="7" Style="{StaticResource PadButton}" Command="{Binding AppendDigitCommand}" CommandParameter="7" />
@@ -338,7 +347,7 @@
         </Grid>
 
         <!-- Status bar -->
-        <Border Grid.Row="2" Background="#0F1519" CornerRadius="6" Padding="10,6" Margin="0,10,0,0">
+        <Border Grid.Row="2" Background="{DynamicResource Bar}" CornerRadius="6" Padding="10,6" Margin="0,10,0,0">
             <TextBlock Text="{Binding StatusMessage}" Foreground="#DCEFDD" FontSize="14" />
         </Border>
     </Grid>

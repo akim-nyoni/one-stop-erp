@@ -25,7 +25,7 @@ public sealed class ReportEngine
         }
 
         ReportDefinition def = input.Definition;
-        RenderModel model = new() { ReportName = def.Name, Page = def.Page };
+        RenderModel model = new() { ReportName = def.Name, Page = def.Page, RightToLeft = input.Culture?.TextInfo.IsRightToLeft ?? false };
 
         model.ReportHeader = ResolveOptional(def.BandOfType(BandType.ReportHeader), input, null, input.Rows);
         model.PageHeader = ResolveOptional(def.BandOfType(BandType.PageHeader), input, null, input.Rows);
@@ -157,9 +157,9 @@ public sealed class ReportEngine
             string text = element.Kind switch
             {
                 ElementKind.Checkbox => Truthy(ctx.Fields.GetValueOrDefault(element.FieldName ?? string.Empty)) ? "☑" : "☐",
-                ElementKind.Signature => element.Text ?? "Signature",
-                ElementKind.Aggregate => NumberToWords.Format(ComputeAggregate(element, scope, row, input.Rows), element.Format),
-                _ => ResolveText(element, ctx, scope),
+                ElementKind.Signature => Label(element, input) is { Length: > 0 } caption ? caption : "Signature",
+                ElementKind.Aggregate => NumberToWords.Format(ComputeAggregate(element, scope, row, input.Rows), element.Format, input.Culture),
+                _ => ResolveText(element, ctx, scope, input),
             };
             (string foreground, string? background, bool bold) = ApplyConditionalFormats(element, ctx);
             (string? drillTarget, string? drillKey) = DrillThrough.For(element, row);
@@ -190,14 +190,29 @@ public sealed class ReportEngine
         return rendered;
     }
 
-    private string ResolveText(ReportElement element, ReportExpressionContext ctx, IReadOnlyList<IReadOnlyDictionary<string, object?>> scope) => element.Kind switch
+    private string ResolveText(ReportElement element, ReportExpressionContext ctx, IReadOnlyList<IReadOnlyDictionary<string, object?>> scope, ReportInput input) => element.Kind switch
     {
-        ElementKind.Label => element.Text ?? string.Empty,
-        ElementKind.Field => NumberToWords.Format(ctx.Fields.GetValueOrDefault(element.FieldName ?? string.Empty), element.Format),
-        ElementKind.Expression => NumberToWords.Format(_expressions.Evaluate(element.Expression ?? string.Empty, ctx), element.Format),
-        ElementKind.Aggregate => NumberToWords.Format(ComputeAggregate(element, scope, null, scope), element.Format),
+        ElementKind.Label => Label(element, input),
+        ElementKind.Field => NumberToWords.Format(ctx.Fields.GetValueOrDefault(element.FieldName ?? string.Empty), element.Format, input.Culture),
+        ElementKind.Expression => NumberToWords.Format(_expressions.Evaluate(element.Expression ?? string.Empty, ctx), element.Format, input.Culture),
+        ElementKind.Aggregate => NumberToWords.Format(ComputeAggregate(element, scope, null, scope), element.Format, input.Culture),
         _ => string.Empty,
     };
+
+    // A label in the report's language (its translation for the culture, then the language), with the company's terms.
+    private static string Label(ReportElement element, ReportInput input)
+    {
+        string text = element.Text ?? string.Empty;
+        Dictionary<string, Dictionary<string, string>> translations = input.Definition.LabelTranslations;
+        if (input.Culture is System.Globalization.CultureInfo culture && translations.Count > 0
+            && ((translations.GetValueOrDefault(culture.Name)?.TryGetValue(element.Name, out string? specific) ?? false ? specific : null)
+                ?? (translations.GetValueOrDefault(culture.TwoLetterISOLanguageName)?.TryGetValue(element.Name, out string? neutral) ?? false ? neutral : null)) is string translated)
+        {
+            text = translated;
+        }
+
+        return Core.Common.Terminology.Apply(text, input.Terminology);
+    }
 
     private static decimal ComputeAggregate(ReportElement element, IReadOnlyList<IReadOnlyDictionary<string, object?>> scope, IReadOnlyDictionary<string, object?>? row,
         IReadOnlyList<IReadOnlyDictionary<string, object?>> all)

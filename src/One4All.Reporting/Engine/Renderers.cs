@@ -37,7 +37,7 @@ public sealed class HtmlReportRenderer : IReportRenderer
     public string RenderToString(RenderModel model)
     {
         StringBuilder sb = new();
-        sb.Append("<!doctype html><html><head><meta charset=\"utf-8\"><title>")
+        sb.Append(model.RightToLeft ? "<!doctype html><html dir=\"rtl\"><head><meta charset=\"utf-8\"><title>" : "<!doctype html><html><head><meta charset=\"utf-8\"><title>")
           .Append(Escape(model.ReportName))
           .Append("</title></head><body style=\"margin:0;background:#eee;font-family:Segoe UI,Arial,sans-serif\">");
 

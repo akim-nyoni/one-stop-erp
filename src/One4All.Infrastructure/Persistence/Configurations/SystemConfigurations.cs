@@ -13,6 +13,7 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
         b.Property(x => x.Code).HasMaxLength(20);
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
         b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.Locale).HasMaxLength(20);
         b.Property(x => x.RegistrationNumber).HasMaxLength(60);
         b.Property(x => x.TaxNumber).HasMaxLength(60);
         b.Property(x => x.TimeZoneId).HasMaxLength(64);
@@ -166,5 +167,17 @@ internal sealed class JobRunConfiguration : IEntityTypeConfiguration<JobRun>
         b.Property(x => x.Message).HasMaxLength(2000);
         b.HasOne<ScheduledJob>().WithMany().HasForeignKey(x => x.ScheduledJobId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => x.ScheduledJobId);
+    }
+}
+
+internal sealed class TerminologyOverrideConfiguration : IEntityTypeConfiguration<TerminologyOverride>
+{
+    public void Configure(EntityTypeBuilder<TerminologyOverride> b)
+    {
+        b.ToTable("terminology_override", Schemas.System);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Term).HasMaxLength(60);
+        b.Property(x => x.Replacement).HasMaxLength(60);
+        b.HasIndex(x => new { x.CompanyId, x.Term }).IsUnique();
     }
 }

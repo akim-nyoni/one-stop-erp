@@ -21,6 +21,7 @@ public partial class ShellWindow : Window
         _services = services;
         DataContext = viewModel;
         InitializeComponent();
+        FlowDirection = Localization.UiText.Direction;
         _idleLock = new IdleLock(services);
         Loaded += (_, _) => HideUnavailableOperations(viewModel);
     }

@@ -34,7 +34,10 @@ public static class FixedReportDocument
 
         foreach (LayoutPage page in pages)
         {
-            FixedPage fixedPage = new() { Width = width * PointsToDips, Height = height * PointsToDips, Background = Brushes.White };
+            FixedPage fixedPage = new()
+            {
+                Width = width * PointsToDips, Height = height * PointsToDips, Background = Brushes.White, FlowDirection = model.RightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight,
+            };
             if (!string.IsNullOrWhiteSpace(model.Page.Watermark))
             {
                 fixedPage.Children.Add(Watermark(model.Page.Watermark, width * PointsToDips, height * PointsToDips));
