@@ -19030,6 +19030,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
                     b.Property<int>("FiscalAttempts")
                         .HasColumnType("integer")
                         .HasColumnName("fiscal_attempts");

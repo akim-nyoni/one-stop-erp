@@ -144,6 +144,24 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [ObservableProperty]
     private string _voucherNumber = string.Empty;
 
+    /// <summary>The currencies the till takes today (base first) and the one the next cash, card or mobile tender is in.</summary>
+    public ObservableCollection<TillCurrency> TenderCurrencies { get; } = [];
+
+    /// <summary>The currency of the next cash, card or mobile tender.</summary>
+    [ObservableProperty]
+    private TillCurrency? _selectedTenderCurrency;
+
+    /// <summary>The customer code an on-account sale is charged to.</summary>
+    [ObservableProperty]
+    private string _accountCustomer = string.Empty;
+
+    partial void OnSelectedTenderCurrencyChanged(TillCurrency? value) => RefreshTotals();
+
+    /// <summary>The balance due in the selected tender currency (blank in base).</summary>
+    public string BalanceInTenderCurrencyText => SelectedTenderCurrency is { } currency && currency.Code != _currency
+        ? $"{_ticket.BalanceDueIn(currency.Rate).ToString("N2", CultureInfo.CurrentCulture)} {currency.Code.Value} @ {currency.Rate.ToString("0.######", CultureInfo.CurrentCulture)}"
+        : string.Empty;
+
     /// <summary>The GL account manual discounts post to.</summary>
     [ObservableProperty]
     private string _discountAccountCode = string.Empty;
@@ -273,6 +291,13 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         await LoadTaxRatesAsync(db, ct).ConfigureAwait(true);
         await LoadProductsAsync(scope.ServiceProvider.GetRequiredService<IPosCatalogueService>(), ct).ConfigureAwait(true);
         await PrefillAccountsAsync(db, ct).ConfigureAwait(true);
+        TenderCurrencies.Clear();
+        foreach (TillCurrency currency in await scope.ServiceProvider.GetRequiredService<IPosService>().TenderCurrenciesAsync(_companyId, DateOnly.FromDateTime(DateTime.Today), ct).ConfigureAwait(true))
+        {
+            TenderCurrencies.Add(currency);
+        }
+
+        SelectedTenderCurrency = TenderCurrencies.FirstOrDefault();
         await RefreshParkedAsync().ConfigureAwait(true);
 
         PendingOfflineCount = await LocalQueue.CountAsync(ct).ConfigureAwait(true);
@@ -541,6 +566,30 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             return;
         }
 
+        // A tender in another currency: the amount typed is in that currency (blank: the balance in it), turned into base at today's rate.
+        if (SelectedTenderCurrency is { } foreign && foreign.Code != _currency)
+        {
+            decimal due = _ticket.BalanceDueIn(foreign.Rate);
+            decimal given = string.IsNullOrWhiteSpace(TenderEntry) ? due : decimal.TryParse(TenderEntry, NumberStyles.Number, CultureInfo.CurrentCulture, out decimal typed) ? typed : 0m;
+            if (!allowOverTender && given > due)
+            {
+                given = due;
+            }
+
+            Result foreignResult = _ticket.AddForeignTender(type, foreign.Code, foreign.Rate, given);
+            if (foreignResult.IsFailure)
+            {
+                StatusMessage = foreignResult.Error.Message;
+                return;
+            }
+
+            TenderEntry = string.Empty;
+            RefreshTotals();
+            StatusMessage = (_ticket.IsFullyTendered ? $"Paid. Change {ChangeText} {_currency.Value}. Press Pay to complete." : $"Balance {BalanceText} due.")
+                + $" Took {given:N2} {foreign.Code.Value}.";
+            return;
+        }
+
         decimal amount;
         if (string.IsNullOrWhiteSpace(TenderEntry))
         {
@@ -695,6 +744,46 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     /// <summary>Takes a mobile-money tender for the entered amount (or the exact balance when blank).</summary>
     [RelayCommand]
     private void TenderMobileMoney() => AddTender(TenderType.MobileMoney, allowOverTender: false);
+
+    /// <summary>Charges the balance to the customer's account (checked against their credit limit when the sale posts).</summary>
+    [RelayCommand]
+    private async Task TenderAccountAsync()
+    {
+        if (!IsSessionOpen || _ticket.Lines.Count == 0)
+        {
+            return;
+        }
+
+        if (await AccountCustomerIdAsync().ConfigureAwait(true) is not long)
+        {
+            StatusMessage = string.IsNullOrWhiteSpace(AccountCustomer) ? "Type the customer's account code first." : $"No customer {AccountCustomer.Trim().ToUpperInvariant()}.";
+            return;
+        }
+
+        Result added = _ticket.AddTender(TenderType.Credit, string.IsNullOrWhiteSpace(TenderEntry) ? _ticket.BalanceDue : TryEntry(out decimal typed) ? Math.Min(typed, _ticket.BalanceDue) : 0m);
+        if (added.IsFailure)
+        {
+            StatusMessage = added.Error.Message;
+            return;
+        }
+
+        TenderEntry = string.Empty;
+        RefreshTotals();
+        StatusMessage = _ticket.IsFullyTendered ? $"Charged to {AccountCustomer.Trim().ToUpperInvariant()}. Press Pay to complete." : $"Balance {BalanceText} due.";
+    }
+
+    private async Task<long?> AccountCustomerIdAsync()
+    {
+        if (string.IsNullOrWhiteSpace(AccountCustomer))
+        {
+            return null;
+        }
+
+        string code = AccountCustomer.Trim().ToUpperInvariant();
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<One4AllDbContext>().Customers.AsNoTracking()
+            .Where(c => c.CompanyId == _companyId && c.Code.ToUpper() == code).Select(c => (long?)c.Id).FirstOrDefaultAsync().ConfigureAwait(true);
+    }
 
     /// <summary>
     /// Pays from a gift card: the entered amount (or the balance due) up to what the card holds; the card is charged only when the sale
@@ -953,7 +1042,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         string saleNumber = $"POS{_terminalId}-{DateTime.Now:yyMMddHHmmss}-{++_saleSequence}";
-        PosSaleContext context = SaleContext(saleNumber);
+        PosSaleContext context = SaleContext(saleNumber) with { CustomerId = await AccountCustomerIdAsync().ConfigureAwait(true) };
         Result<CompleteSaleRequest> build = _ticket.BuildSale(context);
         if (build.IsFailure)
         {
@@ -1138,6 +1227,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             _ticket.Clear();
             AgeVerified = false;
             PrescriptionReference = string.Empty;
+            AccountCustomer = string.Empty;
             RebuildCart();
             StatusMessage = $"Sale {saleNumber} posted (journal {result.Value.JournalNumber}). Change {change:N2}.{loyalty}{(printed is null ? string.Empty : $" Receipt not printed: {printed}")}";
         }
@@ -1327,5 +1417,6 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         OnPropertyChanged(nameof(TenderedText));
         OnPropertyChanged(nameof(BalanceText));
         OnPropertyChanged(nameof(ChangeText));
+        OnPropertyChanged(nameof(BalanceInTenderCurrencyText));
     }
 }

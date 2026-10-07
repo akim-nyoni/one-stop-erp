@@ -70,6 +70,9 @@ public sealed class Sale : AuditableEntity, ICompanyScoped
     /// <summary>The company base currency.</summary>
     public CurrencyCode BaseCurrency { get; private set; }
 
+    /// <summary>The customer an on-account sale is charged to (brief §4.1).</summary>
+    public long? CustomerId { get; set; }
+
     /// <summary>The status.</summary>
     public SaleStatus Status { get; private set; }
 

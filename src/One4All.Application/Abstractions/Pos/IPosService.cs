@@ -52,6 +52,9 @@ public sealed class CompleteSaleRequest
     /// <summary>The warehouse stock is issued from.</summary>
     public long WarehouseId { get; init; }
 
+    /// <summary>The customer: an on-account (credit) tender charges their account as an invoice, within their credit limit.</summary>
+    public long? CustomerId { get; init; }
+
     /// <summary>The output-tax account (credited).</summary>
     public string? TaxAccountCode { get; init; }
 
@@ -73,6 +76,11 @@ public sealed class CompleteSaleRequest
 /// <param name="JournalNumber">The sale GL journal number.</param>
 /// <param name="TotalGross">The gross total.</param>
 public readonly record struct CompleteSaleResult(long SaleId, string JournalNumber, decimal TotalGross);
+
+/// <summary>A currency the till can take, with the units of base currency one unit of it buys today.</summary>
+/// <param name="Code">The currency.</param>
+/// <param name="Rate">Its rate to base.</param>
+public sealed record TillCurrency(CurrencyCode Code, decimal Rate);
 
 /// <summary>
 /// One basket split into several sales, each paid on its own (brief §4.1 split bill). The basket and its checks are as for
@@ -163,6 +171,13 @@ public interface IPosService
     /// <param name="ct">A cancellation token.</param>
     /// <returns>How many were signed and how many still wait.</returns>
     Task<(int Fiscalised, int StillQueued)> RetryFiscalAsync(long companyId, CancellationToken ct = default);
+
+    /// <summary>The currencies the till can take on a date: base, and every currency with a daily rate to it (direct, inverse or through another).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="date">The day.</param>
+    /// <param name="ct">A cancellation token.</param>
+    /// <returns>The currencies, base first.</returns>
+    Task<IReadOnlyList<TillCurrency>> TenderCurrenciesAsync(long companyId, DateOnly date, CancellationToken ct = default);
 
     /// <summary>
     /// Voids/refunds a completed sale: posts the exact inverse of the sale's tender/revenue/tax journal

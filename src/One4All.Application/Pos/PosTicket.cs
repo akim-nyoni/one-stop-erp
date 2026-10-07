@@ -35,7 +35,8 @@ public sealed record PosSaleContext(
     IReadOnlyDictionary<TenderType, string> TenderAccounts,
     bool AgeVerified = false,
     string? PrescriptionReference = null,
-    string? DiscountAccountCode = null);
+    string? DiscountAccountCode = null,
+    long? CustomerId = null);
 
 /// <summary>
 /// One line on a POS ticket. Prices are tax-exclusive (a menu/item <c>Price</c> is a net price, matching
@@ -123,7 +124,11 @@ public sealed class PosTicketLine
 /// <summary>A tender taken against a ticket.</summary>
 /// <param name="Type">The tender type.</param>
 /// <param name="Amount">The amount taken (in the ticket currency).</param>
-public readonly record struct PosTicketTender(TenderType Type, decimal Amount, string? VoucherNumber = null);
+public readonly record struct PosTicketTender(TenderType Type, decimal Amount, string? VoucherNumber = null, CurrencyCode? Currency = null, decimal Rate = 1m)
+{
+    /// <summary>What the tender is worth in the ticket's currency (to four places for a foreign tender, as the sale is posted).</summary>
+    public decimal BaseAmount => Currency is null ? Amount : decimal.Round(Amount * Rate, 4, MidpointRounding.ToEven);
+}
 
 /// <summary>Rounds POS money to two decimals (customer-facing minor units), half away from zero.</summary>
 public static class PosMoney
@@ -161,13 +166,40 @@ public sealed class PosTicket
     public decimal GrossTotal => SubtotalNet + TaxTotal;
 
     /// <summary>The amount tendered so far.</summary>
-    public decimal Tendered => PosMoney.Round(_tenders.Sum(t => t.Amount));
+    public decimal Tendered => decimal.Round(_tenders.Sum(t => t.BaseAmount), 4, MidpointRounding.ToEven);
 
     /// <summary>The outstanding balance (never negative).</summary>
-    public decimal BalanceDue => Math.Max(0m, PosMoney.Round(GrossTotal - Tendered));
+    public decimal BalanceDue => Math.Max(0m, decimal.Round(GrossTotal - Tendered, 4, MidpointRounding.ToEven));
 
     /// <summary>The change owed to the customer (never negative).</summary>
-    public decimal ChangeDue => Math.Max(0m, PosMoney.Round(Tendered - GrossTotal));
+    public decimal ChangeDue => Math.Max(0m, decimal.Round(Tendered - GrossTotal, 4, MidpointRounding.ToEven));
+
+    /// <summary>The balance still due expressed in another currency (rounded up to the cent, so it covers the balance).</summary>
+    /// <param name="rate">Units of the ticket's currency one unit of the other buys.</param>
+    /// <returns>The amount in the other currency.</returns>
+    public decimal BalanceDueIn(decimal rate) => rate <= 0m ? 0m : Math.Ceiling(BalanceDue / rate * 100m) / 100m;
+
+    /// <summary>Records a tender in another currency at a rate (units of the ticket's currency one unit of it buys).</summary>
+    /// <param name="type">The tender type.</param>
+    /// <param name="currency">The tender's currency.</param>
+    /// <param name="rate">Its rate.</param>
+    /// <param name="amount">The amount in that currency.</param>
+    /// <returns>Success, or why not.</returns>
+    public Result AddForeignTender(TenderType type, CurrencyCode currency, decimal rate, decimal amount)
+    {
+        if (amount <= 0m || rate <= 0m)
+        {
+            return Result.Failure(Error.Validation("Pos.Tender", "A foreign tender needs a positive amount and rate."));
+        }
+
+        if (type is TenderType.Voucher or TenderType.Credit)
+        {
+            return Result.Failure(Error.Validation("Pos.ForeignTender", "Vouchers and accounts are tendered in the ticket's own currency."));
+        }
+
+        _tenders.Add(new PosTicketTender(type, PosMoney.Round(amount), null, currency, rate));
+        return Result.Success();
+    }
 
     /// <summary>True once the ticket has lines and is fully paid.</summary>
     public bool IsFullyTendered => _lines.Count > 0 && Tendered >= GrossTotal;
@@ -367,12 +399,24 @@ public sealed class PosTicket
         List<PosTenderRequest> tenders = [];
         foreach (PosTicketTender tender in _tenders)
         {
-            if (!context.TenderAccounts.TryGetValue(tender.Type, out string? account) || string.IsNullOrWhiteSpace(account))
+            string? account = context.TenderAccounts.GetValueOrDefault(tender.Type);
+            if (tender.Type == TenderType.Credit)
+            {
+                if (context.CustomerId is null)
+                {
+                    return Error.Validation("Pos.AccountCustomer", "An on-account tender needs the customer it is charged to.");
+                }
+
+                account ??= string.Empty; // the server posts it to the receivables control account
+            }
+            else if (string.IsNullOrWhiteSpace(account))
             {
                 return Error.Validation("Pos.TenderAccount", $"No GL account is configured for {tender.Type} tenders.");
             }
 
-            tenders.Add(new PosTenderRequest(tender.Type, context.Currency, tender.Amount, account, IsChange: false, VoucherNumber: tender.VoucherNumber));
+            tenders.Add(tender.Currency is CurrencyCode foreign && foreign != context.Currency
+                ? new PosTenderRequest(tender.Type, foreign, tender.Amount, account, IsChange: false, ExchangeRate: tender.Rate)
+                : new PosTenderRequest(tender.Type, context.Currency, tender.Amount, account, IsChange: false, VoucherNumber: tender.VoucherNumber));
         }
 
         if (ChangeDue > 0m)
@@ -390,7 +434,7 @@ public sealed class PosTicket
         {
             CompanyId = sale.CompanyId, TerminalId = sale.TerminalId, TillSessionId = sale.TillSessionId, CashierUserId = sale.CashierUserId, SaleNumber = sale.SaleNumber,
             SaleDate = sale.SaleDate, WarehouseId = sale.WarehouseId, TaxAccountCode = sale.TaxAccountCode, AgeVerified = sale.AgeVerified,
-            PrescriptionReference = sale.PrescriptionReference, Lines = sale.Lines, Tenders = tenders,
+            PrescriptionReference = sale.PrescriptionReference, CustomerId = sale.CustomerId, Lines = sale.Lines, Tenders = tenders,
         };
     }
 
@@ -423,6 +467,7 @@ public sealed class PosTicket
             TaxAccountCode = context.TaxAccountCode,
             AgeVerified = context.AgeVerified,
             PrescriptionReference = context.PrescriptionReference,
+            CustomerId = context.CustomerId,
             Lines = lines,
         };
     }

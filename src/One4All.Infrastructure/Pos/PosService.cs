@@ -8,6 +8,7 @@ using One4All.Core.Common;
 using One4All.Core.Inventory;
 using One4All.Core.Pos;
 using One4All.Core.System;
+using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
 using One4All.Licensing.Core;
 
@@ -23,6 +24,7 @@ public sealed class PosService : IPosService
     private readonly IInventoryService _inventory;
     private readonly IClock _clock;
     private readonly IFiscalDeviceProvider? _fiscal;
+    private readonly Application.Abstractions.Trading.IAllocationService? _allocations;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
@@ -32,9 +34,11 @@ public sealed class PosService : IPosService
     /// <param name="licence">Caps the POS terminals that may trade.</param>
     /// <param name="webhooks">Publishes completed sales.</param>
     /// <param name="fiscal">The fiscal device (brief §3.5); none or a disabled one means sales are not fiscalised.</param>
+    /// <param name="allocations">Settles a voided on-account sale's invoice against its credit.</param>
     public PosService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, Application.Abstractions.Licensing.ILicenceService? licence = null,
-        Application.Abstractions.Integration.IWebhookService? webhooks = null, IFiscalDeviceProvider? fiscal = null)
+        Application.Abstractions.Integration.IWebhookService? webhooks = null, IFiscalDeviceProvider? fiscal = null, Application.Abstractions.Trading.IAllocationService? allocations = null)
     {
+        _allocations = allocations;
         _fiscal = fiscal;
         _webhooks = webhooks;
         _licence = licence;
@@ -147,6 +151,47 @@ public sealed class PosService : IPosService
             vouchers[number] = (card, taken);
         }
 
+        // On account: a credit tender (other than a staff purchase) charges the customer's account, which must be open, in the base currency
+        // and within its credit limit; it posts to the receivables control account.
+        decimal onAccount = request.Tenders.Where(t => t.TenderType == TenderType.Credit && t.StaffEmployeeId is null && !t.IsChange).Sum(t => t.Amount);
+        Customer? accountCustomer = null;
+        string? receivablesControl = null;
+        if (onAccount > 0m)
+        {
+            if (request.CustomerId is not long customerId
+                || await _db.Customers.FirstOrDefaultAsync(c => c.Id == customerId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false) is not Customer customer)
+            {
+                return Error.Validation("Pos.AccountCustomer", "An on-account sale needs the customer it is charged to.");
+            }
+
+            if (customer.OnHold)
+            {
+                return Error.Rule("Pos.CustomerOnHold", $"Customer {customer.Code} is on hold; nothing more can be charged to the account.");
+            }
+
+            if (customer.Currency != baseCurrency || request.Tenders.Any(t => t.TenderType == TenderType.Credit && t.StaffEmployeeId is null && t.Currency != baseCurrency))
+            {
+                return Error.Rule("Pos.AccountCurrency", $"Only accounts kept in {baseCurrency.Value} can be charged at the till.");
+            }
+
+            decimal owed = await _db.OpenItems.Where(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == customer.Id)
+                .SumAsync(i => i.Sign == LedgerSign.Debit ? i.OutstandingBase : -i.OutstandingBase, ct).ConfigureAwait(false);
+            if (customer.CreditLimit > 0m && owed + onAccount > customer.CreditLimit)
+            {
+                return Error.Rule("Pos.CreditLimit", $"Customer {customer.Code} owes {owed:N2}; {onAccount:N2} more would pass the credit limit of {customer.CreditLimit:N2}.");
+            }
+
+            receivablesControl = await _db.Accounts.Where(a => a.CompanyId == request.CompanyId && a.ControlAccountType == ControlAccountType.AccountsReceivable)
+                .Select(a => a.AccountCode).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (receivablesControl is null)
+            {
+                return Error.Rule("Trading.NoControlAccount", "No receivables control account is configured.");
+            }
+
+            accountCustomer = customer;
+            sale.CustomerId = customer.Id;
+        }
+
         List<JournalLineRequest> journalLines = [];
         foreach (PosTenderRequest tender in request.Tenders)
         {
@@ -172,10 +217,11 @@ public sealed class PosService : IPosService
 
             decimal rate = rateResult.Value;
             decimal baseAmount = decimal.Round(tender.Amount * rate, 4, MidpointRounding.ToEven);
-            sale.AddTender(new SaleTender(tender.TenderType, tender.Currency, tender.Amount, rate, baseAmount, tender.AccountCode, tender.IsChange, tender.StaffEmployeeId,
+            string tenderAccount = tender.TenderType == TenderType.Credit && tender.StaffEmployeeId is null && receivablesControl is not null ? receivablesControl : tender.AccountCode;
+            sale.AddTender(new SaleTender(tender.TenderType, tender.Currency, tender.Amount, rate, baseAmount, tenderAccount, tender.IsChange, tender.StaffEmployeeId,
                 tender.TenderType == TenderType.Voucher ? tender.VoucherNumber!.Trim().ToUpperInvariant() : null));
 
-            journalLines.Add(new JournalLineRequest { AccountCode = tender.AccountCode, Side = tender.IsChange ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = baseAmount });
+            journalLines.Add(new JournalLineRequest { AccountCode = tenderAccount, Side = tender.IsChange ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = baseAmount });
         }
 
         // Revenue (net) per line, then output tax.
@@ -237,6 +283,16 @@ public sealed class PosService : IPosService
 
         sale.JournalEntryId = posting.Value.JournalId;
         _db.Set<Sale>().Add(sale);
+
+        // The on-account part becomes an invoice on the customer's account, on the sale's journal.
+        if (accountCustomer is not null)
+        {
+            _db.OpenItems.Add(new OpenItem(request.CompanyId, TradingLedger.AccountsReceivable, accountCustomer.Id, OpenItemType.Invoice, LedgerSign.Debit, request.SaleNumber, request.SaleDate,
+                accountCustomer.DueDateFor(request.SaleDate), baseCurrency, 1m, onAccount, onAccount)
+            {
+                JournalEntryId = posting.Value.JournalId, Narrative = $"POS sale {request.SaleNumber} on account",
+            });
+        }
 
         // The cards are charged only once the sale has posted.
         foreach ((string number, (Core.Vouchers.GiftCard card, decimal amount)) in vouchers)
@@ -411,6 +467,30 @@ public sealed class PosService : IPosService
         if (posting.IsFailure)
         {
             return posting.Error;
+        }
+
+        // An on-account sale: the voided amount is credited to the customer and set against the sale's invoice.
+        decimal charged = sale.Tenders.Where(t => t.TenderType == TenderType.Credit && t.StaffEmployeeId is null && !t.IsChange).Sum(t => t.BaseAmount);
+        if (sale.CustomerId is long accountId && charged > 0m)
+        {
+            OpenItem? invoice = await _db.OpenItems.FirstOrDefaultAsync(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == accountId
+                && i.DocumentNumber == sale.SaleNumber && i.ItemType == OpenItemType.Invoice, ct).ConfigureAwait(false);
+            OpenItem credit = new(companyId, TradingLedger.AccountsReceivable, accountId, OpenItemType.CreditNote, LedgerSign.Credit, $"VOID-{sale.SaleNumber}", date, date, sale.BaseCurrency, 1m,
+                charged, charged)
+            {
+                JournalEntryId = posting.Value.JournalId, Narrative = $"Void of POS sale {sale.SaleNumber}: {reason}",
+            };
+            _db.OpenItems.Add(credit);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            if (invoice is not null && _allocations is not null && invoice.OutstandingBase > 0m)
+            {
+                Result<Application.Abstractions.Trading.AllocationResult> settled = await _allocations.AllocateAsync(companyId, TradingLedger.AccountsReceivable, invoice.Id, credit.Id,
+                    Math.Min(invoice.OutstandingTransaction, charged), date, ct).ConfigureAwait(false);
+                if (settled.IsFailure)
+                {
+                    return settled.Error;
+                }
+            }
         }
 
         // Give back what the sale took from gift cards.
@@ -605,6 +685,22 @@ public sealed class PosService : IPosService
         }
 
         return rate.Value;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<TillCurrency>> TenderCurrenciesAsync(long companyId, DateOnly date, CancellationToken ct = default)
+    {
+        CurrencyCode baseCurrency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).SingleAsync(ct).ConfigureAwait(false);
+        List<TillCurrency> currencies = [new TillCurrency(baseCurrency, 1m)];
+        foreach (CurrencyCode code in await _db.Currencies.AsNoTracking().Select(c => c.Code).ToListAsync(ct).ConfigureAwait(false))
+        {
+            if (code != baseCurrency && await Accounting.ExchangeRateResolver.FindAsync(_db, code, baseCurrency, ExchangeRateType.Daily, date, ct).ConfigureAwait(false) is decimal rate && rate > 0m)
+            {
+                currencies.Add(new TillCurrency(code, rate));
+            }
+        }
+
+        return currencies;
     }
 
     /// <inheritdoc />

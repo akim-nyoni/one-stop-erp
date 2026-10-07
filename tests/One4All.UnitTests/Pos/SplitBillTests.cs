@@ -72,4 +72,32 @@ public sealed class SplitBillTests
         SplitBill.Plan(basket.Lines, SplitBill.Evenly(basket.Lines, 2)).Value.Select(SplitBill.Gross).Should().Equal(23m, 23m);
         new PosTicket().BuildBasket(context).Error.Code.Should().Be("Pos.Empty");
     }
+
+    [Fact]
+    public void Foreign_tenders_convert_at_their_rate_and_change_is_exact_in_base()
+    {
+        PosTicket ticket = new();
+        ticket.AddLine(0, "Meal", 20.00m, 0.15m, "4000");
+        Core.Accounting.CurrencyCode eur = Core.Accounting.CurrencyCode.Parse("EUR"), usd = Core.Accounting.CurrencyCode.Parse("USD");
+        ticket.BalanceDueIn(1.10m).Should().Be(20.91m);
+        ticket.AddForeignTender(Core.Pos.TenderType.Voucher, eur, 1.10m, 5m).Error.Code.Should().Be("Pos.ForeignTender");
+        ticket.AddForeignTender(Core.Pos.TenderType.Cash, eur, 1.10m, 20.91m).IsSuccess.Should().BeTrue();
+        (ticket.Tendered, ticket.ChangeDue, ticket.IsFullyTendered).Should().Be((23.001m, 0.001m, true));
+        CompleteSaleRequest sale = ticket.BuildSale(new PosSaleContext(1, 1, 1, 1, "S3", new DateOnly(2026, 6, 1), 1, usd, "2200", "1000",
+            new Dictionary<Core.Pos.TenderType, string> { [Core.Pos.TenderType.Cash] = "1000" })).Value;
+        sale.Tenders.Should().Equal(new PosTenderRequest(Core.Pos.TenderType.Cash, eur, 20.91m, "1000", IsChange: false, ExchangeRate: 1.10m),
+            new PosTenderRequest(Core.Pos.TenderType.Cash, usd, 0.001m, "1000", IsChange: true));
+    }
+
+    [Fact]
+    public void An_account_tender_needs_the_customer()
+    {
+        PosTicket ticket = new();
+        ticket.AddLine(0, "Meal", 20.00m, 0m, "4000");
+        ticket.AddTender(Core.Pos.TenderType.Credit, 20m).IsSuccess.Should().BeTrue();
+        PosSaleContext context = new(1, 1, 1, 1, "S4", new DateOnly(2026, 6, 1), 1, Core.Accounting.CurrencyCode.Parse("USD"), null, "1000", new Dictionary<Core.Pos.TenderType, string>());
+        ticket.BuildSale(context).Error.Code.Should().Be("Pos.AccountCustomer");
+        CompleteSaleRequest sale = ticket.BuildSale(context with { CustomerId = 77 }).Value;
+        (sale.CustomerId, sale.Tenders.Single().TenderType).Should().Be((77L, Core.Pos.TenderType.Credit));
+    }
 }

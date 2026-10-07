@@ -340,6 +340,16 @@
                                 <TextBlock Text="Gift card no." Foreground="{DynamicResource Muted}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
                                 <TextBox Text="{Binding VoucherNumber, UpdateSourceTrigger=PropertyChanged}" />
                             </DockPanel>
+                            <DockPanel Margin="2,0,2,4">
+                                <TextBlock Text="Pay in" Foreground="{DynamicResource Muted}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <ComboBox ItemsSource="{Binding TenderCurrencies}" SelectedItem="{Binding SelectedTenderCurrency}" DisplayMemberPath="Code" Width="80" Margin="0,0,6,0" />
+                                <TextBlock Text="{Binding BalanceInTenderCurrencyText}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                            </DockPanel>
+                            <DockPanel Margin="2,0,2,4">
+                                <Button DockPanel.Dock="Right" Content="ACCOUNT" Style="{StaticResource PadButton}" Height="36" Width="100" FontSize="14" Background="#5D6D7E" Command="{Binding TenderAccountCommand}" />
+                                <TextBlock Text="Customer a/c" Foreground="{DynamicResource Muted}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                <TextBox Text="{Binding AccountCustomer, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,6,0" />
+                            </DockPanel>
                             <Button Content="PAY / COMPLETE" Style="{StaticResource PadButton}" Height="72" FontSize="22" Background="#27AE60" Command="{Binding PayCommand}" />
                             <UniformGrid Columns="2">
                                 <Button Content="Clear Tenders" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#7F8C8D" Command="{Binding ClearTendersCommand}" />
