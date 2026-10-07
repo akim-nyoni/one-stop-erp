@@ -30,6 +30,7 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
         DateOnly from = DateParameter(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
         return command.ToUpperInvariant() switch
         {
+            "RECVDEPOSITS" => await DepositsAsync(companyId, DateParameter(parameters, "AsAtDate") ?? DateOnly.FromDateTime(DateTime.Today), ct).ConfigureAwait(false),
             "RECVGROUPSTATEMENT" => await GroupStatementAsync(companyId, from, to, ct).ConfigureAwait(false),
             "RECVCREDITNOTES" => await CreditNotesAsync(companyId, from, to, ct).ConfigureAwait(false),
             "RECVCOLLECTIONS" => await CollectionsAsync(companyId, from, to, ct).ConfigureAwait(false),
@@ -354,5 +355,18 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
         }
 
         return row;
+    }
+
+    // Credits on the sales ledger still unapplied at the date (receipts and other credits, not credit notes against goods).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DepositsAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<OpenItemAsAt> open = [.. (await OpenItemsAsAt.LoadAsync(_db, companyId, TradingLedger.AccountsReceivable, asAt, ct).ConfigureAwait(false))
+            .Where(o => o.Item.Sign == LedgerSign.Credit && o.Item.ItemType != OpenItemType.CreditNote && o.OutstandingBase != 0m)];
+        List<long> ids = [.. open.Select(o => o.Item.TraderId).Distinct()];
+        Dictionary<long, string> names = await _db.Customers.AsNoTracking().IgnoreQueryFilters().Where(c => ids.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => $"{c.Code} {c.Name}", ct).ConfigureAwait(false);
+        return [.. open.OrderBy(o => names.GetValueOrDefault(o.Item.TraderId, "?"), StringComparer.Ordinal).ThenBy(o => o.Item.DocumentDate)
+            .Select(o => Row(("Customer", names.GetValueOrDefault(o.Item.TraderId, "?")), ("Document", o.Item.DocumentNumber), ("Date", Date(o.Item.DocumentDate)), ("Type", o.Item.ItemType.ToString()),
+                ("Currency", o.Item.Currency.Value), ("Received", Money(o.Item.OriginalTransaction)), ("Unapplied", Money(o.OutstandingTransaction)),
+                ("Days", asAt.DayNumber - o.Item.DocumentDate.DayNumber), ("Base", o.OutstandingBase)))];
     }
 }

@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-550 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+557 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -127,6 +127,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | GL16 | Realised FX Gain / Loss | Exchange differences realised on settlement in the period. | FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Document, Narrative, Account, Amount | — | Sum(Amount) |
 | GL17 | Suspense & Unallocated Items Review | Balances on suspense accounts and unallocated receipts and payments on the trading ledgers at the date. | AsAtDate (Date, optional) | Item, Reference, Count, Oldest, Balance | — | Sum(Balance) |
 | GL18 | Control Reconciliation — VAT and Bank | Tax accounts against the tax-coded postings, and each bank account's ledger balance against its statement, with what explains the gap. | AsAtDate (Date, optional) | Control, Account, Ledger, Other, Explained, Difference | — | Sum(Difference) |
+| GL19 | Period Close Checklist & Status | Each period of the year to the date: its status per module, whether it is ready to close, and every close check with its count, value and whether it blocks. | AsAtDate (Date, optional) | Period, Ends, Status, Ready, Check, Count, Value, Blocking, Detail | — | — |
 | GL2 | Trial Balance — Multi-currency | Posted balances as at the date per account and transaction currency, in transaction and base. | AsAtDate (Date, optional) | Account, Name, Currency, Transaction, Base | — | Sum(Base) |
 | GL20 | Year-End Pack | For the year containing the date: the close checklist, the trial balance totals, the result for the year and the year's journals by source. | AsAtDate (Date, optional) | Section, Item, Value | — | — |
 | GL22 | Recurring Journals Due & Missed | Each active recurring template's last posted month against the date: posted, due or missed. | AsAtDate (Date, optional) | Code, Description, LastPosted, Status, Value | — | Sum(Value) |
@@ -271,6 +272,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | INV91 | Goods in Transit | Transfers dispatched but not yet received at the date: from, to, days on the road, quantity and value. | AsAtDate (Date, optional) | Transfer, Item, From, To, Dispatched, Days, Quantity, Value | — | Sum(Value) |
 | INV92 | Stock Turnover & Days Cover | Per item over the period: cost of issues, average stock value, turnover and days of cover at the current rate. | FromDate (Date, optional), ToDate (Date, optional) | Item, Issued, AverageStock, Turns, DaysCover, Value | — | Sum(Value) |
 | INV93 | Gross Margin by Item | Per item over the period: net sales (POS and invoiced orders), cost of issues and the margin. | FromDate (Date, optional), ToDate (Date, optional) | Item, Category, Quantity, Sales, Cost, MarginPercent, Margin | — | Sum(Margin) |
+| INV95 | Item Master Listing & Variant Matrix | Every item with its type, unit, category, brand, barcode, tax, costing, tracking and reorder settings; variants sit under their parent with size and colour, and each parent shows its size × colour matrix. | Category (String, optional) | Code, Description, Parent, Size, Colour, Type, Unit, Category, Brand, Barcode, Tax, Costing, Tracking, Reorder, Active | — | — |
 | INV96 | Cost Change History | Each receipt at a unit cost different from the item's previous receipt, with the change. | FromDate (Date, optional), ToDate (Date, optional) | Item, Date, Reference, Previous, Cost, Change, Quantity | — | — |
 | INV97 | Landed Cost Analysis | Landed costs added to stock in the period, per item and reference, against the goods' own receipt value. | FromDate (Date, optional), ToDate (Date, optional) | Date, Reference, Item, Goods, Uplift, Landed | — | Sum(Landed) |
 | INV98 | Bill of Materials Costing | Each BOM's components with scrap allowance and current average cost, rolled up to a cost per finished unit. | — | Bom, Parent, Component, PerBatch, Scrap, PerUnit, UnitCost, Extended | — | Sum(Extended) |
@@ -426,8 +428,11 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | POS115 | Loyalty Points Statement | Per loyalty customer: points earned and redeemed in the period and the balance to date. | FromDate (Date, optional), ToDate (Date, optional) | Customer, Transactions, Earned, Redeemed, LastActivity, Balance | — | Sum(Balance) |
 | POS116 | Receipt Reprint Log | Every receipt reprinted in the period: when, by whom, the sale and its value. | FromDate (Date, optional), ToDate (Date, optional) | Printed, Till, Cashier, Sale, Reason, Amount | — | Sum(Amount) |
 | POS117 | Tender & Multi-currency Tender Analysis | Tenders taken in the period by type and currency, in currency and base, net of change. | FromDate (Date, optional), ToDate (Date, optional) | Tender, Currency, Count, Amount, Share, Base | — | Sum(Base) |
+| POS118 | Table / Tab Report | Tabs opened in the period: those still open with their table, waiter, party and spend so far, then per waiter the tabs, average minutes from opening to the bill, average spend (before tips) and tips. | FromDate (Date, optional), ToDate (Date, optional) | Section, Waiter, Tab, Opened, Tabs, Minutes, Spend, Tips | — | Sum(Tips) |
+| POS119 | Kitchen / Bar Ticket Volumes & Void-after-Print | Per day and course: tickets sent to the kitchen or bar, items on them, how many reached the table, and items voided after they were sent, with the value voided and the reasons. | FromDate (Date, optional), ToDate (Date, optional) | Date, Course, Tickets, Items, Served, Voided, Reasons, VoidValue | — | Sum(VoidValue) |
 | POS120 | Offline Sync Log | Operations captured offline in the period: kind, status, attempts, when synced and any error. | FromDate (Date, optional), ToDate (Date, optional) | Created, Kind, Status, Attempts, Synced, Error | — | — |
 | POS121 | Fiscal Submission Log | Sales submitted to the fiscal device or revenue authority in the period, with the fiscal receipt reference and outcome. | FromDate (Date, optional), ToDate (Date, optional) | Submitted, Till, Sale, Reference, Outcome, Amount | — | Sum(Amount) |
+| POS122 | Receipt / Invoice / Refund Slip Layouts | A sale's slip as printed on 58 mm or 80 mm roll paper or an A4 page, with any refunds taken against it as a refund slip below. | SaleNumber (String, optional), Paper (String, optional) | Line, Text | — | Sum(Text) |
 
 ## Purchasing
 
@@ -532,6 +537,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | AR37 | Credit Notes & Returns Analysis | Credit notes raised in the period by reason code, with customer and narrative. | FromDate (Date, optional), ToDate (Date, optional) | Reason, Date, Number, Customer, Narrative, Amount | — | Sum(Amount) |
 | AR38 | Receipts / Collections Report | Customer receipts in the period by day, bank account (method), currency and the user who posted them. | FromDate (Date, optional), ToDate (Date, optional) | Date, Method, Currency, User, Count, Amount, Base | — | Sum(Base) |
 | AR42 | Dunning / Reminder Letters | Every customer with overdue debt at the date, at its reminder level (first, second, final), with the letter itself — overdue amount after unallocated credits and the oldest days overdue. | AsAtDate (Date, optional), FirstDays (Integer, optional), SecondDays (Integer, optional), FinalDays (Integer, optional) | Customer, Level, Stage, Overdue, OldestDays, Letter | — | — |
+| AR44 | Customer Deposits & Advance Payments Held | Money received from customers and not yet applied to an invoice at the date — deposits, advances and payments on account — with how long each has been held, in transaction currency and base. | AsAtDate (Date, optional) | Customer, Document, Date, Type, Currency, Received, Unapplied, Days, Base | — | Sum(Base) |
 | AR46 | Sales Agent Commission Statement & Accrual Schedule | Per sales rep for the period: commission earned on each customer's base, the rep's total to accrue, optionally for one rep. | FromDate (Date, optional), ToDate (Date, optional), RepCode (String, optional) | Rep, Customer, Base, Commission | — | Sum(Commission) |
 
 ## Restaurant
@@ -653,6 +659,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | TX218 | Exempt, Zero-rated & Out-of-scope Supplies | Lines in the period under zero-rated, exempt and out-of-scope tax codes, totalled per code. | FromDate (Date, optional), ToDate (Date, optional) | TaxCode, Name, Type, Lines, Amount | — | Sum(Amount) |
 | TX219 | Reverse Charge & Import VAT | Lines in the period under reverse-charge and deemed (import) tax codes: the output tax self-assessed, the input tax claimed and what is left payable. | FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Document, TaxCode, Account, Side, Amount | — | Sum(Amount) |
 | TX220 | Withholding Tax Return | Withholding certificates by month and tax code: count, gross paid, tax withheld and how much has been remitted. | FromDate (Date, optional), ToDate (Date, optional) | Month, TaxCode, Certificates, Gross, Remitted, Withheld | — | Sum(Withheld) |
+| TX223 | Tax Invoice / Fiscal Receipt Compliance Layout | A sale laid out as a tax invoice — supplier and tax number, document number and time, lines with tax, the tax summary by code, totals, the fiscal device status — followed by the compliance checks it passes or fails. | SaleNumber (String, optional) | Section, Item, Value, Check | — | Sum(Check) |
 | TX224 | Annual Financial Statements Pack | Statement of financial position and profit or loss by report category for the year to the date, with the prior year's comparatives and the note each line is disclosed in. | AsAtDate (Date, optional) | Statement, Line, Note, Prior, Current | — | Sum(Current) |
 | TX225 | Audit File Export (SAF-T style) | Every posted journal line in the period with its period, source, document, account, tax code, trading party, currency amounts and base debit / credit — the GL audit file. | FromDate (Date, optional), ToDate (Date, optional) | Journal, Date, Period, Source, Document, Account, TaxCode, Party, Currency, Transaction, Debit, Credit, Narrative | — | — |
 

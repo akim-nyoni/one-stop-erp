@@ -16,7 +16,16 @@ public sealed class RetailReportDataProvider : IReportDataProvider
 
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
-    public RetailReportDataProvider(One4AllDbContext db) => _db = db;
+    public RetailReportDataProvider(One4AllDbContext db, Application.Abstractions.Pos.IPosReceiptService? receipts = null,
+        Application.Abstractions.Accounting.IFiscalDeviceProvider? fiscal = null)
+    {
+        _db = db;
+        _receipts = receipts;
+        _fiscal = fiscal;
+    }
+
+    private readonly Application.Abstractions.Pos.IPosReceiptService? _receipts;
+    private readonly Application.Abstractions.Accounting.IFiscalDeviceProvider? _fiscal;
 
     /// <inheritdoc />
     public bool CanHandle(string command) => command.StartsWith("Retl", StringComparison.OrdinalIgnoreCase);
@@ -31,6 +40,10 @@ public sealed class RetailReportDataProvider : IReportDataProvider
         {
             "RETLDAILY" => await DailyAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLZREAD" => await ZReadAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "RETLTABS" => await TabsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "RETLSLIP" => await SlipAsync(companyId, SaleNumber(parameters), parameters.TryGetValue("Paper", out object? paper) ? paper as string : null, ct).ConfigureAwait(false),
+            "RETLTAXINVOICE" => await TaxInvoiceAsync(companyId, SaleNumber(parameters), ct).ConfigureAwait(false),
+            "RETLKITCHEN" => await KitchenAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLCASHIERS" => await CashiersAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLCASHUP" => await CashUpAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLHEATMAP" => await HeatmapAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -326,6 +339,155 @@ public sealed class RetailReportDataProvider : IReportDataProvider
             rows.AddRange(tenders.Select(t => Line(t.TenderType.ToString(), t.Currency, t.Amount, t.Base)));
         }
 
+        return rows;
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TabsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<Core.Restaurant.TableOrder> orders = await _db.TableOrders.AsNoTracking().Include(o => o.Lines)
+            .Where(o => o.CompanyId == companyId && o.OpenedOn >= fromDate && o.OpenedOn <= toDate && o.Status != Core.Restaurant.TableOrderStatus.Cancelled).ToListAsync(ct).ConfigureAwait(false);
+        List<long> ids = [.. orders.Select(o => o.Id)], waiters = [.. orders.Select(o => o.WaiterUserId).Distinct()];
+        List<Core.Restaurant.RestaurantBill> bills = await _db.RestaurantBills.AsNoTracking().Where(b => ids.Contains(b.TableOrderId) && !b.IsReversed).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> tables = await _db.RestaurantTables.AsNoTracking().IgnoreQueryFilters().Where(t => t.CompanyId == companyId).ToDictionaryAsync(t => t.Id, t => t.TableNumber, ct).ConfigureAwait(false);
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().Where(u => waiters.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        string Waiter(long id) => users.GetValueOrDefault(id, $"user {id}");
+        static decimal Spend(Core.Restaurant.TableOrder o) => o.Lines.Where(l => !l.IsVoided && !l.IsComped).Sum(l => Math.Round((l.Quantity * l.UnitPrice) + l.TaxAmount, 2, MidpointRounding.AwayFromZero));
+        List<IReadOnlyDictionary<string, object?>> rows = [.. orders.Where(o => o.Status == Core.Restaurant.TableOrderStatus.Open).OrderBy(o => o.CreatedOnUtc)
+            .Select(o => Row(("Section", "Open tab"), ("Waiter", Waiter(o.WaiterUserId)), ("Tab", o.TableId is long t ? $"{o.OrderNumber} @ {tables.GetValueOrDefault(t, "?")}" : o.OrderNumber),
+                ("Opened", o.CreatedOnUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Tabs", o.PartySize), ("Minutes", string.Empty), ("Spend", Spend(o)), ("Tips", 0m)))];
+        rows.AddRange(orders.GroupBy(o => o.WaiterUserId).OrderBy(g => Waiter(g.Key), StringComparer.Ordinal).Select(g =>
+        {
+            List<(Core.Restaurant.TableOrder Order, Core.Restaurant.RestaurantBill Bill)> closed = [.. g.Join(bills, o => o.Id, b => b.TableOrderId, (o, b) => (o, b))];
+            double minutes = closed.Count == 0 ? 0 : closed.Average(x => Math.Max(0, (x.Bill.CreatedOnUtc - x.Order.CreatedOnUtc).TotalMinutes));
+            return Row(("Section", "Waiter"), ("Waiter", Waiter(g.Key)), ("Tab", $"{g.Count(o => o.Status == Core.Restaurant.TableOrderStatus.Open)} still open"), ("Opened", string.Empty),
+                ("Tabs", g.Count()), ("Minutes", closed.Count == 0 ? "—" : Math.Round(minutes).ToString(CultureInfo.InvariantCulture)),
+                ("Spend", closed.Count == 0 ? 0m : Math.Round(closed.Average(x => x.Bill.Gross - x.Bill.Tip), 2, MidpointRounding.AwayFromZero)), ("Tips", Math.Round(closed.Sum(x => x.Bill.Tip), 2, MidpointRounding.AwayFromZero)));
+        }));
+        return rows;
+    }
+
+    // Lines fired to the kitchen and later voided are the "void after print" exposure.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> KitchenAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<Core.Restaurant.KitchenTicket> tickets = await _db.KitchenTickets.AsNoTracking().Include(t => t.Lines)
+            .Where(t => t.CompanyId == companyId && t.SentOn >= fromDate && t.SentOn <= toDate).ToListAsync(ct).ConfigureAwait(false);
+        List<long> orderIds = [.. tickets.Select(t => t.TableOrderId).Distinct()];
+        List<Core.Restaurant.TableOrder> orders = await _db.TableOrders.AsNoTracking().Include(o => o.Lines).Where(o => orderIds.Contains(o.Id)).ToListAsync(ct).ConfigureAwait(false);
+        string Course(Core.Restaurant.MenuCourse? course) => course?.ToString() ?? "All courses";
+
+        // Each voided line counts against the ticket that carried it: the order's earliest ticket for its course (or for all courses).
+        var voids = orders.SelectMany(o => o.Lines.Where(l => l.Fired && l.IsVoided).Select(l =>
+        {
+            Core.Restaurant.KitchenTicket? ticket = tickets.Where(t => t.TableOrderId == o.Id && (t.Course == null || t.Course == l.Course)).OrderBy(t => t.SentOn).ThenBy(t => t.Id).FirstOrDefault();
+            return new
+            {
+                Date = ticket?.SentOn ?? o.OpenedOn, Course = ticket is null ? l.Course.ToString() : Course(ticket.Course), l.Quantity, l.VoidReason,
+                Value = Math.Round((l.Quantity * l.UnitPrice) + l.TaxAmount, 2, MidpointRounding.AwayFromZero),
+            };
+        })).ToList();
+        var keys = tickets.Select(t => (t.SentOn, Course: Course(t.Course))).Concat(voids.Select(v => (SentOn: v.Date, v.Course))).Distinct()
+            .OrderBy(k => k.SentOn).ThenBy(k => k.Course, StringComparer.Ordinal);
+        static string Count(decimal quantity) => quantity.ToString("0.###", CultureInfo.InvariantCulture);
+        return [.. keys.Select(k =>
+        {
+            List<Core.Restaurant.KitchenTicket> mine = [.. tickets.Where(t => t.SentOn == k.SentOn && Course(t.Course) == k.Course)];
+            var voided = voids.Where(v => v.Date == k.SentOn && v.Course == k.Course).ToList();
+            return Row(("Date", Date(k.SentOn)), ("Course", k.Course), ("Tickets", mine.Count), ("Items", Count(mine.Sum(t => t.Lines.Sum(l => l.Quantity)))),
+                ("Served", mine.Count(t => t.Status == Core.Restaurant.KitchenTicketStatus.Served)), ("Voided", Count(voided.Sum(v => v.Quantity))),
+                ("Reasons", string.Join("; ", voided.Select(v => v.VoidReason).Where(r => !string.IsNullOrWhiteSpace(r)).Distinct())), ("VoidValue", voided.Sum(v => v.Value)));
+        })];
+    }
+
+    private static string? SaleNumber(IReadOnlyDictionary<string, object?> parameters)
+        => parameters.TryGetValue("SaleNumber", out object? value) && value is string text && text.Trim().Length > 0 ? text.Trim() : null;
+
+    /// <summary>Characters per line for each paper: 58 mm and 80 mm roll printers at their usual font, and an A4 page.</summary>
+    internal static int PaperWidth(string? paper) => (paper ?? "80mm").Trim().ToUpperInvariant().Replace(" ", string.Empty, StringComparison.Ordinal) switch
+    {
+        "58MM" or "58" => 32,
+        "A4" => 96,
+        _ => 48,
+    };
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SlipAsync(long companyId, string? saleNumber, string? paper, CancellationToken ct)
+    {
+        Core.Pos.Sale? sale = saleNumber is null || _receipts is null ? null
+            : await _db.Sales.AsNoTracking().FirstOrDefaultAsync(s => s.CompanyId == companyId && s.SaleNumber == saleNumber, ct).ConfigureAwait(false);
+        if (sale is null)
+        {
+            return [];
+        }
+
+        int width = PaperWidth(paper);
+        Core.Common.Result<string> text = await _receipts!.RenderReceiptTextAsync(companyId, sale.Id, width, ct).ConfigureAwait(false);
+        if (text.IsFailure)
+        {
+            return [];
+        }
+
+        List<string> lines = [.. text.Value.Replace("\r", string.Empty, StringComparison.Ordinal).Split('\n')];
+        List<Core.Pos.PosEvent> refunds = await _db.PosEvents.AsNoTracking().Where(e => e.CompanyId == companyId && e.SaleNumber == sale.SaleNumber && e.Kind == Core.Pos.PosEventKind.Refund)
+            .OrderBy(e => e.OccurredOnUtc).ToListAsync(ct).ConfigureAwait(false);
+        if (refunds.Count > 0)
+        {
+            lines.Add(new string('=', width));
+            lines.Add("REFUND SLIP".PadLeft((width + 11) / 2));
+            foreach (Core.Pos.PosEvent refund in refunds)
+            {
+                string left = $"{refund.EventDate:yyyy-MM-dd} {refund.Description}", right = refund.Quantity is decimal q ? $"x{q.ToString("0.###", CultureInfo.InvariantCulture)}" : string.Empty;
+                left = left.Length + right.Length + 1 > width ? left[..Math.Max(0, width - right.Length - 1)] : left;
+                lines.Add(left + new string(' ', Math.Max(1, width - left.Length - right.Length)) + right);
+            }
+        }
+
+        return [.. lines.Select((l, i) => Row(("Line", i + 1), ("Text", l)))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TaxInvoiceAsync(long companyId, string? saleNumber, CancellationToken ct)
+    {
+        Core.Pos.Sale? sale = saleNumber is null ? null : await _db.Sales.AsNoTracking().Include(s => s.Lines).Include(s => s.Tenders)
+            .FirstOrDefaultAsync(s => s.CompanyId == companyId && s.SaleNumber == saleNumber, ct).ConfigureAwait(false);
+        if (sale is null)
+        {
+            return [];
+        }
+
+        Core.System.Company company = await _db.Companies.AsNoTracking().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        List<long> itemIds = [.. sale.Lines.Select(l => l.ItemId).Distinct()];
+        Dictionary<long, string?> taxCodes = await _db.Items.AsNoTracking().IgnoreQueryFilters().Where(i => itemIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id, i => i.TaxCode, ct).ConfigureAwait(false);
+        int sameNumber = await _db.Sales.AsNoTracking().CountAsync(s => s.CompanyId == companyId && s.SaleNumber == sale.SaleNumber, ct).ConfigureAwait(false);
+        decimal net = sale.Lines.Sum(l => l.LineNet), tax = sale.Lines.Sum(l => l.TaxAmount), gross = net + tax;
+        decimal tendered = sale.Tenders.Sum(t => t.IsChange ? -t.BaseAmount : t.BaseAmount);
+        static string M(decimal amount) => amount.ToString("N2", CultureInfo.InvariantCulture);
+        static IReadOnlyDictionary<string, object?> R(string section, string item, string value, string check = "") => Row(("Section", section), ("Item", item), ("Value", value), ("Check", check));
+
+        List<IReadOnlyDictionary<string, object?>> rows =
+        [
+            R("Header", "Document", tax == 0m ? "RECEIPT" : "TAX INVOICE / FISCAL RECEIPT"),
+            R("Header", "Supplier", company.Name),
+            R("Header", "Supplier tax number", company.TaxNumber ?? "(none)"),
+            R("Header", "Number", sale.SaleNumber),
+            R("Header", "Date and time", $"{sale.SaleDate:yyyy-MM-dd} {sale.CreatedOnUtc.ToLocalTime():HH:mm}"),
+            R("Header", "Buyer", "Cash sale (buyer details not captured at the till)"),
+        ];
+        rows.AddRange(sale.Lines.Select(l => R("Line", $"{l.Description} — {l.Quantity.ToString("0.###", CultureInfo.InvariantCulture)} × {M(l.UnitPrice)}",
+            $"net {M(l.LineNet)}, {taxCodes.GetValueOrDefault(l.ItemId) ?? "no tax code"} {M(l.TaxAmount)}, gross {M(l.LineNet + l.TaxAmount)}")));
+        rows.AddRange(sale.Lines.GroupBy(l => taxCodes.GetValueOrDefault(l.ItemId) ?? "(none)").OrderBy(g => g.Key, StringComparer.Ordinal).Select(g =>
+        {
+            decimal n = g.Sum(l => l.LineNet), t = g.Sum(l => l.TaxAmount);
+            return R("Tax summary", g.Key, $"net {M(n)}, tax {M(t)}" + (n == 0m ? string.Empty : $" ({(t * 100m / n).ToString("0.##", CultureInfo.InvariantCulture)}%)"));
+        }));
+        rows.Add(R("Totals", "Net / tax / gross", $"{M(net)} / {M(tax)} / {M(gross)} {sale.BaseCurrency.Value}"));
+        rows.Add(R("Totals", "Tendered", M(tendered)));
+        rows.Add(R("Fiscal", "Fiscal device", _fiscal is { IsEnabled: true } ? "enabled — the receipt was fiscalised at the sale" : "not enabled"));
+
+        string Ok(bool pass) => pass ? "PASS" : "FAIL";
+        rows.Add(R("Compliance", "Supplier tax number shown", company.TaxNumber ?? "missing", Ok(!string.IsNullOrWhiteSpace(company.TaxNumber))));
+        rows.Add(R("Compliance", "Document number unique", $"{sameNumber} sale(s) with this number", Ok(sameNumber == 1)));
+        rows.Add(R("Compliance", "Every line has a tax code", $"{sale.Lines.Count(l => taxCodes.GetValueOrDefault(l.ItemId) is null)} line(s) without", Ok(sale.Lines.All(l => taxCodes.GetValueOrDefault(l.ItemId) is not null))));
+        rows.Add(R("Compliance", "Gross = net + tax", $"{M(net)} + {M(tax)} = {M(gross)}", Ok(true)));
+        rows.Add(R("Compliance", "Payment covers the total", $"{M(tendered)} against {M(gross + sale.CashRounding)}", Ok(tendered >= gross + sale.CashRounding - 0.01m)));
+        rows.Add(R("Compliance", "Sale completed (not voided or parked)", sale.Status.ToString(), Ok(sale.Status == Core.Pos.SaleStatus.Completed)));
         return rows;
     }
 }

@@ -66,6 +66,20 @@ public static class RetailReports
         yield return Listing("POS117", "Tender & Multi-currency Tender Analysis", "PointOfSale", "Tenders taken in the period by type and currency, in currency and base, net of change.",
             "RetlTenders", [new Column("Tender", "Tender", 90), new Column("Currency", "Currency", 55), new Column("Count", "Count", 50), new Column("Amount", "In currency", 95), new Column("Share", "Share", 60),
              new Column("Base", "Base", 95, true)], Period);
+        yield return Listing("POS118", "Table / Tab Report", "PointOfSale", "Tabs opened in the period: those still open with their table, waiter, party and spend so far, then per waiter the "
+            + "tabs, average minutes from opening to the bill, average spend (before tips) and tips.", "RetlTabs",
+            [new Column("Section", "Section", 70), new Column("Waiter", "Waiter", 90), new Column("Tab", "Tab / table", 110), new Column("Opened", "Opened", 95), new Column("Tabs", "Tabs", 45),
+             new Column("Minutes", "Avg minutes", 60), new Column("Spend", "Spend", 90), new Column("Tips", "Tips", 80, true)], Period);
+        yield return Listing("POS119", "Kitchen / Bar Ticket Volumes & Void-after-Print", "PointOfSale", "Per day and course: tickets sent to the kitchen or bar, items on them, how many reached "
+            + "the table, and items voided after they were sent, with the value voided and the reasons.", "RetlKitchen",
+            [new Column("Date", "Date", 75), new Column("Course", "Course", 80), new Column("Tickets", "Tickets", 50), new Column("Items", "Items", 50), new Column("Served", "Served", 50),
+             new Column("Voided", "Voided after print", 70), new Column("Reasons", "Void reasons", 200), new Column("VoidValue", "Value voided", 90, true)], Period);
+        yield return Listing("POS122", "Receipt / Invoice / Refund Slip Layouts", "PointOfSale", "A sale's slip as printed on 58 mm or 80 mm roll paper or an A4 page, with any refunds "
+            + "taken against it as a refund slip below.", "RetlSlip", [new Column("Line", "#", 30), new Column("Text", "Slip", 520, true)],
+            [("SaleNumber", ParameterType.String), ("Paper", ParameterType.String)]);
+        yield return Listing("TX223", "Tax Invoice / Fiscal Receipt Compliance Layout", "Tax", "A sale laid out as a tax invoice — supplier and tax number, document number and time, lines with "
+            + "tax, the tax summary by code, totals, the fiscal device status — followed by the compliance checks it passes or fails.", "RetlTaxInvoice",
+            [new Column("Section", "Section", 90), new Column("Item", "Item", 220), new Column("Value", "Value", 220), new Column("Check", "Check", 60, true)], [("SaleNumber", ParameterType.String)]);
         yield return Listing("POS120", "Offline Sync Log", "PointOfSale", "Operations captured offline in the period: kind, status, attempts, when synced and any error.",
             "RetlOffline", [new Column("Created", "Created", 115), new Column("Kind", "Kind", 110), new Column("Status", "Status", 70), new Column("Attempts", "Attempts", 55), new Column("Synced", "Synced", 115),
              new Column("Error", "Last error", 240)], Period);

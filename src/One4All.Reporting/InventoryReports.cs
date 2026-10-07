@@ -49,6 +49,12 @@ public static class InventoryReports
         yield return Listing("INV93", "Gross Margin by Item", "Inventory", "Per item over the period: net sales (POS and invoiced orders), cost of issues and the margin.",
             "StkMargin", [new Column("Item", "Item", 150), new Column("Category", "Category", 90), new Column("Quantity", "Qty sold", 65), new Column("Sales", "Net sales", 95), new Column("Cost", "Cost", 95),
              new Column("MarginPercent", "Margin %", 60), new Column("Margin", "Margin", 95, true)], Period);
+        yield return Listing("INV95", "Item Master Listing & Variant Matrix", "Inventory", "Every item with its type, unit, category, brand, barcode, tax, costing, tracking and reorder settings; "
+            + "variants sit under their parent with size and colour, and each parent shows its size × colour matrix.", "StkItemMaster",
+            [new Column("Code", "Code", 90), new Column("Description", "Description", 170), new Column("Parent", "Variant of", 80), new Column("Size", "Size", 45), new Column("Colour", "Colour", 60),
+             new Column("Type", "Type", 70), new Column("Unit", "Unit", 40), new Column("Category", "Category", 80), new Column("Brand", "Brand", 70), new Column("Barcode", "Barcode", 95),
+             new Column("Tax", "Tax", 40), new Column("Costing", "Costing", 70), new Column("Tracking", "Tracking", 60), new Column("Reorder", "Reorder at / qty", 80), new Column("Active", "Active", 40)],
+            [("Category", ParameterType.String)]);
         yield return Listing("INV96", "Cost Change History", "Inventory", "Each receipt at a unit cost different from the item's previous receipt, with the change.",
             "StkCostChanges", [new Column("Item", "Item", 150), new Column("Date", "Date", 75), new Column("Reference", "Reference", 110), new Column("Previous", "Previous cost", 85), new Column("Cost", "New cost", 85),
              new Column("Change", "Change", 60), new Column("Quantity", "Qty", 60)], Period);

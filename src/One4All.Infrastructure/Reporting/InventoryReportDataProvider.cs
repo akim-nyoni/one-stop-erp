@@ -37,6 +37,7 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
         DateOnly fromDate = DateParameter(parameters, "FromDate") ?? new DateOnly(toDate.Year, 1, 1);
         return command.ToUpperInvariant() switch
         {
+            "STKITEMMASTER" => await ItemMasterAsync(companyId, parameters.TryGetValue("Category", out object? category) && category is string cat && cat.Trim().Length > 0 ? cat.Trim() : null, ct).ConfigureAwait(false),
             "STKVALUATIONVSGL" => await ValuationVsGlAsync(companyId, asAt, ct).ConfigureAwait(false),
             "STKAVAILABILITY" => await AvailabilityAsync(companyId, ct).ConfigureAwait(false),
             "STKSTOCKTAKE" => await StocktakeAsync(companyId, ct).ConfigureAwait(false),
@@ -409,5 +410,40 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
         }
 
         return row;
+    }
+
+    // Parents first with a matrix row of their variants (size × colour), then the variants themselves; standalone items as they are.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ItemMasterAsync(long companyId, string? category, CancellationToken ct)
+    {
+        List<Item> items = await _db.Items.AsNoTracking().Where(i => i.CompanyId == companyId && (category == null || i.Category == category)).OrderBy(i => i.Code).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, Item> byId = items.ToDictionary(i => i.Id);
+        ILookup<long, Item> variants = items.Where(i => i.ParentItemId is not null).ToLookup(i => i.ParentItemId!.Value);
+        IReadOnlyDictionary<string, object?> Line(Item i) => Row(("Code", i.Code), ("Description", i.Description), ("Parent", i.ParentItemId is long p && byId.TryGetValue(p, out Item? parent) ? parent.Code : string.Empty),
+            ("Size", i.Size ?? string.Empty), ("Colour", i.Colour ?? string.Empty), ("Type", i.ItemType.ToString()), ("Unit", i.UnitOfMeasure), ("Category", i.Category ?? string.Empty),
+            ("Brand", i.Brand ?? string.Empty), ("Barcode", i.Barcode ?? string.Empty), ("Tax", i.TaxCode ?? string.Empty), ("Costing", i.CostingMethod.ToString()), ("Tracking", i.Tracking.ToString()),
+            ("Reorder", i.ReorderLevel == 0m && i.ReorderQuantity == 0m ? string.Empty : $"{Qty(i.ReorderLevel)} / {Qty(i.ReorderQuantity)}"), ("Active", i.IsActive ? "Yes" : "No"));
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (Item item in items.Where(i => i.ParentItemId is null || !byId.ContainsKey(i.ParentItemId.Value)))
+        {
+            rows.Add(Line(item));
+            List<Item> children = [.. variants[item.Id]];
+            if (children.Count == 0)
+            {
+                continue;
+            }
+
+            List<string> colours = [.. children.Select(v => v.Colour ?? "—").Distinct().Order(StringComparer.Ordinal)];
+            foreach (IGrouping<string, Item> size in children.GroupBy(v => v.Size ?? "—").OrderBy(g => g.Key, StringComparer.Ordinal))
+            {
+                string matrix = string.Join("  ", colours.Select(c => $"{c}: {size.FirstOrDefault(v => (v.Colour ?? "—") == c)?.Code ?? "·"}"));
+                rows.Add(Row(("Code", string.Empty), ("Description", $"Matrix — size {size.Key}: {matrix}"), ("Parent", item.Code), ("Size", size.Key), ("Colour", string.Empty), ("Type", string.Empty),
+                    ("Unit", string.Empty), ("Category", string.Empty), ("Brand", string.Empty), ("Barcode", string.Empty), ("Tax", string.Empty), ("Costing", string.Empty), ("Tracking", string.Empty),
+                    ("Reorder", string.Empty), ("Active", string.Empty)));
+            }
+
+            rows.AddRange(children.OrderBy(v => v.Size, StringComparer.Ordinal).ThenBy(v => v.Colour, StringComparer.Ordinal).Select(Line));
+        }
+
+        return rows;
     }
 }

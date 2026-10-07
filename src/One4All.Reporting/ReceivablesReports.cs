@@ -58,6 +58,10 @@ public static class ReceivablesReports
         yield return Listing("AR43", "Bad Debt Write-off Listing", "Sales", "Write-offs in the period with the customer, document and the debt case that approved it.",
             "RecvWriteOffs", [new Column("Date", "Date", 75), new Column("Customer", "Customer", 150), new Column("Document", "Document", 110), new Column("Case", "Debt case", 170), new Column("Amount", "Amount", 90, true)],
             Period);
+        yield return Listing("AR44", "Customer Deposits & Advance Payments Held", "Receivables", "Money received from customers and not yet applied to an invoice at the date — deposits, "
+            + "advances and payments on account — with how long each has been held, in transaction currency and base.", "RecvDeposits",
+            [new Column("Customer", "Customer", 160), new Column("Document", "Document", 110), new Column("Date", "Received", 75), new Column("Type", "Type", 80), new Column("Currency", "Currency", 55),
+             new Column("Received", "Received", 90), new Column("Unapplied", "Unapplied", 90), new Column("Days", "Days held", 55), new Column("Base", "Base held", 100, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("AR45", "Lay-bye Status & Arrears", "Sales", "Every lay-bye plan with price, paid, balance and days to (or past) its final date.",
             "RecvLaybys", [new Column("Plan", "Plan", 80), new Column("Customer", "Customer", 150), new Column("Opened", "Opened", 75), new Column("Final", "Final date", 75), new Column("Status", "Status", 70),
              new Column("Price", "Price", 90), new Column("Paid", "Paid", 90), new Column("Due", "Days", 70), new Column("Balance", "Balance", 90, true)], [("AsAtDate", ParameterType.Date)]);

@@ -49,6 +49,10 @@ public static class LedgerReports
         yield return Listing("GL18", "Control Reconciliation — VAT and Bank", "GeneralLedger", "Tax accounts against the tax-coded postings, and each bank account's ledger balance against its statement, with what explains the gap.",
             "GledControlLegs", [new Column("Control", "Control", 110), new Column("Account", "Account", 90), new Column("Ledger", "Ledger", 100), new Column("Other", "Sub-ledger / statement", 120), new Column("Explained", "Explained by", 220),
              new Column("Difference", "Difference", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("GL19", "Period Close Checklist & Status", "GeneralLedger", "Each period of the year to the date: its status per module, whether it is ready to close, and every "
+            + "close check with its count, value and whether it blocks.", "GledCloseStatus",
+            [new Column("Period", "Period", 70), new Column("Ends", "Ends", 75), new Column("Status", "Status", 150), new Column("Ready", "Ready", 55), new Column("Check", "Check", 170),
+             new Column("Count", "Count", 50), new Column("Value", "Value", 90), new Column("Blocking", "Blocks", 50), new Column("Detail", "Detail", 220)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("GL20", "Year-End Pack", "GeneralLedger", "For the year containing the date: the close checklist, the trial balance totals, the result for the year and the year's journals by source.",
             "GledYearEnd", [new Column("Section", "Section", 110), new Column("Item", "Item", 260), new Column("Value", "Value", 160)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("GL22", "Recurring Journals Due & Missed", "GeneralLedger", "Each active recurring template's last posted month against the date: posted, due or missed.",

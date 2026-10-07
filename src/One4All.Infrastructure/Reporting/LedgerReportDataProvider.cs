@@ -40,6 +40,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
         DateOnly fromDate = DateParameter(parameters, "FromDate") ?? new DateOnly(toDate.Year, 1, 1);
         return command.ToUpperInvariant() switch
         {
+            "GLEDCLOSESTATUS" => await CloseStatusAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDMULTICURRENCYTB" => await MultiCurrencyTbAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDJOURNALS" => await JournalsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDEQUITY" => await EquityAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -443,5 +444,30 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
         }
 
         return row;
+    }
+
+    // Every period of the year up to the one holding the date, each with its module statuses and the close checklist at its end.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CloseStatusAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        Core.System.FiscalYear? year = await _db.FiscalYears.AsNoTracking().Include(y => y.Periods).ThenInclude(p => p.ModuleStatuses)
+            .FirstOrDefaultAsync(y => y.CompanyId == companyId && y.StartDate <= asAt && y.EndDate >= asAt, ct).ConfigureAwait(false);
+        if (year is null)
+        {
+            return [];
+        }
+
+        var close = _services.GetRequiredService<Application.Abstractions.Accounting.IPeriodCloseService>();
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (Core.System.FiscalPeriod period in year.Periods.Where(p => p.StartDate <= asAt).OrderBy(p => p.PeriodNumber))
+        {
+            string status = period.ModuleStatuses.Count == 0 ? "—"
+                : string.Join(", ", period.ModuleStatuses.OrderBy(m => m.ModuleCode, StringComparer.Ordinal).Select(m => $"{m.ModuleCode} {m.Status}"));
+            var checklist = await close.ChecklistAsync(companyId, period.EndDate, ct).ConfigureAwait(false);
+            string ready = checklist.IsReadyToClose ? (checklist.Outstanding == 0 ? "Yes" : "Yes (warnings)") : "No";
+            rows.AddRange(checklist.Checks.Select(c => Row(("Period", period.Name), ("Ends", Date(period.EndDate)), ("Status", status), ("Ready", ready), ("Check", c.Name),
+                ("Count", c.Count), ("Value", Money(c.Value)), ("Blocking", c.Passes ? "—" : c.IsBlocking ? "Blocks" : "Warns"), ("Detail", c.Detail))));
+        }
+
+        return rows;
     }
 }
