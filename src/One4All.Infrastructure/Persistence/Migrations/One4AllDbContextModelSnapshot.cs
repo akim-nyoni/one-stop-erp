@@ -30080,6 +30080,27 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("stage", "wf");
                 });
 
+            modelBuilder.Entity("One4All.Infrastructure.Licensing.ClockMark", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Sealed")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("sealed");
+
+                    b.HasKey("Id")
+                        .HasName("pk_clock_mark");
+
+                    b.ToTable("clock_mark", "lic");
+                });
+
             modelBuilder.Entity("One4All.Core.Accounting.AllocationRuleTarget", b =>
                 {
                     b.HasOne("One4All.Core.Accounting.AllocationRule", null)

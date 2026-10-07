@@ -49,7 +49,9 @@ public sealed class LicenceService : ILicenceService
             () => CoreFingerprint.FromComponents(machineId.GetComponents()),
             LazyThreadSafetyMode.ExecutionAndPublication);
         _trustedKeys = trustedKeys.PublicKeysByKid;
-        _validator = new LicenseValidator(new LicenseVerifier(trustedKeys.PublicKeysByKid), clock, Product);
+        // Clock rollback: the latest time seen, kept in the database and a file; a clock set back beyond a day is tampering.
+        ILicenseHighWaterMarkStore? mark = options?.DetectClockRollback ?? _enforce ? new ClockHighWaterMarkStore(scopeFactory, machineId, options?.ClockMarkPath) : null;
+        _validator = new LicenseValidator(new LicenseVerifier(trustedKeys.PublicKeysByKid), clock, Product, mark);
         _current = LicenseValidationResult.Failure(LicenseStatus.Invalid, "No licence installed.", clock);
     }
 

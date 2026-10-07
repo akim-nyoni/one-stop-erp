@@ -16,6 +16,15 @@ public sealed class LicensingOptions
     /// refused, limits applied. The server and desktop enforce; embedded test hosts may not.
     /// </summary>
     public bool Enforce { get; set; }
+
+    /// <summary>
+    /// Gets or sets whether clock rollback is detected (brief §11.5: a high-water mark kept in the database and a file); on by default wherever
+    /// the licence is enforced.
+    /// </summary>
+    public bool? DetectClockRollback { get; set; }
+
+    /// <summary>Gets or sets where the file copy of the clock mark lives (default: the common application data folder).</summary>
+    public string? ClockMarkPath { get; set; }
 }
 
 /// <summary>Reads the trusted licence public keys from <see cref="LicensingOptions"/>.</summary>

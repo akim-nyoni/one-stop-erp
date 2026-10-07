@@ -25,3 +25,13 @@ internal sealed class InstalledRevocationListConfiguration : IEntityTypeConfigur
         b.HasIndex(x => x.Sequence).IsUnique();
     }
 }
+
+internal sealed class ClockMarkConfiguration : IEntityTypeConfiguration<One4All.Infrastructure.Licensing.ClockMark>
+{
+    public void Configure(EntityTypeBuilder<One4All.Infrastructure.Licensing.ClockMark> b)
+    {
+        b.ToTable("clock_mark", Schemas.Licensing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Sealed).HasMaxLength(200);
+    }
+}
