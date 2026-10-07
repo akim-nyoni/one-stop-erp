@@ -197,6 +197,85 @@ app.Use(async (context, next) =>
     await buffer.CopyToAsync(original, context.RequestAborted).ConfigureAwait(false);
 });
 
+// Idempotency keys (brief §2.4): a POST/PUT/PATCH/DELETE carrying an Idempotency-Key header runs once; a retry with the same key and
+// request gets the first response back (it passes through the field-stripping above again), a different request with the key is
+// refused, and one still running is reported as such. A server-side failure lets the key go so the retry runs.
+app.Use(async (context, next) =>
+{
+    string? key = context.Request.Headers["Idempotency-Key"].FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(key) || HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method)
+        || !context.Request.Path.StartsWithSegments("/api") || SignedInUser(context.User) is not long userId)
+    {
+        await next(context).ConfigureAwait(false);
+        return;
+    }
+
+    if (key.Length > 100)
+    {
+        await Results.Json(new { error = "An Idempotency-Key is at most 100 characters." }, statusCode: StatusCodes.Status400BadRequest).ExecuteAsync(context).ConfigureAwait(false);
+        return;
+    }
+
+    context.Request.EnableBuffering();
+    using System.Security.Cryptography.IncrementalHash hash = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+    hash.AppendData(Encoding.UTF8.GetBytes($"{context.Request.Method} {context.Request.Path}{context.Request.QueryString}\n"));
+    await using (MemoryStream requestBody = new())
+    {
+        await context.Request.Body.CopyToAsync(requestBody, context.RequestAborted).ConfigureAwait(false);
+        hash.AppendData(requestBody.ToArray());
+    }
+
+    context.Request.Body.Position = 0;
+    string requestHash = Convert.ToHexString(hash.GetHashAndReset());
+    One4All.Application.Abstractions.Integration.IIdempotencyStore store = context.RequestServices.GetRequiredService<One4All.Application.Abstractions.Integration.IIdempotencyStore>();
+    One4All.Application.Abstractions.Integration.IdempotencyClaim claim = await store.BeginAsync(userId, key, context.Request.Method, context.Request.Path.Value ?? string.Empty, requestHash, context.RequestAborted)
+        .ConfigureAwait(false);
+    switch (claim.Outcome)
+    {
+        case One4All.Application.Abstractions.Integration.IdempotencyOutcome.Replay:
+            context.Response.StatusCode = claim.Status;
+            context.Response.Headers["Idempotent-Replayed"] = "true";
+            if (claim.ContentType is not null)
+            {
+                context.Response.ContentType = claim.ContentType;
+            }
+
+            await context.Response.Body.WriteAsync(claim.Body ?? [], context.RequestAborted).ConfigureAwait(false);
+            return;
+        case One4All.Application.Abstractions.Integration.IdempotencyOutcome.InProgress:
+            await Results.Json(new { error = "A request with this Idempotency-Key is still being processed." }, statusCode: StatusCodes.Status409Conflict).ExecuteAsync(context).ConfigureAwait(false);
+            return;
+        case One4All.Application.Abstractions.Integration.IdempotencyOutcome.Mismatch:
+            await Results.Json(new { error = "This Idempotency-Key was already used for a different request." }, statusCode: StatusCodes.Status422UnprocessableEntity).ExecuteAsync(context).ConfigureAwait(false);
+            return;
+    }
+
+    Stream original = context.Response.Body;
+    await using MemoryStream buffer = new();
+    context.Response.Body = buffer;
+    bool kept = false;
+    try
+    {
+        await next(context).ConfigureAwait(false);
+        if (context.Response.StatusCode < 500)
+        {
+            await store.CompleteAsync(claim.ClaimId!.Value, context.Response.StatusCode, context.Response.ContentType, buffer.ToArray(), CancellationToken.None).ConfigureAwait(false);
+            kept = true;
+        }
+    }
+    finally
+    {
+        if (!kept)
+        {
+            await store.AbandonAsync(claim.ClaimId!.Value, CancellationToken.None).ConfigureAwait(false);
+        }
+
+        context.Response.Body = original;
+        buffer.Position = 0;
+        await buffer.CopyToAsync(original, CancellationToken.None).ConfigureAwait(false);
+    }
+});
+
 // --- Endpoints --------------------------------------------------------------------------------------------
 app.MapPost("/api/auth/login", async (LoginRequest request, IAuthenticationService auth, IJwtTokenService tokens, CancellationToken ct) =>
 {

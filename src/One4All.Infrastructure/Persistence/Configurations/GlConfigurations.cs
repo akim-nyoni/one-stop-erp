@@ -150,6 +150,8 @@ internal sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journ
         b.Property(x => x.RejectionReason).HasMaxLength(256);
         b.Property(x => x.BatchNumber).HasMaxLength(30);
         b.Property(x => x.SourceModule).HasMaxLength(40);
+        b.Property(x => x.IdempotencyKey).HasMaxLength(100);
+        b.HasIndex(x => new { x.CompanyId, x.IdempotencyKey }).IsUnique().HasFilter("idempotency_key IS NOT NULL");
         b.Property(x => x.DocumentType).HasMaxLength(40);
         b.Property(x => x.DocumentNumber).HasMaxLength(40);
         b.Property(x => x.Reference).HasMaxLength(80);

@@ -592,6 +592,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("fiscal_year_id");
 
+                    b.Property<string>("IdempotencyKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("idempotency_key");
+
                     b.Property<bool>("IsManual")
                         .HasColumnType("boolean")
                         .HasColumnName("is_manual");
@@ -668,6 +673,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CompanyId", "FiscalPeriodId")
                         .HasDatabaseName("ix_journal_company_id_fiscal_period_id");
+
+                    b.HasIndex("CompanyId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_journal_company_id_idempotency_key")
+                        .HasFilter("idempotency_key IS NOT NULL");
 
                     b.HasIndex("CompanyId", "JournalNumber")
                         .IsUnique()
@@ -25894,6 +25904,87 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_fiscal_year_company_id_code");
 
                     b.ToTable("fiscal_year", "sys");
+                });
+
+            modelBuilder.Entity("One4All.Core.System.IdempotencyRecord", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset?>("CompletedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_on_utc");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("method");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("path");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("request_hash");
+
+                    b.Property<byte[]>("ResponseBody")
+                        .HasColumnType("bytea")
+                        .HasColumnName("response_body");
+
+                    b.Property<string>("ResponseContentType")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("response_content_type");
+
+                    b.Property<int?>("ResponseStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("response_status");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTimeOffset>("StartedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_on_utc");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer")
+                        .HasColumnName("state");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_idempotency_record");
+
+                    b.HasIndex("StartedOnUtc")
+                        .HasDatabaseName("ix_idempotency_record_started_on_utc");
+
+                    b.HasIndex("UserId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("ix_idempotency_record_user_id_key");
+
+                    b.ToTable("idempotency_record", "sys");
                 });
 
             modelBuilder.Entity("One4All.Core.System.JobRun", b =>

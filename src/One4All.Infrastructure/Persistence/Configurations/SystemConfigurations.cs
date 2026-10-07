@@ -181,3 +181,20 @@ internal sealed class TerminologyOverrideConfiguration : IEntityTypeConfiguratio
         b.HasIndex(x => new { x.CompanyId, x.Term }).IsUnique();
     }
 }
+
+internal sealed class IdempotencyRecordConfiguration : IEntityTypeConfiguration<IdempotencyRecord>
+{
+    public void Configure(EntityTypeBuilder<IdempotencyRecord> b)
+    {
+        b.ToTable("idempotency_record", Schemas.System);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Key).HasMaxLength(100);
+        b.Property(x => x.Method).HasMaxLength(10);
+        b.Property(x => x.Path).HasMaxLength(400);
+        b.Property(x => x.RequestHash).HasMaxLength(64);
+        b.Property(x => x.ResponseContentType).HasMaxLength(200);
+        b.Property(x => x.State).HasConversion<int>();
+        b.HasIndex(x => new { x.UserId, x.Key }).IsUnique();
+        b.HasIndex(x => x.StartedOnUtc);
+    }
+}

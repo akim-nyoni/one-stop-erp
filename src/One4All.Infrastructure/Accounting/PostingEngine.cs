@@ -43,6 +43,17 @@ public sealed class PostingEngine : IPostingEngine
     // One unit of work, retried if it loses a race with another posting for the sequence or a period balance.
     private async Task<Result<PostingReceipt>> PostCoreAsync(JournalRequest request, CancellationToken ct)
     {
+        // A request already posted with the same idempotency key gets the original journal back, not a second one.
+        string? idempotencyKey = string.IsNullOrWhiteSpace(request.IdempotencyKey) ? null : request.IdempotencyKey.Trim();
+        if (idempotencyKey is not null
+            && await _db.Journals.AsNoTracking().Include(j => j.Lines).FirstOrDefaultAsync(j => j.CompanyId == request.CompanyId && j.IdempotencyKey == idempotencyKey, ct).ConfigureAwait(false)
+                is JournalEntry earlier)
+        {
+            return earlier.Status == JournalStatus.Cancelled
+                ? Error.Conflict("Posting.KeyUsed", $"Idempotency key {idempotencyKey} belongs to journal {earlier.JournalNumber}, which was rejected; send a new key.")
+                : new PostingReceipt(earlier.Id, earlier.JournalNumber, earlier.PostingDate, earlier.Lines.Sum(l => l.BaseDebit), earlier.Status == JournalStatus.Deferred);
+        }
+
         if (request.Lines.Count == 0)
         {
             return Error.Validation("Posting.NoLines", "A journal must have at least one line.");
@@ -76,6 +87,7 @@ public sealed class PostingEngine : IPostingEngine
         journal.DocumentNumber = request.DocumentNumber;
         journal.Reference = request.Reference;
         journal.Narrative = request.Narrative;
+        journal.IdempotencyKey = idempotencyKey;
 
         Dictionary<string, (decimal debit, decimal credit)> perCurrency = new(StringComparer.Ordinal);
         decimal totalBaseDebit = 0m;

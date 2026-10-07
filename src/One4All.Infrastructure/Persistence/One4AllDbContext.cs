@@ -134,6 +134,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Trader open items (AR + AP).</summary>
     public DbSet<Core.Trading.OpenItem> OpenItems => Set<Core.Trading.OpenItem>();
 
+    /// <summary>Idempotency keys sent with posting requests.</summary>
+    public DbSet<Core.System.IdempotencyRecord> IdempotencyRecords => Set<Core.System.IdempotencyRecord>();
+
     /// <summary>Trader allocations.</summary>
     public DbSet<Core.Trading.Allocation> Allocations => Set<Core.Trading.Allocation>();
 

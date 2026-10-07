@@ -87,6 +87,7 @@ internal static class AtomicWork
         "ix_number_sequence_company_id_branch_id_document_type",         // both created the company's sequence
         "pk_number_sequence_year",                                       // both opened the same year's counter
         "ix_stock_balance_company_id_item_id_warehouse_id",              // both created the same stock balance
+        "ix_journal_company_id_idempotency_key",                         // the same request posted twice at once: the retry finds the first
     };
 
     /// <summary>

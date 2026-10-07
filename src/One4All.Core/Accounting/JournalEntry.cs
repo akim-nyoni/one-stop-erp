@@ -79,6 +79,9 @@ public sealed class JournalEntry : AuditableEntity, ICompanyScoped
     /// <summary>A narrative/description.</summary>
     public string? Narrative { get; set; }
 
+    /// <summary>The idempotency key it was posted with: the same key posts nothing new (brief §2.4).</summary>
+    public string? IdempotencyKey { get; set; }
+
     /// <summary>
     /// Whether this is a manual (user-keyed) journal. Manual journals may not touch control accounts — checked by the
     /// posting engine and, independently, by a database trigger on the journal lines (brief §3.1).
