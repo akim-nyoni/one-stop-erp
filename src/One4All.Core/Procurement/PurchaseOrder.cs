@@ -77,6 +77,15 @@ public sealed class PurchaseOrder : AuditableEntity, ICompanyScoped
     /// <summary>Whether an amendment is waiting for re-approval; nothing can be received against it meanwhile.</summary>
     public bool AwaitingReapproval { get; private set; }
 
+    /// <summary>Whether the order waits for its approval workflow before goods may be received against it (brief §7).</summary>
+    public bool AwaitingApproval { get; private set; }
+
+    /// <summary>Holds the order for its approval workflow.</summary>
+    public void HoldForApproval() => AwaitingApproval = true;
+
+    /// <summary>Releases the order once its workflow approves it.</summary>
+    public void Approve() => AwaitingApproval = false;
+
     /// <summary>Who made the latest amendment.</summary>
     public long? LastAmendedByUserId { get; private set; }
 

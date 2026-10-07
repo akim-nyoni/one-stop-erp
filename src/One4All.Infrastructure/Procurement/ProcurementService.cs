@@ -16,6 +16,7 @@ public sealed class ProcurementService : IProcurementService
 {
     private readonly One4All.Application.Abstractions.Budgeting.IBudgetGateService? _budget;
     private readonly One4All.Application.Abstractions.Security.IPermissionService? _permissions;
+    private readonly Lazy<Application.Abstractions.Workflow.IWorkflowService>? _workflow;
     private readonly One4AllDbContext _db;
     private readonly IInventoryService _inventory;
     private readonly IPostingEngine _postingEngine;
@@ -32,8 +33,10 @@ public sealed class ProcurementService : IProcurementService
     /// <param name="budget">The budget gate at order raising and invoice posting.</param>
     /// <param name="permissions">Checks who may approve a budget overrun.</param>
     public ProcurementService(One4AllDbContext db, IInventoryService inventory, IPostingEngine postingEngine, One4All.Application.Abstractions.Numbering.INumberSequenceService numbers,
-        One4All.Application.Abstractions.Budgeting.IBudgetGateService? budget = null, One4All.Application.Abstractions.Security.IPermissionService? permissions = null)
+        One4All.Application.Abstractions.Budgeting.IBudgetGateService? budget = null, One4All.Application.Abstractions.Security.IPermissionService? permissions = null,
+        Lazy<Application.Abstractions.Workflow.IWorkflowService>? workflow = null)
     {
+        _workflow = workflow;
         _budget = budget;
         _permissions = permissions;
         _db = db;
@@ -136,6 +139,21 @@ public sealed class ProcurementService : IProcurementService
 
         _db.Set<PurchaseOrder>().Add(order);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // The company's purchase-order workflow, when defined, holds the order until it is approved.
+        Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, request.CompanyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.PurchaseOrder,
+            order.OrderNumber, order.Lines.Sum(l => l.OrderedQuantity * l.UnitPrice), request.RaisedByUserId, ct).ConfigureAwait(false);
+        if (governed.IsFailure)
+        {
+            return governed.Error;
+        }
+
+        if (governed.Value)
+        {
+            order.HoldForApproval();
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
         if (_budget is not null && demands.Count > 0)
         {
             Result<int> committed = await _budget.CommitAsync(request.CompanyId, order.OrderNumber, request.OrderDate, demands, ct).ConfigureAwait(false);
@@ -190,6 +208,11 @@ public sealed class ProcurementService : IProcurementService
         if (order is null)
         {
             return Error.NotFound("Pop.OrderNotFound", $"Purchase order {request.PurchaseOrderId} not found.");
+        }
+
+        if (order.AwaitingApproval)
+        {
+            return Error.Rule("Pop.AwaitingApproval", $"Purchase order {order.OrderNumber} is awaiting approval.");
         }
 
         if (order.AwaitingReapproval)
@@ -602,5 +625,40 @@ public sealed class ProcurementService : IProcurementService
         }
 
         return null;
+    }
+}
+
+/// <summary>Applies the end of a purchase order's workflow: approved → released for receiving; rejected or returned → cancelled.</summary>
+internal sealed class PurchaseOrderWorkflowHandler : Application.Abstractions.Workflow.IWorkflowDocumentHandler
+{
+    private readonly One4AllDbContext _db;
+    private readonly IProcurementService _procurement;
+
+    public PurchaseOrderWorkflowHandler(One4AllDbContext db, IProcurementService procurement)
+    {
+        _db = db;
+        _procurement = procurement;
+    }
+
+    public string DocumentType => Application.Abstractions.Workflow.WorkflowDocumentTypes.PurchaseOrder;
+
+    public async Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+    {
+        PurchaseOrder? order = await _db.Set<PurchaseOrder>().FirstOrDefaultAsync(o => o.CompanyId == companyId && o.OrderNumber == documentReference && o.AwaitingApproval, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Result.Success();
+        }
+
+        if (outcome == Core.Workflow.WorkflowStatus.Approved)
+        {
+            order.Approve();
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result.Success();
+        }
+
+        order.Approve();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return await _procurement.CancelPurchaseOrderAsync(companyId, order.Id, string.IsNullOrWhiteSpace(comment) ? $"{outcome} in the approval workflow" : comment!, ct).ConfigureAwait(false);
     }
 }

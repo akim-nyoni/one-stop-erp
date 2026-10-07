@@ -86,9 +86,10 @@ public static partial class OperationCatalogue
                     {
                         CompanyId = c.CompanyId, SupplierId = await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true), OrderNumber = i.Text("Number"), OrderDate = i.Date("Date"),
                         RequiredBy = i.Optional("RequiredBy") is string by ? Day(by) : null, Currency = CurrencyCode.Parse(i.Optional("Currency") ?? "USD"), Lines = lines,
-                        BudgetApprovedByUserId = await OptionalUserAsync(c, i.Optional("BudgetApprover")).ConfigureAwait(true),
+                        BudgetApprovedByUserId = await OptionalUserAsync(c, i.Optional("BudgetApprover")).ConfigureAwait(true), RaisedByUserId = c.UserId,
                     }).ConfigureAwait(true));
-                    return $"Purchase order {created.OrderNumber} raised.";
+                    bool held = await c.Db.PurchaseOrders.AsNoTracking().AnyAsync(o => o.Id == created.PurchaseOrderId && o.AwaitingApproval).ConfigureAwait(true);
+                    return held ? $"Purchase order {created.OrderNumber} raised; it is awaiting approval before goods can be received." : $"Purchase order {created.OrderNumber} raised.";
                 }
 
                 long order = OrderId(c, i.Text("Number"));

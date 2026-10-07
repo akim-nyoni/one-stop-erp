@@ -44,4 +44,7 @@ public static class WorkflowDocumentTypes
 
     /// <summary>Debt write-off requests (reference: the debt case number).</summary>
     public const string WriteOff = "WriteOff";
+
+    /// <summary>Purchase orders raised directly (reference: the order number).</summary>
+    public const string PurchaseOrder = "PurchaseOrder";
 }

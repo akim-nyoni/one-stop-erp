@@ -39,6 +39,9 @@ public sealed class CreatePurchaseOrderRequest
 
     /// <summary>The order lines.</summary>
     public IReadOnlyList<PurchaseOrderLineRequest> Lines { get; init; } = [];
+
+    /// <summary>Who raises the order (its workflow's initiator, who cannot approve it).</summary>
+    public long RaisedByUserId { get; init; }
 }
 
 /// <summary>A received line on a GRN.</summary>

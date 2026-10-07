@@ -20455,6 +20455,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<bool>("AwaitingApproval")
+                        .HasColumnType("boolean")
+                        .HasColumnName("awaiting_approval");
+
                     b.Property<bool>("AwaitingReapproval")
                         .HasColumnType("boolean")
                         .HasColumnName("awaiting_reapproval");
