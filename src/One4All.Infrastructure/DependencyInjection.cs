@@ -307,6 +307,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Trading.CreditNoteWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Procurement.PurchaseOrderWorkflowHandler>();
         services.AddScoped<Schools.SchoolBursaryService>();
+        services.AddScoped<Application.Abstractions.Budgeting.IBudgetFrameworkService, Budgeting.BudgetFrameworkService>();
         services.AddScoped<Application.Abstractions.Schools.ISchoolBursaryService>(sp => sp.GetRequiredService<Schools.SchoolBursaryService>());
         services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Schools.BursaryWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Workflow.WorkflowEscalationTask>();

@@ -86,6 +86,11 @@ public sealed class BudgetingService : IBudgetingService
             return Result.Failure(Error.NotFound("Budget.NotFound", $"Budget {budgetId} not found."));
         }
 
+        if (budget.IsPutAway)
+        {
+            return Result.Failure(Error.Rule("Budget.PutAway", $"Budget {budget.Label} v{budget.VersionNumber} is {budget.Status} and cannot be activated."));
+        }
+
         // Where the company requires it, only a budget approved through preparation can be activated (brief §4.18.4).
         if (budget.Status != BudgetStatus.Approved && await _db.Companies.AnyAsync(c => c.Id == companyId && c.BudgetApprovalRequired, ct).ConfigureAwait(false))
         {

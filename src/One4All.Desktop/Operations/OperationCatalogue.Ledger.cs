@@ -230,6 +230,48 @@ public static partial class OperationCatalogue
             },
             List = BudgetsInPreparationAsync,
         };
+        yield return new Operation
+        {
+            Module = "Budgeting", Title = "Multi-year framework, archive and lock", ListTitle = "Budget versions",
+            Description = "Outer years: indicative amounts for the years after the budget year (\"1:6100:1300; 2:6100:1400\" — years after:account:amount), set before approval. "
+                + "Show: the framework by account. Roll forward: next year's draft from an approved framework. Archive a superseded version (seal verified), then Lock it for good.",
+            Fields = [Pick("Step", "Step", ["Outer years", "Show", "Roll forward", "Archive", "Lock"]), Num("Budget", "Budget id"), Opt("Years", "Outer years (outer years step)"),
+                OptNum("NextYear", "Next fiscal year (start year, roll forward)"), Opt("Label", "Label for the new draft")],
+            Run = async (c, i) =>
+            {
+                IBudgetFrameworkService framework = c.Get<IBudgetFrameworkService>();
+                long budget = (long)i.Number("Budget");
+                switch (i.Text("Step"))
+                {
+                    case "Outer years":
+                        List<OuterYearAmount> amounts = [];
+                        foreach (string part in (i.Optional("Years") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                            amounts.Add(bits.Length == 3 && int.TryParse(bits[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int offset)
+                                && decimal.TryParse(bits[2], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal amount)
+                                ? new OuterYearAmount(offset, bits[1], amount) : throw new OperationException($"Write each as years after:account:amount (\"{part}\")."));
+                        }
+
+                        return Check(await framework.SetOuterYearsAsync(c.CompanyId, budget, amounts).ConfigureAwait(true), "Outer years saved.");
+                    case "Show":
+                        IReadOnlyList<FrameworkRow> rows = Check(await framework.FrameworkAsync(c.CompanyId, budget).ConfigureAwait(true));
+                        return rows.Count == 0 ? "No lines." : string.Join(Environment.NewLine, rows.Select(r => $"{r.AccountCode,-8} {r.CostCentre,-8} " + string.Join("  ", r.Years.Select(M))));
+                    case "Roll forward":
+                        int year = (int)(i.OptionalNumber("NextYear") ?? throw new OperationException("Give the next fiscal year."));
+                        long yearId = await c.Db.FiscalYears.AsNoTracking().Where(y => y.CompanyId == c.CompanyId && y.StartDate.Year == year).Select(y => (long?)y.Id).FirstOrDefaultAsync().ConfigureAwait(true)
+                            ?? throw new OperationException($"No fiscal year starting in {year}.");
+                        return Check(await framework.RollForwardAsync(c.CompanyId, budget, yearId, i.Optional("Label") ?? string.Empty).ConfigureAwait(true), id => $"Draft budget {id} created for {year}.");
+                    case "Archive":
+                        return Check(await framework.ArchiveAsync(c.CompanyId, budget).ConfigureAwait(true), "Budget archived.");
+                    default:
+                        return Check(await framework.LockAsync(c.CompanyId, budget).ConfigureAwait(true), "Budget locked.");
+                }
+            },
+            List = async c => Table(await c.Db.Set<Budget>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Take(100).ToListAsync().ConfigureAwait(true),
+                ("Id", b => b.Id), ("Label", b => b.Label), ("Type", b => b.Type), ("Version", b => b.VersionNumber), ("Status", b => b.Status), ("Department", b => b.Department),
+                ("Rolled from", b => b.RolledFromBudgetId)),
+        };
     }
 
     // "6100 Dr 500 project=P1 fund=WATER # narrative; 2410 Cr 500 fund=WATER"

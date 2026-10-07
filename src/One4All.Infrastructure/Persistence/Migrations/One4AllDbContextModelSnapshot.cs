@@ -2568,6 +2568,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("resolution_reference");
 
+                    b.Property<long?>("RolledFromBudgetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rolled_from_budget_id");
+
                     b.Property<int>("Round")
                         .HasColumnType("integer")
                         .HasColumnName("round");
@@ -3020,6 +3024,54 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_budget_line_budget_id_account_code_period");
 
                     b.ToTable("budget_line", "bud");
+                });
+
+            modelBuilder.Entity("One4All.Core.Budgeting.BudgetOuterYearLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("account_code");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("BudgetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("budget_id");
+
+                    b.Property<string>("CostCentre")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("cost_centre");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("YearOffset")
+                        .HasColumnType("integer")
+                        .HasColumnName("year_offset");
+
+                    b.HasKey("Id")
+                        .HasName("pk_budget_outer_year");
+
+                    b.HasIndex("BudgetId")
+                        .HasDatabaseName("ix_budget_outer_year_budget_id");
+
+                    b.ToTable("budget_outer_year", "bud");
                 });
 
             modelBuilder.Entity("One4All.Core.Budgeting.BudgetProposal", b =>
@@ -30669,6 +30721,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_budget_line_budgets_budget_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Budgeting.BudgetOuterYearLine", b =>
+                {
+                    b.HasOne("One4All.Core.Budgeting.Budget", null)
+                        .WithMany("OuterYears")
+                        .HasForeignKey("BudgetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_budget_outer_year_budget_budget_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Communications.OutboundMessage", b =>
                 {
                     b.HasOne("One4All.Core.Communications.DespatchBatch", null)
@@ -32416,6 +32478,8 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Budgeting.Budget", b =>
                 {
                     b.Navigation("Lines");
+
+                    b.Navigation("OuterYears");
                 });
 
             modelBuilder.Entity("One4All.Core.Expenses.ExpenseClaim", b =>

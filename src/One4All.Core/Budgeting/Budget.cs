@@ -26,6 +26,27 @@ public enum BudgetType
 
     /// <summary>A cash budget.</summary>
     Cash = 6,
+
+    /// <summary>The base-case scenario.</summary>
+    BaseCase = 7,
+
+    /// <summary>The best-case scenario.</summary>
+    BestCase = 8,
+
+    /// <summary>The worst-case scenario.</summary>
+    WorstCase = 9,
+
+    /// <summary>A zero-based budget (every line justified from nil).</summary>
+    ZeroBased = 10,
+
+    /// <summary>A rolling forecast.</summary>
+    RollingForecast = 11,
+
+    /// <summary>A project budget.</summary>
+    Project = 12,
+
+    /// <summary>An establishment / staff budget.</summary>
+    Establishment = 13,
 }
 
 /// <summary>The lifecycle of a budget version (brief §4.18.4).</summary>
@@ -54,6 +75,12 @@ public enum BudgetStatus
 
     /// <summary>Recommended by the committee/executive for approval.</summary>
     Recommended = 8,
+
+    /// <summary>A superseded version put away (its seal verified); retrievable exactly as approved.</summary>
+    Archived = 9,
+
+    /// <summary>Archived and locked: nothing about it may change again.</summary>
+    Locked = 10,
 }
 
 /// <summary>
@@ -64,6 +91,7 @@ public enum BudgetStatus
 public sealed class Budget : SoftDeletableEntity, ICompanyScoped
 {
     private readonly List<BudgetLine> _lines = [];
+    private readonly List<BudgetOuterYearLine> _outerYears = [];
 
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private Budget()
@@ -182,6 +210,11 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
             throw new InvalidOperationException("An approved budget cannot be edited; create a new version or a virement.");
         }
 
+        if (IsPutAway)
+        {
+            throw new InvalidOperationException($"Budget {Label} v{VersionNumber} is {Status}; nothing about it can change.");
+        }
+
         BudgetLine line = new(accountCode, period, amount, costCentre, virementId) { RephaseId = rephaseId };
         _lines.Add(line);
         return line;
@@ -225,6 +258,63 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
     {
         Status = BudgetStatus.Superseded;
         IsActive = false;
+    }
+
+    /// <summary>Whether it is archived or locked (closed to every change).</summary>
+    public bool IsPutAway => Status is BudgetStatus.Archived or BudgetStatus.Locked;
+
+    /// <summary>The budget this one was rolled forward from (multi-year framework), if any.</summary>
+    public long? RolledFromBudgetId { get; private set; }
+
+    /// <summary>Records the framework it was rolled forward from.</summary>
+    /// <param name="budgetId">The earlier year's budget.</param>
+    public void MarkRolledFrom(long budgetId) => RolledFromBudgetId = budgetId;
+
+    /// <summary>The indicative outer years of the multi-year framework (year 1 is the budget's own lines).</summary>
+    public IReadOnlyList<BudgetOuterYearLine> OuterYears => _outerYears.AsReadOnly();
+
+    /// <summary>Replaces the outer years (only before the budget is sealed).</summary>
+    /// <param name="lines">The lines.</param>
+    public void SetOuterYears(IEnumerable<BudgetOuterYearLine> lines)
+    {
+        if (IsSealed || IsPutAway)
+        {
+            throw new InvalidOperationException("An approved budget's framework cannot be edited; roll it forward or create a new version.");
+        }
+
+        _outerYears.Clear();
+        _outerYears.AddRange(lines);
+    }
+
+    /// <summary>Archives a superseded version, provided its approved lines still match the seal.</summary>
+    /// <returns>Null when archived, else why not.</returns>
+    public string? Archive()
+    {
+        if (Status != BudgetStatus.Superseded)
+        {
+            return $"Only a superseded budget can be archived; this one is {Status}.";
+        }
+
+        if (IsSealed && !VerifySeal())
+        {
+            return "Its lines no longer match the approval seal; investigate before archiving.";
+        }
+
+        Status = BudgetStatus.Archived;
+        return null;
+    }
+
+    /// <summary>Locks an archived version for good.</summary>
+    /// <returns>Null when locked, else why not.</returns>
+    public string? Lock()
+    {
+        if (Status != BudgetStatus.Archived)
+        {
+            return $"Only an archived budget can be locked; this one is {Status}.";
+        }
+
+        Status = BudgetStatus.Locked;
+        return null;
     }
 }
 
@@ -564,3 +654,36 @@ public sealed class BudgetRephase : Entity, ICompanyScoped
     public long? DecidedByUserId { get; set; }
 }
 
+/// <summary>An indicative outer-year amount in a multi-year (MTEF) framework (<c>bud.budget_outer_year</c>): year 2 is offset 1, and so on.</summary>
+public sealed class BudgetOuterYearLine : Entity
+{
+    private BudgetOuterYearLine() => AccountCode = string.Empty;
+
+    /// <summary>Creates the line.</summary>
+    /// <param name="yearOffset">Years after the budget year (1–4).</param>
+    /// <param name="accountCode">The account.</param>
+    /// <param name="costCentre">The cost centre, if any.</param>
+    /// <param name="amount">The indicative annual amount.</param>
+    public BudgetOuterYearLine(int yearOffset, string accountCode, string? costCentre, decimal amount)
+    {
+        YearOffset = yearOffset;
+        AccountCode = accountCode;
+        CostCentre = costCentre;
+        Amount = amount;
+    }
+
+    /// <summary>The budget.</summary>
+    public long BudgetId { get; private set; }
+
+    /// <summary>Years after the budget year (1–4).</summary>
+    public int YearOffset { get; private set; }
+
+    /// <summary>The account.</summary>
+    public string AccountCode { get; private set; }
+
+    /// <summary>The cost centre, if any.</summary>
+    public string? CostCentre { get; private set; }
+
+    /// <summary>The indicative annual amount.</summary>
+    public decimal Amount { get; private set; }
+}

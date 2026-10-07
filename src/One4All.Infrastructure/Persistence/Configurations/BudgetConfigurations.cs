@@ -19,6 +19,9 @@ internal sealed class BudgetConfiguration : IEntityTypeConfiguration<Budget>
         b.Property(x => x.SealHash).HasMaxLength(64);
         b.Ignore(x => x.IsSealed);
         b.Ignore(x => x.AnnualTotal);
+        b.Ignore(x => x.IsPutAway);
+        b.HasMany(x => x.OuterYears).WithOne().HasForeignKey(x => x.BudgetId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.OuterYears).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.BudgetId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.FiscalYearId, x.Type, x.Department, x.VersionNumber }).IsUnique();
@@ -215,5 +218,17 @@ internal sealed class BudgetRephaseConfiguration : IEntityTypeConfiguration<Budg
         b.Property(x => x.Reason).HasMaxLength(300);
         b.Property(x => x.Status).HasConversion<int>();
         b.HasIndex(x => x.BudgetId);
+    }
+}
+
+internal sealed class BudgetOuterYearLineConfiguration : IEntityTypeConfiguration<BudgetOuterYearLine>
+{
+    public void Configure(EntityTypeBuilder<BudgetOuterYearLine> b)
+    {
+        b.ToTable("budget_outer_year", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AccountCode).HasMaxLength(30);
+        b.Property(x => x.CostCentre).HasMaxLength(30);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
     }
 }
