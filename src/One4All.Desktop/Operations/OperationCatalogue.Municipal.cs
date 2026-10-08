@@ -144,6 +144,177 @@ public static partial class OperationCatalogue
                 ("Run", r => r.RunNumber), ("Service", r => r.ServiceType), ("Bill date", r => r.BillDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Ward", r => r.Ward),
                 ("Status", r => r.Status), ("Proposed by", r => r.ProposedByUserId)),
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Valuation roll", ListTitle = "Open objections",
+            Description = "Import a general valuation roll (a CSV file: stand,value) effective from a date; record a supplementary valuation on one stand (bills since re-rated); "
+                + "lodge an objection and decide it (a revised value re-rates the bills); History lists a stand's valuations.",
+            Fields = [Pick("Step", "Step", ["Import roll", "Supplementary", "Objection", "Decide objection", "History"]), Opt("File", "Roll CSV file (stand,value)"), Opt("Roll", "Roll name"),
+                Opt("Stand", "Stand number"), OptNum("Value", "Value / claimed value / revised value"), Opt("Text", "Reason / grounds / notes"), Opt("Objection", "Objection number (decide)"),
+                Today("Effective", "Effective from"), Today()],
+            Run = async (c, i) =>
+            {
+                IValuationRollService roll = c.Get<IValuationRollService>();
+                switch (i.Text("Step"))
+                {
+                    case "Import roll":
+                        List<RollEntry> entries = [];
+                        foreach (string row in (await System.IO.File.ReadAllLinesAsync(i.Optional("File") ?? string.Empty).ConfigureAwait(true)).Where(r => r.Trim().Length > 0))
+                        {
+                            string[] bits = row.Split(',', StringSplitOptions.TrimEntries);
+                            if (bits.Length == 2 && decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal value))
+                            {
+                                entries.Add(new RollEntry(bits[0], value));
+                            }
+                        }
+
+                        return $"{Check(await roll.ImportRollAsync(c.CompanyId, i.Optional("Roll") ?? string.Empty, i.Date("Effective"), entries).ConfigureAwait(true))} valuation(s) loaded.";
+                    case "Supplementary":
+                        ValuationAdjustment adjusted = Check(await roll.RecordSupplementaryAsync(c.CompanyId, await PropertyAsync(c, i.Optional("Stand") ?? string.Empty).ConfigureAwait(true), i.Date("Effective"),
+                            i.OptionalNumber("Value") ?? 0m, i.Optional("Text") ?? string.Empty, i.Date("Date")).ConfigureAwait(true));
+                        return $"Recorded; {adjusted.BillsAdjusted} bill(s) re-rated by {M(adjusted.Amount)}{(adjusted.DocumentNumber is null ? string.Empty : $" ({adjusted.DocumentNumber})")}.";
+                    case "Objection":
+                        return $"Objection {Check(await roll.LodgeObjectionAsync(c.CompanyId, await PropertyAsync(c, i.Optional("Stand") ?? string.Empty).ConfigureAwait(true), i.Date("Date"),
+                            i.OptionalNumber("Value") ?? 0m, i.Optional("Text") ?? string.Empty).ConfigureAwait(true))} lodged.";
+                    case "Decide objection":
+                        ValuationAdjustment decided = Check(await roll.DecideObjectionAsync(c.CompanyId, i.Optional("Objection") ?? string.Empty, i.Date("Date"), i.OptionalNumber("Value"), i.Optional("Text") ?? string.Empty)
+                            .ConfigureAwait(true));
+                        return $"Decided; {decided.BillsAdjusted} bill(s) re-rated by {M(decided.Amount)}.";
+                    default:
+                        IReadOnlyList<ValuationEntry> history = await roll.HistoryAsync(c.CompanyId, await PropertyAsync(c, i.Optional("Stand") ?? string.Empty).ConfigureAwait(true)).ConfigureAwait(true);
+                        return string.Join(Environment.NewLine, history.Select(v => $"{v.EffectiveFrom:yyyy-MM-dd}  {M(v.Value),14}  {v.Kind,-12} {v.Reference}"));
+                }
+            },
+            List = async c => Table(await c.Get<IValuationRollService>().ObjectionsAsync(c.CompanyId, ObjectionStatus.Lodged).ConfigureAwait(true),
+                ("Objection", o => o.ObjectionNumber), ("Stand", o => o.StandNumber), ("Lodged", o => o.LodgedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Objected to", o => M(o.ValueObjectedTo)),
+                ("Claimed", o => M(o.ClaimedValue)), ("Status", o => o.Status)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Rates clearance certificates",
+            Description = "Quotes what a stand must pay for a clearance certificate (its balance plus so many months' billing in advance), and issues the certificate once that is "
+                + "paid, valid for so many days.",
+            Fields = [Pick("Step", "Step", ["Quote", "Issue"]), Req("Stand", "Stand number"), Num("Months", "Months in advance", "3"), Num("Valid", "Valid for (days)", "60"), Today()],
+            Run = async (c, i) =>
+            {
+                IClearanceService clearance = c.Get<IClearanceService>();
+                long property = await PropertyAsync(c, i.Text("Stand")).ConfigureAwait(true);
+                if (i.Text("Step") == "Quote")
+                {
+                    One4All.Application.Municipal.ClearanceQuote quote = Check(await clearance.QuoteAsync(c.CompanyId, property, i.Date("Date"), i.Whole("Months")).ConfigureAwait(true));
+                    return $"Balance {M(quote.Balance)} + {quote.MonthsInAdvance} month(s) at {M(quote.AverageMonthlyBilling)} = advance {M(quote.AdvanceRequired)}; to pay {M(quote.AmountDue)}"
+                        + (quote.CanIssue ? " — can be issued now." : ".");
+                }
+
+                IssuedClearance issued = Check(await clearance.IssueAsync(c.CompanyId, property, i.Date("Date"), i.Whole("Months"), i.Whole("Valid"), c.UserId).ConfigureAwait(true));
+                return $"Certificate {issued.CertificateNumber} for {issued.StandNumber}, valid until {issued.ValidUntil:yyyy-MM-dd}; advance held {M(issued.AdvanceHeld)}.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Prepaid vending", ListTitle = "Prepaid sales (this month)",
+            Description = "Sells prepaid units (water or electricity) to a stand: part of the payment can go to its arrears; the rest buys units and gives a token.",
+            Fields = [Req("Stand", "Stand number"), Pick("Service", "Service", [nameof(ServiceType.Water), nameof(ServiceType.Electricity)]), Num("Amount", "Amount paid"), Req("Bank", "Bank / cash account"),
+                Num("Arrears", "% to arrears", "0"), Pick("Channel", "Channel", ["Counter", "Agent", "Mobile"]), Today()],
+            Run = async (c, i) =>
+            {
+                VendResult vend = Check(await c.Get<IPrepaidVendingService>().VendAsync(new PrepaidVendRequest
+                {
+                    CompanyId = c.CompanyId, PropertyId = await PropertyAsync(c, i.Text("Stand")).ConfigureAwait(true), ServiceType = Enum.Parse<ServiceType>(i.Text("Service")), Amount = i.Number("Amount"),
+                    Date = i.Date("Date"), BankAccountCode = i.Text("Bank"), ArrearsPercent = i.Number("Arrears"), Channel = i.Text("Channel"),
+                }).ConfigureAwait(true));
+                return $"Sale {vend.SaleNumber}: token {vend.Token} for {Q(vend.Units)} units ({M(vend.ToUnits)}); {M(vend.ToArrears)} to arrears, arrears now {M(vend.ArrearsAfter)}.";
+            },
+            List = async c => Table(await c.Get<IPrepaidVendingService>().SalesAsync(c.CompanyId, new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1), DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true),
+                ("Sale", x => x.SaleNumber), ("Stand", x => x.StandNumber), ("Date", x => x.SoldOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Amount", x => M(x.Amount)),
+                ("To arrears", x => M(x.ToArrears)), ("Units", x => Q(x.Units)), ("Token", x => x.Token), ("Channel", x => x.Channel)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Service deposits",
+            Description = "Takes a deposit for a service on a stand (held as a liability), refunds it or applies it to the arrears when the account closes; Held lists a stand's deposits.",
+            Fields = [Pick("Step", "Step", ["Take", "Refund", "Apply to arrears", "Held"]), Opt("Stand", "Stand number (take / held)"), Pick("Service", "Service", Enum.GetNames<ServiceType>()),
+                Num("Amount", "Amount", "0"), Opt("Reference", "Deposit reference (refund / apply)"), Opt("Bank", "Bank account"), Opt("Liability", "Deposit liability account (take)"), Today()],
+            Run = async (c, i) =>
+            {
+                IServiceDepositService deposits = c.Get<IServiceDepositService>();
+                switch (i.Text("Step"))
+                {
+                    case "Take":
+                        DepositTaken taken = Check(await deposits.TakeAsync(new TakeDepositRequest
+                        {
+                            CompanyId = c.CompanyId, PropertyId = await PropertyAsync(c, i.Optional("Stand") ?? string.Empty).ConfigureAwait(true), ServiceType = Enum.Parse<ServiceType>(i.Text("Service")),
+                            Amount = i.Number("Amount"), Date = i.Date("Date"), BankAccountCode = i.Optional("Bank") ?? string.Empty, LiabilityAccountCode = i.Optional("Liability") ?? string.Empty,
+                        }).ConfigureAwait(true));
+                        return $"Deposit {taken.Reference} of {M(taken.Amount)} taken ({taken.JournalNumber}).";
+                    case "Refund":
+                        return $"Refunded ({Check(await deposits.RefundAsync(c.CompanyId, i.Optional("Reference") ?? string.Empty, i.Date("Date"), i.Optional("Bank") ?? string.Empty).ConfigureAwait(true))}).";
+                    case "Apply to arrears":
+                        return $"Applied ({Check(await deposits.ApplyToArrearsAsync(c.CompanyId, i.Optional("Reference") ?? string.Empty, i.Date("Date")).ConfigureAwait(true))}).";
+                    default:
+                        IReadOnlyList<HeldDeposit> held = await deposits.HeldAsync(c.CompanyId, await PropertyAsync(c, i.Optional("Stand") ?? string.Empty).ConfigureAwait(true)).ConfigureAwait(true);
+                        return held.Count == 0 ? "No deposits held." : string.Join(Environment.NewLine, held.Select(d => $"{d.Reference,-14} {d.ServiceType,-12} {M(d.Amount),12}  since {d.TakenOn:yyyy-MM-dd}"));
+                }
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Indigent register", ListTitle = "Reviews due in 60 days",
+            Description = "Registers a household as indigent (income under the maximum) with its subsidy % and review date; reviews it (staying on only while still under the maximum); "
+                + "applies the month's subsidies to their bills.",
+            Fields = [Pick("Step", "Step", ["Register", "Review", "Apply subsidies"]), Opt("Stand", "Stand number (register)"), OptNum("Registration", "Registration id (review)"), Num("Income", "Household income", "0"),
+                Num("Subsidy", "Subsidy %", "100"), Num("Maximum", "Maximum income to qualify", "0"), Today("Review", "Next review due"), Opt("Account", "Subsidy (expense) account"), Today()],
+            Run = async (c, i) =>
+            {
+                IIndigentRegisterService register = c.Get<IIndigentRegisterService>();
+                switch (i.Text("Step"))
+                {
+                    case "Register":
+                        return Check(await register.RegisterAsync(c.CompanyId, new IndigentApplication(await PropertyAsync(c, i.Optional("Stand") ?? string.Empty).ConfigureAwait(true), i.Number("Income"),
+                            i.Number("Subsidy"), i.Date("Date"), i.Date("Review"), c.UserId), i.Number("Maximum")).ConfigureAwait(true), id => $"Registered ({id}).");
+                    case "Review":
+                        bool stays = Check(await register.ReviewAsync(c.CompanyId, (long)(i.OptionalNumber("Registration") ?? 0m), i.Number("Income"), i.Number("Subsidy"), i.Date("Review"), i.Number("Maximum"), c.UserId)
+                            .ConfigureAwait(true));
+                        return stays ? "Still indigent; review date moved." : "No longer qualifies; removed from the register.";
+                    default:
+                        IReadOnlyList<SubsidyLine> subsidies = Check(await register.ApplySubsidiesAsync(c.CompanyId, i.Date("Date"), i.Optional("Account") ?? string.Empty).ConfigureAwait(true));
+                        return $"{subsidies.Count} household(s) subsidised {M(subsidies.Sum(x => x.Subsidy))}.";
+                }
+            },
+            List = async c => Table(await c.Get<IIndigentRegisterService>().ReviewsDueAsync(c.CompanyId, DateOnly.FromDateTime(DateTime.Today), 60).ConfigureAwait(true),
+                ("Registration", r => r.RegistrationId), ("Stand", r => r.StandNumber), ("Review due", r => r.ReviewDue.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Overdue", r => r.Overdue)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Meter reading routes",
+            Description = "Creates a reading route for a meter reader (meter serials in walking order, comma-separated); Sheet prints it with the last readings; Import loads a CSV of "
+                + "readings taken on the round (each checked like a keyed reading).",
+            Fields = [Pick("Step", "Step", ["Create route", "Sheet", "Import readings"]), Opt("Route", "Route code"), Opt("Name", "Route name"), Opt("Reader", "Meter reader"),
+                Opt("Meters", "Meter serials in order, comma-separated"), Opt("File", "Readings CSV file (import)")],
+            Run = async (c, i) =>
+            {
+                IReadingRouteService routes = c.Get<IReadingRouteService>();
+                switch (i.Text("Step"))
+                {
+                    case "Create route":
+                        List<long> meters = [];
+                        foreach (string serial in (i.Optional("Meters") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            meters.Add(await FindAsync(c.Db.Meters, m => m.CompanyId == c.CompanyId && m.Serial == serial.ToUpper(), m => m.Id, "meter", serial).ConfigureAwait(true));
+                        }
+
+                        return Check(await routes.CreateRouteAsync(c.CompanyId, i.Optional("Route") ?? string.Empty, i.Optional("Name") ?? string.Empty, i.Optional("Reader") ?? string.Empty, meters).ConfigureAwait(true),
+                            _ => "Route created.");
+                    case "Sheet":
+                        IReadOnlyList<RouteStop> stops = Check(await routes.RouteSheetAsync(c.CompanyId, i.Optional("Route") ?? string.Empty).ConfigureAwait(true));
+                        return string.Join(Environment.NewLine, stops.Select(x => $"{x.Sequence,3}  {x.Serial,-14} {x.StandNumber,-12} last {Q(x.LastReading),12} {x.LastReadingDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}   ______"));
+                    default:
+                        ReadingImportResult imported = await routes.ImportReadingsAsync(c.CompanyId, await System.IO.File.ReadAllTextAsync(i.Optional("File") ?? string.Empty).ConfigureAwait(true)).ConfigureAwait(true);
+                        return $"{imported.Captured} reading(s) captured, {imported.Rejected} rejected." + (imported.Errors.Count == 0 ? string.Empty
+                            : Environment.NewLine + string.Join(Environment.NewLine, imported.Errors.Take(30).Select(e => $"Line {e.LineNumber}: {e.Message}")));
+                }
+            },
+        };
     }
 
     private static async Task<long> PropertyAsync(OperationContext c, string stand)
