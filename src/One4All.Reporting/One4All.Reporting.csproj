@@ -15,6 +15,7 @@
     <PackageReference Include="DynamicExpresso.Core" Version="2.16.1" />
     <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="QuestPDF" Version="2024.12.3" />
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
   </ItemGroup>
 
 </Project>

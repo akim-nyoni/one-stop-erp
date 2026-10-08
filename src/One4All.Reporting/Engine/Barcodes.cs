@@ -25,7 +25,7 @@ public static class Barcodes
     private const int StartB = 104;
 
     /// <summary>The symbologies supported.</summary>
-    public static readonly IReadOnlyList<string> Symbologies = ["QR", "Code128", "Code39", "EAN13"];
+    public static readonly IReadOnlyList<string> Symbologies = ["QR", "Code128", "Code39", "EAN13", "PDF417"];
 
     // Code 39: per character, nine elements (bar, space, bar …) where 1 is wide.
     private static readonly Dictionary<char, string> Code39 = new()
@@ -73,6 +73,32 @@ public static class Barcodes
         }
 
         return modules;
+    }
+
+    /// <summary>The PDF417 modules (true = dark) for a value, error correction level 2, quiet zone included (ZXing's encoder).</summary>
+    /// <param name="value">The value (any text; bytes are used where it is not plain text).</param>
+    /// <returns>The rows of modules.</returns>
+    public static bool[][] Pdf417Modules(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        ZXing.PDF417.PDF417Writer writer = new();
+        Dictionary<ZXing.EncodeHintType, object> hints = new()
+        {
+            [ZXing.EncodeHintType.ERROR_CORRECTION] = ZXing.PDF417.Internal.PDF417ErrorCorrectionLevel.L2,
+            [ZXing.EncodeHintType.MARGIN] = 2,
+            [ZXing.EncodeHintType.CHARACTER_SET] = "UTF-8",
+        };
+        ZXing.Common.BitMatrix matrix = writer.encode(value, ZXing.BarcodeFormat.PDF_417, 0, 0, hints);
+        return [.. Enumerable.Range(0, matrix.Height).Select(y => Enumerable.Range(0, matrix.Width).Select(x => matrix[x, y]).ToArray())];
+    }
+
+    // A PDF417 symbol, two pixels a module across and three down (the symbol's rows are taller than wide).
+    private static byte[] Pdf417Png(string value)
+    {
+        bool[][] rows = Pdf417Modules(value);
+        const int across = 2, down = 3;
+        int width = rows[0].Length * across;
+        return GreyscalePng(width, rows.Length * down, y => [.. rows[y / down].SelectMany(dark => Enumerable.Repeat(dark ? (byte)0 : (byte)255, across))]);
     }
 
     /// <summary>The EAN-13 check digit for twelve digits.</summary>
@@ -168,6 +194,10 @@ public static class Barcodes
         }
 
         string kind = (symbology ?? "Code128").Replace(" ", string.Empty, StringComparison.Ordinal).Replace("-", string.Empty, StringComparison.Ordinal).ToUpperInvariant();
+        if (kind is "PDF417" or "PDF")
+        {
+            return Pdf417Png(value);
+        }
         List<bool> bars;
         if (kind == "CODE39")
         {
