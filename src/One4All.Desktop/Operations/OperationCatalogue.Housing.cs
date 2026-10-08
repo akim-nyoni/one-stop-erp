@@ -458,6 +458,121 @@ public static partial class OperationCatalogue
                 ("Acquisition", a => a.AcquisitionNumber), ("Parcel", a => a.ParcelNumber), ("Method", a => a.Method), ("Counterparty", a => a.Counterparty), ("Valued", a => a.ValuedAt is decimal v ? M(v) : "-"),
                 ("Cost", a => M(a.TotalCost)), ("Status", a => a.Status)),
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Title deeds", ListTitle = "Title pipeline",
+            Description = "Apply for a stand's title, then move the application through conveyancer assigned → lodged → query raised / resolved → registered → in custody → "
+                + "handed over (a conveyancer is named when assigned). The list shows open applications with days at their stage.",
+            Fields = [Pick("Step", "Step", ["Apply", "Advance"]), Opt("Stand", "Stand number (apply)"), Opt("Application", "Title application number (advance)"),
+                Pick("Stage", "To stage", Enum.GetNames<TitleStage>()), Opt("Conveyancer", "Conveyancer"), Opt("Note", "Note"), Today()],
+            Run = async (c, i) =>
+            {
+                ITitleDeedService titles = c.Get<ITitleDeedService>();
+                if (i.Text("Step") == "Apply")
+                {
+                    long stand = await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == (i.Optional("Stand") ?? string.Empty).ToUpper(), x => x.Id, "stand",
+                        i.Optional("Stand") ?? string.Empty).ConfigureAwait(true);
+                    return $"Title application {Check(await titles.ApplyAsync(c.CompanyId, stand, i.Date("Date")).ConfigureAwait(true))} opened.";
+                }
+
+                return Check(await titles.AdvanceAsync(c.CompanyId, i.Optional("Application") ?? string.Empty, new TitleStepInput
+                {
+                    Stage = Enum.Parse<TitleStage>(i.Text("Stage")), Date = i.Date("Date"), Note = i.Optional("Note"), Conveyancer = i.Optional("Conveyancer"),
+                }).ConfigureAwait(true), $"Moved to {i.Text("Stage")}.");
+            },
+            List = async c => Table((await c.Get<ITitleDeedService>().PipelineAsync(c.CompanyId, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true)).Applications,
+                ("Application", t => t.ApplicationNumber), ("Stand", t => t.StandNumber), ("Stage", t => t.Stage), ("Days at stage", t => t.DaysAtStage), ("Days since applied", t => t.DaysSinceApplied),
+                ("Conveyancer", t => t.Conveyancer)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Stand blocks and caveats", ListTitle = "Blocks in force",
+            Description = "Places a block on a stand (court interdict, family dispute, suspected fraud, double allocation, boundary dispute…) with its document — a blocked stand cannot be "
+                + "allocated, sold, leased or transferred — or lifts it with the reason. History shows every block on a stand.",
+            Fields = [Pick("Step", "Step", ["Place", "Lift", "History"]), Req("Stand", "Stand number"), Pick("Reason", "Reason (place)", Enum.GetNames<BlockReason>()),
+                Opt("Detail", "Detail / reason for lifting"), Opt("Document", "Document reference"), Today()],
+            Run = async (c, i) =>
+            {
+                IStandBlockService blocks = c.Get<IStandBlockService>();
+                long stand = await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == i.Text("Stand").ToUpper(), x => x.Id, "stand", i.Text("Stand")).ConfigureAwait(true);
+                switch (i.Text("Step"))
+                {
+                    case "Place":
+                        return Check(await blocks.PlaceAsync(c.CompanyId, stand, Enum.Parse<BlockReason>(i.Text("Reason")), i.Optional("Detail") ?? string.Empty, i.Optional("Document") ?? string.Empty,
+                            c.UserId, i.Date("Date")).ConfigureAwait(true), "Block placed.");
+                    case "Lift":
+                        return Check(await blocks.LiftAsync(c.CompanyId, stand, i.Optional("Detail") ?? string.Empty, i.Optional("Document") ?? string.Empty, c.UserId, i.Date("Date")).ConfigureAwait(true),
+                            "Block lifted.");
+                    default:
+                        IReadOnlyList<StandBlockEntry> history = await blocks.HistoryAsync(c.CompanyId, stand).ConfigureAwait(true);
+                        return history.Count == 0 ? "No blocks." : string.Join(Environment.NewLine, history.Select(b =>
+                            $"{D(b.PlacedOn)} {b.Reason}: {b.Detail} ({b.DocumentReference}){(b.LiftedOn is DateOnly lifted ? $" — lifted {D(lifted)}: {b.LiftReason}" : " — in force")}"));
+                }
+            },
+            List = async c => Table(await c.Get<IStandBlockService>().InForceAsync(c.CompanyId).ConfigureAwait(true),
+                ("Stand", b => b.StandNumber), ("Reason", b => b.Reason), ("Detail", b => b.Detail), ("Document", b => b.DocumentReference), ("Since", b => D(b.PlacedOn))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Repossess a stand", ListTitle = "Repossessions this year",
+            Description = "Takes back a stand sold on instalments (requested by you, approved by another user): the receivable is derecognised, the stand comes back into inventory at "
+                + "its net realisable value, and the difference is a gain or loss.",
+            Fields = [Req("Agreement", "Instalment agreement number"), Num("Nrv", "Net realisable value"), Req("Reason", "Reason"), Req("Approver", "Approving user name"),
+                Req("Available", "Stands available (inventory) account"), Req("GainLoss", "Gain / loss account"), Today()],
+            Run = async (c, i) =>
+            {
+                RepossessionEntry taken = Check(await c.Get<IRepossessionService>().RepossessAsync(new RepossessionRequest
+                {
+                    CompanyId = c.CompanyId, AgreementNumber = i.Text("Agreement"), Date = i.Date("Date"), NetRealisableValue = i.Number("Nrv"), Reason = i.Text("Reason"),
+                    RequestedByUserId = c.UserId, ApprovedByUserId = await UserAsync(c, i.Text("Approver")).ConfigureAwait(true),
+                    StandsAvailableAccountCode = i.Text("Available"), GainLossAccountCode = i.Text("GainLoss"),
+                }).ConfigureAwait(true));
+                return $"{taken.Reference}: stand {taken.StandNumber} back at {M(taken.InventoryRecognised)}; receivable {M(taken.ReceivableDerecognised)} derecognised; "
+                    + $"{(taken.GainOrLoss >= 0m ? "gain" : "loss")} {M(Math.Abs(taken.GainOrLoss))}.";
+            },
+            List = async c => Table(await c.Get<IRepossessionService>().RegisterAsync(c.CompanyId, new DateOnly(DateTime.Today.Year, 1, 1), DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true),
+                ("Reference", r => r.Reference), ("Agreement", r => r.AgreementNumber), ("Stand", r => r.StandNumber), ("Date", r => D(r.Date)), ("Receivable", r => M(r.ReceivableDerecognised)),
+                ("Inventory", r => M(r.InventoryRecognised)), ("Gain / loss", r => M(r.GainOrLoss))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Rental maintenance", ListTitle = "Rental units",
+            Description = "Report a repair on a unit; complete it with its cost (recharged to the tenant when they caused it); record an inspection with its condition grade (1–5) and "
+                + "whether it needs follow-up, and close the follow-up; History summarises a unit's repairs and condition.",
+            Fields = [Pick("Step", "Step", ["Report repair", "Complete repair", "Inspection", "Close follow-up", "History"]), Opt("Unit", "Unit code"), Opt("Repair", "Repair number (complete)"),
+                Opt("Description", "Description / findings"), Num("Cost", "Cost", "0"), Opt("Expense", "Repairs expense account"), Opt("PaidFrom", "Paid from account"), Tick("TenantCaused", "Tenant caused it"),
+                Opt("Recharge", "Recharge income account"), Opt("Inspector", "Inspector"), Num("Grade", "Condition grade (1–5)", "3"), Tick("FollowUp", "Needs follow-up"),
+                OptNum("Inspection", "Inspection id (close)"), Today()],
+            Run = async (c, i) =>
+            {
+                IRentalMaintenanceService maintenance = c.Get<IRentalMaintenanceService>();
+                string unit = i.Optional("Unit") ?? string.Empty;
+                switch (i.Text("Step"))
+                {
+                    case "Report repair":
+                        return $"Repair {Check(await maintenance.ReportRepairAsync(c.CompanyId, unit, i.Date("Date"), i.Optional("Description") ?? string.Empty).ConfigureAwait(true))} reported.";
+                    case "Complete repair":
+                        string? recharge = Check(await maintenance.CompleteRepairAsync(new RepairCompletion
+                        {
+                            CompanyId = c.CompanyId, RepairNumber = i.Optional("Repair") ?? string.Empty, Date = i.Date("Date"), Cost = i.Number("Cost"), ExpenseAccountCode = i.Optional("Expense") ?? string.Empty,
+                            PaidFromAccountCode = i.Optional("PaidFrom") ?? string.Empty, TenantCaused = i.Flag("TenantCaused"), RechargeAccountCode = i.Optional("Recharge"),
+                        }).ConfigureAwait(true));
+                        return recharge is null ? "Repair completed." : $"Repair completed; recharged to the tenant ({recharge}).";
+                    case "Inspection":
+                        return Check(await maintenance.RecordInspectionAsync(c.CompanyId, unit, i.Date("Date"), i.Optional("Inspector") ?? string.Empty, i.Whole("Grade"), i.Optional("Description") ?? string.Empty,
+                            i.Flag("FollowUp")).ConfigureAwait(true), id => $"Inspection {id} recorded.");
+                    case "Close follow-up":
+                        return Check(await maintenance.CloseFollowUpAsync(c.CompanyId, (long)(i.OptionalNumber("Inspection") ?? 0m), i.Date("Date")).ConfigureAwait(true), "Follow-up closed.");
+                    default:
+                        UnitMaintenanceHistory history = Check(await maintenance.HistoryAsync(c.CompanyId, unit).ConfigureAwait(true));
+                        return $"{history.UnitCode}: {history.RepairsOpen} repair(s) open, repairs cost {M(history.RepairCost)}, recharged {M(history.Recharged)}, "
+                            + $"latest condition {(history.LatestConditionGrade is int grade ? grade.ToString(CultureInfo.InvariantCulture) : "-")}, {history.FollowUpsOpen} follow-up(s) open.";
+                }
+            },
+            List = async c => Table(await c.Db.Set<RentalUnit>().AsNoTracking().Where(u => u.CompanyId == c.CompanyId).OrderBy(u => u.Code).Take(500).ToListAsync().ConfigureAwait(true),
+                ("Unit", u => u.Code), ("Description", u => u.Description), ("Type", u => u.UnitType), ("Rooms", u => u.Rooms), ("Rent", u => M(u.MonthlyRent)),
+                ("Vacant since", u => u.VacantSince is DateOnly v ? D(v) : "let"), ("Most people", u => u.MaxOccupants)),
+        };
     }
 
     private static async Task<System.Data.DataTable> ApplicantsAsync(OperationContext c)
