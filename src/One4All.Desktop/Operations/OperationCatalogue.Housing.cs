@@ -925,6 +925,166 @@ public static partial class OperationCatalogue
             List = async c => Table(await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.StandNumber).Take(1000).ToListAsync().ConfigureAwait(true),
                 ("Stand", s => s.StandNumber), ("Status", s => s.Status), ("Holder", s => s.CurrentHolderCustomerId)),
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Developer agreements", ListTitle = "Developer agreements",
+            Description = "A developer services a scheme for a share of its stands: create the agreement (council and developer quotas, delivery deadline, penalty per stand a month "
+                + "late), add and complete milestones, assign stands to a quota (\"S1,S2\"), hand stands over, reconcile delivery against the quotas, and charge accrued penalties.",
+            Fields = [Pick("Step", "Step", ["Create", "Add milestone", "Complete milestone", "Assign stands", "Hand over", "Reconcile", "Charge penalties"]), Opt("Agreement", "Agreement number"),
+                Opt("Scheme", "Scheme code (create)"), Opt("Developer", "Developer customer code (create)"), Num("CouncilQuota", "Council stands", "0"), Num("DeveloperQuota", "Developer stands", "0"),
+                Today("Deadline", "Delivery deadline / milestone due"), Num("Penalty", "Penalty per stand per month late", "0"), Opt("Milestone", "Milestone description"),
+                Pick("Quota", "Quota (assign)", Enum.GetNames<StandQuota>()), Opt("Stands", "Stand number(s), comma-separated"), Opt("Income", "Penalty income account"), Today()],
+            Run = async (c, i) =>
+            {
+                IDeveloperAgreementService developers = c.Get<IDeveloperAgreementService>();
+                string agreement = i.Optional("Agreement") ?? string.Empty;
+                DateOnly date = i.Date("Date");
+                async Task<List<long>> StandIds()
+                {
+                    List<long> ids = [];
+                    foreach (string number in (i.Optional("Stands") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        ids.Add(await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == number.ToUpper(), x => x.Id, "stand", number).ConfigureAwait(true));
+                    }
+
+                    return ids;
+                }
+
+                switch (i.Text("Step"))
+                {
+                    case "Create":
+                        long scheme = await FindAsync(c.Db.HousingSchemes, x => x.CompanyId == c.CompanyId && x.Code == (i.Optional("Scheme") ?? string.Empty).ToUpper(), x => x.Id, "scheme",
+                            i.Optional("Scheme") ?? string.Empty).ConfigureAwait(true);
+                        return $"Agreement {Check(await developers.CreateAsync(new DeveloperAgreementTerms
+                        {
+                            CompanyId = c.CompanyId, SchemeId = scheme, DeveloperCustomerId = await CustomerAsync(c, i.Optional("Developer") ?? string.Empty).ConfigureAwait(true),
+                            CouncilQuota = i.Whole("CouncilQuota"), DeveloperQuota = i.Whole("DeveloperQuota"), SignedOn = date, DeliveryDeadline = i.Date("Deadline"),
+                            PenaltyPerStandPerMonth = i.Number("Penalty"),
+                        }).ConfigureAwait(true))} created.";
+                    case "Add milestone":
+                        return Check(await developers.AddMilestoneAsync(c.CompanyId, agreement, i.Optional("Milestone") ?? string.Empty, i.Date("Deadline")).ConfigureAwait(true), "Milestone added.");
+                    case "Complete milestone":
+                        return Check(await developers.CompleteMilestoneAsync(c.CompanyId, agreement, i.Optional("Milestone") ?? string.Empty, date).ConfigureAwait(true), "Milestone completed.");
+                    case "Assign stands":
+                        return $"{Check(await developers.AssignStandsAsync(c.CompanyId, agreement, Enum.Parse<StandQuota>(i.Text("Quota")), await StandIds().ConfigureAwait(true), date).ConfigureAwait(true))} stand(s) assigned.";
+                    case "Hand over":
+                        return Check(await developers.HandOverAsync(c.CompanyId, agreement, (await StandIds().ConfigureAwait(true)).FirstOrDefault(), date).ConfigureAwait(true), "Handed over.");
+                    case "Reconcile":
+                        DeveloperReconciliation rec = Check(await developers.ReconcileAsync(c.CompanyId, agreement, date).ConfigureAwait(true));
+                        return string.Join(Environment.NewLine, rec.Quotas.Select(q => $"{q.Quota,-10} contracted {q.Contracted}, assigned {q.Assigned}, handed over {q.HandedOver}, outstanding {q.Outstanding}"))
+                            + Environment.NewLine + $"Overdue milestones: {(rec.OverdueMilestones.Count == 0 ? "none" : string.Join(", ", rec.OverdueMilestones))}. "
+                            + $"Penalty accrued {M(rec.PenaltyAccrued)}, charged {M(rec.PenaltiesCharged)}.";
+                    default:
+                        return $"{M(Check(await developers.ChargePenaltiesAsync(c.CompanyId, agreement, date, i.Optional("Income") ?? string.Empty).ConfigureAwait(true)))} penalties charged.";
+                }
+            },
+            List = async c => Table(await c.Db.Set<DeveloperAgreement>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.Id).Take(200).ToListAsync().ConfigureAwait(true),
+                ("Agreement", x => x.AgreementNumber), ("Scheme", x => x.SchemeId), ("Developer", x => x.DeveloperCustomerId), ("Council stands", x => x.CouncilQuota), ("Developer stands", x => x.DeveloperQuota),
+                ("Deadline", x => D(x.DeliveryDeadline))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Housing expected credit loss",
+            Description = "Assesses the IFRS 9 expected credit loss on housing debtors (instalment buyers and tenants) by arrears band with the default matrices, showing the allowance "
+                + "needed against what is booked; Post books the difference.",
+            Fields = [Pick("Step", "Step", ["Assess", "Post"]), Today("Date", "As at"), Opt("Allowance", "Loss allowance account"), Opt("Expense", "Impairment expense account")],
+            Run = async (c, i) =>
+            {
+                IHousingEclService ecl = c.Get<IHousingEclService>();
+                HousingEclRequest request = new()
+                {
+                    CompanyId = c.CompanyId, AsAtDate = i.Date("Date"), AllowanceAccountCode = i.Optional("Allowance") ?? string.Empty, ExpenseAccountCode = i.Optional("Expense") ?? string.Empty,
+                };
+                HousingEclReport report = Check(await (i.Text("Step") == "Post" ? ecl.PostAsync(request) : ecl.AssessAsync(request)).ConfigureAwait(true));
+                return string.Join(Environment.NewLine, report.Portfolios.SelectMany(p => p.Bands.Select(b => $"{p.Portfolio,-12} {b.Band,-12} exposure {M(b.Exposure),14}  provision {M(b.Provision),12}")))
+                    + Environment.NewLine + $"Needed {M(report.TargetAllowance)}, booked {M(report.BookedAllowance)}, adjustment {M(report.Adjustment)}{(report.JournalNumber is null ? string.Empty : $" (posted {report.JournalNumber})")}.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Informal settlements", ListTitle = "Settlements",
+            Description = "Registers a settlement (with its enumeration cut-off date), approves its upgrading plan, runs an enumeration of its households (eligibility checked on each), "
+                + "closes it, then turns an eligible household into a waiting-list registration or regularises it on a stand; Summary shows where the settlement stands.",
+            Fields = [Pick("Step", "Step", ["Register", "Approve plan", "Start enumeration", "Enumerate household", "Close enumeration", "To waiting list", "Regularise", "Summary"]),
+                Opt("Settlement", "Settlement code"), Opt("Name", "Name / plan / enumeration reference"), Opt("Ward", "Ward (register)"), Today("CutOff", "Cut-off date (register)"),
+                Opt("Household", "Household number"), Opt("IdNumber", "Head's national ID"), Opt("Head", "Head's name"), Opt("Born", "Head's date of birth (yyyy-MM-dd)"), Num("Size", "Household size", "1"),
+                Num("Income", "Monthly income", "0"), Opt("Since", "Occupied since (yyyy-MM-dd)"), Pick("Structure", "Structure", Enum.GetNames<StructureType>()), Opt("StructureRef", "Structure reference"),
+                Pick("Category", "Waiting-list category", Enum.GetNames<HousingCategory>()), Opt("Stand", "Stand number (regularise)"), Today()],
+            Run = async (c, i) =>
+            {
+                IInformalSettlementService settlements = c.Get<IInformalSettlementService>();
+                string code = i.Optional("Settlement") ?? string.Empty;
+                DateOnly date = i.Date("Date");
+                switch (i.Text("Step"))
+                {
+                    case "Register":
+                        return Check(await settlements.RegisterAsync(new SettlementRegistration
+                        {
+                            CompanyId = c.CompanyId, Code = code, Name = i.Optional("Name") ?? code, Ward = i.Optional("Ward") ?? string.Empty, CutOffDate = i.Date("CutOff"),
+                        }).ConfigureAwait(true), _ => "Settlement registered.");
+                    case "Approve plan":
+                        return Check(await settlements.ApprovePlanAsync(c.CompanyId, code, i.Optional("Name") ?? string.Empty, date).ConfigureAwait(true), "Upgrading plan approved.");
+                    case "Start enumeration":
+                        return Check(await settlements.StartEnumerationAsync(c.CompanyId, code, i.Optional("Name") ?? string.Empty, date).ConfigureAwait(true), _ => "Enumeration started.");
+                    case "Enumerate household":
+                        EnumerationResult household = Check(await settlements.EnumerateAsync(new HouseholdSurvey
+                        {
+                            CompanyId = c.CompanyId, SettlementCode = code, HeadIdNumber = i.Optional("IdNumber") ?? string.Empty, HeadName = i.Optional("Head") ?? string.Empty,
+                            HeadDateOfBirth = Day(i.Optional("Born") ?? string.Empty), HouseholdSize = i.Whole("Size"), MonthlyIncome = i.Number("Income"), OccupiedSince = Day(i.Optional("Since") ?? string.Empty),
+                            StructureType = Enum.Parse<StructureType>(i.Text("Structure")), StructureReference = i.Optional("StructureRef") ?? string.Empty, Date = date,
+                        }).ConfigureAwait(true));
+                        return household.IsEligible ? $"Household {household.HouseholdNumber} enumerated (eligible)." : $"Household {household.HouseholdNumber} enumerated — not eligible: {household.IneligibleReason}.";
+                    case "Close enumeration":
+                        return $"Enumeration closed with {Check(await settlements.CloseEnumerationAsync(c.CompanyId, code, date).ConfigureAwait(true))} household(s).";
+                    case "To waiting list":
+                        return $"Registered on the waiting list as {Check(await settlements.ConvertToWaitingListAsync(c.CompanyId, i.Optional("Household") ?? string.Empty, Enum.Parse<HousingCategory>(i.Text("Category")), date).ConfigureAwait(true))}.";
+                    case "Regularise":
+                        long stand = await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == (i.Optional("Stand") ?? string.Empty).ToUpper(), x => x.Id, "stand",
+                            i.Optional("Stand") ?? string.Empty).ConfigureAwait(true);
+                        return Check(await settlements.RegulariseAsync(c.CompanyId, i.Optional("Household") ?? string.Empty, stand, date).ConfigureAwait(true), "Regularised on the stand.");
+                    default:
+                        SettlementSummary summary = Check(await settlements.SummaryAsync(c.CompanyId, code).ConfigureAwait(true));
+                        return $"{summary.Code} {summary.Name}: plan {(summary.PlanApprovedOn is DateOnly approved ? $"approved {D(approved)}" : "not approved")}; {summary.Enumerated} enumerated, "
+                            + $"{summary.Eligible} eligible, {summary.WaitingListed} waiting-listed, {summary.Regularised} regularised, {summary.Outstanding} outstanding.";
+                }
+            },
+            List = async c => Table(await c.Db.Set<InformalSettlement>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", x => x.Code), ("Name", x => x.Name), ("Ward", x => x.Ward)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Stand leases", ListTitle = "Stand leases",
+            Description = "Leases a stand (commercial, industrial, agricultural…) for a term at an annual rent reviewed and escalated every so many years; Schedule shows the rent "
+                + "for each year; the monthly run bills the leases and recognises the income straight-line.",
+            Fields = [Pick("Step", "Step", ["Create", "Schedule", "Run month"]), Opt("Lease", "Lease number (schedule)"), Opt("Stand", "Stand number (create)"), Opt("Lessee", "Lessee customer code"),
+                Pick("Use", "Use", Enum.GetNames<LeaseUse>()), Num("Years", "Term (years)", "10"), Num("Rent", "Annual rent", "0"), Num("Review", "Review every (years)", "1"), Num("Escalation", "Escalation %", "0"),
+                Opt("Income", "Lease income account"), Opt("Accrued", "Accrued income account"), Today()],
+            Run = async (c, i) =>
+            {
+                IStandLeaseService leases = c.Get<IStandLeaseService>();
+                switch (i.Text("Step"))
+                {
+                    case "Create":
+                        long stand = await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == (i.Optional("Stand") ?? string.Empty).ToUpper(), x => x.Id, "stand",
+                            i.Optional("Stand") ?? string.Empty).ConfigureAwait(true);
+                        return $"Lease {Check(await leases.CreateAsync(new StandLeaseRequest
+                        {
+                            CompanyId = c.CompanyId, StandId = stand, LesseeCustomerId = await CustomerAsync(c, i.Optional("Lessee") ?? string.Empty).ConfigureAwait(true), Use = Enum.Parse<LeaseUse>(i.Text("Use")),
+                            StartDate = i.Date("Date"), TermYears = i.Whole("Years"), AnnualRent = i.Number("Rent"), ReviewEveryYears = i.Whole("Review"), EscalationPercent = i.Number("Escalation"),
+                            IncomeAccountCode = i.Optional("Income") ?? string.Empty, AccruedIncomeAccountCode = i.Optional("Accrued") ?? string.Empty,
+                        }).ConfigureAwait(true))} created.";
+                    case "Schedule":
+                        IReadOnlyList<LeaseYear> years = Check(await leases.ScheduleAsync(c.CompanyId, i.Optional("Lease") ?? string.Empty).ConfigureAwait(true));
+                        return string.Join(Environment.NewLine, years.Select(y => $"Year {y.Year,3}: {M(y.AnnualRent)}"));
+                    default:
+                        LeaseRunResult run = Check(await leases.RunMonthAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true));
+                        return $"{run.LeasesBilled} lease(s) billed {M(run.RentBilled)}; income recognised {M(run.IncomeRecognised)}.";
+                }
+            },
+            List = async c => Table(await c.Db.Set<StandLease>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.Id).Take(300).ToListAsync().ConfigureAwait(true),
+                ("Lease", x => x.LeaseNumber), ("Stand", x => x.StandId), ("Lessee", x => x.LesseeCustomerId), ("Use", x => x.Use), ("From", x => D(x.StartDate)), ("Years", x => x.TermYears),
+                ("Rent", x => M(x.AnnualRent))),
+        };
     }
 
     private static async Task<System.Data.DataTable> ApplicantsAsync(OperationContext c)
