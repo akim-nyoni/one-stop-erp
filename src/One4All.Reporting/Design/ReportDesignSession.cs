@@ -425,6 +425,29 @@ public sealed class ReportDesignSession
         band.Elements.ForEach(e => Contain(e, band));
     }
 
+    /// <summary>Sets how a band flows across pages (brief §13.1): suppress-when, repeat on a new page, keep-together and page breaks.</summary>
+    /// <param name="type">The band type.</param>
+    /// <param name="groupLevel">The group level (group headers and footers).</param>
+    /// <param name="suppressWhen">The expression that hides the band (blank: never).</param>
+    /// <param name="repeatOnNewPage">Repeat a group header on each page its group continues on.</param>
+    /// <param name="keepTogether">Keep a group header with the band after it.</param>
+    /// <param name="pageBreakBefore">Start a new page before the band.</param>
+    /// <param name="pageBreakAfter">Start a new page after the band.</param>
+    /// <returns>Whether the band exists.</returns>
+    public bool SetBandOptions(BandType type, int groupLevel, string? suppressWhen, bool repeatOnNewPage, bool keepTogether, bool pageBreakBefore, bool pageBreakAfter)
+    {
+        ReportBand? band = Definition.Bands.FirstOrDefault(b => b.Type == type && (type is not (BandType.GroupHeader or BandType.GroupFooter) || b.GroupLevel == groupLevel));
+        if (band is null)
+        {
+            return false;
+        }
+
+        Checkpoint();
+        band.SuppressWhen = string.IsNullOrWhiteSpace(suppressWhen) ? null : suppressWhen.Trim();
+        (band.RepeatOnNewPage, band.KeepTogether, band.PageBreakBefore, band.PageBreakAfter) = (repeatOnNewPage, keepTogether, pageBreakBefore, pageBreakAfter);
+        return true;
+    }
+
     /// <summary>Applies a theme: the font everywhere, sizes by band, and the page header's colours.</summary>
     /// <param name="theme">The theme.</param>
     public void ApplyTheme(ReportTheme theme)

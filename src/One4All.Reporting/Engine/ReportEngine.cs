@@ -40,7 +40,7 @@ public sealed class ReportEngine
             {
                 foreach (IReadOnlyDictionary<string, object?> row in input.Rows)
                 {
-                    model.Body.Add(ResolveBand(detail, input, row, input.Rows));
+                    AddBand(model, detail, input, row, input.Rows);
                 }
             }
 
@@ -65,11 +65,30 @@ public sealed class ReportEngine
 
     private void BuildGrouped(ReportDefinition def, ReportInput input, ReportBand? detail, RenderModel model)
     {
-        // Compute a key per level for each row, then order by the concatenated keys.
-        List<(IReadOnlyDictionary<string, object?> Row, string[] Keys)> keyed = input.Rows
-            .Select(row => (Row: row, Keys: def.Groups.Select(g => ValueToString(Evaluate(g.Expression, input, row))).ToArray()))
-            .OrderBy(x => string.Join('', x.Keys), StringComparer.Ordinal)
+        // A key per level for each row; rows are ordered level by level on the keys' values (numbers and dates as such, text ignoring
+        // case), each level ascending or descending, keeping the data's order within a group.
+        List<(IReadOnlyDictionary<string, object?> Row, string[] Keys, object?[] Values)> evaluated = input.Rows
+            .Select(row =>
+            {
+                object?[] values = [.. def.Groups.Select(g => Evaluate(g.Expression, input, row))];
+                return (Row: row, Keys: values.Select(ValueToString).ToArray(), Values: values);
+            })
             .ToList();
+        IOrderedEnumerable<(IReadOnlyDictionary<string, object?> Row, string[] Keys, object?[] Values)>? ordered = null;
+        for (int level = 0; level < def.Groups.Count; level++)
+        {
+            int at = level;
+            Func<(IReadOnlyDictionary<string, object?> Row, string[] Keys, object?[] Values), object?> key = x => x.Values[at];
+            ordered = (ordered, def.Groups[at].Descending) switch
+            {
+                (null, false) => evaluated.OrderBy(key, GroupKeyComparer.Instance),
+                (null, true) => evaluated.OrderByDescending(key, GroupKeyComparer.Instance),
+                (_, false) => ordered.ThenBy(key, GroupKeyComparer.Instance),
+                _ => ordered.ThenByDescending(key, GroupKeyComparer.Instance),
+            };
+        }
+
+        List<(IReadOnlyDictionary<string, object?> Row, string[] Keys)> keyed = [.. (ordered ?? evaluated.OrderBy(_ => 0)).Select(x => (x.Row, x.Keys))];
 
         List<ReportBand> groupHeaders = def.Bands.Where(b => b.Type == BandType.GroupHeader).OrderBy(b => b.GroupLevel).ToList();
         List<ReportBand> groupFooters = def.Bands.Where(b => b.Type == BandType.GroupFooter).OrderByDescending(b => b.GroupLevel).ToList();
@@ -86,19 +105,19 @@ public sealed class ReportEngine
                 foreach (ReportBand footer in groupFooters.Where(f => f.GroupLevel >= changedFrom))
                 {
                     IReadOnlyList<IReadOnlyDictionary<string, object?>> scope = ScopeFor(keyed, current, footer.GroupLevel);
-                    model.Body.Add(ResolveBand(footer, input, row, scope));
+                    AddBand(model, footer, input, keyed[i - 1].Row, scope);
                 }
             }
 
-            // Open headers for levels that changed (outermost first).
+            // Open headers for levels that changed (outermost first); a header's aggregates cover its own group.
             foreach (ReportBand header in groupHeaders.Where(h => h.GroupLevel >= changedFrom))
             {
-                model.Body.Add(ResolveBand(header, input, row, input.Rows));
+                AddBand(model, header, input, row, ScopeFor(keyed, keys, header.GroupLevel));
             }
 
             if (detail is not null)
             {
-                model.Body.Add(ResolveBand(detail, input, row, input.Rows));
+                AddBand(model, detail, input, row, input.Rows);
             }
 
             current = keys;
@@ -110,7 +129,7 @@ public sealed class ReportEngine
             foreach (ReportBand footer in groupFooters)
             {
                 IReadOnlyList<IReadOnlyDictionary<string, object?>> scope = ScopeFor(keyed, current, footer.GroupLevel);
-                model.Body.Add(ResolveBand(footer, input, keyed[^1].Row, scope));
+                AddBand(model, footer, input, keyed[^1].Row, scope);
             }
         }
     }
@@ -146,11 +165,27 @@ public sealed class ReportEngine
     }
 
     private RenderBand? ResolveOptional(ReportBand? band, ReportInput input, IReadOnlyDictionary<string, object?>? row, IReadOnlyList<IReadOnlyDictionary<string, object?>> scope) =>
-        band is null ? null : ResolveBand(band, input, row, scope);
+        band is null || Suppressed(band, input, row) ? null : ResolveBand(band, input, row, scope);
+
+    // A body band unless its suppress-when expression holds for the row.
+    private void AddBand(RenderModel model, ReportBand band, ReportInput input, IReadOnlyDictionary<string, object?>? row, IReadOnlyList<IReadOnlyDictionary<string, object?>> scope)
+    {
+        if (!Suppressed(band, input, row))
+        {
+            model.Body.Add(ResolveBand(band, input, row, scope));
+        }
+    }
+
+    private bool Suppressed(ReportBand band, ReportInput input, IReadOnlyDictionary<string, object?>? row)
+        => !string.IsNullOrWhiteSpace(band.SuppressWhen) && _expressions.EvaluateBool(band.SuppressWhen, Context(input, row));
 
     private RenderBand ResolveBand(ReportBand band, ReportInput input, IReadOnlyDictionary<string, object?>? row, IReadOnlyList<IReadOnlyDictionary<string, object?>> scope)
     {
-        RenderBand rendered = new() { Type = band.Type, Height = band.Height };
+        RenderBand rendered = new()
+        {
+            Type = band.Type, Height = band.Height, GroupLevel = band.GroupLevel, RepeatOnNewPage = band.RepeatOnNewPage, KeepTogether = band.KeepTogether,
+            PageBreakBefore = band.PageBreakBefore, PageBreakAfter = band.PageBreakAfter,
+        };
         ReportExpressionContext ctx = Context(input, row);
 
         foreach (ReportElement element in band.Elements)
@@ -313,6 +348,11 @@ public sealed class ReportEngine
         IReadOnlyList<IReadOnlyDictionary<string, object?>> all)
     {
         string field = element.AggregateField ?? string.Empty;
+        if (element.AggregateScope == AggregateScope.GrandTotal)
+        {
+            scope = all;
+        }
+
         List<decimal> values = [.. scope
             .Select(r => r.GetValueOrDefault(field))
             .Where(v => v is not null)
@@ -334,6 +374,8 @@ public sealed class ReportEngine
             AggregateFunction.DistinctCount => scope.Select(r => r.GetValueOrDefault(field)?.ToString()).Distinct().Count(),
             AggregateFunction.Min => values.Any() ? values.Min() : 0m,
             AggregateFunction.Max => values.Any() ? values.Max() : 0m,
+            AggregateFunction.First => values.Count > 0 ? values[0] : 0m,
+            AggregateFunction.Last => values.Count > 0 ? values[^1] : 0m,
             _ => values.Sum(),
         };
     }
@@ -389,4 +431,49 @@ public sealed class ReportEngine
     };
 
     private static string ValueToString(object? value) => value?.ToString() ?? string.Empty;
+
+    // Orders group keys by value: numbers numerically, dates by date, everything else as text ignoring case; nulls first.
+    private sealed class GroupKeyComparer : IComparer<object?>
+    {
+        public static readonly GroupKeyComparer Instance = new();
+
+        public int Compare(object? x, object? y)
+        {
+            if (x is null || y is null)
+            {
+                return x is null ? (y is null ? 0 : -1) : 1;
+            }
+
+            if (Number(x) is decimal a && Number(y) is decimal b)
+            {
+                return a.CompareTo(b);
+            }
+
+            if (Moment(x) is DateTime p && Moment(y) is DateTime q)
+            {
+                return p.CompareTo(q);
+            }
+
+            return StringComparer.OrdinalIgnoreCase.Compare(ValueToString(x), ValueToString(y));
+        }
+
+        private static decimal? Number(object value) => value switch
+        {
+            decimal d => d,
+            int i => i,
+            long l => l,
+            short s => s,
+            double db => (decimal)db,
+            float f => (decimal)f,
+            _ => null,
+        };
+
+        private static DateTime? Moment(object value) => value switch
+        {
+            DateTime d => d,
+            DateOnly d => d.ToDateTime(TimeOnly.MinValue),
+            DateTimeOffset d => d.UtcDateTime,
+            _ => null,
+        };
+    }
 }

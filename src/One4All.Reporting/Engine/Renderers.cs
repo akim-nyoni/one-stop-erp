@@ -139,6 +139,7 @@ public sealed class HtmlReportRenderer : IReportRenderer
     {
         PaperSize.A4 => page.Orientation == ReportOrientation.Landscape ? 842 : 595,
         PaperSize.Letter => page.Orientation == ReportOrientation.Landscape ? 792 : 612,
+        PaperSize.Legal => page.Orientation == ReportOrientation.Landscape ? 1008 : 612,
         PaperSize.A5 => 420,
         PaperSize.Receipt58 => 164,
         PaperSize.Receipt80 => 227,

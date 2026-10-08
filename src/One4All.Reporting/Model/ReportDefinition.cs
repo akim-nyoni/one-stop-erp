@@ -113,6 +113,15 @@ public sealed class ReportBand
     /// <summary>Whether the band repeats on each new page (group headers).</summary>
     public bool RepeatOnNewPage { get; set; }
 
+    /// <summary>Gets or sets a value indicating whether a group header stays on the page with the band after it (never left alone at a page's foot).</summary>
+    public bool KeepTogether { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether a new page starts before the band.</summary>
+    public bool PageBreakBefore { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether a new page starts after the band.</summary>
+    public bool PageBreakAfter { get; set; }
+
     /// <summary>An expression that, when true, suppresses the whole band.</summary>
     public string? SuppressWhen { get; set; }
 

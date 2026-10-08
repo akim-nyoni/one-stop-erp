@@ -16,10 +16,10 @@ public sealed class ReportExpressionContext
     public IReadOnlyDictionary<string, object?> Parameters { get; init; } = new Dictionary<string, object?>();
 
     /// <summary>The current page number.</summary>
-    public int PageNumber { get; init; } = 1;
+    public int? PageNumber { get; init; }
 
     /// <summary>The total number of pages (when known during a second pass).</summary>
-    public int TotalPages { get; init; } = 1;
+    public int? TotalPages { get; init; }
 
     /// <summary>The print timestamp.</summary>
     public DateTime PrintDate { get; init; } = DateTime.Now;
@@ -65,8 +65,9 @@ public sealed class ReportExpressionEngine
 
         List<Parameter> parameters =
         [
-            new Parameter("PageNumber", context.PageNumber),
-            new Parameter("TotalPages", context.TotalPages),
+            // Before layout the page is not known: the variables stand as "[Page]" / "[Pages]", which pagination fills in.
+            context.PageNumber is int page ? new Parameter("PageNumber", page) : new Parameter("PageNumber", "[Page]"),
+            context.TotalPages is int pages ? new Parameter("TotalPages", pages) : new Parameter("TotalPages", "[Pages]"),
             new Parameter("PrintDate", context.PrintDate),
             new Parameter("UserName", context.UserName),
             new Parameter("CompanyName", context.CompanyName),
@@ -127,16 +128,37 @@ public sealed class ReportExpressionEngine
         _interpreter.SetFunction("Day", (Func<DateTime, int>)(d => d.Day));
         _interpreter.SetFunction("EndOfMonth", (Func<DateTime, DateTime>)(d => new DateTime(d.Year, d.Month, DateTime.DaysInMonth(d.Year, d.Month))));
         _interpreter.SetFunction("DateDiff", (Func<DateTime, DateTime, int>)((a, b) => (int)(b.Date - a.Date).TotalDays));
+        _interpreter.SetFunction("DateDiffIn", (Func<string, DateTime, DateTime, int>)DateDiffIn);
+        _interpreter.SetFunction("FiscalPeriod", (Func<DateTime, int, int>)((d, firstMonth) => ((d.Month - Math.Clamp(firstMonth, 1, 12) + 12) % 12) + 1));
+        _interpreter.SetFunction("FiscalYear", (Func<DateTime, int, int>)((d, firstMonth) => firstMonth <= 1 || d.Month < firstMonth ? d.Year : d.Year + 1));
 
         // Logical
         _interpreter.SetFunction("If", (Func<bool, object, object, object>)((c, a, b) => c ? a : b));
         _interpreter.SetFunction("IsNull", (Func<object?, object, object>)((v, fallback) => v ?? fallback));
         _interpreter.SetFunction("Coalesce", (Func<object?, object?, object?>)((a, b) => a ?? b));
+        _interpreter.SetFunction("Case", (Func<bool, object?, object?, object?>)((c1, r1, otherwise) => c1 ? r1 : otherwise));
+        _interpreter.SetFunction("Case2", (Func<bool, object?, bool, object?, object?, object?>)((c1, r1, c2, r2, otherwise) => c1 ? r1 : c2 ? r2 : otherwise));
+        _interpreter.SetFunction("Case3", (Func<bool, object?, bool, object?, bool, object?, object?, object?>)((c1, r1, c2, r2, c3, r3, otherwise) =>
+            c1 ? r1 : c2 ? r2 : c3 ? r3 : otherwise));
 
         // Formatting / words
         _interpreter.SetFunction("Format", (Func<object?, string, string>)((v, f) => NumberToWords.Format(v, f)));
         _interpreter.SetFunction("NumberToWords", (Func<decimal, string>)(v => NumberToWords.Convert((long)v)));
         _interpreter.SetFunction("AmountToWords", (Func<decimal, string, string, string>)((v, major, minor) => NumberToWords.Amount(v, major, minor)));
+    }
+
+    // Whole units from a to b: "d" days, "w" weeks, "m" months, "q" quarters, "y" years (completed units, like an age).
+    private static int DateDiffIn(string unit, DateTime a, DateTime b)
+    {
+        int months = ((b.Year - a.Year) * 12) + b.Month - a.Month - (b.Day < a.Day ? 1 : 0);
+        return (unit ?? "d").Trim().ToLowerInvariant() switch
+        {
+            "w" or "week" or "weeks" => (int)((b.Date - a.Date).TotalDays / 7),
+            "m" or "month" or "months" => months,
+            "q" or "quarter" or "quarters" => months / 3,
+            "y" or "year" or "years" => months / 12,
+            _ => (int)(b.Date - a.Date).TotalDays,
+        };
     }
 
     private static bool IsIdentifier(string name)

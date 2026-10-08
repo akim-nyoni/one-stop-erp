@@ -31,6 +31,7 @@ public static class ReportLayout
         (double w, double h) = page.PaperSize switch
         {
             Model.PaperSize.Letter => (612d, 792d),
+            Model.PaperSize.Legal => (612d, 1008d),
             Model.PaperSize.A5 => (420d, 595d),
             Model.PaperSize.Receipt58 => (164d, Math.Max(200d, contentHeight + page.MarginTop + page.MarginBottom)),
             Model.PaperSize.Receipt80 => (227d, Math.Max(200d, contentHeight + page.MarginTop + page.MarginBottom)),
@@ -53,16 +54,64 @@ public static class ReportLayout
 
         List<List<RenderBand>> pages = [[]];
         double used = 0;
-        foreach (RenderBand band in flow)
+        SortedDictionary<int, RenderBand> openHeaders = [];
+        void NewPage(bool repeatHeadersBelow, int belowLevel)
         {
-            if (used > 0 && used + band.Height > available)
+            pages.Add([]);
+            used = 0;
+            if (!repeatHeadersBelow)
             {
-                pages.Add([]);
-                used = 0;
+                return;
+            }
+
+            // The group carries on: its headers marked to repeat open the new page again.
+            foreach (RenderBand repeated in openHeaders.Where(h => h.Key < belowLevel && h.Value.RepeatOnNewPage).Select(h => h.Value))
+            {
+                pages[^1].Add(repeated);
+                used += repeated.Height;
+            }
+        }
+
+        for (int i = 0; i < flow.Count; i++)
+        {
+            RenderBand band = flow[i];
+            bool isHeader = band.Type == BandType.GroupHeader;
+            int level = isHeader || band.Type == BandType.GroupFooter ? band.GroupLevel : int.MaxValue;
+            if (band.PageBreakBefore && used > 0)
+            {
+                NewPage(repeatHeadersBelow: false, 0);
+            }
+
+            // A kept-together header does not sit alone at a page's foot: it moves over with the band after it.
+            double needed = band.Height + (band.KeepTogether && isHeader && i + 1 < flow.Count ? flow[i + 1].Height : 0);
+            if (used > 0 && used + needed > available)
+            {
+                NewPage(repeatHeadersBelow: true, isHeader ? level : int.MaxValue);
             }
 
             pages[^1].Add(band);
             used += band.Height;
+            if (isHeader)
+            {
+                foreach (int deeper in openHeaders.Keys.Where(k => k >= level).ToList())
+                {
+                    openHeaders.Remove(deeper);
+                }
+
+                openHeaders[level] = band;
+            }
+            else if (band.Type == BandType.GroupFooter)
+            {
+                foreach (int closed in openHeaders.Keys.Where(k => k >= level).ToList())
+                {
+                    openHeaders.Remove(closed);
+                }
+            }
+
+            if (band.PageBreakAfter && i + 1 < flow.Count)
+            {
+                NewPage(repeatHeadersBelow: false, 0);
+            }
         }
 
         List<LayoutPage> laid = [];
@@ -114,7 +163,8 @@ public static class ReportLayout
         => band.Cells.Any(c => c.Text.Contains("[Page", StringComparison.Ordinal))
             ? new RenderBand
             {
-                Type = band.Type, Height = band.Height,
+                Type = band.Type, Height = band.Height, GroupLevel = band.GroupLevel, RepeatOnNewPage = band.RepeatOnNewPage, KeepTogether = band.KeepTogether,
+                PageBreakBefore = band.PageBreakBefore, PageBreakAfter = band.PageBreakAfter,
                 Cells = [.. band.Cells.Select(c => c.Text.Contains("[Page", StringComparison.Ordinal) ? With(c, c.Text.Replace("[Pages]", pages.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
                     .Replace("[Page]", page.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)) : c)],
             }

@@ -50,7 +50,16 @@ public sealed class PdfReportRenderer : IReportRenderer
 
                     foreach (RenderBand band in model.Body)
                     {
+                        if (band.PageBreakBefore)
+                        {
+                            col.Item().PageBreak();
+                        }
+
                         col.Item().Element(e => RenderBand(e, band));
+                        if (band.PageBreakAfter)
+                        {
+                            col.Item().PageBreak();
+                        }
                     }
 
                     if (model.ReportFooter is not null)
@@ -76,6 +85,9 @@ public sealed class PdfReportRenderer : IReportRenderer
                 break;
             case PaperSize.Letter:
                 page.Size(setup.Orientation == ReportOrientation.Landscape ? PageSizes.Letter.Landscape() : PageSizes.Letter);
+                break;
+            case PaperSize.Legal:
+                page.Size(setup.Orientation == ReportOrientation.Landscape ? PageSizes.Legal.Landscape() : PageSizes.Legal);
                 break;
             case PaperSize.A5:
                 page.Size(PageSizes.A5);
@@ -110,6 +122,27 @@ public sealed class PdfReportRenderer : IReportRenderer
                     .Element(inner => RenderCell(inner, cell));
             }
         });
+    }
+
+    private const string PageToken = "[Page]";
+    private const string PagesToken = "[Pages]";
+
+    // A run split around "[Page]" and "[Pages]", so the page number and count are drawn by the page.
+    private static IEnumerable<RichRun> PageTokens(RichRun run)
+    {
+        if (run.LineBreak || !run.Text.Contains("[Page", StringComparison.Ordinal))
+        {
+            yield return run;
+            yield break;
+        }
+
+        foreach (string part in System.Text.RegularExpressions.Regex.Split(run.Text, @"(\[Pages?\])"))
+        {
+            if (part.Length > 0)
+            {
+                yield return run with { Text = part };
+            }
+        }
     }
 
     private static void RenderCell(IContainer container, RenderCell cell)
@@ -153,9 +186,15 @@ public sealed class PdfReportRenderer : IReportRenderer
         aligned.Text(text =>
         {
             IEnumerable<RichRun> runs = cell.Runs is { Count: > 0 } rich ? rich : [new RichRun(cell.Text, cell.Bold, cell.Italic, cell.Underline)];
-            foreach (RichRun run in runs)
+            foreach (RichRun run in runs.SelectMany(PageTokens))
             {
-                TextSpanDescriptor span = text.Span(run.LineBreak ? "\n" : run.Text).FontSize((float)cell.FontSize).FontColor(cell.Foreground);
+                TextSpanDescriptor span = run.Text switch
+                {
+                    PageToken when !run.LineBreak => text.CurrentPageNumber(),
+                    PagesToken when !run.LineBreak => text.TotalPages(),
+                    _ => text.Span(run.LineBreak ? "\n" : run.Text),
+                };
+                span = span.FontSize((float)cell.FontSize).FontColor(cell.Foreground);
                 if (run.Bold || cell.Bold)
                 {
                     span.Bold();

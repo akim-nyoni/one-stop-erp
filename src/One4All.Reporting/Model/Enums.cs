@@ -202,6 +202,12 @@ public enum AggregateFunction
 
     /// <summary>The row's rank by value within the scope, highest first.</summary>
     RankOf = 10,
+
+    /// <summary>The first value in the scope (in report order).</summary>
+    First = 11,
+
+    /// <summary>The last value in the scope (in report order).</summary>
+    Last = 12,
 }
 
 /// <summary>The scope an aggregate resets at.</summary>
@@ -215,4 +221,7 @@ public enum AggregateScope
 
     /// <summary>Current page.</summary>
     Page = 2,
+
+    /// <summary>Always the whole report, wherever the element sits (e.g. a grand total in a group footer); Report and Group follow the band.</summary>
+    GrandTotal = 3,
 }

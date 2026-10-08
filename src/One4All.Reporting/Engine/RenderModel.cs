@@ -115,6 +115,21 @@ public sealed class RenderBand
     /// <summary>The band height in points.</summary>
     public double Height { get; set; }
 
+    /// <summary>Gets or sets the group level (group headers and footers).</summary>
+    public int GroupLevel { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether a group header is repeated at the top of each page its group continues on.</summary>
+    public bool RepeatOnNewPage { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether a group header stays with the band after it.</summary>
+    public bool KeepTogether { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether a new page starts before the band.</summary>
+    public bool PageBreakBefore { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether a new page starts after the band.</summary>
+    public bool PageBreakAfter { get; set; }
+
     /// <summary>The resolved cells.</summary>
     public List<RenderCell> Cells { get; init; } = [];
 }
