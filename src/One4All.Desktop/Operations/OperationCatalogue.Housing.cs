@@ -684,6 +684,105 @@ public static partial class OperationCatalogue
             List = async c => Table(await c.Db.Set<DevelopmentLevy>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
                 ("Code", x => x.Code), ("Name", x => x.Name), ("On", x => x.Trigger), ("Basis", x => x.Basis), ("Rate", x => Q(x.Rate)), ("Income", x => x.IncomeAccountCode), ("Active", x => x.IsActive)),
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Stand deposits and cancellations", ListTitle = "Allocation certificates",
+            Description = "Take a deposit against an allocation (held as a liability), apply it when the sale goes ahead or refund it; cancel an instalment agreement at the buyer's "
+                + "request (requested by you, approved by another user): what was paid less occupation rental, the admin charge and arrears is refunded and the stand repossessed.",
+            Fields = [Pick("Step", "Step", ["Take deposit", "Apply deposit", "Refund deposit", "Cancel agreement"]), Opt("Certificate", "Allocation certificate (deposit)"),
+                Opt("Agreement", "Instalment agreement (cancel)"), Opt("Customer", "Customer code (take)"), Num("Amount", "Amount (take) / NRV (cancel)", "0"), Opt("Reference", "Receipt reference / reason"),
+                Opt("Bank", "Bank account"), Opt("Liability", "Deposit liability account (take)"), Num("Rental", "Monthly occupation rental (cancel)", "0"), Num("Admin", "Admin charge % (cancel)", "0"),
+                Opt("Approver", "Approving user name (cancel)"), Opt("Available", "Stands available account (cancel)"), Opt("GainLoss", "Gain / loss account (cancel)"), Today()],
+            Run = async (c, i) =>
+            {
+                IHousingDepositService deposits = c.Get<IHousingDepositService>();
+                string certificate = i.Optional("Certificate") ?? string.Empty;
+                switch (i.Text("Step"))
+                {
+                    case "Take deposit":
+                        return $"Deposit taken ({Check(await deposits.TakeDepositAsync(new StandDepositReceipt
+                        {
+                            CompanyId = c.CompanyId, CertificateNumber = certificate, CustomerId = await CustomerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true), Amount = i.Number("Amount"),
+                            Date = i.Date("Date"), ReceiptReference = i.Optional("Reference") ?? string.Empty, BankAccountCode = i.Optional("Bank") ?? string.Empty,
+                            LiabilityAccountCode = i.Optional("Liability") ?? string.Empty,
+                        }).ConfigureAwait(true))}).";
+                    case "Apply deposit":
+                        return $"Deposit applied ({Check(await deposits.ApplyDepositAsync(c.CompanyId, certificate, i.Date("Date")).ConfigureAwait(true))}).";
+                    case "Refund deposit":
+                        return $"Deposit refunded ({Check(await deposits.RefundDepositAsync(c.CompanyId, certificate, i.Date("Date"), i.Optional("Bank") ?? string.Empty).ConfigureAwait(true))}).";
+                    default:
+                        AgreementCancellationResult cancelled = Check(await deposits.CancelAgreementAsync(new AgreementCancellationRequest
+                        {
+                            CompanyId = c.CompanyId, AgreementNumber = i.Optional("Agreement") ?? string.Empty, Date = i.Date("Date"), Reason = i.Optional("Reference") ?? string.Empty,
+                            MonthlyOccupationRental = i.Number("Rental"), AdminChargePercent = i.Number("Admin"), NetRealisableValue = i.Number("Amount"), RequestedByUserId = c.UserId,
+                            ApprovedByUserId = await UserAsync(c, i.Optional("Approver") ?? string.Empty).ConfigureAwait(true), StandsAvailableAccountCode = i.Optional("Available") ?? string.Empty,
+                            GainLossAccountCode = i.Optional("GainLoss") ?? string.Empty, BankAccountCode = i.Optional("Bank") ?? string.Empty,
+                        }).ConfigureAwait(true));
+                        return $"Cancelled: paid {M(cancelled.Paid)} − {cancelled.MonthsOccupied} month(s) rental {M(cancelled.OccupationRental)} − admin {M(cancelled.AdminCharge)} − arrears "
+                            + $"{M(cancelled.Arrears)} = refund {M(cancelled.Refund)}; repossession {cancelled.RepossessionReference}.";
+                }
+            },
+            List = async c => Table(await c.Db.HousingStands.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.CurrentHolderCustomerId != null).OrderBy(x => x.StandNumber).Take(500)
+                    .ToListAsync().ConfigureAwait(true),
+                ("Stand", x => x.StandNumber), ("Status", x => x.Status), ("Holder", x => x.CurrentHolderCustomerId), ("Price", x => M(x.SellingPrice))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Housing grants", ListTitle = "Grant disclosure",
+            Description = "Receives a grant (deferred until its conditions are assured), assures the conditions, and records expenditure to date so income is recognised as the money "
+                + "is spent (IPSAS 23); the list is the disclosure of each grant's recognised and deferred amounts.",
+            Fields = [Pick("Step", "Step", ["Receive", "Assure conditions", "Expenditure to date"]), Opt("Grant", "Grant number"), Opt("Grantor", "Grantor (receive)"), Num("Amount", "Amount / expenditure to date", "0"),
+                Num("Budget", "Budgeted expenditure (receive)", "0"), Opt("Conditions", "Conditions (receive)"), Opt("Bank", "Bank account"), Opt("Deferred", "Deferred income account"),
+                Opt("Income", "Grant income account"), Today()],
+            Run = async (c, i) =>
+            {
+                IHousingGrantService grants = c.Get<IHousingGrantService>();
+                string grant = i.Optional("Grant") ?? string.Empty;
+                return i.Text("Step") switch
+                {
+                    "Receive" => $"Grant {Check(await grants.ReceiveAsync(new GrantReceipt
+                    {
+                        CompanyId = c.CompanyId, Grantor = i.Optional("Grantor") ?? string.Empty, Amount = i.Number("Amount"), BudgetedExpenditure = i.Number("Budget"),
+                        Conditions = i.Optional("Conditions") ?? string.Empty, ReceivedOn = i.Date("Date"), BankAccountCode = i.Optional("Bank") ?? string.Empty,
+                        DeferredAccountCode = i.Optional("Deferred") ?? string.Empty, IncomeAccountCode = i.Optional("Income") ?? string.Empty,
+                    }).ConfigureAwait(true))} received.",
+                    "Assure conditions" => $"Conditions assured; {M(Check(await grants.AssureConditionsAsync(c.CompanyId, grant, i.Date("Date")).ConfigureAwait(true)))} recognised.",
+                    _ => $"{M(Check(await grants.RecordExpenditureAsync(c.CompanyId, grant, i.Number("Amount"), i.Date("Date")).ConfigureAwait(true)))} recognised.",
+                };
+            },
+            List = async c => Table(await c.Get<IHousingGrantService>().DisclosureAsync(c.CompanyId).ConfigureAwait(true),
+                ("Grant", g => g.GrantNumber), ("Grantor", g => g.Grantor), ("Amount", g => M(g.Amount)), ("Recognised", g => M(g.Recognised)), ("Deferred", g => M(g.Deferred)),
+                ("Assured", g => g.ConditionsAssured), ("Conditions", g => g.Conditions)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Applicant fees and transfer duty", ListTitle = "Applicants",
+            Description = "Records a fee an applicant pays (registration, renewal…) to income; withholds transfer duty on a transfer application at a rate (held as a liability) and "
+                + "remits it to the authority.",
+            Fields = [Pick("Step", "Step", ["Applicant fee", "Withhold duty", "Remit duty"]), Opt("Applicant", "Waiting-list number (fee)"), Pick("FeeType", "Fee", Enum.GetNames<ApplicantFeeType>()),
+                Opt("Application", "Transfer application (duty)"), Num("Amount", "Amount (fee) / rate % (duty)", "0"), Opt("Reference", "Receipt / remittance reference"), Opt("Bank", "Bank account"),
+                Opt("Account", "Income account (fee) / duty liability account"), Today()],
+            Run = async (c, i) =>
+            {
+                IHousingFeeService fees = c.Get<IHousingFeeService>();
+                return i.Text("Step") switch
+                {
+                    "Applicant fee" => $"Fee recorded ({Check(await fees.RecordApplicantFeeAsync(new ApplicantFeeReceipt
+                    {
+                        CompanyId = c.CompanyId, WaitingListNumber = i.Optional("Applicant") ?? string.Empty, FeeType = Enum.Parse<ApplicantFeeType>(i.Text("FeeType")), Amount = i.Number("Amount"),
+                        Date = i.Date("Date"), ReceiptReference = i.Optional("Reference") ?? string.Empty, BankAccountCode = i.Optional("Bank") ?? string.Empty, IncomeAccountCode = i.Optional("Account") ?? string.Empty,
+                    }).ConfigureAwait(true))}).",
+                    "Withhold duty" => $"{M(Check(await fees.WithholdTransferDutyAsync(new TransferDutyReceipt
+                    {
+                        CompanyId = c.CompanyId, ApplicationNumber = i.Optional("Application") ?? string.Empty, RatePercent = i.Number("Amount"), Date = i.Date("Date"),
+                        ReceiptReference = i.Optional("Reference") ?? string.Empty, BankAccountCode = i.Optional("Bank") ?? string.Empty, LiabilityAccountCode = i.Optional("Account") ?? string.Empty,
+                    }).ConfigureAwait(true)))} transfer duty withheld.",
+                    _ => $"Duty remitted ({Check(await fees.RemitTransferDutyAsync(c.CompanyId, i.Optional("Application") ?? string.Empty, i.Date("Date"), i.Optional("Reference") ?? string.Empty,
+                        i.Optional("Bank") ?? string.Empty).ConfigureAwait(true))}).",
+                };
+            },
+            List = ApplicantsAsync,
+        };
     }
 
     private static async Task<System.Data.DataTable> ApplicantsAsync(OperationContext c)
