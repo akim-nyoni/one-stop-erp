@@ -36,6 +36,14 @@ public sealed class DataScope
     /// <returns>True when some value would be refused.</returns>
     public bool Restricts(ScopeDimension dimension) => !_unrestricted && _assignments.All(a => a.ContainsKey(dimension));
 
+    /// <summary>The keys (codes or ids) allowed on a dimension, or null when it is not restricted.</summary>
+    /// <param name="dimension">The dimension.</param>
+    /// <returns>The allowed keys, trimmed and distinct (ignoring case), or null.</returns>
+    public IReadOnlyList<string>? AllowedValues(ScopeDimension dimension)
+        => Restricts(dimension)
+            ? [.. _assignments.SelectMany(a => a.TryGetValue(dimension, out IReadOnlyList<string>? values) ? values : []).Select(v => v.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)]
+            : null;
+
     /// <summary>Whether a record identified by any of its keys (code, id) is reachable on a dimension.</summary>
     /// <param name="dimension">The dimension.</param>
     /// <param name="keys">The record's code and/or id.</param>

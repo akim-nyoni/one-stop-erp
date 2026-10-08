@@ -22,4 +22,10 @@ public interface IDataScopeService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>True when reachable.</returns>
     Task<bool> AllowsAsync(long userId, ScopeDimension dimension, long id, CancellationToken ct = default);
+
+    /// <summary>The rows a user's scope rules reach, for the database's row filters: allowed codes resolved to ids where rows hold ids.</summary>
+    /// <param name="userId">The user.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The row scope (<see cref="RowScope.None"/> for an unrestricted user).</returns>
+    Task<RowScope> RowScopeAsync(long userId, CancellationToken ct = default);
 }

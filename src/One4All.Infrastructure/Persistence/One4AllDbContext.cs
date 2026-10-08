@@ -56,6 +56,48 @@ public class One4AllDbContext : DbContext
         public void Dispose() => db.CompanyScope = previous;
     }
 
+    /// <summary>Gets the branches rows are limited to (null: any).</summary>
+    public long[]? ScopedBranchIds { get; private set; }
+
+    /// <summary>Gets the warehouses rows are limited to (null: any).</summary>
+    public long[]? ScopedWarehouseIds { get; private set; }
+
+    /// <summary>Gets the tills rows are limited to (null: any).</summary>
+    public long[]? ScopedTillIds { get; private set; }
+
+    /// <summary>Gets the jobs / contracts rows are limited to (null: any).</summary>
+    public long[]? ScopedJobIds { get; private set; }
+
+    /// <summary>Gets the cost centre codes (upper case) rows are limited to (null: any).</summary>
+    public string[]? ScopedCostCentres { get; private set; }
+
+    /// <summary>Gets the department codes (upper case) rows are limited to (null: any).</summary>
+    public string[]? ScopedDepartments { get; private set; }
+
+    /// <summary>Gets the ward / zone codes (upper case) rows are limited to (null: any).</summary>
+    public string[]? ScopedWards { get; private set; }
+
+    /// <summary>
+    /// Limits rows to a user's scope rules (brief §5.1): an entity holding a branch, warehouse, till, job, cost centre, department or ward
+    /// reads only the rows whose value is allowed, or that have none. The API applies it to reads; writes are held to the same rules by the
+    /// request checks.
+    /// </summary>
+    /// <param name="scope">The row scope.</param>
+    public void ApplyRowScope(Application.Security.RowScope scope)
+    {
+        ArgumentNullException.ThrowIfNull(scope);
+        (ScopedBranchIds, ScopedWarehouseIds, ScopedTillIds, ScopedJobIds) = (scope.BranchIds, scope.WarehouseIds, scope.TillIds, scope.JobIds);
+        (ScopedCostCentres, ScopedDepartments, ScopedWards) = (scope.CostCentres, scope.Departments, scope.Wards);
+    }
+
+    // The row-scope filters: a column name, the context's list for it, and the filter's name.
+    private static readonly (string Column, string Scope, string Filter)[] RowScopeColumns =
+    [
+        ("BranchId", nameof(ScopedBranchIds), "Scope.Branch"), ("WarehouseId", nameof(ScopedWarehouseIds), "Scope.Warehouse"), ("TerminalId", nameof(ScopedTillIds), "Scope.Till"),
+        ("JobContractId", nameof(ScopedJobIds), "Scope.Job"), ("CostCentre", nameof(ScopedCostCentres), "Scope.CostCentre"), ("Department", nameof(ScopedDepartments), "Scope.Department"),
+        ("Ward", nameof(ScopedWards), "Scope.Ward"), ("Zone", nameof(ScopedWards), "Scope.Zone"),
+    ];
+
     /// <summary>Companies (sets of books).</summary>
     public DbSet<Company> Companies => Set<Company>();
 
@@ -633,6 +675,59 @@ public class One4AllDbContext : DbContext
                 System.Linq.Expressions.Expression.Equal(
                     System.Linq.Expressions.Expression.Convert(System.Linq.Expressions.Expression.Property(row, nameof(ICompanyScoped.CompanyId)), typeof(long?)), scope));
             modelBuilder.Entity(entityType.ClrType).HasQueryFilter(CompanyFilter, System.Linq.Expressions.Expression.Lambda(body, row));
+        }
+
+        // Scope rules: list == null || column == null (or "") || list.Contains(column) — codes compared in upper case.
+        foreach (Microsoft.EntityFrameworkCore.Metadata.IMutableEntityType entityType in modelBuilder.Model.GetEntityTypes().ToList())
+        {
+            if (entityType.BaseType is not null || entityType.IsOwned())
+            {
+                continue;
+            }
+
+            foreach ((string column, string scopeName, string filter) in RowScopeColumns)
+            {
+                Microsoft.EntityFrameworkCore.Metadata.IMutableProperty? property = entityType.FindProperty(column);
+                Type? type = property?.ClrType;
+                if (property?.PropertyInfo is null || (type != typeof(long) && type != typeof(long?) && type != typeof(string)))
+                {
+                    continue;
+                }
+
+                System.Linq.Expressions.ParameterExpression row = System.Linq.Expressions.Expression.Parameter(entityType.ClrType, "row");
+                System.Linq.Expressions.MemberExpression list = System.Linq.Expressions.Expression.Property(System.Linq.Expressions.Expression.Constant(this), scopeName);
+                System.Linq.Expressions.Expression value = System.Linq.Expressions.Expression.Property(row, property.PropertyInfo);
+                Type element = list.Type.GetElementType()!;
+                System.Linq.Expressions.Expression untagged;
+                System.Linq.Expressions.Expression key;
+                if (type == typeof(string))
+                {
+                    untagged = System.Linq.Expressions.Expression.OrElse(System.Linq.Expressions.Expression.Equal(value, System.Linq.Expressions.Expression.Constant(null, typeof(string))),
+                        System.Linq.Expressions.Expression.Equal(value, System.Linq.Expressions.Expression.Constant(string.Empty)));
+                    key = System.Linq.Expressions.Expression.Call(value, typeof(string).GetMethod(nameof(string.ToUpper), Type.EmptyTypes)!);
+                }
+                else if (type == typeof(long?))
+                {
+                    untagged = System.Linq.Expressions.Expression.Equal(value, System.Linq.Expressions.Expression.Constant(null, typeof(long?)));
+                    key = System.Linq.Expressions.Expression.Property(value, nameof(Nullable<long>.Value));
+                }
+                else
+                {
+                    untagged = System.Linq.Expressions.Expression.Constant(false);
+                    key = value;
+                }
+
+                if (key.Type != element)
+                {
+                    continue; // a column of another kind under the same name
+                }
+
+                System.Linq.Expressions.Expression contains = System.Linq.Expressions.Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), [element], list, key);
+                System.Linq.Expressions.Expression body = System.Linq.Expressions.Expression.OrElse(
+                    System.Linq.Expressions.Expression.Equal(list, System.Linq.Expressions.Expression.Constant(null, list.Type)),
+                    System.Linq.Expressions.Expression.OrElse(untagged, contains));
+                modelBuilder.Entity(entityType.ClrType).HasQueryFilter(filter, System.Linq.Expressions.Expression.Lambda(body, row));
+            }
         }
     }
 

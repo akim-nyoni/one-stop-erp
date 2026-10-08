@@ -41,6 +41,43 @@ public sealed class DataScopeService : IDataScopeService
     }
 
     /// <inheritdoc />
+    public async Task<RowScope> RowScopeAsync(long userId, CancellationToken ct = default)
+    {
+        DataScope scope = await ForUserAsync(userId, ct).ConfigureAwait(false);
+        static (string[] Codes, long[] Ids) Keys(IReadOnlyList<string> values)
+            => ([.. values.Select(v => v.ToUpperInvariant())], [.. values.Select(v => long.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out long id) ? id : 0L).Where(id => id > 0L)]);
+        static string[]? Codes(IReadOnlyList<string>? values) => values is null ? null : [.. values.Select(v => v.ToUpperInvariant())];
+
+        long[]? branches = null, warehouses = null, tills = null, jobs = null;
+        if (scope.AllowedValues(ScopeDimension.Branch) is { } b)
+        {
+            (string[] codes, long[] ids) = Keys(b);
+            branches = [.. await _db.Branches.AsNoTracking().Where(x => codes.Contains(x.Code.ToUpper()) || ids.Contains(x.Id)).Select(x => x.Id).ToListAsync(ct).ConfigureAwait(false)];
+        }
+
+        if (scope.AllowedValues(ScopeDimension.Warehouse) is { } w)
+        {
+            (string[] codes, long[] ids) = Keys(w);
+            warehouses = [.. await _db.Warehouses.AsNoTracking().Where(x => codes.Contains(x.Code.ToUpper()) || ids.Contains(x.Id)).Select(x => x.Id).ToListAsync(ct).ConfigureAwait(false)];
+        }
+
+        if (scope.AllowedValues(ScopeDimension.Till) is { } t)
+        {
+            (string[] codes, long[] ids) = Keys(t);
+            tills = [.. await _db.PosTerminals.AsNoTracking().Where(x => codes.Contains(x.Code.ToUpper()) || ids.Contains(x.Id)).Select(x => x.Id).ToListAsync(ct).ConfigureAwait(false)];
+        }
+
+        if (scope.AllowedValues(ScopeDimension.Job) is { } j)
+        {
+            (string[] codes, long[] ids) = Keys(j);
+            jobs = [.. await _db.JobContracts.AsNoTracking().Where(x => codes.Contains(x.ContractNumber.ToUpper()) || ids.Contains(x.Id)).Select(x => x.Id).ToListAsync(ct).ConfigureAwait(false)];
+        }
+
+        return new RowScope(branches, warehouses, tills, jobs, Codes(scope.AllowedValues(ScopeDimension.CostCentre)), Codes(scope.AllowedValues(ScopeDimension.Department)),
+            Codes(scope.AllowedValues(ScopeDimension.WardZone)));
+    }
+
+    /// <inheritdoc />
     public async Task<bool> AllowsAsync(long userId, ScopeDimension dimension, long id, CancellationToken ct = default)
     {
         DataScope scope = await ForUserAsync(userId, ct).ConfigureAwait(false);

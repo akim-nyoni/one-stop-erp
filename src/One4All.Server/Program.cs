@@ -181,6 +181,18 @@ app.Use(async (context, next) =>
         context.RequestServices.GetRequiredService<One4All.Infrastructure.Persistence.One4AllDbContext>().CompanyScope = scopedCompany;
     }
 
+    // Reads see only the rows the user's scope rules reach (branch, warehouse, till, job, cost centre, department, ward); writes are held to them
+    // by the request checks above, and may need rows across scopes (a transfer between warehouses).
+    if (HttpMethods.IsGet(context.Request.Method))
+    {
+        One4All.Application.Security.RowScope rows = await context.RequestServices.GetRequiredService<One4All.Application.Abstractions.Security.IDataScopeService>()
+            .RowScopeAsync(userId, context.RequestAborted).ConfigureAwait(false);
+        if (!rows.IsEmpty)
+        {
+            context.RequestServices.GetRequiredService<One4All.Infrastructure.Persistence.One4AllDbContext>().ApplyRowScope(rows);
+        }
+    }
+
     await next(context).ConfigureAwait(false);
 });
 
