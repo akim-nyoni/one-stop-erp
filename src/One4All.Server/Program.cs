@@ -56,7 +56,13 @@ JwtOptions jwt = new();
 builder.Configuration.GetSection("Jwt").Bind(jwt);
 if (string.IsNullOrWhiteSpace(jwt.SigningKey) || Encoding.UTF8.GetByteCount(jwt.SigningKey) < 32)
 {
-    // Development fallback so the server runs out of the box; production must configure Jwt:SigningKey.
+    // The built-in key is public (it is in the source): only a development server may use it. Anywhere else, anyone who read it could
+    // forge tokens, so the server refuses to start until Jwt:SigningKey is configured.
+    if (!builder.Environment.IsDevelopment())
+    {
+        throw new InvalidOperationException("Jwt:SigningKey must be configured (at least 32 bytes) outside Development.");
+    }
+
     jwt.SigningKey = "one4all-development-signing-key-change-me-please";
 }
 
@@ -68,6 +74,20 @@ builder.Services
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false; // keep claim types verbatim (sub, unique_name, name)
+
+        // A token is only as good as its sign-in session: ended (logout, the session limit, an administrator) or idle past the timeout,
+        // the token stops working before it expires (brief §5.2).
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                if (context.Principal?.FindFirst(One4All.Infrastructure.Security.JwtTokenService.SessionClaim)?.Value is string session
+                    && !await context.HttpContext.RequestServices.GetRequiredService<IAuthenticationService>().TouchSessionAsync(session, context.HttpContext.RequestAborted).ConfigureAwait(false))
+                {
+                    context.Fail("The session has ended; sign in again.");
+                }
+            },
+        };
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -324,7 +344,56 @@ app.Use(async (context, next) =>
     }
 });
 
+// A user who must change their password can do nothing else until they have (brief §5.2).
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/api") && !context.Request.Path.StartsWithSegments("/api/auth")
+        && context.User.FindFirst(One4All.Infrastructure.Security.JwtTokenService.PasswordChangeClaim)?.Value == "true")
+    {
+        await Results.Json(new { error = "Change your password first (POST /api/auth/password), then sign in again." }, statusCode: StatusCodes.Status403Forbidden)
+            .ExecuteAsync(context).ConfigureAwait(false);
+        return;
+    }
+
+    await next(context).ConfigureAwait(false);
+});
+
 // --- Endpoints --------------------------------------------------------------------------------------------
+app.MapPost("/api/auth/logout", async (ClaimsPrincipal user, IAuthenticationService auth, CancellationToken ct) =>
+{
+    if (user.FindFirst(One4All.Infrastructure.Security.JwtTokenService.SessionClaim)?.Value is string session)
+    {
+        await auth.EndSessionAsync(session, ct).ConfigureAwait(false);
+    }
+
+    return Results.NoContent();
+})
+.RequireAuthorization()
+.WithName("Logout");
+
+app.MapPost("/api/auth/password", async (ChangePasswordRequest request, ClaimsPrincipal user, IAuthenticationService auth, CancellationToken ct) =>
+{
+    if (!long.TryParse(user.FindFirstValue(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (!await auth.ChangePasswordAsync(userId, request.CurrentPassword, request.NewPassword, ct).ConfigureAwait(false))
+    {
+        return Results.Json(new { error = "The current password is wrong, or the new one does not meet the password policy." }, statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    // The old session ends with the old password: sign in again with the new one.
+    if (user.FindFirst(One4All.Infrastructure.Security.JwtTokenService.SessionClaim)?.Value is string session)
+    {
+        await auth.EndSessionAsync(session, ct).ConfigureAwait(false);
+    }
+
+    return Results.NoContent();
+})
+.RequireAuthorization()
+.WithName("ChangePassword");
+
 app.MapPost("/api/auth/login", async (LoginRequest request, IAuthenticationService auth, IJwtTokenService tokens, CancellationToken ct) =>
 {
     AuthenticationResult result = await auth.AuthenticateWithCodeAsync(request.Username, request.Password, request.OneTimeCode, "api", ct).ConfigureAwait(false);
@@ -2803,3 +2872,8 @@ static IResult OfflineActionResult(Result result)
 /// <param name="Password">The plaintext password.</param>
 /// <param name="OneTimeCode">The authenticator code, for users with two-factor sign-in.</param>
 internal sealed record LoginRequest(string Username, string Password, string? OneTimeCode = null);
+
+/// <summary>A password change for the signed-in user.</summary>
+/// <param name="CurrentPassword">The current password.</param>
+/// <param name="NewPassword">The new password.</param>
+internal sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);

@@ -57,6 +57,18 @@ public sealed class JwtTokenServiceTests
     }
 
     [Fact]
+    public void A_token_carries_its_session_and_a_pending_password_change()
+    {
+        JwtTokenService service = new(Options);
+        JwtSecurityToken withSession = new JwtSecurityTokenHandler().ReadJwtToken(service.Issue(AuthenticationResult.Success(7, "u", "U", false, true, EffectivePermissions.None, "sess-123")).AccessToken);
+        withSession.Claims.Single(c => c.Type == JwtTokenService.SessionClaim).Value.Should().Be("sess-123", "ending the session revokes the token");
+        withSession.Claims.Single(c => c.Type == JwtTokenService.PasswordChangeClaim).Value.Should().Be("true");
+
+        JwtSecurityToken plain = new JwtSecurityTokenHandler().ReadJwtToken(service.Issue(AuthenticationResult.Success(7, "u", "U", false, false, EffectivePermissions.None)).AccessToken);
+        plain.Claims.Should().NotContain(c => c.Type == JwtTokenService.SessionClaim || c.Type == JwtTokenService.PasswordChangeClaim);
+    }
+
+    [Fact]
     public void A_short_signing_key_is_rejected()
     {
         Action act = () => _ = new JwtTokenService(new JwtOptions { SigningKey = "too-short" });

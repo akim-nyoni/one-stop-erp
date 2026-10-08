@@ -108,6 +108,14 @@ public sealed class AuditingInterceptor : SaveChangesInterceptor
             DateTimeOffset now = _clock.UtcNow;
             Dictionary<long, string> lastHashByCompany = []; // key: companyId ?? -1 (the system chain)
 
+            // The chains are extended under their locks, in a transaction of our own when the save was not in one.
+            Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? own = context.Database.CurrentTransaction is null && context.Database.IsNpgsql()
+                ? await context.Database.BeginTransactionAsync(ct).ConfigureAwait(false)
+                : null;
+            try
+            {
+            await AuditChainLock.AcquireAsync(context, _pending.Select(p => ExtractCompanyId(p.Entry)), ct).ConfigureAwait(false);
+
             foreach (PendingAudit pending in _pending)
             {
                 long? companyId = ExtractCompanyId(pending.Entry);
@@ -156,6 +164,18 @@ public sealed class AuditingInterceptor : SaveChangesInterceptor
 
             _pending.Clear();
             await context.SaveChangesAsync(ct).ConfigureAwait(false);
+            if (own is not null)
+            {
+                await own.CommitAsync(ct).ConfigureAwait(false);
+            }
+            }
+            finally
+            {
+                if (own is not null)
+                {
+                    await own.DisposeAsync().ConfigureAwait(false);
+                }
+            }
         }
         finally
         {

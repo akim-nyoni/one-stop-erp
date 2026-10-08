@@ -46,7 +46,7 @@ public static partial class ApiAccessRules
         .ToDictionary(g => g.Key, g => g.Select(x => x.Module).ToArray(), StringComparer.OrdinalIgnoreCase);
 
     // Areas a signed-in user may use for themselves: the acting user is enforced instead.
-    private static readonly HashSet<string> PersonalAreas = new(StringComparer.OrdinalIgnoreCase) { "me", "ess", "workflow", "notifications" };
+    private static readonly HashSet<string> PersonalAreas = new(StringComparer.OrdinalIgnoreCase) { "me", "ess", "workflow", "notifications", "auth" };
 
     /// <summary>What a request needs, or null when the route is not governed (unknown areas are refused by the caller).</summary>
     /// <param name="method">The HTTP method.</param>

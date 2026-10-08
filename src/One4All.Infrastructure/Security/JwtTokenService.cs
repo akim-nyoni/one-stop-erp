@@ -15,6 +15,12 @@ public sealed class JwtTokenService : IJwtTokenService
     /// <summary>The claim type carrying the admin flag.</summary>
     public const string AdminClaim = "one4all:admin";
 
+    /// <summary>The claim carrying the sign-in session the token belongs to (ending the session revokes the token).</summary>
+    public const string SessionClaim = "sid";
+
+    /// <summary>The claim marking a token whose user must change their password before doing anything else.</summary>
+    public const string PasswordChangeClaim = "one4all:pwd_change";
+
     private readonly JwtOptions _options;
 
     /// <summary>Creates the token service.</summary>
@@ -47,6 +53,15 @@ public sealed class JwtTokenService : IJwtTokenService
             new Claim(AdminClaim, authentication.IsSystemAdministrator ? "true" : "false"),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
         ];
+        if (authentication.SessionId is string session)
+        {
+            claims.Add(new Claim(SessionClaim, session));
+        }
+
+        if (authentication.MustChangePassword)
+        {
+            claims.Add(new Claim(PasswordChangeClaim, "true"));
+        }
 
         SymmetricSecurityKey key = new(Encoding.UTF8.GetBytes(_options.SigningKey));
         SigningCredentials credentials = new(key, SecurityAlgorithms.HmacSha256);
