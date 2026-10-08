@@ -573,6 +573,117 @@ public static partial class OperationCatalogue
                 ("Unit", u => u.Code), ("Description", u => u.Description), ("Type", u => u.UnitType), ("Rooms", u => u.Rooms), ("Rent", u => M(u.MonthlyRent)),
                 ("Vacant since", u => u.VacantSince is DateOnly v ? D(v) : "let"), ("Most people", u => u.MaxOccupants)),
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Allocation appeals", ListTitle = "Appeals",
+            Description = "An applicant appeals an allocation run: lodge the grounds, set the hearing, decide (upheld or dismissed, with reasons), and link an upheld appeal to the "
+                + "re-allocation certificate that put it right.",
+            Fields = [Pick("Step", "Step", ["Lodge", "Hearing", "Decide", "Link re-allocation"]), Opt("Appeal", "Appeal number"), Opt("Applicant", "Waiting-list number (lodge)"),
+                Opt("Run", "Allocation run number (lodge)"), Opt("Text", "Grounds / reasons"), Tick("Upheld", "Upheld"), Opt("Certificate", "Re-allocation certificate"), Today()],
+            Run = async (c, i) =>
+            {
+                IAllocationAppealService appeals = c.Get<IAllocationAppealService>();
+                string appeal = i.Optional("Appeal") ?? string.Empty;
+                return i.Text("Step") switch
+                {
+                    "Lodge" => $"Appeal {Check(await appeals.LodgeAsync(c.CompanyId, i.Optional("Applicant") ?? string.Empty, i.Optional("Run") ?? string.Empty, i.Optional("Text") ?? string.Empty, i.Date("Date")).ConfigureAwait(true))} lodged.",
+                    "Hearing" => Check(await appeals.SetHearingAsync(c.CompanyId, appeal, i.Date("Date")).ConfigureAwait(true), "Hearing set."),
+                    "Decide" => Check(await appeals.DecideAsync(c.CompanyId, appeal, i.Flag("Upheld"), i.Date("Date"), i.Optional("Text") ?? string.Empty).ConfigureAwait(true), i.Flag("Upheld") ? "Upheld." : "Dismissed."),
+                    _ => Check(await appeals.LinkReallocationAsync(c.CompanyId, appeal, i.Optional("Certificate") ?? string.Empty).ConfigureAwait(true), "Re-allocation linked."),
+                };
+            },
+            List = async c => Table(await c.Get<IAllocationAppealService>().RegisterAsync(c.CompanyId).ConfigureAwait(true),
+                ("Appeal", a => a.AppealNumber), ("Applicant", a => a.WaitingListNumber), ("Run", a => a.RunNumber), ("Lodged", a => D(a.LodgedOn)), ("Status", a => a.Status),
+                ("Hearing", a => a.HearingDate is DateOnly h ? D(h) : "-"), ("Re-allocation", a => a.ReallocationCertificate)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Allocation quotas", ListTitle = "Quotas",
+            Description = "Sets the share of allocations reserved for a beneficiary group (women, youth, disabled, elderly, civil servants), for a scheme or overall; declares the groups "
+                + "an applicant belongs to (comma-separated) so allocation runs can meet the quotas.",
+            Fields = [Pick("Step", "Step", ["Set quota", "Declare groups"]), Opt("Scheme", "Scheme code (blank: all schemes)"), Pick("Group", "Group (quota)", Enum.GetNames<BeneficiaryGroups>()),
+                Num("Percent", "Target %", "0"), Opt("Applicant", "Waiting-list number (declare)"), Opt("Groups", "Groups, e.g. Women,Youth (declare)")],
+            Run = async (c, i) =>
+            {
+                IAllocationQuotaService quotas = c.Get<IAllocationQuotaService>();
+                if (i.Text("Step") == "Set quota")
+                {
+                    return Check(await quotas.SetQuotaAsync(c.CompanyId, i.Optional("Scheme"), Enum.Parse<BeneficiaryGroups>(i.Text("Group")), i.Number("Percent")).ConfigureAwait(true), "Quota saved.");
+                }
+
+                BeneficiaryGroups groups = Enum.TryParse(i.Optional("Groups") ?? "None", ignoreCase: true, out BeneficiaryGroups parsed) ? parsed
+                    : throw new OperationException("Name the groups from: " + string.Join(", ", Enum.GetNames<BeneficiaryGroups>()) + ".");
+                return Check(await quotas.DeclareGroupsAsync(c.CompanyId, i.Optional("Applicant") ?? string.Empty, groups).ConfigureAwait(true), "Groups declared.");
+            },
+            List = async c => Table(await c.Db.Set<AllocationQuota>().AsNoTracking().Where(q => q.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true),
+                ("Scheme", q => q.SchemeId), ("Group", q => q.Group), ("Target %", q => Q(q.TargetPercent))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Housing cooperatives", ListTitle = "Cooperatives",
+            Description = "Registers a cooperative, adds and removes members, allocates stands to it (\"S1,S2\") and sub-allocates each to a member; Stands lists what it holds and to whom.",
+            Fields = [Pick("Step", "Step", ["Register", "Add member", "Remove member", "Allocate stands", "Sub-allocate", "Stands"]), Req("Cooperative", "Cooperative code"), Opt("Name", "Name / member name"),
+                Opt("Registration", "Registration number"), Opt("IdNumber", "Member national ID"), Opt("Stands", "Stand number(s), comma-separated"), Today()],
+            Run = async (c, i) =>
+            {
+                ICooperativeService cooperatives = c.Get<ICooperativeService>();
+                string code = i.Text("Cooperative");
+                async Task<List<long>> StandIds()
+                {
+                    List<long> ids = [];
+                    foreach (string number in (i.Optional("Stands") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        ids.Add(await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == number.ToUpper(), x => x.Id, "stand", number).ConfigureAwait(true));
+                    }
+
+                    return ids;
+                }
+
+                switch (i.Text("Step"))
+                {
+                    case "Register":
+                        return Check(await cooperatives.RegisterAsync(c.CompanyId, code, i.Optional("Name") ?? string.Empty, i.Optional("Registration") ?? string.Empty).ConfigureAwait(true), _ => "Cooperative registered.");
+                    case "Add member":
+                        return Check(await cooperatives.AddMemberAsync(c.CompanyId, code, i.Optional("IdNumber") ?? string.Empty, i.Optional("Name") ?? string.Empty, i.Date("Date")).ConfigureAwait(true), "Member added.");
+                    case "Remove member":
+                        return Check(await cooperatives.RemoveMemberAsync(c.CompanyId, code, i.Optional("IdNumber") ?? string.Empty).ConfigureAwait(true), "Member removed.");
+                    case "Allocate stands":
+                        return $"{Check(await cooperatives.AllocateStandsAsync(c.CompanyId, code, await StandIds().ConfigureAwait(true), i.Date("Date")).ConfigureAwait(true))} stand(s) allocated.";
+                    case "Sub-allocate":
+                        List<long> stand = await StandIds().ConfigureAwait(true);
+                        return Check(await cooperatives.SubAllocateAsync(c.CompanyId, code, stand.FirstOrDefault(), i.Optional("IdNumber") ?? string.Empty, i.Date("Date")).ConfigureAwait(true), "Sub-allocated.");
+                    default:
+                        IReadOnlyList<CooperativeStandEntry> held = Check(await cooperatives.StandsAsync(c.CompanyId, code).ConfigureAwait(true));
+                        return held.Count == 0 ? "No stands." : string.Join(Environment.NewLine, held.Select(h => $"{h.StandNumber,-12} {D(h.AllocatedOn)}  {h.MemberName ?? "(not sub-allocated)"}"));
+                }
+            },
+            List = async c => Table(await c.Db.Set<Cooperative>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", x => x.Code), ("Name", x => x.Name), ("Registration", x => x.RegistrationNumber)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Development levies", ListTitle = "Levies",
+            Description = "Defines a levy charged on allocation or on transfer — flat, per m² or a percentage of the price — to an income account, or deactivates it; charges the "
+                + "levies due on an allocation certificate or a transfer application.",
+            Fields = [Pick("Step", "Step", ["Define", "Deactivate", "Charge allocation", "Charge transfer"]), Opt("Code", "Levy code"), Opt("Name", "Name"),
+                Pick("Trigger", "Charged on", Enum.GetNames<LevyTrigger>()), Pick("Basis", "Basis", Enum.GetNames<LevyBasis>()), Num("Rate", "Rate / amount", "0"), Opt("Income", "Income account"),
+                Opt("Document", "Certificate / application number (charge)"), Today()],
+            Run = async (c, i) =>
+            {
+                IDevelopmentLevyService levies = c.Get<IDevelopmentLevyService>();
+                static string Raised(IReadOnlyList<LevyRaised> raised) => raised.Count == 0 ? "No levies due." : string.Join(Environment.NewLine, raised.Select(r => $"{r.LevyCode}: {M(r.Amount)} ({r.DocumentNumber})"));
+                return i.Text("Step") switch
+                {
+                    "Define" => Check(await levies.DefineAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Optional("Name") ?? string.Empty, Enum.Parse<LevyTrigger>(i.Text("Trigger")),
+                        Enum.Parse<LevyBasis>(i.Text("Basis")), i.Number("Rate"), i.Optional("Income") ?? string.Empty).ConfigureAwait(true), _ => "Levy defined."),
+                    "Deactivate" => Check(await levies.DeactivateAsync(c.CompanyId, i.Optional("Code") ?? string.Empty).ConfigureAwait(true), "Levy deactivated."),
+                    "Charge allocation" => Raised(Check(await levies.ChargeAllocationAsync(c.CompanyId, i.Optional("Document") ?? string.Empty, i.Date("Date")).ConfigureAwait(true))),
+                    _ => Raised(Check(await levies.ChargeTransferAsync(c.CompanyId, i.Optional("Document") ?? string.Empty, i.Date("Date")).ConfigureAwait(true))),
+                };
+            },
+            List = async c => Table(await c.Db.Set<DevelopmentLevy>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", x => x.Code), ("Name", x => x.Name), ("On", x => x.Trigger), ("Basis", x => x.Basis), ("Rate", x => Q(x.Rate)), ("Income", x => x.IncomeAccountCode), ("Active", x => x.IsActive)),
+        };
     }
 
     private static async Task<System.Data.DataTable> ApplicantsAsync(OperationContext c)
