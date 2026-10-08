@@ -783,6 +783,148 @@ public static partial class OperationCatalogue
             },
             List = ApplicantsAsync,
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Development covenants", ListTitle = "Covenants",
+            Description = "A covenant that the holder develops a stand within so many years: record its milestones (plan submitted / approved, construction started, completed), grant "
+                + "an extension (with any fee), run the breach check (a penalty levy on those past their deadline) and issue a notice.",
+            Fields = [Pick("Step", "Step", ["Create", "Milestone", "Extension", "Run breaches", "Notice"]), Opt("Covenant", "Covenant number"), Opt("Stand", "Stand number (create)"),
+                Opt("Holder", "Holder customer code (create)"), Num("Years", "Years to develop (create)", "2"), Pick("Milestone", "Milestone", Enum.GetNames<CovenantMilestone>()),
+                Opt("Reference", "Reference"), Num("Months", "Extension months", "6"), Num("Amount", "Extension fee / penalty levy", "0"), Opt("Account", "Fee / levy income account"), Today()],
+            Run = async (c, i) =>
+            {
+                IDevelopmentCovenantService covenants = c.Get<IDevelopmentCovenantService>();
+                string covenant = i.Optional("Covenant") ?? string.Empty;
+                switch (i.Text("Step"))
+                {
+                    case "Create":
+                        long stand = await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == (i.Optional("Stand") ?? string.Empty).ToUpper(), x => x.Id, "stand",
+                            i.Optional("Stand") ?? string.Empty).ConfigureAwait(true);
+                        return $"Covenant {Check(await covenants.CreateAsync(c.CompanyId, stand, await CustomerAsync(c, i.Optional("Holder") ?? string.Empty).ConfigureAwait(true), i.Date("Date"), i.Whole("Years"))
+                            .ConfigureAwait(true))} created.";
+                    case "Milestone":
+                        return Check(await covenants.RecordMilestoneAsync(c.CompanyId, covenant, Enum.Parse<CovenantMilestone>(i.Text("Milestone")), i.Date("Date"), i.Optional("Reference")).ConfigureAwait(true),
+                            "Milestone recorded.");
+                    case "Extension":
+                        return $"Extended to {D(Check(await covenants.GrantExtensionAsync(c.CompanyId, covenant, i.Whole("Months"), i.Date("Date"), i.Number("Amount"), i.Optional("Account")).ConfigureAwait(true)))}.";
+                    case "Run breaches":
+                        IReadOnlyList<string> breached = Check(await covenants.RunBreachesAsync(c.CompanyId, i.Date("Date"), i.Number("Amount"), i.Optional("Account") ?? string.Empty).ConfigureAwait(true));
+                        return breached.Count == 0 ? "No covenants in breach." : $"In breach: {string.Join(", ", breached)}.";
+                    default:
+                        return Check(await covenants.IssueNoticeAsync(c.CompanyId, covenant, i.Date("Date")).ConfigureAwait(true), "Notice issued.");
+                }
+            },
+            List = async c => Table(await c.Get<IDevelopmentCovenantService>().RegisterAsync(c.CompanyId).ConfigureAwait(true),
+                ("Covenant", x => x.CovenantNumber), ("Stand", x => x.StandNumber), ("Deadline", x => D(x.Deadline)), ("Latest milestone", x => x.Latest), ("Extensions", x => x.Extensions), ("Status", x => x.Status)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Waiting-list control", ListTitle = "Applicants",
+            Description = "Request a change to an applicant's registration date (with the reason) and have another user decide it; confirm an applicant's continued interest; run "
+                + "renewals (suspending, then removing, applicants who have not renewed within the cycle and grace); see the notices sent to an applicant.",
+            Fields = [Pick("Step", "Step", ["Request date change", "Decide date change", "Confirm interest", "Run renewals", "Notices"]), Opt("Applicant", "Waiting-list number"),
+                Opt("Reason", "Reason (date change)"), OptNum("Request", "Request id (decide)"), Tick("Approve", "Approve"), Num("Cycle", "Renewal cycle (months)", "12"), Num("Grace", "Grace (days)", "30"), Today()],
+            Run = async (c, i) =>
+            {
+                IWaitingListControlService control = c.Get<IWaitingListControlService>();
+                string applicant = i.Optional("Applicant") ?? string.Empty;
+                switch (i.Text("Step"))
+                {
+                    case "Request date change":
+                        return Check(await control.RequestDateChangeAsync(c.CompanyId, applicant, i.Date("Date"), i.Optional("Reason") ?? string.Empty, c.UserId).ConfigureAwait(true),
+                            id => $"Date change request {id} awaits another user's decision.");
+                    case "Decide date change":
+                        return Check(await control.DecideDateChangeAsync(c.CompanyId, (long)(i.OptionalNumber("Request") ?? 0m), i.Flag("Approve"), c.UserId).ConfigureAwait(true), i.Flag("Approve") ? "Approved." : "Refused.");
+                    case "Confirm interest":
+                        return Check(await control.ConfirmAsync(c.CompanyId, applicant, i.Date("Date")).ConfigureAwait(true), "Interest confirmed.");
+                    case "Run renewals":
+                        RenewalRunResult run = await control.RunRenewalsAsync(c.CompanyId, i.Date("Date"), i.Whole("Cycle"), i.Whole("Grace")).ConfigureAwait(true);
+                        return $"{run.Suspended} suspended, {run.Removed} removed.";
+                    default:
+                        IReadOnlyList<ApplicantNoticeEntry> notices = await control.NoticesAsync(c.CompanyId, applicant).ConfigureAwait(true);
+                        return notices.Count == 0 ? "No notices." : string.Join(Environment.NewLine, notices.Select(n => $"{D(n.SentOn)}  {n.NoticeType}"));
+                }
+            },
+            List = ApplicantsAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Joint ownership", ListTitle = "Stands",
+            Description = "Registers a stand's joint holders (\"CUST1:50; CUST2:50\", jointly with survivorship or in common), transfers part of a holder's share, records a holder's "
+                + "death (survivors take the share under survivorship) and shows the holders on a date.",
+            Fields = [Pick("Step", "Step", ["Register", "Transfer share", "Record death", "Holders"]), Req("Stand", "Stand number"), Pick("Regime", "Regime", Enum.GetNames<CoOwnershipRegime>()),
+                Opt("Holders", "Holders: CUSTOMER:share %; …"), Opt("From", "From / deceased customer code"), Opt("To", "To customer code"), Num("Portion", "Portion (% of the stand)", "0"), Today()],
+            Run = async (c, i) =>
+            {
+                IJointOwnershipService joint = c.Get<IJointOwnershipService>();
+                long stand = await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == i.Text("Stand").ToUpper(), x => x.Id, "stand", i.Text("Stand")).ConfigureAwait(true);
+                static string Show(IReadOnlyList<StandHolderEntry> holders) => holders.Count == 0 ? "No holders." : string.Join(Environment.NewLine,
+                    holders.Select(h => $"{h.Name,-30} {h.SharePercent,7:0.##}%  since {D(h.HeldFrom)}{(h.Deceased ? "  (deceased)" : string.Empty)}"));
+                switch (i.Text("Step"))
+                {
+                    case "Register":
+                        List<HolderShare> shares = [];
+                        foreach (string part in (i.Optional("Holders") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                            shares.Add(bits.Length == 2 && decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal share)
+                                ? new HolderShare(await CustomerAsync(c, bits[0]).ConfigureAwait(true), share) : throw new OperationException($"Write each holder as CUSTOMER:share % (\"{part}\")."));
+                        }
+
+                        return Check(await joint.RegisterAsync(c.CompanyId, stand, Enum.Parse<CoOwnershipRegime>(i.Text("Regime")), shares, i.Date("Date")).ConfigureAwait(true), "Holders registered.");
+                    case "Transfer share":
+                        return Check(await joint.TransferShareAsync(c.CompanyId, stand, await CustomerAsync(c, i.Optional("From") ?? string.Empty).ConfigureAwait(true),
+                            await CustomerAsync(c, i.Optional("To") ?? string.Empty).ConfigureAwait(true), i.Number("Portion"), i.Date("Date")).ConfigureAwait(true), "Share transferred.");
+                    case "Record death":
+                        return Show(Check(await joint.RecordDeathAsync(c.CompanyId, stand, await CustomerAsync(c, i.Optional("From") ?? string.Empty).ConfigureAwait(true), i.Date("Date")).ConfigureAwait(true)));
+                    default:
+                        return Show(await joint.HoldersAsync(c.CompanyId, stand, i.Date("Date")).ConfigureAwait(true));
+                }
+            },
+            List = async c => Table(await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.StandNumber).Take(1000).ToListAsync().ConfigureAwait(true),
+                ("Stand", s => s.StandNumber), ("Status", s => s.Status), ("Holder", s => s.CurrentHolderCustomerId)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Sectional title schemes", ListTitle = "Stands",
+            Description = "Registers a sectional title scheme on a stand with its units' floor areas (\"U1:80; U2:120\" — participation quotas follow from the areas), transfers a unit, "
+                + "lists the units and their owners, and raises a period's levy shared by participation quota.",
+            Fields = [Pick("Step", "Step", ["Register", "Transfer unit", "Units", "Raise levy"]), Req("Scheme", "Scheme code"), Opt("Name", "Name (register)"), Opt("Stand", "Stand number (register)"),
+                Opt("Units", "Units: number:floor area; … (register)"), Opt("Unit", "Unit number (transfer)"), Opt("To", "To customer code (transfer)"), Num("Amount", "Consideration / levy", "0"),
+                Num("Period", "Levy period (yyyyMM)", "0"), Opt("Income", "Levy income account"), Today()],
+            Run = async (c, i) =>
+            {
+                ISectionalTitleService sectional = c.Get<ISectionalTitleService>();
+                string scheme = i.Text("Scheme");
+                static string Show(IReadOnlyList<SectionalUnitEntry> units) => string.Join(Environment.NewLine,
+                    units.Select(u => $"{u.UnitNumber,-8} {Q(u.FloorArea),10} m²  quota {u.ParticipationQuota:0.####}  {u.Owner ?? "(scheme)"}"));
+                switch (i.Text("Step"))
+                {
+                    case "Register":
+                        long stand = await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == (i.Optional("Stand") ?? string.Empty).ToUpper(), x => x.Id, "stand",
+                            i.Optional("Stand") ?? string.Empty).ConfigureAwait(true);
+                        List<UnitArea> areas = [];
+                        foreach (string part in (i.Optional("Units") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                            areas.Add(bits.Length == 2 && decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal area)
+                                ? new UnitArea(bits[0], area) : throw new OperationException($"Write each unit as number:floor area (\"{part}\")."));
+                        }
+
+                        return Show(Check(await sectional.RegisterAsync(c.CompanyId, scheme, i.Optional("Name") ?? scheme, stand, areas).ConfigureAwait(true)));
+                    case "Transfer unit":
+                        return Check(await sectional.TransferUnitAsync(c.CompanyId, scheme, i.Optional("Unit") ?? string.Empty, await CustomerAsync(c, i.Optional("To") ?? string.Empty).ConfigureAwait(true),
+                            i.Number("Amount"), i.Date("Date")).ConfigureAwait(true), "Unit transferred.");
+                    case "Units":
+                        return Show(Check(await sectional.UnitsAsync(c.CompanyId, scheme).ConfigureAwait(true)));
+                    default:
+                        SectionalLevyResult levy = Check(await sectional.RaiseLevyAsync(c.CompanyId, scheme, i.Whole("Period"), i.Number("Amount"), i.Optional("Income") ?? string.Empty, i.Date("Date")).ConfigureAwait(true));
+                        return string.Join(Environment.NewLine, levy.Billed.Select(b => $"{b.UnitNumber,-8} {M(b.Amount)}")) + Environment.NewLine + $"Not billed (no owner): {M(levy.Unbilled)}.";
+                }
+            },
+            List = async c => Table(await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.StandNumber).Take(1000).ToListAsync().ConfigureAwait(true),
+                ("Stand", s => s.StandNumber), ("Status", s => s.Status), ("Holder", s => s.CurrentHolderCustomerId)),
+        };
     }
 
     private static async Task<System.Data.DataTable> ApplicantsAsync(OperationContext c)
