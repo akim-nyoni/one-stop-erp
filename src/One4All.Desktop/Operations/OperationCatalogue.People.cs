@@ -67,7 +67,11 @@ public static partial class OperationCatalogue
             Fields = [Pick("Step", "Step", ["Engage", "Update"]), Req("Number", "Employee number"), Opt("Name", "Full name"), OptNum("Basic", "Basic salary"), Today("Engaged", "Engagement date"),
                 Pick("Type", "Employment", Enum.GetNames<EmploymentType>()), Opt("Department", "Department code (3)"), Opt("CostCentre", "Cost centre code (3)"), Opt("PayGroup", "Pay group"), Opt("Grade", "Grade"),
                 Opt("NationalId", "National ID"), Opt("TaxNumber", "Tax number"), Opt("ContractEnd", "Contract end (yyyy-MM-dd)"), Pick("Method", "Paid by", Enum.GetNames<PayMethod>()),
-                Opt("Bank", "Bank (engage only)"), Opt("Branch", "Branch (engage only)"), Opt("Account", "Account number (engage only)"), Opt("Mobile", "Mobile money (engage only)"), Opt("Email", "Email")],
+                Opt("Bank", "Bank (engage only)"), Opt("Branch", "Bank branch (engage only)"), Opt("Account", "Account number (engage only)"), Opt("Mobile", "Mobile money (engage only)"), Opt("Email", "Email"),
+                Pick("Frequency", "Paid", Enum.GetNames<PayFrequency>()), Opt("WorkBranch", "Works at branch (code)"), Opt("Project", "Charged to project"), Opt("Fund", "Charged to fund"),
+                Opt("ReportsTo", "Reports to (employee number)"), Pick("Marital", "Marital status", Enum.GetNames<MaritalStatus>()), Opt("Nationality", "Nationality"),
+                Opt("SocialSecurity", "Social security number"), Opt("Union", "Trade union"), Opt("KinName", "Next of kin"), Opt("KinPhone", "Next of kin's phone"),
+                Opt("KinRelationship", "Next of kin is (relationship)")],
             Run = async (c, i) =>
             {
                 IPayrollSetupService setup = c.Get<IPayrollSetupService>();
@@ -80,7 +84,10 @@ public static partial class OperationCatalogue
                     {
                         FullName = i.Optional("Name"), BasicSalary = i.OptionalNumber("Basic"), EmploymentType = type, Department = i.Optional("Department"), CostCentre = i.Optional("CostCentre"),
                         PayGroup = i.Optional("PayGroup"), Grade = i.Optional("Grade"), NationalIdNumber = i.Optional("NationalId"), TaxNumber = i.Optional("TaxNumber"), ContractEndDate = contractEnd,
-                        PaymentMethod = method, Email = i.Optional("Email"),
+                        PaymentMethod = method, Email = i.Optional("Email"), PayFrequency = Enum.Parse<PayFrequency>(i.Text("Frequency")), Branch = i.Optional("WorkBranch"),
+                        Project = i.Optional("Project"), Fund = i.Optional("Fund"), ReportsTo = i.Optional("ReportsTo"), MaritalStatus = Enum.Parse<MaritalStatus>(i.Text("Marital")),
+                        Nationality = i.Optional("Nationality"), SocialSecurityNumber = i.Optional("SocialSecurity"), UnionMembership = i.Optional("Union"), NextOfKinName = i.Optional("KinName"),
+                        NextOfKinPhone = i.Optional("KinPhone"), NextOfKinRelationship = i.Optional("KinRelationship"),
                     }).ConfigureAwait(true), string.Empty);
                     return $"Employee {i.Text("Number").ToUpperInvariant()} updated.";
                 }
@@ -90,6 +97,10 @@ public static partial class OperationCatalogue
                     EmploymentType = type, Department = i.Optional("Department"), CostCentre = i.Optional("CostCentre"), PayGroup = i.Optional("PayGroup"), Grade = i.Optional("Grade"),
                     NationalIdNumber = i.Optional("NationalId"), TaxNumber = i.Optional("TaxNumber"), ContractEndDate = contractEnd, PaymentMethod = method, BankName = i.Optional("Bank"),
                     BankBranch = i.Optional("Branch"), BankAccountNumber = i.Optional("Account"), MobileMoneyNumber = i.Optional("Mobile"), Email = i.Optional("Email"),
+                    PayFrequency = Enum.Parse<PayFrequency>(i.Text("Frequency")), Branch = i.Optional("WorkBranch"), Project = i.Optional("Project"), Fund = i.Optional("Fund"),
+                    ReportsTo = i.Optional("ReportsTo"), MaritalStatus = Enum.Parse<MaritalStatus>(i.Text("Marital")), Nationality = i.Optional("Nationality"),
+                    SocialSecurityNumber = i.Optional("SocialSecurity"), UnionMembership = i.Optional("Union"), NextOfKinName = i.Optional("KinName"), NextOfKinPhone = i.Optional("KinPhone"),
+                    NextOfKinRelationship = i.Optional("KinRelationship"),
                 }).ConfigureAwait(true));
                 return $"Employee {i.Text("Number").ToUpperInvariant()} engaged (id {id}).";
             },

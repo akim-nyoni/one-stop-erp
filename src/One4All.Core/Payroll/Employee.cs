@@ -100,6 +100,39 @@ public sealed class Employee : SoftDeletableEntity, ICompanyScoped
     /// <summary>Gets or sets how often the employee is paid; sets the period a pay date covers, part-period pay and the tax bands' scale.</summary>
     public PayFrequency PayFrequency { get; set; }
 
+    /// <summary>Gets or sets the branch the employee works at (the payroll journal's branch; branch-scoped users see only their branches' staff).</summary>
+    public long? BranchId { get; set; }
+
+    /// <summary>Gets or sets the project the employee's pay is charged to (GL project code).</summary>
+    public string? Project { get; set; }
+
+    /// <summary>Gets or sets the fund the employee's pay is charged to (GL fund code).</summary>
+    public string? Fund { get; set; }
+
+    /// <summary>Gets or sets the next of kin's name.</summary>
+    public string? NextOfKinName { get; set; }
+
+    /// <summary>Gets or sets the next of kin's phone.</summary>
+    public string? NextOfKinPhone { get; set; }
+
+    /// <summary>Gets or sets how the next of kin is related.</summary>
+    public string? NextOfKinRelationship { get; set; }
+
+    /// <summary>Gets or sets the marital status.</summary>
+    public MaritalStatus MaritalStatus { get; set; }
+
+    /// <summary>Gets or sets the nationality.</summary>
+    public string? Nationality { get; set; }
+
+    /// <summary>Gets or sets the social security number.</summary>
+    public string? SocialSecurityNumber { get; set; }
+
+    /// <summary>Gets or sets the trade union the employee belongs to.</summary>
+    public string? UnionMembership { get; set; }
+
+    /// <summary>Gets or sets whom the employee reports to.</summary>
+    public long? ReportsToEmployeeId { get; set; }
+
     /// <summary>
     /// Gets or sets the payroll the employee is paid in (e.g. MONTHLY, WEEKLY, CASUAL — brief §4.15.6); null for the company's default
     /// payroll. Each pay group is run, guarded and reversed on its own.

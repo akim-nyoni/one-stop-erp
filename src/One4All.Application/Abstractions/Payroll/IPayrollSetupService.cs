@@ -60,6 +60,42 @@ public sealed record NewEmployee(string EmployeeNumber, string FullName, decimal
 
     /// <summary>Email.</summary>
     public string? Email { get; init; }
+
+    /// <summary>How often they are paid.</summary>
+    public PayFrequency? PayFrequency { get; init; }
+
+    /// <summary>The branch code they work at.</summary>
+    public string? Branch { get; init; }
+
+    /// <summary>The GL project their pay is charged to.</summary>
+    public string? Project { get; init; }
+
+    /// <summary>The GL fund their pay is charged to.</summary>
+    public string? Fund { get; init; }
+
+    /// <summary>The next of kin's name.</summary>
+    public string? NextOfKinName { get; init; }
+
+    /// <summary>The next of kin's phone.</summary>
+    public string? NextOfKinPhone { get; init; }
+
+    /// <summary>How the next of kin is related.</summary>
+    public string? NextOfKinRelationship { get; init; }
+
+    /// <summary>The marital status.</summary>
+    public MaritalStatus? MaritalStatus { get; init; }
+
+    /// <summary>The nationality.</summary>
+    public string? Nationality { get; init; }
+
+    /// <summary>The social security number.</summary>
+    public string? SocialSecurityNumber { get; init; }
+
+    /// <summary>The trade union.</summary>
+    public string? UnionMembership { get; init; }
+
+    /// <summary>The employee number of whom they report to.</summary>
+    public string? ReportsTo { get; init; }
 }
 
 /// <summary>Changes to an employee's record (a null leaves the field as it is). Bank details are not here: they change through an approved request.</summary>
@@ -109,6 +145,42 @@ public sealed record EmployeeUpdate
 
     /// <summary>Email.</summary>
     public string? Email { get; init; }
+
+    /// <summary>How often they are paid.</summary>
+    public PayFrequency? PayFrequency { get; init; }
+
+    /// <summary>The branch code they work at.</summary>
+    public string? Branch { get; init; }
+
+    /// <summary>The GL project their pay is charged to.</summary>
+    public string? Project { get; init; }
+
+    /// <summary>The GL fund their pay is charged to.</summary>
+    public string? Fund { get; init; }
+
+    /// <summary>The next of kin's name.</summary>
+    public string? NextOfKinName { get; init; }
+
+    /// <summary>The next of kin's phone.</summary>
+    public string? NextOfKinPhone { get; init; }
+
+    /// <summary>How the next of kin is related.</summary>
+    public string? NextOfKinRelationship { get; init; }
+
+    /// <summary>The marital status.</summary>
+    public MaritalStatus? MaritalStatus { get; init; }
+
+    /// <summary>The nationality.</summary>
+    public string? Nationality { get; init; }
+
+    /// <summary>The social security number.</summary>
+    public string? SocialSecurityNumber { get; init; }
+
+    /// <summary>The trade union.</summary>
+    public string? UnionMembership { get; init; }
+
+    /// <summary>The employee number of whom they report to.</summary>
+    public string? ReportsTo { get; init; }
 }
 
 /// <summary>A new pay element.</summary>

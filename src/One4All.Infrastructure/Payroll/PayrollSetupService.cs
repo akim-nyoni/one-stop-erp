@@ -49,13 +49,23 @@ public sealed class PayrollSetupService : IPayrollSetupService
             return Error.Conflict("Payroll.EmployeeExists", $"Employee {number} already exists.");
         }
 
+        Result<Placement> placement = await PlacementAsync(companyId, employee.Branch, employee.Project, employee.Fund, employee.ReportsTo, null, ct).ConfigureAwait(false);
+        if (placement.IsFailure)
+        {
+            return placement.Error;
+        }
+
         Employee created = new(companyId, number, employee.FullName.Trim(), employee.BasicSalary, employee.EngagementDate)
         {
             EmploymentType = employee.EmploymentType, Department = Clean(employee.Department), CostCentre = Clean(employee.CostCentre), PayGroup = Clean(employee.PayGroup),
             Grade = Clean(employee.Grade), Notch = employee.Notch, NationalIdNumber = Clean(employee.NationalIdNumber), TaxNumber = Clean(employee.TaxNumber), Gender = employee.Gender,
             DateOfBirth = employee.DateOfBirth, ContractEndDate = employee.ContractEndDate, ProbationEndDate = employee.ProbationEndDate, PaymentMethod = employee.PaymentMethod,
             BankName = Clean(employee.BankName), BankBranch = Clean(employee.BankBranch), BankAccountNumber = Clean(employee.BankAccountNumber),
-            MobileMoneyNumber = Clean(employee.MobileMoneyNumber), Email = Clean(employee.Email),
+            MobileMoneyNumber = Clean(employee.MobileMoneyNumber), Email = Clean(employee.Email), PayFrequency = employee.PayFrequency ?? PayFrequency.Monthly,
+            BranchId = placement.Value.BranchId, Project = placement.Value.Project, Fund = placement.Value.Fund, ReportsToEmployeeId = placement.Value.ReportsToId,
+            NextOfKinName = Clean(employee.NextOfKinName), NextOfKinPhone = Clean(employee.NextOfKinPhone), NextOfKinRelationship = Clean(employee.NextOfKinRelationship),
+            MaritalStatus = employee.MaritalStatus ?? MaritalStatus.NotRecorded, Nationality = Clean(employee.Nationality), SocialSecurityNumber = Clean(employee.SocialSecurityNumber),
+            UnionMembership = Clean(employee.UnionMembership),
         };
         _db.Employees.Add(created);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -99,6 +109,24 @@ public sealed class PayrollSetupService : IPayrollSetupService
         employee.WorkPermitExpiry = update.WorkPermitExpiry ?? employee.WorkPermitExpiry;
         employee.PaymentMethod = update.PaymentMethod ?? employee.PaymentMethod;
         employee.Email = update.Email is null ? employee.Email : Clean(update.Email);
+        Result<Placement> placement = await PlacementAsync(companyId, update.Branch, update.Project, update.Fund, update.ReportsTo, employee.Id, ct).ConfigureAwait(false);
+        if (placement.IsFailure)
+        {
+            return Result.Failure(placement.Error);
+        }
+
+        employee.PayFrequency = update.PayFrequency ?? employee.PayFrequency;
+        employee.BranchId = update.Branch is null ? employee.BranchId : placement.Value.BranchId;
+        employee.Project = update.Project is null ? employee.Project : placement.Value.Project;
+        employee.Fund = update.Fund is null ? employee.Fund : placement.Value.Fund;
+        employee.ReportsToEmployeeId = update.ReportsTo is null ? employee.ReportsToEmployeeId : placement.Value.ReportsToId;
+        employee.NextOfKinName = update.NextOfKinName is null ? employee.NextOfKinName : Clean(update.NextOfKinName);
+        employee.NextOfKinPhone = update.NextOfKinPhone is null ? employee.NextOfKinPhone : Clean(update.NextOfKinPhone);
+        employee.NextOfKinRelationship = update.NextOfKinRelationship is null ? employee.NextOfKinRelationship : Clean(update.NextOfKinRelationship);
+        employee.MaritalStatus = update.MaritalStatus ?? employee.MaritalStatus;
+        employee.Nationality = update.Nationality is null ? employee.Nationality : Clean(update.Nationality);
+        employee.SocialSecurityNumber = update.SocialSecurityNumber is null ? employee.SocialSecurityNumber : Clean(update.SocialSecurityNumber);
+        employee.UnionMembership = update.UnionMembership is null ? employee.UnionMembership : Clean(update.UnionMembership);
         if (employee.EmploymentType == EmploymentType.Contract && employee.ContractEndDate is null)
         {
             return Result.Failure(Error.Validation("Payroll.ContractEnd", "A contract employee needs the contract's end date."));
@@ -106,6 +134,53 @@ public sealed class PayrollSetupService : IPayrollSetupService
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
+    }
+
+    // Where the employee sits: their branch, project and fund (each the company's, and open), and whom they report to (another of the company's
+    // staff, not themselves). A blank text clears the field.
+    private sealed record Placement(long? BranchId, string? Project, string? Fund, long? ReportsToId);
+
+    private async Task<Result<Placement>> PlacementAsync(long companyId, string? branch, string? project, string? fund, string? reportsTo, long? self, CancellationToken ct)
+    {
+        long? branchId = null;
+        if (Clean(branch) is string branchCode)
+        {
+            string key = branchCode.ToUpperInvariant();
+            branchId = await _db.Branches.Where(b => b.CompanyId == companyId && b.Code.ToUpper() == key).Select(b => (long?)b.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (branchId is null)
+            {
+                return Error.Validation("Payroll.BranchUnknown", $"Branch {branchCode} does not exist.");
+            }
+        }
+
+        string? projectCode = Clean(project)?.ToUpperInvariant();
+        if (projectCode is not null && !await _db.Projects.AnyAsync(p => p.CompanyId == companyId && p.Code == projectCode && p.IsActive, ct).ConfigureAwait(false))
+        {
+            return Error.Validation("Payroll.ProjectUnknown", $"Project {projectCode} does not exist or is closed.");
+        }
+
+        string? fundCode = Clean(fund)?.ToUpperInvariant();
+        if (fundCode is not null && !await _db.Funds.AnyAsync(f => f.CompanyId == companyId && f.Code == fundCode && f.IsActive, ct).ConfigureAwait(false))
+        {
+            return Error.Validation("Payroll.FundUnknown", $"Fund {fundCode} does not exist or is inactive.");
+        }
+
+        long? managerId = null;
+        if (Clean(reportsTo) is string managerNumber)
+        {
+            managerId = (await EmployeeAsync(companyId, managerNumber, ct).ConfigureAwait(false))?.Id;
+            if (managerId is null)
+            {
+                return EmployeeNotFound(managerNumber);
+            }
+
+            if (managerId == self)
+            {
+                return Error.Validation("Payroll.ReportsToSelf", "An employee cannot report to themselves.");
+            }
+        }
+
+        return new Placement(branchId, projectCode, fundCode, managerId);
     }
 
     /// <inheritdoc />

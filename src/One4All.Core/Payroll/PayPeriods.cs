@@ -1,5 +1,24 @@
 namespace One4All.Core.Payroll;
 
+/// <summary>An employee's marital status.</summary>
+public enum MaritalStatus
+{
+    /// <summary>Not recorded.</summary>
+    NotRecorded = 0,
+
+    /// <summary>Single.</summary>
+    Single = 1,
+
+    /// <summary>Married.</summary>
+    Married = 2,
+
+    /// <summary>Divorced.</summary>
+    Divorced = 3,
+
+    /// <summary>Widowed.</summary>
+    Widowed = 4,
+}
+
 /// <summary>How often an employee is paid (brief §4.15: monthly salaries, weekly wages).</summary>
 public enum PayFrequency
 {

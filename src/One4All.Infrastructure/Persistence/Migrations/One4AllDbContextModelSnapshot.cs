@@ -17139,6 +17139,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnName("basic_salary")
                         .HasAnnotation("One4All:Encrypted", true);
 
+                    b.Property<long?>("BranchId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("branch_id");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -17202,6 +17206,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("full_name");
 
+                    b.Property<string>("Fund")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("fund");
+
                     b.Property<int>("Gender")
                         .HasColumnType("integer")
                         .HasColumnName("gender");
@@ -17228,6 +17237,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_salary_held");
 
+                    b.Property<int>("MaritalStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("marital_status");
+
                     b.Property<string>("MobileMoneyNumber")
                         .HasMaxLength(256)
                         .HasColumnType("text")
@@ -17247,6 +17260,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("national_id_number")
                         .HasAnnotation("One4All:Encrypted", true);
+
+                    b.Property<string>("Nationality")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("nationality");
+
+                    b.Property<string>("NextOfKinName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("next_of_kin_name");
+
+                    b.Property<string>("NextOfKinPhone")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("next_of_kin_phone");
+
+                    b.Property<string>("NextOfKinRelationship")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("next_of_kin_relationship");
 
                     b.Property<int?>("Notch")
                         .HasColumnType("integer")
@@ -17269,11 +17302,25 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("probation_end_date");
 
+                    b.Property<string>("Project")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("project");
+
+                    b.Property<long?>("ReportsToEmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reports_to_employee_id");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
+
+                    b.Property<string>("SocialSecurityNumber")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("social_security_number");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer")
@@ -17293,6 +17340,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)")
                         .HasColumnName("termination_reason");
+
+                    b.Property<string>("UnionMembership")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("union_membership");
 
                     b.Property<long?>("UserId")
                         .HasColumnType("bigint")

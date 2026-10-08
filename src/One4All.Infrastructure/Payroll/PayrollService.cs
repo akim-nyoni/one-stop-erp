@@ -243,11 +243,13 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         Dictionary<long, PayElement> elements, PayRunKind kind, string? reason, string payGroup, CancellationToken ct)
     {
         // Costs are analysed by the employee's department and cost centre (§4.15.9), matched to the GL dimensions by code or name.
-        Dictionary<(string Account, string CostCentre, string Department), decimal> debitsByAccount = [];
+        Dictionary<(string Account, string CostCentre, string Department, string? Project, string? Fund, string? Branch), decimal> debitsByAccount = [];
         Dictionary<string, decimal> creditsByAccount = new(StringComparer.OrdinalIgnoreCase);
         List<long> employeeIds = [.. slips.Select(s => s.EmployeeId).Distinct()];
-        Dictionary<long, (string? Department, string? CostCentre)> staff = await _db.Set<Employee>().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(e => employeeIds.Contains(e.Id))
-            .ToDictionaryAsync(e => e.Id, e => (e.Department, e.CostCentre), ct).ConfigureAwait(false);
+        Dictionary<long, (string? Department, string? CostCentre, string? Project, string? Fund, long? BranchId)> staff = await _db.Set<Employee>()
+            .IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(e => employeeIds.Contains(e.Id))
+            .ToDictionaryAsync(e => e.Id, e => (e.Department, e.CostCentre, e.Project, e.Fund, e.BranchId), ct).ConfigureAwait(false);
+        Dictionary<long, string> branchCodes = await _db.Branches.Where(b => b.CompanyId == company.Id).ToDictionaryAsync(b => b.Id, b => b.Code, ct).ConfigureAwait(false);
         var departments = await _db.Departments.Where(d => d.CompanyId == company.Id).Select(d => new { d.Code, d.Name }).ToListAsync(ct).ConfigureAwait(false);
         var costCentres = await _db.CostCentres.Where(c => c.CompanyId == company.Id).Select(c => new { c.Code, c.Name }).ToListAsync(ct).ConfigureAwait(false);
         string Dimension(string? value, IEnumerable<(string Code, string Name)> master)
@@ -260,9 +262,10 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         foreach (Payslip payslip in slips)
         {
             _db.Set<Payslip>().Add(payslip);
-            (string? department, string? costCentre) = staff.GetValueOrDefault(payslip.EmployeeId);
+            (string? department, string? costCentre, string? project, string? fund, long? branchId) = staff.GetValueOrDefault(payslip.EmployeeId);
             string dept = Dimension(department, departments.Select(d => (d.Code, d.Name)));
             string cc = Dimension(costCentre, costCentres.Select(c => (c.Code, c.Name)));
+            string? branch = branchId is long b ? branchCodes.GetValueOrDefault(b) : null;
 
             foreach (PayslipLine line in payslip.Lines)
             {
@@ -274,7 +277,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                 PayElement element = elements.Values.First(e => e.Code == line.ElementCode);
                 if (line.Type == PayElementType.Earning)
                 {
-                    debitsByAccount[(element.AccountCode, cc, dept)] = debitsByAccount.GetValueOrDefault((element.AccountCode, cc, dept)) + line.Amount;
+                    debitsByAccount[(element.AccountCode, cc, dept, project, fund, branch)] = debitsByAccount.GetValueOrDefault((element.AccountCode, cc, dept, project, fund, branch)) + line.Amount;
                 }
                 else if (line.Type == PayElementType.Deduction)
                 {
@@ -288,7 +291,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                         return Error.Validation("Payroll.ContributionAccount", $"Employer contribution {element.Code} needs an expense account before it can be posted.");
                     }
 
-                    debitsByAccount[(element.ContributionExpenseAccountCode, cc, dept)] = debitsByAccount.GetValueOrDefault((element.ContributionExpenseAccountCode, cc, dept)) + line.Amount;
+                    debitsByAccount[(element.ContributionExpenseAccountCode, cc, dept, project, fund, branch)] =
+                        debitsByAccount.GetValueOrDefault((element.ContributionExpenseAccountCode, cc, dept, project, fund, branch)) + line.Amount;
                     Add(creditsByAccount, element.AccountCode, line.Amount);
                 }
             }
@@ -302,7 +306,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
         List<JournalLineRequest> lines = [.. debitsByAccount.Where(kv => kv.Value != 0m).Select(kv => new JournalLineRequest
             {
-                AccountCode = kv.Key.Account, CostCentre = kv.Key.CostCentre, Department = kv.Key.Department, Side = kv.Value > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(kv.Value),
+                AccountCode = kv.Key.Account, CostCentre = kv.Key.CostCentre, Department = kv.Key.Department, Project = kv.Key.Project, Fund = kv.Key.Fund, Branch = kv.Key.Branch,
+                Side = kv.Value > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(kv.Value),
             }),
             .. creditsByAccount.Where(kv => kv.Value != 0m)
                 .Select(kv => new JournalLineRequest { AccountCode = kv.Key, Side = kv.Value > 0m ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = Math.Abs(kv.Value) })];
