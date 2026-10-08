@@ -395,6 +395,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Municipal tariffs.</summary>
     public DbSet<Core.Municipal.Tariff> Tariffs => Set<Core.Municipal.Tariff>();
 
+    /// <summary>Gets the council's own service types.</summary>
+    public DbSet<Core.Municipal.MunicipalServiceType> MunicipalServiceTypes => Set<Core.Municipal.MunicipalServiceType>();
+
     /// <summary>Municipal properties / stands.</summary>
     public DbSet<Core.Municipal.Property> Properties => Set<Core.Municipal.Property>();
 

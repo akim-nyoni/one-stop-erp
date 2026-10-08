@@ -140,6 +140,7 @@ internal sealed class BillingRunConfiguration : IEntityTypeConfiguration<Billing
     {
         b.ToTable("billing_run", Schemas.Municipal, t => t.HasCheckConstraint("ck_billing_run_approver", "approved_by_user_id IS NULL OR approved_by_user_id <> proposed_by_user_id"));
         b.HasKey(x => x.Id);
+        b.Property(x => x.ServiceCode).HasMaxLength(20);
         b.Property(x => x.RunNumber).HasMaxLength(30);
         b.Property(x => x.ServiceType).HasConversion<int>();
         b.Property(x => x.Status).HasConversion<int>();
@@ -362,6 +363,20 @@ internal sealed class PropertyConfiguration : IEntityTypeConfiguration<Property>
     }
 }
 
+internal sealed class MunicipalServiceTypeConfiguration : IEntityTypeConfiguration<MunicipalServiceType>
+{
+    public void Configure(EntityTypeBuilder<MunicipalServiceType> b)
+    {
+        b.ToTable("service_type", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.DefaultDeposit).HasPrecision(19, 4);
+        b.Property(x => x.DepositAccountCode).HasMaxLength(20);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
 internal sealed class PropertyServiceLinkConfiguration : IEntityTypeConfiguration<PropertyServiceLink>
 {
     public void Configure(EntityTypeBuilder<PropertyServiceLink> b)
@@ -369,6 +384,9 @@ internal sealed class PropertyServiceLinkConfiguration : IEntityTypeConfiguratio
         b.ToTable("property_service", Schemas.Municipal);
         b.HasKey(x => x.Id);
         b.Property(x => x.ServiceType).HasConversion<int>();
+        b.Property(x => x.ServiceCode).HasMaxLength(20);
+        b.Property(x => x.Quantity).HasPrecision(19, 4).HasDefaultValue(1m);
+        b.Property(x => x.DepositAmount).HasPrecision(19, 4);
         b.HasIndex(x => new { x.PropertyId, x.ServiceType });
     }
 }

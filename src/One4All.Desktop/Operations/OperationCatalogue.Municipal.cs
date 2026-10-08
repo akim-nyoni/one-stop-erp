@@ -106,10 +106,45 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Council service types", ListTitle = "Service types",
+            Description = "The council's own services (e.g. extra refuse bins, fire levy): billed like a built-in category, metered or not, with the deposit a new connection pays.",
+            Fields = [Req("Code", "Code"), Req("Name", "Name"), Pick("Category", "Bills as", Enum.GetNames<ServiceType>()), Tick("Metered", "Metered"), Num("Deposit", "Deposit on connection", "0"),
+                Opt("Account", "Deposit account")],
+            Run = async (c, i) => Check(await c.Get<IMunicipalServiceTypeService>().SaveAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), Enum.Parse<ServiceType>(i.Text("Category")), i.Flag("Metered"),
+                i.Number("Deposit"), i.Optional("Account")).ConfigureAwait(true), "Service type saved."),
+            List = async c => Table(await c.Db.MunicipalServiceTypes.AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", t => t.Code), ("Name", t => t.Name), ("Bills as", t => t.Category), ("Metered", t => t.IsMetered), ("Deposit", t => M(t.DefaultDeposit)), ("Account", t => t.DepositAccountCode ?? "—")),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Service connections", ListTitle = "Connections",
+            Description = "Connect a council service to a stand (with a quantity and its deposit, invoiced to the ratepayer), change its quantity, or suspend, disconnect, reconnect or close it. "
+                + "Only an active connection is billed, at the tariff times the quantity.",
+            Fields = [Pick("Step", "Step", ["Connect", "Quantity", .. Enum.GetNames<ServiceLinkStatus>()]), Req("Stand", "Stand number"), Req("Service", "Service code"), Opt("Tariff", "Tariff code (connect)"),
+                Today(), OptNum("Quantity", "Quantity"), OptNum("Deposit", "Deposit (connect; blank: the service's)")],
+            Run = async (c, i) =>
+            {
+                IMunicipalServiceTypeService services = c.Get<IMunicipalServiceTypeService>();
+                return i.Text("Step") switch
+                {
+                    "Connect" => Check(await services.ConnectAsync(c.CompanyId, i.Text("Stand"), i.Text("Service"), i.Optional("Tariff") ?? string.Empty, i.Date("Date"), i.OptionalNumber("Quantity"),
+                        i.OptionalNumber("Deposit")).ConfigureAwait(true), deposit => deposit is null ? "Connected." : $"Connected; deposit billed on {deposit}."),
+                    "Quantity" => Check(await services.SetQuantityAsync(c.CompanyId, i.Text("Stand"), i.Text("Service"), i.OptionalNumber("Quantity") ?? 0m).ConfigureAwait(true), "Quantity changed."),
+                    string status => Check(await services.SetStatusAsync(c.CompanyId, i.Text("Stand"), i.Text("Service"), Enum.Parse<ServiceLinkStatus>(status), i.Date("Date")).ConfigureAwait(true),
+                        $"Connection {status.ToLowerInvariant()}."),
+                };
+            },
+            List = async c => Table(await c.Get<IMunicipalServiceTypeService>().ConnectionsAsync(c.CompanyId, null).ConfigureAwait(true),
+                ("Stand", r => r.StandNumber), ("Service", r => r.Service), ("Tariff", r => r.Tariff), ("Quantity", r => r.Quantity), ("Deposit", r => M(r.Deposit)), ("Status", r => r.Status),
+                ("Since", r => D(r.StartDate))),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Billing run", ListTitle = "Billing runs",
             Description = "Propose a run for a service (and ward), review its exceptions, include or exclude stands, then approve to post the bills — someone other than the proposer approves.",
             Fields = [Pick("Step", "Step", ["Propose", "Show exceptions", "Exclude a stand", "Include a stand", "Approve", "Resume posting", "Cancel"]), Pick("Service", "Service", Enum.GetNames<ServiceType>()),
-                Today("BillDate", "Bill date"), Opt("Ward", "Ward (blank: all)"), Opt("Prefix", "Invoice prefix", "MB"), Opt("Run", "Run number"), Opt("Stand", "Stand number")],
+                Today("BillDate", "Bill date"), Opt("Ward", "Ward (blank: all)"), Opt("ServiceCode", "Council service code (blank: the category's own)"), Opt("Prefix", "Invoice prefix", "MB"),
+                Opt("Run", "Run number"), Opt("Stand", "Stand number")],
             Run = async (c, i) =>
             {
                 IBillingRunService runs = c.Get<IBillingRunService>();
@@ -121,7 +156,7 @@ public static partial class OperationCatalogue
                         return Summary(Check(await runs.ProposeAsync(new BillingRunProposal
                         {
                             CompanyId = c.CompanyId, ServiceType = Enum.Parse<ServiceType>(i.Text("Service")), BillDate = i.Date("BillDate"), Ward = i.Optional("Ward"),
-                            InvoicePrefix = i.Optional("Prefix") ?? "MB", UserId = c.UserId,
+                            InvoicePrefix = i.Optional("Prefix") ?? "MB", UserId = c.UserId, ServiceCode = i.Optional("ServiceCode"),
                         }).ConfigureAwait(true)));
                     case "Show exceptions":
                         IReadOnlyList<BillingRunLineView> lines = Check(await runs.LinesAsync(c.CompanyId, i.Text("Run"), exceptionsOnly: true).ConfigureAwait(true));

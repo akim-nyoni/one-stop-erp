@@ -48,7 +48,9 @@ public sealed class BillingRunService : IBillingRunService
         }
 
         DateOnly period = new(proposal.BillDate.Year, proposal.BillDate.Month, 1);
-        if (await _db.Set<BillingRun>().AnyAsync(r => r.CompanyId == proposal.CompanyId && r.ServiceType == proposal.ServiceType && r.Period == period && r.Status == BillingRunStatus.Proposed, ct).ConfigureAwait(false))
+        string? serviceCode = string.IsNullOrWhiteSpace(proposal.ServiceCode) ? null : proposal.ServiceCode.Trim().ToUpperInvariant();
+        if (await _db.Set<BillingRun>().AnyAsync(r => r.CompanyId == proposal.CompanyId && r.ServiceType == proposal.ServiceType && r.ServiceCode == serviceCode && r.Period == period
+            && r.Status == BillingRunStatus.Proposed, ct).ConfigureAwait(false))
         {
             return Error.Conflict("Mun.RunPending", $"A {proposal.ServiceType} run for {period:yyyy-MM} is already awaiting approval.");
         }
@@ -61,14 +63,15 @@ public sealed class BillingRunService : IBillingRunService
 
         string prefix = proposal.InvoicePrefix.Trim();
         BillingRun run = new(proposal.CompanyId, number.Value, proposal.ServiceType, proposal.BillDate, string.IsNullOrWhiteSpace(proposal.Ward) ? null : proposal.Ward.Trim(), prefix, proposal.UserId);
-        List<long> propertyIds = await MunicipalCharges.PropertiesToBillAsync(_db, proposal.CompanyId, proposal.ServiceType, proposal.BillDate, run.Ward, ct).ConfigureAwait(false);
+        run.ServiceCode = serviceCode;
+        List<long> propertyIds = await MunicipalCharges.PropertiesToBillAsync(_db, proposal.CompanyId, proposal.ServiceType, proposal.BillDate, run.Ward, ct, serviceCode).ConfigureAwait(false);
         Dictionary<long, string> numbers = propertyIds.ToDictionary(id => id, id => $"{prefix}-{id}-{proposal.BillDate:yyyyMM}");
         HashSet<string> alreadyRaised = await MunicipalCharges.AlreadyRaisedAsync(_db, proposal.CompanyId, numbers.Values, ct).ConfigureAwait(false);
 
         foreach (long propertyId in propertyIds)
         {
             string invoice = numbers[propertyId];
-            Result<ComputedCharge> computed = await MunicipalCharges.ComputeAsync(_db, proposal.CompanyId, propertyId, proposal.ServiceType, 0m, proposal.BillDate, prorate: true, ct).ConfigureAwait(false);
+            Result<ComputedCharge> computed = await MunicipalCharges.ComputeAsync(_db, proposal.CompanyId, propertyId, proposal.ServiceType, 0m, proposal.BillDate, prorate: true, ct, serviceCode).ConfigureAwait(false);
             if (computed.IsFailure && computed.Error.Code == "Mun.NotDueThisCycle")
             {
                 continue;

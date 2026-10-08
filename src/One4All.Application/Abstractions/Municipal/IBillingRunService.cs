@@ -18,6 +18,9 @@ public sealed class BillingRunProposal
     /// <summary>Only this ward, or null for all.</summary>
     public string? Ward { get; init; }
 
+    /// <summary>The council service to bill (null: the category's connections without one).</summary>
+    public string? ServiceCode { get; init; }
+
     /// <summary>The bill-number prefix (bills are numbered prefix-property-yyyyMM).</summary>
     public string InvoicePrefix { get; init; } = string.Empty;
 

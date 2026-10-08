@@ -96,6 +96,9 @@ public sealed class BillingRun : AuditableEntity, ICompanyScoped
     /// <summary>The bill-number prefix.</summary>
     public string InvoicePrefix { get; private set; }
 
+    /// <summary>Gets or sets the council service the run bills (null: the built-in category's own connections).</summary>
+    public string? ServiceCode { get; set; }
+
     /// <summary>Where it stands.</summary>
     public BillingRunStatus Status { get; private set; }
 

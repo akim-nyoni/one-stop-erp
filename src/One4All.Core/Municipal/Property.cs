@@ -112,6 +112,35 @@ public sealed class PropertyServiceLink : Entity
 
     /// <summary>Whether the service is active.</summary>
     public bool IsActive { get; set; }
+
+    /// <summary>Gets or sets the council's own service type it is (null: the built-in category alone).</summary>
+    public string? ServiceCode { get; set; }
+
+    /// <summary>Gets or sets how many units are billed (bins, connection points…); the charge is multiplied by it.</summary>
+    public decimal Quantity { get; set; } = 1m;
+
+    /// <summary>Gets or sets the deposit taken on connection.</summary>
+    public decimal DepositAmount { get; set; }
+
+    /// <summary>Gets where the connection stands; only an active one is billed.</summary>
+    public ServiceLinkStatus Status { get; private set; }
+
+    /// <summary>Gets when the status last changed.</summary>
+    public DateOnly? StatusDate { get; private set; }
+
+    /// <summary>Suspends, disconnects, reconnects or closes the connection.</summary>
+    /// <param name="status">The new status.</param>
+    /// <param name="date">When.</param>
+    public void SetStatus(ServiceLinkStatus status, DateOnly date)
+    {
+        Status = status;
+        StatusDate = date;
+        IsActive = status == ServiceLinkStatus.Active;
+        if (status == ServiceLinkStatus.Closed)
+        {
+            EndDate = date;
+        }
+    }
 }
 
 /// <summary>A meter on a property service (<c>mun.meter</c>).</summary>

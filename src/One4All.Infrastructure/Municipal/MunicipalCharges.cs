@@ -40,13 +40,13 @@ internal static class MunicipalCharges
     /// <param name="ward">Only this ward, if given.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The property ids.</returns>
-    public static Task<List<long>> PropertiesToBillAsync(One4AllDbContext db, long companyId, ServiceType serviceType, DateOnly date, string? ward, CancellationToken ct)
+    public static Task<List<long>> PropertiesToBillAsync(One4AllDbContext db, long companyId, ServiceType serviceType, DateOnly date, string? ward, CancellationToken ct, string? serviceCode = null)
     {
         // Connected by the month end and either running (not cut off) or ended within the month.
         (DateOnly monthStart, DateOnly monthEnd) = ProRata.Month(date);
         string? onlyWard = string.IsNullOrWhiteSpace(ward) ? null : ward.Trim();
         return db.Set<Property>()
-            .Where(p => p.CompanyId == companyId && (onlyWard == null || p.Ward == onlyWard) && p.Services.Any(s => s.ServiceType == serviceType && s.StartDate <= monthEnd
+            .Where(p => p.CompanyId == companyId && (onlyWard == null || p.Ward == onlyWard) && p.Services.Any(s => s.ServiceType == serviceType && s.ServiceCode == serviceCode && s.StartDate <= monthEnd
                 && ((s.IsActive && (s.EndDate == null || s.EndDate >= monthStart)) || (s.EndDate != null && s.EndDate >= monthStart))))
             .OrderBy(p => p.Id)
             .Select(p => p.Id)
@@ -63,7 +63,9 @@ internal static class MunicipalCharges
     /// <param name="prorate">Whether to bill only the share of the month the service was in place.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The charge, or why there is none.</returns>
-    public static async Task<Result<ComputedCharge>> ComputeAsync(One4AllDbContext db, long companyId, long propertyId, ServiceType serviceType, decimal consumption, DateOnly date, bool prorate, CancellationToken ct)
+    /// <param name="serviceCode">The council service (null: the category's connection without one).</param>
+    public static async Task<Result<ComputedCharge>> ComputeAsync(One4AllDbContext db, long companyId, long propertyId, ServiceType serviceType, decimal consumption, DateOnly date, bool prorate, CancellationToken ct,
+        string? serviceCode = null)
     {
         Property? property = await db.Set<Property>().Include(p => p.Services)
             .FirstOrDefaultAsync(p => p.Id == propertyId && p.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -74,10 +76,11 @@ internal static class MunicipalCharges
 
         // With prorate, the link may have ended within the bill's month and the charge covers only the days it was in place.
         decimal fraction = 1m;
-        PropertyServiceLink? link = property.Services.FirstOrDefault(s => s.ServiceType == serviceType && s.IsActive);
+        List<PropertyServiceLink> services = [.. property.Services.Where(s => s.ServiceType == serviceType && s.ServiceCode == serviceCode)];
+        PropertyServiceLink? link = services.FirstOrDefault(s => s.IsActive);
         if (prorate)
         {
-            link = property.Services.Where(s => s.ServiceType == serviceType)
+            link = services
                 .Select(s => (Link: s, Share: s.IsActive || s.EndDate != null ? ProRata.Fraction(date, s.StartDate, s.EndDate) : 0m))
                 .Where(x => x.Share > 0m).OrderByDescending(x => x.Share).Select(x => x.Link).FirstOrDefault();
             fraction = link is null ? 0m : ProRata.Fraction(date, link.StartDate, link.EndDate);
@@ -109,10 +112,9 @@ internal static class MunicipalCharges
                 return Error.Rule("Mun.NotDueThisCycle", $"{tariff.Code} is billed in {slot.Instalments} instalments from {slot.PeriodStart:yyyy-MM}; nothing is due in {date:yyyy-MM}.");
             }
 
-            PropertyServiceLink inPlace = property.Services.Where(s => s.ServiceType == serviceType)
-                .OrderByDescending(s => BillingCycles.Share(slot, s.StartDate, s.EndDate)).First();
+            PropertyServiceLink inPlace = services.OrderByDescending(s => BillingCycles.Share(slot, s.StartDate, s.EndDate)).First();
             decimal share = BillingCycles.Share(slot, inPlace.StartDate, inPlace.EndDate);
-            decimal periodCharge = ProRata.Apply(tariff.CalculateCharge(consumption, valuation, property.SizeSquareMetres, slot.PeriodStart.Month), share);
+            decimal periodCharge = ProRata.Apply(tariff.CalculateCharge(consumption, valuation, property.SizeSquareMetres, slot.PeriodStart.Month) * inPlace.Quantity, share);
             decimal billed = BillingCycles.InstalmentAmount(periodCharge, slot);
             if (billed <= 0m)
             {
@@ -123,7 +125,7 @@ internal static class MunicipalCharges
             return new ComputedCharge(property, tariff, billed) { BillMonth = slot.BillMonth(date), CycleNote = note };
         }
 
-        decimal charge = ProRata.Apply(tariff.CalculateCharge(consumption, valuation, property.SizeSquareMetres, date.Month), fraction);
+        decimal charge = ProRata.Apply(tariff.CalculateCharge(consumption, valuation, property.SizeSquareMetres, date.Month) * link.Quantity, fraction);
         if (charge <= 0m)
         {
             return Error.Rule("Mun.NothingToBill", $"Computed charge for {serviceType} on {property.StandNumber} is zero.");
