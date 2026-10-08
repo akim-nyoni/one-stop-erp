@@ -7,7 +7,7 @@ using static One4All.Desktop.Operations.Ops;
 
 namespace One4All.Desktop.Operations;
 
-/// <content>Cashier receipting: the till session, taking payments (account or sundry), and reversals.</content>
+/// <content>Cashier receipting: the till session, taking payments (account or sundry), reversals, collection agents, banking, receipt imports and manual receipt books.</content>
 public static partial class OperationCatalogue
 {
     private static IEnumerable<Operation> Receipting()
@@ -105,6 +105,150 @@ public static partial class OperationCatalogue
                 return Table(await c.Db.Receipts.AsNoTracking().Where(r => r.CompanyId == c.CompanyId && r.CashierUserId == c.UserId && r.Date == today).OrderByDescending(r => r.Id).ToListAsync()
                         .ConfigureAwait(true), ("Receipt", r => r.ReceiptNumber), ("Payer", r => r.PayerKind), ("Account", r => r.PayerAccountId), ("Status", r => r.Status));
             },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Collection agents", ListTitle = "Agents",
+            Description = "Third-party agents who collect from customers for a commission: register one, record a collection (allocated to the customer's debt, owed by the agent) "
+                + "and take the agent's remittance (commission kept, the net banked).",
+            Fields = [Pick("Step", "Step", ["Register", "Collection", "Remittance"]), Req("Agent", "Agent code"), Opt("Name", "Name (register)"), Num("Commission", "Commission %", "0"),
+                Opt("Customer", "Customer code or stand (collection)"), Num("Amount", "Amount", "0"), Opt("Control", "Agent control account"), Opt("Bank", "Bank account (remittance)"),
+                Opt("CommissionAccount", "Commission expense account (remittance)"), Today()],
+            Run = async (c, i) =>
+            {
+                IAgentService agents = c.Get<IAgentService>();
+                string code = i.Text("Agent").Trim();
+                if (i.Text("Step") == "Register")
+                {
+                    return Check(await agents.RegisterAgentAsync(c.CompanyId, code, i.Optional("Name") ?? code, i.Number("Commission")).ConfigureAwait(true), _ => $"Agent {code} registered.");
+                }
+
+                long agent = await c.Db.Agents.AsNoTracking().Where(a => a.CompanyId == c.CompanyId && a.Code.ToUpper() == code.ToUpper()).Select(a => (long?)a.Id).FirstOrDefaultAsync().ConfigureAwait(true)
+                    ?? throw new OperationException($"No agent {code}.");
+                if (i.Text("Step") == "Collection")
+                {
+                    AgentCollectionResult collected = Check(await agents.RecordCollectionAsync(c.CompanyId, agent, await PayerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true), i.Number("Amount"),
+                        i.Date("Date"), i.Optional("Control") ?? string.Empty).ConfigureAwait(true));
+                    return $"Collected {M(collected.Amount)} ({M(collected.AllocatedToDebt)} against the debt); the agent now owes {M(collected.AgentOutstanding)}.";
+                }
+
+                AgentRemittanceResult remitted = Check(await agents.RemitAsync(c.CompanyId, agent, i.Number("Amount"), i.Date("Date"), i.Optional("Control") ?? string.Empty, i.Optional("Bank") ?? string.Empty,
+                    i.Optional("CommissionAccount") ?? string.Empty).ConfigureAwait(true));
+                return $"Remitted {M(remitted.Gross)}: commission {M(remitted.Commission)}, banked {M(remitted.Net)} ({remitted.JournalNumber}); the agent still owes {M(remitted.AgentOutstanding)}.";
+            },
+            List = async c => Table(await c.Db.Agents.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderBy(a => a.Code).ToListAsync().ConfigureAwait(true),
+                ("Agent", a => a.Code), ("Name", a => a.Name), ("Commission %", a => a.CommissionPercent), ("Collected", a => M(a.CollectedToDate)), ("Remitted", a => M(a.RemittedToDate)),
+                ("Active", a => a.IsActive)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Banking", ListTitle = "Cash deposits",
+            Description = "Takes cash to the bank (cash to cash-in-transit), confirms a deposit as banked (in transit to the bank account), moves money between accounts, "
+                + "and posts bank charges or interest received from the statement.",
+            Fields = [Pick("Step", "Step", ["Bank cash", "Confirm banked", "Transfer", "Bank charge", "Interest received"]), Num("Amount", "Amount", "0"), Opt("Reference", "Reference / deposit slip"),
+                Opt("From", "Cash / from account"), Opt("Transit", "Cash-in-transit account"), Opt("Bank", "Bank / to account"), Opt("Other", "Charges or interest income account"), Today()],
+            Run = async (c, i) =>
+            {
+                IBankingService banking = c.Get<IBankingService>();
+                string reference = i.Optional("Reference") ?? string.Empty, from = i.Optional("From") ?? string.Empty, transit = i.Optional("Transit") ?? string.Empty,
+                    bank = i.Optional("Bank") ?? string.Empty, other = i.Optional("Other") ?? string.Empty;
+                switch (i.Text("Step"))
+                {
+                    case "Bank cash":
+                        BankingResult deposit = Check(await banking.BankCashAsync(c.CompanyId, i.Number("Amount"), i.Date("Date"), reference, from, transit).ConfigureAwait(true));
+                        return $"Deposit {deposit.Reference} in transit ({deposit.JournalNumber}).";
+                    case "Confirm banked":
+                        long id = await c.Db.BankDeposits.AsNoTracking().Where(d => d.CompanyId == c.CompanyId && d.Reference.ToUpper() == reference.ToUpper()).OrderByDescending(d => d.Id)
+                            .Select(d => (long?)d.Id).FirstOrDefaultAsync().ConfigureAwait(true) ?? throw new OperationException($"No deposit {reference}.");
+                        return Check(await banking.ConfirmBankedAsync(c.CompanyId, id, i.Date("Date"), transit, bank).ConfigureAwait(true), j => $"Banked ({j}).");
+                    case "Transfer":
+                        return Check(await banking.TransferAsync(c.CompanyId, i.Number("Amount"), i.Date("Date"), reference, from, bank).ConfigureAwait(true), j => $"Transferred ({j}).");
+                    case "Bank charge":
+                        return Check(await banking.PostBankChargeAsync(c.CompanyId, i.Number("Amount"), i.Date("Date"), reference, bank, other).ConfigureAwait(true), j => $"Charge posted ({j}).");
+                    default:
+                        return Check(await banking.PostInterestReceivedAsync(c.CompanyId, i.Number("Amount"), i.Date("Date"), reference, bank, other).ConfigureAwait(true), j => $"Interest posted ({j}).");
+                }
+            },
+            List = async c => Table(await c.Db.BankDeposits.AsNoTracking().Where(d => d.CompanyId == c.CompanyId).OrderByDescending(d => d.Id).Take(200).ToListAsync().ConfigureAwait(true),
+                ("Reference", d => d.Reference), ("Date", d => D(d.DepositDate)), ("Amount", d => M(d.Amount)), ("Status", d => d.Status), ("Banked", d => d.BankedOn is DateOnly b ? D(b) : string.Empty)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Import receipts from a file", ListTitle = "Import batches",
+            Description = "Receipts a bank statement, mobile money, card settlement, employer or agent file (CSV: payer reference, payer name, amount, value date): lines matching one "
+                + "account are receipted to it, the rest go to suspense; the same file cannot be imported twice.",
+            Fields = [Req("File", "CSV file path"), Pick("Source", "Source", Enum.GetNames<ImportSource>()), Opt("Bank", "Bank account"), Opt("Suspense", "Suspense account"), Today()],
+            Run = async (c, i) =>
+            {
+                string path = i.Text("File");
+                byte[] bytes = await System.IO.File.ReadAllBytesAsync(path).ConfigureAwait(true);
+                List<ImportLineRequest> lines = [];
+                int row = 0;
+                foreach (string raw in System.Text.Encoding.UTF8.GetString(bytes).Split('\n'))
+                {
+                    row++;
+                    string line = raw.Trim().TrimStart('\uFEFF');
+                    if (line.Length == 0)
+                    {
+                        continue;
+                    }
+
+                    string[] cells = line.Split(',', StringSplitOptions.TrimEntries).Select(x => x.Trim('"')).ToArray();
+                    decimal amount = 0m;
+                    DateOnly value = default;
+                    bool parsed = cells.Length >= 4 && decimal.TryParse(cells[2], NumberStyles.Number, CultureInfo.InvariantCulture, out amount)
+                        & DateOnly.TryParse(cells.Length >= 4 ? cells[3] : string.Empty, CultureInfo.InvariantCulture, DateTimeStyles.None, out value);
+                    if (!parsed && row == 1)
+                    {
+                        continue; // a heading row
+                    }
+
+                    lines.Add(parsed ? new ImportLineRequest(cells[0], cells[1], amount, value)
+                        : throw new OperationException($"Line {row}: write payer reference, payer name, amount, value date (yyyy-mm-dd)."));
+                }
+
+                ImportResult imported = Check(await c.Get<IReceiptImportService>().ImportAsync(new ImportRequest
+                {
+                    CompanyId = c.CompanyId, FileReference = System.IO.Path.GetFileName(path), FileHash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)),
+                    Source = Enum.Parse<ImportSource>(i.Text("Source")), Date = i.Date("Date"), BankAccountCode = i.Optional("Bank") ?? string.Empty,
+                    SuspenseAccountCode = i.Optional("Suspense") ?? string.Empty, Lines = lines,
+                }).ConfigureAwait(true));
+                return $"{imported.TotalLines} line(s): {imported.Matched} matched ({M(imported.MatchedAmount)}), {imported.Unmatched} to suspense ({M(imported.UnmatchedAmount)}).";
+            },
+            List = async c => Table(await c.Db.ImportBatches.AsNoTracking().Include(b => b.Lines).Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Take(100).ToListAsync().ConfigureAwait(true),
+                ("File", b => b.FileReference), ("Source", b => b.Source), ("Date", b => D(b.ImportDate)), ("Matched", b => b.MatchedCount), ("Unmatched", b => b.UnmatchedCount)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Manual receipt books", ListTitle = "Receipt books",
+            Description = "Pre-numbered manual receipt books for when the system is down: issue a book (serial range) to a cashier, capture a manual receipt written from it later, "
+                + "and list the serials still unused (every serial must be accounted for).",
+            Fields = [Pick("Step", "Step", ["Issue", "Capture", "Unused serials"]), Req("Book", "Book number"), OptNum("FromSerial", "First serial (issue)"), OptNum("ToSerial", "Last serial (issue)"),
+                Opt("Cashier", "Issued to (user name; blank: me)"), OptNum("Serial", "Serial (capture)"), Num("Amount", "Amount (capture)", "0"), Today("Date", "Issue / receipt date")],
+            Run = async (c, i) =>
+            {
+                IStationeryService stationery = c.Get<IStationeryService>();
+                string number = i.Text("Book").Trim();
+                if (i.Text("Step") == "Issue")
+                {
+                    long cashier = i.Optional("Cashier") is string name ? await UserAsync(c, name).ConfigureAwait(true) : c.UserId;
+                    return Check(await stationery.IssueBookAsync(c.CompanyId, number, (long)(i.OptionalNumber("FromSerial") ?? 0m), (long)(i.OptionalNumber("ToSerial") ?? 0m), cashier, i.Date("Date"))
+                        .ConfigureAwait(true), _ => $"Book {number} issued.");
+                }
+
+                long book = await c.Db.StationeryBooks.AsNoTracking().Where(b => b.CompanyId == c.CompanyId && b.BookNumber.ToUpper() == number.ToUpper()).Select(b => (long?)b.Id).FirstOrDefaultAsync()
+                    .ConfigureAwait(true) ?? throw new OperationException($"No receipt book {number}.");
+                if (i.Text("Step") == "Capture")
+                {
+                    ManualCaptureResult captured = Check(await stationery.CaptureManualReceiptAsync(c.CompanyId, book, (long)(i.OptionalNumber("Serial") ?? 0m), i.Number("Amount"), i.Date("Date")).ConfigureAwait(true));
+                    return $"Serial {captured.Serial} captured; {captured.RemainingUnused} unused in the book.";
+                }
+
+                IReadOnlyList<long> unused = Check(await stationery.GetUnusedSerialsAsync(c.CompanyId, book).ConfigureAwait(true));
+                return unused.Count == 0 ? "Every serial is used." : $"{unused.Count} unused: {string.Join(", ", unused)}";
+            },
+            List = async c => Table(await c.Db.StationeryBooks.AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Take(200).ToListAsync().ConfigureAwait(true),
+                ("Book", b => b.BookNumber), ("From", b => b.FromSerial), ("To", b => b.ToSerial), ("Issued to", b => b.IssuedToUserId), ("Issued", b => D(b.IssuedOn)), ("Status", b => b.Status)),
         };
     }
 
