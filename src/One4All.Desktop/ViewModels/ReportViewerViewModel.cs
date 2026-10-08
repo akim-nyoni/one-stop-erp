@@ -39,7 +39,26 @@ public sealed partial class ReportParameterInput : ObservableObject
         Prompt = prompt;
         Type = type;
         _value = value;
+        Definition = new ReportParameter { Name = name, Type = type, Prompt = prompt };
     }
+
+    /// <summary>Creates a parameter input from the report's parameter.</summary>
+    /// <param name="parameter">The parameter.</param>
+    public ReportParameterInput(ReportParameter parameter)
+        : this(parameter.Name, string.IsNullOrWhiteSpace(parameter.Prompt) ? parameter.Name : parameter.Prompt!, parameter.Type, parameter.DefaultValue ?? string.Empty)
+        => Definition = parameter;
+
+    /// <summary>The report's parameter.</summary>
+    public ReportParameter Definition { get; }
+
+    /// <summary>The choices from the parameter's list-of-values query.</summary>
+    public ObservableCollection<ParameterChoice> Options { get; } = [];
+
+    /// <summary>Whether the parameter offers a list of choices.</summary>
+    public bool HasLookup => !string.IsNullOrWhiteSpace(Definition.LookupQuery);
+
+    /// <summary>Whether the parameter is typed as text (no list).</summary>
+    public bool IsPlain => !HasLookup;
 
     /// <summary>The parameter name (key passed to the runner).</summary>
     public string Name { get; }
@@ -51,18 +70,37 @@ public sealed partial class ReportParameterInput : ObservableObject
     public ParameterType Type { get; }
 
     /// <summary>A hint describing the expected input.</summary>
-    public string Hint => Type switch
+    public string Hint => (Type switch
     {
         ParameterType.Date => "yyyy-mm-dd",
         ParameterType.Integer => "whole number",
         ParameterType.Decimal => "number",
         ParameterType.Boolean => "true / false",
         _ => "text",
-    };
+    }) + (Definition.MultiSelect ? ", several separated by commas" : string.Empty) + (LookupNote is { Length: > 0 } note ? " — " + note : string.Empty);
+
+    /// <summary>Why the list is empty (waiting on another parameter, refused), shown under the input.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Hint))]
+    private string _lookupNote = string.Empty;
 
     /// <summary>The current text value.</summary>
     [ObservableProperty]
     private string _value;
+
+    /// <summary>Raised when the value changes (a dependent list reloads).</summary>
+    public event EventHandler? ValueChanged;
+
+    partial void OnValueChanged(string value) => ValueChanged?.Invoke(this, EventArgs.Empty);
+}
+
+/// <summary>One choice in a parameter's list.</summary>
+/// <param name="Value">The value passed to the report.</param>
+/// <param name="Label">What the user sees.</param>
+public sealed record ParameterChoice(string Value, string Label)
+{
+    /// <summary>The text in the drop-down.</summary>
+    public string Display => Label == Value ? Value : $"{Value} — {Label}";
 }
 
 /// <summary>
@@ -139,11 +177,76 @@ public sealed partial class ReportViewerViewModel : ObservableObject
         ReportDefinition? definition = TryDeserialize(value.DefinitionJson);
         foreach (ReportParameter parameter in definition?.Parameters ?? [])
         {
-            Parameters.Add(new ReportParameterInput(
-                parameter.Name,
-                string.IsNullOrWhiteSpace(parameter.Prompt) ? parameter.Name : parameter.Prompt!,
-                parameter.Type,
-                parameter.DefaultValue ?? string.Empty));
+            ReportParameterInput input = new(parameter);
+            input.ValueChanged += (_, _) => ReloadDependants(input.Name);
+            Parameters.Add(input);
+        }
+
+        foreach (ReportParameterInput input in Parameters.Where(p => p.HasLookup))
+        {
+            _ = LoadOptionsAsync(input);
+        }
+    }
+
+    private CancellationTokenSource? _reload;
+
+    // A parent's value changed: once typing pauses, the lists that depend on it reload.
+    private void ReloadDependants(string parent)
+    {
+        List<ReportParameterInput> dependants = [.. Parameters.Where(p => p.HasLookup && p.Definition.DependsOn.Contains(parent, StringComparer.OrdinalIgnoreCase))];
+        if (dependants.Count == 0)
+        {
+            return;
+        }
+
+        _reload?.Cancel();
+        CancellationTokenSource reload = _reload = new CancellationTokenSource();
+        _ = Task.Delay(400, reload.Token).ContinueWith(
+            async t =>
+            {
+                if (!t.IsCanceled)
+                {
+                    foreach (ReportParameterInput dependant in dependants)
+                    {
+                        await LoadOptionsAsync(dependant).ConfigureAwait(true);
+                    }
+                }
+            },
+            CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.FromCurrentSynchronizationContext());
+    }
+
+    // The parameter's choices, from its list-of-values query run with the values entered so far.
+    private async Task LoadOptionsAsync(ReportParameterInput input)
+    {
+        if (SelectedReport is not ReportListItem report)
+        {
+            return;
+        }
+
+        Dictionary<string, string> entered = Parameters.Where(p => !ReferenceEquals(p, input) && !string.IsNullOrWhiteSpace(p.Value))
+            .ToDictionary(p => p.Name, p => p.Value.Trim(), StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            Result<IReadOnlyList<ParameterOption>> options = await scope.ServiceProvider.GetRequiredService<IReportParameterLookupService>()
+                .OptionsAsync(_companyId, report.Code, input.Name, entered).ConfigureAwait(true);
+            input.Options.Clear();
+            if (options.IsFailure)
+            {
+                input.LookupNote = options.Error.Message;
+                return;
+            }
+
+            foreach (ParameterOption option in options.Value)
+            {
+                input.Options.Add(new ParameterChoice(option.Value, option.Label));
+            }
+
+            input.LookupNote = input.Options.Count == 0 ? "no choices" : string.Empty;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or Npgsql.NpgsqlException or TimeoutException)
+        {
+            input.LookupNote = "the list could not be loaded: " + ex.Message;
         }
     }
 
@@ -240,15 +343,7 @@ public sealed partial class ReportViewerViewModel : ObservableObject
                 continue; // let the report's own defaults apply
             }
 
-            string raw = input.Value.Trim();
-            parameters[input.Name] = input.Type switch
-            {
-                ParameterType.Date when DateOnly.TryParse(raw, CultureInfo.InvariantCulture, out DateOnly d) => d,
-                ParameterType.Integer when long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out long i) => i,
-                ParameterType.Decimal when decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal m) => m,
-                ParameterType.Boolean when bool.TryParse(raw, out bool b) => b,
-                _ => raw,
-            };
+            parameters[input.Name] = ReportParameterValues.Parse(input.Definition, input.Value);
         }
 
         return parameters;

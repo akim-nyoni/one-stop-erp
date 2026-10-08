@@ -70,6 +70,9 @@ public sealed class ReportParameter
 
     /// <summary>An optional query returning the list of valid values.</summary>
     public string? LookupQuery { get; set; }
+
+    /// <summary>Gets or sets the parameters this one's list depends on (cascading): their values are bound into <see cref="LookupQuery"/>.</summary>
+    public List<string> DependsOn { get; set; } = [];
 }
 
 /// <summary>A named data source for a report (brief §13.1).</summary>

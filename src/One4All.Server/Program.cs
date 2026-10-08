@@ -2503,6 +2503,17 @@ app.MapPost("/api/reports/{code}/run", async (string code, long companyId, One4A
 .RequireAuthorization()
 .WithName("RunReportAudited");
 
+// The choices for a report parameter with a list-of-values query; the other query values are the parameters entered so far (cascading).
+app.MapGet("/api/reports/{code}/parameters/{name}/options", async (string code, string name, long companyId, HttpRequest request,
+    One4All.Application.Abstractions.Reporting.IReportParameterLookupService lookups, CancellationToken ct) =>
+{
+    Dictionary<string, string> entered = request.Query.Where(q => !string.Equals(q.Key, "companyId", StringComparison.OrdinalIgnoreCase))
+        .ToDictionary(q => q.Key, q => q.Value.ToString(), StringComparer.OrdinalIgnoreCase);
+    return ValueResponse(await lookups.OptionsAsync(companyId, code, name, entered, ct).ConfigureAwait(false));
+})
+.RequireAuthorization()
+.WithName("ReportParameterOptions");
+
 app.MapGet("/api/reports/{code}/runs", async (string code, long companyId, One4All.Application.Abstractions.Reporting.IAuditedReportRunner reports, CancellationToken ct) =>
     Results.Ok(await reports.RunLogAsync(companyId, code, ct).ConfigureAwait(false)))
 .RequireAuthorization()

@@ -3,6 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="One4All — Report Viewer" Height="720" Width="1160"
         WindowStartupLocation="CenterOwner" Background="White">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </Window.Resources>
     <DockPanel>
         <!-- Footer status bar -->
         <Border DockPanel.Dock="Bottom" Background="{StaticResource BrandBrush}">
@@ -44,7 +47,11 @@
                                     <DataTemplate>
                                         <StackPanel Margin="0,0,0,10">
                                             <TextBlock Text="{Binding Prompt}" FontSize="12" Foreground="#556" />
-                                            <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Height="24" VerticalContentAlignment="Center" Padding="4,0" />
+                                            <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Height="24" VerticalContentAlignment="Center" Padding="4,0"
+                                                     Visibility="{Binding IsPlain, Converter={StaticResource BoolToVisibility}}" />
+                                            <ComboBox IsEditable="True" ItemsSource="{Binding Options}" DisplayMemberPath="Display" TextSearch.TextPath="Value"
+                                                      Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Height="24"
+                                                      Visibility="{Binding HasLookup, Converter={StaticResource BoolToVisibility}}" />
                                             <TextBlock Text="{Binding Hint}" FontSize="10" Foreground="#99A" />
                                         </StackPanel>
                                     </DataTemplate>

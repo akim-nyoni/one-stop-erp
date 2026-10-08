@@ -140,7 +140,7 @@ public sealed class ReportRunner : IReportRunner
         IReportDataProvider? provider = _providers.FirstOrDefault(p => p.CanHandle(command));
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = provider is null
             ? []
-            : await provider.GetRowsAsync(companyId, command, parameters, ct).ConfigureAwait(false);
+            : await provider.GetRowsAsync(companyId, command, ReportParameterValues.ForQuery(definition, parameters), ct).ConfigureAwait(false);
         return Application.Security.FieldSensitivity.Strip(rows, hiddenFields);
     }
 
@@ -230,9 +230,20 @@ public sealed class ReportRunner : IReportRunner
         return new RenderedDocument(bytes, contentType, $"{baseName}.{ext}");
     }
 
-    private async Task<ReportDefinition?> ResolveDefinitionAsync(long companyId, string code, CancellationToken ct)
+    /// <summary>The definition a code runs: the company's version, else the system one, else a built-in report.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="companyId">The company.</param>
+    /// <param name="code">The report code.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The definition, or null.</returns>
+    internal static async Task<ReportDefinition?> DefinitionAsync(One4AllDbContext db, long companyId, string code, CancellationToken ct)
+        => await ResolveDefinitionAsync(db, companyId, code, ct).ConfigureAwait(false) ?? BuiltInDefinition(code);
+
+    private Task<ReportDefinition?> ResolveDefinitionAsync(long companyId, string code, CancellationToken ct) => ResolveDefinitionAsync(_db, companyId, code, ct);
+
+    private static async Task<ReportDefinition?> ResolveDefinitionAsync(One4AllDbContext db, long companyId, string code, CancellationToken ct)
     {
-        ReportDefinitionRecord? record = await _db.ReportDefinitions
+        ReportDefinitionRecord? record = await db.ReportDefinitions
             .Where(r => r.Code == code && (r.Scope == ReportScope.System || (r.Scope == ReportScope.Company && r.CompanyId == companyId)))
             .OrderByDescending(r => r.Scope)
             .FirstOrDefaultAsync(ct)
