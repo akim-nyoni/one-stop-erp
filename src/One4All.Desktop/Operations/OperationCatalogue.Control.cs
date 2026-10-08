@@ -3,6 +3,9 @@ using One4All.Application.Abstractions.Banking;
 using One4All.Application.Abstractions.Budgeting;
 using One4All.Application.Abstractions.Communications;
 using One4All.Application.Abstractions.Expenses;
+using One4All.Application.Abstractions.Housing;
+using One4All.Application.Abstractions.Offline;
+using One4All.Application.Housing;
 using One4All.Application.Budgeting;
 using One4All.Core.Budgeting;
 using One4All.Core.Expenses;
@@ -10,7 +13,7 @@ using static One4All.Desktop.Operations.Ops;
 
 namespace One4All.Desktop.Operations;
 
-/// <content>Control operations: staff expense claims, treasury transfers between bank accounts, budget control (virements, the vote book, utilisation alerts, year-end commitments, the seal), variance commentary and statement despatch.</content>
+/// <content>Control operations: staff expense claims, treasury transfers between bank accounts, budget control (virements, the vote book, utilisation alerts, year-end commitments, the seal), variance commentary, statement despatch, housing agreements and maps, and failed offline operations.</content>
 public static partial class OperationCatalogue
 {
     private static IEnumerable<Operation> Control()
@@ -187,6 +190,103 @@ public static partial class OperationCatalogue
                 StatementDespatch queued = Check(await c.Get<IStatementDespatchService>().QueueAsync(c.CompanyId, i.Date("Date"), i.Text("Template"), i.Text("Language"), i.Number("Minimum")).ConfigureAwait(true));
                 return $"{queued.Queued} statement(s) queued{(queued.BatchId is long b ? $" (batch {b})" : string.Empty)}; {queued.NoEmail} customer(s) with no email; {queued.BelowMinimum} below the minimum.";
             },
+        };
+        yield return new Operation
+        {
+            Module = "Housing", Title = "Sale, lease and rental agreements", ListTitle = "Agreements",
+            Description = "Drafts an agreement with a party for a stand (price, terms, special conditions), records its signing with witnesses, amends it as a new version "
+                + "with a reason, shows its version history, or checks every stored agreement document against its hash.",
+            Fields = [Pick("Step", "Step", ["Draft", "Sign", "Amend", "History", "Verify documents"]), Opt("Agreement", "Agreement number"), Pick("Type", "Type (draft)", Enum.GetNames<Core.Housing.AgreementType>()),
+                Opt("Party", "Party customer code (draft)"), Opt("Stand", "Stand number"), Num("Price", "Price", "0"), Opt("Terms", "Terms"), Opt("Special", "Special conditions"),
+                Opt("Witnesses", "Witnesses, comma-separated (sign)"), Opt("Reason", "Amendment reason"), Today()],
+            Run = async (c, i) =>
+            {
+                IAgreementRegisterService register = c.Get<IAgreementRegisterService>();
+                string number = (i.Optional("Agreement") ?? string.Empty).Trim();
+                switch (i.Text("Step"))
+                {
+                    case "Draft":
+                        long? stand = i.Optional("Stand") is string standNumber
+                            ? await FindAsync(c.Db.HousingStands, s => s.CompanyId == c.CompanyId && s.StandNumber.ToUpper() == standNumber.Trim().ToUpper(), s => s.Id, "stand", standNumber).ConfigureAwait(true)
+                            : null;
+                        return Check(await register.DraftAsync(new AgreementDraft
+                        {
+                            CompanyId = c.CompanyId, AgreementType = Enum.Parse<Core.Housing.AgreementType>(i.Text("Type")), PartyCustomerId = await CustomerAsync(c, i.Optional("Party") ?? string.Empty).ConfigureAwait(true),
+                            StandId = stand, Price = i.Number("Price"), Terms = i.Optional("Terms") ?? string.Empty, SpecialConditions = i.Optional("Special"), Date = i.Date("Date"),
+                        }).ConfigureAwait(true), n => $"Agreement {n} drafted; sign it once executed.");
+                    case "Sign":
+                        string[] witnesses = (i.Optional("Witnesses") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                        return Check(await register.SignAsync(c.CompanyId, number, i.Date("Date"), witnesses).ConfigureAwait(true), $"Agreement {number} signed.");
+                    case "Amend":
+                        return Check(await register.AmendAsync(c.CompanyId, number, i.Number("Price"), i.Optional("Terms") ?? string.Empty, i.Optional("Special"), i.Optional("Reason") ?? string.Empty)
+                            .ConfigureAwait(true), v => $"Agreement {number} amended (version {v}).");
+                    case "History":
+                        IReadOnlyList<AgreementVersionEntry> history = Check(await register.HistoryAsync(c.CompanyId, number).ConfigureAwait(true));
+                        return string.Join(Environment.NewLine, history.Select(h => $"v{h.Version} {M(h.Price),14} {(h.InForce ? "IN FORCE" : string.Empty),-9} signed {(h.SignedOn is DateOnly d ? D(d) : "-")} "
+                            + $"{h.Witnesses} {h.AmendmentReason}"));
+                    default:
+                        IReadOnlyList<string> problems = await register.VerifyDocumentsAsync(c.CompanyId).ConfigureAwait(true);
+                        return problems.Count == 0 ? "Every agreement document matches its hash." : string.Join(Environment.NewLine, problems.Prepend("ALTERED OR MISSING:"));
+                }
+            },
+            List = async c => Table(await c.Db.Set<Core.Housing.HousingAgreement>().AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Take(500).ToListAsync().ConfigureAwait(true),
+                ("Agreement", a => a.AgreementNumber), ("Type", a => a.AgreementType), ("Party", a => a.PartyCustomerId), ("Stand", a => a.StandId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty)),
+        };
+        yield return new Operation
+        {
+            Module = "Housing", Title = "Map stands and parcels",
+            Description = "Records a stand's or land parcel's boundary (WKT POLYGON in longitude latitude), lists stands whose mapped area differs from the surveyed area "
+                + "by more than a tolerance, or exports a layer as GeoJSON for a GIS.",
+            Fields = [Pick("Step", "Step", ["Map a stand", "Map a parcel", "Area discrepancies", "Export GeoJSON"]), Opt("Number", "Stand / parcel number"), Opt("Wkt", "Boundary (WKT POLYGON)"),
+                Num("Tolerance", "Tolerance %", "5"), Pick("Layer", "Layer (export)", Enum.GetNames<MapLayer>()), Opt("Scheme", "Scheme code (export; blank: all)"), Opt("File", "Save GeoJSON to (path)")],
+            Run = async (c, i) =>
+            {
+                ISpatialRegisterService spatial = c.Get<ISpatialRegisterService>();
+                string number = (i.Optional("Number") ?? string.Empty).Trim();
+                static string Shown(GeoBoundary b) => $"Mapped: {b.AreaSquareMetres:#,0.##} m², centroid {b.Centroid.Longitude:0.######}, {b.Centroid.Latitude:0.######}.";
+                switch (i.Text("Step"))
+                {
+                    case "Map a stand":
+                        long standId = await FindAsync(c.Db.HousingStands, s => s.CompanyId == c.CompanyId && s.StandNumber.ToUpper() == number.ToUpper(), s => s.Id, "stand", number).ConfigureAwait(true);
+                        return Shown(Check(await spatial.MapStandAsync(c.CompanyId, standId, i.Optional("Wkt") ?? string.Empty).ConfigureAwait(true)));
+                    case "Map a parcel":
+                        long parcelId = await FindAsync(c.Db.LandParcels, p => p.CompanyId == c.CompanyId && p.ParcelNumber.ToUpper() == number.ToUpper(), p => p.Id, "land parcel", number).ConfigureAwait(true);
+                        return Shown(Check(await spatial.MapParcelAsync(c.CompanyId, parcelId, i.Optional("Wkt") ?? string.Empty).ConfigureAwait(true)));
+                    case "Area discrepancies":
+                        IReadOnlyList<AreaDiscrepancy> off = await spatial.DiscrepanciesAsync(c.CompanyId, i.Number("Tolerance")).ConfigureAwait(true);
+                        return off.Count == 0 ? "Every mapped stand is within tolerance." : string.Join(Environment.NewLine, off.Select(d => $"{d.StandNumber,-12} surveyed {d.SurveyedSquareMetres,12:#,0.##} m²  "
+                            + $"mapped {d.MappedSquareMetres,12:#,0.##} m²  {d.DifferencePercent,6:0.0}%"));
+                    default:
+                        long? scheme = i.Optional("Scheme") is string code
+                            ? await FindAsync(c.Db.HousingSchemes, s => s.CompanyId == c.CompanyId && s.Code.ToUpper() == code.Trim().ToUpper(), s => s.Id, "scheme", code).ConfigureAwait(true)
+                            : null;
+                        string json = await spatial.GeoJsonAsync(c.CompanyId, Enum.Parse<MapLayer>(i.Text("Layer")), scheme).ConfigureAwait(true);
+                        if (i.Optional("File") is string path)
+                        {
+                            await System.IO.File.WriteAllTextAsync(path, json).ConfigureAwait(true);
+                            return $"GeoJSON saved to {path} ({json.Length:#,0} characters).";
+                        }
+
+                        return json;
+                }
+            },
+        };
+        yield return new Operation
+        {
+            Module = "System Manager", Title = "Failed offline operations", ListTitle = "Failed offline operations",
+            Description = "Work captured offline that failed to synchronise: requeue one (after fixing the cause) or discard it, by its operation id.",
+            Fields = [Pick("Step", "Step", ["Requeue", "Discard"]), Req("Operation", "Operation id")],
+            Run = async (c, i) =>
+            {
+                Guid id = Guid.TryParse(i.Text("Operation"), out Guid parsed) ? parsed : throw new OperationException("That is not an operation id.");
+                IOfflineAdminService offline = c.Get<IOfflineAdminService>();
+                return i.Text("Step") == "Requeue"
+                    ? Check(await offline.RequeueAsync(id).ConfigureAwait(true), "Requeued; it synchronises with the next run.")
+                    : Check(await offline.DiscardAsync(id).ConfigureAwait(true), "Discarded.");
+            },
+            List = async c => Table(await c.Get<IOfflineAdminService>().ListFailedAsync().ConfigureAwait(true),
+                ("Operation", o => o.OperationId), ("Kind", o => o.Kind), ("Created", o => o.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)),
+                ("Attempts", o => o.Attempts), ("Error", o => o.LastError ?? string.Empty)),
         };
     }
 
