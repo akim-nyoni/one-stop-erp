@@ -278,6 +278,69 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     /// <summary>Loads the company, terminal, menu and default accounts.</summary>
     public async Task LoadAsync(CancellationToken ct = default)
     {
+        try
+        {
+            await LoadOnlineAsync(ct).ConfigureAwait(true);
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            await LoadOfflineAsync(ct).ConfigureAwait(true);
+        }
+    }
+
+    // The database is unreachable: the terminal sells from its sealed local snapshot (brief §6B), and its sales queue locally.
+    private async Task LoadOfflineAsync(CancellationToken ct)
+    {
+        PendingOfflineCount = await LocalQueue.CountAsync(ct).ConfigureAwait(true);
+        PosOfflineSnapshot? snapshot = await CatalogueStore.LoadAsync(ct).ConfigureAwait(true);
+        if (snapshot is null)
+        {
+            StatusMessage = "Offline, and this terminal has no saved catalogue yet — it needs the connection once before it can sell offline.";
+            return;
+        }
+
+        _snapshot = snapshot;
+        _companyId = snapshot.CompanyId;
+        _currency = CurrencyCode.Parse(snapshot.BaseCurrency);
+        _warehouseId = snapshot.WarehouseId;
+        _terminalId = snapshot.TerminalId;
+        _taxRates.Clear();
+        foreach ((string code, decimal rate) in snapshot.TaxRates)
+        {
+            _taxRates[code] = rate;
+        }
+
+        ShowProducts(snapshot.Tiles);
+        string Account(string role, string current) => snapshot.Accounts.TryGetValue(role, out string? code) && code.Length > 0 ? code : current;
+        CashAccountCode = Account("Cash", CashAccountCode);
+        CardAccountCode = Account("Card", CardAccountCode);
+        TaxAccountCode = Account("Tax", TaxAccountCode);
+        OverShortAccountCode = Account("OverShort", OverShortAccountCode);
+        DiscountAccountCode = Account("Discount", DiscountAccountCode);
+        MobileMoneyAccountCode = Account("MobileMoney", MobileMoneyAccountCode);
+        GiftCardAccountCode = Account("GiftCard", GiftCardAccountCode);
+        TenderCurrencies.Clear();
+        foreach (OfflineTenderCurrency currency in snapshot.TenderCurrencies)
+        {
+            TenderCurrencies.Add(new TillCurrency(CurrencyCode.Parse(currency.Code), currency.Rate));
+        }
+
+        SelectedTenderCurrency = TenderCurrencies.FirstOrDefault();
+        string taken = snapshot.TakenUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+        if (snapshot.OpenSessionId is long session)
+        {
+            TillSessionId = session;
+            IsSessionOpen = true;
+            StatusMessage = $"Offline — selling from the catalogue saved {taken} in till session {session}; sales queue here ({PendingOfflineCount} so far) and sync when the connection returns.";
+        }
+        else
+        {
+            StatusMessage = $"Offline — the catalogue saved {taken} is shown, but a till can only be opened with the connection.";
+        }
+    }
+
+    private async Task LoadOnlineAsync(CancellationToken ct)
+    {
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
 
@@ -307,6 +370,9 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         SelectedTenderCurrency = TenderCurrencies.FirstOrDefault();
+        _customers = await db.Customers.AsNoTracking().Where(c => c.CompanyId == _companyId).OrderBy(c => c.Code).Take(5000)
+            .Select(c => new OfflineCustomer(c.Id, c.Code, c.Name)).ToListAsync(ct).ConfigureAwait(true);
+        await SaveSnapshotAsync(IsSessionOpen ? TillSessionId : null).ConfigureAwait(true);
         await RefreshParkedAsync().ConfigureAwait(true);
 
         PendingOfflineCount = await LocalQueue.CountAsync(ct).ConfigureAwait(true);
@@ -319,6 +385,42 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     }
 
     private ILocalOfflineQueue LocalQueue => _services.GetRequiredService<ILocalOfflineQueue>();
+
+    private ILocalCatalogueStore CatalogueStore => _services.GetRequiredService<ILocalCatalogueStore>();
+
+    private PosOfflineSnapshot? _snapshot;
+    private IReadOnlyList<PosTile> _tiles = [];
+    private List<OfflineCustomer> _customers = [];
+
+    // Seals what the terminal needs to sell offline; best effort — a terminal that cannot write its snapshot still sells online.
+    private async Task SaveSnapshotAsync(long? openSessionId)
+    {
+        if (_companyId == 0)
+        {
+            return;
+        }
+
+        _snapshot = new PosOfflineSnapshot
+        {
+            TakenUtc = DateTimeOffset.UtcNow, CompanyId = _companyId, BaseCurrency = _currency.Value, WarehouseId = _warehouseId, TerminalId = _terminalId,
+            OpenSessionId = openSessionId, TaxRates = new Dictionary<string, decimal>(_taxRates, StringComparer.OrdinalIgnoreCase), Tiles = _tiles,
+            Accounts = new Dictionary<string, string>
+            {
+                ["Cash"] = CashAccountCode, ["Card"] = CardAccountCode, ["Tax"] = TaxAccountCode, ["OverShort"] = OverShortAccountCode, ["Discount"] = DiscountAccountCode,
+                ["MobileMoney"] = MobileMoneyAccountCode, ["GiftCard"] = GiftCardAccountCode,
+            },
+            TenderCurrencies = [.. TenderCurrencies.Select(t => new OfflineTenderCurrency(t.Code.Value, t.Rate))],
+            Customers = _customers.Count > 0 ? _customers : _snapshot?.Customers ?? [],
+        };
+        try
+        {
+            await CatalogueStore.SaveAsync(_snapshot).ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or System.Security.Cryptography.CryptographicException)
+        {
+            // The snapshot is a fallback; failing to write it never stops an online sale.
+        }
+    }
 
     private async Task<long> ResolveTerminalAsync(One4AllDbContext db, CancellationToken ct)
     {
@@ -354,8 +456,11 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
     // Tiles come from the item master (not the restaurant menu), so a tapped sale issues stock and posts its cost like a scanned one.
     private async Task LoadProductsAsync(IPosCatalogueService catalogue, CancellationToken ct)
+        => ShowProducts(await catalogue.TilesAsync(_companyId, ct).ConfigureAwait(true));
+
+    private void ShowProducts(IReadOnlyList<PosTile> tiles)
     {
-        IReadOnlyList<PosTile> tiles = await catalogue.TilesAsync(_companyId, ct).ConfigureAwait(true);
+        _tiles = tiles;
         _allProducts.Clear();
         foreach (PosTile tile in tiles)
         {
@@ -442,6 +547,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         TillSessionId = result.Value;
         IsSessionOpen = true;
         StatusMessage = $"Till open (session {TillSessionId}). Ready to trade.";
+        await SaveSnapshotAsync(TillSessionId).ConfigureAwait(true);
 
         // The database is reachable (the till just opened) — flush anything captured offline earlier.
         if (PendingOfflineCount > 0)
@@ -666,7 +772,17 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         IDeviceProvider devices = scope.ServiceProvider.GetRequiredService<IDeviceProvider>();
         EmbeddedBarcode? embedded = Barcodes.TryParseEmbedded(code, devices.BarcodeRules);
-        Result<ItemLookup> found = await scope.ServiceProvider.GetRequiredService<IItemCatalogueService>().LookupAsync(_companyId, embedded?.ItemCode ?? code).ConfigureAwait(true);
+        Result<ItemLookup> found;
+        try
+        {
+            found = await scope.ServiceProvider.GetRequiredService<IItemCatalogueService>().LookupAsync(_companyId, embedded?.ItemCode ?? code).ConfigureAwait(true);
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            await ScanOfflineAsync(devices, code, embedded).ConfigureAwait(true);
+            return;
+        }
+
         if (found.IsFailure)
         {
             StatusMessage = $"Nothing found for {code}.";
@@ -709,6 +825,32 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         TenderEntry = string.Empty;
         RebuildCart();
         StatusMessage = $"{item.Description} × {quantity:0.###}";
+        await ShowOnDisplayAsync(devices, line.Description, line.LineGross).ConfigureAwait(true);
+    }
+
+    // Offline: the code is found in the saved catalogue (barcode, PLU, item code) and sold at its saved price.
+    private async Task ScanOfflineAsync(IDeviceProvider devices, string code, EmbeddedBarcode? embedded)
+    {
+        PosTile? tile = (_snapshot ?? new PosOfflineSnapshot { Tiles = _tiles }).Find(embedded?.ItemCode ?? code);
+        if (tile is null)
+        {
+            StatusMessage = $"Offline: {code} is not in the saved catalogue.";
+            return;
+        }
+
+        decimal rate = tile.TaxCode is not null && _taxRates.TryGetValue(tile.TaxCode, out decimal r) ? r : 0m;
+        decimal quantity = embedded?.Kind == EmbeddedValueKind.Weight ? embedded.Value : TryEntry(out decimal typed) && typed > 0m ? typed : 1m;
+        decimal unitPrice = tile.UnitPrice;
+        if (embedded?.Kind == EmbeddedValueKind.Price)
+        {
+            unitPrice = PosMoney.Round(embedded.Value / (1m + rate));
+            quantity = 1m;
+        }
+
+        PosTicketLine line = _ticket.AddLine(tile.ItemId, tile.Name, unitPrice, rate, tile.RevenueAccountCode, tile.TaxCode, quantity);
+        TenderEntry = string.Empty;
+        RebuildCart();
+        StatusMessage = $"{tile.Name} × {quantity:0.###} (offline price)";
         await ShowOnDisplayAsync(devices, line.Description, line.LineGross).ConfigureAwait(true);
     }
 
@@ -1258,6 +1400,10 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             AccountCustomer = string.Empty;
             RebuildCart();
             StatusMessage = $"Sale {saleNumber} posted (journal {result.Value.JournalNumber}). Change {changeShown ?? change.ToString("N2", CultureInfo.CurrentCulture)}.{loyalty}{(printed is null ? string.Empty : $" Receipt not printed: {printed}")}";
+            if (PendingOfflineCount > 0)
+            {
+                await FlushOfflineAsync().ConfigureAwait(true); // the connection is back: sales queued while offline sync now
+            }
         }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex) && request.Tenders.Any(t => t.TenderType == TenderType.Voucher))
         {
@@ -1433,6 +1579,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         IsSessionOpen = false;
         TillSessionId = 0;
         CountedCash = string.Empty;
+        await SaveSnapshotAsync(null).ConfigureAwait(true);
     }
 
     // Promotions are re-priced whenever the basket changes, until payment starts (a tender fixes the total).
