@@ -117,7 +117,10 @@ public static partial class OperationCatalogue
                 Opt("Name", "Element name"), Pick("Type", "Element type", Enum.GetNames<PayElementType>()), Pick("Basis", "Calculation", Enum.GetNames<CalculationBasis>()), OptNum("Sequence", "Sequence"),
                 Opt("Account", "Account (salaries expense for the standard set)"), Opt("Liability", "PAYE liability account (standard set)"), OptNum("Amount", "Fixed / override amount"),
                 OptNum("Rate", "Rate / override rate"), OptNum("Units", "Units"), Opt("Formula", "Formula"), Tick("Taxable", "Taxable"), Opt("TaxTable", "Tax table code"),
-                Opt("Employee", "Employee number"), Today("From", "Tax table effective from"), Opt("Bands", "Tax bands")],
+                Opt("Employee", "Employee number"), Today("From", "Tax table effective from"), Opt("Bands", "Tax bands"), Tick("Pensionable", "Pensionable"),
+                Tick("SocialSecurity", "Subject to social security"), Tick("OvertimeBase", "In the overtime base"), Tick("LeaveBase", "In the leave-pay base"), Opt("Group", "Adds to group"),
+                Opt("BasisGroup", "Percentage of group (percent-of-group)"), OptNum("Floor", "Floor"), OptNum("Ceiling", "Ceiling"), OptNum("RoundTo", "Round to (unit)"),
+                Pick("Rounding", "Rounding", Enum.GetNames<PayRounding>()), Opt("Expense", "Expense account (contribution / provision)"), Opt("DeptAccounts", "Accounts by department: DEPT=ACCOUNT; …")],
             Run = async (c, i) =>
             {
                 IPayrollSetupService setup = c.Get<IPayrollSetupService>();
@@ -156,6 +159,9 @@ public static partial class OperationCatalogue
                             Enum.Parse<PayElementType>(i.Text("Type")), Enum.Parse<CalculationBasis>(i.Text("Basis")), (int)(i.OptionalNumber("Sequence") ?? 10), i.Optional("Account") ?? string.Empty)
                         {
                             FixedAmount = i.OptionalNumber("Amount") ?? 0m, Rate = i.OptionalNumber("Rate") ?? 0m, Formula = i.Optional("Formula"), Taxable = i.Flag("Taxable"), TaxTableCode = i.Optional("TaxTable"),
+                            Pensionable = i.Flag("Pensionable"), SubjectToSocialSecurity = i.Flag("SocialSecurity"), OvertimeBase = i.Flag("OvertimeBase"), LeavePayBase = i.Flag("LeaveBase"),
+                            Group = i.Optional("Group"), BasisGroup = i.Optional("BasisGroup"), Floor = i.OptionalNumber("Floor"), Ceiling = i.OptionalNumber("Ceiling"), RoundTo = i.OptionalNumber("RoundTo"),
+                            Rounding = Enum.Parse<PayRounding>(i.Text("Rounding")), ContributionExpenseAccountCode = i.Optional("Expense"), DepartmentAccounts = i.Optional("DeptAccounts"),
                         }).ConfigureAwait(true));
                         return $"Pay element created (id {element}).";
                 }

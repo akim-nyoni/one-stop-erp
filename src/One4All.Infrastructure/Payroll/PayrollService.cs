@@ -277,13 +277,14 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                 PayElement element = elements.Values.First(e => e.Code == line.ElementCode);
                 if (line.Type == PayElementType.Earning)
                 {
-                    debitsByAccount[(element.AccountCode, cc, dept, project, fund, branch)] = debitsByAccount.GetValueOrDefault((element.AccountCode, cc, dept, project, fund, branch)) + line.Amount;
+                    string expense = element.AccountFor(dept, element.AccountCode);
+                    debitsByAccount[(expense, cc, dept, project, fund, branch)] = debitsByAccount.GetValueOrDefault((expense, cc, dept, project, fund, branch)) + line.Amount;
                 }
                 else if (line.Type == PayElementType.Deduction)
                 {
                     Add(creditsByAccount, element.AccountCode, line.Amount);
                 }
-                else if (line.Type == PayElementType.EmployerContribution)
+                else if (line.Type is PayElementType.EmployerContribution or PayElementType.Provision)
                 {
                     // The employer's cost: Dr its expense account, Cr the liability to the scheme.
                     if (string.IsNullOrWhiteSpace(element.ContributionExpenseAccountCode))
@@ -291,8 +292,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                         return Error.Validation("Payroll.ContributionAccount", $"Employer contribution {element.Code} needs an expense account before it can be posted.");
                     }
 
-                    debitsByAccount[(element.ContributionExpenseAccountCode, cc, dept, project, fund, branch)] =
-                        debitsByAccount.GetValueOrDefault((element.ContributionExpenseAccountCode, cc, dept, project, fund, branch)) + line.Amount;
+                    string cost = element.AccountFor(dept, element.ContributionExpenseAccountCode);
+                    debitsByAccount[(cost, cc, dept, project, fund, branch)] = debitsByAccount.GetValueOrDefault((cost, cc, dept, project, fund, branch)) + line.Amount;
                     Add(creditsByAccount, element.AccountCode, line.Amount);
                 }
             }
@@ -400,8 +401,27 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         Dictionary<string, decimal> taxableByCurrency = new(StringComparer.Ordinal);
         vars[TaxableByCurrencyKey] = taxableByCurrency;
 
+        // The bases flagged earnings build up (pensionable pay, the social security base…) and each element group's total.
+        foreach (string basis in new[] { "PENSIONABLE", "SOCIALSECURITYBASE", "OVERTIMEBASE", "LEAVEBASE" })
+        {
+            vars[basis] = 0m;
+        }
+
+        foreach (string group in elements.Values.Select(e => e.Group).Concat(elements.Values.Select(e => e.BasisGroup)).OfType<string>().Where(g => g.Trim().Length > 0))
+        {
+            vars[GroupVariable(group)] = 0m;
+        }
+
         foreach ((PayElement element, EmployeePayElement assigned1) in ordered)
         {
+            void Accumulate(bool applies, string name)
+            {
+                if (applies)
+                {
+                    vars[name] = (vars.GetValueOrDefault(name) is decimal so_far ? so_far : 0m) + (decimal)vars[element.Code]!;
+                }
+            }
+
             EmployeePayElement assignment = assigned1;
             PayrollVariable? variable = variables?.GetValueOrDefault(element.Code);
             if (variable?.Units is decimal units)
@@ -415,7 +435,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                 return resolved.Error;
             }
 
-            decimal amount = decimal.Round(resolved.Value, 2, MidpointRounding.ToEven);
+            decimal amount = element.ApplyLimits(resolved.Value);
 
             // Net-pay protection: arrears suspended earlier are attempted again; a cap holds a suspended deduction down.
             if (element.Type == PayElementType.Deduction && element.Recovers == PayRecovery.None)
@@ -434,6 +454,11 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             {
                 case PayElementType.Earning:
                     gross += amount;
+                    Accumulate(element.Pensionable, "PENSIONABLE");
+                    Accumulate(element.SubjectToSocialSecurity, "SOCIALSECURITYBASE");
+                    Accumulate(element.OvertimeBase, "OVERTIMEBASE");
+                    Accumulate(element.LeavePayBase, "LEAVEBASE");
+                    Accumulate(!string.IsNullOrWhiteSpace(element.Group), GroupVariable(element.Group));
                     if (element.Taxable)
                     {
                         taxable += amount;
@@ -458,6 +483,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         return payslip;
     }
 
+    private static string GroupVariable(string? group) => "GROUP_" + new string([.. (group ?? string.Empty).Trim().ToUpperInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '_')]);
+
     private Result<decimal> Resolve(PayElement element, EmployeePayElement assignment, IReadOnlyDictionary<string, object?> vars)
     {
         decimal basic = (decimal)(vars["BASIC"] ?? 0m);
@@ -476,6 +503,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                 return rate * (assignment.Units ?? 0m);
             case CalculationBasis.TaxTable:
                 return TaxFromTable(element, vars);
+            case CalculationBasis.PercentOfGroup:
+                return (vars.GetValueOrDefault(GroupVariable(element.BasisGroup)) is decimal groupTotal ? groupTotal : 0m) * rate / 100m;
             case CalculationBasis.Formula:
                 if (string.IsNullOrWhiteSpace(element.Formula))
                 {

@@ -203,6 +203,39 @@ public sealed record NewPayElement(string Code, string Name, PayElementType Type
 
     /// <summary>Expense account of an employer contribution.</summary>
     public string? ContributionExpenseAccountCode { get; init; }
+
+    /// <summary>Counts towards pensionable pay.</summary>
+    public bool Pensionable { get; init; }
+
+    /// <summary>Subject to social security.</summary>
+    public bool SubjectToSocialSecurity { get; init; }
+
+    /// <summary>In the overtime base.</summary>
+    public bool OvertimeBase { get; init; }
+
+    /// <summary>In the leave-pay base.</summary>
+    public bool LeavePayBase { get; init; }
+
+    /// <summary>The element group an earning adds to.</summary>
+    public string? Group { get; init; }
+
+    /// <summary>The group a percent-of-group element is a percentage of.</summary>
+    public string? BasisGroup { get; init; }
+
+    /// <summary>The least it comes to.</summary>
+    public decimal? Floor { get; init; }
+
+    /// <summary>The most it comes to.</summary>
+    public decimal? Ceiling { get; init; }
+
+    /// <summary>The unit it is rounded to.</summary>
+    public decimal? RoundTo { get; init; }
+
+    /// <summary>How it is rounded.</summary>
+    public PayRounding Rounding { get; init; }
+
+    /// <summary>Expense accounts per department, "DEPT=ACCOUNT;…".</summary>
+    public string? DepartmentAccounts { get; init; }
 }
 
 /// <summary>One band of a tax table: taxed at the rate from <paramref name="From"/> up to <paramref name="To"/> (open-ended when null).</summary>

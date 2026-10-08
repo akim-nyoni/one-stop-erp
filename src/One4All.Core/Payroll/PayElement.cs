@@ -14,6 +14,12 @@ public enum PayElementType
 
     /// <summary>An employer contribution (cost to employer, not deducted from the employee).</summary>
     EmployerContribution = 3,
+
+    /// <summary>Shown on the payslip for information (leave days, an employer's notional cost); neither paid nor posted.</summary>
+    Memo = 4,
+
+    /// <summary>An employer accrual (leave pay, a thirteenth cheque, gratuity): Dr its expense, Cr the provision; not paid on the payslip.</summary>
+    Provision = 5,
 }
 
 /// <summary>How a pay element's amount is calculated (brief §4.15.2).</summary>
@@ -36,6 +42,9 @@ public enum CalculationBasis
 
     /// <summary>Income tax from the effective-dated tax table in force (brief §4.15.3), per period or cumulative year-to-date.</summary>
     TaxTable = 5,
+
+    /// <summary>A percentage of a named element group's total this period (<see cref="PayElement.BasisGroup"/>).</summary>
+    PercentOfGroup = 6,
 }
 
 /// <summary>
@@ -154,6 +163,105 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
     /// rather than at one period's marginal rate.
     /// </summary>
     public bool IsAnnualPayment { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether an earning counts towards pensionable pay (formula variable PENSIONABLE).</summary>
+    public bool Pensionable { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether an earning is subject to social security (formula variable SOCIALSECURITYBASE).</summary>
+    public bool SubjectToSocialSecurity { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether an earning is in the overtime rate's base (formula variable OVERTIMEBASE).</summary>
+    public bool OvertimeBase { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether an earning is in leave pay's base (formula variable LEAVEBASE).</summary>
+    public bool LeavePayBase { get; set; }
+
+    /// <summary>Gets or sets the group an earning adds to (formula variable GROUP_name; a <see cref="CalculationBasis.PercentOfGroup"/> element's base).</summary>
+    public string? Group { get; set; }
+
+    /// <summary>Gets or sets the group a <see cref="CalculationBasis.PercentOfGroup"/> element is a percentage of.</summary>
+    public string? BasisGroup { get; set; }
+
+    /// <summary>Gets or sets the least the element comes to in a period (when it is not zero).</summary>
+    public decimal? Floor { get; set; }
+
+    /// <summary>Gets or sets the most the element comes to in a period (e.g. a social security ceiling).</summary>
+    public decimal? Ceiling { get; set; }
+
+    /// <summary>Gets or sets the unit the amount is rounded to (0.05, 1, 10…); null for cents.</summary>
+    public decimal? RoundTo { get; set; }
+
+    /// <summary>Gets or sets how the amount is rounded to <see cref="RoundTo"/>.</summary>
+    public PayRounding Rounding { get; set; }
+
+    /// <summary>Gets or sets the expense account per department, as "DEPT=ACCOUNT;…" (the element's own account elsewhere).</summary>
+    public string? DepartmentAccounts { get; set; }
+
+    /// <summary>The amount after the element's floor, ceiling and rounding rules.</summary>
+    /// <param name="amount">The calculated amount.</param>
+    /// <returns>The amount to pay.</returns>
+    public decimal ApplyLimits(decimal amount)
+    {
+        if (Floor is decimal floor && amount != 0m && amount < floor)
+        {
+            amount = floor;
+        }
+
+        if (Ceiling is decimal ceiling && amount > ceiling)
+        {
+            amount = ceiling;
+        }
+
+        if (RoundTo is decimal unit and > 0m)
+        {
+            decimal units = amount / unit;
+            units = Rounding switch
+            {
+                PayRounding.Up => Math.Ceiling(units),
+                PayRounding.Down => Math.Floor(units),
+                _ => Math.Round(units, MidpointRounding.AwayFromZero),
+            };
+            amount = units * unit;
+        }
+
+        return decimal.Round(amount, 2, MidpointRounding.ToEven);
+    }
+
+    /// <summary>The account an amount for an employee of a department posts to.</summary>
+    /// <param name="department">The employee's department code.</param>
+    /// <param name="fallback">The account otherwise.</param>
+    /// <returns>The account.</returns>
+    public string AccountFor(string? department, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(department) || string.IsNullOrWhiteSpace(DepartmentAccounts))
+        {
+            return fallback;
+        }
+
+        foreach (string pair in DepartmentAccounts.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] parts = pair.Split('=', StringSplitOptions.TrimEntries);
+            if (parts.Length == 2 && string.Equals(parts[0], department.Trim(), StringComparison.OrdinalIgnoreCase) && parts[1].Length > 0)
+            {
+                return parts[1].ToUpperInvariant();
+            }
+        }
+
+        return fallback;
+    }
+}
+
+/// <summary>How a pay element's amount is rounded to its unit.</summary>
+public enum PayRounding
+{
+    /// <summary>To the nearest unit.</summary>
+    Nearest = 0,
+
+    /// <summary>Up to the next unit.</summary>
+    Up = 1,
+
+    /// <summary>Down to the unit below.</summary>
+    Down = 2,
 }
 
 /// <summary>A balance a payroll deduction recovers from the employee (brief §4.15.4).</summary>

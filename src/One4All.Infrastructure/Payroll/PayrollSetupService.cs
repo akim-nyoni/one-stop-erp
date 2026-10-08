@@ -197,9 +197,19 @@ public sealed class PayrollSetupService : IPayrollSetupService
             return Error.Validation("Payroll.FormulaRequired", "A formula element needs its formula.");
         }
 
-        if (element.Type == PayElementType.EmployerContribution && string.IsNullOrWhiteSpace(element.ContributionExpenseAccountCode))
+        if (element.Type is PayElementType.EmployerContribution or PayElementType.Provision && string.IsNullOrWhiteSpace(element.ContributionExpenseAccountCode))
         {
-            return Error.Validation("Payroll.ContributionAccount", "An employer contribution needs the expense account it is charged to.");
+            return Error.Validation("Payroll.ContributionAccount", "An employer contribution or provision needs the expense account it is charged to.");
+        }
+
+        if (element.Basis == CalculationBasis.PercentOfGroup && string.IsNullOrWhiteSpace(element.BasisGroup))
+        {
+            return Error.Validation("Payroll.BasisGroupRequired", "A percent-of-group element needs the group it is a percentage of.");
+        }
+
+        if (element.Floor is decimal floor && element.Ceiling is decimal ceiling && floor > ceiling)
+        {
+            return Error.Validation("Payroll.FloorAboveCeiling", "An element's floor cannot be above its ceiling.");
         }
 
         string account = element.AccountCode.Trim().ToUpperInvariant();
@@ -216,7 +226,10 @@ public sealed class PayrollSetupService : IPayrollSetupService
         PayElement created = new(companyId, code, element.Name.Trim(), element.Type, element.Basis, element.Sequence, account)
         {
             FixedAmount = element.FixedAmount, Rate = element.Rate, Formula = Clean(element.Formula), Taxable = element.Taxable, TaxTableCode = Clean(element.TaxTableCode)?.ToUpperInvariant(),
-            ContributionExpenseAccountCode = Clean(element.ContributionExpenseAccountCode)?.ToUpperInvariant(),
+            ContributionExpenseAccountCode = Clean(element.ContributionExpenseAccountCode)?.ToUpperInvariant(), Pensionable = element.Pensionable,
+            SubjectToSocialSecurity = element.SubjectToSocialSecurity, OvertimeBase = element.OvertimeBase, LeavePayBase = element.LeavePayBase,
+            Group = Clean(element.Group)?.ToUpperInvariant(), BasisGroup = Clean(element.BasisGroup)?.ToUpperInvariant(), Floor = element.Floor, Ceiling = element.Ceiling,
+            RoundTo = element.RoundTo, Rounding = element.Rounding, DepartmentAccounts = Clean(element.DepartmentAccounts),
         };
         _db.PayElements.Add(created);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

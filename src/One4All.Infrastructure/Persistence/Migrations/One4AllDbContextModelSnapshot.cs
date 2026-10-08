@@ -18223,10 +18223,20 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("basis");
 
+                    b.Property<string>("BasisGroup")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("basis_group");
+
                     b.Property<string>("BenefitCategory")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
                         .HasColumnName("benefit_category");
+
+                    b.Property<decimal?>("Ceiling")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("ceiling");
 
                     b.Property<string>("Code")
                         .IsRequired()
@@ -18263,15 +18273,30 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
 
+                    b.Property<string>("DepartmentAccounts")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("department_accounts");
+
                     b.Property<decimal>("FixedAmount")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("fixed_amount");
 
+                    b.Property<decimal?>("Floor")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("floor");
+
                     b.Property<string>("Formula")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("formula");
+
+                    b.Property<string>("Group")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("group");
 
                     b.Property<bool>("IsAnnualPayment")
                         .HasColumnType("boolean")
@@ -18280,6 +18305,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<bool>("LeavePayBase")
+                        .HasColumnType("boolean")
+                        .HasColumnName("leave_pay_base");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
@@ -18295,10 +18324,18 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("name");
 
+                    b.Property<bool>("OvertimeBase")
+                        .HasColumnType("boolean")
+                        .HasColumnName("overtime_base");
+
                     b.Property<string>("PaidInCurrency")
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
                         .HasColumnName("paid_in_currency");
+
+                    b.Property<bool>("Pensionable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("pensionable");
 
                     b.Property<decimal>("Rate")
                         .HasPrecision(19, 6)
@@ -18308,6 +18345,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("Recovers")
                         .HasColumnType("integer")
                         .HasColumnName("recovers");
+
+                    b.Property<decimal?>("RoundTo")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("round_to");
+
+                    b.Property<int>("Rounding")
+                        .HasColumnType("integer")
+                        .HasColumnName("rounding");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
@@ -18322,6 +18368,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("SplitCurrencyTax")
                         .HasColumnType("boolean")
                         .HasColumnName("split_currency_tax");
+
+                    b.Property<bool>("SubjectToSocialSecurity")
+                        .HasColumnType("boolean")
+                        .HasColumnName("subject_to_social_security");
 
                     b.Property<int>("SuspensionPriority")
                         .HasColumnType("integer")
