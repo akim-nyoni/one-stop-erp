@@ -354,6 +354,7 @@ public static class DependencyInjection
 
         // School management & fee billing.
         services.AddScoped<Application.Abstractions.Schools.ISchoolBillingService, Schools.SchoolBillingService>();
+        services.AddScoped<Application.Abstractions.Schools.IAcademicStructureService, Schools.AcademicStructureService>();
         services.AddScoped<Application.Abstractions.Schools.IStudentWalletService, Schools.StudentWalletService>();
 
         // Construction / Job Costing.

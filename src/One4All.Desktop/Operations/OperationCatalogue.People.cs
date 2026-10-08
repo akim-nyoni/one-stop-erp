@@ -959,6 +959,53 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Academic years and terms", ListTitle = "Terms",
+            Description = "Years and their terms (no overlaps). A term's code is what fee structures name as their term: saving it gives them its dates for pro-rata billing and deferred income.",
+            Fields = [Pick("Step", "Step", ["Save year", "Save term", "Which term is it?"]), Req("Year", "Year code"), Opt("Term", "Term code (e.g. 2026-T1)"), Opt("Name", "Term name"),
+                Num("Sequence", "Term number", "1"), Today("From", "First day"), Today("To", "Last day")],
+            Run = async (c, i) =>
+            {
+                IAcademicStructureService academic = c.Get<IAcademicStructureService>();
+                return i.Text("Step") switch
+                {
+                    "Save year" => Check(await academic.SaveYearAsync(c.CompanyId, i.Text("Year"), i.Date("From"), i.Date("To")).ConfigureAwait(true), "Year saved."),
+                    "Save term" => Check(await academic.SaveTermAsync(c.CompanyId, i.Text("Year"), i.Optional("Term") ?? string.Empty, i.Optional("Name") ?? string.Empty, i.Whole("Sequence"),
+                        i.Date("From"), i.Date("To")).ConfigureAwait(true), n => $"Term saved; {n} fee structure(s) took its dates."),
+                    _ => Check(await academic.TermOnAsync(c.CompanyId, i.Date("From")).ConfigureAwait(true), t => $"{i.Date("From"):yyyy-MM-dd} is in {t.Name} ({t.Term}) of {t.Year}: {D(t.StartDate)} to {D(t.EndDate)}."),
+                };
+            },
+            List = async c => Table(await (from t in c.Db.SchoolTerms.AsNoTracking()
+                                           join y in c.Db.AcademicYears.AsNoTracking() on t.AcademicYearId equals y.Id
+                                           where t.CompanyId == c.CompanyId
+                                           orderby t.StartDate
+                                           select new { Year = y.Code, t.Code, t.Name, t.StartDate, t.EndDate }).ToListAsync().ConfigureAwait(true),
+                ("Year", t => t.Year), ("Term", t => t.Code), ("Name", t => t.Name), ("From", t => D(t.StartDate)), ("To", t => D(t.EndDate))),
+        };
+        yield return new Operation
+        {
+            Module = "Sales & Schools", Title = "Classes and streams", ListTitle = "Class rolls",
+            Description = "Classes by grade and stream with capacity and the grade they move up to (blank: final year). Place a student within capacity; at year end, promote the school once.",
+            Fields = [Pick("Step", "Step", ["Save class", "Place a student", "Promote the year"]), Opt("Grade", "Grade / form"), Opt("Stream", "Stream"), Opt("Name", "Class name"),
+                OptNum("Capacity", "Capacity"), Opt("Next", "Next grade"), Opt("Student", "Admission number"), Opt("Year", "Year ending (promote)")],
+            Run = async (c, i) =>
+            {
+                IAcademicStructureService academic = c.Get<IAcademicStructureService>();
+                return i.Text("Step") switch
+                {
+                    "Save class" => Check(await academic.SaveClassAsync(c.CompanyId, i.Optional("Grade") ?? string.Empty, i.Optional("Stream"), i.Optional("Name") ?? string.Empty,
+                        i.OptionalNumber("Capacity") is decimal cap ? (int)cap : null, i.Optional("Next")).ConfigureAwait(true), "Class saved."),
+                    "Place a student" => Check(await academic.PlaceAsync(c.CompanyId, i.Optional("Student") ?? string.Empty, i.Optional("Grade") ?? string.Empty, i.Optional("Stream")).ConfigureAwait(true),
+                        "Student placed."),
+                    _ => Check(await academic.PromoteAsync(c.CompanyId, i.Optional("Year") ?? string.Empty).ConfigureAwait(true),
+                        r => $"{r.Promoted} promoted, {r.Completed} in final-year classes" + (r.Unplaced.Count == 0 ? "." : $"; no class for: {string.Join(", ", r.Unplaced)}.")),
+                };
+            },
+            List = async c => Table(await c.Get<IAcademicStructureService>().ClassRollsAsync(c.CompanyId).ConfigureAwait(true),
+                ("Grade", r => r.Grade), ("Stream", r => r.Stream ?? "—"), ("Class", r => r.Name), ("Enrolled", r => r.Enrolled), ("Capacity", r => r.Capacity?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—"),
+                ("Moves to", r => r.NextGrade ?? "leaves")),
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Set a sibling discount", ListTitle = "Sibling discounts",
             Description = "A family's children (sharing a guardian, in admission order) get this percentage off from the given child on, after any bursary. 0 removes the rule.",
             Fields = [Num("From", "From child (2 = second)", "2"), Num("Percent", "Discount %")],

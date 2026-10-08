@@ -36,6 +36,44 @@ internal sealed class FeeItemConfiguration : IEntityTypeConfiguration<FeeItem>
     }
 }
 
+internal sealed class AcademicYearConfiguration : IEntityTypeConfiguration<AcademicYear>
+{
+    public void Configure(EntityTypeBuilder<AcademicYear> b)
+    {
+        b.ToTable("academic_year", Schemas.School);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class SchoolTermConfiguration : IEntityTypeConfiguration<SchoolTerm>
+{
+    public void Configure(EntityTypeBuilder<SchoolTerm> b)
+    {
+        b.ToTable("term", Schemas.School);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(80);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+        b.HasOne<AcademicYear>().WithMany().HasForeignKey(x => x.AcademicYearId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class SchoolClassConfiguration : IEntityTypeConfiguration<SchoolClass>
+{
+    public void Configure(EntityTypeBuilder<SchoolClass> b)
+    {
+        b.ToTable("class", Schemas.School);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Grade).HasMaxLength(20);
+        b.Property(x => x.Stream).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(80);
+        b.Property(x => x.NextGrade).HasMaxLength(20);
+        b.HasIndex(x => new { x.CompanyId, x.Grade, x.Stream }).IsUnique().AreNullsDistinct(false);
+    }
+}
+
 internal sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
 {
     public void Configure(EntityTypeBuilder<Student> b)

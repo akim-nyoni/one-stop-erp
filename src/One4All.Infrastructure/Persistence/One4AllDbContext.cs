@@ -428,6 +428,15 @@ public class One4AllDbContext : DbContext
     /// <summary>Students.</summary>
     public DbSet<Core.Schools.Student> Students => Set<Core.Schools.Student>();
 
+    /// <summary>Gets the academic years.</summary>
+    public DbSet<Core.Schools.AcademicYear> AcademicYears => Set<Core.Schools.AcademicYear>();
+
+    /// <summary>Gets the terms.</summary>
+    public DbSet<Core.Schools.SchoolTerm> SchoolTerms => Set<Core.Schools.SchoolTerm>();
+
+    /// <summary>Gets the classes.</summary>
+    public DbSet<Core.Schools.SchoolClass> SchoolClasses => Set<Core.Schools.SchoolClass>();
+
     /// <summary>Bursary requests and their decisions.</summary>
     public DbSet<Core.Schools.BursaryAward> BursaryAwards => Set<Core.Schools.BursaryAward>();
 
