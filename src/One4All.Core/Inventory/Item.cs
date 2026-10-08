@@ -109,6 +109,21 @@ public sealed class Item : SoftDeletableEntity, ICompanyScoped
     /// </summary>
     public string? UsageVarianceAccountCode { get; set; }
 
+    /// <summary>
+    /// The weight unit of a catch-weight item (kg, t…; brief §3.6): stock is counted in pieces and weighed, receipts can be costed per weight unit and
+    /// issues are costed by the weight that leaves. Null: not catch-weight.
+    /// </summary>
+    public string? CatchWeightUnit { get; set; }
+
+    /// <summary>The nominal weight of one piece of a catch-weight item (null: none).</summary>
+    public decimal? NominalWeight { get; set; }
+
+    /// <summary>How far, in percent, a receipt's average weight per piece may stray from the nominal weight (null: any).</summary>
+    public decimal? WeightTolerancePercent { get; set; }
+
+    /// <summary>Whether the item is catch-weight.</summary>
+    public bool IsCatchWeight => !string.IsNullOrWhiteSpace(CatchWeightUnit);
+
     /// <summary>The weight of one unit in kilograms, used to share landed costs by weight.</summary>
     public decimal? UnitWeightKg { get; set; }
 

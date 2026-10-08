@@ -11442,6 +11442,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(60)")
                         .HasColumnName("brand");
 
+                    b.Property<string>("CatchWeightUnit")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("catch_weight_unit");
+
                     b.Property<string>("Category")
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)")
@@ -11545,6 +11550,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<decimal?>("NominalWeight")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("nominal_weight");
+
                     b.Property<long?>("ParentItemId")
                         .HasColumnType("bigint")
                         .HasColumnName("parent_item_id");
@@ -11632,6 +11642,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("usage_variance_account_code");
+
+                    b.Property<decimal?>("WeightTolerancePercent")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)")
+                        .HasColumnName("weight_tolerance_percent");
 
                     b.HasKey("Id")
                         .HasName("pk_item");
@@ -12119,6 +12134,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("warehouse_id");
 
+                    b.Property<decimal>("WeightOnHand")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("weight_on_hand");
+
                     b.HasKey("Id")
                         .HasName("pk_stock_balance");
 
@@ -12337,6 +12357,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("WarehouseId")
                         .HasColumnType("bigint")
                         .HasColumnName("warehouse_id");
+
+                    b.Property<decimal?>("Weight")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("weight");
 
                     b.HasKey("Id")
                         .HasName("pk_stock_movement");

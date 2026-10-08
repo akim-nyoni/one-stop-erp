@@ -51,6 +51,10 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
 {
     public void Configure(EntityTypeBuilder<Item> b)
     {
+        b.Property(x => x.CatchWeightUnit).HasMaxLength(10);
+        b.Property(x => x.NominalWeight).HasPrecision(19, 4);
+        b.Property(x => x.WeightTolerancePercent).HasPrecision(7, 4);
+        b.Ignore(x => x.IsCatchWeight);
         b.Property(x => x.UsageVarianceAccountCode).HasMaxLength(20);
         b.ToTable("item", Schemas.Inventory);
         b.HasKey(x => x.Id);
@@ -106,6 +110,8 @@ internal sealed class StockBalanceConfiguration : IEntityTypeConfiguration<Stock
 {
     public void Configure(EntityTypeBuilder<StockBalance> b)
     {
+        b.Property(x => x.WeightOnHand).HasPrecision(19, 4);
+        b.Ignore(x => x.CostPerWeight);
         b.ToTable("stock_balance", Schemas.Inventory);
         b.HasKey(x => x.Id);
         b.Property(x => x.QuantityOnHand).HasPrecision(19, 4);
@@ -119,6 +125,7 @@ internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<Stoc
 {
     public void Configure(EntityTypeBuilder<StockMovement> b)
     {
+        b.Property(x => x.Weight).HasPrecision(19, 4);
         b.ToTable("stock_movement", Schemas.Inventory);
         b.HasKey(x => x.Id);
         b.Property(x => x.ReasonCode).HasMaxLength(20);

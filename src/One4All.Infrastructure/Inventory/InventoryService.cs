@@ -47,10 +47,27 @@ public sealed class InventoryService : IInventoryService
         }
 
         (Item item, string stockCode, CurrencyCode currency) = setup.Value;
-        decimal actual = decimal.Round(request.Quantity * request.UnitCost, 4, MidpointRounding.ToEven);
+
+        // A catch-weight item is weighed in: its weight is required, its pieces' average must sit near the nominal weight, and it may be bought by weight.
+        decimal pieceCost = request.UnitCost;
+        if (item.IsCatchWeight)
+        {
+            Error? weighed = CatchWeightCheck(item, request.Quantity, request.Weight);
+            if (weighed is not null)
+            {
+                return weighed;
+            }
+
+            if (request.CostPerWeightUnit is decimal perWeight)
+            {
+                pieceCost = request.Quantity == 0m ? 0m : request.Weight!.Value * perWeight / request.Quantity;
+            }
+        }
+
+        decimal actual = decimal.Round(request.Quantity * pieceCost, 4, MidpointRounding.ToEven);
 
         // A standard-costed item goes into stock at its standard; what it really cost differs by the price variance.
-        Result<decimal> standard = StandardUnitCost(item, request.UnitCost);
+        Result<decimal> standard = StandardUnitCost(item, pieceCost);
         if (standard.IsFailure)
         {
             return standard.Error;
@@ -96,6 +113,10 @@ public sealed class InventoryService : IInventoryService
             ? Math.Min(-balance.QuantityOnHand, request.Quantity) : 0m;
         decimal costUsed = balance.AverageCost;
         StockCosting.Receive(_db, item, balance, request.Date, request.Reference, request.Quantity, value);
+        if (item.IsCatchWeight)
+        {
+            balance.AdjustWeight(request.Weight!.Value);
+        }
 
         // Goods sold short went out at the old average: the units now received cover them, so their cost is put right (cost of sales against
         // stock) instead of being spread over what is left.
@@ -135,6 +156,7 @@ public sealed class InventoryService : IInventoryService
         StockMovement movement = new(request.CompanyId, request.ItemId, request.WarehouseId, request.Date, StockMovementType.Receipt, request.Quantity, unitCost, value, request.Reference)
         {
             JournalEntryId = posting.Value.JournalId,
+            Weight = item.IsCatchWeight ? request.Weight : null,
         };
         _db.Set<StockMovement>().Add(movement);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -221,6 +243,23 @@ public sealed class InventoryService : IInventoryService
 
             issue = await StockCosting.PlanSpecificIssueAsync(_db, item, balance, lotsOut, ct).ConfigureAwait(false);
         }
+        else if (item.IsCatchWeight)
+        {
+            // Costed by the weight that leaves, at the stock's cost per weight unit; the last pieces take whatever value and weight are left.
+            if (request.Weight is not > 0m)
+            {
+                return Error.Validation("Inv.WeightRequired", $"'{item.Code}' is catch-weight: weigh what is issued.");
+            }
+
+            if (!request.AllowNegative && request.Weight > balance.WeightOnHand && request.Quantity < balance.QuantityOnHand)
+            {
+                return Error.Rule("Inv.InsufficientWeight", $"'{item.Code}' has {balance.WeightOnHand:0.###} {item.CatchWeightUnit} on hand, less than the {request.Weight:0.###} to issue.");
+            }
+
+            decimal weightCost = request.Quantity >= balance.QuantityOnHand && balance.QuantityOnHand > 0m ? balance.TotalValue
+                : decimal.Round(request.Weight.Value * balance.CostPerWeight, 4, MidpointRounding.ToEven);
+            issue = new StockIssue(balance, request.Quantity, weightCost, null, AtCost: true);
+        }
         else
         {
             issue = await StockCosting.PlanIssueAsync(_db, item, balance, request.Quantity, ct).ConfigureAwait(false);
@@ -256,9 +295,18 @@ public sealed class InventoryService : IInventoryService
             _db.Set<NegativeStockEvent>().Add(negative);
         }
 
+        decimal? weightOut = null;
+        if (item.IsCatchWeight)
+        {
+            // With the last pieces gone, whatever weight is left goes with them (the scale's difference on the way out).
+            weightOut = balance.QuantityOnHand <= 0m ? balance.WeightOnHand : request.Weight!.Value;
+            balance.AdjustWeight(-weightOut.Value);
+        }
+
         StockMovement movement = new(request.CompanyId, request.ItemId, request.WarehouseId, request.Date, StockMovementType.Issue, -request.Quantity, issue.UnitCost, -cost, request.Reference)
         {
             JournalEntryId = posting.Value.JournalId,
+            Weight = -weightOut,
         };
         _db.Set<StockMovement>().Add(movement);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -563,6 +611,54 @@ public sealed class InventoryService : IInventoryService
 
         var rows = await query.ToListAsync(ct).ConfigureAwait(false);
         return rows.Select(r => new StockValuationLine(r.Code, r.Description, r.WarehouseCode, r.QuantityOnHand, r.AverageCost, r.TotalValue)).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetCatchWeightAsync(long companyId, long itemId, string? weightUnit, decimal? nominalWeight, decimal? tolerancePercent, CancellationToken ct = default)
+    {
+        Item? item = await _db.Items.FirstOrDefaultAsync(i => i.Id == itemId && i.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (item is null)
+        {
+            return Result.Failure(Error.NotFound("Inv.ItemNotFound", $"Item {itemId} not found."));
+        }
+
+        string? unit = string.IsNullOrWhiteSpace(weightUnit) ? null : weightUnit.Trim().ToLowerInvariant();
+        if (nominalWeight is <= 0m || tolerancePercent is < 0m or > 100m || (unit is null && (nominalWeight is not null || tolerancePercent is not null)) || unit?.Length > 10)
+        {
+            return Result.Failure(Error.Validation("Inv.CatchWeight", "A catch-weight item needs a weight unit; a nominal weight must be positive and a tolerance 0–100%."));
+        }
+
+        if (unit != item.CatchWeightUnit && await _db.StockBalances.AnyAsync(b => b.ItemId == itemId && b.QuantityOnHand != 0m, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.Rule("Inv.CatchWeightStock", $"'{item.Code}' has stock on hand; its weight unit cannot change until it is cleared."));
+        }
+
+        item.CatchWeightUnit = unit;
+        item.NominalWeight = unit is null ? null : nominalWeight;
+        item.WeightTolerancePercent = unit is null ? null : tolerancePercent;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    // A catch-weight receipt: the weight is required and its average per piece must be within the tolerance of the nominal weight.
+    private static Error? CatchWeightCheck(Item item, decimal quantity, decimal? weight)
+    {
+        if (weight is not > 0m)
+        {
+            return Error.Validation("Inv.WeightRequired", $"'{item.Code}' is catch-weight: weigh what is received.");
+        }
+
+        if (item.NominalWeight is decimal nominal && item.WeightTolerancePercent is decimal tolerance && quantity > 0m)
+        {
+            decimal average = weight.Value / quantity;
+            if (Math.Abs(average - nominal) / nominal * 100m > tolerance)
+            {
+                return Error.Rule("Inv.WeightOutOfTolerance",
+                    $"'{item.Code}' averages {average:0.###} {item.CatchWeightUnit} a piece, more than {tolerance:0.##}% from the nominal {nominal:0.###}.");
+            }
+        }
+
+        return null;
     }
 
     /// <inheritdoc />

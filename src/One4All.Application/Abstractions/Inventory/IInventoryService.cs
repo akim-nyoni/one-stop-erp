@@ -31,6 +31,12 @@ public sealed class ReceiveStockRequest
 
     /// <summary>The batches / serials received (required for a tracked item when the company enforces lot tracking).</summary>
     public IReadOnlyList<One4All.Application.Inventory.LotQuantity> Lots { get; init; } = [];
+
+    /// <summary>The weight received or issued, for a catch-weight item (required for one).</summary>
+    public decimal? Weight { get; init; }
+
+    /// <summary>The cost per weight unit, for a catch-weight item bought by weight (instead of <see cref="UnitCost"/> per piece).</summary>
+    public decimal? CostPerWeightUnit { get; init; }
 }
 
 /// <summary>A request to issue stock out of a warehouse (at moving-average cost).</summary>
@@ -68,6 +74,9 @@ public sealed class IssueStockRequest
 
     /// <summary>The batches / serials issued (none: the earliest-expiry batches on hand are taken when the company enforces lot tracking).</summary>
     public IReadOnlyList<One4All.Application.Inventory.LotQuantity> Lots { get; init; } = [];
+
+    /// <summary>The weight received or issued, for a catch-weight item (required for one).</summary>
+    public decimal? Weight { get; init; }
 
     /// <summary>
     /// The account the issue is charged to, for internal consumption (a department's supplies expense, say); null to
@@ -180,4 +189,7 @@ public interface IInventoryService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The net revaluation (+ stock up, − stock down), or why it was refused.</returns>
     Task<Result<decimal>> RevalueStandardCostAsync(long companyId, long itemId, decimal newStandardCost, DateOnly date, string revaluationAccountCode, CancellationToken ct = default);
+
+    /// <summary>Makes an item catch-weight (a weight unit; null makes it ordinary again), with its nominal weight per piece and the tolerance a receipt's average may stray from it.</summary>
+    Task<Result> SetCatchWeightAsync(long companyId, long itemId, string? weightUnit, decimal? nominalWeight, decimal? tolerancePercent, CancellationToken ct = default);
 }

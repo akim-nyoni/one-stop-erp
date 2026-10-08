@@ -417,6 +417,15 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Set an item as catch-weight",
+            Description = "Counted in pieces and weighed: receipts need their weight (and may be costed per weight unit), the average weight per piece must be within the tolerance "
+                + "of the nominal weight, and issues are costed by the weight that leaves. Leave the unit blank to make the item ordinary again (only with no stock on hand).",
+            Fields = [Req("Item", "Item code"), Opt("Unit", "Weight unit (kg, t…)", "kg"), OptNum("Nominal", "Nominal weight per piece"), OptNum("Tolerance", "Tolerance %")],
+            Run = async (c, i) => Check(await c.Get<IInventoryService>().SetCatchWeightAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Optional("Unit"),
+                i.OptionalNumber("Nominal"), i.OptionalNumber("Tolerance")).ConfigureAwait(true), "Catch weight saved."),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set an item's replenishment policy", ListTitle = "Replenishment policies",
             Description = "Min/max and forecast: at or below the reorder level (on hand plus on order) a reorder is suggested, up to the maximum if set, else the reorder quantity. "
                 + "With a forecast window, the reorder level rises to the average daily issues over that window times the lead time.",

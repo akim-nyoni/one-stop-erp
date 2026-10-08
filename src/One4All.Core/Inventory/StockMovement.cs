@@ -63,6 +63,9 @@ public sealed class StockMovement : AuditableEntity, ICompanyScoped
     /// <summary>An optional reference.</summary>
     public string? Reference { get; set; }
 
+    /// <summary>The signed weight moved, for a catch-weight item.</summary>
+    public decimal? Weight { get; set; }
+
     /// <summary>The GL journal that posted the movement.</summary>
     public long? JournalEntryId { get; set; }
 

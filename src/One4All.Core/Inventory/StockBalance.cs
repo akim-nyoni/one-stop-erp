@@ -96,6 +96,16 @@ public sealed class StockBalance : Entity, ICompanyScoped
         AverageCost = QuantityOnHand == 0m ? 0m : decimal.Round(TotalValue / QuantityOnHand, CostScale, MidpointRounding.ToEven);
     }
 
+    /// <summary>The weight on hand of a catch-weight item (in its weight unit).</summary>
+    public decimal WeightOnHand { get; private set; }
+
+    /// <summary>The value of one weight unit on hand (catch-weight items).</summary>
+    public decimal CostPerWeight => WeightOnHand == 0m ? 0m : decimal.Round(TotalValue / WeightOnHand, CostScale, MidpointRounding.ToEven);
+
+    /// <summary>Moves the weight on hand.</summary>
+    /// <param name="weight">The signed weight (+ in, − out).</param>
+    public void AdjustWeight(decimal weight) => WeightOnHand = decimal.Round(WeightOnHand + weight, 4, MidpointRounding.ToEven);
+
     /// <summary>The cost an issue of <paramref name="quantity"/> would carry at the current average, without issuing it.</summary>
     /// <param name="quantity">The quantity to issue (positive).</param>
     /// <returns>The cost <see cref="Issue"/> would return.</returns>
