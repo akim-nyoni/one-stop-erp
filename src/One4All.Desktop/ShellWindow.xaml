@@ -82,6 +82,7 @@
                 <MenuItem Header="{loc:T 'Customers — Invoices, Credit Notes, Receipts, Statements…'}" Tag="Customers" Click="OpenOperations_Click" />
                 <MenuItem Header="{loc:T 'Suppliers — Invoices, Credit Notes, Payments, Statements…'}" Tag="Suppliers" Click="OpenOperations_Click" />
                 <MenuItem Header="{loc:T 'Point of Sale — Refunds, Till Events, Gift Cards…'}" Tag="Point of Sale" Click="OpenOperations_Click" />
+                <MenuItem Header="{loc:T 'Restaurant — Menu, Tables, Orders, Kitchen, Billing, Reservations…'}" Tag="Restaurant" Click="OpenOperations_Click" />
                 <MenuItem Header="{loc:T 'Stock — Lots, Transfers, Stocktakes, Assembly, Pricing…'}" Tag="Stock" Click="OpenOperations_Click" />
                 <MenuItem Header="{loc:T 'Purchasing — Requisitions, Orders, Goods Received, Invoice Matching, Budget Gate…'}" Tag="Purchasing" Click="OpenOperations_Click" />
                 <MenuItem Header="{loc:T 'Budgeting — Preparation, Review &amp; Approval…'}" Tag="Budgeting" Click="OpenOperations_Click" />

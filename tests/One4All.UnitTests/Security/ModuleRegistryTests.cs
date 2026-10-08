@@ -41,6 +41,7 @@ public sealed class ModuleRegistryTests
         registry.IsMenuEntryAvailable("Sales & Schools", c => c is LicenceModules.School, new EffectivePermissions(new Dictionary<string, OperationFlags> { ["School.Student"] = OperationFlags.View }))
             .Should().BeTrue("a group shared by two modules shows when either is available");
         registry.IsMenuEntryAvailable("Nobody's group", _ => true, BudgetClerk).Should().BeFalse();
+        registry.ForMenuEntry("Restaurant").Select(m => m.LicenceModule).Should().Equal([LicenceModules.PointOfSale], "the restaurant screens come with point of sale");
 
         registry.ForTask("housing.lapse-offers")!.LicenceModule.Should().Be(LicenceModules.Housing);
         registry.ForApiArea("trading").Select(m => m.Code).Should().BeEquivalentTo(["Sales", "Purchasing"]);

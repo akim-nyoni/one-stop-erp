@@ -69,7 +69,7 @@ public static class BuiltInModules
         new ModuleDescriptor("Inventory", "Inventory", LicenceModules.Inventory, "\U0001F4E6", "#6D4C41", ["stock", "pricing"], [], ["Stock", "Weighbridge"]),
         new ModuleDescriptor("Procurement", "Procurement", LicenceModules.Procurement, "\U0001F4CB", "#5E35B1", ["pop"], [], ["Purchasing"]),
         new ModuleDescriptor("SalesOrders", "Order Entry", LicenceModules.SalesOrders, "\U0001F5D2", "#00695C", ["sop"], [], []),
-        new ModuleDescriptor("Pos", "Point of Sale", LicenceModules.PointOfSale, "\U0001F6D2", "#AD1457", [], ["pos.fiscal-retry"], ["Point of Sale"]),
+        new ModuleDescriptor("Pos", "Point of Sale", LicenceModules.PointOfSale, "\U0001F6D2", "#AD1457", [], ["pos.fiscal-retry"], ["Point of Sale", "Restaurant"]),
         new ModuleDescriptor("Voucher", "Voucher Management", LicenceModules.Vouchers, "\U0001F3AB", "#EF6C00", ["vouchers"], [], []),
         new ModuleDescriptor("Municipal", "Municipality", LicenceModules.Municipal, "\U0001F3DB", "#3949AB", ["municipal"], [], ["Municipality"]),
         new ModuleDescriptor("Housing", "Housing & Land", LicenceModules.Housing, "\U0001F3D8", "#00796B", ["housing"], ["housing.lapse-offers"], ["Housing"]),
