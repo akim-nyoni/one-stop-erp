@@ -81,6 +81,9 @@ public sealed class Company : SoftDeletableEntity
     /// <summary>Gets or sets the deemed (official) annual interest rate a cheap or interest-free staff loan's benefit is taxed at (null: no loan benefit).</summary>
     public decimal? DeemedLoanInterestRatePercent { get; set; }
 
+    /// <summary>Gets or sets the income account interest charged on staff loans is credited to.</summary>
+    public string? StaffLoanInterestAccountCode { get; set; }
+
     /// <summary>
     /// Gets or sets the net-pay movement from the group's last run (in percent, either way) above which a second, different approver
     /// is needed. Null needs one approver always.

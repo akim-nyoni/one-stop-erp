@@ -52,7 +52,7 @@ public sealed class BenefitsInKindTests
             new EmployeeBenefit(companyId, employee.Id, BenefitKind.MotorVehicle, "ABC 1234", new DateOnly(2026, 1, 1)) { EngineCapacityCc = 2000 },
             new EmployeeBenefit(companyId, employee.Id, BenefitKind.Housing, "Staff house 4", new DateOnly(2026, 1, 1)) { MonthlyValue = 150m },
             new EmployeeBenefit(companyId, employee.Id, BenefitKind.Medical, "Ended cover", new DateOnly(2025, 1, 1)) { MonthlyValue = 999m, To = new DateOnly(2025, 12, 31) });
-        db.EmployeeLoans.Add(new EmployeeLoan(companyId, employee.Id, "LN-7", 12000m, 500m, new DateOnly(2026, 1, 2), "1200"));
+        db.EmployeeLoans.Add(new EmployeeLoan(companyId, employee.Id, "LN-7", 12000m, 500m, new DateOnly(2026, 1, 2), "1200") { DeductFromPay = false });
         await db.SaveChangesAsync();
 
         (await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-01", new DateOnly(2026, 1, 25), "2420", "BEN-2026-01")).IsSuccess.Should().BeTrue();

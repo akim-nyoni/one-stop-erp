@@ -17647,6 +17647,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<bool>("DeductFromPay")
+                        .HasColumnType("boolean")
+                        .HasColumnName("deduct_from_pay");
+
                     b.Property<long>("EmployeeId")
                         .HasColumnType("bigint")
                         .HasColumnName("employee_id");
@@ -17704,6 +17708,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");
+
+                    b.Property<bool>("Suspended")
+                        .HasColumnType("boolean")
+                        .HasColumnName("suspended");
 
                     b.HasKey("Id")
                         .HasName("pk_employee_loan");
@@ -27924,6 +27932,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("staff_child_discount_percent");
+
+                    b.Property<string>("StaffLoanInterestAccountCode")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("staff_loan_interest_account_code");
 
                     b.Property<string>("TaxNumber")
                         .HasMaxLength(60)

@@ -48,7 +48,7 @@ public sealed class PayrollControlReportsTests
         Customer client = new(companyId, "PCCLI", "Client", Scenario.Usd);
         db.Customers.Add(client);
         await db.SaveChangesAsync();
-        db.Add(new EmployeeLoan(companyId, leaver.Id, "LN-9", 600m, 100m, new DateOnly(2025, 6, 1), "1400"));
+        db.Add(new EmployeeLoan(companyId, leaver.Id, "LN-9", 600m, 100m, new DateOnly(2025, 6, 1), "1400") { DeductFromPay = false });
         db.Add(new EmployeeLeaveBalance(companyId, leaver.Id, "Annual"));
         await db.SaveChangesAsync();
         (await db.Set<EmployeeLeaveBalance>().SingleAsync(l => l.EmployeeId == leaver.Id)).Accrue(10m);

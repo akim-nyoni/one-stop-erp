@@ -236,6 +236,25 @@ public sealed partial class PayrollService
         }
 
         await ReverseArrearsAsync(companyId, run.DocumentNumber, reversalDocument, date, ct).ConfigureAwait(false);
+
+        // Loans the run repaid get the repayment back and lose the interest it charged (the journal reversal unwinds the postings).
+        List<PayslipLine> loanLines = [.. original.SelectMany(s => s.Lines).Where(l => LoanIdOf(l.ElementCode) is not null)];
+        List<long> reversedLoanIds = [.. loanLines.Select(l => LoanIdOf(l.ElementCode)!.Value).Distinct()];
+        Dictionary<long, EmployeeLoan> reversedLoans = await _db.EmployeeLoans.Where(l => reversedLoanIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id, ct).ConfigureAwait(false);
+        foreach (PayslipLine line in loanLines)
+        {
+            if (reversedLoans.TryGetValue(LoanIdOf(line.ElementCode)!.Value, out EmployeeLoan? loan))
+            {
+                if (line.ElementCode.StartsWith(LoanInterestLinePrefix, StringComparison.Ordinal))
+                {
+                    loan.ChargeInterest(-line.Amount);
+                }
+                else
+                {
+                    loan.Restore(line.Amount);
+                }
+            }
+        }
         run.MarkReversed(date, reversalDocument, approvedByUserId);
         _db.Set<PayrollRunRecord>().Add(new PayrollRunRecord(companyId, run.PeriodLabel, date, original.Count, gross, deductions, net, reversed.Value.JournalNumber, PayRunKind.Reversal,
             reversalDocument, reason.Trim(), run.PayGroup));

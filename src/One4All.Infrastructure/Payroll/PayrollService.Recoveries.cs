@@ -37,6 +37,13 @@ public sealed partial class PayrollService
     private const string PayRatesKey = "__PAYRATES";
     private const string PayDateKey = "__PAYDATE";
     private const string BenefitsKey = "__BENEFITS";
+    private const string LoansKey = "__LOANS";
+
+    /// <summary>The prefix of a payslip line repaying a staff loan (followed by the loan's id).</summary>
+    public const string LoanLinePrefix = "LOAN-";
+
+    /// <summary>The prefix of a payslip memo line for the interest a staff loan was charged (followed by the loan's id).</summary>
+    public const string LoanInterestLinePrefix = "LOANINT-";
 
     // Each employee's balances to recover as at the date: staff tenders less staff-purchase deductions already made, and the tenancy
     // account's balance (never below zero — a tenant in credit has nothing to deduct).
@@ -94,6 +101,12 @@ public sealed partial class PayrollService
             .Where(l => l.CompanyId == companyId && ids.Contains(l.EmployeeId) && l.Outstanding > 0m && l.GrantedOn <= asAt)
             .Select(l => new { l.EmployeeId, l.Reference, l.Outstanding, l.InterestRatePercent }).ToListAsync(ct).ConfigureAwait(false);
 
+        // Loans repaid from pay this period (brief §4.15.5): active, deducted from pay, not suspended.
+        var repaying = await _db.EmployeeLoans.AsNoTracking()
+            .Where(l => l.CompanyId == companyId && ids.Contains(l.EmployeeId) && l.Status == EmployeeLoanStatus.Active && l.DeductFromPay && !l.Suspended && l.Outstanding > 0m && l.GrantedOn <= asAt)
+            .OrderBy(l => l.GrantedOn).ThenBy(l => l.Id)
+            .Select(l => new { l.Id, l.EmployeeId, l.Reference, l.Outstanding, l.Installment, l.InterestRatePercent }).ToListAsync(ct).ConfigureAwait(false);
+
         // What the previous payroll paid earlier in the tax year (migrated openings) counts with this payroll's own payslips.
         var openings = await _db.Set<PayrollYtdOpening>().AsNoTracking().Where(o => ids.Contains(o.EmployeeId) && o.TaxYear == asAt.Year)
             .Select(o => new { o.EmployeeId, o.Code, o.Amount }).ToListAsync(ct).ConfigureAwait(false);
@@ -132,6 +145,7 @@ public sealed partial class PayrollService
             }
 
             values[BenefitsKey] = valued;
+            values[LoansKey] = repaying.Where(l => l.EmployeeId == e.Id).Select(l => (l.Id, l.Reference, l.Outstanding, l.Installment, l.InterestRatePercent)).ToList();
             result[e.Id] = values;
         }
 

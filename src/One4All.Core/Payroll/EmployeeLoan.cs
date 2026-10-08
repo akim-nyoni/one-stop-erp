@@ -64,6 +64,39 @@ public sealed class EmployeeLoan : AuditableEntity, ICompanyScoped
     /// <summary>Gets or sets the annual interest rate the loan charges (0 for an interest-free loan, taxed as a benefit at the deemed rate).</summary>
     public decimal InterestRatePercent { get; set; }
 
+    /// <summary>Gets or sets a value indicating whether each pay run deducts the instalment (brief §4.15.5: automatic deduction each run).</summary>
+    public bool DeductFromPay { get; set; } = true;
+
+    /// <summary>Gets or sets a value indicating whether deductions are suspended (unpaid leave, hardship); interest still accrues.</summary>
+    public bool Suspended { get; set; }
+
+    /// <summary>Adds a period's interest to the balance.</summary>
+    /// <param name="interest">The interest.</param>
+    public void ChargeInterest(decimal interest) => Outstanding = decimal.Round(Outstanding + interest, 4, MidpointRounding.ToEven);
+
+    /// <summary>Puts a repayment back (its pay run was reversed), reopening a loan it had settled.</summary>
+    /// <param name="amount">The repayment to restore.</param>
+    public void Restore(decimal amount)
+    {
+        Outstanding = decimal.Round(Outstanding + amount, 4, MidpointRounding.ToEven);
+        if (Outstanding > 0m)
+        {
+            Status = EmployeeLoanStatus.Active;
+        }
+    }
+
+    /// <summary>This period's interest and the most the instalment can take: the instalment, but never more than the balance with its interest.</summary>
+    /// <param name="outstanding">The balance before the period.</param>
+    /// <param name="installment">The instalment.</param>
+    /// <param name="ratePercent">The annual rate.</param>
+    /// <param name="periodsPerYear">The employee's pay periods a year.</param>
+    /// <returns>The interest and the amount due.</returns>
+    public static (decimal Interest, decimal Due) Instalment(decimal outstanding, decimal installment, decimal ratePercent, int periodsPerYear)
+    {
+        decimal interest = ratePercent <= 0m || outstanding <= 0m ? 0m : decimal.Round(outstanding * ratePercent / 100m / Math.Max(1, periodsPerYear), 2, MidpointRounding.AwayFromZero);
+        return (interest, Math.Max(0m, Math.Min(installment, outstanding + interest)));
+    }
+
     /// <summary>The advance date.</summary>
     public DateOnly GrantedOn { get; private set; }
 

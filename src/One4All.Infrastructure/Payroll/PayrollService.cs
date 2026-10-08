@@ -259,6 +259,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         decimal totalDeductions = 0m;
         decimal totalNet = 0m;
 
+        List<long> loanIds = [.. slips.SelectMany(s => s.Lines).Select(l => LoanIdOf(l.ElementCode)).OfType<long>().Distinct()];
+        Dictionary<long, EmployeeLoan> loansById = loanIds.Count == 0 ? [] : await _db.EmployeeLoans.Where(l => loanIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id, ct).ConfigureAwait(false);
         foreach (Payslip payslip in slips)
         {
             _db.Set<Payslip>().Add(payslip);
@@ -269,6 +271,31 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
             foreach (PayslipLine line in payslip.Lines)
             {
+                if (line.Amount != 0m && LoanIdOf(line.ElementCode) is long loanId && loansById.TryGetValue(loanId, out EmployeeLoan? loan))
+                {
+                    if (line.ElementCode.StartsWith(LoanInterestLinePrefix, StringComparison.Ordinal))
+                    {
+                        // Interest charged: Dr the loan, Cr interest income.
+                        if (string.IsNullOrWhiteSpace(company.StaffLoanInterestAccountCode))
+                        {
+                            return Error.Validation("Payroll.LoanInterestAccount", "Set the staff loan interest income account before charging interest on staff loans.");
+                        }
+
+                        debitsByAccount[(loan.LoanReceivableAccountCode, string.Empty, string.Empty, null, null, null)] =
+                            debitsByAccount.GetValueOrDefault((loan.LoanReceivableAccountCode, string.Empty, string.Empty, null, null, null)) + line.Amount;
+                        Add(creditsByAccount, company.StaffLoanInterestAccountCode, line.Amount);
+                        loan.ChargeInterest(line.Amount);
+                    }
+                    else
+                    {
+                        // The repayment out of pay: Cr the loan.
+                        Add(creditsByAccount, loan.LoanReceivableAccountCode, line.Amount);
+                        loan.Repay(line.Amount);
+                    }
+
+                    continue;
+                }
+
                 // Memo lines (benefits in kind, notes) are neither paid nor posted.
                 if (line.Amount == 0m || line.Type == PayElementType.Memo)
                 {
@@ -497,7 +524,36 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             payslip.AddLine(element.Code, element.Name, element.Type, amount, element.Taxable);
         }
 
+        // Staff loans (brief §4.15.5): the period's interest is charged (a memo line) and the instalment deducted, never taking net pay below zero.
+        if (vars.GetValueOrDefault(LoansKey) is List<(long Id, string Reference, decimal Outstanding, decimal Installment, decimal Rate)> loans)
+        {
+            decimal available = Math.Max(0m, gross - deductions);
+            foreach ((long id, string reference, decimal outstanding, decimal installment, decimal rate) in loans)
+            {
+                (decimal interest, decimal due) = EmployeeLoan.Instalment(outstanding, installment, rate, PayPeriods.PerYear(employee.PayFrequency));
+                if (interest > 0m)
+                {
+                    payslip.AddLine(LoanInterestLinePrefix + id.ToString(System.Globalization.CultureInfo.InvariantCulture), $"Interest on loan {reference}", PayElementType.Memo, interest, false);
+                }
+
+                decimal take = Math.Min(due, available);
+                if (take > 0m)
+                {
+                    payslip.AddLine(LoanLinePrefix + id.ToString(System.Globalization.CultureInfo.InvariantCulture), $"Loan {reference} repayment", PayElementType.Deduction, take, false);
+                    available -= take;
+                }
+            }
+        }
+
         return payslip;
+    }
+
+    // The loan a payslip line repays (or was charged interest on), or null.
+    private static long? LoanIdOf(string code)
+    {
+        string? digits = code.StartsWith(LoanInterestLinePrefix, StringComparison.Ordinal) ? code[LoanInterestLinePrefix.Length..]
+            : code.StartsWith(LoanLinePrefix, StringComparison.Ordinal) ? code[LoanLinePrefix.Length..] : null;
+        return long.TryParse(digits, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long id) ? id : null;
     }
 
     private static string GroupVariable(string? group) => "GROUP_" + new string([.. (group ?? string.Empty).Trim().ToUpperInvariant().Select(c => char.IsLetterOrDigit(c) ? c : '_')]);

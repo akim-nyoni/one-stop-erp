@@ -47,7 +47,7 @@ public sealed class PayrollExtrasTests
         ted.AssignPayElement(basic.Id);
         db.Employees.AddRange(ann, cas, ted);
         await db.SaveChangesAsync();
-        db.AddRange(new EmployeeLoan(companyId, ted.Id, "LN-T", 500m, 100m, new DateOnly(2025, 6, 1), "1400"), new EmployeePaymentSplit(companyId, ann.Id, PayMethod.MobileMoney, "0772", 500m));
+        db.AddRange(new EmployeeLoan(companyId, ted.Id, "LN-T", 500m, 100m, new DateOnly(2025, 6, 1), "1400") { DeductFromPay = false }, new EmployeePaymentSplit(companyId, ann.Id, PayMethod.MobileMoney, "0772", 500m));
         await db.SaveChangesAsync();
         (await scope.ServiceProvider.GetRequiredService<ILeaveService>().AccrueAsync(companyId, ted.Id, "Annual", 10m)).IsSuccess.Should().BeTrue();
 

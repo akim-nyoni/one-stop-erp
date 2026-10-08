@@ -308,7 +308,8 @@ public static partial class OperationCatalogue
             Module = people, Title = "Benefits in kind", ListTitle = "Benefits",
             Description = "Taxable benefits (a company car valued from the vehicle scale by engine size or cost, housing, school fees, medical): taxed each pay period they "
                 + "apply and shown on the payslip as memo lines. Also the vehicle scale's bands, the deemed interest rate cheap staff loans are taxed at, and a loan's own rate.",
-            Fields = [Pick("Step", "Step", ["Add benefit", "End benefit", "Vehicle scale band", "Deemed loan rate", "Loan interest rate"]), Opt("Employee", "Employee number"),
+            Fields = [Pick("Step", "Step", ["Add benefit", "End benefit", "Vehicle scale band", "Deemed loan rate", "Loan interest rate", "Suspend loan deductions", "Resume loan deductions",
+                    "Loan interest income account"]), Opt("Employee", "Employee number"), Opt("Account", "Interest income account"),
                 Pick("Kind", "Benefit", Enum.GetNames<Core.Payroll.BenefitKind>()), Opt("Description", "What it is (registration, property)"), OptNum("Engine", "Engine capacity (cc)"),
                 OptNum("Cost", "Vehicle cost"), OptNum("Monthly", "Monthly value (blank: from the vehicle scale)"), Pick("Basis", "Scale measured on", Enum.GetNames<Core.Payroll.VehicleScaleBasis>()),
                 OptNum("From", "Scale band from"), OptNum("To", "Scale band to (blank: open)"), OptNum("Rate", "Interest rate % a year"), Opt("Loan", "Loan reference"),
@@ -343,6 +344,20 @@ public static partial class OperationCatalogue
                         company.DeemedLoanInterestRatePercent = i.OptionalNumber("Rate");
                         await c.Db.SaveChangesAsync().ConfigureAwait(true);
                         return company.DeemedLoanInterestRatePercent is decimal rate ? $"Cheap loans are taxed at a deemed {rate}% a year." : "No loan benefit is taxed.";
+                    case "Loan interest income account":
+                        Core.System.Company owner = await c.Db.Companies.FirstAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                        owner.StaffLoanInterestAccountCode = i.Optional("Account")?.Trim().ToUpperInvariant();
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return $"Staff loan interest is credited to {owner.StaffLoanInterestAccountCode ?? "(none)"}.";
+                    case "Suspend loan deductions":
+                    case "Resume loan deductions":
+                        string held = (i.Optional("Loan") ?? string.Empty).Trim();
+                        Core.Payroll.EmployeeLoan pausing = await c.Db.EmployeeLoans.FirstOrDefaultAsync(l => l.CompanyId == c.CompanyId && l.Reference.ToUpper() == held.ToUpper()).ConfigureAwait(true)
+                            ?? throw new OperationException($"No loan {held}.");
+                        pausing.Suspended = i.Text("Step") == "Suspend loan deductions";
+                        pausing.DeductFromPay = true;
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return pausing.Suspended ? $"Loan {pausing.Reference} is not deducted until resumed (interest still accrues)." : $"Loan {pausing.Reference} is deducted from pay each run.";
                     default:
                         string reference = (i.Optional("Loan") ?? string.Empty).Trim();
                         Core.Payroll.EmployeeLoan loan = await c.Db.EmployeeLoans.FirstOrDefaultAsync(l => l.CompanyId == c.CompanyId && l.Reference.ToUpper() == reference.ToUpper()).ConfigureAwait(true)
