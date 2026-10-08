@@ -29,6 +29,9 @@ public sealed partial class PayrollService
     /// <summary>The formula variable holding the period number in the tax year (the pay date's month).</summary>
     public const string TaxPeriodVariable = "TAXPERIOD";
 
+    /// <summary>The variable holding the employee's pay periods a year (12, 26 or 52).</summary>
+    public const string PeriodsPerYearVariable = "PERIODSPERYEAR";
+
     private const string TaxTablesKey = "__TAXTABLES";
     private const string TaxableByCurrencyKey = "__TAXABLEBYCCY";
     private const string PayRatesKey = "__PAYRATES";
@@ -90,7 +93,7 @@ public sealed partial class PayrollService
             {
                 [YtdTaxableVariable] = ytd.Where(l => l.EmployeeId == e.Id && l.Type == PayElementType.Earning).Sum(l => l.Amount)
                     + openings.Where(o => o.EmployeeId == e.Id && o.Code == PayrollYtdOpening.TaxableCode).Sum(o => o.Amount),
-                [TaxPeriodVariable] = (decimal)asAt.Month,
+                [TaxPeriodVariable] = (decimal)PayPeriods.Number(e.PayFrequency, asAt),
                 [TaxTablesKey] = tables,
                 [PayDateKey] = asAt,
                 [PayRatesKey] = rates,

@@ -94,8 +94,11 @@ public sealed class Employee : SoftDeletableEntity, ICompanyScoped
     /// <summary>The full name as on the national ID.</summary>
     public string FullName { get; set; }
 
-    /// <summary>The basic salary per period.</summary>
+    /// <summary>The basic salary per period (of the employee's <see cref="PayFrequency"/>: a month's salary, or a week's wage).</summary>
     public decimal BasicSalary { get; set; }
+
+    /// <summary>Gets or sets how often the employee is paid; sets the period a pay date covers, part-period pay and the tax bands' scale.</summary>
+    public PayFrequency PayFrequency { get; set; }
 
     /// <summary>
     /// Gets or sets the payroll the employee is paid in (e.g. MONTHLY, WEEKLY, CASUAL — brief §4.15.6); null for the company's default

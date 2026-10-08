@@ -1,0 +1,67 @@
+namespace One4All.Core.Payroll;
+
+/// <summary>How often an employee is paid (brief §4.15: monthly salaries, weekly wages).</summary>
+public enum PayFrequency
+{
+    /// <summary>Once a calendar month.</summary>
+    Monthly = 0,
+
+    /// <summary>Every two weeks.</summary>
+    Fortnightly = 1,
+
+    /// <summary>Every week.</summary>
+    Weekly = 2,
+}
+
+/// <summary>
+/// The pay periods of each frequency (brief §4.15.4: "pro-rated for part-period", tax tables "per frequency"): the window a pay date pays for, how
+/// many periods a year has, the period's number in the tax year, and the share of a period someone employed for part of it earns.
+/// </summary>
+public static class PayPeriods
+{
+    /// <summary>The periods in a year.</summary>
+    /// <param name="frequency">The frequency.</param>
+    /// <returns>12, 26 or 52.</returns>
+    public static int PerYear(PayFrequency frequency) => frequency switch
+    {
+        PayFrequency.Weekly => 52,
+        PayFrequency.Fortnightly => 26,
+        _ => 12,
+    };
+
+    /// <summary>The days a pay date pays for: the calendar month it falls in, or the week / fortnight ending on it.</summary>
+    /// <param name="frequency">The frequency.</param>
+    /// <param name="payDate">The pay date.</param>
+    /// <returns>The first and last day.</returns>
+    public static (DateOnly From, DateOnly To) Window(PayFrequency frequency, DateOnly payDate) => frequency switch
+    {
+        PayFrequency.Weekly => (payDate.AddDays(-6), payDate),
+        PayFrequency.Fortnightly => (payDate.AddDays(-13), payDate),
+        _ => (new DateOnly(payDate.Year, payDate.Month, 1), new DateOnly(payDate.Year, payDate.Month, DateTime.DaysInMonth(payDate.Year, payDate.Month))),
+    };
+
+    /// <summary>The period's number in the (calendar) tax year: the month, or the week / fortnight counted from 1 January.</summary>
+    /// <param name="frequency">The frequency.</param>
+    /// <param name="payDate">The pay date.</param>
+    /// <returns>The period number, from 1.</returns>
+    public static int Number(PayFrequency frequency, DateOnly payDate) => frequency switch
+    {
+        PayFrequency.Weekly => Math.Min(52, ((payDate.DayOfYear - 1) / 7) + 1),
+        PayFrequency.Fortnightly => Math.Min(26, ((payDate.DayOfYear - 1) / 14) + 1),
+        _ => payDate.Month,
+    };
+
+    /// <summary>The days of the period someone was employed (from engagement, to termination), and the days in the period.</summary>
+    /// <param name="frequency">The frequency.</param>
+    /// <param name="payDate">The pay date.</param>
+    /// <param name="engaged">When they started.</param>
+    /// <param name="terminated">When they left, if they have.</param>
+    /// <returns>Days employed in the period and days in the period.</returns>
+    public static (int Worked, int InPeriod) Days(PayFrequency frequency, DateOnly payDate, DateOnly engaged, DateOnly? terminated)
+    {
+        (DateOnly from, DateOnly to) = Window(frequency, payDate);
+        DateOnly first = engaged > from ? engaged : from;
+        DateOnly last = terminated is DateOnly left && left < to ? left : to;
+        return (Math.Max(0, last.DayNumber - first.DayNumber + 1), to.DayNumber - from.DayNumber + 1);
+    }
+}

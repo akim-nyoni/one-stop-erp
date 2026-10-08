@@ -17252,6 +17252,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("notch");
 
+                    b.Property<int>("PayFrequency")
+                        .HasColumnType("integer")
+                        .HasColumnName("pay_frequency");
+
                     b.Property<string>("PayGroup")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")

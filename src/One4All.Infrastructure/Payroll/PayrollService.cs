@@ -346,10 +346,19 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
     {
         Payslip payslip = new(companyId, employee.Id, periodLabel, payDate, PayRunKind.Regular, documentNumber, PayGroupKey(employee.PayGroup));
 
+        // Someone who joins or leaves during the period is paid basic for the days they were employed (brief §4.15.4); a given basic (back pay,
+        // a final settlement) is used as it is.
+        (int worked, int inPeriod) = PayPeriods.Days(employee.PayFrequency, payDate, employee.EngagementDate, employee.TerminationDate);
+        decimal share = basicSalary is null && worked < inPeriod ? (decimal)worked / inPeriod : 1m;
+
         // Variables the formulas evaluate against; updated as each element resolves.
         Dictionary<string, object?> vars = new(StringComparer.Ordinal)
         {
-            ["BASIC"] = basicSalary ?? employee.BasicSalary,
+            ["BASIC"] = basicSalary ?? decimal.Round(employee.BasicSalary * share, 2, MidpointRounding.AwayFromZero),
+            ["DAYSWORKED"] = (decimal)worked,
+            ["DAYSINPERIOD"] = (decimal)inPeriod,
+            ["PRORATA"] = share,
+            [PeriodsPerYearVariable] = (decimal)PayPeriods.PerYear(employee.PayFrequency),
             ["GROSS"] = 0m,
             ["TAXABLE"] = 0m,
             ["DEDUCTIONS"] = 0m,
@@ -497,18 +506,22 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         }
 
         decimal Number(string name) => vars.GetValueOrDefault(name) is decimal value ? value : 0m;
+
+        // The tables' bands are monthly: a weekly or fortnightly employee's period takes them scaled to the period (12/52, 12/26).
+        decimal periodsPerYear = Number(PeriodsPerYearVariable) is > 0m and var perYear ? perYear : 12m;
+        decimal scale = 12m / periodsPerYear;
         IEnumerable<PayeBand> Bands(decimal times) => table.Bands.Select(b => new PayeBand(b.From * times, b.To * times, b.RatePercent));
         decimal taxable = Number("TAXABLE");
         if (element.CumulativeTax)
         {
             decimal period = Math.Max(1m, Number(TaxPeriodVariable));
-            return PayeTable.Tax(Bands(period), Number(YtdTaxableVariable) + taxable) - Number("YTD_" + element.Code);
+            return PayeTable.Tax(Bands(period * scale), Number(YtdTaxableVariable) + taxable) - Number("YTD_" + element.Code);
         }
 
         decimal annual = Number("ANNUALTAXABLE");
         decimal regular = taxable - annual;
-        decimal tax = PayeTable.Tax(Bands(1m), regular);
-        tax = annual == 0m ? tax : tax + PayeTable.Tax(Bands(12m), (regular * 12m) + annual) - PayeTable.Tax(Bands(12m), regular * 12m);
+        decimal tax = PayeTable.Tax(Bands(scale), regular);
+        tax = annual == 0m ? tax : tax + PayeTable.Tax(Bands(12m), (regular * periodsPerYear) + annual) - PayeTable.Tax(Bands(12m), regular * periodsPerYear);
         return element.SplitCurrencyTax ? SplitByCurrency(element, vars, tax, taxable, payDate) : tax;
     }
 
