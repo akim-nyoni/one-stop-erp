@@ -474,6 +474,29 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "API keys for integrations", ListTitle = "API clients",
+            Description = "An integration signs in with the X-Api-Key header and acts with the permissions of the service user named (create one with only what it needs). "
+                + "The key is shown once — copy it then; rotating issues a new one and the old stops working; revoking stops the client.",
+            Fields = [Pick("Step", "Step", ["Create", "Rotate", "Revoke"]), Opt("Name", "Client name (create)"), Opt("User", "Service user it acts as (create)"),
+                new("Expires", "Expires on (create)", FieldKind.Date, Required: false), OptNum("Rate", "Requests per minute (create; blank: the server's)"), Opt("Client", "Client id (rotate / revoke)")],
+            Run = async (c, i) =>
+            {
+                IApiClientService clients = c.Get<IApiClientService>();
+                string client = i.Optional("Client") ?? string.Empty;
+                return i.Text("Step") switch
+                {
+                    "Create" => Check(await clients.CreateAsync(i.Optional("Name") ?? string.Empty, i.Optional("User") ?? string.Empty, i.OptionalDate("Expires"),
+                        i.OptionalNumber("Rate") is decimal rate ? (int)rate : null).ConfigureAwait(true), k => $"Client {k.ClientId} created. Its API key (shown only now): {k.ApiKey}"),
+                    "Rotate" => Check(await clients.RotateAsync(client).ConfigureAwait(true), k => $"New API key for {k.ClientId} (shown only now): {k.ApiKey}"),
+                    _ => Check(await clients.RevokeAsync(client).ConfigureAwait(true), $"Client {client} revoked."),
+                };
+            },
+            List = async c => Table(await c.Get<IApiClientService>().ListAsync().ConfigureAwait(true), ("Client", r => r.ClientId), ("Name", r => r.Name), ("Acts as", r => r.ActsAs),
+                ("Active", r => r.IsActive), ("Expires", r => r.ExpiresOn is DateOnly d ? D(d) : "—"), ("Rate/min", r => r.RequestsPerMinute?.ToString(CultureInfo.CurrentCulture) ?? "server"),
+                ("Last used", r => r.LastUsedOnUtc?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) ?? "never")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Reset a password", ListTitle = "Users and their roles", Description = "Sets a new password the user must change at next sign-in, and clears any lockout.",
             Fields = [Req("Username", "Login name"), Req("Password", "New password")],
             Run = async (c, i) => Check(await c.Get<IUserAdminService>().ResetPasswordAsync(await UserAsync(c, i.Text("Username")).ConfigureAwait(true), i.Text("Password")).ConfigureAwait(true), "Password reset."),

@@ -68,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Onboarding.IOpeningBalanceService, Onboarding.OpeningBalanceService>();
         services.AddScoped<Application.Abstractions.Security.IApiAccessService, Security.ApiAccessService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<IApiClientService, ApiClientService>();
         services.AddScoped<IAuditService, Security.AuditService>();
 
         // Accounting.

@@ -119,6 +119,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Users.</summary>
     public DbSet<User> Users => Set<User>();
 
+    /// <summary>Gets the API clients (integration credentials).</summary>
+    public DbSet<ApiClient> ApiClients => Set<ApiClient>();
+
     /// <summary>Row changes caught by triggers on sensitive tables (read only).</summary>
     public DbSet<Core.Audit.DatabaseChange> DatabaseChanges => Set<Core.Audit.DatabaseChange>();
 

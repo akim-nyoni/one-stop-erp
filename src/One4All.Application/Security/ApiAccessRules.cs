@@ -21,7 +21,7 @@ public static partial class ApiAccessRules
     /// Routes called without a signed-in user, each protecting itself: sign-in (credentials) and the WhatsApp webhook (Meta's verify token and
     /// signed deliveries). Any other route must belong to a governed area.
     /// </summary>
-    public static readonly IReadOnlyList<string> AnonymousRoutes = ["/api/auth/login", "/api/webhooks/whatsapp"];
+    public static readonly IReadOnlyList<string> AnonymousRoutes = ["/api/auth/login", "/api/webhooks/whatsapp", "/api/workflow/email/{token}"];
 
     /// <summary>Query parameters naming the user acting: they must be the signed-in user.</summary>
     public static readonly IReadOnlyList<string> ActorParameters = ["userId", "approverUserId"];

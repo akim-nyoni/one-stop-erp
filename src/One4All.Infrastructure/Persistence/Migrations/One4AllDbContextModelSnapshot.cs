@@ -26972,6 +26972,88 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("access_scope", "sec");
                 });
 
+            modelBuilder.Entity("One4All.Core.Security.ApiClient", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ActsAsUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("acts_as_user_id");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("client_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly?>("ExpiresOn")
+                        .HasColumnType("date")
+                        .HasColumnName("expires_on");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTimeOffset?>("LastUsedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<int?>("RequestsPerMinute")
+                        .HasColumnType("integer")
+                        .HasColumnName("requests_per_minute");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("SecretHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("secret_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_api_client");
+
+                    b.HasIndex("ActsAsUserId")
+                        .HasDatabaseName("ix_api_client_acts_as_user_id");
+
+                    b.HasIndex("ClientId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_api_client_client_id");
+
+                    b.ToTable("api_client", "sec");
+                });
+
             modelBuilder.Entity("One4All.Core.Security.Group", b =>
                 {
                     b.Property<long>("Id")
@@ -33595,6 +33677,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_access_scope_user_role_user_role_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Security.ApiClient", b =>
+                {
+                    b.HasOne("One4All.Core.Security.User", null)
+                        .WithMany()
+                        .HasForeignKey("ActsAsUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_api_client_users_acts_as_user_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Security.GroupRole", b =>

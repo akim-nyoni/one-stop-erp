@@ -92,6 +92,20 @@ internal sealed class GroupRoleConfiguration : IEntityTypeConfiguration<GroupRol
     }
 }
 
+internal sealed class ApiClientConfiguration : IEntityTypeConfiguration<ApiClient>
+{
+    public void Configure(EntityTypeBuilder<ApiClient> b)
+    {
+        b.ToTable("api_client", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.ClientId).HasMaxLength(40);
+        b.Property(x => x.SecretHash).HasMaxLength(64);
+        b.HasIndex(x => x.ClientId).IsUnique();
+        b.HasOne<User>().WithMany().HasForeignKey(x => x.ActsAsUserId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
 {
     public void Configure(EntityTypeBuilder<User> b)

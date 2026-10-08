@@ -50,6 +50,6 @@ public sealed partial class ApiAccessRulesTests
         return dir?.FullName ?? throw new InvalidOperationException("Repository root not found.");
     }
 
-    [GeneratedRegex("app\\.Map(?:Get|Post|Put|Delete)\\(\"(/api/[^\"]*)\"")]
+    [GeneratedRegex("(?:app|api)\\.Map(?:Get|Post|Put|Delete)\\(\"(/api/[^\"]*)\"")]
     private static partial Regex Route();
 }
