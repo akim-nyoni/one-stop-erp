@@ -170,4 +170,28 @@ public static class Scenario
         await db.SaveChangesAsync();
         return company.Id;
     }
+
+    /// <summary>Sets up codes as both cost centres and departments, as the posting engine only takes dimensions the company has.</summary>
+    /// <param name="db">The context.</param>
+    /// <param name="companyId">The company.</param>
+    /// <param name="codes">The codes.</param>
+    /// <returns>A task.</returns>
+    public static async Task DimensionsAsync(One4AllDbContext db, long companyId, params string[] codes)
+    {
+        foreach (string code in codes)
+        {
+            string key = code.ToUpperInvariant();
+            if (!await EntityFrameworkQueryableExtensions.AnyAsync(db.CostCentres, c => c.CompanyId == companyId && c.Code == key))
+            {
+                db.CostCentres.Add(new Core.Accounting.CostCentre(companyId, code, code));
+            }
+
+            if (!await EntityFrameworkQueryableExtensions.AnyAsync(db.Departments, d => d.CompanyId == companyId && d.Code == key))
+            {
+                db.Departments.Add(new Core.Accounting.Department(companyId, code, code));
+            }
+        }
+
+        await db.SaveChangesAsync();
+    }
 }

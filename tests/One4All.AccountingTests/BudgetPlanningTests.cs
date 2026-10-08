@@ -32,6 +32,7 @@ public sealed class BudgetPlanningTests
         await using AsyncServiceScope scope = provider.CreateAsyncScope();
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
         long companyId = await Scenario.SeedAsync(db);
+        await Scenario.DimensionsAsync(db, companyId, "WRK", "PRK");
         await scope.ServiceProvider.GetRequiredService<ReportCatalogueSeeder>().SeedAsync();
         long yearId = await db.FiscalYears.Where(y => y.CompanyId == companyId && y.Code == "2026").Select(y => y.Id).SingleAsync();
 

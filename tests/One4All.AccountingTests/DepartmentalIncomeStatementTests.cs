@@ -30,6 +30,7 @@ public sealed class DepartmentalIncomeStatementTests
         {
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             companyId = await Scenario.SeedAsync(db);
+            await Scenario.DimensionsAsync(db, companyId, "NTH", "STH");
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())

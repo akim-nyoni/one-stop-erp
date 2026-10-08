@@ -469,6 +469,18 @@ public sealed class PostingEngine : IPostingEngine
             return Error.Rule("Posting.BranchUnknown", $"Branch '{branch}' does not exist.");
         }
 
+        // Cost centre and department must be ones the company has set up and still uses (brief §3.2: "permitted for the company / cost centre /
+        // department").
+        if (key.CostCentre.Length > 0 && !await _db.CostCentres.AnyAsync(c => c.CompanyId == request.CompanyId && c.Code == key.CostCentre && c.IsActive, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Posting.CostCentreUnknown", $"Cost centre '{key.CostCentre}' does not exist or is inactive.");
+        }
+
+        if (key.Department.Length > 0 && !await _db.Departments.AnyAsync(d => d.CompanyId == request.CompanyId && d.Code == key.Department && d.IsActive, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Posting.DepartmentUnknown", $"Department '{key.Department}' does not exist or is inactive.");
+        }
+
         if (account.RequiresProject && line.Project is null)
         {
             return Error.Rule("Posting.ProjectRequired", $"Postings to '{key.AccountCode}' must name a project.");

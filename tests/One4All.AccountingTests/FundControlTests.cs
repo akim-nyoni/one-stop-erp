@@ -34,6 +34,7 @@ public sealed class FundControlTests
         await using AsyncServiceScope scope = provider.CreateAsyncScope();
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
         long companyId = await Scenario.SeedAsync(db);
+        await Scenario.DimensionsAsync(db, companyId, "ADM", "SAL");
         (await db.Companies.SingleAsync(c => c.Id == companyId)).FundControlEnabled = true;
         (await db.Accounts.SingleAsync(a => a.CompanyId == companyId && a.AccountCode == "6800")).BudgetEnabled = true;
         (await db.Accounts.SingleAsync(a => a.CompanyId == companyId && a.AccountCode == "6700")).BudgetEnabled = true;

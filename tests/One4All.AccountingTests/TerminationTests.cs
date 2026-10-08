@@ -31,6 +31,7 @@ public sealed class TerminationTests
         await using AsyncServiceScope scope = provider.CreateAsyncScope();
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
         long companyId = await Scenario.SeedAsync(db);
+        await Scenario.DimensionsAsync(db, companyId, "WKS");
         db.Accounts.Add(new LedgerAccount(companyId, "6150", "Terminal Benefits", AccountType.Expense));
         await db.SaveChangesAsync();
         IPayrollSetupService setup = scope.ServiceProvider.GetRequiredService<IPayrollSetupService>();

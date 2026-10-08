@@ -30,6 +30,7 @@ public sealed class StoreRequisitionTests
         await using AsyncServiceScope scope = provider.CreateAsyncScope();
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
         long companyId = await Scenario.SeedAsync(db);
+        await Scenario.DimensionsAsync(db, companyId, "CAN");
         Item cup = new(companyId, "SR-CUP", "Cup") { CostOfSalesAccountCode = "5000" };
         Warehouse store = new(companyId, "SRST", "Main store");
         db.AddRange(cup, store);

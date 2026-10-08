@@ -27,6 +27,7 @@ public sealed class CostCentreIncomeStatementTests
         {
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             companyId = await Scenario.SeedAsync(db);
+            await Scenario.DimensionsAsync(db, companyId, "CC1", "CC2");
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
