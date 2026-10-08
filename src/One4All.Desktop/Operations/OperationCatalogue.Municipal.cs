@@ -315,6 +315,196 @@ public static partial class OperationCatalogue
                 }
             },
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Cemeteries", ListTitle = "Burials this year",
+            Description = "Adds plots to a cemetery section (\"A1,A2,A3\") at a price and capacity, sells a plot to a holder, records an interment (with its fee), and lists a "
+                + "cemetery's plots.",
+            Fields = [Pick("Step", "Step", ["Add plots", "Sell plot", "Interment", "Plots"]), Opt("Cemetery", "Cemetery"), Opt("Section", "Section"), Opt("Plots", "Plot numbers, comma-separated"),
+                Num("Price", "Price / interment fee", "0"), Num("Capacity", "Capacity (graves per plot)", "1"), Opt("Plot", "Plot reference (sell / interment)"), Opt("Holder", "Holder customer code"),
+                Opt("Deceased", "Deceased name"), Opt("Died", "Date of death (yyyy-MM-dd)"), Opt("Account", "Revenue / fee account"), Today()],
+            Run = async (c, i) =>
+            {
+                ICemeteryService cemetery = c.Get<ICemeteryService>();
+                switch (i.Text("Step"))
+                {
+                    case "Add plots":
+                        List<string> plots = [.. (i.Optional("Plots") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+                        return $"{Check(await cemetery.AddPlotsAsync(c.CompanyId, i.Optional("Cemetery") ?? string.Empty, i.Optional("Section") ?? string.Empty, plots, i.Number("Price"), i.Whole("Capacity")).ConfigureAwait(true))} plot(s) added.";
+                    case "Sell plot":
+                        return $"Sold ({Check(await cemetery.SellAsync(c.CompanyId, i.Optional("Plot") ?? string.Empty, await CustomerAsync(c, i.Optional("Holder") ?? string.Empty).ConfigureAwait(true), i.Date("Date"),
+                            i.Optional("Account") ?? string.Empty).ConfigureAwait(true))}).";
+                    case "Interment":
+                        return $"Interment {Check(await cemetery.RecordIntermentAsync(new IntermentRequest
+                        {
+                            CompanyId = c.CompanyId, PlotReference = i.Optional("Plot") ?? string.Empty, DeceasedName = i.Optional("Deceased") ?? string.Empty,
+                            DateOfDeath = DateOnly.ParseExact(i.Optional("Died") ?? string.Empty, "yyyy-MM-dd", CultureInfo.InvariantCulture), IntermentDate = i.Date("Date"), IntermentFee = i.Number("Price"),
+                            FeeAccountCode = i.Optional("Account"),
+                        }).ConfigureAwait(true))} recorded.";
+                    default:
+                        IReadOnlyList<PlotEntry> list = await cemetery.PlotsAsync(c.CompanyId, i.Optional("Cemetery") ?? string.Empty, null).ConfigureAwait(true);
+                        return string.Join(Environment.NewLine, list.Select(x => $"{x.Reference,-16} {x.Status,-10} {M(x.Price),10}  {x.Interred}/{x.Capacity}  {x.HolderCode}"));
+                }
+            },
+            List = async c => Table(await c.Get<ICemeteryService>().BurialRegisterAsync(c.CompanyId, new DateOnly(DateTime.Today.Year, 1, 1), DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true),
+                ("Interment", b => b.IntermentNumber), ("Plot", b => b.PlotReference), ("Deceased", b => b.DeceasedName), ("Died", b => b.DateOfDeath.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+                ("Interred", b => b.IntermentDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Council licences", ListTitle = "Renewals due in 60 days",
+            Description = "Issues a licence (business, liquor, shop, building plan, hawker…) with its fee and renewal cycle, records inspections (a failed one suspends it), renews it "
+                + "(late renewals with a penalty %), or revokes it.",
+            Fields = [Pick("Step", "Step", ["Issue", "Inspection", "Renew", "Revoke"]), Pick("Kind", "Licence kind", Enum.GetNames<CouncilLicenceKind>()), Opt("Holder", "Holder customer code (issue)"),
+                Opt("Stand", "Stand number (optional)"), Opt("Description", "Description / inspector / reason"), Num("Cycle", "Renewal cycle (months)", "12"), Num("Fee", "Fee / penalty %", "0"),
+                Opt("Account", "Revenue / penalty account"), Opt("Licence", "Licence number"), Tick("Passed", "Inspection passed", true), Opt("Notes", "Notes"), Today()],
+            Run = async (c, i) =>
+            {
+                ICouncilLicensingService licensing = c.Get<ICouncilLicensingService>();
+                string licence = i.Optional("Licence") ?? string.Empty;
+                switch (i.Text("Step"))
+                {
+                    case "Issue":
+                        IssuedLicence issued = Check(await licensing.IssueAsync(new IssueLicenceRequest
+                        {
+                            CompanyId = c.CompanyId, Kind = Enum.Parse<CouncilLicenceKind>(i.Text("Kind")), HolderCustomerId = await CustomerAsync(c, i.Optional("Holder") ?? string.Empty).ConfigureAwait(true),
+                            PropertyId = i.Optional("Stand") is string stand ? await PropertyAsync(c, stand).ConfigureAwait(true) : null, Description = i.Optional("Description") ?? string.Empty,
+                            IssuedOn = i.Date("Date"), CycleMonths = i.Whole("Cycle"), Fee = i.Number("Fee"), RevenueAccountCode = i.Optional("Account") ?? string.Empty,
+                        }).ConfigureAwait(true));
+                        return $"Licence {issued.LicenceNumber}, expires {issued.ExpiresOn:yyyy-MM-dd}{(issued.FeeInvoiceNumber is null ? string.Empty : $"; fee invoice {issued.FeeInvoiceNumber}")}.";
+                    case "Inspection":
+                        return $"Licence is now {Check(await licensing.RecordInspectionAsync(c.CompanyId, licence, i.Date("Date"), i.Optional("Description") ?? string.Empty, i.Flag("Passed"), i.Optional("Notes")).ConfigureAwait(true))}.";
+                    case "Renew":
+                        LicenceRenewed renewed = Check(await licensing.RenewAsync(c.CompanyId, licence, i.Date("Date"), i.Number("Fee"), i.Optional("Account")).ConfigureAwait(true));
+                        return $"Renewed to {renewed.Terms.NewExpiry:yyyy-MM-dd}: fee {M(renewed.Terms.Fee)}{(renewed.Terms.Late ? $", late penalty {M(renewed.Terms.Penalty)}" : string.Empty)}"
+                            + (renewed.InvoiceNumber is null ? "." : $" ({renewed.InvoiceNumber}).");
+                    default:
+                        return Check(await licensing.RevokeAsync(c.CompanyId, licence, i.Optional("Description") ?? string.Empty).ConfigureAwait(true), "Licence revoked.");
+                }
+            },
+            List = async c => Table(await c.Get<ICouncilLicensingService>().RenewalsDueAsync(c.CompanyId, DateOnly.FromDateTime(DateTime.Today), 60).ConfigureAwait(true),
+                ("Licence", x => x.LicenceNumber), ("Kind", x => x.Kind), ("Holder", x => x.HolderCode), ("Description", x => x.Description), ("Expires", x => x.ExpiresOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+                ("Days left", x => x.DaysLeft)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Facility bookings",
+            Description = "Halls, grounds and other council facilities: create one with its daily rate, book it for a customer (the fee invoiced; double bookings refused), cancel a "
+                + "booking with a refund %, and see a facility's calendar.",
+            Fields = [Pick("Step", "Step", ["Create facility", "Book", "Cancel", "Calendar"]), Req("Facility", "Facility code (booking number to cancel)"), Opt("Name", "Name / purpose"),
+                Num("Rate", "Daily rate / refund %", "0"), Opt("Account", "Revenue account (create)"), Opt("Customer", "Customer code (book)"), Today("From", "From"), Today("To", "To"), Today("Date", "Date")],
+            Run = async (c, i) =>
+            {
+                IFacilityBookingService bookings = c.Get<IFacilityBookingService>();
+                switch (i.Text("Step"))
+                {
+                    case "Create facility":
+                        return Check(await bookings.CreateFacilityAsync(c.CompanyId, i.Text("Facility"), i.Optional("Name") ?? string.Empty, i.Number("Rate"), i.Optional("Account") ?? string.Empty).ConfigureAwait(true),
+                            _ => "Facility created.");
+                    case "Book":
+                        FacilityBooked booked = Check(await bookings.BookAsync(new FacilityBookingRequest
+                        {
+                            CompanyId = c.CompanyId, FacilityCode = i.Text("Facility"), CustomerId = await CustomerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true), FromDate = i.Date("From"),
+                            ToDate = i.Date("To"), Purpose = i.Optional("Name") ?? string.Empty, BookedOn = i.Date("Date"),
+                        }).ConfigureAwait(true));
+                        return $"Booking {booked.BookingNumber}: {booked.Days} day(s), fee {M(booked.Fee)}.";
+                    case "Cancel":
+                        return $"Cancelled; {M(Check(await bookings.CancelAsync(c.CompanyId, i.Text("Facility"), i.Date("Date"), i.Number("Rate")).ConfigureAwait(true)))} refunded.";
+                    default:
+                        IReadOnlyList<FacilityCalendarEntry> calendar = Check(await bookings.CalendarAsync(c.CompanyId, i.Text("Facility"), i.Date("From"), i.Date("To")).ConfigureAwait(true));
+                        return calendar.Count == 0 ? "Free throughout." : string.Join(Environment.NewLine, calendar.Select(b =>
+                            $"{b.FromDate:yyyy-MM-dd} – {b.ToDate:yyyy-MM-dd}  {b.BookingNumber,-12} {b.CustomerCode,-10} {b.Purpose}"));
+                }
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Property ownership",
+            Description = "Registers a stand's owners and their shares (\"CUST1:50:R; CUST2:50\" — R marks the ratepayer), transfers it to buyers against a clearance certificate, "
+                + "and shows the owners now or the full history.",
+            Fields = [Pick("Step", "Step", ["Register", "Transfer", "Owners", "History"]), Req("Stand", "Stand number"), Opt("Owners", "Owners: CUSTOMER:share[:R]; …"), Opt("Clearance", "Clearance certificate (transfer)"),
+                Opt("Deeds", "Deeds reference"), Today()],
+            Run = async (c, i) =>
+            {
+                IOwnershipService ownership = c.Get<IOwnershipService>();
+                long property = await PropertyAsync(c, i.Text("Stand")).ConfigureAwait(true);
+                async Task<List<One4All.Application.Municipal.OwnerShare>> Shares()
+                {
+                    List<One4All.Application.Municipal.OwnerShare> shares = [];
+                    foreach (string part in (i.Optional("Owners") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                        shares.Add(bits.Length is 2 or 3 && decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal share)
+                            ? new One4All.Application.Municipal.OwnerShare(await CustomerAsync(c, bits[0]).ConfigureAwait(true), share, bits.Length == 3 && bits[2].Equals("R", StringComparison.OrdinalIgnoreCase))
+                            : throw new OperationException($"Write each owner as CUSTOMER:share[:R] (\"{part}\")."));
+                    }
+
+                    return shares;
+                }
+
+                static string Show(IReadOnlyList<OwnerEntry> owners) => owners.Count == 0 ? "No owners recorded." : string.Join(Environment.NewLine, owners.Select(o =>
+                    $"{o.CustomerCode,-12} {o.SharePercent,6:0.##}%{(o.IsRatepayer ? " ratepayer" : string.Empty),-10} {o.OwnedFrom:yyyy-MM-dd} – {o.OwnedTo?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "now"}  {o.Reference}"));
+                switch (i.Text("Step"))
+                {
+                    case "Register":
+                        return Check(await ownership.RegisterOwnersAsync(c.CompanyId, property, await Shares().ConfigureAwait(true), i.Date("Date"), i.Optional("Deeds")).ConfigureAwait(true), "Owners registered.");
+                    case "Transfer":
+                        return Check(await ownership.TransferAsync(c.CompanyId, property, await Shares().ConfigureAwait(true), i.Date("Date"), i.Optional("Clearance") ?? string.Empty, i.Optional("Deeds")).ConfigureAwait(true),
+                            "Transferred.");
+                    case "Owners":
+                        return Show(await ownership.OwnersAsync(c.CompanyId, property, i.Date("Date")).ConfigureAwait(true));
+                    default:
+                        return Show(await ownership.HistoryAsync(c.CompanyId, property).ConfigureAwait(true));
+                }
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Disconnections and reconnections",
+            Description = "Lists stands whose arrears for a service pass a threshold, raises a disconnection (or reconnection) order for one, executes it (a reconnection with its fee) or "
+                + "cancels it.",
+            Fields = [Pick("Step", "Step", ["Candidates", "Raise", "Execute", "Cancel"]), Pick("Service", "Service", Enum.GetNames<ServiceType>()), Num("Threshold", "Arrears threshold", "0"),
+                Opt("Stand", "Stand number (raise)"), Pick("Kind", "Order", Enum.GetNames<ServiceOrderKind>()), Opt("Order", "Order number"), Num("Fee", "Reconnection fee", "0"), Opt("Account", "Fee revenue account"), Today()],
+            Run = async (c, i) =>
+            {
+                IServiceOrderService orders = c.Get<IServiceOrderService>();
+                ServiceType service = Enum.Parse<ServiceType>(i.Text("Service"));
+                switch (i.Text("Step"))
+                {
+                    case "Candidates":
+                        IReadOnlyList<DisconnectionCandidate> candidates = await orders.CandidatesAsync(c.CompanyId, service, i.Date("Date"), i.Number("Threshold")).ConfigureAwait(true);
+                        return candidates.Count == 0 ? "No stands over the threshold." : string.Join(Environment.NewLine, candidates.Select(x => $"{x.StandNumber,-12} {M(x.Arrears),14}  oldest due {x.OldestDueDate:yyyy-MM-dd}"));
+                    case "Raise":
+                        return $"Order {Check(await orders.RaiseAsync(c.CompanyId, await PropertyAsync(c, i.Optional("Stand") ?? string.Empty).ConfigureAwait(true), service, Enum.Parse<ServiceOrderKind>(i.Text("Kind")),
+                            i.Date("Date"), i.Number("Threshold")).ConfigureAwait(true))} raised.";
+                    case "Execute":
+                        ReconnectionFee? fee = i.Number("Fee") > 0m ? new ReconnectionFee(i.Number("Fee"), i.Optional("Account") ?? string.Empty) : null;
+                        return Check(await orders.ExecuteAsync(c.CompanyId, i.Optional("Order") ?? string.Empty, i.Date("Date"), fee).ConfigureAwait(true), "Order executed.");
+                    default:
+                        return Check(await orders.CancelAsync(c.CompanyId, i.Optional("Order") ?? string.Empty).ConfigureAwait(true), "Order cancelled.");
+                }
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Tariff catalogue",
+            Description = "Lists a service's tariffs in force on a date, or resolves which tariff applies to a consumer category in a ward.",
+            Fields = [Pick("Step", "Step", ["List", "Resolve"]), Pick("Service", "Service", Enum.GetNames<ServiceType>()), Pick("Category", "Consumer category (resolve)", Enum.GetNames<ConsumerCategory>()),
+                Opt("Ward", "Ward (resolve)"), Today()],
+            Run = async (c, i) =>
+            {
+                ITariffCatalogueService catalogue = c.Get<ITariffCatalogueService>();
+                ServiceType service = Enum.Parse<ServiceType>(i.Text("Service"));
+                static string Show(CatalogueTariff t) => $"{t.Code,-10} {t.Name,-30} {t.Category,-14} {t.Ward ?? "all wards",-12} from {t.EffectiveFrom:yyyy-MM-dd}";
+                if (i.Text("Step") == "Resolve")
+                {
+                    return Show(Check(await catalogue.ResolveAsync(c.CompanyId, service, Enum.Parse<ConsumerCategory>(i.Text("Category")), i.Optional("Ward"), i.Date("Date")).ConfigureAwait(true)));
+                }
+
+                IReadOnlyList<CatalogueTariff> tariffs = await catalogue.ListAsync(c.CompanyId, service, i.Date("Date")).ConfigureAwait(true);
+                return tariffs.Count == 0 ? "No tariffs in force." : string.Join(Environment.NewLine, tariffs.Select(Show));
+            },
+        };
     }
 
     private static async Task<long> PropertyAsync(OperationContext c, string stand)
