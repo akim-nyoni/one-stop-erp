@@ -142,6 +142,13 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
     public bool CumulativeTax { get; set; }
 
     /// <summary>
+    /// A tax-table element that taxes each currency's earnings apart (split-currency remuneration, brief §4.15.3): earnings paid in a currency with
+    /// its own tax table are converted at the pay date's rate, taxed on that table and converted back; the rest bear their share of the base
+    /// table's tax on the whole. Applies to period (not cumulative) tax.
+    /// </summary>
+    public bool SplitCurrencyTax { get; set; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the earning is an annual payment (bonus, 13th cheque): a non-cumulative tax-table element taxes
     /// it annualised and apportioned — the annual tax on twelve periods of regular pay plus the payment, less that on the regular pay alone —
     /// rather than at one period's marginal rate.

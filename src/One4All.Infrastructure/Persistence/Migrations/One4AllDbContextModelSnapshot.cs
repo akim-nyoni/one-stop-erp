@@ -18143,6 +18143,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("sequence");
 
+                    b.Property<bool>("SplitCurrencyTax")
+                        .HasColumnType("boolean")
+                        .HasColumnName("split_currency_tax");
+
                     b.Property<int>("SuspensionPriority")
                         .HasColumnType("integer")
                         .HasColumnName("suspension_priority");

@@ -30,6 +30,8 @@ public sealed partial class PayrollService
     public const string TaxPeriodVariable = "TAXPERIOD";
 
     private const string TaxTablesKey = "__TAXTABLES";
+    private const string TaxableByCurrencyKey = "__TAXABLEBYCCY";
+    private const string PayRatesKey = "__PAYRATES";
     private const string PayDateKey = "__PAYDATE";
 
     // Each employee's balances to recover as at the date: staff tenders less staff-purchase deductions already made, and the tenancy
@@ -63,6 +65,20 @@ public sealed partial class PayrollService
             .ToListAsync(ct).ConfigureAwait(false);
         List<TaxTable> tables = taxCodes.Count == 0 ? [] : await _db.Set<TaxTable>().AsNoTracking().Include(t => t.Bands).Where(t => t.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
 
+        // The pay date's rate for each currency elements are paid in (split-currency tax converts at it).
+        Dictionary<string, decimal> rates = new(StringComparer.Ordinal);
+        if (elements.Values.Any(e => e.SplitCurrencyTax))
+        {
+            Core.Accounting.CurrencyCode baseCurrency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+            foreach (Core.Accounting.CurrencyCode currency in elements.Values.Where(e => e.PaidInCurrency is not null).Select(e => e.PaidInCurrency!.Value).Distinct())
+            {
+                if (await Accounting.ExchangeRateResolver.FindAsync(_db, currency, baseCurrency, ExchangeRateType.Daily, asAt, ct).ConfigureAwait(false) is decimal rate)
+                {
+                    rates[currency.Value] = rate;
+                }
+            }
+        }
+
         // What the previous payroll paid earlier in the tax year (migrated openings) counts with this payroll's own payslips.
         var openings = await _db.Set<PayrollYtdOpening>().AsNoTracking().Where(o => ids.Contains(o.EmployeeId) && o.TaxYear == asAt.Year)
             .Select(o => new { o.EmployeeId, o.Code, o.Amount }).ToListAsync(ct).ConfigureAwait(false);
@@ -77,6 +93,7 @@ public sealed partial class PayrollService
                 [TaxPeriodVariable] = (decimal)asAt.Month,
                 [TaxTablesKey] = tables,
                 [PayDateKey] = asAt,
+                [PayRatesKey] = rates,
                 [StaffPurchasesVariable] = Math.Max(0m, (tendered.FirstOrDefault(t => t.EmployeeId == e.Id)?.Amount ?? 0m) - (recovered.FirstOrDefault(r => r.EmployeeId == e.Id)?.Amount ?? 0m)),
                 [HousingRentVariable] = tenantByEmployee.TryGetValue(e.Id, out long customer) ? Math.Max(0m, owing.GetValueOrDefault(customer)) : 0m,
             };
