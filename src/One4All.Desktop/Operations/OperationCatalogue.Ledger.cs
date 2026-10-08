@@ -346,6 +346,136 @@ public static partial class OperationCatalogue
             List = async c => Table(await c.Db.Set<Core.Accounting.RecurringJournal>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Code).ToListAsync().ConfigureAwait(true),
                 ("Code", r => r.Code), ("Description", r => r.Description), ("Active", r => r.IsActive)),
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Recognise deferred income",
+            Description = "Recognises the income earned by the date on every deferred income schedule (fees billed in advance, annual licences) and shows each schedule's share.",
+            Fields = [Today("Date", "As at")],
+            Run = async (c, i) =>
+            {
+                DeferredIncomeRunResult run = Check(await c.Get<IDeferredIncomeService>().RecogniseAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true));
+                return run.Lines.Count == 0 ? "No deferred income to recognise."
+                    : string.Join(Environment.NewLine, run.Lines.Select(l => $"{l.Reference,-14} {l.Description,-30} {M(l.Amount),12}  earned {M(l.EarnedToDate),12}  now {M(l.RecognisedThisRun),12}"))
+                        + Environment.NewLine + $"Recognised {M(run.Recognised)}{(run.JournalNumber is null ? string.Empty : $" ({run.JournalNumber})")}.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Petty cash",
+            Description = "Disburse: a petty cash payment to an expense account. Top up: reimburses the float back to its fixed amount from the bank (imprest).",
+            Fields = [Pick("Step", "Step", ["Disburse", "Top up float"]), Num("Amount", "Amount / float amount"), Req("PettyCash", "Petty cash account"), Opt("Expense", "Expense account (disburse)"),
+                Opt("Bank", "Bank account (top up)"), Req("Document", "Document number"), Today()],
+            Run = async (c, i) =>
+            {
+                IPettyCashService petty = c.Get<IPettyCashService>();
+                if (i.Text("Step") == "Disburse")
+                {
+                    return $"Paid ({Check(await petty.DisburseAsync(c.CompanyId, i.Number("Amount"), i.Date("Date"), i.Optional("Expense") ?? string.Empty, i.Text("PettyCash"), i.Text("Document")).ConfigureAwait(true))}).";
+                }
+
+                ImprestResult topped = Check(await petty.ReimburseToFloatAsync(c.CompanyId, i.Date("Date"), i.Text("PettyCash"), i.Optional("Bank") ?? string.Empty, i.Number("Amount"), i.Text("Document")).ConfigureAwait(true));
+                return $"Reimbursed {M(topped.ReimbursedAmount)}; float now {M(topped.FloatBalanceAfter)}{(topped.JournalNumber is null ? string.Empty : $" ({topped.JournalNumber})")}.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Import journals from a file",
+            Description = "Imports manual journals from a CSV file, all or nothing (a file with any problem imports nothing); journals over the approval threshold wait for a second "
+                + "user's approval instead of posting.",
+            Fields = [Req("File", "CSV file path")],
+            Run = async (c, i) =>
+            {
+                string csv = await System.IO.File.ReadAllTextAsync(i.Text("File")).ConfigureAwait(true);
+                IReadOnlyList<ImportedJournalResult> imported = Check(await c.Get<IJournalImportService>().ImportAsync(c.CompanyId, csv, c.UserId).ConfigureAwait(true));
+                return string.Join(Environment.NewLine, imported.Select(j => $"{j.Reference,-14} {j.JournalNumber}{(j.AwaitingApproval ? " (awaiting approval)" : string.Empty)}"));
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Overhead allocation", ListTitle = "Allocation rules",
+            Description = "Rules that recharge a cost centre's overheads to others by fixed %, headcount, floor area or a usage driver (targets \"CC1:60; CC2:40\", optionally CC:driver:dept). "
+                + "Drivers updates a rule's targets; Preview shows the period's recharge; Run posts it.",
+            Fields = [Pick("Step", "Step", ["Create rule", "Drivers", "Preview", "Run"]), Opt("Code", "Rule code"), Opt("Name", "Name"), Num("Sequence", "Order", "1"),
+                Pick("Basis", "Basis", Enum.GetNames<Core.Accounting.AllocationBasis>()), Opt("Source", "Source account"), Opt("SourceCc", "Source cost centre"), Opt("Target", "Target account (blank: same)"),
+                Opt("Targets", "Targets: CC:driver[:dept]; …"), Today("Date", "Period (any day in it)")],
+            Run = async (c, i) =>
+            {
+                IOverheadAllocationService allocation = c.Get<IOverheadAllocationService>();
+                List<AllocationTargetRequest> Targets()
+                {
+                    List<AllocationTargetRequest> targets = [];
+                    foreach (string part in (i.Optional("Targets") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                        targets.Add(bits.Length is 2 or 3 && decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal driver)
+                            ? new AllocationTargetRequest(bits[0], bits.Length == 3 ? bits[2] : null, driver) : throw new OperationException($"Write each target as CC:driver[:dept] (\"{part}\")."));
+                    }
+
+                    return targets;
+                }
+
+                static string Show(AllocationRunResult run) => run.Rules.Count == 0 ? "No rules." : string.Join(Environment.NewLine, run.Rules.Select(r =>
+                    $"{r.RuleCode} {r.RuleName} ({r.Basis}): pool {M(r.Pool)}{(r.JournalNumber is null ? string.Empty : $" → {r.JournalNumber}")}" + Environment.NewLine
+                    + string.Join(Environment.NewLine, r.Shares.Select(x => $"    {x.CostCentre,-8} {x.Department,-6} driver {Q(x.Driver),10}  {M(x.Amount),12}"))));
+                switch (i.Text("Step"))
+                {
+                    case "Create rule":
+                        return Check(await allocation.CreateRuleAsync(new AllocationRuleRequest
+                        {
+                            CompanyId = c.CompanyId, Code = i.Optional("Code") ?? string.Empty, Name = i.Optional("Name") ?? string.Empty, Sequence = i.Whole("Sequence"),
+                            Basis = Enum.Parse<Core.Accounting.AllocationBasis>(i.Text("Basis")), SourceAccountCode = i.Optional("Source") ?? string.Empty, SourceCostCentre = i.Optional("SourceCc") ?? string.Empty,
+                            TargetAccountCode = i.Optional("Target"), Targets = Targets(),
+                        }).ConfigureAwait(true), id => $"Rule {id} created.");
+                    case "Drivers":
+                        long rule = await FindAsync(c.Db.Set<Core.Accounting.AllocationRule>(), r => r.CompanyId == c.CompanyId && r.Code == (i.Optional("Code") ?? string.Empty).ToUpper(), r => r.Id,
+                            "allocation rule", i.Optional("Code") ?? string.Empty).ConfigureAwait(true);
+                        return Check(await allocation.SetDriversAsync(c.CompanyId, rule, Targets()).ConfigureAwait(true), "Drivers updated.");
+                    case "Preview":
+                        return Show(Check(await allocation.PreviewAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true)));
+                    default:
+                        return Show(Check(await allocation.RunAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true)));
+                }
+            },
+            List = async c => Table(await c.Db.Set<Core.Accounting.AllocationRule>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Sequence).ToListAsync().ConfigureAwait(true),
+                ("Code", r => r.Code), ("Name", r => r.Name), ("Order", r => r.Sequence), ("Basis", r => r.Basis), ("Source", r => r.SourceAccountCode), ("Cost centre", r => r.SourceCostCentre)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Intercompany journal",
+            Description = "Posts both sides of an intercompany charge at once: in this company against its intercompany account, and in the other company against its own.",
+            Fields = [Req("ToCompany", "Other company code"), Num("Amount", "Amount"), Req("Document", "Document number"), Opt("Narrative", "Narrative"), Req("FromAccount", "This company's account"),
+                Req("FromIc", "This company's intercompany account"), Req("ToAccount", "Other company's account"), Req("ToIc", "Other company's intercompany account"), Today()],
+            Run = async (c, i) =>
+            {
+                long other = await FindAsync(c.Db.Companies, x => x.Code == i.Text("ToCompany").ToUpper(), x => x.Id, "company", i.Text("ToCompany")).ConfigureAwait(true);
+                IntercompanyPostingResult posted = Check(await c.Get<IIntercompanyService>().PostAsync(new IntercompanyJournalRequest
+                {
+                    FromCompanyId = c.CompanyId, ToCompanyId = other, Amount = i.Number("Amount"), Date = i.Date("Date"), DocumentNumber = i.Text("Document"), Narrative = i.Optional("Narrative"),
+                    FromAccountCode = i.Text("FromAccount"), FromIntercompanyAccountCode = i.Text("FromIc"), ToAccountCode = i.Text("ToAccount"), ToIntercompanyAccountCode = i.Text("ToIc"),
+                }).ConfigureAwait(true));
+                return $"Posted {posted.FromJournalNumber} here and {posted.ToJournalNumber} in {i.Text("ToCompany").ToUpperInvariant()}.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Hyperinflation (IAS 29)",
+            Description = "Index: records a price index value for a month. Restate: the trial balance restated in current terms by the index — non-monetary items moved by the index "
+                + "change since they arose — with the gain or loss on the net monetary position.",
+            Fields = [Pick("Step", "Step", ["Index", "Restate"]), Req("Index", "Index code", "CPI"), Today("Date", "Month / as at"), Num("Value", "Index value (index)", "0")],
+            Run = async (c, i) =>
+            {
+                IHyperinflationService inflation = c.Get<IHyperinflationService>();
+                if (i.Text("Step") == "Index")
+                {
+                    return Check(await inflation.SetIndexAsync(c.CompanyId, i.Text("Index"), i.Date("Date"), i.Number("Value")).ConfigureAwait(true), "Index value saved.");
+                }
+
+                RestatedTrialBalance tb = Check(await inflation.RestatedTrialBalanceAsync(c.CompanyId, i.Date("Date"), i.Text("Index")).ConfigureAwait(true));
+                return $"Closing index {tb.ClosingIndex:0.####}" + Environment.NewLine + string.Join(Environment.NewLine, tb.Rows.Select(r =>
+                    $"{r.AccountCode,-8} {r.Name,-28} {(r.Monetary ? "monetary" : "non-monetary"),-12} {M(r.Historical),14} → {M(r.Restated),14}"))
+                    + Environment.NewLine + $"Gain / loss on the net monetary position: {M(tb.MonetaryGainLoss)}.";
+            },
+        };
     }
 
     // "6100 Dr 500 project=P1 fund=WATER # narrative; 2410 Cr 500 fund=WATER"
