@@ -450,6 +450,19 @@ public sealed class ReportDesignSession
         return true;
     }
 
+    /// <summary>Replaces the page setup (paper, margins, columns, watermark, background, tray, duplex), as one undoable change.</summary>
+    /// <param name="page">The new page setup.</param>
+    public void SetPage(PageSetup page)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        Checkpoint();
+        Definition.Page = page;
+        foreach (ReportBand band in Definition.Bands)
+        {
+            band.Elements.ForEach(e => Contain(e, band));
+        }
+    }
+
     /// <summary>Applies a theme: the font everywhere, sizes by band, and the page header's colours.</summary>
     /// <param name="theme">The theme.</param>
     public void ApplyTheme(ReportTheme theme)

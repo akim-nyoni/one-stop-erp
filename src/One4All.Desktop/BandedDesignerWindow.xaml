@@ -57,6 +57,7 @@
                 <ComboBox x:Name="GridBox" Width="55" SelectionChanged="Grid_Changed" />
                 <TextBlock Text="Zoom" VerticalAlignment="Center" Margin="8,0,4,0" />
                 <Slider x:Name="ZoomSlider" Width="110" Minimum="0.6" Maximum="2.5" Value="1.3" VerticalAlignment="Center" ValueChanged="Zoom_Changed" />
+                <Button Content="Page setup…" Padding="6,2" Margin="8,1,1,1" Click="PageSetup_Click" ToolTip="Paper, margins, columns for labels, watermark, background picture, tray and two-sided printing" />
                 <TextBlock Text="Theme" VerticalAlignment="Center" Margin="8,0,4,0" />
                 <ComboBox x:Name="ThemeBox" Width="110" />
                 <Button Content="Apply" Padding="6,2" Margin="1" Click="Theme_Click" />

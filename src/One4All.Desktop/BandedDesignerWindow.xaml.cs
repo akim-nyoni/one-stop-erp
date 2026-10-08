@@ -131,7 +131,20 @@ public partial class BandedDesignerWindow : Window
             height.KeyDown += BandHeight_KeyDown;
             DockPanel.SetDock(height, Dock.Right);
             strip.Children.Add(height);
-            strip.Children.Add(new TextBlock { Text = $" {band.Type}{(band.Type is BandType.GroupHeader or BandType.GroupFooter ? $" {band.GroupLevel}" : string.Empty)}", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+            Button flow = new() { Content = "Flow…", Padding = new Thickness(6, 0, 6, 0), Margin = new Thickness(0, 0, 4, 0), ToolTip = "Hide when…, repeat, keep together, page breaks" };
+            flow.Click += (_, _) => BandFlow_Click(band);
+            DockPanel.SetDock(flow, Dock.Right);
+            strip.Children.Add(flow);
+            string flags = string.Join(" · ", new[]
+            {
+                string.IsNullOrWhiteSpace(band.SuppressWhen) ? null : "hidden when " + band.SuppressWhen, band.RepeatOnNewPage ? "repeats" : null, band.KeepTogether ? "kept with next" : null,
+                band.PageBreakBefore ? "new page before" : null, band.PageBreakAfter ? "new page after" : null,
+            }.OfType<string>());
+            strip.Children.Add(new TextBlock
+            {
+                Text = $" {band.Type}{(band.Type is BandType.GroupHeader or BandType.GroupFooter ? $" {band.GroupLevel}" : string.Empty)}{(flags.Length > 0 ? "   (" + flags + ")" : string.Empty)}",
+                FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center,
+            });
             BandsPanel.Children.Add(strip);
 
             Canvas canvas = new() { Width = width, Height = band.Height * Zoom, Background = GridBrush(), ClipToBounds = true, Tag = band.Type, Margin = new Thickness(0, 0, 0, 6) };
@@ -351,6 +364,30 @@ public partial class BandedDesignerWindow : Window
         }
 
         Status.Text = $"{property} set.";
+        Render();
+    }
+
+    private void BandFlow_Click(ReportBand band)
+    {
+        if (_session is null || DesignerDialogs.AskBandFlow(this, band) is not DesignerDialogs.BandFlow flow)
+        {
+            return;
+        }
+
+        _session.SetBandOptions(band.Type, band.GroupLevel, flow.SuppressWhen, flow.RepeatOnNewPage, flow.KeepTogether, flow.PageBreakBefore, flow.PageBreakAfter);
+        Status.Text = $"{band.Type} flow set.";
+        Render();
+    }
+
+    private void PageSetup_Click(object sender, RoutedEventArgs e)
+    {
+        if (_session is null || DesignerDialogs.AskPageSetup(this, _session.Definition.Page) is not PageSetup page)
+        {
+            return;
+        }
+
+        _session.SetPage(page);
+        Status.Text = page.Columns > 1 ? $"Page setup saved: {page.PaperSize}, {page.Columns} columns." : $"Page setup saved: {page.PaperSize} {page.Orientation}.";
         Render();
     }
 
