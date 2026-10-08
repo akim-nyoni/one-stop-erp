@@ -115,13 +115,19 @@ public sealed class LaybyService : ILaybyService
 
             foreach (LaybyLine line in plan.Lines)
             {
-                Result<StockMovementResult> issued = await _inventory.IssueAsync(new IssueStockRequest
+                // A kit leaves stock as its components.
+                List<(Core.Inventory.Item Item, decimal Quantity)> stock = await Inventory.KitExplosion.StockLinesAsync(_db, companyId, line.ItemId, line.Quantity, ct).ConfigureAwait(false);
+                Core.Inventory.Item? sold = await _db.Set<Core.Inventory.Item>().AsNoTracking().FirstOrDefaultAsync(i => i.Id == line.ItemId, ct).ConfigureAwait(false);
+                foreach ((long itemId, decimal quantity) in sold is { ItemType: Core.Inventory.ItemType.Kit } ? stock.Select(s => (s.Item.Id, s.Quantity)) : new[] { (line.ItemId, line.Quantity) })
                 {
-                    CompanyId = companyId, ItemId = line.ItemId, WarehouseId = plan.WarehouseId, Date = date, Quantity = line.Quantity, Reference = plan.PlanNumber,
-                }, ct).ConfigureAwait(false);
-                if (issued.IsFailure)
-                {
-                    return issued.Error;
+                    Result<StockMovementResult> issued = await _inventory.IssueAsync(new IssueStockRequest
+                    {
+                        CompanyId = companyId, ItemId = itemId, WarehouseId = plan.WarehouseId, Date = date, Quantity = quantity, Reference = plan.PlanNumber,
+                    }, ct).ConfigureAwait(false);
+                    if (issued.IsFailure)
+                    {
+                        return issued.Error;
+                    }
                 }
             }
         }

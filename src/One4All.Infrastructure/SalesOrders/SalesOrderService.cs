@@ -172,16 +172,16 @@ public sealed class SalesOrderService : ISalesOrderService
         decimal costOfSales = 0m;
         foreach ((SalesOrderLine line, decimal quantity) in despatches)
         {
-            Item? item = await _db.Set<Item>().FirstOrDefaultAsync(i => i.Id == line.ItemId, ct).ConfigureAwait(false);
-            if (item is { IsStockTracked: true } && !string.IsNullOrEmpty(item.CostOfSalesAccountCode))
+            // A kit despatches its components.
+            foreach ((Item item, decimal issued) in await Inventory.KitExplosion.StockLinesAsync(_db, request.CompanyId, line.ItemId, quantity, ct).ConfigureAwait(false))
             {
                 Result<StockMovementResult> issue = await _inventory.IssueAsync(new IssueStockRequest
                 {
                     CompanyId = request.CompanyId,
-                    ItemId = line.ItemId,
+                    ItemId = item.Id,
                     WarehouseId = request.WarehouseId,
                     Date = request.Date,
-                    Quantity = quantity,
+                    Quantity = issued,
                     Reference = request.Reference,
                 }, ct).ConfigureAwait(false);
 
@@ -268,22 +268,21 @@ public sealed class SalesOrderService : ISalesOrderService
             return Error.Rule("Sop.NotReturnable", $"Order line {line.Id}: cannot return {quantity}; only {returnable} despatched and uninvoiced.");
         }
 
-        Item? item = await _db.Set<Item>().FirstOrDefaultAsync(i => i.Id == line.ItemId, ct).ConfigureAwait(false);
         decimal returnedValue = 0m;
-        if (item is { IsStockTracked: true } && !string.IsNullOrEmpty(item.CostOfSalesAccountCode))
+        foreach ((Item item, decimal returned) in await Inventory.KitExplosion.StockLinesAsync(_db, companyId, line.ItemId, quantity, ct).ConfigureAwait(false))
         {
-            // Return the goods to stock at the current average cost, reversing cost of sales.
+            // Return the goods (a kit's components) to stock at the current average cost, reversing cost of sales.
             decimal averageCost = await _db.Set<StockBalance>()
-                .Where(b => b.CompanyId == companyId && b.ItemId == line.ItemId && b.WarehouseId == warehouseId)
+                .Where(b => b.CompanyId == companyId && b.ItemId == item.Id && b.WarehouseId == warehouseId)
                 .Select(b => b.AverageCost).FirstOrDefaultAsync(ct).ConfigureAwait(false);
 
             Result<StockMovementResult> receipt = await _inventory.ReceiveAsync(new ReceiveStockRequest
             {
                 CompanyId = companyId,
-                ItemId = line.ItemId,
+                ItemId = item.Id,
                 WarehouseId = warehouseId,
                 Date = date,
-                Quantity = quantity,
+                Quantity = returned,
                 UnitCost = averageCost,
                 CreditAccountCode = item.CostOfSalesAccountCode!,
                 Reference = $"RET:{order.OrderNumber}",
@@ -294,7 +293,7 @@ public sealed class SalesOrderService : ISalesOrderService
                 return receipt.Error;
             }
 
-            returnedValue = receipt.Value.Value;
+            returnedValue += receipt.Value.Value;
         }
 
         line.ReturnDespatch(quantity);

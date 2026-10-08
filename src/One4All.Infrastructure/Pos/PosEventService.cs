@@ -166,24 +166,22 @@ public sealed class PosEventService : IPosEventService
 
         if (request.Restock)
         {
-            foreach ((SaleLine line, decimal quantity, _, _, _) in refunded)
+            foreach ((SaleLine line, decimal returned, _, _, _) in refunded)
             {
-                Item? item = await _db.Set<Item>().AsNoTracking().FirstOrDefaultAsync(i => i.Id == line.ItemId, ct).ConfigureAwait(false);
-                if (item is not { IsStockTracked: true } || string.IsNullOrEmpty(item.CostOfSalesAccountCode))
+                // A kit's components go back at what they were issued at on the sale.
+                foreach ((Item item, decimal quantity) in await Inventory.KitExplosion.StockLinesAsync(_db, request.CompanyId, line.ItemId, returned, ct).ConfigureAwait(false))
                 {
-                    continue;
-                }
-
-                StockMovement? issue = await _db.Set<StockMovement>().AsNoTracking()
-                    .FirstOrDefaultAsync(m => m.CompanyId == request.CompanyId && m.Reference == sale.SaleNumber && m.ItemId == line.ItemId && m.Type == StockMovementType.Issue, ct).ConfigureAwait(false);
-                Result<StockMovementResult> back = await _inventory.ReceiveAsync(new ReceiveStockRequest
-                {
-                    CompanyId = request.CompanyId, ItemId = line.ItemId, WarehouseId = line.WarehouseId, Date = request.Date, Quantity = quantity,
-                    UnitCost = issue?.UnitCost ?? 0m, CreditAccountCode = item.CostOfSalesAccountCode, Reference = $"REFUND:{sale.SaleNumber}",
-                }, ct).ConfigureAwait(false);
-                if (back.IsFailure)
-                {
-                    return back.Error;
+                    StockMovement? issue = await _db.Set<StockMovement>().AsNoTracking()
+                        .FirstOrDefaultAsync(m => m.CompanyId == request.CompanyId && m.Reference == sale.SaleNumber && m.ItemId == item.Id && m.Type == StockMovementType.Issue, ct).ConfigureAwait(false);
+                    Result<StockMovementResult> back = await _inventory.ReceiveAsync(new ReceiveStockRequest
+                    {
+                        CompanyId = request.CompanyId, ItemId = item.Id, WarehouseId = line.WarehouseId, Date = request.Date, Quantity = quantity,
+                        UnitCost = issue?.UnitCost ?? 0m, CreditAccountCode = item.CostOfSalesAccountCode!, Reference = $"REFUND:{sale.SaleNumber}",
+                    }, ct).ConfigureAwait(false);
+                    if (back.IsFailure)
+                    {
+                        return back.Error;
+                    }
                 }
             }
         }
@@ -347,17 +345,20 @@ public sealed class PosEventService : IPosEventService
             return posting.Error;
         }
 
-        if (request.RestockWarehouseId is long warehouse && item.IsStockTracked && !string.IsNullOrEmpty(item.CostOfSalesAccountCode))
+        if (request.RestockWarehouseId is long warehouse)
         {
-            decimal cost = await _db.StockBalances.Where(b => b.ItemId == item.Id && b.WarehouseId == warehouse).Select(b => b.AverageCost).FirstOrDefaultAsync(ct).ConfigureAwait(false);
-            Result<StockMovementResult> back = await _inventory.ReceiveAsync(new ReceiveStockRequest
+            foreach ((Item stocked, decimal quantity) in await Inventory.KitExplosion.StockLinesAsync(_db, request.CompanyId, item.Id, request.Quantity, ct).ConfigureAwait(false))
             {
-                CompanyId = request.CompanyId, ItemId = item.Id, WarehouseId = warehouse, Date = request.Date, Quantity = request.Quantity, UnitCost = cost, CreditAccountCode = item.CostOfSalesAccountCode,
-                Reference = $"REFUND:{document}",
-            }, ct).ConfigureAwait(false);
-            if (back.IsFailure)
-            {
-                return back.Error;
+                decimal cost = await _db.StockBalances.Where(b => b.ItemId == stocked.Id && b.WarehouseId == warehouse).Select(b => b.AverageCost).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+                Result<StockMovementResult> back = await _inventory.ReceiveAsync(new ReceiveStockRequest
+                {
+                    CompanyId = request.CompanyId, ItemId = stocked.Id, WarehouseId = warehouse, Date = request.Date, Quantity = quantity, UnitCost = cost,
+                    CreditAccountCode = stocked.CostOfSalesAccountCode!, Reference = $"REFUND:{document}",
+                }, ct).ConfigureAwait(false);
+                if (back.IsFailure)
+                {
+                    return back.Error;
+                }
             }
         }
 

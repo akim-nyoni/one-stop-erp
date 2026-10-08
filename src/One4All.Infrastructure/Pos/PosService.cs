@@ -336,19 +336,18 @@ public sealed class PosService : IPosService
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        // Cost of sales: issue stock for stock-tracked lines.
+        // Cost of sales: issue stock for stock-tracked lines, and a kit's components for a kit.
         foreach (SaleLine line in sale.Lines)
         {
-            Item? item = await _db.Set<Item>().FirstOrDefaultAsync(i => i.Id == line.ItemId, ct).ConfigureAwait(false);
-            if (item is { IsStockTracked: true } && !string.IsNullOrEmpty(item.CostOfSalesAccountCode))
+            foreach ((Item item, decimal quantity) in await Inventory.KitExplosion.StockLinesAsync(_db, request.CompanyId, line.ItemId, line.Quantity, ct).ConfigureAwait(false))
             {
                 Result<StockMovementResult> issue = await _inventory.IssueAsync(new IssueStockRequest
                 {
                     CompanyId = request.CompanyId,
-                    ItemId = line.ItemId,
+                    ItemId = item.Id,
                     WarehouseId = request.WarehouseId,
                     Date = request.SaleDate,
-                    Quantity = line.Quantity,
+                    Quantity = quantity,
                     Reference = request.SaleNumber,
                     AllowNegative = true, FromTill = true, // the sale is committed; let stock go negative (recorded under the company's control) and reconcile by stocktake
                 }, ct).ConfigureAwait(false);
