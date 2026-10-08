@@ -266,6 +266,151 @@ public static partial class OperationCatalogue
                 .ConfigureAwait(true)),
             List = c => OpenItemsAsync(c, TradingLedger.AccountsPayable),
         };
+
+        const string credit = "Customers";
+        yield return new Operation
+        {
+            Module = credit, Title = "Dunning reminders",
+            Description = "Lists the customers due a reminder by how long their oldest debt is overdue (first reminder, second, final notice — days configurable), or renders the "
+                + "reminder letter for one customer.",
+            Fields = [Pick("Step", "Step", ["Assess", "Letter"]), Opt("Customer", "Customer code (letter)"), Num("First", "First reminder after (days)", "7"), Num("Second", "Second after (days)", "30"),
+                Num("Final", "Final notice after (days)", "60"), Today("Date", "As at")],
+            Run = async (c, i) =>
+            {
+                IDunningService dunning = c.Get<IDunningService>();
+                One4All.Application.Trading.DunningStages stages = new(i.Whole("First"), i.Whole("Second"), i.Whole("Final"));
+                if (i.Text("Step") == "Letter")
+                {
+                    return Check(await dunning.RenderReminderTextAsync(c.CompanyId, await CustomerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true), i.Date("Date"), stages).ConfigureAwait(true));
+                }
+
+                IReadOnlyList<DunningNotice> notices = Check(await dunning.AssessAsync(c.CompanyId, i.Date("Date"), stages).ConfigureAwait(true));
+                return notices.Count == 0 ? "Nobody is due a reminder." : string.Join(Environment.NewLine, notices.Select(n =>
+                    $"{n.CustomerName,-30} {n.LevelLabel,-16} {M(n.OverdueAmount),14}  oldest {n.OldestDaysOverdue} days"));
+            },
+        };
+        yield return new Operation
+        {
+            Module = credit, Title = "Debt collection cases", ListTitle = "Summons register",
+            Description = "Hands a customer's overdue debt to a collector or lawyer (a case), records the summons, asks for the case to be written off (approved by another user), "
+                + "and closes it as settled or withdrawn.",
+            Fields = [Pick("Step", "Step", ["Hand over", "Summons", "Request write-off", "Approve write-off", "Close"]), Opt("Customer", "Customer code (hand over)"), Opt("Case", "Case number"),
+                Opt("Party", "Handed over to / court"), Opt("Summons", "Summons number"), Opt("Hearing", "Hearing date (yyyy-MM-dd)"), Opt("Reason", "Reason (write-off)"),
+                Opt("BadDebt", "Bad debt account"), Pick("Outcome", "Outcome (close)", [nameof(Core.Trading.DebtCaseStage.Settled), nameof(Core.Trading.DebtCaseStage.Withdrawn)]), Today()],
+            Run = async (c, i) =>
+            {
+                IDebtCollectionService collection = c.Get<IDebtCollectionService>();
+                string caseNumber = i.Optional("Case") ?? string.Empty;
+                switch (i.Text("Step"))
+                {
+                    case "Hand over":
+                        return $"Case {Check(await collection.HandOverAsync(c.CompanyId, await CustomerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true), i.Optional("Party") ?? string.Empty, i.Date("Date")).ConfigureAwait(true))} opened.";
+                    case "Summons":
+                        DateOnly? hearing = i.Optional("Hearing") is string h ? DateOnly.ParseExact(h, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : null;
+                        return Check(await collection.RecordSummonsAsync(c.CompanyId, caseNumber, i.Optional("Summons") ?? string.Empty, i.Optional("Party") ?? string.Empty, i.Date("Date"), hearing).ConfigureAwait(true),
+                            "Summons recorded.");
+                    case "Request write-off":
+                        return Check(await collection.RequestWriteOffAsync(c.CompanyId, caseNumber, c.UserId, i.Optional("Reason") ?? string.Empty, i.Optional("BadDebt") ?? string.Empty).ConfigureAwait(true),
+                            "Write-off requested; another user approves it.");
+                    case "Approve write-off":
+                        CaseWriteOff written = Check(await collection.ApproveWriteOffAsync(c.CompanyId, caseNumber, c.UserId, i.Date("Date"), i.Optional("BadDebt") ?? string.Empty).ConfigureAwait(true));
+                        return $"Written off: {written.InvoicesWrittenOff} invoice(s), {M(written.Amount)}.";
+                    default:
+                        return Check(await collection.CloseAsync(c.CompanyId, caseNumber, Enum.Parse<Core.Trading.DebtCaseStage>(i.Text("Outcome")), i.Date("Date")).ConfigureAwait(true), "Case closed.");
+                }
+            },
+            List = async c => Table(await c.Get<IDebtCollectionService>().SummonsRegisterAsync(c.CompanyId).ConfigureAwait(true),
+                ("Case", x => x.CaseNumber), ("Customer", x => x.CustomerCode), ("Summons", x => x.SummonsNumber), ("Court", x => x.Court), ("Issued", x => D(x.IssuedOn)),
+                ("Hearing", x => x.HearingDate is DateOnly d ? D(d) : "-"), ("Amount", x => M(x.AmountHandedOver))),
+        };
+        yield return new Operation
+        {
+            Module = credit, Title = "Raise finance charges",
+            Description = "Charges interest on overdue customer balances past the grace days at the annual rate (simple or compound, with a minimum charge), optionally exempting "
+                + "indigent customers.",
+            Fields = [Today("Date", "As at"), Num("Rate", "Annual rate %"), Num("Grace", "Grace days", "30"), Num("Minimum", "Minimum charge", "0"), Req("Income", "Interest income account"),
+                Req("Prefix", "Document prefix", "FC"), Tick("Compound", "Compound"), Tick("Indigent", "Exempt indigent customers", true)],
+            Run = async (c, i) =>
+            {
+                FinanceChargeRunResult run = Check(await c.Get<IFinanceChargeService>().RaiseChargesAsync(new FinanceChargeRunRequest
+                {
+                    CompanyId = c.CompanyId, AsAtDate = i.Date("Date"), AnnualRatePercent = i.Number("Rate"), GraceDays = i.Whole("Grace"), MinimumCharge = i.Number("Minimum"),
+                    InterestIncomeAccountCode = i.Text("Income"), DocumentPrefix = i.Text("Prefix"), Compound = i.Flag("Compound"), ExemptIndigent = i.Flag("Indigent"),
+                }).ConfigureAwait(true));
+                return $"{run.Charges.Count} customer(s) charged {M(run.TotalInterest)}{(run.CustomersExempted > 0 ? $"; {run.CustomersExempted} exempted" : string.Empty)}.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = credit, Title = "Credit limits", ListTitle = "Increases awaiting approval",
+            Description = "Lowers a customer's credit limit at once; an increase is requested with the reason and approved (or rejected) by another user.",
+            Fields = [Pick("Step", "Step", ["Lower", "Request increase", "Approve", "Reject"]), Opt("Customer", "Customer code"), Num("Limit", "New limit", "0"), Opt("Reason", "Reason"), OptNum("Request", "Request id")],
+            Run = async (c, i) =>
+            {
+                ICreditLimitService limits = c.Get<ICreditLimitService>();
+                long request = (long)(i.OptionalNumber("Request") ?? 0m);
+                switch (i.Text("Step"))
+                {
+                    case "Lower":
+                        return Check(await limits.LowerAsync(c.CompanyId, await CustomerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true), i.Number("Limit")).ConfigureAwait(true), "Limit lowered.");
+                    case "Request increase":
+                        return Check(await limits.RequestIncreaseAsync(c.CompanyId, await CustomerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true), i.Number("Limit"), i.Optional("Reason") ?? string.Empty, c.UserId)
+                            .ConfigureAwait(true), id => $"Request {id} awaits another user's approval.");
+                    case "Approve":
+                        return Check(await limits.ApproveAsync(c.CompanyId, request, c.UserId).ConfigureAwait(true), "Limit raised.");
+                    default:
+                        return Check(await limits.RejectAsync(c.CompanyId, request, c.UserId, i.Optional("Reason") ?? string.Empty).ConfigureAwait(true), "Request rejected.");
+                }
+            },
+            List = async c => Table(await c.Get<ICreditLimitService>().PendingAsync(c.CompanyId).ConfigureAwait(true),
+                ("Request", x => x.RequestId), ("Customer", x => x.CustomerCode), ("Current", x => M(x.CurrentLimit)), ("Requested", x => M(x.RequestedLimit)), ("Reason", x => x.Reason)),
+        };
+        yield return new Operation
+        {
+            Module = credit, Title = "Expected credit loss on debtors",
+            Description = "Assesses the IFRS 9 loss allowance on trade debtors by arrears band (default provision matrix) against the allowance booked; Post books the difference.",
+            Fields = [Pick("Step", "Step", ["Assess", "Post"]), Today("Date", "As at"), Req("Allowance", "Loss allowance account"), Opt("Expense", "Impairment expense account (post)")],
+            Run = async (c, i) =>
+            {
+                IExpectedCreditLossService ecl = c.Get<IExpectedCreditLossService>();
+                One4All.Application.Trading.EclMatrix matrix = One4All.Application.Trading.EclMatrix.Default;
+                EclReport report;
+                string? journal = null;
+                if (i.Text("Step") == "Post")
+                {
+                    EclPostingResult posted = Check(await ecl.PostAsync(c.CompanyId, i.Date("Date"), matrix, i.Text("Allowance"), i.Optional("Expense") ?? string.Empty).ConfigureAwait(true));
+                    (report, journal) = (posted.Report, posted.JournalNumber);
+                }
+                else
+                {
+                    report = Check(await ecl.AssessAsync(c.CompanyId, i.Date("Date"), matrix, i.Text("Allowance")).ConfigureAwait(true));
+                }
+
+                return string.Join(Environment.NewLine, report.Bands.Select(b => $"{b.Band,-14} exposure {M(b.Exposure),14}  provision {M(b.Provision),12}"))
+                    + Environment.NewLine + $"Needed {M(report.TargetAllowance)}, booked {M(report.BookedAllowance)}, adjustment {M(report.Adjustment)}{(journal is null ? string.Empty : $" (posted {journal})")}.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = credit, Title = "Promises to pay", ListTitle = "Open promises",
+            Description = "Records a customer's promise to pay an amount by a date; Review shows, as at a date, which promises were kept, which were broken and how many are still open.",
+            Fields = [Pick("Step", "Step", ["Record", "Review"]), Opt("Customer", "Customer code"), Num("Amount", "Amount", "0"), Today("PayBy", "Pay by"), Opt("Note", "Note"), Today("Date", "Made on / as at")],
+            Run = async (c, i) =>
+            {
+                IPromiseToPayService promises = c.Get<IPromiseToPayService>();
+                if (i.Text("Step") == "Record")
+                {
+                    return Check(await promises.RecordAsync(c.CompanyId, await CustomerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true), i.Date("Date"), i.Date("PayBy"), i.Number("Amount"),
+                        i.Optional("Note"), c.UserId).ConfigureAwait(true), id => $"Promise {id} recorded.");
+                }
+
+                PromiseReview review = await promises.ReviewAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true);
+                return $"Kept: {review.Kept.Count}. Broken: {review.Broken.Count}{(review.Broken.Count == 0 ? string.Empty : " — " + string.Join(", ", review.Broken.Select(b => $"{b.CustomerCode} {M(b.Amount)} by {D(b.PayBy)}")))}. "
+                    + $"Still open: {review.StillOpen}.";
+            },
+            List = async c => Table(await c.Get<IPromiseToPayService>().DiaryAsync(c.CompanyId, Core.Trading.PromiseStatus.Open).ConfigureAwait(true),
+                ("Promise", x => x.PromiseId), ("Customer", x => x.CustomerCode), ("Made", x => D(x.MadeOn)), ("Pay by", x => D(x.PayBy)), ("Amount", x => M(x.Amount)), ("Note", x => x.Note)),
+        };
     }
 
     private static async Task<DataTable> OpenItemsAsync(OperationContext c, TradingLedger ledger)
