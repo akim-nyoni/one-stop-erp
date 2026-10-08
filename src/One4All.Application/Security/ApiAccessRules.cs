@@ -26,6 +26,19 @@ public static partial class ApiAccessRules
     /// <summary>Query parameters naming the user acting: they must be the signed-in user.</summary>
     public static readonly IReadOnlyList<string> ActorParameters = ["userId", "approverUserId"];
 
+    /// <summary>
+    /// Body fields that record who acted or who gave an authority: over the API they must be the signed-in user — a client cannot act for, or
+    /// claim the authority of, anyone else (a supervisor authorises by making the request themselves).
+    /// </summary>
+    public static readonly IReadOnlySet<string> BodyActorFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "userId", "approverUserId", "requestedByUserId", "cashierUserId", "preparedByUserId", "amendedByUserId", "uploadedByUserId", "savedByUserId",
+        "placedByUserId", "liftedByUserId", "initiatedByUserId", "commentedByUserId", "submittedByUserId", "receivedByUserId", "raisedByUserId",
+        "postedByUserId", "enteredByUserId", "countedByUserId", "clearedByUserId", "approvedByUserId", "budgetApprovedByUserId",
+        "authorisedByUserId", "rateOverrideByUserId", "overReceiptAuthorisedByUserId", "negativeAuthorisedByUserId", "creditLimitOverrideByUserId",
+        "budgetOverrideAuthorisedByUserId",
+    };
+
     // Each area belongs to the modules that declare it (brief §10: modules register their API areas).
     private static readonly Dictionary<string, string[]> ModulesByArea = Modules.BuiltInModules.All
         .SelectMany(m => m.ApiAreas.Select(area => (Area: area, Module: m.Code)))

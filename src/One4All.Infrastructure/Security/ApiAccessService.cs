@@ -67,12 +67,45 @@ public sealed class ApiAccessService : IApiAccessService
             return ApiAccessDecision.Refuse(403, $"You have no permission to {(requirement.IsWrite ? "change" : "view")} {string.Join(" or ", requirement.Modules)}.");
         }
 
-        // Whoever the request says is acting must be the signed-in user; left out, it is filled in.
+        // A JSON body is held to the same checks as the query: its company, branch and acting-user fields join the query's, and may not
+        // contradict them.
+        Dictionary<string, string> values = new(request.Query, StringComparer.OrdinalIgnoreCase);
+        foreach ((string key, string value) in request.Body ?? new Dictionary<string, string>())
+        {
+            bool checkedField = ScopedParameters.Any(p => string.Equals(p.Name, key, StringComparison.OrdinalIgnoreCase)) || ApiAccessRules.BodyActorFields.Contains(key);
+            if (!checkedField)
+            {
+                continue;
+            }
+
+            if (values.TryGetValue(key, out string? fromQuery) && !string.Equals(fromQuery, value, StringComparison.OrdinalIgnoreCase))
+            {
+                return ApiAccessDecision.Refuse(400, $"The request names two different {key} values.");
+            }
+
+            values[key] = value;
+        }
+
+        // Whoever the request says is acting (or authorising) must be the signed-in user; left out of the query, it is filled in.
         List<string> missing = [];
         if (!ApiAccessRules.UserIdIsTarget(request.Path))
         {
+            foreach ((string key, string value) in request.Body ?? new Dictionary<string, string>())
+            {
+                if (ApiAccessRules.BodyActorFields.Contains(key) && value.Length > 0
+                    && (!long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long bodyActor) || bodyActor != request.UserId))
+                {
+                    return ApiAccessDecision.Refuse(403, "Requests act, and authorise, as the signed-in user only.");
+                }
+            }
+
             foreach (string name in ApiAccessRules.ActorParameters)
             {
+                if (request.Body?.Keys.Any(k => string.Equals(k, name, StringComparison.OrdinalIgnoreCase)) == true)
+                {
+                    continue;
+                }
+
                 string? given = request.Query.FirstOrDefault(q => string.Equals(q.Key, name, StringComparison.OrdinalIgnoreCase)).Value;
                 if (given is null)
                 {
@@ -91,8 +124,7 @@ public sealed class ApiAccessService : IApiAccessService
         {
             foreach ((string name, ScopeDimension dimension, bool isId) in ScopedParameters)
             {
-                string? value = request.Query.FirstOrDefault(q => string.Equals(q.Key, name, StringComparison.OrdinalIgnoreCase)).Value;
-                if (value is null)
+                if (!values.TryGetValue(name, out string? value))
                 {
                     continue;
                 }

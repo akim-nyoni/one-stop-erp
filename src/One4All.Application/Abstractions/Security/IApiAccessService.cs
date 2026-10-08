@@ -5,7 +5,9 @@ namespace One4All.Application.Abstractions.Security;
 /// <param name="Method">The HTTP method.</param>
 /// <param name="Path">The path.</param>
 /// <param name="Query">The query parameters (name → value).</param>
-public sealed record ApiAccessRequest(long UserId, string Method, string Path, IReadOnlyDictionary<string, string> Query);
+/// <param name="Body">The top-level scalar values of a JSON request body (name → value), checked like the query: a body cannot name a company,
+/// branch or acting user the query could not.</param>
+public sealed record ApiAccessRequest(long UserId, string Method, string Path, IReadOnlyDictionary<string, string> Query, IReadOnlyDictionary<string, string>? Body = null);
 
 /// <summary>The decision.</summary>
 /// <param name="Allowed">Whether the request may proceed.</param>

@@ -160,8 +160,9 @@ app.Use(async (context, next) =>
         }
     }
 
+    Dictionary<string, string>? body = await JsonBodyScalarsAsync(context.Request, context.RequestAborted).ConfigureAwait(false);
     One4All.Application.Abstractions.Security.ApiAccessDecision decision = await access.AuthoriseAsync(
-        new One4All.Application.Abstractions.Security.ApiAccessRequest(userId, context.Request.Method, context.Request.Path.Value ?? string.Empty, query), context.RequestAborted).ConfigureAwait(false);
+        new One4All.Application.Abstractions.Security.ApiAccessRequest(userId, context.Request.Method, context.Request.Path.Value ?? string.Empty, query, body), context.RequestAborted).ConfigureAwait(false);
     if (!decision.Allowed)
     {
         await Results.Json(new { error = decision.Reason }, statusCode: decision.StatusCode).ExecuteAsync(context).ConfigureAwait(false);
@@ -2650,6 +2651,44 @@ app.MapPost("/api/hr/self-service/detail/{requestId:long}/decide", async (long r
 .WithName("EssDecideDetail");
 
 app.Run();
+
+// The top-level scalar values of a JSON request body, read without consuming it (the endpoint still binds it), for the access check.
+static async Task<Dictionary<string, string>?> JsonBodyScalarsAsync(HttpRequest request, CancellationToken ct)
+{
+    if (HttpMethods.IsGet(request.Method) || request.ContentType?.Contains("json", StringComparison.OrdinalIgnoreCase) != true || request.ContentLength is 0)
+    {
+        return null;
+    }
+
+    request.EnableBuffering();
+    try
+    {
+        using System.Text.Json.JsonDocument document = await System.Text.Json.JsonDocument.ParseAsync(request.Body, cancellationToken: ct).ConfigureAwait(false);
+        if (document.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        Dictionary<string, string> values = new(StringComparer.OrdinalIgnoreCase);
+        foreach (System.Text.Json.JsonProperty property in document.RootElement.EnumerateObject())
+        {
+            if (property.Value.ValueKind is System.Text.Json.JsonValueKind.Number or System.Text.Json.JsonValueKind.String)
+            {
+                values[property.Name] = property.Value.ValueKind == System.Text.Json.JsonValueKind.String ? property.Value.GetString() ?? string.Empty : property.Value.GetRawText();
+            }
+        }
+
+        return values;
+    }
+    catch (System.Text.Json.JsonException)
+    {
+        return null; // the endpoint's own binding reports a malformed body
+    }
+    finally
+    {
+        request.Body.Position = 0;
+    }
+}
 
 // Maps a text-bearing Result to a plain-text response (200), or 404 / 409 / 400 by error type.
 // The signed-in user's id from the token's subject, or null.
