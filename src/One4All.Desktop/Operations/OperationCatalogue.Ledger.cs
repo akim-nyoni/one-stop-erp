@@ -272,6 +272,80 @@ public static partial class OperationCatalogue
                 ("Id", b => b.Id), ("Label", b => b.Label), ("Type", b => b.Type), ("Version", b => b.VersionNumber), ("Status", b => b.Status), ("Department", b => b.Department),
                 ("Rolled from", b => b.RolledFromBudgetId)),
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Settle VAT for a period",
+            Description = "Clears the period's output and input VAT accounts into the VAT payable (or refundable) account and shows output, input and the net.",
+            Fields = [Today("From", "From"), Today("To", "To"), Req("Payable", "VAT payable account"), Req("Document", "Document number")],
+            Run = async (c, i) =>
+            {
+                VatSettlementResult vat = Check(await c.Get<IVatReturnService>().SettleAsync(new SettleVatRequest
+                {
+                    CompanyId = c.CompanyId, FromDate = i.Date("From"), ToDate = i.Date("To"), VatPayableAccountCode = i.Text("Payable"), DocumentNumber = i.Text("Document"),
+                }).ConfigureAwait(true));
+                return $"Output {M(vat.OutputTax)} − input {M(vat.InputTax)} = {(vat.NetPayable >= 0m ? "payable" : "refundable")} {M(Math.Abs(vat.NetPayable))}{(vat.JournalNumber is null ? string.Empty : $" ({vat.JournalNumber})")}.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Revalue foreign currency balances",
+            Description = "Revalues the foreign-currency balances (banks, debtors, creditors, loans) at the closing rate on the date, posting the differences to FX gain / loss and, "
+                + "if ticked, reversing them on the next day.",
+            Fields = [Today("Date", "As at"), Tick("Reverse", "Reverse next day", true)],
+            Run = async (c, i) =>
+            {
+                FxRevaluationResult fx = Check(await c.Get<IFxRevaluationService>().RevalueAsync(c.CompanyId, i.Date("Date"), i.Flag("Reverse")).ConfigureAwait(true));
+                return fx.Accounts.Count == 0 ? "No foreign-currency balances to revalue."
+                    : string.Join(Environment.NewLine, fx.Accounts.Select(a => $"{a.AccountCode,-8} {a.Currency} {Q(a.ForeignBalance),14} @ {a.ClosingRate:0.######}: {M(a.BaseBefore)} → {M(a.BaseAfter)}"))
+                        + Environment.NewLine + $"Net difference {M(fx.NetDifference)}; {string.Join(", ", fx.JournalNumbers)}{(fx.ReversalJournalNumbers.Count == 0 ? string.Empty : $", reversed by {string.Join(", ", fx.ReversalJournalNumbers)}")}.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Accruals and prepayments",
+            Description = "An accrual (an expense incurred, not yet invoiced) or a prepayment (paid ahead), posted on the date and reversed automatically on the reversal date.",
+            Fields = [Pick("Kind", "Kind", ["Accrual", "Prepayment"]), Today("Date", "Date"), Today("Reversal", "Reverses on"), Req("Expense", "Expense account"), Req("Balance", "Accrual / prepayment account"),
+                Num("Amount", "Amount"), Req("Document", "Document number"), Req("Narrative", "Narrative")],
+            Run = async (c, i) =>
+            {
+                IAccrualService accruals = c.Get<IAccrualService>();
+                ReversingJournalResult posted = i.Text("Kind") == "Accrual"
+                    ? Check(await accruals.PostAccrualAsync(c.CompanyId, i.Date("Date"), i.Date("Reversal"), i.Text("Expense"), i.Text("Balance"), i.Number("Amount"), i.Text("Document"), i.Text("Narrative")).ConfigureAwait(true))
+                    : Check(await accruals.PostPrepaymentAsync(c.CompanyId, i.Date("Date"), i.Date("Reversal"), i.Text("Balance"), i.Text("Expense"), i.Number("Amount"), i.Text("Document"), i.Text("Narrative")).ConfigureAwait(true));
+                return $"Posted {posted.PostingJournalNumber}; reverses as {posted.ReversalJournalNumber}.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Recurring journals", ListTitle = "Recurring journals",
+            Description = "Create: a journal posted again each period (\"6100 Dr 500 cc=ADM; 2100 Cr 500\"). Post: one of them on a date. Post all: every active one. Stop / restart one.",
+            Fields = [Pick("Step", "Step", ["Create", "Post", "Post all", "Stop", "Restart"]), Opt("Code", "Code"), Opt("Description", "Description"), Opt("Lines", "Lines (create)"),
+                Opt("Narrative", "Narrative"), Opt("Document", "Document number (post)"), Today()],
+            Run = async (c, i) =>
+            {
+                IRecurringJournalService recurring = c.Get<IRecurringJournalService>();
+                async Task<long> Id() => await FindAsync(c.Db.Set<Core.Accounting.RecurringJournal>(), r => r.CompanyId == c.CompanyId && r.Code == (i.Optional("Code") ?? string.Empty).ToUpper(), r => r.Id,
+                    "recurring journal", i.Optional("Code") ?? string.Empty).ConfigureAwait(true);
+                switch (i.Text("Step"))
+                {
+                    case "Create":
+                        List<RecurringJournalLineInput> lines = [.. JournalLines(i.Optional("Lines") ?? string.Empty)
+                            .Select(l => new RecurringJournalLineInput(l.AccountCode, l.Side == JournalSide.Debit, l.TransactionAmount, l.CostCentre, l.Department))];
+                        return Check(await recurring.CreateAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Optional("Description") ?? string.Empty, "GL", lines, i.Optional("Narrative")).ConfigureAwait(true),
+                            _ => "Recurring journal created.");
+                    case "Post":
+                        return $"Posted {Check(await recurring.PostAsync(c.CompanyId, await Id().ConfigureAwait(true), i.Date("Date"), i.Optional("Document")).ConfigureAwait(true))}.";
+                    case "Post all":
+                        IReadOnlyList<RecurringRunLine> run = Check(await recurring.PostAllActiveAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true));
+                        return run.Count == 0 ? "Nothing to post." : string.Join(Environment.NewLine, run.Select(r => $"{r.Code}: {r.JournalNumber}{(r.AlreadyPosted ? " (already posted)" : string.Empty)}"));
+                    default:
+                        bool active = i.Text("Step") == "Restart";
+                        return Check(await recurring.SetActiveAsync(c.CompanyId, await Id().ConfigureAwait(true), active).ConfigureAwait(true), active ? "Restarted." : "Stopped.");
+                }
+            },
+            List = async c => Table(await c.Db.Set<Core.Accounting.RecurringJournal>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", r => r.Code), ("Description", r => r.Description), ("Active", r => r.IsActive)),
+        };
     }
 
     // "6100 Dr 500 project=P1 fund=WATER # narrative; 2410 Cr 500 fund=WATER"
