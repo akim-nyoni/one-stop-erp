@@ -590,3 +590,15 @@ internal sealed class RosterEntryConfiguration : IEntityTypeConfiguration<Roster
         b.HasOne<Shift>().WithMany().HasForeignKey(x => x.ShiftId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+internal sealed class PayrollYtdOpeningConfiguration : IEntityTypeConfiguration<PayrollYtdOpening>
+{
+    public void Configure(EntityTypeBuilder<PayrollYtdOpening> b)
+    {
+        b.ToTable("ytd_opening", Schemas.Payroll);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.EmployeeId, x.TaxYear, x.Code }).IsUnique();
+    }
+}

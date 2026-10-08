@@ -143,7 +143,7 @@ public static partial class OperationCatalogue
                     .ConfigureAwait(true), ("Id", a => a.Id), ("Record", a => a.Target), ("Number", a => a.TargetKey), ("File", a => a.FileName), ("KB", a => a.SizeBytes / 1024),
                 ("Uploaded", a => a.UploadedOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Description", a => a.Description)),
         };
-        string[] imports = ["Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "Properties", "Students"];
+        string[] imports = ["Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "PayrollYtd", "Properties", "Students"];
         yield return new Operation
         {
             Module = module, Title = "Import master data or opening balances", ListTitle = "Opening balance reconciliation",
@@ -152,6 +152,7 @@ public static partial class OperationCatalogue
                 + "Receivables/Payables: trader,document,date,amount (negative = credit). TrialBalance: account,debit,credit. "
                 + "FixedAssets: asset_number,description,class,acquired,cost,accumulated,life_months,cost_account,accum_account,expense_account[,residual,method,rate]. "
                 + "Employees: employee_number,name,basic_salary,engaged[,national_id,department,cost_centre,grade]. StaffLoans: employee_number,reference,outstanding,instalment,loan_account. "
+                + "PayrollYtd: employee_number,tax_year,code,amount (TAXABLE for taxable pay so far, or a pay element such as PAYE for tax already deducted). "
                 + "Properties: stand,ward,ratepayer[,valuation,size,connected,services e.g. Water:WAT1;Refuse:REF1]. Students: admission,name,grade,guardian[,boarder,admitted]. "
                 + "The list also shows the fixed asset and staff loan registers against their accounts.",
             Fields = [Pick("Kind", "What", imports), Req("File", "CSV file path"), Today("Date", "Opening date"), Req("Suspense", "Migration suspense account", "2900"), Tick("Commit", "Commit")],
@@ -172,6 +173,7 @@ public static partial class OperationCatalogue
                     "FixedAssets" => await registers.ImportFixedAssetsAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),
                     "Employees" => await registers.ImportEmployeesAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "StaffLoans" => await registers.ImportEmployeeLoansAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),
+                    "PayrollYtd" => await registers.ImportPayrollYtdAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "Properties" => await registers.ImportPropertiesAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "Students" => await registers.ImportStudentsAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     _ => await ob.ImportTrialBalanceAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),

@@ -63,12 +63,17 @@ public sealed partial class PayrollService
             .ToListAsync(ct).ConfigureAwait(false);
         List<TaxTable> tables = taxCodes.Count == 0 ? [] : await _db.Set<TaxTable>().AsNoTracking().Include(t => t.Bands).Where(t => t.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
 
+        // What the previous payroll paid earlier in the tax year (migrated openings) counts with this payroll's own payslips.
+        var openings = await _db.Set<PayrollYtdOpening>().AsNoTracking().Where(o => ids.Contains(o.EmployeeId) && o.TaxYear == asAt.Year)
+            .Select(o => new { o.EmployeeId, o.Code, o.Amount }).ToListAsync(ct).ConfigureAwait(false);
+
         Dictionary<long, Dictionary<string, object?>> result = [];
         foreach (Employee e in employees)
         {
             Dictionary<string, object?> values = new(StringComparer.Ordinal)
             {
-                [YtdTaxableVariable] = ytd.Where(l => l.EmployeeId == e.Id && l.Type == PayElementType.Earning).Sum(l => l.Amount),
+                [YtdTaxableVariable] = ytd.Where(l => l.EmployeeId == e.Id && l.Type == PayElementType.Earning).Sum(l => l.Amount)
+                    + openings.Where(o => o.EmployeeId == e.Id && o.Code == PayrollYtdOpening.TaxableCode).Sum(o => o.Amount),
                 [TaxPeriodVariable] = (decimal)asAt.Month,
                 [TaxTablesKey] = tables,
                 [PayDateKey] = asAt,
@@ -77,7 +82,8 @@ public sealed partial class PayrollService
             };
             foreach (string code in taxCodes)
             {
-                values["YTD_" + code] = ytd.Where(l => l.EmployeeId == e.Id && l.ElementCode == code && l.Type != PayElementType.Earning).Sum(l => l.Amount);
+                values["YTD_" + code] = ytd.Where(l => l.EmployeeId == e.Id && l.ElementCode == code && l.Type != PayElementType.Earning).Sum(l => l.Amount)
+                    + openings.Where(o => o.EmployeeId == e.Id && string.Equals(o.Code, code, StringComparison.OrdinalIgnoreCase)).Sum(o => o.Amount);
             }
 
             result[e.Id] = values;

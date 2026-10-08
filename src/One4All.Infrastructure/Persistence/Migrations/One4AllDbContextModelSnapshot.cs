@@ -18475,6 +18475,68 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("payroll_variable", "pay");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.PayrollYtdOpening", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("TaxYear")
+                        .HasColumnType("integer")
+                        .HasColumnName("tax_year");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ytd_opening");
+
+                    b.HasIndex("EmployeeId", "TaxYear", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_ytd_opening_employee_id_tax_year_code");
+
+                    b.ToTable("ytd_opening", "pay");
+                });
+
             modelBuilder.Entity("One4All.Core.Payroll.Payslip", b =>
                 {
                     b.Property<long>("Id")

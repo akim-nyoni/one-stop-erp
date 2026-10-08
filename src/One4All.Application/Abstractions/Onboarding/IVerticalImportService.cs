@@ -39,6 +39,13 @@ public interface IVerticalImportService
     /// </summary>
     Task<ImportReport> ImportPropertiesAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
 
+    /// <summary>
+    /// Payroll year-to-date openings: <c>employee_number, tax_year, code, amount</c> — <c>TAXABLE</c> for taxable pay so far, or a pay element's code
+    /// (a tax-table element's figure is the tax already deducted). Cumulative tax counts them with this payroll's own payslips; a later import
+    /// of the same employee, year and code replaces the figure.
+    /// </summary>
+    Task<ImportReport> ImportPayrollYtdAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
+
     /// <summary>Students: <c>admission, name, grade, guardian</c> (customer code) (optional <c>boarder, admitted</c>).</summary>
     Task<ImportReport> ImportStudentsAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
 

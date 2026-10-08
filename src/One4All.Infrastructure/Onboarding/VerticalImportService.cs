@@ -160,6 +160,74 @@ public sealed class VerticalImportService : IVerticalImportService
     }
 
     /// <inheritdoc />
+    public async Task<ImportReport> ImportPayrollYtdAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "employee_number", "tax_year", "code", "amount");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        Dictionary<string, long> employees = await _db.Employees.Where(e => e.CompanyId == companyId).ToDictionaryAsync(e => e.EmployeeNumber, e => e.Id, StringComparer.OrdinalIgnoreCase, ct)
+            .ConfigureAwait(false);
+        HashSet<string> elements = new(await _db.PayElements.Where(e => e.CompanyId == companyId).Select(e => e.Code).ToListAsync(ct).ConfigureAwait(false), StringComparer.OrdinalIgnoreCase);
+        List<ImportError> errors = [];
+        List<(long Employee, int Year, string Code, decimal Amount)> figures = [];
+        HashSet<(long, int, string)> seen = [];
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string number = Code(row.Text("employee_number")), code = Code(row.Text("code"));
+                decimal? year = row.Number("tax_year"), amount = row.Number("amount");
+                if (!employees.TryGetValue(number, out long employee))
+                {
+                    return $"No employee {number}.";
+                }
+
+                if (code != PayrollYtdOpening.TaxableCode && !elements.Contains(code))
+                {
+                    return $"'{code}' is neither TAXABLE nor a pay element.";
+                }
+
+                if (year is not (>= 2000 and <= 2100) || year != decimal.Truncate(year.Value) || amount is not >= 0m)
+                {
+                    return "A year-to-date figure needs a tax year and an amount of nil or more.";
+                }
+
+                if (!seen.Add((employee, (int)year.Value, code)))
+                {
+                    return $"{number} {code} {year} appears twice.";
+                }
+
+                figures.Add((employee, (int)year.Value, code, amount.Value));
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, 0, errors, commit, ct, async () =>
+        {
+            List<long> ids = [.. figures.Select(f => f.Employee).Distinct()];
+            Dictionary<(long, int, string), PayrollYtdOpening> existing = (await _db.Set<PayrollYtdOpening>().Where(o => ids.Contains(o.EmployeeId)).ToListAsync(ct).ConfigureAwait(false))
+                .ToDictionary(o => (o.EmployeeId, o.TaxYear, o.Code));
+            foreach ((long employee, int year, string code, decimal amount) in figures)
+            {
+                if (existing.TryGetValue((employee, year, code), out PayrollYtdOpening? opening))
+                {
+                    opening.Amount = amount;
+                }
+                else
+                {
+                    _db.Set<PayrollYtdOpening>().Add(new PayrollYtdOpening(companyId, employee, year, code, amount));
+                }
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return figures.Count;
+        }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<ImportReport> ImportEmployeeLoansAsync(long companyId, string csv, DateOnly asAt, string suspenseAccountCode, bool commit, CancellationToken ct = default)
     {
         (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "employee_number", "reference", "outstanding", "instalment", "loan_account");
