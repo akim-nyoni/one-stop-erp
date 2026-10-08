@@ -194,4 +194,10 @@ public sealed class WorkflowApproval : Entity
 
     /// <summary>Gets or sets the document as it stood when this decision was made (JSON).</summary>
     public string? Snapshot { get; set; }
+
+    /// <summary>Gets or sets the SHA-256 (hex) of <see cref="Snapshot"/>, so a later change to the stored snapshot shows.</summary>
+    public string? SnapshotHash { get; set; }
+
+    /// <summary>Gets or sets the terminal or network address the decision was given from.</summary>
+    public string? Machine { get; set; }
 }

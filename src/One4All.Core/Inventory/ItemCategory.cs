@@ -34,4 +34,7 @@ public sealed class ItemCategory : AuditableEntity, ICompanyScoped
 
     /// <summary>Gets or sets a value indicating whether it is offered for new items.</summary>
     public bool IsActive { get; set; }
+
+    /// <summary>Gets or sets the category this one sits under (null: a top-level category), for drilling down at the till.</summary>
+    public string? ParentCode { get; set; }
 }

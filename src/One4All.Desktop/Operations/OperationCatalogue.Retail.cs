@@ -53,6 +53,73 @@ public static partial class OperationCatalogue
         string[] kinds = [.. Enum.GetNames<PosEventKind>().Where(k => k != nameof(PosEventKind.Refund))];
         yield return new Operation
         {
+            Module = module, Title = "Till favourites", ListTitle = "Favourites",
+            Description = "Items pinned to the till's ★ Favourites tab — for one terminal, or every till when no terminal is given (the till's own come first).",
+            Fields = [Req("Item", "Item code"), Opt("Terminal", "Terminal code (blank: every till)"), Num("Order", "Position", "10"), Tick("Remove", "Remove it")],
+            Run = async (c, i) =>
+            {
+                long? terminal = null;
+                if (i.Optional("Terminal") is string code)
+                {
+                    string key = code.ToUpperInvariant();
+                    terminal = await FindAsync(c.Db.PosTerminals, t => t.CompanyId == c.CompanyId && t.Code == key, t => t.Id, "terminal", code).ConfigureAwait(true);
+                }
+
+                return Check(await c.Get<IPosCatalogueService>().SetFavouriteAsync(c.CompanyId, terminal, i.Text("Item"), i.Whole("Order"), i.Flag("Remove")).ConfigureAwait(true),
+                    i.Flag("Remove") ? "Favourite removed." : "Favourite saved.");
+            },
+            List = async c => Table(await (from f in c.Db.PosFavourites.AsNoTracking()
+                                           join it in c.Db.Items.AsNoTracking() on f.ItemId equals it.Id
+                                           join t in c.Db.PosTerminals.AsNoTracking() on f.TerminalId equals (long?)t.Id into terminals
+                                           from t in terminals.DefaultIfEmpty()
+                                           where f.CompanyId == c.CompanyId
+                                           orderby f.TerminalId, f.SortOrder
+                                           select new { Till = t == null ? "every till" : t.Code, it.Code, it.Description, f.SortOrder }).ToListAsync().ConfigureAwait(true),
+                ("Till", r => r.Till), ("Item", r => r.Code), ("Description", r => r.Description), ("Position", r => r.SortOrder)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Refund window", Description = "How many days after a sale an ordinary supervisor may authorise its refund (blank: no limit). Past it, the authoriser needs the late-refund authority (Pos.Refund, AuthoriseLevel2).",
+            Fields = [OptNum("Days", "Days")],
+            Run = async (c, i) =>
+            {
+                Core.System.Company company = await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                company.RefundWindowDays = i.OptionalNumber("Days") is decimal days ? (int)days : null;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return company.RefundWindowDays is int d ? $"Refunds after {d} days need late-refund authority." : "Refunds have no time limit.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Category under a category", ListTitle = "Item categories",
+            Description = "Places a category under another so the till can drill down (blank parent: top level).",
+            Fields = [Req("Category", "Category code"), Opt("Parent", "Parent category code")],
+            Run = async (c, i) =>
+            {
+                string code = i.Text("Category").ToUpperInvariant(), parent = (i.Optional("Parent") ?? string.Empty).ToUpperInvariant();
+                ItemCategory category = await c.Db.ItemCategories.FirstOrDefaultAsync(x => x.CompanyId == c.CompanyId && x.Code == code).ConfigureAwait(true)
+                    ?? throw new OperationException($"Category {code} not found.");
+                if (parent.Length > 0)
+                {
+                    List<ItemCategory> all = await c.Db.ItemCategories.Where(x => x.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true);
+                    for (string? up = parent; up is not null; up = all.FirstOrDefault(x => x.Code == up)?.ParentCode)
+                    {
+                        if (up == code || all.All(x => x.Code != up))
+                        {
+                            throw new OperationException(up == code ? "A category cannot sit under itself or its own sub-category." : $"Category {up} not found.");
+                        }
+                    }
+                }
+
+                category.ParentCode = parent.Length == 0 ? null : parent;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return parent.Length == 0 ? $"{code} is a top-level category." : $"{code} now sits under {parent}.";
+            },
+            List = async c => Table(await c.Db.ItemCategories.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.ParentCode).ThenBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", x => x.Code), ("Name", x => x.Name), ("Under", x => x.ParentCode ?? "—"), ("Active", x => x.IsActive)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Save a promotion", ListTitle = "Promotions",
             Description = "NForPrice (N items for a price), BuyXGetY (no reward items = lowest price free), PercentOff (items or a category), MealDeal (courses separated by '|'). Items as codes separated by ','.",
             Fields = [Req("Code", "Code"), Req("Name", "Name on receipts"), Pick("Kind", "Kind", Enum.GetNames<PromotionKind>()), Req("Account", "Discount account"), Num("Quantity", "N / X", "0"),

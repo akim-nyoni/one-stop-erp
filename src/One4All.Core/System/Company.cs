@@ -162,6 +162,9 @@ public sealed class Company : SoftDeletableEntity
     /// <summary>Gets or sets the most a refund without a receipt may pay out (null: such refunds are not allowed).</summary>
     public decimal? UnreceiptedRefundLimit { get; set; }
 
+    /// <summary>Gets or sets how many days after a sale an ordinary supervisor may authorise its refund; later needs the late-refund authority (null: no limit).</summary>
+    public int? RefundWindowDays { get; set; }
+
     /// <summary>
     /// Whether fund control is on (brief §4.4 / §4.18.5): expenditure cannot be posted to a budget-enabled expense account
     /// (a vote) that has no appropriation in the year's active approved or supplementary budget.

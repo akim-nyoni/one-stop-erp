@@ -335,6 +335,12 @@ public class One4AllDbContext : DbContext
     /// <summary>POS terminals.</summary>
     public DbSet<Core.Pos.PosTerminal> PosTerminals => Set<Core.Pos.PosTerminal>();
 
+    /// <summary>Gets the items pinned to the tills' favourites.</summary>
+    public DbSet<Core.Pos.PosFavourite> PosFavourites => Set<Core.Pos.PosFavourite>();
+
+    /// <summary>Gets the exchange-rate type each document type or ledger uses.</summary>
+    public DbSet<Core.System.ExchangeRatePolicy> ExchangeRatePolicies => Set<Core.System.ExchangeRatePolicy>();
+
     /// <summary>Till sessions.</summary>
     public DbSet<Core.Pos.TillSession> TillSessions => Set<Core.Pos.TillSession>();
 

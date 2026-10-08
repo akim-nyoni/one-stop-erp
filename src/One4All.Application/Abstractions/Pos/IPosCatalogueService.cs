@@ -1,3 +1,5 @@
+using One4All.Core.Common;
+
 namespace One4All.Application.Abstractions.Pos;
 
 /// <summary>One product tile on the till: a stock-master item with its price for one unit.</summary>
@@ -27,6 +29,12 @@ public sealed record PosTile(long ItemId, string Code, string Name, string Categ
     }
 }
 
+/// <summary>A category at the till.</summary>
+/// <param name="Code">Its code.</param>
+/// <param name="Name">Its name.</param>
+/// <param name="HasChildren">Whether there are categories under it.</param>
+public sealed record PosCategory(string Code, string Name, bool HasChildren);
+
 /// <summary>The till's product tiles (brief §4.1), drawn from the item master so every tile sale moves stock and posts its cost.</summary>
 public interface IPosCatalogueService
 {
@@ -38,4 +46,43 @@ public interface IPosCatalogueService
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The tiles by category and name.</returns>
     Task<IReadOnlyList<PosTile>> TilesAsync(long companyId, CancellationToken ct = default);
+
+    /// <summary>Searches the whole item master on the server — code, PLU, barcodes (item, pack or alias), synonyms, brand and description — and prices the hits.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="term">What was typed or scanned.</param>
+    /// <param name="take">How many to return.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The tiles, best match first.</returns>
+    Task<IReadOnlyList<PosTile>> SearchAsync(long companyId, string term, int take = 30, CancellationToken ct = default);
+
+    /// <summary>The till's favourites: its own first, then those for every till.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="terminalId">The terminal.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The tiles in their order.</returns>
+    Task<IReadOnlyList<PosTile>> FavouritesAsync(long companyId, long? terminalId, CancellationToken ct = default);
+
+    /// <summary>Pins, re-orders or removes a favourite.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="terminalId">The terminal (null: every till).</param>
+    /// <param name="itemCode">The item.</param>
+    /// <param name="sortOrder">Where it sits.</param>
+    /// <param name="remove">True to remove it.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or why not.</returns>
+    Task<Result> SetFavouriteAsync(long companyId, long? terminalId, string itemCode, int sortOrder, bool remove, CancellationToken ct = default);
+
+    /// <summary>The categories under a category (null: the top level), for drilling down.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="parentCode">The parent category.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The categories.</returns>
+    Task<IReadOnlyList<PosCategory>> CategoriesAsync(long companyId, string? parentCode, CancellationToken ct = default);
+
+    /// <summary>The tiles in a category and every category under it.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="categoryCode">The category.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The tiles.</returns>
+    Task<IReadOnlyList<PosTile>> CategoryTilesAsync(long companyId, string categoryCode, CancellationToken ct = default);
 }

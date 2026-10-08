@@ -94,6 +94,8 @@ internal sealed class WorkflowApprovalConfiguration : IEntityTypeConfiguration<W
         b.ToTable("approval", Schemas.Workflow);
         b.HasKey(x => x.Id);
         b.Property(x => x.Snapshot).HasColumnType("text");
+        b.Property(x => x.SnapshotHash).HasMaxLength(64);
+        b.Property(x => x.Machine).HasMaxLength(80);
         b.Property(x => x.Action).HasConversion<int>();
         b.Property(x => x.Comment).HasMaxLength(1024);
     }

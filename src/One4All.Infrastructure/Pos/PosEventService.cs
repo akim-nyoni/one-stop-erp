@@ -18,6 +18,7 @@ public sealed class PosEventService : IPosEventService
 {
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _postingEngine;
+    private readonly Application.Abstractions.Security.IPermissionService? _permissions;
     private readonly IPosService? _pos;
     private readonly IInventoryService _inventory;
     private readonly IClock _clock;
@@ -27,8 +28,10 @@ public sealed class PosEventService : IPosEventService
     /// <param name="postingEngine">Posts the refund journal.</param>
     /// <param name="inventory">Returns restocked goods.</param>
     /// <param name="clock">Stamps the events.</param>
-    public PosEventService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, IPosService? pos = null)
+    public PosEventService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, IPosService? pos = null,
+        Application.Abstractions.Security.IPermissionService? permissions = null)
     {
+        _permissions = permissions;
         _pos = pos;
         _db = db;
         _postingEngine = postingEngine;
@@ -102,6 +105,15 @@ public sealed class PosEventService : IPosEventService
         if (sale.Status != SaleStatus.Completed)
         {
             return Error.Rule("Pos.SaleNotCompleted", "Only a completed sale can be refunded.");
+        }
+
+        // Past the refund window, only an authoriser with the second-level refund authority (Pos.Refund, AuthoriseLevel2) may approve it.
+        int? window = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.RefundWindowDays).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (window is int days && request.Date > sale.SaleDate.AddDays(days)
+            && (request.AuthorisedByUserId is not long authoriser || _permissions is null
+                || !(await _permissions.ResolveAsync(authoriser, ct).ConfigureAwait(false)).Has("Pos.Refund", Core.Security.OperationFlags.AuthoriseLevel2)))
+        {
+            return Error.Rule("Pos.RefundWindow", $"Sale {sale.SaleNumber} is more than {days} days old: the refund needs a supervisor with late-refund authority.");
         }
 
         Dictionary<long, decimal> alreadyRefunded = await _db.PosEvents.AsNoTracking()

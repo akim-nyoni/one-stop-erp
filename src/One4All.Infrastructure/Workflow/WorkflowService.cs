@@ -14,6 +14,7 @@ public sealed class WorkflowService : IWorkflowService
     private readonly IClock _clock;
     private readonly IEnumerable<IWorkflowDocumentHandler> _handlers;
     private readonly Application.Abstractions.Communications.INotificationService? _notifications;
+    private readonly Application.Abstractions.Security.ICurrentUser? _caller;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
@@ -21,12 +22,13 @@ public sealed class WorkflowService : IWorkflowService
     /// <param name="handlers">What each module does when its document's workflow ends.</param>
     /// <param name="notifications">Tells approvers a document is waiting, and the requester the outcome.</param>
     public WorkflowService(One4AllDbContext db, IClock clock, IEnumerable<IWorkflowDocumentHandler>? handlers = null,
-        Application.Abstractions.Communications.INotificationService? notifications = null)
+        Application.Abstractions.Communications.INotificationService? notifications = null, Application.Abstractions.Security.ICurrentUser? caller = null)
     {
         _db = db;
         _clock = clock;
         _handlers = handlers ?? [];
         _notifications = notifications;
+        _caller = caller;
     }
 
     /// <inheritdoc />
@@ -165,6 +167,9 @@ public sealed class WorkflowService : IWorkflowService
             {
                 instance.DocumentType, instance.DocumentReference, instance.Value, Stage = currentStage?.Name, Attributes = Attributes(instance),
             });
+            WorkflowApproval decision = instance.Approvals[^1];
+            decision.SnapshotHash = WorkflowActionToken.Hash(decision.Snapshot!);
+            decision.Machine = _caller?.Terminal ?? _caller?.ClientAddress;
         }
         if (result.IsFailure)
         {

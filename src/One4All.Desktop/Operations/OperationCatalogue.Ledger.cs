@@ -18,6 +18,39 @@ public static partial class OperationCatalogue
         const string module = "General Ledger";
         yield return new Operation
         {
+            Module = module, Title = "Exchange-rate policy", ListTitle = "Rate policies",
+            Description = "Which rate type a document type (SalesInvoice, Receipt, SalesCreditNote, PurchaseInvoice, PurchaseCreditNote, Payment) or a whole ledger (AR, AP) uses "
+                + "when no rate is keyed. A trader's own rate type still comes first; with no policy the daily rate is used.",
+            Fields = [Pick("Document", "Document type or ledger", ["SalesInvoice", "Receipt", "SalesCreditNote", "PurchaseInvoice", "PurchaseCreditNote", "Payment", "AR", "AP"]),
+                Pick("RateType", "Rate type", Enum.GetNames<ExchangeRateType>()), Tick("Remove", "Remove the policy")],
+            Run = async (c, i) =>
+            {
+                string document = i.Text("Document");
+                ExchangeRatePolicy? policy = await c.Db.ExchangeRatePolicies.FirstOrDefaultAsync(p => p.CompanyId == c.CompanyId && p.DocumentType == document).ConfigureAwait(true);
+                if (i.Flag("Remove"))
+                {
+                    if (policy is not null)
+                    {
+                        c.Db.ExchangeRatePolicies.Remove(policy);
+                    }
+                }
+                else if (policy is null)
+                {
+                    c.Db.ExchangeRatePolicies.Add(new ExchangeRatePolicy(c.CompanyId, document, Enum.Parse<ExchangeRateType>(i.Text("RateType"))));
+                }
+                else
+                {
+                    policy.RateType = Enum.Parse<ExchangeRateType>(i.Text("RateType"));
+                }
+
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return i.Flag("Remove") ? $"{document} uses the default rate again." : $"{document} now uses the {i.Text("RateType")} rate.";
+            },
+            List = async c => Table(await c.Db.ExchangeRatePolicies.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.DocumentType).ToListAsync().ConfigureAwait(true),
+                ("Document", p => p.DocumentType), ("Rate type", p => p.RateType)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Year-end", ListTitle = "Fiscal years",
             Description = "Run: rolls the year's profit or loss to retained earnings (in the adjustment period when there is one), opens the next year on the same calendar and closes "
                 + "the year. Reverse: undoes a year-end not yet hard-locked so adjustments can be made and it can be run again. Hard lock: makes it final — every period permanently closed.",

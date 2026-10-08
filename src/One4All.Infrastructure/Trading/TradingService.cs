@@ -92,7 +92,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, customer.RateType, (request.RateOverrideByUserId, request.DocumentNumber)).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, customer.RateType, (request.RateOverrideByUserId, request.DocumentNumber), "SalesInvoice").ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -532,7 +532,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.ReceiptDate, ct, customer.RateType, (request.RateOverrideByUserId, request.DocumentNumber)).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.ReceiptDate, ct, customer.RateType, (request.RateOverrideByUserId, request.DocumentNumber), "Receipt").ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -571,7 +571,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, customer.RateType, (request.RateOverrideByUserId, request.DocumentNumber)).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, customer.RateType, (request.RateOverrideByUserId, request.DocumentNumber), "SalesCreditNote").ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -626,7 +626,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, supplier.RateType, (request.RateOverrideByUserId, request.DocumentNumber)).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, supplier.RateType, (request.RateOverrideByUserId, request.DocumentNumber), "PurchaseCreditNote").ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -704,7 +704,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, supplier.RateType, (request.RateOverrideByUserId, request.DocumentNumber)).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.DocumentDate, ct, supplier.RateType, (request.RateOverrideByUserId, request.DocumentNumber), "PurchaseInvoice").ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -769,7 +769,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return controlResult.Error;
         }
 
-        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.PaymentDate, ct, supplier.RateType, (request.RateOverrideByUserId, request.DocumentNumber)).ConfigureAwait(false);
+        Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, request.Currency, request.ExchangeRate, request.PaymentDate, ct, supplier.RateType, (request.RateOverrideByUserId, request.DocumentNumber), "Payment").ConfigureAwait(false);
         if (rateResult.IsFailure)
         {
             return rateResult.Error;
@@ -1149,7 +1149,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
     // The rate given on the document; else the trader's own rate type (a contract or bank rate) when one is found; else the daily rate.
     private async Task<Result<decimal>> ResolveRateAsync(long companyId, CurrencyCode currency, decimal? explicitRate, DateOnly date, CancellationToken ct, ExchangeRateType? traderRateType = null,
-        (long? ByUserId, string DocumentNumber)? keyed = null)
+        (long? ByUserId, string DocumentNumber)? keyed = null, string? documentType = null)
     {
         Company company = await _db.Companies.FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         if (currency == company.BaseCurrency)
@@ -1174,6 +1174,14 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             }
 
             return r;
+        }
+
+        if (traderRateType is null or ExchangeRateType.Daily && documentType is not null)
+        {
+            string ledger = documentType.StartsWith("Purchase", StringComparison.Ordinal) || documentType == "Payment" ? "AP" : "AR";
+            List<ExchangeRatePolicy> policies = await _db.ExchangeRatePolicies.AsNoTracking().Where(p => p.CompanyId == companyId && (p.DocumentType == documentType || p.DocumentType == ledger))
+                .ToListAsync(ct).ConfigureAwait(false);
+            traderRateType = (policies.FirstOrDefault(p => p.DocumentType == documentType) ?? policies.FirstOrDefault())?.RateType ?? traderRateType;
         }
 
         decimal? rate = traderRateType is ExchangeRateType own && own != ExchangeRateType.Daily

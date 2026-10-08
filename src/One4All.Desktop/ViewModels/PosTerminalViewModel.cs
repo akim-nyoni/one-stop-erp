@@ -361,7 +361,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         _terminalId = await ResolveTerminalAsync(db, ct).ConfigureAwait(true);
 
         await LoadTaxRatesAsync(db, ct).ConfigureAwait(true);
-        await LoadProductsAsync(scope.ServiceProvider.GetRequiredService<IPosCatalogueService>(), ct).ConfigureAwait(true);
+        await LoadProductsAsync(scope.ServiceProvider.GetRequiredService<IPosCatalogueService>(), db, ct).ConfigureAwait(true);
         await PrefillAccountsAsync(db, ct).ConfigureAwait(true);
         TenderCurrencies.Clear();
         foreach (TillCurrency currency in await scope.ServiceProvider.GetRequiredService<IPosService>().TenderCurrenciesAsync(_companyId, DateOnly.FromDateTime(DateTime.Today), ct).ConfigureAwait(true))
@@ -390,6 +390,14 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
     private PosOfflineSnapshot? _snapshot;
     private IReadOnlyList<PosTile> _tiles = [];
+
+    private const string FavouritesTab = "★ Favourites";
+
+    // The till's favourites in order, each category's parent (to show sub-categories with their parent), and whether the server can be asked.
+    private List<long> _favourites = [];
+    private Dictionary<string, string?> _categoryParents = new(StringComparer.OrdinalIgnoreCase);
+    private bool _online;
+    private CancellationTokenSource? _searching;
     private List<OfflineCustomer> _customers = [];
 
     // Seals what the terminal needs to sell offline; best effort — a terminal that cannot write its snapshot still sells online.
@@ -455,8 +463,19 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     }
 
     // Tiles come from the item master (not the restaurant menu), so a tapped sale issues stock and posts its cost like a scanned one.
-    private async Task LoadProductsAsync(IPosCatalogueService catalogue, CancellationToken ct)
-        => ShowProducts(await catalogue.TilesAsync(_companyId, ct).ConfigureAwait(true));
+    private async Task LoadProductsAsync(IPosCatalogueService catalogue, One4AllDbContext db, CancellationToken ct)
+    {
+        _favourites = [.. (await catalogue.FavouritesAsync(_companyId, _terminalId == 0 ? null : _terminalId, ct).ConfigureAwait(true)).Select(t => t.ItemId)];
+        _categoryParents = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (ItemCategory category in await db.ItemCategories.AsNoTracking().Where(c => c.CompanyId == _companyId).ToListAsync(ct).ConfigureAwait(true))
+        {
+            _categoryParents[category.Code] = category.ParentCode;
+            _categoryParents.TryAdd(category.Name, category.ParentCode);
+        }
+
+        _online = true;
+        ShowProducts(await catalogue.TilesAsync(_companyId, ct).ConfigureAwait(true));
+    }
 
     private void ShowProducts(IReadOnlyList<PosTile> tiles)
     {
@@ -464,22 +483,16 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         _allProducts.Clear();
         foreach (PosTile tile in tiles)
         {
-            decimal rate = tile.TaxCode is not null && _taxRates.TryGetValue(tile.TaxCode, out decimal r) ? r : 0m;
-            _allProducts.Add(new PosProductVm
-            {
-                ItemId = tile.ItemId,
-                Tile = tile,
-                Name = tile.Name,
-                Category = tile.Category,
-                Price = tile.UnitPrice,
-                RevenueAccountCode = tile.RevenueAccountCode,
-                TaxCode = tile.TaxCode,
-                TaxRate = rate,
-            });
+            _allProducts.Add(Product(tile));
         }
 
         Categories.Clear();
         Categories.Add("All");
+        if (_favourites.Count > 0)
+        {
+            Categories.Add(FavouritesTab);
+        }
+
         foreach (string category in _allProducts.Select(p => p.Category).Distinct().OrderBy(c => c))
         {
             Categories.Add(category);
@@ -487,6 +500,69 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
         SelectedCategory = "All";
         ApplyCategoryFilter();
+    }
+
+    private PosProductVm Product(PosTile tile) => new()
+    {
+        ItemId = tile.ItemId,
+        Tile = tile,
+        Name = tile.Name,
+        Category = tile.Category,
+        Price = tile.UnitPrice,
+        RevenueAccountCode = tile.RevenueAccountCode,
+        TaxCode = tile.TaxCode,
+        TaxRate = tile.TaxCode is not null && _taxRates.TryGetValue(tile.TaxCode, out decimal r) ? r : 0m,
+    };
+
+    // Whether a tile's category is the one chosen or sits (at any depth) under it.
+    private bool InCategory(PosProductVm product, string chosen)
+    {
+        for (string? category = product.Category; category is not null; category = _categoryParents.GetValueOrDefault(category))
+        {
+            if (string.Equals(category, chosen, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (!_categoryParents.ContainsKey(category))
+            {
+                break;
+            }
+        }
+
+        return false;
+    }
+
+    // What was typed matches no tile here: ask the server, which also knows alias and pack barcodes and synonyms.
+    private async Task SearchServerAsync(string text)
+    {
+        _searching?.Cancel();
+        CancellationTokenSource cts = new();
+        _searching = cts;
+        try
+        {
+            await Task.Delay(300, cts.Token).ConfigureAwait(true);
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            IReadOnlyList<PosTile> hits = await scope.ServiceProvider.GetRequiredService<IPosCatalogueService>().SearchAsync(_companyId, text, 30, cts.Token).ConfigureAwait(true);
+            if (cts.IsCancellationRequested || ScanEntry != text)
+            {
+                return;
+            }
+
+            Products.Clear();
+            foreach (PosTile hit in hits)
+            {
+                Products.Add(_allProducts.FirstOrDefault(p => p.ItemId == hit.ItemId) ?? Product(hit));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer keystroke took over.
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            _online = false;
+        }
     }
 
     private async Task PrefillAccountsAsync(One4AllDbContext db, CancellationToken ct)
@@ -516,11 +592,20 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     private void ApplyCategoryFilter()
     {
         Products.Clear();
-        IEnumerable<PosProductVm> filtered = (SelectedCategory == "All" ? _allProducts : _allProducts.Where(p => p.Category == SelectedCategory))
-            .Where(p => p.Tile?.Matches(ScanEntry) ?? true);
-        foreach (PosProductVm product in filtered)
+        IEnumerable<PosProductVm> chosen = SelectedCategory switch
+        {
+            "All" => _allProducts,
+            FavouritesTab => _favourites.Select(id => _allProducts.FirstOrDefault(p => p.ItemId == id)).OfType<PosProductVm>(),
+            _ => _allProducts.Where(p => InCategory(p, SelectedCategory)),
+        };
+        foreach (PosProductVm product in chosen.Where(p => p.Tile?.Matches(ScanEntry) ?? true))
         {
             Products.Add(product);
+        }
+
+        if (Products.Count == 0 && _online && ScanEntry is { Length: >= 3 } typed)
+        {
+            _ = SearchServerAsync(typed);
         }
     }
 

@@ -11834,6 +11834,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("name");
 
+                    b.Property<string>("ParentCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("parent_code");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -20473,6 +20478,49 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("event", "pos");
                 });
 
+            modelBuilder.Entity("One4All.Core.Pos.PosFavourite", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<long?>("TerminalId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("terminal_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_favourite");
+
+                    b.HasIndex("CompanyId", "TerminalId", "ItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_favourite_company_id_terminal_id_item_id");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("CompanyId", "TerminalId", "ItemId"), false);
+
+                    b.ToTable("favourite", "pos");
+                });
+
             modelBuilder.Entity("One4All.Core.Pos.PosTerminal", b =>
                 {
                     b.Property<long>("Id")
@@ -28129,6 +28177,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("rate_override_control");
 
+                    b.Property<int?>("RefundWindowDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("refund_window_days");
+
                     b.Property<string>("RegistrationNumber")
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)")
@@ -28442,6 +28494,45 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_rate_override_company_id_date");
 
                     b.ToTable("rate_override", "sys");
+                });
+
+            modelBuilder.Entity("One4All.Core.System.ExchangeRatePolicy", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("document_type");
+
+                    b.Property<int>("RateType")
+                        .HasColumnType("integer")
+                        .HasColumnName("rate_type");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_exchange_rate_policy");
+
+                    b.HasIndex("CompanyId", "DocumentType")
+                        .IsUnique()
+                        .HasDatabaseName("ix_exchange_rate_policy_company_id_document_type");
+
+                    b.ToTable("exchange_rate_policy", "sys");
                 });
 
             modelBuilder.Entity("One4All.Core.System.FiscalPeriod", b =>
@@ -31664,6 +31755,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(1024)")
                         .HasColumnName("comment");
 
+                    b.Property<string>("Machine")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("machine");
+
                     b.Property<DateTimeOffset>("OccurredOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("occurred_on_utc");
@@ -31682,6 +31778,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("text")
                         .HasColumnName("snapshot");
+
+                    b.Property<string>("SnapshotHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("snapshot_hash");
 
                     b.Property<int>("StageSequence")
                         .HasColumnType("integer")

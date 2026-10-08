@@ -309,12 +309,34 @@ internal sealed class ItemWarehouseLevelConfiguration : IEntityTypeConfiguration
     }
 }
 
+internal sealed class PosFavouriteConfiguration : IEntityTypeConfiguration<Core.Pos.PosFavourite>
+{
+    public void Configure(EntityTypeBuilder<Core.Pos.PosFavourite> b)
+    {
+        b.ToTable("favourite", Schemas.PointOfSale);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.CompanyId, x.TerminalId, x.ItemId }).IsUnique().AreNullsDistinct(false);
+    }
+}
+
+internal sealed class ExchangeRatePolicyConfiguration : IEntityTypeConfiguration<Core.System.ExchangeRatePolicy>
+{
+    public void Configure(EntityTypeBuilder<Core.System.ExchangeRatePolicy> b)
+    {
+        b.ToTable("exchange_rate_policy", Schemas.System);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.DocumentType).HasMaxLength(40);
+        b.HasIndex(x => new { x.CompanyId, x.DocumentType }).IsUnique();
+    }
+}
+
 internal sealed class ItemCategoryConfiguration : IEntityTypeConfiguration<Core.Inventory.ItemCategory>
 {
     public void Configure(EntityTypeBuilder<Core.Inventory.ItemCategory> b)
     {
         b.ToTable("item_category", Schemas.Inventory);
         b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.ParentCode).HasMaxLength(30);
         b.Property(x => x.Name).HasMaxLength(120);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
     }
