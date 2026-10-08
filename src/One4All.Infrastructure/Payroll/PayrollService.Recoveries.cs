@@ -32,6 +32,9 @@ public sealed partial class PayrollService
     /// <summary>The variable holding the employee's pay periods a year (12, 26 or 52).</summary>
     public const string PeriodsPerYearVariable = "PERIODSPERYEAR";
 
+    /// <summary>The variable holding the period's acting allowance: the acted grade's scale less the employee's own basic (brief §4.15.1).</summary>
+    public const string ActingAllowanceVariable = "ACTINGALLOWANCE";
+
     private const string TaxTablesKey = "__TAXTABLES";
     private const string TaxableByCurrencyKey = "__TAXABLEBYCCY";
     private const string PayRatesKey = "__PAYRATES";
@@ -108,6 +111,11 @@ public sealed partial class PayrollService
             .Select(l => new { l.Id, l.EmployeeId, l.Reference, l.Outstanding, l.Installment, l.InterestRatePercent }).ToListAsync(ct).ConfigureAwait(false);
 
         // What the previous payroll paid earlier in the tax year (migrated openings) counts with this payroll's own payslips.
+        // Acting appointments covering the pay date, valued at the acted grade's scale.
+        List<ActingAppointment> acting = await _db.ActingAppointments.AsNoTracking().Where(a => a.CompanyId == companyId && ids.Contains(a.EmployeeId) && a.From <= asAt && (a.To == null || a.To >= asAt))
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<SalaryScale> salaryScales = acting.Count == 0 ? [] : await _db.SalaryScales.AsNoTracking().Where(s => s.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+
         var openings = await _db.Set<PayrollYtdOpening>().AsNoTracking().Where(o => ids.Contains(o.EmployeeId) && o.TaxYear == asAt.Year)
             .Select(o => new { o.EmployeeId, o.Code, o.Amount }).ToListAsync(ct).ConfigureAwait(false);
 
@@ -144,6 +152,9 @@ public sealed partial class PayrollService
                 }
             }
 
+            decimal actingMonthly = acting.Where(a => a.EmployeeId == e.Id)
+                .Select(a => Math.Max(0m, (SalaryScale.Amount(salaryScales, a.Grade, a.Notch, asAt) ?? 0m) - e.BasicSalary)).DefaultIfEmpty(0m).Max();
+            values[ActingAllowanceVariable] = decimal.Round(actingMonthly * 12m / PayPeriods.PerYear(e.PayFrequency), 2, MidpointRounding.AwayFromZero);
             values[BenefitsKey] = valued;
             values[LoansKey] = repaying.Where(l => l.EmployeeId == e.Id).Select(l => (l.Id, l.Reference, l.Outstanding, l.Installment, l.InterestRatePercent)).ToList();
             result[e.Id] = values;

@@ -55,6 +55,11 @@ public sealed class PayrollSetupService : IPayrollSetupService
             return placement.Error;
         }
 
+        if (await EstablishmentService.PostProblemAsync(_db, companyId, employee.Department, employee.Grade, null, ct).ConfigureAwait(false) is Error post)
+        {
+            return post;
+        }
+
         Employee created = new(companyId, number, employee.FullName.Trim(), employee.BasicSalary, employee.EngagementDate)
         {
             EmploymentType = employee.EmploymentType, Department = Clean(employee.Department), CostCentre = Clean(employee.CostCentre), PayGroup = Clean(employee.PayGroup),
@@ -130,6 +135,16 @@ public sealed class PayrollSetupService : IPayrollSetupService
         if (employee.EmploymentType == EmploymentType.Contract && employee.ContractEndDate is null)
         {
             return Result.Failure(Error.Validation("Payroll.ContractEnd", "A contract employee needs the contract's end date."));
+        }
+
+        // A move to another department or grade needs a vacant approved post there.
+        Microsoft.EntityFrameworkCore.ChangeTracking.PropertyValues original = _db.Entry(employee).OriginalValues;
+        if ((!string.Equals(original.GetValue<string?>(nameof(Employee.Department)), employee.Department, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(original.GetValue<string?>(nameof(Employee.Grade)), employee.Grade, StringComparison.OrdinalIgnoreCase))
+            && employee.Status == EmployeeStatus.Active
+            && await EstablishmentService.PostProblemAsync(_db, companyId, employee.Department, employee.Grade, employee.Id, ct).ConfigureAwait(false) is Error post)
+        {
+            return Result.Failure(post);
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

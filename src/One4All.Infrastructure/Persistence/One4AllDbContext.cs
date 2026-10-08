@@ -488,6 +488,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the approved establishment.</summary>
     public DbSet<Core.Payroll.EstablishmentPost> EstablishmentPosts => Set<Core.Payroll.EstablishmentPost>();
 
+    /// <summary>Gets the salary scales (grade and notch).</summary>
+    public DbSet<Core.Payroll.SalaryScale> SalaryScales => Set<Core.Payroll.SalaryScale>();
+
+    /// <summary>Gets the acting appointments.</summary>
+    public DbSet<Core.Payroll.ActingAppointment> ActingAppointments => Set<Core.Payroll.ActingAppointment>();
+
     /// <summary>Gets the documents on employee files.</summary>
     public DbSet<Core.Payroll.EmployeeDocument> EmployeeDocuments => Set<Core.Payroll.EmployeeDocument>();
 

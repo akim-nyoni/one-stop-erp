@@ -394,6 +394,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             ["DAYSINPERIOD"] = (decimal)inPeriod,
             ["PRORATA"] = share,
             [PeriodsPerYearVariable] = (decimal)PayPeriods.PerYear(employee.PayFrequency),
+            [ActingAllowanceVariable] = 0m,
             ["GROSS"] = 0m,
             ["TAXABLE"] = 0m,
             ["DEDUCTIONS"] = 0m,

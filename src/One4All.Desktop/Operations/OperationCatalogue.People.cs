@@ -334,6 +334,42 @@ public static partial class OperationCatalogue
             Module = module, Title = "Set the establishment", Description = "Approved posts and annual cost per post for a department and grade.",
             Fields = [Req("Department", "Department"), Req("Grade", "Grade"), Num("Posts", "Approved posts"), Num("Cost", "Annual cost per post")],
             Run = async (c, i) => Check(await c.Get<IHrRecordsService>().SetEstablishmentAsync(c.CompanyId, i.Text("Department"), i.Text("Grade"), i.Whole("Posts"), i.Number("Cost")).ConfigureAwait(true), "Establishment saved."),
+            List = async c => Table(await c.Get<IEstablishmentService>().VacanciesAsync(c.CompanyId).ConfigureAwait(true),
+                ("Department", v => v.Department), ("Grade", v => v.Grade), ("Approved", v => v.Approved), ("Filled", v => v.Filled), ("Vacant", v => v.Vacant)),
+            ListTitle = "Posts filled and vacant",
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Set a salary scale notch", ListTitle = "Salary scales",
+            Description = "A grade's monthly salary at a notch, from a date. Once a company keeps posts, staff can only be engaged or moved into a vacant approved post.",
+            Fields = [Req("Grade", "Grade"), Num("Notch", "Notch (1 is the bottom)"), Num("Amount", "Monthly salary"), new("From", "Effective from", FieldKind.Date)],
+            Run = async (c, i) => Check(await c.Get<IEstablishmentService>().SetScaleAsync(c.CompanyId, i.Text("Grade"), i.Whole("Notch"), i.Number("Amount"), i.Date("From")).ConfigureAwait(true),
+                "Scale notch saved."),
+            List = async c => Table(await c.Db.SalaryScales.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.Grade).ThenByDescending(s => s.EffectiveFrom).ThenBy(s => s.Notch)
+                .ToListAsync().ConfigureAwait(true), ("Grade", s => s.Grade), ("Notch", s => s.Notch), ("Monthly", s => M(s.MonthlyAmount)), ("From", s => D(s.EffectiveFrom))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Run the annual increment", ListTitle = "Staff on scales",
+            Description = "Moves every active employee on a scaled grade up one notch, to that notch's salary, unless at the top or incremented within the year.",
+            Fields = [Today()],
+            Run = async (c, i) => Check(await c.Get<IEstablishmentService>().RunIncrementsAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true),
+                r => $"{r.Moved.Count} employee(s) moved up a notch; {r.AtTop.Count} at the top of their scale."),
+            List = async c => Table(await c.Db.Employees.AsNoTracking().Where(e => e.CompanyId == c.CompanyId && e.Grade != null && e.Notch != null).OrderBy(e => e.EmployeeNumber).ToListAsync()
+                .ConfigureAwait(true), ("Number", e => e.EmployeeNumber), ("Name", e => e.FullName), ("Grade", e => e.Grade), ("Notch", e => e.Notch), ("Basic", e => M(e.BasicSalary)),
+                ("Last increment", e => e.LastIncrementOn is DateOnly d ? D(d) : "—")),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Appoint to act", ListTitle = "Acting appointments",
+            Description = "An employee acting in a higher grade for a time is paid ACTINGALLOWANCE (that grade's scale less their basic) through an element whose formula is ACTINGALLOWANCE.",
+            Fields = [Req("Employee", "Employee number"), Req("Grade", "Acting grade"), Num("Notch", "Notch"), new("From", "From", FieldKind.Date), new("To", "To", FieldKind.Date, Required: false)],
+            Run = async (c, i) => Check(await c.Get<IEstablishmentService>().AppointActingAsync(c.CompanyId, i.Text("Employee"), i.Text("Grade"), i.Whole("Notch"), i.Date("From"),
+                i.OptionalDate("To")).ConfigureAwait(true), "Acting appointment recorded."),
+            List = async c => Table(await c.Db.ActingAppointments.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.From)
+                .Join(c.Db.Employees.AsNoTracking(), a => a.EmployeeId, e => e.Id, (a, e) => new { e.EmployeeNumber, e.FullName, a.Grade, a.Notch, a.From, a.To }).Take(200).ToListAsync()
+                .ConfigureAwait(true), ("Employee", a => a.EmployeeNumber), ("Name", a => a.FullName), ("Grade", a => a.Grade), ("Notch", a => a.Notch), ("From", a => D(a.From)),
+                ("To", a => a.To is DateOnly t ? D(t) : "open")),
         };
         yield return new Operation
         {

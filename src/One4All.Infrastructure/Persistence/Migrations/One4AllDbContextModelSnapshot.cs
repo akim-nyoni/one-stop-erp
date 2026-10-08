@@ -16756,6 +16756,59 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("offline_operation", "sync");
                 });
 
+            modelBuilder.Entity("One4All.Core.Payroll.ActingAppointment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<DateOnly>("From")
+                        .HasColumnType("date")
+                        .HasColumnName("from");
+
+                    b.Property<string>("Grade")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("grade");
+
+                    b.Property<int>("Notch")
+                        .HasColumnType("integer")
+                        .HasColumnName("notch");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateOnly?>("To")
+                        .HasColumnType("date")
+                        .HasColumnName("to");
+
+                    b.HasKey("Id")
+                        .HasName("pk_acting_appointment");
+
+                    b.HasIndex("EmployeeId")
+                        .HasDatabaseName("ix_acting_appointment_employee_id");
+
+                    b.HasIndex("CompanyId", "EmployeeId")
+                        .HasDatabaseName("ix_acting_appointment_company_id_employee_id");
+
+                    b.ToTable("acting_appointment", "hr");
+                });
+
             modelBuilder.Entity("One4All.Core.Payroll.AttendanceRecord", b =>
                 {
                     b.Property<long>("Id")
@@ -17236,6 +17289,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsSalaryHeld")
                         .HasColumnType("boolean")
                         .HasColumnName("is_salary_held");
+
+                    b.Property<DateOnly?>("LastIncrementOn")
+                        .HasColumnType("date")
+                        .HasColumnName("last_increment_on");
 
                     b.Property<int>("MaritalStatus")
                         .HasColumnType("integer")
@@ -19227,6 +19284,54 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_roster_entry_employee_id_date");
 
                     b.ToTable("roster_entry", "hr");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.SalaryScale", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<string>("Grade")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("grade");
+
+                    b.Property<decimal>("MonthlyAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("monthly_amount");
+
+                    b.Property<int>("Notch")
+                        .HasColumnType("integer")
+                        .HasColumnName("notch");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_salary_scale");
+
+                    b.HasIndex("CompanyId", "Grade", "Notch", "EffectiveFrom")
+                        .IsUnique()
+                        .HasDatabaseName("ix_salary_scale_company_id_grade_notch_effective_from");
+
+                    b.ToTable("salary_scale", "hr");
                 });
 
             modelBuilder.Entity("One4All.Core.Payroll.SchemeMembership", b =>
@@ -32858,6 +32963,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_valuation_objection_property_valuation_objected_valuation_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.ActingAppointment", b =>
+                {
+                    b.HasOne("One4All.Core.Payroll.Employee", null)
+                        .WithMany()
+                        .HasForeignKey("EmployeeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_acting_appointment_employees_employee_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Payroll.EmployeePayElement", b =>

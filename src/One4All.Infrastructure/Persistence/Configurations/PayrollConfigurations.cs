@@ -226,6 +226,30 @@ internal sealed class PayrollRunRecordConfiguration : IEntityTypeConfiguration<P
     }
 }
 
+internal sealed class SalaryScaleConfiguration : IEntityTypeConfiguration<SalaryScale>
+{
+    public void Configure(EntityTypeBuilder<SalaryScale> b)
+    {
+        b.ToTable("salary_scale", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Grade).HasMaxLength(40);
+        b.Property(x => x.MonthlyAmount).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.Grade, x.Notch, x.EffectiveFrom }).IsUnique();
+    }
+}
+
+internal sealed class ActingAppointmentConfiguration : IEntityTypeConfiguration<ActingAppointment>
+{
+    public void Configure(EntityTypeBuilder<ActingAppointment> b)
+    {
+        b.ToTable("acting_appointment", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Grade).HasMaxLength(40);
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId });
+        b.HasOne<Employee>().WithMany().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class EstablishmentPostConfiguration : IEntityTypeConfiguration<EstablishmentPost>
 {
     public void Configure(EntityTypeBuilder<EstablishmentPost> b)

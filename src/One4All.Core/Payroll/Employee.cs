@@ -130,6 +130,9 @@ public sealed class Employee : SoftDeletableEntity, ICompanyScoped
     /// <summary>Gets or sets the trade union the employee belongs to.</summary>
     public string? UnionMembership { get; set; }
 
+    /// <summary>Gets or sets when the employee last moved up a notch (the annual increment).</summary>
+    public DateOnly? LastIncrementOn { get; set; }
+
     /// <summary>Gets or sets whom the employee reports to.</summary>
     public long? ReportsToEmployeeId { get; set; }
 
