@@ -292,6 +292,81 @@ public sealed class VerticalImportService : IVerticalImportService
     }
 
     /// <inheritdoc />
+    public async Task<ImportReport> ImportMetersAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "serial", "stand", "service", "reading", "date");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        var links = await (from l in _db.Set<PropertyServiceLink>()
+                           join p in _db.Properties on l.PropertyId equals p.Id
+                           where p.CompanyId == companyId && l.IsActive
+                           select new { Link = l, p.StandNumber }).ToListAsync(ct).ConfigureAwait(false);
+        HashSet<string> serials = [.. await _db.Set<Meter>().Where(m => m.CompanyId == companyId).Select(m => m.Serial).ToListAsync(ct).ConfigureAwait(false)];
+        List<ImportError> errors = [];
+        List<(Meter Meter, PropertyServiceLink Link, decimal Reading, DateOnly Date)> toInstall = [];
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<PropertyServiceLink> claimed = [];
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string serial = Code(row.Text("serial")), stand = Code(row.Text("stand"));
+                decimal? reading = row.Number("reading");
+                DateOnly? date = row.Date("date");
+                int digits = (int)(row.Number("digits") ?? 0m);
+                decimal multiplier = row.Number("multiplier") ?? 1m;
+                if (serial.Length == 0 || reading is not >= 0m || date is null || digits is < 0 or > 12 || multiplier <= 0m)
+                {
+                    return "A meter needs a serial, an opening reading of nil or more, a date, 0 to 12 dials and a positive multiplier.";
+                }
+
+                if (!Enum.TryParse(row.Text("service"), ignoreCase: true, out ServiceType service))
+                {
+                    return $"'{row.Text("service")}' is not a service.";
+                }
+
+                if (serials.Contains(serial) || !seen.Add(serial))
+                {
+                    return $"Meter {serial} is already on the register or appears twice.";
+                }
+
+                PropertyServiceLink? link = links.Where(l => l.StandNumber == stand && l.Link.ServiceType == service).Select(l => l.Link).FirstOrDefault();
+                if (link is null)
+                {
+                    return $"Stand {stand} has no active {service} service.";
+                }
+
+                if (link.MeterId is not null || !claimed.Add(link))
+                {
+                    return $"Stand {stand}'s {service} service already has a meter.";
+                }
+
+                Meter meter = new(companyId, serial, multiplier) { Digits = digits, InstalledOn = date };
+                meter.Start(reading.Value, date.Value, 0m);
+                toInstall.Add((meter, link, reading.Value, date.Value));
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, 0, errors, commit, ct, async () =>
+        {
+            _db.Set<Meter>().AddRange(toInstall.Select(m => m.Meter));
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            foreach ((Meter meter, PropertyServiceLink link, decimal reading, DateOnly date) in toInstall)
+            {
+                link.MeterId = meter.Id;
+                _db.Set<MeterReading>().Add(new MeterReading(companyId, meter.Id, date, reading, reading, 0m, 0m, MeterReadingKind.Actual, ReadingFlags.None, accepted: true));
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return toInstall.Count;
+        }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<ImportReport> ImportPropertiesAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
     {
         (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "stand", "ward", "ratepayer");

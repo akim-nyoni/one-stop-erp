@@ -46,6 +46,13 @@ public interface IVerticalImportService
     /// </summary>
     Task<ImportReport> ImportPayrollYtdAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
 
+    /// <summary>
+    /// The meter register: <c>serial, stand, service, reading, date</c> (optional <c>digits, multiplier</c>) — each meter goes on the register with
+    /// its opening reading as an accepted actual reading and is linked to the property's active service of that type (Water, Sewer…), which must
+    /// not already be metered.
+    /// </summary>
+    Task<ImportReport> ImportMetersAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
+
     /// <summary>Students: <c>admission, name, grade, guardian</c> (customer code) (optional <c>boarder, admitted</c>).</summary>
     Task<ImportReport> ImportStudentsAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
 
