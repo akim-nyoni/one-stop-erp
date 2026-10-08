@@ -140,6 +140,9 @@ public class One4AllDbContext : DbContext
     /// <summary>The append-only audit change log.</summary>
     public DbSet<ChangeLogEntry> ChangeLog => Set<ChangeLogEntry>();
 
+    /// <summary>Archived years of the audit log.</summary>
+    public DbSet<AuditArchive> AuditArchives => Set<AuditArchive>();
+
     /// <summary>Installed licence tokens (active + history).</summary>
     public DbSet<InstalledLicence> InstalledLicences => Set<InstalledLicence>();
 
@@ -646,7 +649,9 @@ public class One4AllDbContext : DbContext
         // Map the xmin system column as the concurrency token for every entity deriving from Entity.
         foreach (Microsoft.EntityFrameworkCore.Metadata.IMutableEntityType entityType in modelBuilder.Model.GetEntityTypes())
         {
-            if (typeof(Entity).IsAssignableFrom(entityType.ClrType))
+            // Not the audit log: it is append-only (no concurrency to check) and partitioned, and PostgreSQL cannot return xmin from an insert
+            // into a partitioned table.
+            if (typeof(Entity).IsAssignableFrom(entityType.ClrType) && entityType.ClrType != typeof(Core.Audit.ChangeLogEntry))
             {
                 modelBuilder.Entity(entityType.ClrType)
                     .Property<uint>(nameof(Entity.RowVersion))
@@ -659,6 +664,7 @@ public class One4AllDbContext : DbContext
 
         // Entity type configurations (IEntityTypeConfiguration<T>) are discovered here as modules land.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(One4AllDbContext).Assembly);
+        modelBuilder.Entity<Core.Audit.ChangeLogEntry>().Ignore(e => e.RowVersion);
 
         // Every company-scoped root entity: CompanyScope == null || CompanyId == CompanyScope, read from this context at query time.
         System.Linq.Expressions.MemberExpression scope = System.Linq.Expressions.Expression.Property(System.Linq.Expressions.Expression.Constant(this), nameof(CompanyScope));

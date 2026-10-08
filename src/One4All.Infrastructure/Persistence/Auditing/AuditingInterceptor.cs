@@ -119,7 +119,16 @@ public sealed class AuditingInterceptor : SaveChangesInterceptor
                         .OrderByDescending(c => c.Id)
                         .Select(c => c.RowHash)
                         .FirstOrDefaultAsync(ct)
-                        .ConfigureAwait(false) ?? string.Empty;
+                        .ConfigureAwait(false);
+
+                    // Every live entry of the chain archived: it carries on from where the archive left it.
+                    if (previousHash is null && context is One4AllDbContext db)
+                    {
+                        previousHash = (await Security.AuditArchiveService.ChainHeadsAsync(db, ct).ConfigureAwait(false))
+                            .GetValueOrDefault(Security.AuditArchiveService.ChainKey(companyId));
+                    }
+
+                    previousHash ??= string.Empty;
                 }
 
                 string entityType = pending.Entry.Entity.GetType().Name;

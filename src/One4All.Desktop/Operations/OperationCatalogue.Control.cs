@@ -5,6 +5,7 @@ using One4All.Application.Abstractions.Communications;
 using One4All.Application.Abstractions.Expenses;
 using One4All.Application.Abstractions.Housing;
 using One4All.Application.Abstractions.Offline;
+using One4All.Application.Abstractions.Security;
 using One4All.Application.Housing;
 using One4All.Application.Budgeting;
 using One4All.Core.Budgeting;
@@ -287,6 +288,20 @@ public static partial class OperationCatalogue
             List = async c => Table(await c.Get<IOfflineAdminService>().ListFailedAsync().ConfigureAwait(true),
                 ("Operation", o => o.OperationId), ("Kind", o => o.Kind), ("Created", o => o.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)),
                 ("Attempts", o => o.Attempts), ("Error", o => o.LastError ?? string.Empty)),
+        };
+        yield return new Operation
+        {
+            Module = "System Manager", Title = "Archive an audit year", ListTitle = "Audit log by year",
+            Description = "Moves a closed year of the audit log out of the live table into the archive schema (still readable, never deleted). It needs the "
+                + "licence holder's signed authorisation for that year (MA1. token), years go oldest first, and the hash chain carries on across the gap.",
+            Fields = [Num("Year", "Year to archive"), Req("Authorisation", "Licence holder's authorisation (MA1. token)")],
+            Run = async (c, i) =>
+            {
+                AuditArchiveEntry archived = Check(await c.Get<IAuditArchiveService>().ArchiveYearAsync(i.Whole("Year"), i.Text("Authorisation"), c.UserId).ConfigureAwait(true));
+                return $"{archived.Year} archived: {archived.RowCount:N0} entries now in {archived.TableName} (content hash {archived.ContentHash[..12]}…).";
+            },
+            List = async c => Table(await c.Get<IAuditArchiveService>().YearsAsync().ConfigureAwait(true),
+                ("Year", y => y.Year), ("Entries", y => y.Rows), ("Archived", y => y.Archived)),
         };
     }
 

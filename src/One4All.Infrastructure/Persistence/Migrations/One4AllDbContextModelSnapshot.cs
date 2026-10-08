@@ -1574,6 +1574,71 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("tax_rate", "sys");
                 });
 
+            modelBuilder.Entity("One4All.Core.Audit.AuditArchive", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ArchivedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("archived_by_user_id");
+
+                    b.Property<DateTimeOffset>("ArchivedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_on_utc");
+
+                    b.Property<string>("AuthorisationKeyId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("authorisation_key_id");
+
+                    b.Property<string>("ChainHeadsJson")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("chain_heads_json");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<long>("RowCount")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_count");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("TableName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("table_name");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer")
+                        .HasColumnName("year");
+
+                    b.HasKey("Id")
+                        .HasName("pk_archive");
+
+                    b.HasIndex("Year")
+                        .IsUnique()
+                        .HasDatabaseName("ix_archive_year");
+
+                    b.ToTable("archive", "audit");
+                });
+
             modelBuilder.Entity("One4All.Core.Audit.ChangeLogEntry", b =>
                 {
                     b.Property<long>("Id")
@@ -1647,12 +1712,6 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)")
                         .HasColumnName("row_hash");
-
-                    b.Property<uint>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
 
                     b.Property<string>("SessionId")
                         .HasMaxLength(64)

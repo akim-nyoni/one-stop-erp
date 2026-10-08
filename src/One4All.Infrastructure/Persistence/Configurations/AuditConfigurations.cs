@@ -41,3 +41,17 @@ internal sealed class ChangeLogEntryConfiguration : IEntityTypeConfiguration<Cha
         b.HasIndex(x => x.UserId);
     }
 }
+
+internal sealed class AuditArchiveConfiguration : IEntityTypeConfiguration<AuditArchive>
+{
+    public void Configure(EntityTypeBuilder<AuditArchive> b)
+    {
+        b.ToTable("archive", Schemas.Audit);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.TableName).HasMaxLength(120);
+        b.Property(x => x.ChainHeadsJson).HasColumnType("text");
+        b.Property(x => x.ContentHash).HasMaxLength(64);
+        b.Property(x => x.AuthorisationKeyId).HasMaxLength(100);
+        b.HasIndex(x => x.Year).IsUnique();
+    }
+}

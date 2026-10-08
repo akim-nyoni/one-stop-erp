@@ -87,8 +87,8 @@ public sealed class AuditService : IAuditService
     /// <inheritdoc />
     public async Task<AuditChainVerification> VerifyChainAsync(long? companyId, CancellationToken ct = default)
     {
-        // Walk the chain in id order, in batches so a long log never loads at once.
-        string previous = string.Empty;
+        // Walk the chain in id order, in batches so a long log never loads at once, from where the archived years left it.
+        string previous = (await AuditArchiveService.ChainHeadsAsync(_db, ct).ConfigureAwait(false)).GetValueOrDefault(AuditArchiveService.ChainKey(companyId)) ?? string.Empty;
         long lastId = 0;
         int checkedCount = 0;
         while (true)
