@@ -97,6 +97,12 @@ public sealed class JournalLineRequest
     public decimal TransactionAmount { get; init; }
 
     /// <summary>
+    /// The line's own currency when it differs from the journal's (brief §3.3 multi-currency journals: a till's US dollar drawer takes dollars while
+    /// the sale is in base currency); null for the journal's. The journal balances in base currency.
+    /// </summary>
+    public CurrencyCode? Currency { get; init; }
+
+    /// <summary>
     /// The exchange rate to base currency. When null and the transaction currency differs from base, the
     /// engine looks up the daily rate for the posting date.
     /// </summary>

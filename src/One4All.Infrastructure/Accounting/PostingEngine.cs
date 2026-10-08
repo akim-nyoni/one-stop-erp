@@ -86,7 +86,8 @@ public sealed class PostingEngine : IPostingEngine
 
         // Resolve the open period for the posting module.
         Result<(FiscalYear year, FiscalPeriod period)> periodResult =
-            await ResolvePeriodAsync(request.CompanyId, request.SourceModule, request.PostingDate, company.AllowFuturePeriodPosting, ct, request.ToAdjustmentPeriod)
+            await ResolvePeriodAsync(request.CompanyId, request.SourceModule, request.PostingDate, company.AllowFuturePeriodPosting, ct, request.ToAdjustmentPeriod,
+                    request.PostedByUserId ?? request.SubmittedByUserId)
                 .ConfigureAwait(false);
         if (periodResult.IsFailure)
         {
@@ -155,8 +156,9 @@ public sealed class PostingEngine : IPostingEngine
                 $"Journal does not balance in base currency ({baseCurrency}): debits {totalBaseDebit:0.0000} vs credits {totalBaseCredit:0.0000}.");
         }
 
-        // Rule 1 (continued): Dr = Cr per transaction currency.
-        foreach ((string currency, (decimal debit, decimal credit)) in perCurrency)
+        // Rule 1 (continued): Dr = Cr per transaction currency — for a journal in one currency. A multi-currency journal (a till's euros against a
+        // base-currency sale) balances in base, which rule 1 already holds it to.
+        foreach ((string currency, (decimal debit, decimal credit)) in perCurrency.Count == 1 ? perCurrency : [])
         {
             if (Math.Abs(debit - credit) > BalanceTolerance)
             {
@@ -412,7 +414,7 @@ public sealed class PostingEngine : IPostingEngine
                 $"Account '{key.AccountCode}' is a control account and cannot be posted by manual journal.");
         }
 
-        CurrencyCode lineCurrency = request.TransactionCurrency;
+        CurrencyCode lineCurrency = lineRequest.Currency ?? request.TransactionCurrency;
         if (!account.AllowsCurrency(lineCurrency))
         {
             return Error.Rule("Posting.CurrencyNotAllowed",
@@ -601,7 +603,7 @@ public sealed class PostingEngine : IPostingEngine
     }
 
     private async Task<Result<(FiscalYear, FiscalPeriod)>> ResolvePeriodAsync(long companyId, string moduleCode, DateOnly date, bool allowFuture, CancellationToken ct,
-        bool toAdjustment = false)
+        bool toAdjustment = false, long? actorUserId = null)
     {
         List<FiscalYear> years = await _db.FiscalYears
             .Include(y => y.Periods).ThenInclude(p => p.ModuleStatuses)
@@ -627,6 +629,21 @@ public sealed class PostingEngine : IPostingEngine
             if (status == PeriodStatus.Open || (status == PeriodStatus.Future && allowFuture))
             {
                 return (year, period);
+            }
+
+            // A (soft-)closed period still takes adjustments from someone permitted to make them (brief §3.4: "soft close… allow adjustments with
+            // permission, then hard close"); a permanently closed one takes nothing.
+            // A year the year-end routine has closed takes no adjustments: they would miss the closing entries (reverse the year-end instead).
+            if (status == PeriodStatus.Closed && !year.IsClosed)
+            {
+                if (actorUserId is long actor && _permissions is not null
+                    && (await _permissions.ResolveAsync(actor, ct).ConfigureAwait(false)).Has("GeneralLedger.PeriodAdjustment", Core.Security.OperationFlags.Post))
+                {
+                    return (year, period);
+                }
+
+                return Error.Rule("Posting.PeriodNotOpen",
+                    $"The period containing {date:yyyy-MM-dd} is closed for module {moduleCode}; only a user permitted to post adjustments into closed periods can post to it.");
             }
 
             return Error.Rule("Posting.PeriodNotOpen",

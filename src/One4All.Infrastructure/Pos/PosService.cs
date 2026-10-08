@@ -226,7 +226,14 @@ public sealed class PosService : IPosService
             sale.AddTender(new SaleTender(tender.TenderType, tender.Currency, tender.Amount, rate, baseAmount, tenderAccount, tender.IsChange, tender.StaffEmployeeId,
                 tender.TenderType == TenderType.Voucher ? tender.VoucherNumber!.Trim().ToUpperInvariant() : null));
 
-            journalLines.Add(new JournalLineRequest { AccountCode = tenderAccount, Side = tender.IsChange ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = baseAmount });
+            // A foreign-currency tender goes to its account in that currency (so the drawer's dollars are revalued as dollars), at the till's rate.
+            journalLines.Add(tender.Currency == baseCurrency
+                ? new JournalLineRequest { AccountCode = tenderAccount, Side = tender.IsChange ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = baseAmount }
+                : new JournalLineRequest
+                {
+                    AccountCode = tenderAccount, Side = tender.IsChange ? JournalSide.Credit : JournalSide.Debit, Currency = tender.Currency, TransactionAmount = tender.Amount,
+                    ExchangeRate = rate, BaseAmount = baseAmount,
+                });
         }
 
         // Revenue (net) per line, then output tax.
@@ -454,7 +461,13 @@ public sealed class PosService : IPosService
         List<JournalLineRequest> lines = [];
         foreach (SaleTender tender in sale.Tenders)
         {
-            lines.Add(new JournalLineRequest { AccountCode = tender.AccountCode, Side = tender.IsChange ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = tender.BaseAmount });
+            lines.Add(tender.Currency == sale.BaseCurrency
+                ? new JournalLineRequest { AccountCode = tender.AccountCode, Side = tender.IsChange ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = tender.BaseAmount }
+                : new JournalLineRequest
+                {
+                    AccountCode = tender.AccountCode, Side = tender.IsChange ? JournalSide.Debit : JournalSide.Credit, Currency = tender.Currency, TransactionAmount = tender.Amount,
+                    ExchangeRate = tender.ExchangeRate, BaseAmount = tender.BaseAmount,
+                });
         }
 
         foreach (SaleLine line in sale.Lines)

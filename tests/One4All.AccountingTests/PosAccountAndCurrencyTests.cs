@@ -1,4 +1,5 @@
 using FluentAssertions;
+using One4All.Core.Accounting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Inventory;
@@ -77,7 +78,17 @@ public sealed class PosAccountAndCurrencyTests
         IReadOnlyList<TillCurrency> currencies = await pos.TenderCurrenciesAsync(companyId, day);
         currencies[0].Should().Be(new TillCurrency(Scenario.Usd, 1m));
         currencies.Should().Contain(new TillCurrency(Scenario.Eur, 1.10m));
-        (await Sell("AC-6", null, 23m, new PosTenderRequest(TenderType.Cash, Scenario.Eur, 20.91m, "1000", IsChange: false, ExchangeRate: 1.10m),
-            new PosTenderRequest(TenderType.Cash, Scenario.Usd, 0.001m, "1000", IsChange: true))).IsSuccess.Should().BeTrue();
+        CompleteSaleResult euros = (await Sell("AC-6", null, 23m, new PosTenderRequest(TenderType.Cash, Scenario.Eur, 20.91m, "1000", IsChange: false, ExchangeRate: 1.10m),
+            new PosTenderRequest(TenderType.Cash, Scenario.Usd, 0.001m, "1000", IsChange: true))).Value;
+
+        // The euros reach the ledger as euros (so revaluation can retranslate the drawer), at the till's rate; the journal balances in base.
+        JournalEntry sold = await db.Journals.AsNoTracking().Include(j => j.Lines).SingleAsync(j => j.CompanyId == companyId && j.DocumentNumber == "AC-6" && j.DocumentType == "PosSale");
+        JournalLine drawer = sold.Lines.Single(l => l.TransactionCurrency == Scenario.Eur);
+        (drawer.AccountCode, drawer.TransactionDebit, drawer.ExchangeRate, drawer.BaseDebit).Should().Be(("1000", 20.91m, 1.10m, 23.001m));
+        sold.IsBalancedInBase.Should().BeTrue();
+
+        (await pos.VoidSaleAsync(companyId, euros.SaleId, day, "Rung up twice")).IsSuccess.Should().BeTrue();
+        JournalEntry voided = await db.Journals.AsNoTracking().Include(j => j.Lines).Where(j => j.CompanyId == companyId && j.SourceModule == "POS").OrderByDescending(j => j.Id).FirstAsync();
+        voided.Lines.Single(l => l.TransactionCurrency == Scenario.Eur).TransactionCredit.Should().Be(20.91m, "the void gives the euros back as euros");
     }
 }

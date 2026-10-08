@@ -68,6 +68,7 @@ public static class PermissionCatalogue
         const string gl = "GeneralLedger";
         Add(gl, LicenceModules.GeneralLedger, "Account", "Chart of Accounts", master);
         Add(gl, LicenceModules.GeneralLedger, "Journal", "Manual Journals", txn | OperationFlags.BackDate);
+        Add(gl, LicenceModules.GeneralLedger, "PeriodAdjustment", "Adjustments in Closed (Soft-Closed) Periods", OperationFlags.View | OperationFlags.Post);
         Add(gl, LicenceModules.GeneralLedger, "RecurringJournal", "Recurring Journals", txn);
         Add(gl, LicenceModules.GeneralLedger, "YearEnd", "Year-End Routine", OperationFlags.View | OperationFlags.Post | OperationFlags.VoidReverse | auth);
         Add(gl, LicenceModules.GeneralLedger, "Revaluation", "FX Revaluation", OperationFlags.View | OperationFlags.Post | OperationFlags.VoidReverse);
