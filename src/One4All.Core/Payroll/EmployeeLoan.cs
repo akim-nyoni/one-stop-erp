@@ -61,6 +61,9 @@ public sealed class EmployeeLoan : AuditableEntity, ICompanyScoped
     /// <summary>The scheduled repayment per period (informational).</summary>
     public decimal Installment { get; private set; }
 
+    /// <summary>Gets or sets the annual interest rate the loan charges (0 for an interest-free loan, taxed as a benefit at the deemed rate).</summary>
+    public decimal InterestRatePercent { get; set; }
+
     /// <summary>The advance date.</summary>
     public DateOnly GrantedOn { get; private set; }
 

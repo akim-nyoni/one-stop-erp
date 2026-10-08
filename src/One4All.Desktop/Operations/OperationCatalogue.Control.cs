@@ -303,6 +303,59 @@ public static partial class OperationCatalogue
             List = async c => Table(await c.Get<IAuditArchiveService>().YearsAsync().ConfigureAwait(true),
                 ("Year", y => y.Year), ("Entries", y => y.Rows), ("Archived", y => y.Archived)),
         };
+        yield return new Operation
+        {
+            Module = people, Title = "Benefits in kind", ListTitle = "Benefits",
+            Description = "Taxable benefits (a company car valued from the vehicle scale by engine size or cost, housing, school fees, medical): taxed each pay period they "
+                + "apply and shown on the payslip as memo lines. Also the vehicle scale's bands, the deemed interest rate cheap staff loans are taxed at, and a loan's own rate.",
+            Fields = [Pick("Step", "Step", ["Add benefit", "End benefit", "Vehicle scale band", "Deemed loan rate", "Loan interest rate"]), Opt("Employee", "Employee number"),
+                Pick("Kind", "Benefit", Enum.GetNames<Core.Payroll.BenefitKind>()), Opt("Description", "What it is (registration, property)"), OptNum("Engine", "Engine capacity (cc)"),
+                OptNum("Cost", "Vehicle cost"), OptNum("Monthly", "Monthly value (blank: from the vehicle scale)"), Pick("Basis", "Scale measured on", Enum.GetNames<Core.Payroll.VehicleScaleBasis>()),
+                OptNum("From", "Scale band from"), OptNum("To", "Scale band to (blank: open)"), OptNum("Rate", "Interest rate % a year"), Opt("Loan", "Loan reference"),
+                OptNum("Benefit", "Benefit id (end)"), Today()],
+            Run = async (c, i) =>
+            {
+                switch (i.Text("Step"))
+                {
+                    case "Add benefit":
+                        long employee = await EmployeeAsync(c, i.Optional("Employee") ?? string.Empty).ConfigureAwait(true);
+                        Core.Payroll.EmployeeBenefit benefit = new(c.CompanyId, employee, Enum.Parse<Core.Payroll.BenefitKind>(i.Text("Kind")), i.Optional("Description") ?? string.Empty, i.Date("Date"))
+                        {
+                            EngineCapacityCc = i.OptionalNumber("Engine") is decimal cc ? (int)cc : null, Cost = i.OptionalNumber("Cost"), MonthlyValue = i.OptionalNumber("Monthly"),
+                        };
+                        c.Db.EmployeeBenefits.Add(benefit);
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return $"Benefit {benefit.Id} recorded from {D(benefit.From)}.";
+                    case "End benefit":
+                        long id = (long)(i.OptionalNumber("Benefit") ?? 0m);
+                        Core.Payroll.EmployeeBenefit ending = await c.Db.EmployeeBenefits.FirstOrDefaultAsync(b => b.CompanyId == c.CompanyId && b.Id == id).ConfigureAwait(true)
+                            ?? throw new OperationException($"No benefit {id}.");
+                        ending.To = i.Date("Date");
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return $"Benefit {id} ends on {D(i.Date("Date"))}.";
+                    case "Vehicle scale band":
+                        c.Db.VehicleBenefitScales.Add(new Core.Payroll.VehicleBenefitScale(c.CompanyId, Enum.Parse<Core.Payroll.VehicleScaleBasis>(i.Text("Basis")), i.OptionalNumber("From") ?? 0m,
+                            i.OptionalNumber("To"), i.OptionalNumber("Monthly") ?? 0m, i.Date("Date")));
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return "Scale band saved.";
+                    case "Deemed loan rate":
+                        Core.System.Company company = await c.Db.Companies.FirstAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                        company.DeemedLoanInterestRatePercent = i.OptionalNumber("Rate");
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return company.DeemedLoanInterestRatePercent is decimal rate ? $"Cheap loans are taxed at a deemed {rate}% a year." : "No loan benefit is taxed.";
+                    default:
+                        string reference = (i.Optional("Loan") ?? string.Empty).Trim();
+                        Core.Payroll.EmployeeLoan loan = await c.Db.EmployeeLoans.FirstOrDefaultAsync(l => l.CompanyId == c.CompanyId && l.Reference.ToUpper() == reference.ToUpper()).ConfigureAwait(true)
+                            ?? throw new OperationException($"No loan {reference}.");
+                        loan.InterestRatePercent = i.OptionalNumber("Rate") ?? 0m;
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return $"Loan {loan.Reference} charges {loan.InterestRatePercent}% a year.";
+                }
+            },
+            List = async c => Table(await c.Db.EmployeeBenefits.AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderBy(b => b.EmployeeId).ToListAsync().ConfigureAwait(true),
+                ("Id", b => b.Id), ("Employee", b => b.EmployeeId), ("Benefit", b => b.Kind), ("What", b => b.Description), ("Engine cc", b => b.EngineCapacityCc?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty),
+                ("Monthly", b => b.MonthlyValue is decimal m ? M(m) : "scale"), ("From", b => D(b.From)), ("To", b => b.To is DateOnly t ? D(t) : string.Empty)),
+        };
     }
 
     // The financial year starting in a calendar year.

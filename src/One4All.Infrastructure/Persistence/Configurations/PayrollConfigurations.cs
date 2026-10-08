@@ -602,3 +602,22 @@ internal sealed class PayrollYtdOpeningConfiguration : IEntityTypeConfiguration<
         b.HasIndex(x => new { x.EmployeeId, x.TaxYear, x.Code }).IsUnique();
     }
 }
+
+internal sealed class EmployeeBenefitConfiguration : IEntityTypeConfiguration<EmployeeBenefit>
+{
+    public void Configure(EntityTypeBuilder<EmployeeBenefit> b)
+    {
+        b.ToTable("employee_benefit", Schemas.Payroll);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId });
+    }
+}
+
+internal sealed class VehicleBenefitScaleConfiguration : IEntityTypeConfiguration<VehicleBenefitScale>
+{
+    public void Configure(EntityTypeBuilder<VehicleBenefitScale> b)
+    {
+        b.ToTable("vehicle_benefit_scale", Schemas.Payroll);
+        b.HasIndex(x => new { x.CompanyId, x.Basis, x.EffectiveFrom });
+    }
+}

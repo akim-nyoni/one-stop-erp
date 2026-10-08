@@ -545,6 +545,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Employee loans.</summary>
     public DbSet<Core.Payroll.EmployeeLoan> EmployeeLoans => Set<Core.Payroll.EmployeeLoan>();
 
+    /// <summary>Employees' benefits in kind.</summary>
+    public DbSet<Core.Payroll.EmployeeBenefit> EmployeeBenefits => Set<Core.Payroll.EmployeeBenefit>();
+
+    /// <summary>The motor vehicle benefit scale.</summary>
+    public DbSet<Core.Payroll.VehicleBenefitScale> VehicleBenefitScales => Set<Core.Payroll.VehicleBenefitScale>();
+
     /// <summary>Employee leave balances.</summary>
     public DbSet<Core.Payroll.EmployeeLeaveBalance> EmployeeLeaveBalances => Set<Core.Payroll.EmployeeLeaveBalance>();
 

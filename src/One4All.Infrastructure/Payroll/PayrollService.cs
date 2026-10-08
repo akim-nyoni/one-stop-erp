@@ -269,7 +269,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
             foreach (PayslipLine line in payslip.Lines)
             {
-                if (line.Amount == 0m)
+                // Memo lines (benefits in kind, notes) are neither paid nor posted.
+                if (line.Amount == 0m || line.Type == PayElementType.Memo)
                 {
                     continue;
                 }
@@ -410,6 +411,22 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         foreach (string group in elements.Values.Select(e => e.Group).Concat(elements.Values.Select(e => e.BasisGroup)).OfType<string>().Where(g => g.Trim().Length > 0))
         {
             vars[GroupVariable(group)] = 0m;
+        }
+
+        // Benefits in kind are taxed but not paid: memo lines, valued monthly and scaled to the employee's pay period (brief §4.15.4).
+        if (vars.GetValueOrDefault(BenefitsKey) is List<(string Code, string Name, decimal Monthly)> benefitsInKind)
+        {
+            decimal perPeriod = 12m / PayPeriods.PerYear(employee.PayFrequency);
+            foreach ((string code, string name, decimal monthly) in benefitsInKind)
+            {
+                decimal value = decimal.Round(monthly * perPeriod, 2, MidpointRounding.AwayFromZero);
+                taxable += value;
+                taxableByCurrency[string.Empty] = taxableByCurrency.GetValueOrDefault(string.Empty) + value;
+                payslip.AddLine(code, name, PayElementType.Memo, value, true);
+            }
+
+            vars["BENEFITS"] = taxable;
+            vars["TAXABLE"] = taxable;
         }
 
         foreach ((PayElement element, EmployeePayElement assigned1) in ordered)

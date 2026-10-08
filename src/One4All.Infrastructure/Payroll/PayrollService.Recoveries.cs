@@ -36,6 +36,7 @@ public sealed partial class PayrollService
     private const string TaxableByCurrencyKey = "__TAXABLEBYCCY";
     private const string PayRatesKey = "__PAYRATES";
     private const string PayDateKey = "__PAYDATE";
+    private const string BenefitsKey = "__BENEFITS";
 
     // Each employee's balances to recover as at the date: staff tenders less staff-purchase deductions already made, and the tenancy
     // account's balance (never below zero — a tenant in credit has nothing to deduct).
@@ -64,7 +65,8 @@ public sealed partial class PayrollService
         DateOnly yearStart = new(asAt.Year, 1, 1);
         List<string> taxCodes = [.. elements.Values.Where(e => e.Basis == CalculationBasis.TaxTable).Select(e => e.Code)];
         var ytd = await _db.Set<Payslip>().Where(p => p.CompanyId == companyId && ids.Contains(p.EmployeeId) && p.PayDate >= yearStart && p.PayDate < asAt)
-            .SelectMany(p => p.Lines.Where(l => (l.Type == PayElementType.Earning && l.Taxable) || taxCodes.Contains(l.ElementCode)).Select(l => new { p.EmployeeId, l.ElementCode, l.Type, l.Amount }))
+            .SelectMany(p => p.Lines.Where(l => ((l.Type == PayElementType.Earning || l.Type == PayElementType.Memo) && l.Taxable) || taxCodes.Contains(l.ElementCode))
+                .Select(l => new { p.EmployeeId, l.ElementCode, l.Type, l.Amount }))
             .ToListAsync(ct).ConfigureAwait(false);
         List<TaxTable> tables = taxCodes.Count == 0 ? [] : await _db.Set<TaxTable>().AsNoTracking().Include(t => t.Bands).Where(t => t.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
 
@@ -82,6 +84,16 @@ public sealed partial class PayrollService
             }
         }
 
+        // Benefits in kind in force on the pay date, valued for the month (brief §4.15.4): each benefit, and a cheap loan's benefit at the deemed rate.
+        List<EmployeeBenefit> benefits = await _db.EmployeeBenefits.AsNoTracking().Where(b => b.CompanyId == companyId && ids.Contains(b.EmployeeId)).ToListAsync(ct).ConfigureAwait(false);
+        List<VehicleBenefitScale> scales = benefits.Any(b => b.Kind == BenefitKind.MotorVehicle)
+            ? await _db.VehicleBenefitScales.AsNoTracking().Where(s => s.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false)
+            : [];
+        decimal? deemedRate = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.DeemedLoanInterestRatePercent).FirstAsync(ct).ConfigureAwait(false);
+        var loans = deemedRate is null ? [] : await _db.EmployeeLoans.AsNoTracking()
+            .Where(l => l.CompanyId == companyId && ids.Contains(l.EmployeeId) && l.Outstanding > 0m && l.GrantedOn <= asAt)
+            .Select(l => new { l.EmployeeId, l.Reference, l.Outstanding, l.InterestRatePercent }).ToListAsync(ct).ConfigureAwait(false);
+
         // What the previous payroll paid earlier in the tax year (migrated openings) counts with this payroll's own payslips.
         var openings = await _db.Set<PayrollYtdOpening>().AsNoTracking().Where(o => ids.Contains(o.EmployeeId) && o.TaxYear == asAt.Year)
             .Select(o => new { o.EmployeeId, o.Code, o.Amount }).ToListAsync(ct).ConfigureAwait(false);
@@ -91,7 +103,7 @@ public sealed partial class PayrollService
         {
             Dictionary<string, object?> values = new(StringComparer.Ordinal)
             {
-                [YtdTaxableVariable] = ytd.Where(l => l.EmployeeId == e.Id && l.Type == PayElementType.Earning).Sum(l => l.Amount)
+                [YtdTaxableVariable] = ytd.Where(l => l.EmployeeId == e.Id && l.Type is PayElementType.Earning or PayElementType.Memo).Sum(l => l.Amount)
                     + openings.Where(o => o.EmployeeId == e.Id && o.Code == PayrollYtdOpening.TaxableCode).Sum(o => o.Amount),
                 [TaxPeriodVariable] = (decimal)PayPeriods.Number(e.PayFrequency, asAt),
                 [TaxTablesKey] = tables,
@@ -106,6 +118,20 @@ public sealed partial class PayrollService
                     + openings.Where(o => o.EmployeeId == e.Id && string.Equals(o.Code, code, StringComparison.OrdinalIgnoreCase)).Sum(o => o.Amount);
             }
 
+            List<(string Code, string Name, decimal Monthly)> valued = [.. benefits.Where(b => b.EmployeeId == e.Id)
+                .Select(b => ($"BEN-{b.Kind.ToString().ToUpperInvariant()}", b.Description.Length > 0 ? $"{b.Kind} benefit ({b.Description})" : $"{b.Kind} benefit",
+                    BenefitValuation.Monthly(b, scales, asAt)))
+                .Where(b => b.Item3 > 0m)];
+            foreach (var loan in loans.Where(l => l.EmployeeId == e.Id))
+            {
+                decimal loanBenefit = BenefitValuation.LoanBenefit(loan.Outstanding, loan.InterestRatePercent, deemedRate ?? 0m);
+                if (loanBenefit > 0m)
+                {
+                    valued.Add(("BEN-LOAN", $"Loan benefit ({loan.Reference})", loanBenefit));
+                }
+            }
+
+            values[BenefitsKey] = valued;
             result[e.Id] = values;
         }
 
