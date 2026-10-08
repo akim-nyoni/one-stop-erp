@@ -11,7 +11,8 @@ namespace One4All.Application.Abstractions.JobCosting;
 /// <param name="OpenItemId">The AR open item for the net.</param>
 /// <param name="ArJournalNumber">The AR journal number.</param>
 /// <param name="RetentionJournalNumber">The journal recognising the retention receivable.</param>
-public readonly record struct CertificateResult(long CertificateId, decimal Gross, decimal Retention, decimal NetPayable, long OpenItemId, string ArJournalNumber, string? RetentionJournalNumber);
+public readonly record struct CertificateResult(long CertificateId, decimal Gross, decimal Retention, decimal NetPayable, long OpenItemId, string ArJournalNumber, string? RetentionJournalNumber,
+    decimal AdvanceRecovered = 0m);
 
 /// <summary>A snapshot of job profitability (brief §4.12).</summary>
 /// <param name="ContractValue">The contract value.</param>
@@ -78,7 +79,32 @@ public interface IJobCostingService
     /// <param name="retentionReceivableAccountCode">The retention-receivable account (debited for retention).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The certificate result.</returns>
-    Task<Result<CertificateResult>> CertifyProgressAsync(long companyId, long contractId, string certificateNumber, DateOnly date, decimal workDoneToDate, decimal materialsOnSite, string retentionReceivableAccountCode, CancellationToken ct = default);
+    /// <param name="variationsToDate">The cumulative value of approved variation work done (shown apart, never above the approved variations).</param>
+    Task<Result<CertificateResult>> CertifyProgressAsync(long companyId, long contractId, string certificateNumber, DateOnly date, decimal workDoneToDate, decimal materialsOnSite, string retentionReceivableAccountCode, CancellationToken ct = default,
+        decimal variationsToDate = 0m);
+
+    /// <summary>Records the client's advance (mobilisation) payment: Dr bank, Cr the advance liability; later certificates recover it at the percentage given.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="contractId">The contract.</param>
+    /// <param name="amount">The advance.</param>
+    /// <param name="recoveryPercent">The share of each certificate's gross recovered (above 0, at most 100).</param>
+    /// <param name="advanceAccountCode">The liability account it is held in.</param>
+    /// <param name="bankAccountCode">The bank it was paid into.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="documentNumber">The receipt document.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The journal number.</returns>
+    Task<Result<string>> ReceiveAdvanceAsync(long companyId, long contractId, decimal amount, decimal recoveryPercent, string advanceAccountCode, string bankAccountCode, DateOnly date, string documentNumber,
+        CancellationToken ct = default);
+
+    /// <summary>Records practical completion and the defects-liability period: half the retention may then be released, the rest when the period ends.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="contractId">The contract.</param>
+    /// <param name="date">The date of practical completion.</param>
+    /// <param name="defectsLiabilityMonths">The defects-liability period in months.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or why not.</returns>
+    Task<Result> SetPracticalCompletionAsync(long companyId, long contractId, DateOnly date, int defectsLiabilityMonths, CancellationToken ct = default);
 
     /// <summary>Returns a job profitability snapshot.</summary>
     /// <param name="companyId">The company.</param>

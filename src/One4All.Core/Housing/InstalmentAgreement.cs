@@ -112,6 +112,21 @@ public sealed class InstalmentAgreement : AuditableEntity, ICompanyScoped
     /// <summary>The interest income account.</summary>
     public string InterestAccountCode { get; private set; }
 
+    /// <summary>Gets the discount for the financing component held back from sale revenue (0: none).</summary>
+    public decimal FinancingDiscount { get; private set; }
+
+    /// <summary>Gets the account the unearned financing discount is held in.</summary>
+    public string? DeferredFinancingAccountCode { get; private set; }
+
+    /// <summary>Records the financing component's discount.</summary>
+    /// <param name="discount">The discount.</param>
+    /// <param name="accountCode">The account it is deferred in.</param>
+    public void DeferFinancing(decimal discount, string accountCode)
+    {
+        FinancingDiscount = discount;
+        DeferredFinancingAccountCode = accountCode;
+    }
+
     /// <summary>Where it stands.</summary>
     public InstalmentAgreementStatus Status { get; private set; }
 
@@ -210,4 +225,13 @@ public sealed class InstalmentScheduleLine : Entity
 
     /// <summary>Marks its interest rebated.</summary>
     public void Rebate() => Rebated = true;
+
+    /// <summary>Gets or sets the financing discount earned when this instalment falls due.</summary>
+    public decimal FinancingUnwind { get; set; }
+
+    /// <summary>Gets whether its financing discount has been earned.</summary>
+    public bool FinancingEarned { get; private set; }
+
+    /// <summary>Marks its financing discount earned.</summary>
+    public void EarnFinancing() => FinancingEarned = true;
 }

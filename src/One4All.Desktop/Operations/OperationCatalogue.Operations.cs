@@ -329,6 +329,38 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Client certificates, advance and retention", ListTitle = "Contract positions",
+            Description = "Certify progress (cumulative work, approved variation work and materials on site; retention held and any client advance recovered at its percentage), "
+                + "receive a client advance, record practical completion with the defects-liability period, and release retention — half after completion, the rest when the period ends.",
+            Fields = [Pick("Step", "Step", ["Certify", "Receive advance", "Practical completion", "Release retention"]), Req("Contract", "Contract number"), Opt("Number", "Document number"), Today(),
+                OptNum("Work", "Work done to date"), OptNum("Variations", "Variation work to date"), OptNum("Materials", "Materials on site"), Opt("RetentionAccount", "Retention receivable account"),
+                OptNum("Amount", "Amount (advance / release)"), OptNum("Percent", "Advance recovery %"), Opt("AdvanceAccount", "Advance liability account"), Opt("Bank", "Bank account"),
+                OptNum("Months", "Defects-liability months")],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.JobCosting.IJobCostingService jobs = c.Get<Application.Abstractions.JobCosting.IJobCostingService>();
+                long contract = await ContractAsync(c, i.Text("Contract")).ConfigureAwait(true);
+                string number = i.Optional("Number") ?? string.Empty;
+                return i.Text("Step") switch
+                {
+                    "Certify" => Check(await jobs.CertifyProgressAsync(c.CompanyId, contract, number, i.Date("Date"), i.OptionalNumber("Work") ?? 0m, i.OptionalNumber("Materials") ?? 0m,
+                        i.Optional("RetentionAccount") ?? string.Empty, default, i.OptionalNumber("Variations") ?? 0m).ConfigureAwait(true),
+                        r => $"Certificate {number.ToUpperInvariant()}: gross {M(r.Gross)}, retention {M(r.Retention)}, advance recovered {M(r.AdvanceRecovered)}, payable {M(r.NetPayable)}."),
+                    "Receive advance" => Check(await jobs.ReceiveAdvanceAsync(c.CompanyId, contract, i.OptionalNumber("Amount") ?? 0m, i.OptionalNumber("Percent") ?? 0m, i.Optional("AdvanceAccount") ?? string.Empty,
+                        i.Optional("Bank") ?? string.Empty, i.Date("Date"), number).ConfigureAwait(true), j => $"Advance received (journal {j})."),
+                    "Practical completion" => Check(await jobs.SetPracticalCompletionAsync(c.CompanyId, contract, i.Date("Date"), (int)(i.OptionalNumber("Months") ?? 12m)).ConfigureAwait(true),
+                        "Practical completion recorded."),
+                    _ => Check(await jobs.ReleaseRetentionAsync(c.CompanyId, contract, i.OptionalNumber("Amount") ?? 0m, i.Date("Date"), i.Optional("RetentionAccount") ?? string.Empty, number).ConfigureAwait(true),
+                        r => $"Retention of {M(i.OptionalNumber("Amount") ?? 0m)} released."),
+                };
+            },
+            List = async c => Table(await c.Db.Set<Core.JobCosting.JobContract>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.ContractNumber).ToListAsync().ConfigureAwait(true),
+                ("Contract", x => x.ContractNumber), ("Certified", x => M(x.CertifiedToDate)), ("Retention held", x => M(x.RetentionHeld)), ("Released", x => M(x.RetentionReleased)),
+                ("Advance left", x => M(x.AdvanceOutstanding)), ("Completed", x => x.PracticalCompletionDate is DateOnly d ? D(d) : "—"),
+                ("Defects end", x => x.DefectsLiabilityEnds is DateOnly e ? D(e) : "—")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Add a BOQ line", Description = "A bill-of-quantities line on a contract.",
             Fields = [Req("Contract", "Contract number"), Req("Item", "BOQ item ref"), Req("Description", "Work"), Req("Unit", "Unit", "m3"), Num("Quantity", "BOQ quantity"), Num("Rate", "Rate")],
             Run = async (c, i) => Check(await c.Get<IContractControlService>().AddBoqItemAsync(c.CompanyId, await ContractAsync(c, i.Text("Contract")).ConfigureAwait(true), i.Text("Item"), i.Text("Description"),

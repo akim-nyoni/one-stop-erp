@@ -81,6 +81,12 @@ public sealed class Company : SoftDeletableEntity
     /// <summary>Gets or sets the deemed (official) annual interest rate a cheap or interest-free staff loan's benefit is taxed at (null: no loan benefit).</summary>
     public decimal? DeemedLoanInterestRatePercent { get; set; }
 
+    /// <summary>
+    /// Gets or sets the market interest rate a stand buyer would pay for credit (IFRS 15 financing component): an instalment sale longer than a year at a
+    /// lower rate has its revenue discounted to present value at this rate (null: no discounting).
+    /// </summary>
+    public decimal? HousingMarketRatePercent { get; set; }
+
     /// <summary>Gets or sets the income account interest charged on staff loans is credited to.</summary>
     public string? StaffLoanInterestAccountCode { get; set; }
 

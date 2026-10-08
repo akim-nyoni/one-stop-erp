@@ -195,7 +195,89 @@ public sealed class JobContract : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Reduces the retention held when it is released.</summary>
     /// <param name="amount">The amount released.</param>
-    public void ReleaseRetention(decimal amount) => RetentionHeld -= amount;
+    public void ReleaseRetention(decimal amount)
+    {
+        RetentionHeld -= amount;
+        RetentionReleased += amount;
+    }
+
+    /// <summary>Gets the retention released so far.</summary>
+    public decimal RetentionReleased { get; private set; }
+
+    /// <summary>Gets the client's advance (mobilisation) payment received.</summary>
+    public decimal AdvanceReceived { get; private set; }
+
+    /// <summary>Gets the advance recovered from certificates so far.</summary>
+    public decimal AdvanceRecovered { get; private set; }
+
+    /// <summary>Gets the share of each certificate's gross recovered against the advance.</summary>
+    public decimal AdvanceRecoveryPercent { get; private set; }
+
+    /// <summary>Gets the liability account the advance is held in.</summary>
+    public string? AdvanceAccountCode { get; private set; }
+
+    /// <summary>Gets the advance still to recover.</summary>
+    public decimal AdvanceOutstanding => AdvanceReceived - AdvanceRecovered;
+
+    /// <summary>Gets the date of practical completion (the defects-liability period runs from it).</summary>
+    public DateOnly? PracticalCompletionDate { get; private set; }
+
+    /// <summary>Gets the defects-liability period in months.</summary>
+    public int DefectsLiabilityMonths { get; private set; }
+
+    /// <summary>Gets when the defects-liability period ends.</summary>
+    public DateOnly? DefectsLiabilityEnds => PracticalCompletionDate?.AddMonths(DefectsLiabilityMonths);
+
+    /// <summary>Records an advance from the client, recovered from later certificates.</summary>
+    /// <param name="amount">The advance.</param>
+    /// <param name="recoveryPercent">The share of each certificate's gross recovered.</param>
+    /// <param name="accountCode">The liability account it is held in.</param>
+    public void ReceiveAdvance(decimal amount, decimal recoveryPercent, string accountCode)
+    {
+        AdvanceReceived += amount;
+        AdvanceRecoveryPercent = recoveryPercent;
+        AdvanceAccountCode = accountCode;
+    }
+
+    /// <summary>The advance recovered from a certificate of this gross: its share, never more than is outstanding.</summary>
+    /// <param name="gross">The certificate's gross.</param>
+    /// <returns>The recovery.</returns>
+    public decimal AdvanceRecoveryFor(decimal gross) => Math.Min(AdvanceOutstanding, Math.Round(gross * AdvanceRecoveryPercent / 100m, 2, MidpointRounding.AwayFromZero));
+
+    /// <summary>Records advance recovered on a certificate.</summary>
+    /// <param name="amount">The amount.</param>
+    public void RecoverAdvance(decimal amount) => AdvanceRecovered += amount;
+
+    /// <summary>Records practical completion and the defects-liability period that follows.</summary>
+    /// <param name="date">The date of practical completion.</param>
+    /// <param name="defectsLiabilityMonths">The defects-liability period.</param>
+    public void CompletePractically(DateOnly date, int defectsLiabilityMonths)
+    {
+        PracticalCompletionDate = date;
+        DefectsLiabilityMonths = defectsLiabilityMonths;
+    }
+
+    /// <summary>
+    /// The retention that may be released on a date: none before practical completion; half of all retention held at completion until the
+    /// defects-liability period ends; the rest after. A contract with no completion recorded may release what it holds (as before).
+    /// </summary>
+    /// <param name="date">The release date.</param>
+    /// <returns>The amount releasable.</returns>
+    public decimal RetentionReleasable(DateOnly date)
+    {
+        if (PracticalCompletionDate is not DateOnly completed)
+        {
+            return RetentionHeld;
+        }
+
+        if (date < completed)
+        {
+            return 0m;
+        }
+
+        return date >= DefectsLiabilityEnds ? RetentionHeld
+            : Math.Max(0m, Math.Round((RetentionHeld + RetentionReleased) / 2m, 2, MidpointRounding.AwayFromZero) - RetentionReleased);
+    }
 
     /// <summary>Records the cumulative revenue adjustment after a percentage-of-completion run.</summary>
     /// <param name="cumulativeAdjustment">The new cumulative adjustment (earned − certified).</param>

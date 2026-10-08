@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Housing;
 using One4All.Application.Abstractions.Numbering;
 using One4All.Application.Abstractions.Trading;
 using One4All.Application.Housing;
 using One4All.Core.Common;
 using One4All.Core.Housing;
+using One4All.Core.System;
 using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
 
@@ -17,14 +19,16 @@ public sealed class InstalmentSaleService : IInstalmentSaleService
     private readonly INumberSequenceService _numbers;
     private readonly IHousingService _housing;
     private readonly ISalesLedgerService _ar;
+    private readonly IPostingEngine? _posting;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="numbers">The number sequences.</param>
     /// <param name="housing">The housing service (stand sales).</param>
     /// <param name="ar">The receivables ledger.</param>
-    public InstalmentSaleService(One4AllDbContext db, INumberSequenceService numbers, IHousingService housing, ISalesLedgerService ar)
+    public InstalmentSaleService(One4AllDbContext db, INumberSequenceService numbers, IHousingService housing, ISalesLedgerService ar, IPostingEngine? posting = null)
     {
+        _posting = posting;
         _db = db;
         _numbers = numbers;
         _housing = housing;
@@ -62,6 +66,18 @@ public sealed class InstalmentSaleService : IInstalmentSaleService
             return Error.NotFound("Hse.BuyerNotFound", $"Customer {request.BuyerCustomerId} not found.");
         }
 
+        // A plan with a financing component needs somewhere to defer its discount: refused before anything is sold.
+        decimal? marketRate = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.HousingMarketRatePercent).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        IReadOnlyList<PlannedInstalment> schedule = InstalmentPlan.Build(request.CashPrice - request.Deposit, request.AnnualRatePercent, request.TermMonths, request.Method, request.FirstDueDate);
+        FinancingDiscount? financing = request.AnnualRatePercent < (marketRate ?? 0m)
+            ? FinancingComponent.Measure(schedule, request.CashPrice - request.Deposit, marketRate, request.SignedOn, request.TermMonths)
+            : null;
+        if (financing is not null && (string.IsNullOrWhiteSpace(request.DeferredFinancingAccountCode) || _posting is null))
+        {
+            return Error.Validation("Hse.DeferredFinancingAccount",
+                $"The plan runs {request.TermMonths} months below the market rate of {marketRate:0.##}%: give the account its {financing.Discount:N2} financing discount is deferred in.");
+        }
+
         Result<string> number = await _numbers.AllocateAsync(request.CompanyId, "IA", request.SignedOn, ct: ct).ConfigureAwait(false);
         if (number.IsFailure)
         {
@@ -89,12 +105,28 @@ public sealed class InstalmentSaleService : IInstalmentSaleService
             }
         }
 
-        IReadOnlyList<PlannedInstalment> schedule = InstalmentPlan.Build(request.CashPrice - request.Deposit, request.AnnualRatePercent, request.TermMonths, request.Method, request.FirstDueDate);
         InstalmentAgreement agreement = new(request.CompanyId, number.Value, request.StandId, buyer.Id, request.CashPrice, request.Deposit, request.AnnualRatePercent,
             request.Method, request.TermMonths, request.SignedOn, request.InterestAccountCode.Trim());
+        // A long plan below the market rate carries a financing component: the sale is its present value, the rest is interest earned over the term.
         foreach (PlannedInstalment line in schedule)
         {
-            agreement.AddLine(new InstalmentScheduleLine(line.Number, line.DueDate, line.Amount, line.Interest, line.Principal, line.BalanceAfter));
+            agreement.AddLine(new InstalmentScheduleLine(line.Number, line.DueDate, line.Amount, line.Interest, line.Principal, line.BalanceAfter)
+            {
+                FinancingUnwind = financing?.Unwind.GetValueOrDefault(line.Number) ?? 0m,
+            });
+        }
+
+        if (financing is not null)
+        {
+            string deferred = request.DeferredFinancingAccountCode!.Trim();
+            Result<PostingReceipt> discounted = await PostAsync(request.CompanyId, request.SignedOn, "FIN-DISCOUNT", number.Value, $"Financing component of {number.Value} (IFRS 15)",
+                request.SalesAccountCode.Trim(), deferred, financing.Discount, ct).ConfigureAwait(false);
+            if (discounted.IsFailure)
+            {
+                return discounted.Error;
+            }
+
+            agreement.DeferFinancing(financing.Discount, deferred);
         }
 
         _db.Set<InstalmentAgreement>().Add(agreement);
@@ -167,6 +199,17 @@ public sealed class InstalmentSaleService : IInstalmentSaleService
         }
 
         SettlementQuote quote = InstalmentPlan.Settle(Planned(agreement), asAtDate);
+
+        // Settling early ends the financing: the discount not yet earned is earned now.
+        foreach (InstalmentScheduleLine line in agreement.Lines.Where(l => !l.FinancingEarned && l.FinancingUnwind > 0m).OrderBy(l => l.Number))
+        {
+            Result earned = await EarnFinancingAsync(agreement, line, asAtDate, ct).ConfigureAwait(false);
+            if (earned.IsFailure)
+            {
+                return earned.Error;
+            }
+        }
+
         agreement.SettleEarly(asAtDate);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return quote;
@@ -194,6 +237,12 @@ public sealed class InstalmentSaleService : IInstalmentSaleService
                 }
             }
 
+            Result earned = await EarnFinancingAsync(agreement, line, line.DueDate, ct).ConfigureAwait(false);
+            if (earned.IsFailure)
+            {
+                return earned.Error;
+            }
+
             line.MarkRaised();
             count++;
             interest += line.Interest;
@@ -205,6 +254,41 @@ public sealed class InstalmentSaleService : IInstalmentSaleService
         }
 
         return Result<(int Count, decimal Interest)>.Success((count, interest));
+    }
+
+    // The instalment's share of the financing discount moves from deferred to interest income.
+    private async Task<Result> EarnFinancingAsync(InstalmentAgreement agreement, InstalmentScheduleLine line, DateOnly date, CancellationToken ct)
+    {
+        if (line.FinancingEarned || line.FinancingUnwind <= 0m || agreement.DeferredFinancingAccountCode is not string deferred)
+        {
+            return Result.Success();
+        }
+
+        Result<PostingReceipt> posted = await PostAsync(agreement.CompanyId, date, "FIN-UNWIND", $"{agreement.AgreementNumber}-F{line.Number:000}",
+            $"Financing income on instalment {line.Number} of {agreement.AgreementNumber}", deferred, agreement.InterestAccountCode, line.FinancingUnwind, ct).ConfigureAwait(false);
+        if (posted.IsFailure)
+        {
+            return Result.Failure(posted.Error);
+        }
+
+        line.EarnFinancing();
+        return Result.Success();
+    }
+
+    private async Task<Result<PostingReceipt>> PostAsync(long companyId, DateOnly date, string documentType, string documentNumber, string narrative, string debit, string credit, decimal amount,
+        CancellationToken ct)
+    {
+        Company company = await _db.Companies.AsNoTracking().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        return await _posting!.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId, SourceModule = "GL", PostingDate = date, TransactionCurrency = company.BaseCurrency, DocumentType = documentType, DocumentNumber = documentNumber,
+            Narrative = narrative, EnforceManualJournalRules = false,
+            Lines =
+            [
+                new JournalLineRequest { AccountCode = debit, Side = JournalSide.Debit, TransactionAmount = amount },
+                new JournalLineRequest { AccountCode = credit, Side = JournalSide.Credit, TransactionAmount = amount },
+            ],
+        }, ct).ConfigureAwait(false);
     }
 
     private static List<PlannedInstalment> Planned(InstalmentAgreement agreement)

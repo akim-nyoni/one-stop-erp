@@ -21,8 +21,11 @@ public sealed class ProgressCertificate : AuditableEntity, ICompanyScoped
     /// <param name="materialsOnSite">Materials on site this valuation.</param>
     /// <param name="previouslyCertified">The gross previously certified.</param>
     /// <param name="retentionPercent">The retention percentage.</param>
-    public ProgressCertificate(long companyId, long jobContractId, string certificateNumber, DateOnly date, decimal workDoneToDate, decimal materialsOnSite, decimal previouslyCertified, decimal retentionPercent)
+    /// <param name="variationsToDate">The cumulative value of approved variation work done to date.</param>
+    public ProgressCertificate(long companyId, long jobContractId, string certificateNumber, DateOnly date, decimal workDoneToDate, decimal materialsOnSite, decimal previouslyCertified, decimal retentionPercent,
+        decimal variationsToDate = 0m)
     {
+        VariationsToDate = variationsToDate;
         CompanyId = companyId;
         JobContractId = jobContractId;
         CertificateNumber = certificateNumber.Trim().ToUpperInvariant();
@@ -30,9 +33,23 @@ public sealed class ProgressCertificate : AuditableEntity, ICompanyScoped
         WorkDoneToDate = workDoneToDate;
         MaterialsOnSite = materialsOnSite;
         PreviouslyCertified = previouslyCertified;
-        GrossThisCertificate = workDoneToDate + materialsOnSite - previouslyCertified;
+        GrossThisCertificate = workDoneToDate + variationsToDate + materialsOnSite - previouslyCertified;
         RetentionThisCertificate = decimal.Round(GrossThisCertificate * retentionPercent / 100m, 4, MidpointRounding.ToEven);
         NetPayable = GrossThisCertificate - RetentionThisCertificate;
+    }
+
+    /// <summary>Gets the cumulative value of approved variation work done to date.</summary>
+    public decimal VariationsToDate { get; private set; }
+
+    /// <summary>Gets the client's advance recovered on this certificate.</summary>
+    public decimal AdvanceRecovered { get; private set; }
+
+    /// <summary>Deducts advance recovery from what the certificate pays.</summary>
+    /// <param name="amount">The recovery.</param>
+    public void RecoverAdvance(decimal amount)
+    {
+        AdvanceRecovered = amount;
+        NetPayable -= amount;
     }
 
     /// <inheritdoc />

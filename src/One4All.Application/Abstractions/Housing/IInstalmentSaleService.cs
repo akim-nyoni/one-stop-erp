@@ -51,6 +51,9 @@ public sealed class InstalmentSaleRequest
 
     /// <summary>The bank account the deposit is banked to.</summary>
     public string BankAccountCode { get; init; } = string.Empty;
+
+    /// <summary>The account a financing-component discount is deferred in (needed when the plan runs over a year below the market rate).</summary>
+    public string? DeferredFinancingAccountCode { get; init; }
 }
 
 /// <summary>An instalment sale made.</summary>

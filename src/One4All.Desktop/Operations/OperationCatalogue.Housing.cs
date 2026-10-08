@@ -302,16 +302,24 @@ public static partial class OperationCatalogue
             Module = module, Title = "Instalment sales of stands", ListTitle = "Instalment agreements",
             Description = "Sign: sells a stand on instalments (deposit, rate, zero / flat / reducing-balance interest, term) and shows the schedule. Raise due: bills the instalments due "
                 + "by a date. Quote / settle early: the principal outstanding and the interest rebated when paid off now.",
-            Fields = [Pick("Step", "Step", ["Sign", "Raise due", "Quote settlement", "Settle early"]), Opt("Stand", "Stand number (sign)"), Opt("Buyer", "Buyer customer code (sign)"),
+            Fields = [Pick("Step", "Step", ["Sign", "Raise due", "Quote settlement", "Settle early", "Set market rate"]), Opt("Stand", "Stand number (sign)"), Opt("Buyer", "Buyer customer code (sign)"),
                 Opt("Agreement", "Agreement number (quote / settle)"), Num("Price", "Cash price", "0"), Num("Deposit", "Deposit", "0"), Num("Rate", "Annual interest %", "0"),
                 Pick("Method", "Interest", Enum.GetNames<InterestMethod>()), Num("Term", "Term (months)", "12"), Today("Date", "Signed / as at"), Today("FirstDue", "First instalment due"),
                 Opt("Sales", "Sales account"), Opt("Available", "Stands available (inventory) account"), Opt("Cost", "Cost of sales account"), Opt("Interest", "Interest income account"),
-                Opt("Bank", "Bank account (deposit)")],
+                Opt("Bank", "Bank account (deposit)"), Opt("Deferred", "Deferred financing account (plans over a year below the market rate)"),
+                OptNum("Market", "Market credit rate % (set market rate; blank: no discounting)")],
             Run = async (c, i) =>
             {
                 IInstalmentSaleService sales = c.Get<IInstalmentSaleService>();
                 switch (i.Text("Step"))
                 {
+                    case "Set market rate":
+                        Core.System.Company company = await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                        company.HousingMarketRatePercent = i.OptionalNumber("Market");
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return company.HousingMarketRatePercent is decimal rate
+                            ? $"Plans over a year below {rate:0.##}% are discounted to present value; the difference is earned as interest over the term."
+                            : "Instalment sales are not discounted.";
                     case "Sign":
                         long stand = await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == (i.Optional("Stand") ?? string.Empty).ToUpper(), x => x.Id, "stand",
                             i.Optional("Stand") ?? string.Empty).ConfigureAwait(true);
@@ -322,6 +330,7 @@ public static partial class OperationCatalogue
                             SignedOn = i.Date("Date"), FirstDueDate = i.Date("FirstDue"), SalesAccountCode = i.Optional("Sales") ?? string.Empty,
                             StandsAvailableAccountCode = i.Optional("Available") ?? string.Empty, CostOfSalesAccountCode = i.Optional("Cost") ?? string.Empty,
                             InterestAccountCode = i.Optional("Interest") ?? string.Empty, BankAccountCode = i.Optional("Bank") ?? string.Empty,
+                            DeferredFinancingAccountCode = i.Optional("Deferred"),
                         }).ConfigureAwait(true));
                         return $"Agreement {signed.AgreementNumber}:" + Environment.NewLine + string.Join(Environment.NewLine, signed.Schedule.Select(x =>
                             $"{x.Number,3}  {D(x.DueDate)}  {M(x.Amount),12}  interest {M(x.Interest),10}  principal {M(x.Principal),10}  balance {M(x.BalanceAfter),12}"));

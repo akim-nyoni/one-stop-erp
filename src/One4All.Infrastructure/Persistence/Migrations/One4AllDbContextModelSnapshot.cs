@@ -7583,10 +7583,20 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<string>("DeferredFinancingAccountCode")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("deferred_financing_account_code");
+
                     b.Property<decimal>("Deposit")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("deposit");
+
+                    b.Property<decimal>("FinancingDiscount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("financing_discount");
 
                     b.Property<string>("InterestAccountCode")
                         .IsRequired()
@@ -7670,6 +7680,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("DueDate")
                         .HasColumnType("date")
                         .HasColumnName("due_date");
+
+                    b.Property<bool>("FinancingEarned")
+                        .HasColumnType("boolean")
+                        .HasColumnName("financing_earned");
+
+                    b.Property<decimal>("FinancingUnwind")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("financing_unwind");
 
                     b.Property<long>("InstalmentAgreementId")
                         .HasColumnType("bigint")
@@ -13185,6 +13204,26 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("AdvanceAccountCode")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("advance_account_code");
+
+                    b.Property<decimal>("AdvanceReceived")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("advance_received");
+
+                    b.Property<decimal>("AdvanceRecovered")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("advance_recovered");
+
+                    b.Property<decimal>("AdvanceRecoveryPercent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("advance_recovery_percent");
+
                     b.Property<decimal>("BudgetCost")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -13222,6 +13261,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("customer_id");
 
+                    b.Property<int>("DefectsLiabilityMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("defects_liability_months");
+
                     b.Property<long?>("DeletedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("deleted_by_user_id");
@@ -13253,6 +13296,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("name");
 
+                    b.Property<DateOnly?>("PracticalCompletionDate")
+                        .HasColumnType("date")
+                        .HasColumnName("practical_completion_date");
+
                     b.Property<decimal>("RetentionHeld")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -13262,6 +13309,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(9, 4)
                         .HasColumnType("numeric(9,4)")
                         .HasColumnName("retention_percent");
+
+                    b.Property<decimal>("RetentionReleased")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("retention_released");
 
                     b.Property<string>("RevenueAccountCode")
                         .IsRequired()
@@ -13680,6 +13732,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<decimal>("AdvanceRecovered")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("advance_recovered");
+
                     b.Property<string>("CertificateNumber")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -13744,6 +13801,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
+
+                    b.Property<decimal>("VariationsToDate")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("variations_to_date");
 
                     b.Property<decimal>("WorkDoneToDate")
                         .HasPrecision(19, 4)
@@ -28360,6 +28422,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("FundControlEnabled")
                         .HasColumnType("boolean")
                         .HasColumnName("fund_control_enabled");
+
+                    b.Property<decimal?>("HousingMarketRatePercent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("housing_market_rate_percent");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")

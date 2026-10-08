@@ -61,11 +61,12 @@ public sealed class JobCostingService : IJobCostingService
     }
 
     /// <inheritdoc />
-    public Task<Result<CertificateResult>> CertifyProgressAsync(long companyId, long contractId, string certificateNumber, DateOnly date, decimal workDoneToDate, decimal materialsOnSite, string retentionReceivableAccountCode, CancellationToken ct = default)
-        => _db.AtomicAsync(() => CertifyProgressCoreAsync(companyId, contractId, certificateNumber, date, workDoneToDate, materialsOnSite, retentionReceivableAccountCode, ct), ct);
+    public Task<Result<CertificateResult>> CertifyProgressAsync(long companyId, long contractId, string certificateNumber, DateOnly date, decimal workDoneToDate, decimal materialsOnSite, string retentionReceivableAccountCode, CancellationToken ct = default, decimal variationsToDate = 0m)
+        => _db.AtomicAsync(() => CertifyProgressCoreAsync(companyId, contractId, certificateNumber, date, workDoneToDate, materialsOnSite, retentionReceivableAccountCode, ct, variationsToDate), ct);
 
     // One unit of work: its postings and record changes commit together or not at all.
-    private async Task<Result<CertificateResult>> CertifyProgressCoreAsync(long companyId, long contractId, string certificateNumber, DateOnly date, decimal workDoneToDate, decimal materialsOnSite, string retentionReceivableAccountCode, CancellationToken ct)
+    private async Task<Result<CertificateResult>> CertifyProgressCoreAsync(long companyId, long contractId, string certificateNumber, DateOnly date, decimal workDoneToDate, decimal materialsOnSite, string retentionReceivableAccountCode, CancellationToken ct,
+        decimal variationsToDate = 0m)
     {
         JobContract? contract = await _db.Set<JobContract>()
             .FirstOrDefaultAsync(c => c.Id == contractId && c.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -80,11 +81,27 @@ public sealed class JobCostingService : IJobCostingService
             return Error.NotFound("Job.CompanyNotFound", $"Company {companyId} not found.");
         }
 
-        ProgressCertificate certificate = new(companyId, contractId, certificateNumber, date, workDoneToDate, materialsOnSite, contract.CertifiedToDate, contract.RetentionPercent);
+        // Variation work is valued apart and never beyond what the client has approved.
+        if (variationsToDate < 0m)
+        {
+            return Error.Validation("Job.Variations", "Variation work cannot be negative.");
+        }
+
+        decimal approvedVariations = await _db.VariationOrders.Where(v => v.CompanyId == companyId && v.JobContractId == contractId && v.Status == VariationStatus.Approved)
+            .SumAsync(v => v.ValueImpact, ct).ConfigureAwait(false);
+        if (variationsToDate > approvedVariations)
+        {
+            return Error.Rule("Job.VariationsExceed", $"Variation work {variationsToDate:0.00} exceeds the approved variations {approvedVariations:0.00}.");
+        }
+
+        ProgressCertificate certificate = new(companyId, contractId, certificateNumber, date, workDoneToDate, materialsOnSite, contract.CertifiedToDate, contract.RetentionPercent, variationsToDate);
         if (certificate.GrossThisCertificate <= 0m)
         {
             return Error.Rule("Job.NothingToCertify", $"Certificate {certificateNumber} values no new work (gross {certificate.GrossThisCertificate}).");
         }
+
+        decimal advanceRecovery = contract.AdvanceRecoveryFor(certificate.GrossThisCertificate);
+        certificate.RecoverAdvance(advanceRecovery);
 
         _db.Set<ProgressCertificate>().Add(certificate);
 
@@ -135,10 +152,92 @@ public sealed class JobCostingService : IJobCostingService
             retentionJournal = retention.Value.JournalNumber;
         }
 
+        // The advance recovered comes off the advance liability, also crediting revenue (so total revenue stays the gross).
+        if (advanceRecovery > 0m)
+        {
+            Result<PostingReceipt> recovered = await _posting.PostAsync(new JournalRequest
+            {
+                CompanyId = companyId, SourceModule = "GL", PostingDate = date, TransactionCurrency = company.BaseCurrency, DocumentType = "ADVANCE-RECOVERY", DocumentNumber = certificateNumber,
+                Narrative = $"Advance recovered — IPC {certificateNumber}",
+                Lines =
+                [
+                    new JournalLineRequest { AccountCode = contract.AdvanceAccountCode!, Side = JournalSide.Debit, TransactionAmount = advanceRecovery },
+                    new JournalLineRequest { AccountCode = contract.RevenueAccountCode, Side = JournalSide.Credit, TransactionAmount = advanceRecovery },
+                ],
+            }, ct).ConfigureAwait(false);
+            if (recovered.IsFailure)
+            {
+                return recovered.Error;
+            }
+        }
+
         contract.ApplyCertificate(certificate.GrossThisCertificate, certificate.RetentionThisCertificate);
+        contract.RecoverAdvance(advanceRecovery);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        return new CertificateResult(certificate.Id, certificate.GrossThisCertificate, certificate.RetentionThisCertificate, certificate.NetPayable, ar.Value.OpenItemId, ar.Value.JournalNumber, retentionJournal);
+        return new CertificateResult(certificate.Id, certificate.GrossThisCertificate, certificate.RetentionThisCertificate, certificate.NetPayable, ar.Value.OpenItemId, ar.Value.JournalNumber, retentionJournal,
+            advanceRecovery);
+    }
+
+    /// <inheritdoc />
+    public Task<Result<string>> ReceiveAdvanceAsync(long companyId, long contractId, decimal amount, decimal recoveryPercent, string advanceAccountCode, string bankAccountCode, DateOnly date, string documentNumber,
+        CancellationToken ct = default)
+        => _db.AtomicAsync<string>(async () =>
+        {
+            if (amount <= 0m || recoveryPercent is <= 0m or > 100m || string.IsNullOrWhiteSpace(advanceAccountCode) || string.IsNullOrWhiteSpace(bankAccountCode))
+            {
+                return Error.Validation("Job.Advance", "An advance needs a positive amount, a recovery percentage above 0 and at most 100, and its liability and bank accounts.");
+            }
+
+            JobContract? contract = await _db.Set<JobContract>().FirstOrDefaultAsync(c => c.Id == contractId && c.CompanyId == companyId, ct).ConfigureAwait(false);
+            if (contract is null)
+            {
+                return Error.NotFound("Job.ContractNotFound", $"Contract {contractId} not found.");
+            }
+
+            if (contract.AdvanceAccountCode is string held && !string.Equals(held, advanceAccountCode.Trim(), StringComparison.OrdinalIgnoreCase) && contract.AdvanceOutstanding > 0m)
+            {
+                return Error.Rule("Job.AdvanceAccount", $"The contract's advance is held in {held}; recover it before using another account.");
+            }
+
+            Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+            Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+            {
+                CompanyId = companyId, SourceModule = "GL", PostingDate = date, TransactionCurrency = company.BaseCurrency, DocumentType = "ADVANCE", DocumentNumber = documentNumber,
+                Narrative = $"Client advance — {contract.ContractNumber}",
+                Lines =
+                [
+                    new JournalLineRequest { AccountCode = bankAccountCode.Trim(), Side = JournalSide.Debit, TransactionAmount = amount },
+                    new JournalLineRequest { AccountCode = advanceAccountCode.Trim(), Side = JournalSide.Credit, TransactionAmount = amount },
+                ],
+            }, ct).ConfigureAwait(false);
+            if (posted.IsFailure)
+            {
+                return posted.Error;
+            }
+
+            contract.ReceiveAdvance(amount, recoveryPercent, advanceAccountCode.Trim().ToUpperInvariant());
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result<string>.Success(posted.Value.JournalNumber);
+        }, ct);
+
+    /// <inheritdoc />
+    public async Task<Result> SetPracticalCompletionAsync(long companyId, long contractId, DateOnly date, int defectsLiabilityMonths, CancellationToken ct = default)
+    {
+        if (defectsLiabilityMonths is < 0 or > 120)
+        {
+            return Result.Failure(Error.Validation("Job.DefectsPeriod", "The defects-liability period is 0 to 120 months."));
+        }
+
+        JobContract? contract = await _db.Set<JobContract>().FirstOrDefaultAsync(c => c.Id == contractId && c.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (contract is null)
+        {
+            return Result.Failure(Error.NotFound("Job.ContractNotFound", $"Contract {contractId} not found."));
+        }
+
+        contract.CompletePractically(date, defectsLiabilityMonths);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 
     /// <inheritdoc />
@@ -218,6 +317,14 @@ public sealed class JobCostingService : IJobCostingService
         if (amount > contract.RetentionHeld)
         {
             return Error.Rule("Job.RetentionExceedsHeld", $"The release {amount:0.00} exceeds the retention held {contract.RetentionHeld:0.00}.");
+        }
+
+        decimal releasable = contract.RetentionReleasable(date);
+        if (amount > releasable)
+        {
+            return Error.Rule("Job.RetentionNotDue", contract.PracticalCompletionDate is DateOnly done && date < done
+                ? $"No retention is due before practical completion on {done:yyyy-MM-dd}."
+                : $"Only {releasable:0.00} may be released before the defects-liability period ends on {contract.DefectsLiabilityEnds:yyyy-MM-dd}.");
         }
 
         Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
