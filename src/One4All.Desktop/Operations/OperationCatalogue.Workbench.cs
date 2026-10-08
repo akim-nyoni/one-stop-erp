@@ -226,5 +226,192 @@ public static partial class OperationCatalogue
                 return Check(await c.Get<IPickListService>().RenderTextAsync(c.CompanyId, order, await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true)).ConfigureAwait(true));
             },
         };
+        const string customers = "Customers", suppliers = "Suppliers";
+        yield return new Operation
+        {
+            Module = customers, Title = "Sales commissions", ListTitle = "Sales reps",
+            Description = "A sales rep's commission statement for a period (by customer, on the rep's basis), or the month-end accrual of every rep's commission earned.",
+            Fields = [Pick("Step", "Step", ["Statement", "Accrue"]), Opt("Rep", "Sales rep code (statement)"), Today("From", "From"), Today("To", "To / month end"), Opt("Expense", "Commission expense account (accrue)"),
+                Opt("Payable", "Commission payable account (accrue)")],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.Trading.ICommissionService commissions = c.Get<Application.Abstractions.Trading.ICommissionService>();
+                if (i.Text("Step") == "Statement")
+                {
+                    long rep = await FindAsync(c.Db.Set<Core.Trading.SalesRep>(), r => r.CompanyId == c.CompanyId && r.Code == (i.Optional("Rep") ?? string.Empty).ToUpper(), r => r.Id, "sales rep",
+                        i.Optional("Rep") ?? string.Empty).ConfigureAwait(true);
+                    Application.Abstractions.Trading.CommissionStatement statement = Check(await commissions.StatementAsync(c.CompanyId, rep, i.Date("From"), i.Date("To")).ConfigureAwait(true));
+                    return string.Join(Environment.NewLine, statement.Lines.Select(l => $"{l.CustomerCode,-12} base {M(l.Base),14}  commission {M(l.Commission),12}"))
+                        + Environment.NewLine + $"{statement.RepCode} total {M(statement.Total)}.";
+                }
+
+                IReadOnlyList<Application.Abstractions.Trading.CommissionAccrualLine> accrued = Check(await commissions.AccrueAsync(c.CompanyId, i.Date("To"), i.Optional("Expense") ?? string.Empty,
+                    i.Optional("Payable") ?? string.Empty).ConfigureAwait(true));
+                return accrued.Count == 0 ? "Nothing to accrue." : string.Join(Environment.NewLine, accrued.Select(a => $"{a.RepCode,-10} earned {M(a.Earned),12}  booked now {M(a.Booked),12}"));
+            },
+            List = async c => Table(await c.Db.Set<Core.Trading.SalesRep>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Code).ToListAsync().ConfigureAwait(true),
+                ("Rep", r => r.Code), ("Active", r => r.IsActive)),
+        };
+        yield return new Operation
+        {
+            Module = customers, Title = "Lay-bys", ListTitle = "Lay-by plans",
+            Description = "Opens a lay-by (goods ITEM:quantity@price; … reserved against a deposit, paid off by a final date), takes payments (completed when paid up), cancels one "
+                + "(the forfeit % kept, the rest refunded) or defaults every overdue plan.",
+            Fields = [Pick("Step", "Step", ["Open", "Pay", "Cancel", "Default overdue"]), Opt("Plan", "Plan number"), Opt("Customer", "Customer code (open)"), Opt("Warehouse", "Warehouse (open)"),
+                Opt("Lines", "Goods: ITEM:quantity@price; … (open)"), Num("Amount", "Deposit / payment", "0"), Num("MinDeposit", "Minimum deposit %", "10"), Num("Forfeit", "Forfeit % on cancel", "10"),
+                Today("Final", "Final payment date (open)"), Opt("Bank", "Bank / refund account"), Opt("Deposits", "Lay-by deposits account"), Opt("Revenue", "Revenue account"), Opt("Forfeits", "Forfeiture income account"), Today()],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.Trading.ILaybyService laybys = c.Get<Application.Abstractions.Trading.ILaybyService>();
+                async Task<long> PlanId() => await FindAsync(c.Db.Set<Core.Trading.LaybyPlan>(), l => l.CompanyId == c.CompanyId && l.PlanNumber.ToUpper() == (i.Optional("Plan") ?? string.Empty).ToUpper(),
+                    l => l.Id, "lay-by", i.Optional("Plan") ?? string.Empty).ConfigureAwait(true);
+                switch (i.Text("Step"))
+                {
+                    case "Open":
+                        List<Application.Abstractions.Trading.LaybyLineRequest> lines = [];
+                        foreach (string part in (i.Optional("Lines") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            string[] main = part.Split('@', StringSplitOptions.TrimEntries);
+                            string[] itemQty = main[0].Split(':', StringSplitOptions.TrimEntries);
+                            lines.Add(main.Length == 2 && itemQty.Length == 2 && decimal.TryParse(itemQty[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal quantity)
+                                && decimal.TryParse(main[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal price)
+                                ? new Application.Abstractions.Trading.LaybyLineRequest(await ItemAsync(c, itemQty[0]).ConfigureAwait(true), quantity, price)
+                                : throw new OperationException($"Write each line as ITEM:quantity@price (\"{part}\")."));
+                        }
+
+                        return Check(await laybys.OpenAsync(new Application.Abstractions.Trading.LaybyRequest
+                        {
+                            CompanyId = c.CompanyId, CustomerId = await CustomerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true), PlanNumber = i.Optional("Plan") ?? string.Empty,
+                            WarehouseId = await WarehouseAsync(c, i.Optional("Warehouse") ?? string.Empty).ConfigureAwait(true), OpenedOn = i.Date("Date"), FinalDate = i.Date("Final"), Deposit = i.Number("Amount"),
+                            MinimumDepositPercent = i.Number("MinDeposit"), ForfeitPercent = i.Number("Forfeit"), BankAccountCode = i.Optional("Bank") ?? string.Empty,
+                            DepositAccountCode = i.Optional("Deposits") ?? string.Empty, RevenueAccountCode = i.Optional("Revenue") ?? string.Empty, ForfeitureAccountCode = i.Optional("Forfeits") ?? string.Empty,
+                            Lines = lines,
+                        }).ConfigureAwait(true), _ => "Lay-by opened; the goods are reserved.");
+                    case "Pay":
+                        Application.Abstractions.Trading.LaybyPayment paid = Check(await laybys.PayAsync(c.CompanyId, await PlanId().ConfigureAwait(true), i.Date("Date"), i.Number("Amount"), i.Optional("Bank") ?? string.Empty)
+                            .ConfigureAwait(true));
+                        return paid.Completed ? $"Paid up ({M(paid.Paid)}); the goods can be collected." : $"Paid {M(paid.Paid)}; balance {M(paid.Balance)}.";
+                    case "Cancel":
+                        Application.Abstractions.Trading.LaybyCancellation cancelled = Check(await laybys.CancelAsync(c.CompanyId, await PlanId().ConfigureAwait(true), i.Date("Date"), i.Optional("Bank") ?? string.Empty)
+                            .ConfigureAwait(true));
+                        return $"Cancelled: paid {M(cancelled.Paid)}, forfeited {M(cancelled.Forfeited)}, refunded {M(cancelled.Refunded)}.";
+                    default:
+                        IReadOnlyList<Application.Abstractions.Trading.LaybyCancellation> defaulted = Check(await laybys.DefaultOverdueAsync(c.CompanyId, i.Date("Date"), i.Optional("Bank") ?? string.Empty).ConfigureAwait(true));
+                        return defaulted.Count == 0 ? "No overdue lay-bys." : string.Join(Environment.NewLine, defaulted.Select(d => $"{d.PlanNumber}: forfeited {M(d.Forfeited)}, refunded {M(d.Refunded)}"));
+                }
+            },
+            List = async c => Table(await c.Db.Set<Core.Trading.LaybyPlan>().AsNoTracking().Where(l => l.CompanyId == c.CompanyId).OrderByDescending(l => l.Id).Take(200).ToListAsync().ConfigureAwait(true),
+                ("Plan", l => l.PlanNumber), ("Status", l => l.Status)),
+        };
+        foreach (string ledger in new[] { customers, suppliers })
+        {
+            bool selling = ledger == customers;
+            yield return new Operation
+            {
+                Module = ledger, Title = selling ? "Recurring sales invoices" : "Recurring purchase invoices", ListTitle = "Recurring invoices",
+                Description = $"An invoice {(selling ? "to a customer" : "from a supplier")} raised every so many months from a first date; Generate raises all that are due; Stop / restart one.",
+                Fields = [Pick("Step", "Step", ["Create", "Generate due", "Stop", "Restart"]), Opt("Trader", selling ? "Customer code (create)" : "Supplier code (create)"), Opt("Reference", "Reference"),
+                    Num("Net", "Net amount", "0"), Num("Tax", "Tax amount", "0"), Opt("Account", selling ? "Sales account" : "Expense account"), Opt("TaxAccount", "Tax account"), Num("Interval", "Every (months)", "1"),
+                    Today("First", "First run date"), Opt("Narrative", "Narrative"), Today("Date", "Generate as of")],
+                Run = async (c, i) =>
+                {
+                    string reference = i.Optional("Reference") ?? string.Empty;
+                    async Task<long> TemplateId() => selling
+                        ? await FindAsync(c.Db.Set<Core.Trading.RecurringSalesInvoice>(), t => t.CompanyId == c.CompanyId && t.Reference.ToUpper() == reference.ToUpper(), t => t.Id, "recurring invoice", reference).ConfigureAwait(true)
+                        : await FindAsync(c.Db.Set<Core.Trading.RecurringPurchaseInvoice>(), t => t.CompanyId == c.CompanyId && t.Reference.ToUpper() == reference.ToUpper(), t => t.Id, "recurring invoice", reference).ConfigureAwait(true);
+                    switch (i.Text("Step"))
+                    {
+                        case "Create":
+                            if (selling)
+                            {
+                                long customer = await CustomerAsync(c, i.Optional("Trader") ?? string.Empty).ConfigureAwait(true);
+                                CurrencyCode currency = await c.Db.Customers.AsNoTracking().Where(x => x.Id == customer).Select(x => x.Currency).FirstAsync().ConfigureAwait(true);
+                                return Check(await c.Get<Application.Abstractions.Trading.IRecurringSalesInvoiceService>().CreateAsync(c.CompanyId, customer, reference, currency, i.Number("Net"), i.Number("Tax"),
+                                    i.Optional("Account") ?? string.Empty, i.Optional("TaxAccount"), i.Whole("Interval"), i.Date("First"), i.Optional("Narrative")).ConfigureAwait(true), _ => "Recurring invoice created.");
+                            }
+
+                            long supplier = await SupplierAsync(c, i.Optional("Trader") ?? string.Empty).ConfigureAwait(true);
+                            CurrencyCode supplierCurrency = await c.Db.Suppliers.AsNoTracking().Where(x => x.Id == supplier).Select(x => x.Currency).FirstAsync().ConfigureAwait(true);
+                            return Check(await c.Get<Application.Abstractions.Trading.IRecurringPurchaseInvoiceService>().CreateAsync(c.CompanyId, supplier, reference, supplierCurrency, i.Number("Net"), i.Number("Tax"),
+                                i.Optional("Account") ?? string.Empty, i.Optional("TaxAccount"), i.Whole("Interval"), i.Date("First"), i.Optional("Narrative")).ConfigureAwait(true), _ => "Recurring invoice created.");
+                        case "Generate due":
+                            int raised = selling
+                                ? Check(await c.Get<Application.Abstractions.Trading.IRecurringSalesInvoiceService>().GenerateDueAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true))
+                                : Check(await c.Get<Application.Abstractions.Trading.IRecurringPurchaseInvoiceService>().GenerateDueAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true));
+                            return $"{raised} invoice(s) raised.";
+                        default:
+                            bool active = i.Text("Step") == "Restart";
+                            long id = await TemplateId().ConfigureAwait(true);
+                            return Check(selling
+                                ? await c.Get<Application.Abstractions.Trading.IRecurringSalesInvoiceService>().SetActiveAsync(c.CompanyId, id, active).ConfigureAwait(true)
+                                : await c.Get<Application.Abstractions.Trading.IRecurringPurchaseInvoiceService>().SetActiveAsync(c.CompanyId, id, active).ConfigureAwait(true), active ? "Restarted." : "Stopped.");
+                    }
+                },
+                List = selling
+                    ? async c => Table(await c.Db.Set<Core.Trading.RecurringSalesInvoice>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Reference).ToListAsync().ConfigureAwait(true),
+                        ("Reference", t => t.Reference), ("Active", t => t.IsActive))
+                    : async c => Table(await c.Db.Set<Core.Trading.RecurringPurchaseInvoice>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Reference).ToListAsync().ConfigureAwait(true),
+                        ("Reference", t => t.Reference), ("Active", t => t.IsActive)),
+            };
+        }
+
+        yield return new Operation
+        {
+            Module = suppliers, Title = "Remittance advice",
+            Description = "The remittance advice for a supplier payment (by its document number), as text to print or send, listing the invoices it settled.",
+            Fields = [Req("Payment", "Payment document number")],
+            Run = async (c, i) =>
+            {
+                long payment = await FindAsync(c.Db.OpenItems, o => o.CompanyId == c.CompanyId && o.Ledger == Core.Trading.TradingLedger.AccountsPayable && o.DocumentNumber == i.Text("Payment"), o => o.Id,
+                    "supplier payment", i.Text("Payment")).ConfigureAwait(true);
+                return Check(await c.Get<Application.Abstractions.Trading.IRemittanceService>().RenderRemittanceTextAsync(c.CompanyId, payment).ConfigureAwait(true));
+            },
+        };
+        yield return new Operation
+        {
+            Module = suppliers, Title = "Supplier bank details", ListTitle = "Changes awaiting approval",
+            Description = "A change to a supplier's bank details is requested by one user and approved (or rejected) by another; until then the supplier is held out of payment runs.",
+            Fields = [Pick("Step", "Step", ["Request change", "Approve", "Reject"]), Opt("Supplier", "Supplier code (request)"), Opt("AccountName", "Account name"), Opt("AccountNumber", "Account number"),
+                Opt("Bank", "Bank"), OptNum("Change", "Change id (approve / reject)"), Opt("Reason", "Reason (reject)")],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.Trading.ISupplierBankDetailsService bank = c.Get<Application.Abstractions.Trading.ISupplierBankDetailsService>();
+                long change = (long)(i.OptionalNumber("Change") ?? 0m);
+                return i.Text("Step") switch
+                {
+                    "Request change" => Check(await bank.RequestChangeAsync(c.CompanyId, await SupplierAsync(c, i.Optional("Supplier") ?? string.Empty).ConfigureAwait(true),
+                        new Application.Abstractions.Trading.SupplierBankDetails(i.Optional("AccountName"), i.Optional("AccountNumber"), i.Optional("Bank")), c.UserId).ConfigureAwait(true),
+                        id => $"Change {id} awaits another user's approval; the supplier is held out of payment runs meanwhile."),
+                    "Approve" => Check(await bank.ApproveAsync(c.CompanyId, change, c.UserId).ConfigureAwait(true), "Bank details changed."),
+                    _ => Check(await bank.RejectAsync(c.CompanyId, change, c.UserId, i.Optional("Reason") ?? string.Empty).ConfigureAwait(true), "Change rejected."),
+                };
+            },
+            List = async c => Table(await c.Get<Application.Abstractions.Trading.ISupplierBankDetailsService>().PendingAsync(c.CompanyId).ConfigureAwait(true),
+                ("Change", x => x.ChangeId), ("Supplier", x => x.SupplierCode), ("Current account", x => x.Current.AccountNumber), ("Requested account", x => x.Requested.AccountNumber),
+                ("Requested bank", x => x.Requested.BankName)),
+        };
+        yield return new Operation
+        {
+            Module = suppliers, Title = "Withholding tax returns",
+            Description = "The return of tax withheld from supplier payments in a period (by certificate), its remittance to the revenue authority, or the text of one certificate.",
+            Fields = [Pick("Step", "Step", ["Return", "Remit", "Certificate"]), Today("From", "From"), Today("To", "To"), Today("Date", "Remittance date"), Opt("Bank", "Bank account (remit)"),
+                OptNum("Certificate", "Certificate id")],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.Trading.IWithholdingTaxService wht = c.Get<Application.Abstractions.Trading.IWithholdingTaxService>();
+                switch (i.Text("Step"))
+                {
+                    case "Return":
+                        Application.Abstractions.Trading.WithholdingReturn ret = Check(await wht.ReturnAsync(c.CompanyId, i.Date("From"), i.Date("To")).ConfigureAwait(true));
+                        return string.Join(Environment.NewLine, ret.Lines.Select(l => $"{l.CertificateNumber,-12} {l.SupplierCode,-10} {D(l.PaymentDate)} {l.TaxCode,-8} withheld {M(l.Withheld),12}"))
+                            + Environment.NewLine + $"Withheld {M(ret.TotalWithheld)}; not yet remitted {M(ret.Unremitted)}.";
+                    case "Remit":
+                        Application.Abstractions.Trading.WithholdingRemittance remitted = Check(await wht.RemitAsync(c.CompanyId, i.Date("From"), i.Date("To"), i.Date("Date"), i.Optional("Bank") ?? string.Empty).ConfigureAwait(true));
+                        return $"{remitted.Certificates} certificate(s), {M(remitted.Amount)} remitted{(remitted.JournalNumber is null ? string.Empty : $" ({remitted.JournalNumber})")}.";
+                    default:
+                        return Check(await wht.CertificateTextAsync(c.CompanyId, (long)(i.OptionalNumber("Certificate") ?? 0m)).ConfigureAwait(true));
+                }
+            },
+        };
     }
 }
