@@ -27,8 +27,18 @@ public static class XlsxGrid
     /// <param name="boldRows">How many leading rows are bold.</param>
     /// <returns>The .xlsx bytes.</returns>
     public static byte[] Write(string sheetName, IReadOnlyList<IReadOnlyList<object?>> rows, int boldRows = 0)
+        => Write(sheetName, rows, [.. Enumerable.Range(0, Math.Max(0, boldRows))]);
+
+    /// <summary>Writes a grid as a workbook, the listed rows bold.</summary>
+    /// <param name="sheetName">The worksheet name.</param>
+    /// <param name="rows">The rows of cells.</param>
+    /// <param name="boldRowIndexes">The (zero-based) rows that are bold.</param>
+    /// <returns>The .xlsx bytes.</returns>
+    public static byte[] Write(string sheetName, IReadOnlyList<IReadOnlyList<object?>> rows, IReadOnlyCollection<int> boldRowIndexes)
     {
         ArgumentNullException.ThrowIfNull(rows);
+        ArgumentNullException.ThrowIfNull(boldRowIndexes);
+        HashSet<int> bold = [.. boldRowIndexes];
         XElement sheetData = new(Main + "sheetData");
         for (int r = 0; r < rows.Count; r++)
         {
@@ -42,7 +52,7 @@ public static class XlsxGrid
                 }
 
                 XElement cell = new(Main + "c", new XAttribute("r", Reference(c, r + 1)));
-                if (r < boldRows)
+                if (bold.Contains(r))
                 {
                     cell.Add(new XAttribute("s", 1));
                 }

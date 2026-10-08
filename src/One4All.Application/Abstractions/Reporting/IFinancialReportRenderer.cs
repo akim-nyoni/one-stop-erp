@@ -22,6 +22,15 @@ public enum ReportFormat
 
     /// <summary>The laid-out model as JSON, for the desktop viewer's preview, search, drill-through and printing.</summary>
     Layout = 5,
+
+    /// <summary>Excel laid out like the report (headings, groups, detail and totals in real columns); <see cref="Xlsx"/> is the raw data.</summary>
+    XlsxLayout = 6,
+
+    /// <summary>CSV laid out like the report; <see cref="Csv"/> is the raw data.</summary>
+    CsvLayout = 7,
+
+    /// <summary>A Word document (.docx) with the report as a table.</summary>
+    Docx = 8,
 }
 
 /// <summary>A rendered report document.</summary>
