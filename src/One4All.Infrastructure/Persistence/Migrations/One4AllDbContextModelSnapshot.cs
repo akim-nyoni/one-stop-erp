@@ -4832,6 +4832,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<int>("Convention")
+                        .HasColumnType("integer")
+                        .HasColumnName("convention");
+
                     b.Property<decimal>("Cost")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -4950,6 +4954,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<string>("SourceAccountCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("source_account_code");
+
+                    b.Property<long?>("SourceOpenItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("source_open_item_id");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");
@@ -4972,6 +4985,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ParentAssetId")
                         .HasDatabaseName("ix_asset_parent_asset_id");
+
+                    b.HasIndex("SourceOpenItemId")
+                        .HasDatabaseName("ix_asset_source_open_item_id");
 
                     b.HasIndex("CompanyId", "AssetNumber")
                         .IsUnique()
@@ -5005,6 +5021,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
+
+                    b.Property<int>("Convention")
+                        .HasColumnType("integer")
+                        .HasColumnName("convention");
 
                     b.Property<string>("CostAccountCode")
                         .IsRequired()

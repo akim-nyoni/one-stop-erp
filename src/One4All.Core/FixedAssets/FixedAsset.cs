@@ -15,6 +15,22 @@ public enum DepreciationMethod
     UnitsOfProduction = 3,
 }
 
+/// <summary>When an asset's depreciation starts within its first month (brief §4.14: "depreciation conventions").</summary>
+public enum DepreciationConvention
+{
+    /// <summary>A full month's charge from the month of acquisition.</summary>
+    FullMonth = 0,
+
+    /// <summary>Acquired by the 15th: charged from that month; acquired after it: from the next month.</summary>
+    MidMonth = 1,
+
+    /// <summary>Charged from the month after acquisition.</summary>
+    NextMonth = 2,
+
+    /// <summary>The first month is charged for the days held (from the acquisition day to the month end).</summary>
+    DailyProRata = 3,
+}
+
 /// <summary>Why a depreciation run passed over an asset.</summary>
 public enum DepreciationSkip
 {
@@ -174,6 +190,38 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
     /// <summary>Gets or sets the total units (hours, kilometres, tonnes…) a units-of-production asset is expected to produce in its life.</summary>
     public decimal? TotalEstimatedUnits { get; set; }
 
+    /// <summary>Gets or sets when depreciation starts within the first month.</summary>
+    public DepreciationConvention Convention { get; set; }
+
+    /// <summary>Gets or sets the supplier invoice (AP open item) the asset was capitalised from.</summary>
+    public long? SourceOpenItemId { get; set; }
+
+    /// <summary>Gets or sets the account the supplier invoice was coded to when the asset was capitalised from it.</summary>
+    public string? SourceAccountCode { get; set; }
+
+    /// <summary>The first month (<c>yyyyMM</c>) the convention charges depreciation for.</summary>
+    /// <returns>The period.</returns>
+    public int FirstChargePeriod() => Convention switch
+    {
+        DepreciationConvention.NextMonth => PeriodOf(AcquisitionDate.AddMonths(1)),
+        DepreciationConvention.MidMonth when AcquisitionDate.Day > 15 => PeriodOf(AcquisitionDate.AddMonths(1)),
+        _ => PeriodOf(AcquisitionDate),
+    };
+
+    /// <summary>The share of a month's charge due for the month of a run: the days held in a daily pro-rata asset's first month, otherwise all of it.</summary>
+    /// <param name="runDate">Any date in the run month.</param>
+    /// <returns>The share (0–1).</returns>
+    public decimal FirstMonthShare(DateOnly runDate)
+    {
+        if (Convention != DepreciationConvention.DailyProRata || LastDepreciatedPeriod is not null || PeriodOf(runDate) != PeriodOf(AcquisitionDate))
+        {
+            return 1m;
+        }
+
+        int days = DateTime.DaysInMonth(AcquisitionDate.Year, AcquisitionDate.Month);
+        return (decimal)(days - AcquisitionDate.Day + 1) / days;
+    }
+
     /// <summary>The net book value (cost − accumulated depreciation).</summary>
     public decimal NetBookValue => Cost - AccumulatedDepreciation;
 
@@ -185,7 +233,8 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
     /// </summary>
     /// <returns>The monthly depreciation charge.</returns>
     /// <param name="unitsUsed">Units used in the month (units-of-production assets).</param>
-    public decimal MonthlyDepreciation(decimal unitsUsed = 0m)
+    /// <param name="runDate">The run month, for a daily pro-rata first month (null: a full month).</param>
+    public decimal MonthlyDepreciation(decimal unitsUsed = 0m, DateOnly? runDate = null)
     {
         if (Status != FixedAssetStatus.Active)
         {
@@ -203,6 +252,10 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
             DepreciationMethod.UnitsOfProduction => TotalEstimatedUnits is > 0m and decimal total ? decimal.Round(DepreciableAmount * unitsUsed / total, 4, MidpointRounding.ToEven) : 0m,
             _ => 0m,
         };
+        if (runDate is DateOnly month && Method != DepreciationMethod.UnitsOfProduction && FirstMonthShare(month) is var share && share < 1m)
+        {
+            charge = decimal.Round(charge * share, 4, MidpointRounding.ToEven);
+        }
 
         decimal remaining = NetBookValue - ResidualValue;
         if (remaining <= 0m)
@@ -232,7 +285,7 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
             return DepreciationSkip.NotActive;
         }
 
-        if (PeriodOf(AcquisitionDate) > period)
+        if (FirstChargePeriod() > period)
         {
             return DepreciationSkip.NotYetAcquired;
         }
@@ -272,9 +325,9 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
     /// <summary>The impairment losses held (net of reversals), included in <see cref="AccumulatedDepreciation"/> (IAS 36).</summary>
     public decimal AccumulatedImpairment { get; private set; }
 
-    /// <summary>The months depreciation has been charged for, from the acquisition month to the last period charged.</summary>
-    public int MonthsDepreciated => LastDepreciatedPeriod is int last
-        ? Math.Max(0, ((last / 100) - AcquisitionDate.Year) * 12 + (last % 100) - AcquisitionDate.Month + 1)
+    /// <summary>The months depreciation has been charged for, from the first month the convention charges to the last period charged.</summary>
+    public int MonthsDepreciated => LastDepreciatedPeriod is int last && FirstChargePeriod() is int first
+        ? Math.Max(0, ((last / 100) - (first / 100)) * 12 + (last % 100) - (first % 100) + 1)
         : 0;
 
     /// <summary>
@@ -363,6 +416,9 @@ public sealed class FixedAssetClass : AuditableEntity, ICompanyScoped
 
     /// <summary>The impairment loss (and reversal) account.</summary>
     public string? ImpairmentAccountCode { get; set; }
+
+    /// <summary>The default depreciation convention.</summary>
+    public DepreciationConvention Convention { get; set; }
 }
 
 /// <summary>An impairment test's outcome on an asset (<c>fa.impairment</c>, IAS 36): the recoverable amount found and the loss or reversal booked.</summary>

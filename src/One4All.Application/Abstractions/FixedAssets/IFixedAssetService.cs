@@ -62,6 +62,49 @@ public sealed class RegisterAssetRequest
 
     /// <summary>Gets the GL department code the asset is analysed by.</summary>
     public string? Department { get; init; }
+
+    /// <summary>Gets when depreciation starts in the first month (null: the class's, else a full month).</summary>
+    public DepreciationConvention? Convention { get; init; }
+}
+
+/// <summary>Capitalising an asset from a posted supplier invoice.</summary>
+public sealed class CapitaliseInvoiceRequest
+{
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>Gets the supplier invoice number.</summary>
+    public string InvoiceNumber { get; init; } = string.Empty;
+
+    /// <summary>Gets the supplier's code (needed only when two suppliers used the same invoice number).</summary>
+    public string? SupplierCode { get; init; }
+
+    /// <summary>Gets the account the invoice was coded to (null: the class's cost account, so nothing is reposted).</summary>
+    public string? InvoiceAccountCode { get; init; }
+
+    /// <summary>Gets the asset number.</summary>
+    public string AssetNumber { get; init; } = string.Empty;
+
+    /// <summary>Gets the description.</summary>
+    public string Description { get; init; } = string.Empty;
+
+    /// <summary>Gets the asset class (its defaults and cost account are used).</summary>
+    public string AssetClass { get; init; } = string.Empty;
+
+    /// <summary>Gets the cost to capitalise (null: all of the invoice on that account not yet capitalised).</summary>
+    public decimal? Cost { get; init; }
+
+    /// <summary>Gets the acquisition date (null: the invoice date).</summary>
+    public DateOnly? AcquisitionDate { get; init; }
+
+    /// <summary>Gets the reclassification document number, when the invoice was coded to another account.</summary>
+    public string? DocumentNumber { get; init; }
+
+    /// <summary>Gets the GL cost centre code.</summary>
+    public string? CostCentre { get; init; }
+
+    /// <summary>Gets the GL department code.</summary>
+    public string? Department { get; init; }
 }
 
 /// <summary>The result of a depreciation run.</summary>
@@ -96,6 +139,15 @@ public interface IFixedAssetService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The created asset id.</returns>
     Task<Result<long>> RegisterAsync(RegisterAssetRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Capitalises an asset from a posted supplier invoice (brief §4.14: "acquisition from AP invoice"): the invoice's amount on the account it was coded to
+    /// becomes the asset's cost — moved to the class's cost account when coded elsewhere (a clearing or expense account) — and never more than is left uncapitalised.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The created asset id.</returns>
+    Task<Result<long>> CapitaliseFromInvoiceAsync(CapitaliseInvoiceRequest request, CancellationToken ct = default);
 
     /// <summary>
     /// Creates or updates an asset class: the method, life, residual percentage, rate and accounts an asset registered in it takes
@@ -268,7 +320,8 @@ public sealed record DepreciationForecastReport(DateOnly StartMonth, int Months,
 /// <param name="DepreciationExpenseAccountCode">The depreciation expense account.</param>
 /// <param name="ImpairmentAccountCode">The impairment account.</param>
 public sealed record AssetClassRequest(long CompanyId, string Code, string Name, DepreciationMethod Method, int UsefulLifeMonths, decimal ResidualPercent, decimal ReducingBalanceRatePercent,
-    string CostAccountCode, string AccumulatedDepreciationAccountCode, string DepreciationExpenseAccountCode, string? ImpairmentAccountCode);
+    string CostAccountCode, string AccumulatedDepreciationAccountCode, string DepreciationExpenseAccountCode, string? ImpairmentAccountCode,
+    DepreciationConvention Convention = DepreciationConvention.FullMonth);
 
 /// <summary>The outcome of an impairment test.</summary>
 /// <param name="Amount">The loss (+) or reversal (−) booked (0 when none).</param>

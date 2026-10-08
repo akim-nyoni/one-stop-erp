@@ -75,7 +75,7 @@ public static partial class OperationCatalogue
                 Pick("Method", "Method", Enum.GetNames<Core.FixedAssets.DepreciationMethod>()), OptNum("Life", "Useful life (months)"), OptNum("Residual", "Residual % of cost"),
                 OptNum("Rate", "Reducing-balance rate %"), Opt("CostAccount", "Cost account"), Opt("AccumAccount", "Accumulated depreciation account"), Opt("ExpenseAccount", "Depreciation expense account"),
                 Opt("ImpairmentAccount", "Impairment account"), Opt("Asset", "Asset number (test)"), OptNum("Recoverable", "Recoverable amount (test)"), Opt("Reason", "Indicator / reason (test)"),
-                Opt("Document", "Document number (test)"), Today()],
+                Opt("Document", "Document number (test)"), Pick("Convention", "Depreciation convention", Enum.GetNames<Core.FixedAssets.DepreciationConvention>()), Today()],
             Run = async (c, i) =>
             {
                 Application.Abstractions.FixedAssets.IFixedAssetService assets = c.Get<Application.Abstractions.FixedAssets.IFixedAssetService>();
@@ -83,7 +83,8 @@ public static partial class OperationCatalogue
                 {
                     return Check(await assets.SaveClassAsync(new Application.Abstractions.FixedAssets.AssetClassRequest(c.CompanyId, i.Optional("Class") ?? string.Empty, i.Optional("Name") ?? string.Empty,
                         Enum.Parse<Core.FixedAssets.DepreciationMethod>(i.Text("Method")), (int)(i.OptionalNumber("Life") ?? 0m), i.OptionalNumber("Residual") ?? 0m, i.OptionalNumber("Rate") ?? 0m,
-                        i.Optional("CostAccount") ?? string.Empty, i.Optional("AccumAccount") ?? string.Empty, i.Optional("ExpenseAccount") ?? string.Empty, i.Optional("ImpairmentAccount")))
+                        i.Optional("CostAccount") ?? string.Empty, i.Optional("AccumAccount") ?? string.Empty, i.Optional("ExpenseAccount") ?? string.Empty, i.Optional("ImpairmentAccount"),
+                        Enum.Parse<Core.FixedAssets.DepreciationConvention>(i.Text("Convention"))))
                         .ConfigureAwait(true), "Asset class saved.");
                 }
 
@@ -107,6 +108,23 @@ public static partial class OperationCatalogue
                 long asset = await FindAsync(c.Db.FixedAssets, a => a.CompanyId == c.CompanyId && a.AssetNumber.ToUpper() == i.Text("Asset").ToUpper(), a => a.Id, "asset", i.Text("Asset")).ConfigureAwait(true);
                 return $"Transferred: {Check(await c.Get<IFixedAssetService>().ReassignAsync(c.CompanyId, asset, i.Optional("CostCentre"), i.Optional("Department"), i.Date("Date"), i.Text("Document")).ConfigureAwait(true))}.";
             },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Capitalise from a supplier invoice", ListTitle = "Assets capitalised from invoices",
+            Description = "The invoice's amount on the account it was coded to becomes the asset's cost (moved to the class's cost account when coded elsewhere); never more than is left.",
+            Fields = [Req("Invoice", "Supplier invoice number"), Opt("Supplier", "Supplier code (if the number repeats)"), Req("Asset", "Asset number"), Req("Description", "Description"),
+                Req("Class", "Asset class"), OptNum("Cost", "Cost (blank: all that is left)"), Opt("Account", "Account the invoice was coded to (blank: the class's cost account)"),
+                Opt("Document", "Reclassification document number")],
+            Run = async (c, i) => Check(await c.Get<IFixedAssetService>().CapitaliseFromInvoiceAsync(new Application.Abstractions.FixedAssets.CapitaliseInvoiceRequest
+            {
+                CompanyId = c.CompanyId, InvoiceNumber = i.Text("Invoice"), SupplierCode = i.Optional("Supplier"), AssetNumber = i.Text("Asset"), Description = i.Text("Description"),
+                AssetClass = i.Text("Class"), Cost = i.OptionalNumber("Cost"), InvoiceAccountCode = i.Optional("Account"), DocumentNumber = i.Optional("Document"),
+            }).ConfigureAwait(true), id => $"Asset {i.Text("Asset").ToUpperInvariant()} capitalised (id {id})."),
+            List = async c => Table(await c.Db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == c.CompanyId && a.SourceOpenItemId != null).OrderByDescending(a => a.Id).Take(200)
+                .Join(c.Db.OpenItems.AsNoTracking(), a => a.SourceOpenItemId, o => (long?)o.Id, (a, o) => new { a.AssetNumber, a.Description, a.Cost, o.DocumentNumber, a.SourceAccountCode, a.AcquisitionDate })
+                .ToListAsync().ConfigureAwait(true), ("Asset", a => a.AssetNumber), ("Description", a => a.Description), ("Cost", a => M(a.Cost)), ("Invoice", a => a.DocumentNumber),
+                ("Coded to", a => a.SourceAccountCode), ("Acquired", a => D(a.AcquisitionDate))),
         };
         yield return new Operation
         {

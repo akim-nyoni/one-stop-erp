@@ -30,8 +30,62 @@ public sealed class FixedAssetService : IFixedAssetService
     public Task<Result<long>> RegisterAsync(RegisterAssetRequest request, CancellationToken ct = default)
         => _db.AtomicAsync(() => RegisterCoreAsync(request, ct), ct);
 
-    // One unit of work: its postings and record changes commit together or not at all.
-    private async Task<Result<long>> RegisterCoreAsync(RegisterAssetRequest request, CancellationToken ct)
+    /// <inheritdoc />
+    public Task<Result<long>> CapitaliseFromInvoiceAsync(CapitaliseInvoiceRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => CapitaliseCoreAsync(request, ct), ct);
+
+    private async Task<Result<long>> CapitaliseCoreAsync(CapitaliseInvoiceRequest request, CancellationToken ct)
+    {
+        string number = (request.InvoiceNumber ?? string.Empty).Trim();
+        IQueryable<Core.Trading.OpenItem> invoices = _db.OpenItems.AsNoTracking().Where(i => i.CompanyId == request.CompanyId && i.Ledger == Core.Trading.TradingLedger.AccountsPayable
+            && i.ItemType == Core.Trading.OpenItemType.Invoice && i.DocumentNumber == number && i.JournalEntryId != null);
+        if (!string.IsNullOrWhiteSpace(request.SupplierCode))
+        {
+            string code = request.SupplierCode.Trim().ToUpperInvariant();
+            invoices = invoices.Where(i => _db.Suppliers.Any(s => s.Id == i.TraderId && s.Code == code));
+        }
+
+        List<Core.Trading.OpenItem> found = await invoices.Take(2).ToListAsync(ct).ConfigureAwait(false);
+        if (found.Count == 0)
+        {
+            return Error.NotFound("Fa.InvoiceNotFound", $"No posted supplier invoice {number}.");
+        }
+
+        if (found.Count > 1)
+        {
+            return Error.Validation("Fa.InvoiceAmbiguous", $"More than one supplier has an invoice {number}; name the supplier.");
+        }
+
+        Core.Trading.OpenItem invoice = found[0];
+        string classCode = (request.AssetClass ?? string.Empty).Trim().ToUpperInvariant();
+        if (await _db.Set<FixedAssetClass>().AsNoTracking().FirstOrDefaultAsync(c => c.CompanyId == request.CompanyId && c.Code == classCode, ct).ConfigureAwait(false) is not FixedAssetClass assetClass)
+        {
+            return Error.NotFound("Fa.ClassNotFound", $"Asset class {classCode} not found; capitalising from an invoice takes the class's accounts.");
+        }
+
+        string account = string.IsNullOrWhiteSpace(request.InvoiceAccountCode) ? assetClass.CostAccountCode : request.InvoiceAccountCode.Trim().ToUpperInvariant();
+        decimal invoiced = await _db.Journals.AsNoTracking().Where(j => j.Id == invoice.JournalEntryId).SelectMany(j => j.Lines).Where(l => l.AccountCode == account)
+            .SumAsync(l => l.BaseDebit - l.BaseCredit, ct).ConfigureAwait(false);
+        decimal capitalised = await _db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == request.CompanyId && a.SourceOpenItemId == invoice.Id && a.SourceAccountCode == account)
+            .SumAsync(a => a.Cost, ct).ConfigureAwait(false);
+        decimal left = invoiced - capitalised;
+        decimal cost = request.Cost ?? left;
+        if (cost <= 0m || cost > left + 0.005m)
+        {
+            return Error.Rule("Fa.InvoiceCapitalised", $"Only {left:#,0.00} of invoice {number} on account {account} is left to capitalise.");
+        }
+
+        return await RegisterCoreAsync(new RegisterAssetRequest
+        {
+            CompanyId = request.CompanyId, AssetNumber = request.AssetNumber, Description = request.Description, AssetClass = assetClass.Code, Cost = cost,
+            AcquisitionDate = request.AcquisitionDate ?? invoice.DocumentDate, FundingAccountCode = account,
+            DocumentNumber = string.IsNullOrWhiteSpace(request.DocumentNumber) ? $"CAP-{number}" : request.DocumentNumber.Trim(), CostCentre = request.CostCentre, Department = request.Department,
+        }, ct, (invoice.Id, account)).ConfigureAwait(false);
+    }
+
+    // One unit of work: its postings and record changes commit together or not at all. An asset capitalised from a supplier invoice already coded
+    // to its cost account needs no posting.
+    private async Task<Result<long>> RegisterCoreAsync(RegisterAssetRequest request, CancellationToken ct, (long OpenItemId, string Account)? source = null)
     {
         Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == request.CompanyId, ct).ConfigureAwait(false);
         if (company is null)
@@ -55,7 +109,7 @@ public sealed class FixedAssetService : IFixedAssetService
                 AccumulatedDepreciationAccountCode = Pick(request.AccumulatedDepreciationAccountCode, assetClass.AccumulatedDepreciationAccountCode),
                 DepreciationExpenseAccountCode = Pick(request.DepreciationExpenseAccountCode, assetClass.DepreciationExpenseAccountCode),
                 FundingAccountCode = request.FundingAccountCode, DocumentNumber = request.DocumentNumber, TotalEstimatedUnits = request.TotalEstimatedUnits,
-                ParentAssetNumber = request.ParentAssetNumber, CostCentre = request.CostCentre, Department = request.Department,
+                ParentAssetNumber = request.ParentAssetNumber, CostCentre = request.CostCentre, Department = request.Department, Convention = request.Convention ?? assetClass.Convention,
             };
         }
 
@@ -93,8 +147,16 @@ public sealed class FixedAssetService : IFixedAssetService
             ParentAssetId = parentId,
             CostCentre = analysis.Value.CostCentre,
             Department = analysis.Value.Department,
+            Convention = request.Convention ?? DepreciationConvention.FullMonth,
+            SourceOpenItemId = source?.OpenItemId,
+            SourceAccountCode = source?.Account,
         };
         _db.Set<FixedAsset>().Add(asset);
+        if (source is not null && string.Equals(request.FundingAccountCode, request.CostAccountCode, StringComparison.OrdinalIgnoreCase))
+        {
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return asset.Id;
+        }
 
         Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
         {
@@ -270,7 +332,7 @@ public sealed class FixedAssetService : IFixedAssetService
                     continue;
             }
 
-            decimal charge = asset.MonthlyDepreciation(usage.GetValueOrDefault(asset.Id));
+            decimal charge = asset.MonthlyDepreciation(usage.GetValueOrDefault(asset.Id), date);
             if (charge <= 0m)
             {
                 continue;
@@ -494,6 +556,7 @@ public sealed class FixedAssetService : IFixedAssetService
         assetClass.AccumulatedDepreciationAccountCode = request.AccumulatedDepreciationAccountCode.Trim().ToUpperInvariant();
         assetClass.DepreciationExpenseAccountCode = request.DepreciationExpenseAccountCode.Trim().ToUpperInvariant();
         assetClass.ImpairmentAccountCode = string.IsNullOrWhiteSpace(request.ImpairmentAccountCode) ? null : request.ImpairmentAccountCode.Trim().ToUpperInvariant();
+        assetClass.Convention = request.Convention;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
@@ -636,11 +699,11 @@ public sealed class FixedAssetService : IFixedAssetService
 
         // Simulate each asset month by month on local balances, never touching the entities. The same rule as the
         // run applies: no charge before the acquisition month, nor for a month the run has already charged.
-        (decimal Nbv, decimal Residual, decimal Straight, decimal RbRate, DepreciationMethod Method, bool ByLife, int AcquiredPeriod, int LastCharged)[] state = assets
+        (decimal Nbv, decimal Residual, decimal Straight, decimal RbRate, DepreciationMethod Method, bool ByLife, int AcquiredPeriod, int LastCharged, int ProRataPeriod, decimal ProRataShare)[] state = assets
             .Select(a => (a.NetBookValue, a.ResidualValue,
                 a.UsefulLifeMonths <= 0 ? 0m : decimal.Round(a.DepreciableAmount / a.UsefulLifeMonths, 4, MidpointRounding.ToEven),
                 a.ReducingBalanceRatePercent, a.Method, a.Method == DepreciationMethod.StraightLine,
-                FixedAsset.PeriodOf(a.AcquisitionDate), a.LastDepreciatedPeriod ?? 0))
+                a.FirstChargePeriod(), a.LastDepreciatedPeriod ?? 0, FixedAsset.PeriodOf(a.AcquisitionDate), a.FirstMonthShare(a.AcquisitionDate)))
             .ToArray();
 
         DateOnly month = new(startMonth.Year, startMonth.Month, 1);
@@ -660,6 +723,11 @@ public sealed class FixedAssetService : IFixedAssetService
                     charge = state[i].ByLife
                         ? state[i].Straight
                         : decimal.Round(state[i].Nbv * state[i].RbRate / 100m, 4, MidpointRounding.ToEven);
+                    if (period == state[i].ProRataPeriod && state[i].ProRataShare < 1m)
+                    {
+                        charge = decimal.Round(charge * state[i].ProRataShare, 4, MidpointRounding.ToEven);
+                    }
+
                     if (charge > remaining) { charge = remaining; }
                     state[i].Nbv -= charge;
                 }
