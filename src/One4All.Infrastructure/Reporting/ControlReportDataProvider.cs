@@ -314,7 +314,7 @@ public sealed class ControlReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PriceListsAsync(long companyId, CancellationToken ct)
     {
-        Dictionary<long, string> items = await _db.Items.AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await _db.Items.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
         return [.. (await _db.PriceLists.AsNoTracking().Include(p => p.Lines).Where(p => p.CompanyId == companyId).OrderBy(p => p.Code).ToListAsync(ct).ConfigureAwait(false))
             .SelectMany(p => p.Lines.OrderBy(l => items.GetValueOrDefault(l.ItemId), StringComparer.Ordinal).ThenBy(l => l.MinimumQuantity).Select(l => Row(("PriceList", $"{p.Code} {p.Name}"), ("Currency", p.Currency.Value),
                 ("Status", (p.IsActive ? "Active" : "Inactive") + (p.IsDefault ? ", default" : string.Empty)), ("Item", items.GetValueOrDefault(l.ItemId, "?")),

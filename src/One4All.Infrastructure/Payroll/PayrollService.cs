@@ -246,7 +246,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         Dictionary<(string Account, string CostCentre, string Department), decimal> debitsByAccount = [];
         Dictionary<string, decimal> creditsByAccount = new(StringComparer.OrdinalIgnoreCase);
         List<long> employeeIds = [.. slips.Select(s => s.EmployeeId).Distinct()];
-        Dictionary<long, (string? Department, string? CostCentre)> staff = await _db.Set<Employee>().IgnoreQueryFilters().Where(e => employeeIds.Contains(e.Id))
+        Dictionary<long, (string? Department, string? CostCentre)> staff = await _db.Set<Employee>().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(e => employeeIds.Contains(e.Id))
             .ToDictionaryAsync(e => e.Id, e => (e.Department, e.CostCentre), ct).ConfigureAwait(false);
         var departments = await _db.Departments.Where(d => d.CompanyId == company.Id).Select(d => new { d.Code, d.Name }).ToListAsync(ct).ConfigureAwait(false);
         var costCentres = await _db.CostCentres.Where(c => c.CompanyId == company.Id).Select(c => new { c.Code, c.Name }).ToListAsync(ct).ConfigureAwait(false);

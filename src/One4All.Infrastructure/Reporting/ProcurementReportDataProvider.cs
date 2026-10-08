@@ -18,7 +18,7 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
         List<long> ids = [.. agreements.Select(a => a.Id)];
         List<PurchaseOrder> orders = await _db.Set<PurchaseOrder>().AsNoTracking().Include(o => o.Lines)
             .Where(o => o.FrameworkAgreementId != null && ids.Contains(o.FrameworkAgreementId.Value) && o.Status != PurchaseOrderStatus.Cancelled && o.OrderDate <= asAt).ToListAsync(ct).ConfigureAwait(false);
-        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
+        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
         return [.. agreements.Select(a =>
         {
             List<PurchaseOrder> own = [.. orders.Where(o => o.FrameworkAgreementId == a.Id)];
@@ -283,10 +283,10 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
     }
 
     private Task<Dictionary<long, string>> SuppliersAsync(long companyId, CancellationToken ct)
-        => _db.Suppliers.AsNoTracking().IgnoreQueryFilters().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct);
+        => _db.Suppliers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct);
 
     private Task<Dictionary<long, string>> ItemsAsync(long companyId, CancellationToken ct)
-        => _db.Set<Item>().AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct);
+        => _db.Set<Item>().AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct);
 
     private Task<Dictionary<long, string>> UsersAsync(CancellationToken ct) => _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct);
 

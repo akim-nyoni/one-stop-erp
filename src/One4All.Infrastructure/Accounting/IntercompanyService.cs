@@ -26,8 +26,12 @@ public sealed class IntercompanyService : IIntercompanyService
     }
 
     /// <inheritdoc />
-    public Task<Result<IntercompanyPostingResult>> PostAsync(IntercompanyJournalRequest request, CancellationToken ct = default)
-        => _db.AtomicAsync(() => PostCoreAsync(request, ct), ct);
+    public async Task<Result<IntercompanyPostingResult>> PostAsync(IntercompanyJournalRequest request, CancellationToken ct = default)
+    {
+        // Both companies' books are posted: a request scoped to one company lifts the scope for this transaction alone.
+        using IDisposable unscoped = _db.WithoutCompanyScope();
+        return await _db.AtomicAsync(() => PostCoreAsync(request, ct), ct).ConfigureAwait(false);
+    }
 
     // One unit of work: every posting it makes commits together or not at all (joining a caller's transaction).
     private async Task<Result<IntercompanyPostingResult>> PostCoreAsync(IntercompanyJournalRequest request, CancellationToken ct)

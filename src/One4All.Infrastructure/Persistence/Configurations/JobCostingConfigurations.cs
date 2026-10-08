@@ -23,7 +23,7 @@ internal sealed class JobContractConfiguration : IEntityTypeConfiguration<JobCon
         b.HasMany(x => x.Costs).WithOne().HasForeignKey(x => x.JobContractId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Costs).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.ContractNumber }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

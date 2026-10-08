@@ -34,7 +34,7 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         b.HasMany(x => x.PayElements).WithOne().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.PayElements).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.EmployeeNumber }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -68,7 +68,7 @@ internal sealed class PayElementConfiguration : IEntityTypeConfiguration<PayElem
         b.Property(x => x.AccountCode).HasMaxLength(8);
         b.Property(x => x.ContributionExpenseAccountCode).HasMaxLength(8);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

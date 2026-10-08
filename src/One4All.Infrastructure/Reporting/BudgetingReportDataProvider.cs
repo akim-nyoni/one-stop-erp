@@ -150,7 +150,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
     private static int PeriodOf(FiscalYear year, DateOnly date) => ((date.Year - year.StartDate.Year) * 12) + date.Month - year.StartDate.Month + 1;
 
     private Task<List<Budget>> BudgetsAsync(long companyId, long yearId, bool inForceOnly, CancellationToken ct)
-        => _db.Budgets.AsNoTracking().IgnoreQueryFilters().Include(b => b.Lines)
+        => _db.Budgets.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Include(b => b.Lines)
             .Where(b => b.CompanyId == companyId && b.FiscalYearId == yearId && !b.IsDeleted && (!inForceOnly || (b.IsActive && InForce.Contains(b.Status)))).ToListAsync(ct);
 
     // Budget lines in force, by account and department, for periods up to one (the whole year by default).
@@ -397,7 +397,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
     }
 
     private Task<Dictionary<string, string>> NamesAsync(long companyId, CancellationToken ct)
-        => _db.Accounts.AsNoTracking().IgnoreQueryFilters().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AccountCode, a => a.Name, ct);
+        => _db.Accounts.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AccountCode, a => a.Name, ct);
 
     // A department's status is its latest draft submission's; approved once an in-force budget exists for it.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PrepStatusAsync(Context c, DateOnly? deadline, CancellationToken ct)

@@ -83,7 +83,7 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
     // The depreciation run's expense lines carry the asset number as their narrative.
     private async Task<List<(DateOnly Date, string Asset, decimal Charge)>> ChargesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
-        HashSet<string> expense = [.. await _db.FixedAssets.AsNoTracking().IgnoreQueryFilters().Where(a => a.CompanyId == companyId).Select(a => a.DepreciationExpenseAccountCode).Distinct().ToListAsync(ct).ConfigureAwait(false)];
+        HashSet<string> expense = [.. await _db.FixedAssets.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(a => a.CompanyId == companyId).Select(a => a.DepreciationExpenseAccountCode).Distinct().ToListAsync(ct).ConfigureAwait(false)];
         return [.. (await Posted(companyId, fromDate, toDate).Where(l => l.DocumentType == "FA-DEPR").ToListAsync(ct).ConfigureAwait(false))
             .Where(l => expense.Contains(l.AccountCode) && l.Narrative != null).Select(l => (l.Date, l.Narrative!, l.Debit - l.Credit))];
     }
@@ -218,8 +218,8 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
         var parties = await (from o in _db.OpenItems.AsNoTracking()
                              where o.CompanyId == companyId && o.JournalEntryId != null && journalIds.Contains(o.JournalEntryId.Value)
                              select new { JournalId = o.JournalEntryId!.Value, o.Ledger, o.TraderId }).ToListAsync(ct).ConfigureAwait(false);
-        Dictionary<long, string> customers = await _db.Customers.AsNoTracking().IgnoreQueryFilters().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.Code, ct).ConfigureAwait(false);
-        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Code, ct).ConfigureAwait(false);
+        Dictionary<long, string> customers = await _db.Customers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.Code, ct).ConfigureAwait(false);
+        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Code, ct).ConfigureAwait(false);
         Dictionary<long, string> party = parties.GroupBy(p => p.JournalId).ToDictionary(g => g.Key, g =>
         {
             var first = g.First();
@@ -353,7 +353,7 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
     }
 
     private Task<Dictionary<string, FixedAsset>> AssetsAsync(long companyId, CancellationToken ct)
-        => _db.FixedAssets.AsNoTracking().IgnoreQueryFilters().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AssetNumber, ct);
+        => _db.FixedAssets.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AssetNumber, ct);
 
     private static DateOnly? DateParameter(IReadOnlyDictionary<string, object?> parameters, string name) => parameters.TryGetValue(name, out object? value) && value is DateOnly date ? date : null;
 

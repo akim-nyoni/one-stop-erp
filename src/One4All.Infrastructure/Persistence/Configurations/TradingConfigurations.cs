@@ -26,7 +26,7 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         b.Property(x => x.MobileNumber).HasMaxLength(30);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => new { x.CompanyId, x.NationalIdNumber });
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -48,7 +48,7 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         b.Property(x => x.BankName).HasMaxLength(120);
         b.Property(x => x.BlacklistReason).HasMaxLength(300);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

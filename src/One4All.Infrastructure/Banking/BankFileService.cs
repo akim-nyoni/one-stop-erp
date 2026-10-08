@@ -69,7 +69,7 @@ public sealed class BankFileService : IBankFileService
         Company company = await _db.Companies.AsNoTracking().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         List<Payslip> slips = await _db.Payslips.AsNoTracking().Where(p => p.CompanyId == companyId && p.RunReference == run.DocumentNumber && p.NetPay > 0m).ToListAsync(ct).ConfigureAwait(false);
         List<long> ids = [.. slips.Select(s => s.EmployeeId)];
-        Dictionary<long, Employee> employees = await _db.Employees.AsNoTracking().IgnoreQueryFilters().Where(e => ids.Contains(e.Id)).ToDictionaryAsync(e => e.Id, ct).ConfigureAwait(false);
+        Dictionary<long, Employee> employees = await _db.Employees.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(e => ids.Contains(e.Id)).ToDictionaryAsync(e => e.Id, ct).ConfigureAwait(false);
         List<EmployeePaymentSplit> splits = await _db.PaymentSplits.AsNoTracking().Where(s => s.CompanyId == companyId && ids.Contains(s.EmployeeId) && s.Method == PayMethod.BankTransfer)
             .OrderBy(s => s.Id).ToListAsync(ct).ConfigureAwait(false);
 

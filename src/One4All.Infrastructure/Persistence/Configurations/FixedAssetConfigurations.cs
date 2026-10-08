@@ -33,7 +33,7 @@ internal sealed class FixedAssetConfiguration : IEntityTypeConfiguration<FixedAs
         b.Ignore(x => x.NetBookValue);
         b.Ignore(x => x.DepreciableAmount);
         b.HasIndex(x => new { x.CompanyId, x.AssetNumber }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -78,7 +78,7 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
         b.Ignore(x => x.IsOpen);
         b.Ignore(x => x.WeightedValue);
         b.HasIndex(x => new { x.CompanyId, x.Stage });
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

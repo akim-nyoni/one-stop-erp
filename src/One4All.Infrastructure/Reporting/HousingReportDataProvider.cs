@@ -1911,7 +1911,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
     }
 
     private Task<Dictionary<long, string>> ParcelNumbersAsync(long companyId, CancellationToken ct)
-        => _db.Set<LandParcel>().AsNoTracking().IgnoreQueryFilters().Where(p => p.CompanyId == companyId).ToDictionaryAsync(p => p.Id, p => p.ParcelNumber, ct);
+        => _db.Set<LandParcel>().AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(p => p.CompanyId == companyId).ToDictionaryAsync(p => p.Id, p => p.ParcelNumber, ct);
 
     private static string? Text(IReadOnlyDictionary<string, object?> parameters, string name)
         => parameters.TryGetValue(name, out object? value) && value is string text && text.Trim().Length > 0 ? text.Trim() : null;

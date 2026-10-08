@@ -54,7 +54,7 @@ public sealed class DataHealthService : IDataHealthService
         // Negative stock.
         var negative = await (
             from b in _db.StockBalances.AsNoTracking()
-            join i in _db.Items.IgnoreQueryFilters().AsNoTracking() on b.ItemId equals i.Id
+            join i in _db.Items.IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).AsNoTracking() on b.ItemId equals i.Id
             where b.CompanyId == companyId && b.QuantityOnHand < 0m
             orderby i.Code
             select new { i.Code, b.WarehouseId, b.QuantityOnHand, b.AverageCost }).ToListAsync(ct).ConfigureAwait(false);
@@ -71,17 +71,17 @@ public sealed class DataHealthService : IDataHealthService
         // Orphans: balances left on deleted traders or items.
         var orphanItems = await (
             from o in _db.OpenItems.AsNoTracking()
-            join c in _db.Customers.IgnoreQueryFilters().AsNoTracking() on o.TraderId equals c.Id
+            join c in _db.Customers.IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).AsNoTracking() on o.TraderId equals c.Id
             where o.CompanyId == companyId && o.Ledger == TradingLedger.AccountsReceivable && o.OutstandingBase != 0m && c.IsDeleted
             select new { Who = "Customer " + c.Code, o.DocumentNumber, o.OutstandingBase }).ToListAsync(ct).ConfigureAwait(false);
         orphanItems.AddRange(await (
             from o in _db.OpenItems.AsNoTracking()
-            join s in _db.Suppliers.IgnoreQueryFilters().AsNoTracking() on o.TraderId equals s.Id
+            join s in _db.Suppliers.IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).AsNoTracking() on o.TraderId equals s.Id
             where o.CompanyId == companyId && o.Ledger == TradingLedger.AccountsPayable && o.OutstandingBase != 0m && s.IsDeleted
             select new { Who = "Supplier " + s.Code, o.DocumentNumber, o.OutstandingBase }).ToListAsync(ct).ConfigureAwait(false));
         var orphanStock = await (
             from b in _db.StockBalances.AsNoTracking()
-            join i in _db.Items.IgnoreQueryFilters().AsNoTracking() on b.ItemId equals i.Id
+            join i in _db.Items.IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).AsNoTracking() on b.ItemId equals i.Id
             where b.CompanyId == companyId && b.QuantityOnHand != 0m && i.IsDeleted
             select new { i.Code, b.QuantityOnHand, b.AverageCost }).ToListAsync(ct).ConfigureAwait(false);
         indicators.Add(Indicator(HealthIndicatorKind.OrphanRecords, orphanItems.Count + orphanStock.Count,

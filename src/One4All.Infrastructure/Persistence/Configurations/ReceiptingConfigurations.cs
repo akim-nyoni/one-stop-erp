@@ -14,7 +14,7 @@ internal sealed class CashierStationConfiguration : IEntityTypeConfiguration<Cas
         b.Property(x => x.Name).HasMaxLength(120);
         b.Property(x => x.ReceiptPrefix).HasMaxLength(10);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -90,7 +90,7 @@ internal sealed class AgentConfiguration : IEntityTypeConfiguration<Agent>
         b.Property(x => x.CommissionPercent).HasPrecision(9, 4);
         b.Ignore(x => x.Outstanding);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -106,7 +106,7 @@ internal sealed class StationeryBookConfiguration : IEntityTypeConfiguration<Sta
         b.HasMany(x => x.Captures).WithOne().HasForeignKey(x => x.StationeryBookId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Captures).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.BookNumber }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

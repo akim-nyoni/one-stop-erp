@@ -28,6 +28,7 @@ public sealed class ConsolidationService : IConsolidationService
     /// <inheritdoc />
     public async Task<Result<ConsolidatedTrialBalance>> ConsolidatedTrialBalanceAsync(IReadOnlyList<long> companyIds, DateOnly asAtDate, IReadOnlyCollection<string> intercompanyAccountCodes, CancellationToken ct = default)
     {
+        using IDisposable unscoped = _db.WithoutCompanyScope(); // a group reads every member company's books
         if (companyIds is null || companyIds.Count == 0)
         {
             return Error.Validation("Consolidation.Companies", "At least one company is required.");
@@ -101,6 +102,7 @@ public sealed class ConsolidationService : IConsolidationService
     /// <inheritdoc />
     public async Task<Result<TranslatedTrialBalance>> TranslatedTrialBalanceAsync(IReadOnlyList<long> companyIds, CurrencyCode presentationCurrency, DateOnly asAtDate, IReadOnlyCollection<string>? intercompanyAccountCodes = null, CancellationToken ct = default)
     {
+        using IDisposable unscoped = _db.WithoutCompanyScope(); // a group reads every member company's books
         if (companyIds is null || companyIds.Count == 0)
         {
             return Error.Validation("Consolidation.Companies", "At least one company is required.");

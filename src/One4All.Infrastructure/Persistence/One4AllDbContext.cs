@@ -29,6 +29,33 @@ public class One4AllDbContext : DbContext
     {
     }
 
+    /// <summary>The name of the query filter hiding soft-deleted rows.</summary>
+    public const string SoftDeleteFilter = "SoftDelete";
+
+    /// <summary>The name of the query filter limiting company-scoped rows to the scoped company (brief §2: row-level filtering in the DbContext).</summary>
+    public const string CompanyFilter = "Company";
+
+    /// <summary>
+    /// Gets or sets the company this context is limited to: while set, every company-scoped entity reads only that company's rows (a second
+    /// line of defence behind each service's own company check). Unset, nothing is filtered by company — background jobs, the desktop
+    /// running as several companies, and tests.
+    /// </summary>
+    public long? CompanyScope { get; set; }
+
+    /// <summary>Lifts the company scope until the returned handle is disposed, for the few services that work across companies by design.</summary>
+    /// <returns>A handle restoring the scope.</returns>
+    public IDisposable WithoutCompanyScope()
+    {
+        long? previous = CompanyScope;
+        CompanyScope = null;
+        return new ScopeRestorer(this, previous);
+    }
+
+    private sealed class ScopeRestorer(One4AllDbContext db, long? previous) : IDisposable
+    {
+        public void Dispose() => db.CompanyScope = previous;
+    }
+
     /// <summary>Companies (sets of books).</summary>
     public DbSet<Company> Companies => Set<Company>();
 
@@ -590,6 +617,23 @@ public class One4AllDbContext : DbContext
 
         // Entity type configurations (IEntityTypeConfiguration<T>) are discovered here as modules land.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(One4AllDbContext).Assembly);
+
+        // Every company-scoped root entity: CompanyScope == null || CompanyId == CompanyScope, read from this context at query time.
+        System.Linq.Expressions.MemberExpression scope = System.Linq.Expressions.Expression.Property(System.Linq.Expressions.Expression.Constant(this), nameof(CompanyScope));
+        foreach (Microsoft.EntityFrameworkCore.Metadata.IMutableEntityType entityType in modelBuilder.Model.GetEntityTypes().ToList())
+        {
+            if (entityType.BaseType is not null || entityType.IsOwned() || !typeof(ICompanyScoped).IsAssignableFrom(entityType.ClrType))
+            {
+                continue;
+            }
+
+            System.Linq.Expressions.ParameterExpression row = System.Linq.Expressions.Expression.Parameter(entityType.ClrType, "row");
+            System.Linq.Expressions.Expression body = System.Linq.Expressions.Expression.OrElse(
+                System.Linq.Expressions.Expression.Equal(scope, System.Linq.Expressions.Expression.Constant(null, typeof(long?))),
+                System.Linq.Expressions.Expression.Equal(
+                    System.Linq.Expressions.Expression.Convert(System.Linq.Expressions.Expression.Property(row, nameof(ICompanyScoped.CompanyId)), typeof(long?)), scope));
+            modelBuilder.Entity(entityType.ClrType).HasQueryFilter(CompanyFilter, System.Linq.Expressions.Expression.Lambda(body, row));
+        }
     }
 
     /// <inheritdoc />

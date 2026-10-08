@@ -18,7 +18,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
     {
         List<Core.Banking.SupplierStatement> statements = [.. (await _db.SupplierStatements.AsNoTracking().Include(s => s.Lines).Where(s => s.CompanyId == companyId && s.StatementDate <= asAt)
                 .ToListAsync(ct).ConfigureAwait(false)).GroupBy(s => s.SupplierId).Select(g => g.OrderBy(s => s.StatementDate).ThenBy(s => s.Id).Last())];
-        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
+        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
         List<IReadOnlyDictionary<string, object?>> rows = [];
         foreach (Core.Banking.SupplierStatement statement in statements.OrderBy(s => suppliers.GetValueOrDefault(s.SupplierId), StringComparer.Ordinal))
         {
@@ -146,7 +146,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GrniAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {
         Dictionary<long, string> suppliers = await SuppliersAsync(companyId, ct).ConfigureAwait(false);
-        Dictionary<long, string> items = await _db.Set<Item>().AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await _db.Set<Item>().AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
         List<PurchaseOrder> orders = await _db.Set<PurchaseOrder>().AsNoTracking().Include(o => o.Lines)
             .Where(o => o.CompanyId == companyId && o.Lines.Any(l => l.ReceivedQuantity > l.InvoicedQuantity)).OrderBy(o => o.OrderDate).ThenBy(o => o.OrderNumber).ToListAsync(ct).ConfigureAwait(false);
         List<long> orderIds = [.. orders.Select(o => o.Id)];
@@ -186,7 +186,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BalancesAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {
-        Dictionary<long, Supplier> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, ct).ConfigureAwait(false);
+        Dictionary<long, Supplier> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, ct).ConfigureAwait(false);
         List<OpenItemAsAt> items = await OpenItemsAsAt.LoadAsync(_db, companyId, TradingLedger.AccountsPayable, asAt, ct).ConfigureAwait(false);
         return [.. items.Where(i => suppliers.ContainsKey(i.Item.TraderId)).GroupBy(i => i.Item.TraderId)
             .Select(g => (Supplier: suppliers[g.Key], Balance: g.Sum(i => i.Signed(LedgerSign.Credit)))).Where(x => x.Balance != 0m)
@@ -227,7 +227,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PurchaseAnalysisAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         Dictionary<long, string> suppliers = await SuppliersAsync(companyId, ct).ConfigureAwait(false);
-        Dictionary<long, string> items = await _db.Set<Item>().AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await _db.Set<Item>().AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
         var lines = await (from l in _db.Set<PurchaseOrderLine>().AsNoTracking() join o in _db.Set<PurchaseOrder>().AsNoTracking() on l.PurchaseOrderId equals o.Id
                            where o.CompanyId == companyId && o.Status != PurchaseOrderStatus.Cancelled && o.OrderDate >= fromDate && o.OrderDate <= toDate
                            select new { o.Id, o.SupplierId, Currency = o.Currency.Value, l.ItemId, l.OrderedQuantity, l.UnitPrice }).ToListAsync(ct).ConfigureAwait(false);
@@ -239,7 +239,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
     }
 
     private Task<Dictionary<long, string>> SuppliersAsync(long companyId, CancellationToken ct)
-        => _db.Suppliers.AsNoTracking().IgnoreQueryFilters().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct);
+        => _db.Suppliers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct);
 
     private static DateOnly? DateParameter(IReadOnlyDictionary<string, object?> parameters, string name) => parameters.TryGetValue(name, out object? value) && value is DateOnly date ? date : null;
 

@@ -170,7 +170,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ProductMixAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         List<Sale> completed = [.. (await SalesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).Where(s => s.Status == SaleStatus.Completed)];
-        Dictionary<long, string> items = await _db.Items.AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await _db.Items.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
         var mix = completed.SelectMany(s => s.Lines).GroupBy(l => l.ItemId).Select(g => (Id: g.Key, Quantity: g.Sum(l => l.Quantity), Net: g.Sum(l => l.LineNet))).OrderByDescending(x => x.Net).ToList();
         decimal total = mix.Sum(x => x.Net), running = 0m;
         int rank = 0;
@@ -280,7 +280,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
     }
 
     private Task<Dictionary<long, string>> TillsAsync(long companyId, CancellationToken ct)
-        => _db.PosTerminals.AsNoTracking().IgnoreQueryFilters().Where(t => t.CompanyId == companyId).ToDictionaryAsync(t => t.Id, t => t.Code, ct);
+        => _db.PosTerminals.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(t => t.CompanyId == companyId).ToDictionaryAsync(t => t.Id, t => t.Code, ct);
 
     private Task<Dictionary<long, string>> UsersAsync(CancellationToken ct) => _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct);
 
@@ -348,7 +348,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
             .Where(o => o.CompanyId == companyId && o.OpenedOn >= fromDate && o.OpenedOn <= toDate && o.Status != Core.Restaurant.TableOrderStatus.Cancelled).ToListAsync(ct).ConfigureAwait(false);
         List<long> ids = [.. orders.Select(o => o.Id)], waiters = [.. orders.Select(o => o.WaiterUserId).Distinct()];
         List<Core.Restaurant.RestaurantBill> bills = await _db.RestaurantBills.AsNoTracking().Where(b => ids.Contains(b.TableOrderId) && !b.IsReversed).ToListAsync(ct).ConfigureAwait(false);
-        Dictionary<long, string> tables = await _db.RestaurantTables.AsNoTracking().IgnoreQueryFilters().Where(t => t.CompanyId == companyId).ToDictionaryAsync(t => t.Id, t => t.TableNumber, ct).ConfigureAwait(false);
+        Dictionary<long, string> tables = await _db.RestaurantTables.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(t => t.CompanyId == companyId).ToDictionaryAsync(t => t.Id, t => t.TableNumber, ct).ConfigureAwait(false);
         Dictionary<long, string> users = await _db.Users.AsNoTracking().Where(u => waiters.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
         string Waiter(long id) => users.GetValueOrDefault(id, $"user {id}");
         static decimal Spend(Core.Restaurant.TableOrder o) => o.Lines.Where(l => !l.IsVoided && !l.IsComped).Sum(l => Math.Round((l.Quantity * l.UnitPrice) + l.TaxAmount, 2, MidpointRounding.AwayFromZero));
@@ -454,7 +454,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
 
         Core.System.Company company = await _db.Companies.AsNoTracking().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         List<long> itemIds = [.. sale.Lines.Select(l => l.ItemId).Distinct()];
-        Dictionary<long, string?> taxCodes = await _db.Items.AsNoTracking().IgnoreQueryFilters().Where(i => itemIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id, i => i.TaxCode, ct).ConfigureAwait(false);
+        Dictionary<long, string?> taxCodes = await _db.Items.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => itemIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id, i => i.TaxCode, ct).ConfigureAwait(false);
         int sameNumber = await _db.Sales.AsNoTracking().CountAsync(s => s.CompanyId == companyId && s.SaleNumber == sale.SaleNumber, ct).ConfigureAwait(false);
         decimal net = sale.Lines.Sum(l => l.LineNet), tax = sale.Lines.Sum(l => l.TaxAmount), gross = net + tax;
         decimal tendered = sale.Tenders.Sum(t => t.IsChange ? -t.BaseAmount : t.BaseAmount);

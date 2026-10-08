@@ -354,7 +354,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EliminationsAsync(DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         Dictionary<long, string> companies = await _db.Companies.AsNoTracking().IgnoreQueryFilters().ToDictionaryAsync(c => c.Id, c => c.Code, ct).ConfigureAwait(false);
-        var journals = await _db.Journals.AsNoTracking().IgnoreQueryFilters().Include(j => j.Lines)
+        var journals = await _db.Journals.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Include(j => j.Lines)
             .Where(j => j.DocumentType == "Intercompany" && j.Status == JournalStatus.Posted && j.PostingDate >= fromDate && j.PostingDate <= toDate)
             .ToListAsync(ct).ConfigureAwait(false);
         return [.. journals.GroupBy(j => j.DocumentNumber ?? j.JournalNumber).OrderBy(g => g.Min(j => j.PostingDate)).ThenBy(g => g.Key, StringComparer.Ordinal).Select(g =>
@@ -446,7 +446,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
     }
 
     private Task<Dictionary<string, string>> AccountNamesAsync(long companyId, CancellationToken ct)
-        => _db.Accounts.AsNoTracking().IgnoreQueryFilters().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AccountCode, a => a.Name, ct);
+        => _db.Accounts.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AccountCode, a => a.Name, ct);
 
     private static DateOnly? DateParameter(IReadOnlyDictionary<string, object?> parameters, string name) => parameters.TryGetValue(name, out object? value) && value is DateOnly date ? date : null;
 

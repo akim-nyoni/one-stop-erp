@@ -40,10 +40,10 @@ public sealed class PropertyEnquiryService : IPropertyEnquiryService
 
         // Services with their tariff codes and meters.
         List<long> tariffIds = [.. property.Services.Select(s => s.TariffId).Distinct()];
-        Dictionary<long, string> tariffCodes = await _db.Tariffs.AsNoTracking().IgnoreQueryFilters().Where(t => tariffIds.Contains(t.Id))
+        Dictionary<long, string> tariffCodes = await _db.Tariffs.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(t => tariffIds.Contains(t.Id))
             .ToDictionaryAsync(t => t.Id, t => t.Code, ct).ConfigureAwait(false);
         List<long> meterIds = [.. property.Services.Where(s => s.MeterId != null).Select(s => s.MeterId!.Value).Distinct()];
-        Dictionary<long, Meter> meters = await _db.Set<Meter>().AsNoTracking().IgnoreQueryFilters().Where(m => meterIds.Contains(m.Id))
+        Dictionary<long, Meter> meters = await _db.Set<Meter>().AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(m => meterIds.Contains(m.Id))
             .ToDictionaryAsync(m => m.Id, ct).ConfigureAwait(false);
         List<EnquiryService> services = [.. property.Services.OrderBy(s => s.ServiceType).ThenBy(s => s.StartDate).Select(s =>
         {

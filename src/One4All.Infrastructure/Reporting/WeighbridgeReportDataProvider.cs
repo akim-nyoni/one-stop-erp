@@ -43,10 +43,10 @@ public sealed class WeighbridgeReportDataProvider : IReportDataProvider
         => _db.WeighbridgeTickets.AsNoTracking().Where(t => t.CompanyId == companyId && t.Date >= fromDate && t.Date <= toDate).OrderBy(t => t.Date).ThenBy(t => t.TicketNumber).ToListAsync(ct);
 
     private async Task<Dictionary<long, string>> CustomersAsync(long companyId, CancellationToken ct)
-        => await _db.Customers.AsNoTracking().IgnoreQueryFilters().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.Name, ct).ConfigureAwait(false);
+        => await _db.Customers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.Name, ct).ConfigureAwait(false);
 
     private async Task<Dictionary<long, string>> SuppliersAsync(long companyId, CancellationToken ct)
-        => await _db.Suppliers.AsNoTracking().IgnoreQueryFilters().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
+        => await _db.Suppliers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
 
     private Task<Dictionary<long, string>> UsersAsync(CancellationToken ct) => _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct);
 
@@ -111,8 +111,8 @@ public sealed class WeighbridgeReportDataProvider : IReportDataProvider
             .Select(t => new { ItemId = t.ItemId!.Value, WarehouseId = t.WarehouseId!.Value }).Distinct().ToListAsync(ct).ConfigureAwait(false);
         List<string> ticketNumbers = await _db.WeighbridgeTickets.AsNoTracking().Where(t => t.CompanyId == companyId).Select(t => t.TicketNumber).ToListAsync(ct).ConfigureAwait(false);
         HashSet<string> tickets = [.. ticketNumbers];
-        Dictionary<long, string> items = await _db.Items.AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
-        Dictionary<long, string> warehouses = await _db.Warehouses.AsNoTracking().IgnoreQueryFilters().Where(w => w.CompanyId == companyId).ToDictionaryAsync(w => w.Id, w => w.Code, ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await _db.Items.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
+        Dictionary<long, string> warehouses = await _db.Warehouses.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(w => w.CompanyId == companyId).ToDictionaryAsync(w => w.Id, w => w.Code, ct).ConfigureAwait(false);
         List<IReadOnlyDictionary<string, object?>> rows = [];
         foreach (var pile in piles.OrderBy(p => items.GetValueOrDefault(p.ItemId), StringComparer.Ordinal).ThenBy(p => warehouses.GetValueOrDefault(p.WarehouseId), StringComparer.Ordinal))
         {

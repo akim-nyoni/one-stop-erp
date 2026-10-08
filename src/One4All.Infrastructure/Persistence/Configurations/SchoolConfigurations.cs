@@ -21,7 +21,7 @@ internal sealed class FeeStructureConfiguration : IEntityTypeConfiguration<FeeSt
         b.HasMany(x => x.Items).WithOne().HasForeignKey(x => x.FeeStructureId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -51,7 +51,7 @@ internal sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
         b.Property(x => x.BursaryType).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.AdmissionNumber }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => new { x.CompanyId, x.Grade });
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

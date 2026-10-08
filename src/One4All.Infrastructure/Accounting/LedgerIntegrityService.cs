@@ -172,8 +172,8 @@ public sealed class LedgerIntegrityService : ILedgerIntegrityService
     {
         var balances = await (
             from b in _db.StockBalances
-            join i in _db.Items.IgnoreQueryFilters() on b.ItemId equals i.Id
-            join w in _db.Warehouses.IgnoreQueryFilters() on b.WarehouseId equals w.Id
+            join i in _db.Items.IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]) on b.ItemId equals i.Id
+            join w in _db.Warehouses.IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]) on b.WarehouseId equals w.Id
             where b.CompanyId == companyId
             select new { b.ItemId, b.WarehouseId, ItemCode = i.Code, WarehouseCode = w.Code, b.QuantityOnHand, b.TotalValue, i.CostingMethod })
             .ToListAsync(ct).ConfigureAwait(false);

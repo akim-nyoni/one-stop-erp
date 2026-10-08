@@ -57,8 +57,8 @@ public sealed class StockProvisionService : IStockProvisionService
 
         List<long> itemIds = [.. holdings.Select(h => h.ItemId).Distinct()];
         List<long> warehouseIds = [.. holdings.Select(h => h.WarehouseId).Distinct()];
-        var items = await _db.Items.IgnoreQueryFilters().Where(i => itemIds.Contains(i.Id)).Select(i => new { i.Id, i.Code, i.Description }).ToDictionaryAsync(i => i.Id, ct).ConfigureAwait(false);
-        var warehouses = await _db.Warehouses.IgnoreQueryFilters().Where(w => warehouseIds.Contains(w.Id)).Select(w => new { w.Id, w.Code }).ToDictionaryAsync(w => w.Id, ct).ConfigureAwait(false);
+        var items = await _db.Items.IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => itemIds.Contains(i.Id)).Select(i => new { i.Id, i.Code, i.Description }).ToDictionaryAsync(i => i.Id, ct).ConfigureAwait(false);
+        var warehouses = await _db.Warehouses.IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(w => warehouseIds.Contains(w.Id)).Select(w => new { w.Id, w.Code }).ToDictionaryAsync(w => w.Id, ct).ConfigureAwait(false);
         Dictionary<long, decimal> prices = await SellingPricesAsync(companyId, company.BaseCurrency, itemIds, ct).ConfigureAwait(false);
 
         List<StockProvisionLine> lines = [];

@@ -20,7 +20,7 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
         b.Property(x => x.TimeZoneId).HasMaxLength(64);
         b.Property(x => x.BaseCurrency).HasMaxLength(3);
         b.Property(x => x.ReportingCurrency).HasMaxLength(3);
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -34,7 +34,7 @@ internal sealed class BranchConfiguration : IEntityTypeConfiguration<Branch>
         b.Property(x => x.Name).HasMaxLength(200);
         b.Property(x => x.Address).HasMaxLength(512);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -54,7 +54,7 @@ internal sealed class CurrencyConfiguration : IEntityTypeConfiguration<Currency>
 
         b.HasMany(x => x.Denominations).WithOne().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Denominations).UsePropertyAccessMode(PropertyAccessMode.Field);
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

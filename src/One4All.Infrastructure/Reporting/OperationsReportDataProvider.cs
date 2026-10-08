@@ -199,7 +199,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
     }
 
     private Task<Dictionary<long, string>> ContractNumbersAsync(long companyId, CancellationToken ct)
-        => _db.JobContracts.AsNoTracking().IgnoreQueryFilters().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.ContractNumber, ct);
+        => _db.JobContracts.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.ContractNumber, ct);
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VariationsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
@@ -229,7 +229,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SubcontractsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         Dictionary<long, string> contracts = await ContractNumbersAsync(companyId, ct).ConfigureAwait(false);
-        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
+        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Name, ct).ConfigureAwait(false);
         List<Core.JobCosting.Subcontract> subcontracts = await _db.Subcontracts.AsNoTracking().Include(s => s.Certificates).Where(s => s.CompanyId == companyId).OrderBy(s => s.Reference).ToListAsync(ct).ConfigureAwait(false);
         List<string> releaseRefs = [.. subcontracts.Select(s => s.Reference)];
         List<IReadOnlyDictionary<string, object?>> rows = [];
@@ -272,8 +272,8 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> JobMaterialsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         List<string> contracts = [.. (await ContractNumbersAsync(companyId, ct).ConfigureAwait(false)).Values];
-        Dictionary<long, string> items = await _db.Items.AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
-        Dictionary<long, string> warehouses = await _db.Warehouses.AsNoTracking().IgnoreQueryFilters().Where(w => w.CompanyId == companyId).ToDictionaryAsync(w => w.Id, w => w.Code, ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await _db.Items.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
+        Dictionary<long, string> warehouses = await _db.Warehouses.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(w => w.CompanyId == companyId).ToDictionaryAsync(w => w.Id, w => w.Code, ct).ConfigureAwait(false);
         List<Core.Inventory.StockMovement> issues = await _db.StockMovements.AsNoTracking()
             .Where(m => m.CompanyId == companyId && m.Type == Core.Inventory.StockMovementType.Issue && m.Reference != null && contracts.Contains(m.Reference) && m.Date >= fromDate && m.Date <= toDate)
             .OrderBy(m => m.Reference).ThenBy(m => m.Date).ToListAsync(ct).ConfigureAwait(false);
@@ -306,7 +306,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> OpenOrdersAsync(long companyId, CancellationToken ct)
     {
         Dictionary<long, string> customers = await GuardiansAsync(companyId, ct).ConfigureAwait(false);
-        Dictionary<long, string> items = await _db.Items.AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
+        Dictionary<long, string> items = await _db.Items.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code + " " + i.Description, ct).ConfigureAwait(false);
         Dictionary<long, decimal> onHand = await _db.StockBalances.AsNoTracking().Where(b => b.CompanyId == companyId).GroupBy(b => b.ItemId)
             .Select(g => new { g.Key, Qty = g.Sum(b => b.QuantityOnHand) }).ToDictionaryAsync(x => x.Key, x => x.Qty, ct).ConfigureAwait(false);
         List<SalesOrder> orders = await _db.SalesOrders.AsNoTracking().Include(o => o.Lines)
@@ -362,7 +362,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DeferredFeesAsync(long companyId, CancellationToken ct)
     {
-        List<string> deferredAccounts = await _db.FeeStructures.AsNoTracking().IgnoreQueryFilters().Where(f => f.CompanyId == companyId && f.DeferredIncomeAccountCode != null)
+        List<string> deferredAccounts = await _db.FeeStructures.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(f => f.CompanyId == companyId && f.DeferredIncomeAccountCode != null)
             .Select(f => f.DeferredIncomeAccountCode!).Distinct().ToListAsync(ct).ConfigureAwait(false);
         List<Core.Accounting.DeferredIncomeSchedule> schedules = await _db.Set<Core.Accounting.DeferredIncomeSchedule>().AsNoTracking()
             .Where(d => d.CompanyId == companyId && deferredAccounts.Contains(d.DeferredAccountCode)).OrderBy(d => d.StartDate).ThenBy(d => d.Reference).ToListAsync(ct).ConfigureAwait(false);
@@ -447,7 +447,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             .ToListAsync(ct).ConfigureAwait(false);
         Dictionary<long, (string Number, long CustomerId)> orders = await _db.SalesOrders.AsNoTracking().Where(o => o.CompanyId == companyId).ToDictionaryAsync(o => o.Id, o => (o.OrderNumber, o.CustomerId), ct).ConfigureAwait(false);
         Dictionary<long, string> customers = await GuardiansAsync(companyId, ct).ConfigureAwait(false);
-        Dictionary<long, (string Code, decimal? Weight)> items = await _db.Items.AsNoTracking().IgnoreQueryFilters().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => (i.Code, i.UnitWeightKg), ct).ConfigureAwait(false);
+        Dictionary<long, (string Code, decimal? Weight)> items = await _db.Items.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => (i.Code, i.UnitWeightKg), ct).ConfigureAwait(false);
         return [.. planned.OrderBy(d => d.PlannedFor).ThenBy(d => d.Vehicle ?? "~", StringComparer.Ordinal).ThenBy(d => d.Route ?? string.Empty, StringComparer.Ordinal).ThenBy(d => d.Reference, StringComparer.Ordinal)
             .Select(d => Row(("Date", Date(d.PlannedFor!.Value)), ("Vehicle", d.Vehicle ?? "Unassigned"), ("Route", d.Route ?? "—"), ("Driver", d.Driver ?? "—"), ("Delivery", d.Reference),
                 ("Order", orders.GetValueOrDefault(d.SalesOrderId).Number ?? "?"), ("Customer", customers.GetValueOrDefault(orders.GetValueOrDefault(d.SalesOrderId).CustomerId, "?")),
@@ -456,10 +456,10 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
     }
 
     private Task<Dictionary<string, Student>> StudentsAsync(long companyId, CancellationToken ct)
-        => _db.Students.AsNoTracking().IgnoreQueryFilters().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.AdmissionNumber, ct);
+        => _db.Students.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.AdmissionNumber, ct);
 
     private Task<Dictionary<long, string>> GuardiansAsync(long companyId, CancellationToken ct)
-        => _db.Customers.AsNoTracking().IgnoreQueryFilters().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.Name, ct);
+        => _db.Customers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.Name, ct);
 
     private static DateOnly? DateParameter(IReadOnlyDictionary<string, object?> parameters, string name) => parameters.TryGetValue(name, out object? value) && value is DateOnly date ? date : null;
 

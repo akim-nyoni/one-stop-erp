@@ -22,7 +22,7 @@ internal sealed class MenuItemConfiguration : IEntityTypeConfiguration<MenuItem>
         b.HasMany(x => x.Prices).WithOne().HasForeignKey(x => x.MenuItemId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Prices).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -60,7 +60,7 @@ internal sealed class RestaurantTableConfiguration : IEntityTypeConfiguration<Re
         b.HasIndex(x => new { x.CompanyId, x.TableNumber }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => x.GroupId);
         b.HasIndex(x => x.SectionId);
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -146,7 +146,7 @@ internal sealed class FloorSectionConfiguration : IEntityTypeConfiguration<Floor
         b.Property(x => x.Name).HasMaxLength(120);
         b.Property(x => x.Description).HasMaxLength(400);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

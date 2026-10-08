@@ -56,7 +56,7 @@ public sealed class PayslipDistributionService : IPayslipDistributionService
 
         Company company = await _db.Companies.AsNoTracking().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         List<long> ids = await _db.Payslips.Where(p => p.CompanyId == companyId && p.RunReference == run.DocumentNumber).Select(p => p.EmployeeId).Distinct().ToListAsync(ct).ConfigureAwait(false);
-        List<Employee> employees = await _db.Employees.AsNoTracking().IgnoreQueryFilters().Where(e => ids.Contains(e.Id)).OrderBy(e => e.EmployeeNumber).ToListAsync(ct).ConfigureAwait(false);
+        List<Employee> employees = await _db.Employees.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(e => ids.Contains(e.Id)).OrderBy(e => e.EmployeeNumber).ToListAsync(ct).ConfigureAwait(false);
         int queued = 0;
         List<string> noEmail = [], noPassword = [];
         foreach (Employee employee in employees)

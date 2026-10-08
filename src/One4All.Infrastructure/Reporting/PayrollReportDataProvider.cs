@@ -114,7 +114,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         => _db.Payslips.AsNoTracking().Include(p => p.Lines).Where(p => p.CompanyId == companyId && p.PayDate >= fromDate && p.PayDate <= toDate).OrderBy(p => p.PayDate).ToListAsync(ct);
 
     private Task<Dictionary<long, Employee>> EmployeesAsync(long companyId, CancellationToken ct)
-        => _db.Employees.AsNoTracking().IgnoreQueryFilters().Where(e => e.CompanyId == companyId).ToDictionaryAsync(e => e.Id, ct);
+        => _db.Employees.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(e => e.CompanyId == companyId).ToDictionaryAsync(e => e.Id, ct);
 
     private static string Name(Dictionary<long, Employee> employees, long id) => employees.TryGetValue(id, out Employee? e) ? $"{e.EmployeeNumber} {e.FullName}" : "?";
 
@@ -159,7 +159,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TraceAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
-        Dictionary<string, PayElement> elements = await _db.PayElements.AsNoTracking().IgnoreQueryFilters().Where(e => e.CompanyId == companyId).ToDictionaryAsync(e => e.Code, ct).ConfigureAwait(false);
+        Dictionary<string, PayElement> elements = await _db.PayElements.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(e => e.CompanyId == companyId).ToDictionaryAsync(e => e.Code, ct).ConfigureAwait(false);
         string Rule(PayElement? e) => e is null ? "—" : e.Basis switch
         {
             CalculationBasis.FixedAmount => Money(e.FixedAmount),
@@ -205,7 +205,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> NetControlAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         List<Payslip> slips = await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
-        HashSet<string> elementAccounts = [.. await _db.PayElements.AsNoTracking().IgnoreQueryFilters().Where(e => e.CompanyId == companyId).Select(e => e.AccountCode).Distinct().ToListAsync(ct).ConfigureAwait(false)];
+        HashSet<string> elementAccounts = [.. await _db.PayElements.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(e => e.CompanyId == companyId).Select(e => e.AccountCode).Distinct().ToListAsync(ct).ConfigureAwait(false)];
         List<JournalEntry> journals = await _db.Journals.AsNoTracking().Include(j => j.Lines)
             .Where(j => j.CompanyId == companyId && j.DocumentType == "PAYROLL" && j.Status == JournalStatus.Posted && j.PostingDate >= fromDate && j.PostingDate <= toDate).ToListAsync(ct).ConfigureAwait(false);
         return [.. slips.GroupBy(p => p.PayDate.ToString("yyyy-MM", CultureInfo.InvariantCulture)).OrderBy(g => g.Key, StringComparer.Ordinal).Select(g =>
@@ -292,7 +292,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
 
     // Payroll expense accounts are the earning and employer-contribution element accounts.
     private async Task<HashSet<string>> CostAccountsAsync(long companyId, CancellationToken ct)
-        => [.. await _db.PayElements.AsNoTracking().IgnoreQueryFilters().Where(e => e.CompanyId == companyId && (e.Type == PayElementType.Earning || e.Type == PayElementType.EmployerContribution))
+        => [.. await _db.PayElements.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(e => e.CompanyId == companyId && (e.Type == PayElementType.Earning || e.Type == PayElementType.EmployerContribution))
             .Select(e => e.AccountCode).Distinct().ToListAsync(ct).ConfigureAwait(false)];
 
     private async Task<Dictionary<string, decimal>> LedgerAsync(long companyId, IReadOnlyCollection<string> accounts, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
@@ -337,7 +337,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     // Earnings and employer contributions debit their accounts; deductions and contributions' liabilities credit theirs.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GlReconAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
-        Dictionary<string, PayElement> elements = await _db.PayElements.AsNoTracking().IgnoreQueryFilters().Where(e => e.CompanyId == companyId).ToDictionaryAsync(e => e.Code, ct).ConfigureAwait(false);
+        Dictionary<string, PayElement> elements = await _db.PayElements.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(e => e.CompanyId == companyId).ToDictionaryAsync(e => e.Code, ct).ConfigureAwait(false);
         Dictionary<string, decimal> perSlips = (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).SelectMany(p => p.Lines).Where(l => elements.ContainsKey(l.ElementCode))
             .GroupBy(l => elements[l.ElementCode].AccountCode).ToDictionary(g => g.Key, g => g.Sum(l => l.Type == PayElementType.Deduction ? -l.Amount : l.Amount));
         List<string> accounts = [.. perSlips.Keys];
@@ -1090,7 +1090,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     {
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         List<Core.JobCosting.JobTimesheet> sheets = await _db.JobTimesheets.AsNoTracking().Where(t => t.CompanyId == companyId && t.Date >= fromDate && t.Date <= toDate).ToListAsync(ct).ConfigureAwait(false);
-        Dictionary<long, string> contracts = await _db.JobContracts.AsNoTracking().IgnoreQueryFilters().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.ContractNumber, ct).ConfigureAwait(false);
+        Dictionary<long, string> contracts = await _db.JobContracts.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.ContractNumber, ct).ConfigureAwait(false);
         Dictionary<long, decimal> gross = (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).GroupBy(p => p.EmployeeId).ToDictionary(g => g.Key, g => g.Sum(p => p.GrossEarnings));
         return [.. sheets.Select(t => t.EmployeeId).Concat(gross.Keys).Distinct().OrderBy(id => Name(employees, id), StringComparer.Ordinal).Select(id =>
         {
@@ -1245,7 +1245,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     }
 
     private Task<Dictionary<string, string>> AccountNamesAsync(long companyId, CancellationToken ct)
-        => _db.Accounts.AsNoTracking().IgnoreQueryFilters().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AccountCode, a => a.Name, ct);
+        => _db.Accounts.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AccountCode, a => a.Name, ct);
 
     private static DateTimeOffset Start(DateOnly date) => new(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
 

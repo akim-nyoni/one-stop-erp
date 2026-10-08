@@ -49,7 +49,7 @@ internal sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
 
         b.HasMany(x => x.Permissions).WithOne().HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Permissions).UsePropertyAccessMode(PropertyAccessMode.Field);
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -78,7 +78,7 @@ internal sealed class GroupConfiguration : IEntityTypeConfiguration<Group>
 
         b.HasMany(x => x.Roles).WithOne().HasForeignKey(x => x.GroupId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Roles).UsePropertyAccessMode(PropertyAccessMode.Field);
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -114,7 +114,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.Navigation(x => x.Roles).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.Navigation(x => x.Groups).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.Navigation(x => x.Overrides).UsePropertyAccessMode(PropertyAccessMode.Field);
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

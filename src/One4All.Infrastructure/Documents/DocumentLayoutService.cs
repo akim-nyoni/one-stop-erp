@@ -27,14 +27,14 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
     private Task<Dictionary<long, Item>> ItemsAsync(IEnumerable<long> ids, CancellationToken ct)
     {
         List<long> list = [.. ids.Distinct()];
-        return _db.Items.AsNoTracking().IgnoreQueryFilters().Where(i => list.Contains(i.Id)).ToDictionaryAsync(i => i.Id, ct);
+        return _db.Items.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => list.Contains(i.Id)).ToDictionaryAsync(i => i.Id, ct);
     }
 
     private async Task<string> CustomerAsync(long id, CancellationToken ct)
-        => await _db.Customers.AsNoTracking().IgnoreQueryFilters().Where(c => c.Id == id).Select(c => c.Name + " (" + c.Code + ")").FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? "?";
+        => await _db.Customers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(c => c.Id == id).Select(c => c.Name + " (" + c.Code + ")").FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? "?";
 
     private async Task<string> SupplierAsync(long id, CancellationToken ct)
-        => await _db.Suppliers.AsNoTracking().IgnoreQueryFilters().Where(s => s.Id == id).Select(s => s.Name + " (" + s.Code + ")").FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? "?";
+        => await _db.Suppliers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(s => s.Id == id).Select(s => s.Name + " (" + s.Code + ")").FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? "?";
 
     /// <inheritdoc />
     public async Task<Result<string>> QuotationAsync(long companyId, string quoteNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
@@ -227,7 +227,7 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
         string term = narrative[..narrative.IndexOf(" fees — ", StringComparison.Ordinal)];
         int open = narrative.LastIndexOf('('), close = narrative.LastIndexOf(')');
         string admission = open >= 0 && close > open ? narrative[(open + 1)..close] : string.Empty;
-        Core.Schools.Student? student = await _db.Students.AsNoTracking().IgnoreQueryFilters().FirstOrDefaultAsync(s => s.CompanyId == companyId && s.AdmissionNumber == admission, ct).ConfigureAwait(false);
+        Core.Schools.Student? student = await _db.Students.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).FirstOrDefaultAsync(s => s.CompanyId == companyId && s.AdmissionNumber == admission, ct).ConfigureAwait(false);
         Company company = await CompanyAsync(companyId, ct).ConfigureAwait(false);
         List<BusinessDocumentLine> lines;
         int tag = narrative.IndexOf('[', StringComparison.Ordinal);
@@ -265,7 +265,7 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
             return Error.NotFound("Doc.CertificateNotFound", $"No payment certificate {certificateNumber}.");
         }
 
-        Core.JobCosting.JobContract contract = await _db.JobContracts.AsNoTracking().IgnoreQueryFilters().FirstAsync(c => c.Id == certificate.JobContractId, ct).ConfigureAwait(false);
+        Core.JobCosting.JobContract contract = await _db.JobContracts.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).FirstAsync(c => c.Id == certificate.JobContractId, ct).ConfigureAwait(false);
         Company company = await CompanyAsync(companyId, ct).ConfigureAwait(false);
         decimal valuation = certificate.WorkDoneToDate + certificate.MaterialsOnSite;
         return BusinessDocumentFormatter.ToPlainText(new BusinessDocument

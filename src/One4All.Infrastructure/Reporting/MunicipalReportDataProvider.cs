@@ -150,7 +150,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AgedDebtorsAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {
         var properties = await _db.Properties.AsNoTracking().Include(p => p.Services).Where(p => p.CompanyId == companyId).OrderBy(p => p.Id).ToListAsync(ct).ConfigureAwait(false);
-        Dictionary<long, ConsumerCategory> tariffCategories = await _db.Set<Tariff>().AsNoTracking().IgnoreQueryFilters().Where(t => t.CompanyId == companyId)
+        Dictionary<long, ConsumerCategory> tariffCategories = await _db.Set<Tariff>().AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(t => t.CompanyId == companyId)
             .ToDictionaryAsync(t => t.Id, t => t.Category, ct).ConfigureAwait(false);
         Dictionary<long, (string Ward, string Category)> ratepayers = properties.GroupBy(p => p.RatepayerCustomerId).ToDictionary(g => g.Key, g =>
         {
@@ -202,8 +202,8 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
         Dictionary<long, string> names = await _db.Customers.AsNoTracking().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.Name, ct).ConfigureAwait(false);
         Dictionary<long, List<string>> owners = (await _db.Set<PropertyOwner>().AsNoTracking().Where(o => o.CompanyId == companyId && o.OwnedTo == null).ToListAsync(ct).ConfigureAwait(false))
             .GroupBy(o => o.PropertyId).ToDictionary(g => g.Key, g => g.Select(o => names.GetValueOrDefault(o.CustomerId, "?")).ToList());
-        Dictionary<long, string> tariffs = await _db.Set<Tariff>().AsNoTracking().IgnoreQueryFilters().Where(t => t.CompanyId == companyId).ToDictionaryAsync(t => t.Id, t => t.Code, ct).ConfigureAwait(false);
-        Dictionary<long, string> meters = await _db.Set<Meter>().AsNoTracking().IgnoreQueryFilters().Where(m => m.CompanyId == companyId).ToDictionaryAsync(m => m.Id, m => m.Serial, ct).ConfigureAwait(false);
+        Dictionary<long, string> tariffs = await _db.Set<Tariff>().AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(t => t.CompanyId == companyId).ToDictionaryAsync(t => t.Id, t => t.Code, ct).ConfigureAwait(false);
+        Dictionary<long, string> meters = await _db.Set<Meter>().AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(m => m.CompanyId == companyId).ToDictionaryAsync(m => m.Id, m => m.Serial, ct).ConfigureAwait(false);
         return [.. properties.Select(p =>
         {
             List<PropertyServiceLink> active = [.. p.Services.Where(s => s.IsActive)];
@@ -217,7 +217,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ClearancesAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {
-        Dictionary<long, string> stands = await _db.Properties.AsNoTracking().IgnoreQueryFilters().Where(p => p.CompanyId == companyId).ToDictionaryAsync(p => p.Id, p => p.StandNumber, ct).ConfigureAwait(false);
+        Dictionary<long, string> stands = await _db.Properties.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(p => p.CompanyId == companyId).ToDictionaryAsync(p => p.Id, p => p.StandNumber, ct).ConfigureAwait(false);
         Dictionary<long, string> users = await UsersAsync(ct).ConfigureAwait(false);
         List<ClearanceCertificate> certificates = await _db.Set<ClearanceCertificate>().AsNoTracking().Where(c => c.CompanyId == companyId && c.IssuedOn <= asAt)
             .OrderBy(c => c.IssuedOn).ThenBy(c => c.CertificateNumber).ToListAsync(ct).ConfigureAwait(false);
@@ -246,7 +246,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReadingExceptionsAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {
-        Dictionary<long, string> serials = await _db.Set<Meter>().AsNoTracking().IgnoreQueryFilters().Where(m => m.CompanyId == companyId).ToDictionaryAsync(m => m.Id, m => m.Serial, ct).ConfigureAwait(false);
+        Dictionary<long, string> serials = await _db.Set<Meter>().AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(m => m.CompanyId == companyId).ToDictionaryAsync(m => m.Id, m => m.Serial, ct).ConfigureAwait(false);
         var placed = await (from s in _db.Set<PropertyServiceLink>().AsNoTracking() join p in _db.Properties.AsNoTracking() on s.PropertyId equals p.Id
                             where p.CompanyId == companyId && s.MeterId != null select new { MeterId = s.MeterId!.Value, p.StandNumber }).ToListAsync(ct).ConfigureAwait(false);
         Dictionary<long, string> stands = placed.GroupBy(x => x.MeterId).ToDictionary(g => g.Key, g => g.First().StandNumber);
@@ -262,8 +262,8 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
     private async Task<Dictionary<long, (string Stand, string Ward, string Service, string Category)>> MeterPlacesAsync(long companyId, CancellationToken ct)
     {
         var placed = await (from s in _db.Set<PropertyServiceLink>().AsNoTracking()
-                            join p in _db.Properties.AsNoTracking().IgnoreQueryFilters() on s.PropertyId equals p.Id
-                            join t in _db.Tariffs.AsNoTracking().IgnoreQueryFilters() on s.TariffId equals t.Id
+                            join p in _db.Properties.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]) on s.PropertyId equals p.Id
+                            join t in _db.Tariffs.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]) on s.TariffId equals t.Id
                             where p.CompanyId == companyId && s.MeterId != null
                             orderby s.IsActive descending
                             select new { MeterId = s.MeterId!.Value, p.StandNumber, p.Ward, s.ServiceType, t.Category }).ToListAsync(ct).ConfigureAwait(false);
@@ -274,7 +274,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
     {
         DateOnly from = asAt.AddYears(-1), priorFrom = asAt.AddYears(-2);
         Dictionary<long, (string Stand, string Ward, string Service, string Category)> places = await MeterPlacesAsync(companyId, ct).ConfigureAwait(false);
-        Dictionary<long, string> serials = await _db.Meters.AsNoTracking().IgnoreQueryFilters().Where(m => m.CompanyId == companyId).ToDictionaryAsync(m => m.Id, m => m.Serial, ct).ConfigureAwait(false);
+        Dictionary<long, string> serials = await _db.Meters.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(m => m.CompanyId == companyId).ToDictionaryAsync(m => m.Id, m => m.Serial, ct).ConfigureAwait(false);
         var readings = await _db.MeterReadings.AsNoTracking().Where(r => r.CompanyId == companyId && r.Accepted && r.ReadingDate > priorFrom && r.ReadingDate <= asAt)
             .Select(r => new { r.MeterId, r.ReadingDate, r.Consumption }).ToListAsync(ct).ConfigureAwait(false);
         return [.. readings.GroupBy(r => r.MeterId).Where(g => g.Any(r => r.ReadingDate > from))
@@ -293,7 +293,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
     // A removed meter is replaced by the meter installed on the same stand and service on or after its removal date.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> MetersAsync(long companyId, CancellationToken ct)
     {
-        List<Meter> meters = await _db.Meters.AsNoTracking().IgnoreQueryFilters().Where(m => m.CompanyId == companyId).OrderBy(m => m.Serial).ToListAsync(ct).ConfigureAwait(false);
+        List<Meter> meters = await _db.Meters.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(m => m.CompanyId == companyId).OrderBy(m => m.Serial).ToListAsync(ct).ConfigureAwait(false);
         Dictionary<long, (string Stand, string Ward, string Service, string Category)> places = await MeterPlacesAsync(companyId, ct).ConfigureAwait(false);
         string? ReplacedBy(Meter meter)
         {
@@ -318,7 +318,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ServiceOrdersAsync(long companyId, CancellationToken ct)
     {
-        Dictionary<long, Property> properties = await _db.Properties.AsNoTracking().IgnoreQueryFilters().Where(p => p.CompanyId == companyId).ToDictionaryAsync(p => p.Id, ct).ConfigureAwait(false);
+        Dictionary<long, Property> properties = await _db.Properties.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(p => p.CompanyId == companyId).ToDictionaryAsync(p => p.Id, ct).ConfigureAwait(false);
         List<ServiceOrder> orders = await _db.Set<ServiceOrder>().AsNoTracking().Where(o => o.CompanyId == companyId).OrderBy(o => o.RaisedOn).ThenBy(o => o.OrderNumber).ToListAsync(ct).ConfigureAwait(false);
         return [.. orders.Select(o => Row(("Order", o.OrderNumber), ("Kind", o.Kind.ToString()), ("Stand", properties.GetValueOrDefault(o.PropertyId)?.StandNumber ?? "?"),
             ("Ward", properties.GetValueOrDefault(o.PropertyId)?.Ward ?? "?"), ("Service", o.ServiceType.ToString()), ("Raised", Date(o.RaisedOn)), ("Status", o.Status.ToString()),
@@ -350,7 +350,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
     // Subsidy credits are the IND-{stand}-{yyyyMM} items the subsidy run raises on the ratepayer's account.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> IndigentAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {
-        Dictionary<long, Property> properties = await _db.Properties.AsNoTracking().IgnoreQueryFilters().Where(p => p.CompanyId == companyId).ToDictionaryAsync(p => p.Id, ct).ConfigureAwait(false);
+        Dictionary<long, Property> properties = await _db.Properties.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(p => p.CompanyId == companyId).ToDictionaryAsync(p => p.Id, ct).ConfigureAwait(false);
         List<IndigentRegistration> registrations = await _db.Set<IndigentRegistration>().AsNoTracking().Where(r => r.CompanyId == companyId && r.ApprovedFrom <= asAt).ToListAsync(ct).ConfigureAwait(false);
         DateOnly yearStart = new(asAt.Year, 1, 1);
         var credits = await _db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.DocumentNumber.StartsWith("IND-")
@@ -420,7 +420,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
     private async Task<Dictionary<long, (string Ward, string Category, int Properties)>> RatepayersAsync(long companyId, CancellationToken ct)
     {
         List<Property> properties = await _db.Properties.AsNoTracking().Include(p => p.Services).Where(p => p.CompanyId == companyId).OrderBy(p => p.Id).ToListAsync(ct).ConfigureAwait(false);
-        Dictionary<long, ConsumerCategory> categories = await _db.Tariffs.AsNoTracking().IgnoreQueryFilters().Where(t => t.CompanyId == companyId).ToDictionaryAsync(t => t.Id, t => t.Category, ct).ConfigureAwait(false);
+        Dictionary<long, ConsumerCategory> categories = await _db.Tariffs.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(t => t.CompanyId == companyId).ToDictionaryAsync(t => t.Id, t => t.Category, ct).ConfigureAwait(false);
         return properties.GroupBy(p => p.RatepayerCustomerId).ToDictionary(g => g.Key, g =>
         {
             PropertyServiceLink? link = g.SelectMany(p => p.Services).FirstOrDefault(s => s.IsActive);

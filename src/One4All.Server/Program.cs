@@ -174,6 +174,13 @@ app.Use(async (context, next) =>
         context.Request.QueryString = context.Request.QueryString.Add(name, userId.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
+    // The request's company, once authorised, scopes the database: company-scoped rows of any other company are invisible to it (brief §2).
+    string? requestCompany = query.GetValueOrDefault("companyId") ?? body?.GetValueOrDefault("companyId");
+    if (long.TryParse(requestCompany, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long scopedCompany))
+    {
+        context.RequestServices.GetRequiredService<One4All.Infrastructure.Persistence.One4AllDbContext>().CompanyScope = scopedCompany;
+    }
+
     await next(context).ConfigureAwait(false);
 });
 

@@ -141,7 +141,7 @@ public sealed class MeterReadingService : IMeterReadingService
     public async Task<IReadOnlyList<ReadingException>> ExceptionsAsync(long companyId, DateOnly start, DateOnly end, CancellationToken ct = default)
         => await (
             from r in _db.Set<MeterReading>().AsNoTracking()
-            join m in _db.Set<Meter>().IgnoreQueryFilters().AsNoTracking() on r.MeterId equals m.Id
+            join m in _db.Set<Meter>().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).AsNoTracking() on r.MeterId equals m.Id
             where r.CompanyId == companyId && r.Flags != ReadingFlags.None && r.ReadingDate >= start && r.ReadingDate <= end
             orderby r.ReadingDate, r.Id
             select new ReadingException(m.Serial, r.ReadingDate, r.Kind, r.Reading, r.Consumption, r.Flags, r.Accepted))

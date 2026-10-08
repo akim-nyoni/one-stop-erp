@@ -52,7 +52,7 @@ public sealed class HyperinflationService : IHyperinflationService
             return Error.NotFound("Ias29.NoFiscalYear", $"No financial year contains {asAtDate:yyyy-MM-dd}.");
         }
 
-        Dictionary<string, LedgerAccount> accounts = await _db.Accounts.AsNoTracking().IgnoreQueryFilters()
+        Dictionary<string, LedgerAccount> accounts = await _db.Accounts.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter])
             .Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AccountCode, ct).ConfigureAwait(false);
 
         var movements = await (

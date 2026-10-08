@@ -85,7 +85,7 @@ public sealed class FieldEncryptionService : IFieldEncryptionService
     public async Task<int> ReencryptAsync(CancellationToken ct = default)
     {
         int rows = 0;
-        rows += await RewriteAsync(_db.Employees.IgnoreQueryFilters(), ct).ConfigureAwait(false);
+        rows += await RewriteAsync(_db.Employees.IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]), ct).ConfigureAwait(false);
         rows += await RewriteAsync(_db.Set<DetailChangeRequest>(), ct).ConfigureAwait(false);
         return rows;
     }

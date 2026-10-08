@@ -156,7 +156,7 @@ public sealed class DashboardReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BranchesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         Dictionary<long, string> branches = await _db.Branches.AsNoTracking().Where(b => b.CompanyId == companyId).ToDictionaryAsync(b => b.Id, b => b.Name, ct).ConfigureAwait(false);
-        Dictionary<long, long> terminals = await _db.PosTerminals.AsNoTracking().IgnoreQueryFilters().Where(t => t.CompanyId == companyId).ToDictionaryAsync(t => t.Id, t => t.BranchId, ct).ConfigureAwait(false);
+        Dictionary<long, long> terminals = await _db.PosTerminals.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(t => t.CompanyId == companyId).ToDictionaryAsync(t => t.Id, t => t.BranchId, ct).ConfigureAwait(false);
         var sales = (await _db.Sales.AsNoTracking().Include(s => s.Lines).Where(s => s.CompanyId == companyId && s.Status == SaleStatus.Completed && s.SaleDate >= fromDate && s.SaleDate <= toDate)
                 .ToListAsync(ct).ConfigureAwait(false))
             .GroupBy(s => terminals.GetValueOrDefault(s.TerminalId)).Select(g => (Branch: g.Key, Count: g.Count(), Net: g.SelectMany(s => s.Lines).Sum(l => l.LineNet))).OrderByDescending(x => x.Net).ToList();

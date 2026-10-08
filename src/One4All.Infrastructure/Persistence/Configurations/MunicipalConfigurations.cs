@@ -317,7 +317,7 @@ internal sealed class TariffConfiguration : IEntityTypeConfiguration<Tariff>
         b.Property(x => x.Instalments).HasDefaultValue(1);
         // A tariff code has effective-dated versions: one per code and effective date.
         b.HasIndex(x => new { x.CompanyId, x.Code, x.EffectiveFrom }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -358,7 +358,7 @@ internal sealed class PropertyConfiguration : IEntityTypeConfiguration<Property>
         b.HasMany(x => x.Services).WithOne().HasForeignKey(x => x.PropertyId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Services).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.StandNumber }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -386,7 +386,7 @@ internal sealed class MeterConfiguration : IEntityTypeConfiguration<Meter>
         b.Property(x => x.EstimatedSinceActual).HasPrecision(19, 4);
         b.Property(x => x.UnitsCredit).HasPrecision(19, 4);
         b.HasIndex(x => new { x.CompanyId, x.Serial }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

@@ -16,7 +16,7 @@ internal sealed class WorkflowDefinitionConfiguration : IEntityTypeConfiguration
         b.HasMany(x => x.Stages).WithOne().HasForeignKey(x => x.WorkflowDefinitionId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Stages).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.DocumentType }).HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

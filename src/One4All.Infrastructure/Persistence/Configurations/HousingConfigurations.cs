@@ -22,7 +22,7 @@ internal sealed class LandParcelConfiguration : IEntityTypeConfiguration<LandPar
             o.Property(p => p.AreaSquareMetres).HasColumnName("mapped_area_m2").HasPrecision(19, 4);
         });
         b.HasIndex(x => new { x.CompanyId, x.ParcelNumber }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -37,7 +37,7 @@ internal sealed class HousingSchemeConfiguration : IEntityTypeConfiguration<Hous
         b.Property(x => x.Ward).HasMaxLength(40);
         b.Property(x => x.SchemeType).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -67,7 +67,7 @@ internal sealed class HousingStandConfiguration : IEntityTypeConfiguration<Housi
             o.Property(p => p.AreaSquareMetres).HasColumnName("mapped_area_m2").HasPrecision(19, 4);
         });
         b.HasIndex(x => new { x.CompanyId, x.StandNumber }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -108,7 +108,7 @@ internal sealed class HousingApplicantConfiguration : IEntityTypeConfiguration<H
         b.HasIndex(x => new { x.CompanyId, x.IdNumber }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => new { x.CompanyId, x.WaitingListNumber }).IsUnique().HasFilter("waiting_list_number IS NOT NULL");
         b.HasIndex(x => new { x.CompanyId, x.Category, x.Status });
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

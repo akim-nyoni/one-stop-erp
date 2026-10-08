@@ -22,7 +22,7 @@ internal sealed class LedgerAccountConfiguration : IEntityTypeConfiguration<Ledg
         b.Ignore(x => x.NormalBalance);
         b.Ignore(x => x.IsPostableManually);
         b.HasIndex(x => new { x.CompanyId, x.AccountCode }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -35,7 +35,7 @@ internal sealed class CostCentreConfiguration : IEntityTypeConfiguration<CostCen
         b.Property(x => x.Code).HasMaxLength(3);
         b.Property(x => x.Name).HasMaxLength(120);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -48,7 +48,7 @@ internal sealed class FundConfiguration : IEntityTypeConfiguration<Fund>
         b.Property(x => x.Code).HasMaxLength(20);
         b.Property(x => x.Name).HasMaxLength(120);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -118,7 +118,7 @@ internal sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
         b.Property(x => x.Name).HasMaxLength(160);
         b.Property(x => x.FundCode).HasMaxLength(20);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 
@@ -131,7 +131,7 @@ internal sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departm
         b.Property(x => x.Code).HasMaxLength(3);
         b.Property(x => x.Name).HasMaxLength(120);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

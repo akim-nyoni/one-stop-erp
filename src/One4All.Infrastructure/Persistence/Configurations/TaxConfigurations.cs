@@ -23,7 +23,7 @@ internal sealed class TaxCodeConfiguration : IEntityTypeConfiguration<TaxCode>
 
         b.HasMany(x => x.Rates).WithOne().HasForeignKey(x => x.TaxCodeId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Rates).UsePropertyAccessMode(PropertyAccessMode.Field);
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

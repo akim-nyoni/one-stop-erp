@@ -19,7 +19,7 @@ internal sealed class PriceListConfiguration : IEntityTypeConfiguration<PriceLis
         b.Property(x => x.CostPlusRoundTo).HasPrecision(19, 4);
         b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.PriceListId).OnDelete(DeleteBehavior.Cascade);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
 }
 

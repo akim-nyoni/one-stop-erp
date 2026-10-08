@@ -84,7 +84,7 @@ public sealed class JobScheduler : IJobScheduler
     /// <inheritdoc />
     public async Task<SchedulerPass> RunDueAsync(DateTimeOffset now, long? companyId = null, CancellationToken ct = default)
     {
-        List<ScheduledJob> due = await _db.Set<ScheduledJob>().IgnoreQueryFilters().Where(j => j.IsEnabled && j.NextRunAt <= now && (companyId == null || j.CompanyId == companyId))
+        List<ScheduledJob> due = await _db.Set<ScheduledJob>().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(j => j.IsEnabled && j.NextRunAt <= now && (companyId == null || j.CompanyId == companyId))
             .OrderBy(j => j.NextRunAt).ThenBy(j => j.Id).ToListAsync(ct).ConfigureAwait(false);
         int failed = 0;
         foreach (ScheduledJob job in due)

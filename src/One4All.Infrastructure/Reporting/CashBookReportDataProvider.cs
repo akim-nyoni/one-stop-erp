@@ -185,7 +185,7 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
     // A cheque still issued more than the stale limit after it was written is stale (as at the end of the period).
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ChequesAsync(long companyId, DateOnly fromDate, DateOnly toDate, int staleMonths, CancellationToken ct)
     {
-        Dictionary<long, string> banks = await _db.BankAccounts.AsNoTracking().IgnoreQueryFilters().Where(b => b.CompanyId == companyId).ToDictionaryAsync(b => b.Id, b => b.Code, ct).ConfigureAwait(false);
+        Dictionary<long, string> banks = await _db.BankAccounts.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(b => b.CompanyId == companyId).ToDictionaryAsync(b => b.Id, b => b.Code, ct).ConfigureAwait(false);
         List<Core.Banking.Cheque> cheques = await _db.Cheques.AsNoTracking().Where(c => c.CompanyId == companyId && c.IssuedOn >= fromDate && c.IssuedOn <= toDate).ToListAsync(ct).ConfigureAwait(false);
         return [.. cheques.OrderBy(c => banks.GetValueOrDefault(c.BankAccountId), StringComparer.Ordinal).ThenBy(c => c.ChequeNumber, StringComparer.Ordinal).Select(c =>
         {
