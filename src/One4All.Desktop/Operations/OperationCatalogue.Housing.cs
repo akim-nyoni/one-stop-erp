@@ -1085,7 +1085,113 @@ public static partial class OperationCatalogue
                 ("Lease", x => x.LeaseNumber), ("Stand", x => x.StandId), ("Lessee", x => x.LesseeCustomerId), ("Use", x => x.Use), ("From", x => D(x.StartDate)), ("Years", x => x.TermYears),
                 ("Rent", x => M(x.AnnualRent))),
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Scheme budget and costs", ListTitle = "Schemes",
+            Description = "Sets a housing scheme's budget for each cost element (land, servicing, professional fees, overheads) and records actual costs against them, capitalised "
+                + "into the scheme's stands.",
+            Fields = [Pick("Step", "Step", ["Set budget", "Record cost"]), Req("Scheme", "Scheme code"), Pick("Element", "Cost element", Enum.GetNames<SchemeCostElement>()), Num("Amount", "Amount"),
+                Opt("Reference", "Reference (cost)"), Opt("Description", "Description (cost)"), Opt("Stands", "Stands (WIP) account"), Opt("Funding", "Paid from / funding account"), Today()],
+            Run = async (c, i) =>
+            {
+                ISchemeBudgetService budgets = c.Get<ISchemeBudgetService>();
+                SchemeCostElement element = Enum.Parse<SchemeCostElement>(i.Text("Element"));
+                return i.Text("Step") == "Set budget"
+                    ? Check(await budgets.SetBudgetAsync(c.CompanyId, i.Text("Scheme"), element, i.Number("Amount")).ConfigureAwait(true), "Budget saved.")
+                    : $"Cost recorded ({Check(await budgets.RecordCostAsync(new SchemeCostRequest
+                    {
+                        CompanyId = c.CompanyId, SchemeCode = i.Text("Scheme"), Element = element, Date = i.Date("Date"), Amount = i.Number("Amount"), Reference = i.Optional("Reference") ?? string.Empty,
+                        Description = i.Optional("Description") ?? string.Empty, StandsAccountCode = i.Optional("Stands") ?? string.Empty, FundingAccountCode = i.Optional("Funding") ?? string.Empty,
+                    }).ConfigureAwait(true))}).";
+            },
+            List = SchemesAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Scheme progress", ListTitle = "Schemes",
+            Description = "Records survey progress on stands (pegged, diagram lodged, diagram approved — several stands comma-separated), a bulk-service servicing certificate (water, "
+                + "sewer, roads, electricity, storm water: % complete and stands reached), and a land parcel's valuation.",
+            Fields = [Pick("Step", "Step", ["Survey", "Servicing certificate", "Valuation"]), Opt("Stands", "Stand numbers, comma-separated (survey)"), Pick("Stage", "Survey stage", Enum.GetNames<SurveyStage>()),
+                Opt("Scheme", "Scheme code (servicing)"), Pick("Service", "Bulk service", Enum.GetNames<BulkService>()), Num("Percent", "% complete", "0"), Num("Reached", "Stands reached", "0"),
+                Opt("Parcel", "Land parcel number (valuation)"), Num("Value", "Value", "0"), Opt("Valuer", "Valuer"), Opt("Reference", "Reference"), Today()],
+            Run = async (c, i) =>
+            {
+                ISchemeProgressService progress = c.Get<ISchemeProgressService>();
+                switch (i.Text("Step"))
+                {
+                    case "Survey":
+                        List<string> stands = [.. (i.Optional("Stands") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+                        return $"{Check(await progress.RecordSurveyAsync(c.CompanyId, stands, Enum.Parse<SurveyStage>(i.Text("Stage")), i.Date("Date"), i.Optional("Reference") ?? string.Empty).ConfigureAwait(true))} stand(s) updated.";
+                    case "Servicing certificate":
+                        return Check(await progress.RecordServicingAsync(new ServicingCertificate
+                        {
+                            CompanyId = c.CompanyId, SchemeCode = i.Optional("Scheme") ?? string.Empty, Service = Enum.Parse<BulkService>(i.Text("Service")), Date = i.Date("Date"), PercentComplete = i.Number("Percent"),
+                            StandsReached = i.Whole("Reached"), Reference = i.Optional("Reference") ?? string.Empty,
+                        }).ConfigureAwait(true), _ => "Certificate recorded.");
+                    default:
+                        return Check(await progress.RecordValuationAsync(c.CompanyId, i.Optional("Parcel") ?? string.Empty, i.Date("Date"), i.Number("Value"), i.Optional("Valuer") ?? string.Empty).ConfigureAwait(true),
+                            _ => "Valuation recorded.");
+                }
+            },
+            List = SchemesAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Servicing cost apportionment", ListTitle = "Schemes",
+            Description = "Links a scheme to the servicing contract whose cost it carries and how it is shared (equally, by area, by frontage, by zoning weight); sets a stand's frontage "
+                + "and zoning weight; apportions the contract's cost to date to the stands; Cost per stand shows each stand's land and servicing cost.",
+            Fields = [Pick("Step", "Step", ["Link contract", "Stand measures", "Apportion", "Cost per stand"]), Opt("Scheme", "Scheme code"), Opt("Contract", "Job contract number (link)"),
+                Pick("Basis", "Share by", Enum.GetNames<ServicingBasis>()), Opt("Stand", "Stand number (measures)"), OptNum("Frontage", "Frontage (m)"), OptNum("Weight", "Zoning weight"),
+                Opt("Wip", "Servicing WIP account (apportion)"), Opt("Available", "Stands available account (apportion)"), Today()],
+            Run = async (c, i) =>
+            {
+                IServicingCostService servicing = c.Get<IServicingCostService>();
+                async Task<long> SchemeId() => await FindAsync(c.Db.HousingSchemes, x => x.CompanyId == c.CompanyId && x.Code == (i.Optional("Scheme") ?? string.Empty).ToUpper(), x => x.Id, "scheme",
+                    i.Optional("Scheme") ?? string.Empty).ConfigureAwait(true);
+                switch (i.Text("Step"))
+                {
+                    case "Link contract":
+                        return Check(await servicing.LinkAsync(c.CompanyId, await SchemeId().ConfigureAwait(true), await ContractAsync(c, i.Optional("Contract") ?? string.Empty).ConfigureAwait(true),
+                            Enum.Parse<ServicingBasis>(i.Text("Basis"))).ConfigureAwait(true), "Contract linked.");
+                    case "Stand measures":
+                        long stand = await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == (i.Optional("Stand") ?? string.Empty).ToUpper(), x => x.Id, "stand",
+                            i.Optional("Stand") ?? string.Empty).ConfigureAwait(true);
+                        return Check(await servicing.SetMeasuresAsync(c.CompanyId, stand, i.OptionalNumber("Frontage"), i.OptionalNumber("Weight")).ConfigureAwait(true), "Measures saved.");
+                    case "Apportion":
+                        IReadOnlyList<ServicingRunLine> lines = Check(await servicing.ApportionAsync(c.CompanyId, await SchemeId().ConfigureAwait(true), i.Date("Date"), i.Optional("Wip") ?? string.Empty,
+                            i.Optional("Available") ?? string.Empty).ConfigureAwait(true));
+                        return lines.Count == 0 ? "Nothing new to apportion." : string.Join(Environment.NewLine, lines.Select(l => $"{l.ContractNumber}: {M(l.Apportioned)} {l.JournalNumber}"));
+                    default:
+                        IReadOnlyList<StandCostEntry> costs = await servicing.CostPerStandAsync(c.CompanyId, await SchemeId().ConfigureAwait(true)).ConfigureAwait(true);
+                        return string.Join(Environment.NewLine, costs.Select(x => $"{x.StandNumber,-12} cost {M(x.Cost),12}  of which servicing {M(x.Servicing),12}"));
+                }
+            },
+            List = SchemesAsync,
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Link stands to municipal accounts", ListTitle = "Schemes",
+            Description = "Sets when a housing stand becomes a municipal property (on allocation accepted, sale or title registered) for a ward, and which service tariffs it starts on "
+                + "(tariff codes, comma-separated); the link then happens as those events occur.",
+            Fields = [Pick("Trigger", "When", Enum.GetNames<MunicipalLinkTrigger>()), Req("Ward", "Ward"), Opt("Tariffs", "Tariff codes, comma-separated")],
+            Run = async (c, i) =>
+            {
+                List<long> tariffs = [];
+                foreach (string code in (i.Optional("Tariffs") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    tariffs.Add(await FindAsync(c.Db.Tariffs, t => t.CompanyId == c.CompanyId && t.Code == code.ToUpper(), t => t.Id, "tariff", code).ConfigureAwait(true));
+                }
+
+                return Check(await c.Get<IHousingMunicipalLinkService>().ConfigureAsync(c.CompanyId, Enum.Parse<MunicipalLinkTrigger>(i.Text("Trigger")), i.Text("Ward"), tariffs).ConfigureAwait(true),
+                    "Municipal link set.");
+            },
+            List = SchemesAsync,
+        };
     }
+
+    private static async Task<System.Data.DataTable> SchemesAsync(OperationContext c)
+        => Table(await c.Db.HousingSchemes.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+            ("Scheme", x => x.Code), ("Name", x => x.Name));
 
     private static async Task<System.Data.DataTable> ApplicantsAsync(OperationContext c)
         => Table(await c.Db.HousingApplicants.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Take(500).ToListAsync().ConfigureAwait(true),
