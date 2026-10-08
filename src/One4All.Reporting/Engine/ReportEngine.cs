@@ -197,7 +197,7 @@ public sealed class ReportEngine
 
             if (element.Kind == ElementKind.Chart)
             {
-                rendered.Cells.AddRange(Charts.Bars(element, scope));
+                rendered.Cells.AddRange(ChartImages.Cells(element, scope));
                 continue;
             }
 

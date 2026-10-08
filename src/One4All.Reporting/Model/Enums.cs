@@ -225,3 +225,28 @@ public enum AggregateScope
     /// <summary>Always the whole report, wherever the element sits (e.g. a grand total in a group footer); Report and Group follow the band.</summary>
     GrandTotal = 3,
 }
+
+/// <summary>The kind of chart an element draws.</summary>
+public enum ChartType
+{
+    /// <summary>Horizontal bars with their values (drawn as cells).</summary>
+    Bar = 0,
+
+    /// <summary>Vertical columns (grouped side by side per series).</summary>
+    Column = 1,
+
+    /// <summary>Columns with the series stacked.</summary>
+    StackedColumn = 2,
+
+    /// <summary>A line per series.</summary>
+    Line = 3,
+
+    /// <summary>A line per series with the area beneath it shaded.</summary>
+    Area = 4,
+
+    /// <summary>A pie of the categories.</summary>
+    Pie = 5,
+
+    /// <summary>A pie with a hole.</summary>
+    Donut = 6,
+}

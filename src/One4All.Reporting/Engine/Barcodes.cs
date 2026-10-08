@@ -25,7 +25,105 @@ public static class Barcodes
     private const int StartB = 104;
 
     /// <summary>The symbologies supported.</summary>
-    public static readonly IReadOnlyList<string> Symbologies = ["QR", "Code128"];
+    public static readonly IReadOnlyList<string> Symbologies = ["QR", "Code128", "Code39", "EAN13"];
+
+    // Code 39: per character, nine elements (bar, space, bar …) where 1 is wide.
+    private static readonly Dictionary<char, string> Code39 = new()
+    {
+        ['0'] = "000110100", ['1'] = "100100001", ['2'] = "001100001", ['3'] = "101100000", ['4'] = "000110001", ['5'] = "100110000", ['6'] = "001110000",
+        ['7'] = "000100101", ['8'] = "100100100", ['9'] = "001100100", ['A'] = "100001001", ['B'] = "001001001", ['C'] = "101001000", ['D'] = "000011001",
+        ['E'] = "100011000", ['F'] = "001011000", ['G'] = "000001101", ['H'] = "100001100", ['I'] = "001001100", ['J'] = "000011100", ['K'] = "100000011",
+        ['L'] = "001000011", ['M'] = "101000010", ['N'] = "000010011", ['O'] = "100010010", ['P'] = "001010010", ['Q'] = "000000111", ['R'] = "100000110",
+        ['S'] = "001000110", ['T'] = "000010110", ['U'] = "110000001", ['V'] = "011000001", ['W'] = "111000000", ['X'] = "010010001", ['Y'] = "110010000",
+        ['Z'] = "011010000", ['-'] = "010000101", ['.'] = "110000100", [' '] = "011000100", ['$'] = "010101000", ['/'] = "010100010", ['+'] = "010001010",
+        ['%'] = "000101010", ['*'] = "010010100",
+    };
+
+    // EAN-13 digit codes (left odd "L", left even "G", right "R") and the left-half parity each first digit implies.
+    private static readonly string[] EanL = ["0001101", "0011001", "0010011", "0111101", "0100011", "0110001", "0101111", "0111011", "0110111", "0001011"];
+    private static readonly string[] EanG = ["0100111", "0110011", "0011011", "0100001", "0011101", "0111001", "0000101", "0010001", "0001001", "0010111"];
+    private static readonly string[] EanR = ["1110010", "1100110", "1101100", "1000010", "1011100", "1001110", "1010000", "1000100", "1001000", "1110100"];
+    private static readonly string[] EanParity = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG", "LGGGLL", "LGLGLG", "LGLGGL", "LGGLGL"];
+
+    /// <summary>The Code 39 modules (true = dark) for a value: start and stop asterisks, wide elements three modules, a narrow gap between characters.</summary>
+    /// <param name="value">The value (upper-cased; digits, A–Z, space and - . $ / + %).</param>
+    /// <returns>The modules, or null when a character cannot be encoded.</returns>
+    public static IReadOnlyList<bool>? Code39Modules(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        string text = "*" + value.ToUpperInvariant() + "*";
+        if (value.Contains('*', StringComparison.Ordinal) || text.Any(c => !Code39.ContainsKey(c)))
+        {
+            return null;
+        }
+
+        List<bool> modules = [];
+        foreach (char c in text)
+        {
+            if (modules.Count > 0)
+            {
+                modules.Add(false); // inter-character gap
+            }
+
+            string pattern = Code39[c];
+            for (int i = 0; i < pattern.Length; i++)
+            {
+                modules.AddRange(Enumerable.Repeat(i % 2 == 0, pattern[i] == '1' ? 3 : 1));
+            }
+        }
+
+        return modules;
+    }
+
+    /// <summary>The EAN-13 check digit for twelve digits.</summary>
+    /// <param name="twelve">The first twelve digits.</param>
+    /// <returns>The check digit.</returns>
+    public static int Ean13CheckDigit(string twelve)
+    {
+        ArgumentNullException.ThrowIfNull(twelve);
+        int sum = 0;
+        for (int i = 0; i < 12; i++)
+        {
+            sum += (twelve[i] - '0') * (i % 2 == 0 ? 1 : 3);
+        }
+
+        return (10 - (sum % 10)) % 10;
+    }
+
+    /// <summary>The 95 EAN-13 modules ("1" dark) for twelve digits (the check digit is added) or thirteen (the check digit must be right).</summary>
+    /// <param name="value">The digits.</param>
+    /// <returns>The modules, or null when the value is not a valid EAN-13.</returns>
+    public static string? Ean13Modules(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        string digits = value.Trim();
+        if (digits.Length is not (12 or 13) || !digits.All(char.IsAsciiDigit))
+        {
+            return null;
+        }
+
+        int check = Ean13CheckDigit(digits[..12]);
+        if (digits.Length == 13 && digits[12] - '0' != check)
+        {
+            return null;
+        }
+
+        digits = digits[..12] + (char)('0' + check);
+        string parity = EanParity[digits[0] - '0'];
+        System.Text.StringBuilder modules = new("101");
+        for (int i = 1; i <= 6; i++)
+        {
+            modules.Append(parity[i - 1] == 'L' ? EanL[digits[i] - '0'] : EanG[digits[i] - '0']);
+        }
+
+        modules.Append("01010");
+        for (int i = 7; i <= 12; i++)
+        {
+            modules.Append(EanR[digits[i] - '0']);
+        }
+
+        return modules.Append("101").ToString();
+    }
 
     /// <summary>The Code 128 (set B) width pattern of a value: start, data, checksum and stop, as bar / space widths.</summary>
     /// <param name="value">Printable ASCII text.</param>
@@ -69,20 +167,43 @@ public static class Barcodes
             return new PngByteQRCode(data).GetGraphic(4);
         }
 
-        if (Code128Pattern(value) is not string pattern)
+        string kind = (symbology ?? "Code128").Replace(" ", string.Empty, StringComparison.Ordinal).Replace("-", string.Empty, StringComparison.Ordinal).ToUpperInvariant();
+        List<bool> bars;
+        if (kind == "CODE39")
         {
-            return null;
+            if (Code39Modules(value) is not IReadOnlyList<bool> code39)
+            {
+                return null;
+            }
+
+            bars = [.. code39];
+        }
+        else if (kind is "EAN13" or "EAN")
+        {
+            if (Ean13Modules(value) is not string ean)
+            {
+                return null;
+            }
+
+            bars = [.. ean.Select(m => m == '1')];
+        }
+        else
+        {
+            if (Code128Pattern(value) is not string pattern)
+            {
+                return null;
+            }
+
+            bars = [];
+            for (int i = 0; i < pattern.Length; i++)
+            {
+                bars.AddRange(Enumerable.Repeat(i % 2 == 0, pattern[i] - '0'));
+            }
         }
 
         // Bars two pixels a module, with a quiet zone of ten modules each side.
         const int moduleWidth = 2, quiet = 10, height = 50;
-        List<bool> modules = [.. Enumerable.Repeat(false, quiet)];
-        for (int i = 0; i < pattern.Length; i++)
-        {
-            modules.AddRange(Enumerable.Repeat(i % 2 == 0, pattern[i] - '0'));
-        }
-
-        modules.AddRange(Enumerable.Repeat(false, quiet));
+        List<bool> modules = [.. Enumerable.Repeat(false, quiet), .. bars, .. Enumerable.Repeat(false, quiet)];
         byte[] row = [.. modules.SelectMany(dark => Enumerable.Repeat(dark ? (byte)0 : (byte)255, moduleWidth))];
         return GreyscalePng(row.Length, height, _ => row);
     }
@@ -92,8 +213,21 @@ public static class Barcodes
     /// <returns>The data URI.</returns>
     public static string DataUri(byte[] png) => "data:image/png;base64," + Convert.ToBase64String(png);
 
+    /// <summary>A minimal 8-bit RGB PNG from a row-major RGB buffer.</summary>
+    /// <param name="width">Width in pixels.</param>
+    /// <param name="height">Height in pixels.</param>
+    /// <param name="rgb">Three bytes a pixel, row by row.</param>
+    /// <returns>The PNG.</returns>
+    public static byte[] RgbPng(int width, int height, byte[] rgb)
+    {
+        ArgumentNullException.ThrowIfNull(rgb);
+        return Png(width, height, 2, y => rgb.AsSpan(y * width * 3, width * 3).ToArray());
+    }
+
     // A minimal 8-bit greyscale PNG: signature, IHDR, one zlib IDAT, IEND.
-    private static byte[] GreyscalePng(int width, int height, Func<int, byte[]> rowAt)
+    private static byte[] GreyscalePng(int width, int height, Func<int, byte[]> rowAt) => Png(width, height, 0, rowAt);
+
+    private static byte[] Png(int width, int height, byte colourType, Func<int, byte[]> rowAt)
     {
         using MemoryStream raw = new();
         for (int y = 0; y < height; y++)
@@ -115,7 +249,7 @@ public static class Barcodes
         WriteBigEndian(header, 0, width);
         WriteBigEndian(header, 4, height);
         header[8] = 8; // bit depth
-        header[9] = 0; // greyscale
+        header[9] = colourType; // 0 greyscale, 2 RGB
         Chunk(png, "IHDR", header);
         Chunk(png, "IDAT", compressed.ToArray());
         Chunk(png, "IEND", []);

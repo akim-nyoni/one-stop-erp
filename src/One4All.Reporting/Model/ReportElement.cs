@@ -62,6 +62,12 @@ public sealed class ReportElement
     /// <summary>Gets or sets a chart's bar colour.</summary>
     public string ChartColor { get; set; } = "#2E7D32";
 
+    /// <summary>Gets or sets the kind of chart.</summary>
+    public ChartType ChartType { get; set; }
+
+    /// <summary>Gets or sets a chart's series field: one bar / line / stack segment per value (blank: one series).</summary>
+    public string? ChartSeriesField { get; set; }
+
     /// <summary>The expression for a <see cref="ElementKind.Expression"/> element.</summary>
     public string? Expression { get; set; }
 
