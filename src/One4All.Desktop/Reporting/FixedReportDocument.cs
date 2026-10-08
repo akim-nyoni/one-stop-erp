@@ -38,6 +38,11 @@ public static class FixedReportDocument
             {
                 Width = width * PointsToDips, Height = height * PointsToDips, Background = Brushes.White, FlowDirection = model.RightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight,
             };
+            if (TryImage(model.Page.BackgroundImage) is BitmapImage background)
+            {
+                fixedPage.Children.Add(new Image { Source = background, Width = width * PointsToDips, Height = height * PointsToDips, Stretch = Stretch.Uniform });
+            }
+
             if (!string.IsNullOrWhiteSpace(model.Page.Watermark))
             {
                 fixedPage.Children.Add(Watermark(model.Page.Watermark, width * PointsToDips, height * PointsToDips));

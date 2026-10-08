@@ -42,7 +42,10 @@ public sealed class HtmlReportRenderer : IReportRenderer
           .Append("</title></head><body style=\"margin:0;background:#eee;font-family:Segoe UI,Arial,sans-serif\">");
 
         double pageWidth = PageWidthPoints(model.Page);
-        sb.Append("<div style=\"width:").Append(Px(pageWidth)).Append("px;margin:12px auto;background:white;padding:")
+        string background = string.IsNullOrWhiteSpace(model.Page.BackgroundImage) ? "white"
+            : "white url('" + (model.Page.BackgroundImage.StartsWith("data:", StringComparison.Ordinal) ? model.Page.BackgroundImage : "data:image/png;base64," + model.Page.BackgroundImage)
+                + "') top left/100% auto no-repeat";
+        sb.Append("<div style=\"width:").Append(Px(pageWidth)).Append("px;margin:12px auto;background:").Append(background).Append(";padding:")
           .Append(Px(model.Page.MarginTop)).Append("px ").Append(Px(model.Page.MarginRight)).Append("px ")
           .Append(Px(model.Page.MarginBottom)).Append("px ").Append(Px(model.Page.MarginLeft)).Append("px\">");
 

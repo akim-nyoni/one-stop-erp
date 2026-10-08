@@ -226,6 +226,19 @@ public enum AggregateScope
     GrandTotal = 3,
 }
 
+/// <summary>Printing on one or both sides of the paper.</summary>
+public enum DuplexMode
+{
+    /// <summary>One side.</summary>
+    OneSided = 0,
+
+    /// <summary>Both sides, turned on the long edge (book style).</summary>
+    LongEdge = 1,
+
+    /// <summary>Both sides, turned on the short edge (calendar style).</summary>
+    ShortEdge = 2,
+}
+
 /// <summary>The kind of chart an element draws.</summary>
 public enum ChartType
 {

@@ -114,6 +114,7 @@ public partial class ReportViewerWindow : Window
         }
 
         PrintDialog dialog = new() { UserPageRangeEnabled = true };
+        PrintPreferences.Apply(dialog, _viewModel.SelectedReport.DefinitionJson);
         if (dialog.ShowDialog() != true)
         {
             return;

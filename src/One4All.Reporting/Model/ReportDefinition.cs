@@ -36,6 +36,21 @@ public sealed class PageSetup
     /// </summary>
     public string? WatermarkExpression { get; set; }
 
+    /// <summary>Gets or sets the number of columns the detail rows flow across (labels, cards); 1 for an ordinary report.</summary>
+    public int Columns { get; set; } = 1;
+
+    /// <summary>Gets or sets the gap between columns, in points.</summary>
+    public double ColumnGap { get; set; } = 12;
+
+    /// <summary>Gets or sets a picture (base64 or a data URI) printed behind every page — letterhead, a form, a certificate border.</summary>
+    public string? BackgroundImage { get; set; }
+
+    /// <summary>Gets or sets the printer tray the report prefers (Auto, Manual, Cassette, Tractor…), offered first in the print dialog.</summary>
+    public string? Tray { get; set; }
+
+    /// <summary>Gets or sets whether the report prefers printing on both sides.</summary>
+    public DuplexMode Duplex { get; set; }
+
     /// <summary>A copy of the page setup with another watermark.</summary>
     /// <param name="watermark">The watermark.</param>
     /// <returns>The copy.</returns>

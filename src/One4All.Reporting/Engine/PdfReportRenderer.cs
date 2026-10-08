@@ -31,6 +31,11 @@ public sealed class PdfReportRenderer : IReportRenderer
                 page.MarginRight((float)model.Page.MarginRight);
                 page.MarginTop((float)model.Page.MarginTop);
                 page.MarginBottom((float)model.Page.MarginBottom);
+                if (Picture(model.Page.BackgroundImage) is byte[] background)
+                {
+                    page.Background().Image(background).FitArea();
+                }
+
                 if (!string.IsNullOrWhiteSpace(model.Page.Watermark))
                 {
                     page.Foreground().AlignCenter().AlignMiddle().Text(model.Page.Watermark).FontSize(64).Bold().FontColor(Colors.Grey.Lighten2);
@@ -74,6 +79,24 @@ public sealed class PdfReportRenderer : IReportRenderer
                 }
             });
         }).GeneratePdf();
+    }
+
+    // A base64 picture or data URI as bytes (null when absent or unreadable).
+    private static byte[]? Picture(string? data)
+    {
+        if (string.IsNullOrWhiteSpace(data))
+        {
+            return null;
+        }
+
+        try
+        {
+            return Convert.FromBase64String(data[(data.IndexOf(',', StringComparison.Ordinal) + 1)..]);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     private static void ConfigurePageSize(PageDescriptor page, PageSetup setup)

@@ -44,11 +44,11 @@ public sealed class ReportEngine
                 }
             }
 
-            return model;
+            return Columns.Arrange(model);
         }
 
         BuildGrouped(def, input, detail, model);
-        return model;
+        return Columns.Arrange(model);
     }
 
     // The page with its watermark for this run: an expression's text when it gives one, else the fixed watermark.
