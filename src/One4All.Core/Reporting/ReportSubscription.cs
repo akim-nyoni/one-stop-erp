@@ -65,6 +65,9 @@ public sealed class ReportSubscription : AuditableEntity, ICompanyScoped
     /// <summary>For bursting: the key is a customer (1) or supplier (2) code, sent to the trader's contacts.</summary>
     public int? BurstLedger { get; set; }
 
+    /// <summary>A folder (under the configured delivery root) each run is also saved to; null: email only.</summary>
+    public string? DeliveryFolder { get; set; }
+
     /// <summary>Starts or stops it.</summary>
     /// <param name="active">Whether it runs.</param>
     public void SetActive(bool active) => IsActive = active;

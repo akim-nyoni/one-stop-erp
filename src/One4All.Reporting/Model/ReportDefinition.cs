@@ -29,6 +29,22 @@ public sealed class PageSetup
 
     /// <summary>Optional watermark text.</summary>
     public string? Watermark { get; set; }
+
+    /// <summary>
+    /// An expression giving the watermark for each run (brief §13.4: "CONFIDENTIAL/DRAFT" driven by expression) — evaluated against the parameters,
+    /// the first row's fields, the user and the date, e.g. <c>"Draft".Equals(Param("Status")) ? "DRAFT" : ""</c>; blank falls back to <see cref="Watermark"/>.
+    /// </summary>
+    public string? WatermarkExpression { get; set; }
+
+    /// <summary>A copy of the page setup with another watermark.</summary>
+    /// <param name="watermark">The watermark.</param>
+    /// <returns>The copy.</returns>
+    public PageSetup WithWatermark(string? watermark)
+    {
+        PageSetup copy = (PageSetup)MemberwiseClone();
+        copy.Watermark = watermark;
+        return copy;
+    }
 }
 
 /// <summary>A report parameter prompted at run time (brief §13.1).</summary>

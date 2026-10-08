@@ -23,6 +23,7 @@ internal sealed class ReportSubscriptionConfiguration : IEntityTypeConfiguration
 {
     public void Configure(EntityTypeBuilder<ReportSubscription> b)
     {
+        b.Property(x => x.DeliveryFolder).HasMaxLength(200);
         b.ToTable("report_subscription", Schemas.Reporting);
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).HasMaxLength(40);

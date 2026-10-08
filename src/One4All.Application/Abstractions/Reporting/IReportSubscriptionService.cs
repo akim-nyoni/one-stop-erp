@@ -31,6 +31,9 @@ public sealed class SubscriptionRequest
 
     /// <summary>For bursting: send each part to the contacts of the customer or supplier the key names.</summary>
     public One4All.Core.Trading.TradingLedger? BurstLedger { get; init; }
+
+    /// <summary>A folder, relative to the configured delivery root, each run is saved to (with or instead of emailing it).</summary>
+    public string? DeliveryFolder { get; init; }
 }
 
 /// <summary>A delivery log line.</summary>

@@ -23475,6 +23475,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<string>("DeliveryFolder")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("delivery_folder");
+
                     b.Property<int>("Format")
                         .HasColumnType("integer")
                         .HasColumnName("format");

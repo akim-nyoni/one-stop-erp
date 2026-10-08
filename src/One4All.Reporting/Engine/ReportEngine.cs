@@ -25,7 +25,7 @@ public sealed class ReportEngine
         }
 
         ReportDefinition def = input.Definition;
-        RenderModel model = new() { ReportName = def.Name, Page = def.Page, RightToLeft = input.Culture?.TextInfo.IsRightToLeft ?? false };
+        RenderModel model = new() { ReportName = def.Name, Page = ResolvePage(def, input), RightToLeft = input.Culture?.TextInfo.IsRightToLeft ?? false };
 
         model.ReportHeader = ResolveOptional(def.BandOfType(BandType.ReportHeader), input, null, input.Rows);
         model.PageHeader = ResolveOptional(def.BandOfType(BandType.PageHeader), input, null, input.Rows);
@@ -49,6 +49,18 @@ public sealed class ReportEngine
 
         BuildGrouped(def, input, detail, model);
         return model;
+    }
+
+    // The page with its watermark for this run: an expression's text when it gives one, else the fixed watermark.
+    private PageSetup ResolvePage(ReportDefinition def, ReportInput input)
+    {
+        if (string.IsNullOrWhiteSpace(def.Page.WatermarkExpression))
+        {
+            return def.Page;
+        }
+
+        string? text = ValueToString(Evaluate(def.Page.WatermarkExpression, input, input.Rows.Count > 0 ? input.Rows[0] : EmptyRow));
+        return def.Page.WithWatermark(string.IsNullOrWhiteSpace(text) ? def.Page.Watermark : text);
     }
 
     private void BuildGrouped(ReportDefinition def, ReportInput input, ReportBand? detail, RenderModel model)

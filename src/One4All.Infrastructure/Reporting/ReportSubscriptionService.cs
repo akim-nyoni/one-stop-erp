@@ -18,13 +18,16 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
     private readonly IReportRunner _runner;
     private readonly INotificationService _messages;
     private readonly IReportBurstService? _burst;
+    private readonly ReportDeliveryOptions _delivery;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="runner">The report runner.</param>
     /// <param name="messages">The notification service.</param>
-    public ReportSubscriptionService(One4AllDbContext db, IReportRunner runner, INotificationService messages, IReportBurstService? burst = null)
+    /// <param name="delivery">Where file deliveries may go.</param>
+    public ReportSubscriptionService(One4AllDbContext db, IReportRunner runner, INotificationService messages, IReportBurstService? burst = null, ReportDeliveryOptions? delivery = null)
     {
+        _delivery = delivery ?? new ReportDeliveryOptions();
         _burst = burst;
         _db = db;
         _runner = runner;
@@ -37,10 +40,17 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
         ArgumentNullException.ThrowIfNull(request);
         List<string> recipients = [.. request.Recipients.Where(r => !string.IsNullOrWhiteSpace(r)).Select(r => r.Trim()).Distinct(StringComparer.OrdinalIgnoreCase)];
         bool bursting = !string.IsNullOrWhiteSpace(request.BurstKeyField);
-        if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.ReportCode) || (!bursting && recipients.Count == 0) || !Enum.IsDefined(request.Format)
+        string? folder = string.IsNullOrWhiteSpace(request.DeliveryFolder) ? null : request.DeliveryFolder.Trim();
+        if (folder is not null && (bursting || _delivery.Resolve(folder) is null))
+        {
+            return Result.Failure(Error.Validation("Rpt.DeliveryFolder", bursting ? "A burst subscription is delivered by email, not to a folder."
+                : $"Folder '{folder}' must be a relative folder inside the delivery root."));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.ReportCode) || (!bursting && recipients.Count == 0 && folder is null) || !Enum.IsDefined(request.Format)
             || recipients.Any(r => !r.Contains('@', StringComparison.Ordinal)))
         {
-            return Result.Failure(Error.Validation("Rpt.Subscription", "A subscription needs a code, a report, a format and at least one email address (or a burst key)."));
+            return Result.Failure(Error.Validation("Rpt.Subscription", "A subscription needs a code, a report, a format and at least one email address (or a burst key, or a folder)."));
         }
 
         if (bursting && string.IsNullOrWhiteSpace(request.BurstRecipientField) && request.BurstLedger is null)
@@ -69,7 +79,7 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
         _db.Set<ReportSubscription>().Add(new ReportSubscription(request.CompanyId, code, reportCode, (int)request.Format, JsonSerializer.Serialize(request.Parameters), recipients)
         {
             BurstKeyField = bursting ? request.BurstKeyField!.Trim() : null, BurstRecipientField = bursting ? request.BurstRecipientField?.Trim() : null,
-            BurstLedger = bursting ? (int?)request.BurstLedger : null,
+            BurstLedger = bursting ? (int?)request.BurstLedger : null, DeliveryFolder = folder,
         });
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
@@ -171,6 +181,38 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
         }
 
         RenderedDocument document = rendered.Value;
+        int delivered = 0;
+        bool folderFailed = false;
+        if (subscription.DeliveryFolder is string folder)
+        {
+            // Saved under the delivery root, stamped with the run so earlier runs are kept.
+            string? path = _delivery.Resolve(folder);
+            string fileName = $"{runAt:yyyyMMdd-HHmm}-{document.FileName}";
+            try
+            {
+                if (path is null)
+                {
+                    throw new IOException($"Folder '{folder}' is outside the delivery root.");
+                }
+
+                Directory.CreateDirectory(path);
+                await File.WriteAllBytesAsync(Path.Combine(path, fileName), document.Content, ct).ConfigureAwait(false);
+                _db.Set<ReportDelivery>().Add(new ReportDelivery(subscription.CompanyId, subscription.Id, runAt, $"folder:{folder}", fileName, true, $"Saved to {Path.Combine(path, fileName)}"));
+                delivered++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _db.Set<ReportDelivery>().Add(new ReportDelivery(subscription.CompanyId, subscription.Id, runAt, $"folder:{folder}", fileName, false, ex.Message));
+                folderFailed = true;
+            }
+        }
+
+        if (subscription.Recipients.Count == 0)
+        {
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return folderFailed ? Error.Failure("Rpt.FolderDelivery", $"Subscription {subscription.Code} could not be saved to its folder.") : delivered;
+        }
+
         string summary = string.Join(", ", parameters.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key} = {Format(p.Value)}"));
         Result<long> batch = await _messages.QueueDirectAsync(subscription.CompanyId, $"Report {subscription.Code} {runAt:yyyy-MM-dd}", MessageChannel.Email, subscription.Recipients,
             $"{subscription.ReportCode} — {runAt:d MMMM yyyy}", $"Please find the {subscription.ReportCode} report attached ({summary}).",
@@ -182,7 +224,7 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return batch.IsFailure ? batch.Error : subscription.Recipients.Count;
+        return batch.IsFailure ? batch.Error : subscription.Recipients.Count + delivered;
     }
 
     private static string Format(object? value) => value switch

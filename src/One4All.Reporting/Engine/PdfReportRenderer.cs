@@ -31,6 +31,10 @@ public sealed class PdfReportRenderer : IReportRenderer
                 page.MarginRight((float)model.Page.MarginRight);
                 page.MarginTop((float)model.Page.MarginTop);
                 page.MarginBottom((float)model.Page.MarginBottom);
+                if (!string.IsNullOrWhiteSpace(model.Page.Watermark))
+                {
+                    page.Foreground().AlignCenter().AlignMiddle().Text(model.Page.Watermark).FontSize(64).Bold().FontColor(Colors.Grey.Lighten2);
+                }
 
                 if (model.PageHeader is not null)
                 {

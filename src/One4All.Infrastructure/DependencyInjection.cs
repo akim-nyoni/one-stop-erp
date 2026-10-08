@@ -32,8 +32,10 @@ public static class DependencyInjection
         LicensingOptions? licensingOptions = null,
         Communications.MessagingOptions? messagingOptions = null,
         Backup.BackupOptions? backupOptions = null,
-        FieldEncryptionOptions? fieldEncryption = null)
+        FieldEncryptionOptions? fieldEncryption = null,
+        Reporting.ReportDeliveryOptions? reportDelivery = null)
     {
+        services.AddSingleton(reportDelivery ?? new Reporting.ReportDeliveryOptions());
         // Column encryption for payroll (salary, bank details, national ID): keys from configuration, ONE4ALL_FIELD_KEY or a development key file.
         (FieldEncryptionOptions keys, bool developmentKey) = FieldEncryptionOptions.Resolve(fieldEncryption);
         FieldCipherHolder.Cipher = new FieldCipher(keys);
