@@ -103,6 +103,12 @@ public sealed class Item : SoftDeletableEntity, ICompanyScoped
     /// </summary>
     public string? PriceVarianceAccountCode { get; set; }
 
+    /// <summary>
+    /// Where a standard-costed assembly's usage variance goes: components used beyond (or short of) the bill of materials' standard quantities,
+    /// at the cost they were issued at (brief §3.6).
+    /// </summary>
+    public string? UsageVarianceAccountCode { get; set; }
+
     /// <summary>The weight of one unit in kilograms, used to share landed costs by weight.</summary>
     public decimal? UnitWeightKg { get; set; }
 

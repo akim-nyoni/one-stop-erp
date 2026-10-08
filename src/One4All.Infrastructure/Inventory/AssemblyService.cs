@@ -14,13 +14,15 @@ public sealed class AssemblyService : IAssemblyService
     private readonly One4AllDbContext _db;
     private readonly IInventoryService _inventory;
     private readonly INumberSequenceService _numbers;
+    private readonly One4All.Application.Abstractions.Accounting.IPostingEngine? _posting;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="inventory">Issues components and receives finished goods.</param>
     /// <param name="numbers">Numbers the runs.</param>
-    public AssemblyService(One4AllDbContext db, IInventoryService inventory, INumberSequenceService numbers)
+    public AssemblyService(One4AllDbContext db, IInventoryService inventory, INumberSequenceService numbers, One4All.Application.Abstractions.Accounting.IPostingEngine? posting = null)
     {
+        _posting = posting;
         _db = db;
         _inventory = inventory;
         _numbers = numbers;
@@ -89,10 +91,52 @@ public sealed class AssemblyService : IAssemblyService
         }
 
         decimal total = consumed.Sum(l => l.Cost);
-        decimal unitCost = Math.Round(total / actualOutput, 4, MidpointRounding.AwayFromZero);
+
+        // A standard-costed product separates its usage variance: components used beyond (or short of) standard, at the cost they were issued at,
+        // go to the usage variance account and the product takes the cost of the standard quantities (its receipt then posts any price variance).
+        decimal usageVariance = 0m;
+        Item parent = await _db.Items.AsNoTracking().FirstAsync(i => i.Id == bom.ParentItemId, ct).ConfigureAwait(false);
+        if (parent.CostingMethod == CostingMethod.Standard && !string.IsNullOrWhiteSpace(parent.UsageVarianceAccountCode) && _posting is not null)
+        {
+            foreach (AssemblyRunLine line in consumed.Where(l => l.ActualQuantity != l.StandardQuantity))
+            {
+                decimal unit = line.ActualQuantity > 0m ? line.Cost / line.ActualQuantity
+                    : await _db.Set<StockBalance>().Where(b => b.ItemId == line.ComponentItemId && b.WarehouseId == request.WarehouseId).Select(b => b.AverageCost).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+                usageVariance += (line.ActualQuantity - line.StandardQuantity) * unit;
+            }
+
+            usageVariance = decimal.Round(usageVariance, 2, MidpointRounding.AwayFromZero);
+            if (usageVariance != 0m)
+            {
+                Core.Accounting.CurrencyCode currency = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+                Result<One4All.Application.Abstractions.Accounting.PostingReceipt> posted = await _posting.PostAsync(new One4All.Application.Abstractions.Accounting.JournalRequest
+                {
+                    CompanyId = request.CompanyId, SourceModule = "INV", PostingDate = request.Date, TransactionCurrency = currency, EnforceManualJournalRules = false,
+                    DocumentType = "UsageVariance", DocumentNumber = $"{number.Value}-UV", Narrative = $"Usage variance on {number.Value} ({parent.Code})",
+                    Lines =
+                    [
+                        new One4All.Application.Abstractions.Accounting.JournalLineRequest
+                        {
+                            AccountCode = parent.UsageVarianceAccountCode!.Trim(), Side = usageVariance > 0m ? One4All.Application.Abstractions.Accounting.JournalSide.Debit : One4All.Application.Abstractions.Accounting.JournalSide.Credit, TransactionAmount = Math.Abs(usageVariance),
+                        },
+                        new One4All.Application.Abstractions.Accounting.JournalLineRequest
+                        {
+                            AccountCode = request.ClearingAccountCode.Trim(), Side = usageVariance > 0m ? One4All.Application.Abstractions.Accounting.JournalSide.Credit : One4All.Application.Abstractions.Accounting.JournalSide.Debit, TransactionAmount = Math.Abs(usageVariance),
+                        },
+                    ],
+                }, ct).ConfigureAwait(false);
+                if (posted.IsFailure)
+                {
+                    return posted.Error;
+                }
+            }
+        }
+
+        decimal productCost = total - usageVariance;
+        decimal unitCost = Math.Round(productCost / actualOutput, 4, MidpointRounding.AwayFromZero);
         Result<StockMovementResult> receipt = await _inventory.ReceiveAsync(new ReceiveStockRequest
         {
-            CompanyId = request.CompanyId, ItemId = bom.ParentItemId, WarehouseId = request.WarehouseId, Date = request.Date, Quantity = actualOutput, UnitCost = total / actualOutput,
+            CompanyId = request.CompanyId, ItemId = bom.ParentItemId, WarehouseId = request.WarehouseId, Date = request.Date, Quantity = actualOutput, UnitCost = productCost / actualOutput,
             CreditAccountCode = request.ClearingAccountCode, Reference = number.Value,
         }, ct).ConfigureAwait(false);
         if (receipt.IsFailure)
@@ -100,7 +144,7 @@ public sealed class AssemblyService : IAssemblyService
             return receipt.Error;
         }
 
-        AssemblyRun run = new(request.CompanyId, number.Value, bom.Id, bom.ParentItemId, request.WarehouseId, request.Date, request.PlannedOutput, actualOutput, total);
+        AssemblyRun run = new(request.CompanyId, number.Value, bom.Id, bom.ParentItemId, request.WarehouseId, request.Date, request.PlannedOutput, actualOutput, total) { UsageVariance = usageVariance };
         consumed.ForEach(run.AddLine);
         _db.AssemblyRuns.Add(run);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

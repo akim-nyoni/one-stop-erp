@@ -51,6 +51,7 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
 {
     public void Configure(EntityTypeBuilder<Item> b)
     {
+        b.Property(x => x.UsageVarianceAccountCode).HasMaxLength(20);
         b.ToTable("item", Schemas.Inventory);
         b.HasKey(x => x.Id);
         b.Property(x => x.Plu).HasMaxLength(20);
@@ -146,6 +147,7 @@ internal sealed class StockLotMovementConfiguration : IEntityTypeConfiguration<S
 {
     public void Configure(EntityTypeBuilder<StockLotMovement> b)
     {
+        b.Property(x => x.UnitCost).HasPrecision(19, 6);
         b.ToTable("lot_movement", Schemas.Inventory);
         b.HasKey(x => x.Id);
         b.Property(x => x.LotNumber).HasMaxLength(60);
@@ -199,6 +201,7 @@ internal sealed class AssemblyRunConfiguration : IEntityTypeConfiguration<Assemb
 {
     public void Configure(EntityTypeBuilder<AssemblyRun> b)
     {
+        b.Property(x => x.UsageVariance).HasPrecision(19, 4);
         b.ToTable("assembly_run", Schemas.Inventory);
         b.HasKey(x => x.Id);
         b.Property(x => x.RunNumber).HasMaxLength(40);

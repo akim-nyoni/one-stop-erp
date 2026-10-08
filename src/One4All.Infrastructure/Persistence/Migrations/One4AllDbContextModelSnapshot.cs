@@ -11205,6 +11205,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("total_cost");
 
+                    b.Property<decimal>("UsageVariance")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("usage_variance");
+
                     b.Property<long>("WarehouseId")
                         .HasColumnType("bigint")
                         .HasColumnName("warehouse_id");
@@ -11622,6 +11627,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 6)
                         .HasColumnType("numeric(19,6)")
                         .HasColumnName("unit_weight_kg");
+
+                    b.Property<string>("UsageVarianceAccountCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("usage_variance_account_code");
 
                     b.HasKey("Id")
                         .HasName("pk_item");
@@ -12222,6 +12232,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("StockMovementId")
                         .HasColumnType("bigint")
                         .HasColumnName("stock_movement_id");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("unit_cost");
 
                     b.Property<long>("WarehouseId")
                         .HasColumnType("bigint")

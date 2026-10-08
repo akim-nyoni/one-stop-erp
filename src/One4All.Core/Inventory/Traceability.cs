@@ -104,4 +104,7 @@ public sealed class StockLotMovement : Entity, ICompanyScoped
 
     /// <summary>Gets the batch's expiry date.</summary>
     public DateOnly? ExpiryDate { get; private set; }
+
+    /// <summary>The unit cost the batch or serial came in at (on receipts): what a specifically identified issue of it costs.</summary>
+    public decimal? UnitCost { get; set; }
 }

@@ -67,7 +67,10 @@ public sealed class LotTrackingService : ILotTrackingService
 
             DateOnly? known = onHand.Where(o => o.LotNumber == number).Select(o => o.Expiry).Max();
             DateOnly? expiry = inbound ? LotRules.Expiry(lot.ExpiryDate ?? known, movement.Date, item.ShelfLifeDays) : known;
-            _db.StockLotMovements.Add(new StockLotMovement(companyId, movement.Id, movement.ItemId, movement.WarehouseId, movement.Date, number, inbound ? lot.Quantity : -lot.Quantity, expiry));
+            _db.StockLotMovements.Add(new StockLotMovement(companyId, movement.Id, movement.ItemId, movement.WarehouseId, movement.Date, number, inbound ? lot.Quantity : -lot.Quantity, expiry)
+            {
+                UnitCost = inbound ? movement.UnitCost : null,
+            });
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -98,7 +101,7 @@ public sealed class LotTrackingService : ILotTrackingService
             DateOnly? expiry = await _db.StockLotMovements.Where(l => l.CompanyId == companyId && l.ItemId == movement.ItemId && l.LotNumber == lot.LotNumber).MaxAsync(l => l.ExpiryDate, ct)
                 .ConfigureAwait(false);
             _db.StockLotMovements.Add(new StockLotMovement(companyId, movement.Id, movement.ItemId, movement.WarehouseId, movement.Date, lot.LotNumber.Trim(),
-                movement.Quantity > 0m ? lot.Quantity : -lot.Quantity, expiry));
+                movement.Quantity > 0m ? lot.Quantity : -lot.Quantity, expiry) { UnitCost = movement.Quantity > 0m ? movement.UnitCost : null });
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

@@ -197,7 +197,35 @@ public sealed class InventoryService : IInventoryService
 
         // Work out the cost without touching the balance: it changes only once the journal has posted, so a refused
         // posting (a closed period, say) leaves nothing behind for a later save to persist.
-        StockIssue issue = await StockCosting.PlanIssueAsync(_db, item, balance, request.Quantity, ct).ConfigureAwait(false);
+        // Specific identification: the batches or serials that leave (named, or the earliest-expiry ones) carry their own receipt cost.
+        IReadOnlyList<LotQuantity> lotsOut = request.Lots;
+        StockIssue issue;
+        if (item.CostingMethod == CostingMethod.SpecificIdentification && item.Tracking != ItemTracking.None && _lots is not null)
+        {
+            if (lotsOut.Count == 0)
+            {
+                (IReadOnlyList<LotQuantity> picks, decimal shortfall) = await _lots.SuggestPicksAsync(request.CompanyId, item.Id, request.WarehouseId, request.Quantity, request.Date, ct)
+                    .ConfigureAwait(false);
+                if (shortfall > 0m)
+                {
+                    return Error.Rule("Inv.SpecificLotsShort", $"'{item.Code}' is costed by specific identification and only {request.Quantity - shortfall:0.###} is on hand in known batches.");
+                }
+
+                lotsOut = picks;
+            }
+
+            if (lotsOut.Sum(l => l.Quantity) != request.Quantity)
+            {
+                return Error.Validation("Inv.LotsQuantity", $"The batches named come to {lotsOut.Sum(l => l.Quantity):0.###}, not the {request.Quantity:0.###} issued.");
+            }
+
+            issue = await StockCosting.PlanSpecificIssueAsync(_db, item, balance, lotsOut, ct).ConfigureAwait(false);
+        }
+        else
+        {
+            issue = await StockCosting.PlanIssueAsync(_db, item, balance, request.Quantity, ct).ConfigureAwait(false);
+        }
+
         decimal cost = issue.Cost;
 
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
@@ -234,7 +262,7 @@ public sealed class InventoryService : IInventoryService
         };
         _db.Set<StockMovement>().Add(movement);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        Result traced = await RecordLotsAsync(request.CompanyId, item, movement, request.Lots, inbound: false, request.FromTill, ct).ConfigureAwait(false);
+        Result traced = await RecordLotsAsync(request.CompanyId, item, movement, lotsOut, inbound: false, request.FromTill, ct).ConfigureAwait(false);
         if (traced.IsFailure)
         {
             return traced.Error;

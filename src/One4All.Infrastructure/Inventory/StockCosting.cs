@@ -12,7 +12,8 @@ namespace One4All.Infrastructure.Inventory;
 /// <param name="Quantity">The quantity issued.</param>
 /// <param name="Cost">The cost of the issue.</param>
 /// <param name="Fifo">The FIFO layers drawn on; null for an average-cost item.</param>
-internal sealed record StockIssue(StockBalance Balance, decimal Quantity, decimal Cost, FifoIssuePlan? Fifo)
+/// <param name="AtCost">Taken out at <paramref name="Cost"/> rather than the balance's average (specific identification).</param>
+internal sealed record StockIssue(StockBalance Balance, decimal Quantity, decimal Cost, FifoIssuePlan? Fifo, bool AtCost = false)
 {
     /// <summary>The issue's unit cost.</summary>
     public decimal UnitCost => Quantity == 0m ? 0m : decimal.Round(Cost / Quantity, 6, MidpointRounding.ToEven);
@@ -22,7 +23,15 @@ internal sealed record StockIssue(StockBalance Balance, decimal Quantity, decima
     {
         if (Fifo is null)
         {
-            Balance.Issue(Quantity);
+            if (AtCost)
+            {
+                Balance.IssueAtCost(Quantity, Cost);
+            }
+            else
+            {
+                Balance.Issue(Quantity);
+            }
+
             return;
         }
 
@@ -60,6 +69,35 @@ internal static class StockCosting
         List<StockCostLayer> layers = await OpenLayersAsync(db, balance.CompanyId, item.Id, balance.WarehouseId, ct).ConfigureAwait(false);
         FifoIssuePlan plan = FifoIssuePlan.For(layers, quantity, balance.AverageCost);
         return new StockIssue(balance, quantity, plan.Cost, plan);
+    }
+
+    /// <summary>
+    /// Costs a specifically identified issue (brief §3.6): each batch or serial at the unit cost it came in at (the average of its receipts),
+    /// a lot with no recorded cost at the balance's average.
+    /// </summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="item">The item.</param>
+    /// <param name="balance">The balance issued from.</param>
+    /// <param name="lots">The lots leaving.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The costed issue.</returns>
+    public static async Task<StockIssue> PlanSpecificIssueAsync(One4AllDbContext db, Item item, StockBalance balance, IReadOnlyList<Application.Inventory.LotQuantity> lots,
+        CancellationToken ct)
+    {
+        List<string> numbers = [.. lots.Select(l => l.LotNumber.Trim())];
+        var received = await db.StockLotMovements.AsNoTracking()
+            .Where(l => l.CompanyId == balance.CompanyId && l.ItemId == item.Id && numbers.Contains(l.LotNumber) && l.Quantity > 0m && l.UnitCost != null)
+            .GroupBy(l => l.LotNumber).Select(g => new { g.Key, Quantity = g.Sum(l => l.Quantity), Value = g.Sum(l => l.Quantity * l.UnitCost!.Value) })
+            .ToDictionaryAsync(g => g.Key, ct).ConfigureAwait(false);
+        decimal cost = 0m;
+        foreach (Application.Inventory.LotQuantity lot in lots)
+        {
+            decimal unit = received.TryGetValue(lot.LotNumber.Trim(), out var known) && known.Quantity > 0m ? known.Value / known.Quantity : balance.AverageCost;
+            cost += lot.Quantity * unit;
+        }
+
+        decimal quantity = lots.Sum(l => l.Quantity);
+        return new StockIssue(balance, quantity, decimal.Round(cost, 4, MidpointRounding.ToEven), null, AtCost: true);
     }
 
     /// <summary>Receives stock at a value, opening a cost layer for a FIFO item.</summary>

@@ -142,6 +142,9 @@ public sealed class AssemblyRun : AuditableEntity, ICompanyScoped
     /// <summary>Gets the cost of components consumed.</summary>
     public decimal TotalCost { get; private set; }
 
+    /// <summary>The usage variance posted (components used beyond standard, at their issue cost; negative when fewer were used).</summary>
+    public decimal UsageVariance { get; set; }
+
     /// <summary>Gets or sets a value indicating whether the run took finished goods apart (lines are components recovered).</summary>
     public bool IsDisassembly { get; set; }
 
