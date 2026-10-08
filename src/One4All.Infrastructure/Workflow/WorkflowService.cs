@@ -106,7 +106,7 @@ public sealed class WorkflowService : IWorkflowService
 
             int approvalsSoFar = instance.Approvals.Count(a => a.StageSequence == stage.Sequence && a.Action == WorkflowActionType.Approve);
             pending.Add(new PendingApproval(instance.Id, instance.DocumentType, instance.DocumentReference, instance.Value, instance.InitiatedByUserId, stage.Sequence, stage.Name, approvalsSoFar, stage.Quorum,
-                onBehalfOf));
+                onBehalfOf, await AttachmentCountAsync(instance, ct).ConfigureAwait(false)));
         }
 
         return pending;
@@ -207,11 +207,100 @@ public sealed class WorkflowService : IWorkflowService
             return;
         }
 
+        string? linkBase = (await _db.Companies.AsNoTracking().Where(c => c.Id == instance.CompanyId).Select(c => c.ApprovalLinkBaseUrl).FirstOrDefaultAsync(ct).ConfigureAwait(false))?.Trim().TrimEnd('/');
+        List<string> attached = await AttachmentNamesAsync(instance, ct).ConfigureAwait(false);
+        string files = attached.Count == 0 ? string.Empty : $" Attached: {string.Join(", ", attached)}.";
         foreach (long user in (await ApproversAsync(instance, stage, ct).ConfigureAwait(false)).Where(u => u != instance.InitiatedByUserId))
         {
-            await _notifications.NotifyUserAsync(instance.CompanyId, user, $"Approval needed: {instance.DocumentType} {instance.DocumentReference}",
-                $"{instance.DocumentType} {instance.DocumentReference} ({instance.Value:N2}) is waiting for your approval at stage '{stage.Name}'.", ct).ConfigureAwait(false);
+            string subject = $"Approval needed: {instance.DocumentType} {instance.DocumentReference}";
+            string body = $"{instance.DocumentType} {instance.DocumentReference} ({instance.Value:N2}) is waiting for your approval at stage '{stage.Name}'.{files}";
+            await _notifications.NotifyUserAsync(instance.CompanyId, user, subject, body, ct).ConfigureAwait(false);
+
+            // An emailed single-use link (only its hash is kept) lets the approver decide without signing in.
+            string? email = string.IsNullOrEmpty(linkBase) ? null
+                : await _db.Users.AsNoTracking().Where(u => u.Id == user).Select(u => u.Email).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                string token = Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
+                _db.WorkflowActionTokens.Add(new WorkflowActionToken(instance.CompanyId, instance.Id, user, stage.Sequence, WorkflowActionToken.Hash(token), _clock.UtcNow.AddDays(LinkDays)));
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+                await _notifications.QueueDirectAsync(instance.CompanyId, subject, Core.Communications.MessageChannel.Email, [email], subject,
+                    $"{body}\n\nReview and approve or reject (the link works once, for {LinkDays} days): {linkBase}/api/workflow/email/{token}", null, ct).ConfigureAwait(false);
+            }
         }
+    }
+
+    private const int LinkDays = 7;
+
+    // Files attached to the document for its approvers: on the workflow document itself, or on the purchase order or journal it is.
+    private IQueryable<Core.System.Attachment> AttachmentsOf(WorkflowInstance instance)
+    {
+        string own = $"{instance.DocumentType}/{instance.DocumentReference}".ToUpperInvariant(), reference = instance.DocumentReference.ToUpperInvariant();
+        Core.System.AttachmentTarget? natural = instance.DocumentType switch
+        {
+            WorkflowDocumentTypes.PurchaseOrder => Core.System.AttachmentTarget.PurchaseOrder,
+            WorkflowDocumentTypes.Journal => Core.System.AttachmentTarget.Journal,
+            _ => null,
+        };
+        return _db.Set<Core.System.Attachment>().AsNoTracking().Where(a => a.CompanyId == instance.CompanyId && a.RemovedOnUtc == null
+            && ((a.Target == Core.System.AttachmentTarget.WorkflowDocument && a.TargetKey == own) || (natural != null && a.Target == natural && a.TargetKey == reference)));
+    }
+
+    private Task<int> AttachmentCountAsync(WorkflowInstance instance, CancellationToken ct) => AttachmentsOf(instance).CountAsync(ct);
+
+    private Task<List<string>> AttachmentNamesAsync(WorkflowInstance instance, CancellationToken ct) => AttachmentsOf(instance).OrderBy(a => a.Id).Select(a => a.FileName).ToListAsync(ct);
+
+    /// <inheritdoc />
+    public Task<Result<WorkflowStatus>> ActByTokenAsync(string token, WorkflowActionType action, string? comment, CancellationToken ct = default)
+        => _db.AtomicAsync<WorkflowStatus>(async () =>
+        {
+            Result<(WorkflowActionToken Token, WorkflowInstance Instance)> found = await TokenAsync(token, ct).ConfigureAwait(false);
+            if (found.IsFailure)
+            {
+                return found.Error;
+            }
+
+            if (action is not (WorkflowActionType.Approve or WorkflowActionType.Reject))
+            {
+                return Error.Validation("Workflow.LinkAction", "An emailed link can only approve or reject.");
+            }
+
+            found.Value.Token.UsedOnUtc = _clock.UtcNow;
+            Result<WorkflowStatus> acted = await ActCoreAsync(found.Value.Instance.Id, found.Value.Token.UserId, action, string.IsNullOrWhiteSpace(comment) ? "By emailed link" : comment, ct)
+                .ConfigureAwait(false);
+            if (acted.IsFailure)
+            {
+                return acted;
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return acted;
+        }, ct);
+
+    /// <inheritdoc />
+    public async Task<Result<(string DocumentType, string Reference, decimal Value)>> DescribeTokenAsync(string token, CancellationToken ct = default)
+    {
+        Result<(WorkflowActionToken Token, WorkflowInstance Instance)> found = await TokenAsync(token, ct).ConfigureAwait(false);
+        return found.IsFailure ? found.Error : (found.Value.Instance.DocumentType, found.Value.Instance.DocumentReference, found.Value.Instance.Value);
+    }
+
+    // A link that can still be used: issued, unused, unexpired, and its workflow still at the stage it was sent for.
+    private async Task<Result<(WorkflowActionToken Token, WorkflowInstance Instance)>> TokenAsync(string token, CancellationToken ct)
+    {
+        string hash = WorkflowActionToken.Hash((token ?? string.Empty).Trim());
+        WorkflowActionToken? issued = await _db.WorkflowActionTokens.IgnoreQueryFilters().FirstOrDefaultAsync(t => t.TokenHash == hash, ct).ConfigureAwait(false);
+        if (issued is null || issued.UsedOnUtc is not null || issued.ExpiresOnUtc < _clock.UtcNow)
+        {
+            return Error.Forbidden("Workflow.LinkInvalid", "This approval link has been used, has expired or is not valid.");
+        }
+
+        WorkflowInstance? instance = await _db.WorkflowInstances.IgnoreQueryFilters().FirstOrDefaultAsync(i => i.Id == issued.WorkflowInstanceId, ct).ConfigureAwait(false);
+        if (instance is not { Status: WorkflowStatus.InProgress } || instance.CurrentStageSequence != issued.StageSequence)
+        {
+            return Error.Conflict("Workflow.LinkStale", "The document has moved on since this link was sent; open the approvals inbox.");
+        }
+
+        return (issued, instance);
     }
 
     /// <inheritdoc />

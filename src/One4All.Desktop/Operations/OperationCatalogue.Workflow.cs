@@ -13,6 +13,41 @@ public static partial class OperationCatalogue
         const string module = "Approvals";
         yield return new Operation
         {
+            Module = module, Title = "Request a master-data change", ListTitle = "Master-data changes",
+            Description = "Changes a tariff's rates or a customer's, supplier's or item's field — held for the \"MasterDataChange\" workflow when one is defined, applied at once otherwise. "
+                + "Tariff: FixedCharge, PerUnitRate, RatePerValuationCents, RatePerSquareMetre, MinimumCharge, IsActive. Customer: Name, PaymentTermsDays, SettlementDiscountPercent, OnHold, "
+                + "InterestExempt, TaxRegistration, Email, IsActive. Supplier: Name, PaymentTermsDays, OnHold, TaxRegistration, TaxClearanceExpiry, IsActive. Item: Description, TaxCode, "
+                + "StandardCost, CostOfSalesAccountCode, RevenueAccountCode, IsActive.",
+            Fields = [Pick("Target", "Record", Enum.GetNames<Core.System.MasterDataTarget>()), Req("Key", "Code"), Req("Field", "Field"), Opt("Value", "New value (blank clears)")],
+            Run = async (c, i) => Check(await c.Get<Application.Abstractions.System.IMasterDataChangeService>().RequestAsync(c.CompanyId, Enum.Parse<Core.System.MasterDataTarget>(i.Text("Target")),
+                i.Text("Key"), i.Text("Field"), i.Optional("Value"), c.UserId).ConfigureAwait(true),
+                r => r.Status == Core.System.MasterDataChangeStatus.Applied ? $"{r.Reference}: {r.Field} changed from '{r.OldValue}' to '{r.NewValue}'." : $"{r.Reference} is waiting for approval."),
+            List = async c => Table(await c.Get<Application.Abstractions.System.IMasterDataChangeService>().ListAsync(c.CompanyId).ConfigureAwait(true),
+                ("Reference", r => r.Reference), ("Record", r => $"{r.Target} {r.Key}"), ("Field", r => r.Field), ("Was", r => r.OldValue), ("Now", r => r.NewValue), ("Status", r => r.Status),
+                ("Asked", r => r.RequestedOnUtc.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Email approval links",
+            Description = "The server address approvers reach from their email (e.g. https://erp.example.com). When set, each approver with an email address is also sent single-use "
+                + "approve / reject links (valid 7 days, only while the document is still at their stage). Blank stops the links.",
+            Fields = [Opt("Address", "Server address")],
+            Run = async (c, i) =>
+            {
+                Core.System.Company company = await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                string? address = i.Optional("Address")?.Trim().TrimEnd('/');
+                if (address is not null && !(Uri.TryCreate(address, UriKind.Absolute, out Uri? uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)))
+                {
+                    throw new OperationException("Give the full address, starting http:// or https://.");
+                }
+
+                company.ApprovalLinkBaseUrl = address;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return address is null ? "Approval links are no longer emailed." : $"Approvers will be emailed links to {address}.";
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Delegate my approvals", ListTitle = "Approval delegations",
             Description = "While an approver is away, the delegate may approve anything they could, recorded as on their behalf.",
             Fields = [Req("From", "Approver who is away (user name)"), Req("To", "Delegate (user name)"), Today("Starts", "From"), Today("Ends", "To"), Req("Reason", "Reason", "Leave")],

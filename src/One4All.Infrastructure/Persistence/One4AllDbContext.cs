@@ -251,6 +251,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Workflow instances.</summary>
     public DbSet<Core.Workflow.WorkflowInstance> WorkflowInstances => Set<Core.Workflow.WorkflowInstance>();
 
+    /// <summary>Gets the single-use approval links emailed to approvers.</summary>
+    public DbSet<Core.Workflow.WorkflowActionToken> WorkflowActionTokens => Set<Core.Workflow.WorkflowActionToken>();
+
+    /// <summary>Gets the master-data changes requested for approval.</summary>
+    public DbSet<Core.System.MasterDataChange> MasterDataChanges => Set<Core.System.MasterDataChange>();
+
     /// <summary>Inventory items.</summary>
     public DbSet<Core.Inventory.Item> Items => Set<Core.Inventory.Item>();
 

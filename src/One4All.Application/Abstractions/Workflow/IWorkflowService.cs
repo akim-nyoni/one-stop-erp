@@ -20,7 +20,7 @@ public readonly record struct WorkflowStartResult(long InstanceId, WorkflowStatu
 /// <param name="Quorum">Approvals the stage needs.</param>
 /// <param name="OnBehalfOfUserId">When it reaches the user as someone's delegate, whose approval it is.</param>
 public sealed record PendingApproval(long InstanceId, string DocumentType, string DocumentReference, decimal Value, long InitiatedByUserId, int StageSequence, string StageName, int ApprovalsSoFar, int Quorum,
-    long? OnBehalfOfUserId = null);
+    long? OnBehalfOfUserId = null, int Attachments = 0);
 
 /// <summary>
 /// The generic workflow/approval service (brief §7). One engine serves requisitions, POs, journals,
@@ -70,6 +70,20 @@ public interface IWorkflowService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The status, or an error.</returns>
     Task<Result<WorkflowStatus>> GetStatusAsync(long instanceId, CancellationToken ct = default);
+
+    /// <summary>Acts through a single-use link emailed to an approver: valid once, before it expires, and only while the workflow is still at that stage.</summary>
+    /// <param name="token">The token from the link.</param>
+    /// <param name="action">Approve or reject.</param>
+    /// <param name="comment">The comment.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The workflow's status after the action.</returns>
+    Task<Result<WorkflowStatus>> ActByTokenAsync(string token, WorkflowActionType action, string? comment, CancellationToken ct = default);
+
+    /// <summary>What an emailed link would act on, for the page that asks the approver to confirm.</summary>
+    /// <param name="token">The token from the link.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The document type, reference and value, or why the link cannot be used.</returns>
+    Task<Result<(string DocumentType, string Reference, decimal Value)>> DescribeTokenAsync(string token, CancellationToken ct = default);
 
     /// <summary>
     /// Delegates an approver's approvals to another user between two dates (out of office); refused for oneself or overlapping an

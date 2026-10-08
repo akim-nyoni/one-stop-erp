@@ -27893,6 +27893,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("allow_future_period_posting");
 
+                    b.Property<string>("ApprovalLinkBaseUrl")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("approval_link_base_url");
+
                     b.Property<int?>("BackDateAllowanceDays")
                         .HasColumnType("integer")
                         .HasColumnName("back_date_allowance_days");
@@ -28598,6 +28603,89 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_job_run_scheduled_job_id");
 
                     b.ToTable("job_run", "sys");
+                });
+
+            modelBuilder.Entity("One4All.Core.System.MasterDataChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long?>("DecidedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("decided_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DecidedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_on_utc");
+
+                    b.Property<string>("Field")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("field");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("NewValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("new_value");
+
+                    b.Property<string>("OldValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("old_value");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RequestedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<DateTimeOffset>("RequestedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_on_utc");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<int>("Target")
+                        .HasColumnType("integer")
+                        .HasColumnName("target");
+
+                    b.HasKey("Id")
+                        .HasName("pk_master_data_change");
+
+                    b.HasIndex("CompanyId", "Reference")
+                        .HasDatabaseName("ix_master_data_change_company_id_reference");
+
+                    b.HasIndex("CompanyId", "Target", "Key", "Status")
+                        .HasDatabaseName("ix_master_data_change_company_id_target_key_status");
+
+                    b.ToTable("master_data_change", "sys");
                 });
 
             modelBuilder.Entity("One4All.Core.System.NumberSequence", b =>
@@ -31416,6 +31504,64 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_delegation_company_id_to_user_id");
 
                     b.ToTable("delegation", "wf");
+                });
+
+            modelBuilder.Entity("One4All.Core.Workflow.WorkflowActionToken", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("ExpiresOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_on_utc");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<int>("StageSequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage_sequence");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<DateTimeOffset?>("UsedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_on_utc");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<long>("WorkflowInstanceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("workflow_instance_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_action_token");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_action_token_token_hash");
+
+                    b.HasIndex("WorkflowInstanceId")
+                        .HasDatabaseName("ix_action_token_workflow_instance_id");
+
+                    b.ToTable("action_token", "wf");
                 });
 
             modelBuilder.Entity("One4All.Core.Workflow.WorkflowApproval", b =>

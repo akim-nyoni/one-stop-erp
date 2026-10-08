@@ -41,6 +41,34 @@ internal sealed class WorkflowStageConfiguration : IEntityTypeConfiguration<Work
     }
 }
 
+internal sealed class WorkflowActionTokenConfiguration : IEntityTypeConfiguration<WorkflowActionToken>
+{
+    public void Configure(EntityTypeBuilder<WorkflowActionToken> b)
+    {
+        b.ToTable("action_token", Schemas.Workflow);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.TokenHash).HasMaxLength(64);
+        b.HasIndex(x => x.TokenHash).IsUnique();
+        b.HasIndex(x => x.WorkflowInstanceId);
+    }
+}
+
+internal sealed class MasterDataChangeConfiguration : IEntityTypeConfiguration<Core.System.MasterDataChange>
+{
+    public void Configure(EntityTypeBuilder<Core.System.MasterDataChange> b)
+    {
+        b.ToTable("master_data_change", Schemas.System);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Key).HasMaxLength(40);
+        b.Property(x => x.Field).HasMaxLength(60);
+        b.Property(x => x.OldValue).HasMaxLength(500);
+        b.Property(x => x.NewValue).HasMaxLength(500);
+        b.Property(x => x.Reference).HasMaxLength(30);
+        b.HasIndex(x => new { x.CompanyId, x.Reference });
+        b.HasIndex(x => new { x.CompanyId, x.Target, x.Key, x.Status });
+    }
+}
+
 internal sealed class WorkflowInstanceConfiguration : IEntityTypeConfiguration<WorkflowInstance>
 {
     public void Configure(EntityTypeBuilder<WorkflowInstance> b)

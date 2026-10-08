@@ -134,6 +134,7 @@ public sealed class AttachmentService : IAttachmentService
         AttachmentTarget.Property => _db.Properties.AnyAsync(p => p.CompanyId == companyId && p.StandNumber.ToUpper() == key, ct),
         AttachmentTarget.Student => _db.Students.AnyAsync(s => s.CompanyId == companyId && s.AdmissionNumber.ToUpper() == key, ct),
         AttachmentTarget.Contract => _db.JobContracts.AnyAsync(c => c.CompanyId == companyId && c.ContractNumber.ToUpper() == key, ct),
+        AttachmentTarget.WorkflowDocument => _db.WorkflowInstances.AnyAsync(i => i.CompanyId == companyId && (i.DocumentType + "/" + i.DocumentReference).ToUpper() == key, ct),
         _ => Task.FromResult(false),
     };
 }

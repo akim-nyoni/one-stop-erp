@@ -85,6 +85,12 @@ public sealed class Company : SoftDeletableEntity
     public string? StaffLoanInterestAccountCode { get; set; }
 
     /// <summary>
+    /// Gets or sets the server address approvers reach from their email (e.g. https://erp.example.com); when set, each approver with an email address is
+    /// sent single-use approve / reject links as well as the in-app notice.
+    /// </summary>
+    public string? ApprovalLinkBaseUrl { get; set; }
+
+    /// <summary>
     /// Gets or sets the net-pay movement from the group's last run (in percent, either way) above which a second, different approver
     /// is needed. Null needs one approver always.
     /// </summary>

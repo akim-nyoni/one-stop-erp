@@ -549,6 +549,37 @@ app.MapPost("/api/workflow/{instanceId:long}/act", async (long instanceId, long 
 .RequireAuthorization()
 .WithName("WorkflowAct");
 
+// An approver's emailed single-use link: the GET only shows the document and asks (mail scanners follow links), the POST decides.
+app.MapGet("/api/workflow/email/{token}", async (string token, One4All.Application.Abstractions.Workflow.IWorkflowService workflow, CancellationToken ct) =>
+{
+    Result<(string DocumentType, string Reference, decimal Value)> found = await workflow.DescribeTokenAsync(token, ct).ConfigureAwait(false);
+    if (found.IsFailure)
+    {
+        return Results.Content(ApprovalPage(System.Net.WebUtility.HtmlEncode(found.Error.Message)), "text/html");
+    }
+
+    string document = System.Net.WebUtility.HtmlEncode($"{found.Value.DocumentType} {found.Value.Reference} ({found.Value.Value:N2})");
+    return Results.Content(ApprovalPage($"<p>{document} is waiting for your decision.</p><form method=\"post\"><p><textarea name=\"comment\" rows=\"3\" cols=\"50\" placeholder=\"Comment (optional)\"></textarea></p>"
+        + "<button name=\"action\" value=\"Approve\">Approve</button> <button name=\"action\" value=\"Reject\">Reject</button></form>"), "text/html");
+})
+.AllowAnonymous()
+.WithName("WorkflowEmailLink");
+
+app.MapPost("/api/workflow/email/{token}", async (string token, HttpRequest request, One4All.Application.Abstractions.Workflow.IWorkflowService workflow, CancellationToken ct) =>
+{
+    IFormCollection form = request.HasFormContentType ? await request.ReadFormAsync(ct).ConfigureAwait(false) : FormCollection.Empty;
+    if (!Enum.TryParse(form["action"].ToString(), out One4All.Core.Workflow.WorkflowActionType action))
+    {
+        return Results.Content(ApprovalPage("Choose approve or reject."), "text/html");
+    }
+
+    Result<One4All.Core.Workflow.WorkflowStatus> acted = await workflow.ActByTokenAsync(token, action, form["comment"].ToString(), ct).ConfigureAwait(false);
+    return Results.Content(ApprovalPage(System.Net.WebUtility.HtmlEncode(acted.IsSuccess ? $"Recorded: {action.ToString().ToLowerInvariant()}. The document is now {acted.Value.ToString().ToLowerInvariant()}." : acted.Error.Message)),
+        "text/html");
+})
+.AllowAnonymous()
+.WithName("WorkflowEmailAct");
+
 // --- Credit control -----------------------------------------------------------------------------------------
 app.MapPost("/api/credit/review", async (long companyId, DateOnly asAt, int overdueToleranceDays, One4All.Application.Abstractions.Trading.ICreditControlService credit, CancellationToken ct) =>
     ValueResponse(await credit.ReviewAsync(companyId, asAt, overdueToleranceDays, ct).ConfigureAwait(false)))
@@ -2790,6 +2821,11 @@ static async Task<Dictionary<string, string>?> JsonBodyScalarsAsync(HttpRequest 
         request.Body.Position = 0;
     }
 }
+
+// The bare page an emailed approval link opens (the content is already HTML-encoded by the caller).
+static string ApprovalPage(string content)
+    => $"<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>One4All approval</title></head>"
+        + $"<body style=\"font-family:sans-serif;max-width:40em;margin:2em auto;padding:0 1em\"><h1>One4All approval</h1>{content}</body></html>";
 
 // Maps a text-bearing Result to a plain-text response (200), or 404 / 409 / 400 by error type.
 // The signed-in user's id from the token's subject, or null.

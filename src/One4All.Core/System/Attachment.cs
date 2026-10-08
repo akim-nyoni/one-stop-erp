@@ -34,6 +34,9 @@ public enum AttachmentTarget
 
     /// <summary>A job / contract.</summary>
     Contract = 10,
+
+    /// <summary>A document in an approval workflow, keyed <c>{DocumentType}/{Reference}</c> — shown to its approvers.</summary>
+    WorkflowDocument = 11,
 }
 
 /// <summary>
