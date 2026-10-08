@@ -297,6 +297,167 @@ public static partial class OperationCatalogue
                 ("Open steps", x => string.Join(", ", x.Steps.Where(s => s.Status == CompensationStepStatus.Open).Select(s => $"{s.Kind} {s.Id}"))), ("Assessed", x => x.AssessedAmount is decimal a ? M(a) : "-"),
                 ("Provision", x => M(x.Provision)), ("Paid", x => M(x.PaidToDate)), ("Possession", x => x.PossessionOn is DateOnly o ? D(o) : "-")),
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Instalment sales of stands", ListTitle = "Instalment agreements",
+            Description = "Sign: sells a stand on instalments (deposit, rate, zero / flat / reducing-balance interest, term) and shows the schedule. Raise due: bills the instalments due "
+                + "by a date. Quote / settle early: the principal outstanding and the interest rebated when paid off now.",
+            Fields = [Pick("Step", "Step", ["Sign", "Raise due", "Quote settlement", "Settle early"]), Opt("Stand", "Stand number (sign)"), Opt("Buyer", "Buyer customer code (sign)"),
+                Opt("Agreement", "Agreement number (quote / settle)"), Num("Price", "Cash price", "0"), Num("Deposit", "Deposit", "0"), Num("Rate", "Annual interest %", "0"),
+                Pick("Method", "Interest", Enum.GetNames<InterestMethod>()), Num("Term", "Term (months)", "12"), Today("Date", "Signed / as at"), Today("FirstDue", "First instalment due"),
+                Opt("Sales", "Sales account"), Opt("Available", "Stands available (inventory) account"), Opt("Cost", "Cost of sales account"), Opt("Interest", "Interest income account"),
+                Opt("Bank", "Bank account (deposit)")],
+            Run = async (c, i) =>
+            {
+                IInstalmentSaleService sales = c.Get<IInstalmentSaleService>();
+                switch (i.Text("Step"))
+                {
+                    case "Sign":
+                        long stand = await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == (i.Optional("Stand") ?? string.Empty).ToUpper(), x => x.Id, "stand",
+                            i.Optional("Stand") ?? string.Empty).ConfigureAwait(true);
+                        InstalmentSaleResult signed = Check(await sales.SignAsync(new InstalmentSaleRequest
+                        {
+                            CompanyId = c.CompanyId, StandId = stand, BuyerCustomerId = await CustomerAsync(c, i.Optional("Buyer") ?? string.Empty).ConfigureAwait(true), CashPrice = i.Number("Price"),
+                            Deposit = i.Number("Deposit"), AnnualRatePercent = i.Number("Rate"), Method = Enum.Parse<InterestMethod>(i.Text("Method")), TermMonths = i.Whole("Term"),
+                            SignedOn = i.Date("Date"), FirstDueDate = i.Date("FirstDue"), SalesAccountCode = i.Optional("Sales") ?? string.Empty,
+                            StandsAvailableAccountCode = i.Optional("Available") ?? string.Empty, CostOfSalesAccountCode = i.Optional("Cost") ?? string.Empty,
+                            InterestAccountCode = i.Optional("Interest") ?? string.Empty, BankAccountCode = i.Optional("Bank") ?? string.Empty,
+                        }).ConfigureAwait(true));
+                        return $"Agreement {signed.AgreementNumber}:" + Environment.NewLine + string.Join(Environment.NewLine, signed.Schedule.Select(x =>
+                            $"{x.Number,3}  {D(x.DueDate)}  {M(x.Amount),12}  interest {M(x.Interest),10}  principal {M(x.Principal),10}  balance {M(x.BalanceAfter),12}"));
+                    case "Raise due":
+                        InstalmentRunResult run = Check(await sales.RaiseDueAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true));
+                        return $"{run.InstalmentsRaised} instalment(s) raised, interest {M(run.InterestRaised)}.";
+                    case "Quote settlement":
+                        SettlementQuote quote = Check(await sales.QuoteSettlementAsync(c.CompanyId, i.Optional("Agreement") ?? string.Empty, i.Date("Date")).ConfigureAwait(true));
+                        return $"Settles for {M(quote.PrincipalOutstanding)}; interest rebated {M(quote.InterestRebated)}.";
+                    default:
+                        SettlementQuote settled = Check(await sales.SettleEarlyAsync(c.CompanyId, i.Optional("Agreement") ?? string.Empty, i.Date("Date")).ConfigureAwait(true));
+                        return $"Settled early: {M(settled.PrincipalOutstanding)} principal, {M(settled.InterestRebated)} interest rebated.";
+                }
+            },
+            List = async c => Table(await c.Db.Set<InstalmentAgreement>().AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Take(300).ToListAsync().ConfigureAwait(true),
+                ("Agreement", a => a.AgreementNumber), ("Stand", a => a.StandId), ("Buyer", a => a.BuyerCustomerId), ("Price", a => M(a.CashPrice)), ("Deposit", a => M(a.Deposit)),
+                ("Rate %", a => Q(a.AnnualRatePercent)), ("Term", a => a.TermMonths), ("Signed", a => D(a.SignedOn)), ("Status", a => a.Status)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Transfer of ownership", ListTitle = "Transfer applications",
+            Description = "Lodge a transfer (sale, cession, inheritance, donation, court order) to a new holder; verify each requirement with its document; the checklist shows what is "
+                + "outstanding (rates and housing account clearances are checked live); submit, approve (by someone else), complete or reject.",
+            Fields = [Pick("Step", "Step", ["Lodge", "Verify", "Checklist", "Submit", "Approve", "Complete", "Reject"]), Opt("Application", "Application number"), Opt("Stand", "Stand number (lodge)"),
+                Pick("Type", "Transfer type", Enum.GetNames<TransferType>()), Opt("To", "New holder customer code (lodge)"), Num("Consideration", "Consideration", "0"),
+                Pick("Requirement", "Requirement (verify)", Enum.GetNames<TransferRequirement>()), Opt("Document", "Document reference / reason"), Today()],
+            Run = async (c, i) =>
+            {
+                ITransferApplicationService transfers = c.Get<ITransferApplicationService>();
+                string application = i.Optional("Application") ?? string.Empty;
+                DateOnly date = i.Date("Date");
+                switch (i.Text("Step"))
+                {
+                    case "Lodge":
+                        long stand = await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == (i.Optional("Stand") ?? string.Empty).ToUpper(), x => x.Id, "stand",
+                            i.Optional("Stand") ?? string.Empty).ConfigureAwait(true);
+                        string lodged = Check(await transfers.LodgeAsync(new TransferLodgement
+                        {
+                            CompanyId = c.CompanyId, StandId = stand, TransferType = Enum.Parse<TransferType>(i.Text("Type")), ToCustomerId = await CustomerAsync(c, i.Optional("To") ?? string.Empty).ConfigureAwait(true),
+                            Consideration = i.Number("Consideration"), Date = date,
+                        }).ConfigureAwait(true));
+                        return $"Transfer {lodged} lodged.";
+                    case "Verify":
+                        return Check(await transfers.VerifyAsync(c.CompanyId, application, Enum.Parse<TransferRequirement>(i.Text("Requirement")), i.Optional("Document") ?? string.Empty, c.UserId, date)
+                            .ConfigureAwait(true), "Requirement verified.");
+                    case "Checklist":
+                        IReadOnlyList<TransferChecklistLine> lines = Check(await transfers.ChecklistAsync(c.CompanyId, application, date).ConfigureAwait(true));
+                        return string.Join(Environment.NewLine, lines.Select(l => $"{(l.Satisfied ? "OK " : "-- ")} {l.Requirement}{(l.IsLive ? " (live)" : string.Empty)}{(l.Detail is null ? string.Empty : ": " + l.Detail)}"));
+                    case "Submit":
+                        return Check(await transfers.SubmitAsync(c.CompanyId, application, c.UserId, date).ConfigureAwait(true), "Submitted for approval.");
+                    case "Approve":
+                        return Check(await transfers.ApproveAsync(c.CompanyId, application, c.UserId, date).ConfigureAwait(true), "Approved.");
+                    case "Complete":
+                        return Check(await transfers.CompleteAsync(c.CompanyId, application, date).ConfigureAwait(true), "Transfer completed; the stand has its new holder.");
+                    default:
+                        return Check(await transfers.RejectAsync(c.CompanyId, application, i.Optional("Document") ?? string.Empty, date).ConfigureAwait(true), "Rejected.");
+                }
+            },
+            List = async c => Table(await c.Db.Set<TransferApplication>().AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Take(300).ToListAsync().ConfigureAwait(true),
+                ("Application", a => a.ApplicationNumber), ("Stand", a => a.StandId), ("Type", a => a.TransferType), ("Consideration", a => M(a.Consideration)), ("Status", a => a.Status)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Evictions", ListTitle = "Open eviction cases",
+            Description = "Open a case on a tenancy in arrears (with the notice period), advance it reminder → demand → notice to vacate → legal handover → court order → eviction → unit "
+                + "returned (each with its reference; the last settles the deposit), or withdraw it with the reason.",
+            Fields = [Pick("Step", "Step", ["Open", "Advance", "Withdraw"]), Opt("Tenancy", "Tenancy number (open)"), Opt("Case", "Case number"), Num("Notice", "Notice period (days)", "30"),
+                Pick("Stage", "Stage (advance)", Enum.GetNames<EvictionStage>()), Opt("Reference", "Reference / reason"), Opt("Bank", "Refund bank account (unit returned)"), Today()],
+            Run = async (c, i) =>
+            {
+                IEvictionService evictions = c.Get<IEvictionService>();
+                return i.Text("Step") switch
+                {
+                    "Open" => $"Case {Check(await evictions.OpenAsync(c.CompanyId, i.Optional("Tenancy") ?? string.Empty, i.Date("Date"), i.Whole("Notice"), c.UserId).ConfigureAwait(true))} opened.",
+                    "Advance" => Check(await evictions.AdvanceAsync(c.CompanyId, i.Optional("Case") ?? string.Empty, Enum.Parse<EvictionStage>(i.Text("Stage")), i.Date("Date"), i.Optional("Reference"),
+                        i.Optional("Bank"), c.UserId).ConfigureAwait(true), $"Moved to {i.Text("Stage")}."),
+                    _ => Check(await evictions.WithdrawAsync(c.CompanyId, i.Optional("Case") ?? string.Empty, i.Optional("Reference") ?? string.Empty).ConfigureAwait(true), "Case withdrawn."),
+                };
+            },
+            List = async c => Table(await c.Get<IEvictionService>().RegisterAsync(c.CompanyId, openOnly: true).ConfigureAwait(true),
+                ("Case", e => e.CaseNumber), ("Tenancy", e => e.TenancyNumber), ("Unit", e => e.UnitCode), ("Arrears", e => M(e.ArrearsAtOpening)), ("Stage", e => e.Stage), ("Since", e => D(e.StageDate)),
+                ("Status", e => e.Status)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Land acquisition", ListTitle = "Acquisitions",
+            Description = "Open an acquisition (method, counterparty, authorising resolution), record its valuation, sign off each due-diligence item, capitalise costs into land WIP, "
+                + "see its position (cost build-up and what still blocks it), complete it into the land bank, or abandon it (costs written off).",
+            Fields = [Pick("Step", "Step", ["Open", "Valuation", "Sign off", "Add cost", "Position", "Complete", "Abandon"]), Opt("Acquisition", "Acquisition number"),
+                Opt("Parcel", "Parcel number (open)"), Opt("Description", "Description / finding / reference"), Num("Area", "Area m² (open)", "0"), Pick("Method", "Method (open)", Enum.GetNames<AcquisitionMethod>()),
+                Opt("Party", "Counterparty / valuer"), Opt("Resolution", "Resolution (open) / reason (abandon)"), Num("Amount", "Value / cost", "0"),
+                Pick("Item", "Due-diligence item", Enum.GetNames<DueDiligenceItem>()), Tick("Acceptable", "Acceptable", true), Pick("Component", "Cost component", Enum.GetNames<AcquisitionCostComponent>()),
+                Opt("Wip", "Land WIP account"), Opt("Expense", "Write-off account (abandon)"), Today()],
+            Run = async (c, i) =>
+            {
+                ILandAcquisitionService land = c.Get<ILandAcquisitionService>();
+                string acquisition = i.Optional("Acquisition") ?? string.Empty;
+                DateOnly date = i.Date("Date");
+                switch (i.Text("Step"))
+                {
+                    case "Open":
+                        string opened = Check(await land.OpenAsync(new AcquisitionCase
+                        {
+                            CompanyId = c.CompanyId, ParcelNumber = i.Optional("Parcel") ?? string.Empty, Description = i.Optional("Description") ?? string.Empty, AreaSquareMetres = i.Number("Area"),
+                            Method = Enum.Parse<AcquisitionMethod>(i.Text("Method")), Counterparty = i.Optional("Party") ?? string.Empty, ResolutionReference = i.Optional("Resolution") ?? string.Empty, Date = date,
+                        }).ConfigureAwait(true));
+                        return $"Acquisition {opened} opened.";
+                    case "Valuation":
+                        return Check(await land.RecordValuationAsync(c.CompanyId, acquisition, i.Optional("Party") ?? string.Empty, date, i.Number("Amount")).ConfigureAwait(true), "Valuation recorded.");
+                    case "Sign off":
+                        return Check(await land.SignOffAsync(c.CompanyId, acquisition, Enum.Parse<DueDiligenceItem>(i.Text("Item")), i.Optional("Description") ?? string.Empty, i.Flag("Acceptable"), c.UserId, date)
+                            .ConfigureAwait(true), "Signed off.");
+                    case "Add cost":
+                        string journal = Check(await land.AddCostAsync(c.CompanyId, acquisition, new AcquisitionCostInput
+                        {
+                            Component = Enum.Parse<AcquisitionCostComponent>(i.Text("Component")), Amount = i.Number("Amount"), Date = date, Reference = i.Optional("Description") ?? string.Empty,
+                            WipAccountCode = i.Optional("Wip") ?? string.Empty,
+                        }).ConfigureAwait(true));
+                        return $"Cost capitalised ({journal}).";
+                    case "Position":
+                        AcquisitionPosition position = Check(await land.PositionAsync(c.CompanyId, acquisition).ConfigureAwait(true));
+                        return $"{position.AcquisitionNumber} {position.Status}: total {M(position.TotalCost)}." + Environment.NewLine
+                            + (position.Outstanding.Count == 0 ? "Nothing outstanding." : "Outstanding: " + string.Join("; ", position.Outstanding));
+                    case "Complete":
+                        return Check(await land.CompleteAsync(c.CompanyId, acquisition, date).ConfigureAwait(true), parcel => $"Completed into the land bank (parcel {parcel}).");
+                    default:
+                        decimal written = Check(await land.AbandonAsync(c.CompanyId, acquisition, date, i.Optional("Resolution") ?? string.Empty, i.Optional("Expense") ?? string.Empty, i.Optional("Wip") ?? string.Empty)
+                            .ConfigureAwait(true));
+                        return $"Abandoned; {M(written)} written off.";
+                }
+            },
+            List = async c => Table(await c.Db.Set<LandAcquisition>().AsNoTracking().Include(a => a.Costs).Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Take(300).ToListAsync()
+                    .ConfigureAwait(true),
+                ("Acquisition", a => a.AcquisitionNumber), ("Parcel", a => a.ParcelNumber), ("Method", a => a.Method), ("Counterparty", a => a.Counterparty), ("Valued", a => a.ValuedAt is decimal v ? M(v) : "-"),
+                ("Cost", a => M(a.TotalCost)), ("Status", a => a.Status)),
+        };
     }
 
     private static async Task<System.Data.DataTable> ApplicantsAsync(OperationContext c)
