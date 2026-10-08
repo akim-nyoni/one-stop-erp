@@ -18998,6 +18998,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("type");
 
+                    b.Property<string>("Workings")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("workings");
+
                     b.HasKey("Id")
                         .HasName("pk_payslip_line");
 

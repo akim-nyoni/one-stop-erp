@@ -58,6 +58,7 @@ public sealed class LoanRepaymentFromPayTests
         Payslip lou = slips.Single(p => p.EmployeeId == borrower.Id);
         lou.Lines.Single(l => l.ElementCode == $"LOANINT-{loan.Id}").Amount.Should().Be(12m, "1% a month on 1,200");
         lou.Lines.Single(l => l.ElementCode == $"LOAN-{loan.Id}").Amount.Should().Be(300m);
+        lou.Lines.Single(l => l.ElementCode == $"LOAN-{loan.Id}").Workings.Should().Contain("instalment 300.00 on a balance of 1,212.00");
         lou.NetPay.Should().Be(700m);
         slips.Single(p => p.EmployeeId == stretched.Id).NetPay.Should().Be(0m, "the instalment is held to what pay can bear");
         slips.Single(p => p.EmployeeId == resting.Id).Lines.Should().NotContain(l => l.ElementCode.StartsWith("LOAN", StringComparison.Ordinal), "a suspended loan is not deducted");

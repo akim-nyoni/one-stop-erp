@@ -168,7 +168,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             _ => $"{e.Rate:0.####}%",
         };
         return [.. (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).SelectMany(p => p.Lines.Select(l => Row(("Employee", Name(employees, p.EmployeeId)), ("Period", p.PeriodLabel),
-            ("Element", l.ElementCode), ("Basis", elements.GetValueOrDefault(l.ElementCode)?.Basis.ToString() ?? "—"), ("Rule", Rule(elements.GetValueOrDefault(l.ElementCode))),
+            ("Element", l.ElementCode), ("Basis", elements.GetValueOrDefault(l.ElementCode)?.Basis.ToString() ?? l.Type.ToString()), ("Rule", l.Workings ?? Rule(elements.GetValueOrDefault(l.ElementCode))),
             ("Basic", Money(employees.GetValueOrDefault(p.EmployeeId)?.BasicSalary ?? 0m)), ("Amount", l.Amount))))];
     }
 

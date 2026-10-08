@@ -67,6 +67,7 @@ public sealed class PayElementRulesRunTests
         decimal Line(string code) => slip.Lines.Single(l => l.ElementCode == code).Amount;
         Line("PENSION").Should().Be(100m, "5% of pensionable pay (basic only)");
         Line("NSSA").Should().Be(50m, "4.5% of 2,333.33 is 105, held to the ceiling");
+        slip.Lines.Single(l => l.ElementCode == "NSSA").Workings.Should().Contain("SOCIALSECURITYBASE = 2,333.33").And.Contain("105.00 → 50.00");
         Line("ALLOWLEVY").Should().Be(46m, "10% of the allowances group (453.33) rounded up");
         Line("LEAVEDAYS").Should().Be(2.5m);
         Line("LEAVEPROV").Should().Be(100m);

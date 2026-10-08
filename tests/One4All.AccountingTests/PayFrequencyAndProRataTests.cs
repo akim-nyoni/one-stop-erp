@@ -52,6 +52,8 @@ public sealed class PayFrequencyAndProRataTests
         Payslip january = await db.Payslips.AsNoTracking().Include(p => p.Lines).SingleAsync(p => p.EmployeeId == joiner.Id);
         january.Lines.Single(l => l.ElementCode == "BASIC").Amount.Should().Be(2100m, "21 of January's 31 days of 3,100");
         january.Lines.Single(l => l.ElementCode == "PAYE").Amount.Should().Be(220m);
+        january.Lines.Single(l => l.ElementCode == "BASIC").Workings.Should().Contain("BASIC = 2,100.00").And.Contain("basic 3,100.00 × 21/31 days", "the run keeps its own workings");
+        january.Lines.Single(l => l.ElementCode == "PAYE").Workings.Should().Contain("on taxable 2,100.00");
         (await db.Payslips.AnyAsync(p => p.EmployeeId == waged.Id && p.PeriodLabel == "2026-01")).Should().BeFalse("weekly wages are paid in their own run");
 
         (await payroll.RunGroupAsync(companyId, "WEEKLY", "2026-W02", new DateOnly(2026, 1, 9), "2420", "PF-2026-W02")).IsSuccess.Should().BeTrue();

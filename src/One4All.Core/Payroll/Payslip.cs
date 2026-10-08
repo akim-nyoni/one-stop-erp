@@ -87,9 +87,10 @@ public sealed class Payslip : AuditableEntity, ICompanyScoped
     /// <param name="type">The element type.</param>
     /// <param name="amount">The amount.</param>
     /// <param name="taxable">Whether the line is taxable.</param>
-    public void AddLine(string elementCode, string description, PayElementType type, decimal amount, bool taxable)
+    /// <param name="workings">How the amount was worked out at the time (brief §4.15.7: a full trace per employee per element).</param>
+    public void AddLine(string elementCode, string description, PayElementType type, decimal amount, bool taxable, string? workings = null)
     {
-        _lines.Add(new PayslipLine(elementCode, description, type, amount, taxable));
+        _lines.Add(new PayslipLine(elementCode, description, type, amount, taxable) { Workings = workings is null ? null : workings.Length > 1000 ? workings[..1000] : workings });
         switch (type)
         {
             case PayElementType.Earning:
@@ -131,6 +132,9 @@ public sealed class PayslipLine : Entity
 
     /// <summary>The owning payslip id.</summary>
     public long PayslipId { get; private set; }
+
+    /// <summary>Gets how the amount was worked out when the run was calculated: the basis, the values it used and any limits applied.</summary>
+    public string? Workings { get; init; }
 
     /// <summary>The element code.</summary>
     public string ElementCode { get; private set; }

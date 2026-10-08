@@ -389,6 +389,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         Dictionary<string, object?> vars = new(StringComparer.Ordinal)
         {
             ["BASIC"] = basicSalary ?? decimal.Round(employee.BasicSalary * share, 2, MidpointRounding.AwayFromZero),
+            [BasicNoteKey] = share < 1m ? $"basic {Money(employee.BasicSalary)} × {worked}/{inPeriod} days" : null,
             ["DAYSWORKED"] = (decimal)worked,
             ["DAYSINPERIOD"] = (decimal)inPeriod,
             ["PRORATA"] = share,
@@ -449,7 +450,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                 decimal value = decimal.Round(monthly * perPeriod, 2, MidpointRounding.AwayFromZero);
                 taxable += value;
                 taxableByCurrency[string.Empty] = taxableByCurrency.GetValueOrDefault(string.Empty) + value;
-                payslip.AddLine(code, name, PayElementType.Memo, value, true);
+                payslip.AddLine(code, name, PayElementType.Memo, value, true,
+                    perPeriod == 1m ? $"valued {Money(monthly)} a month" : $"valued {Money(monthly)} a month × 12/{PayPeriods.PerYear(employee.PayFrequency)}");
             }
 
             vars["BENEFITS"] = taxable;
@@ -480,16 +482,23 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             }
 
             decimal amount = element.ApplyLimits(resolved.Value);
-
-            // Net-pay protection: arrears suspended earlier are attempted again; a cap holds a suspended deduction down.
-            if (element.Type == PayElementType.Deduction && element.Recovers == PayRecovery.None)
+            List<string> workings = [variable?.Amount is decimal keyed ? $"keyed for the period: {Money(keyed)}" : Workings(element, assignment, vars)];
+            if (decimal.Round(resolved.Value, 2, MidpointRounding.ToEven) != amount)
             {
-                amount += arrears?.GetValueOrDefault(element.Code) ?? 0m;
+                workings.Add($"{Money(resolved.Value)} → {Money(amount)} by the element's floor / ceiling / rounding");
             }
 
-            if (caps is not null && caps.TryGetValue(element.Code, out decimal cap))
+            // Net-pay protection: arrears suspended earlier are attempted again; a cap holds a suspended deduction down.
+            if (element.Type == PayElementType.Deduction && element.Recovers == PayRecovery.None && arrears?.GetValueOrDefault(element.Code) is decimal arrear and not 0m)
             {
-                amount = Math.Min(amount, cap);
+                amount += arrear;
+                workings.Add($"plus {Money(arrear)} arrears");
+            }
+
+            if (caps is not null && caps.TryGetValue(element.Code, out decimal cap) && cap < amount)
+            {
+                amount = cap;
+                workings.Add($"held to {Money(cap)} to protect net pay");
             }
 
             vars[element.Code] = amount;
@@ -521,7 +530,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             vars["TAXABLE"] = taxable;
             vars["ANNUALTAXABLE"] = annualTaxable;
             vars["DEDUCTIONS"] = deductions;
-            payslip.AddLine(element.Code, element.Name, element.Type, amount, element.Taxable);
+            payslip.AddLine(element.Code, element.Name, element.Type, amount, element.Taxable, string.Join("; ", workings));
         }
 
         // Staff loans (brief §4.15.5): the period's interest is charged (a memo line) and the instalment deducted, never taking net pay below zero.
@@ -533,13 +542,15 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                 (decimal interest, decimal due) = EmployeeLoan.Instalment(outstanding, installment, rate, PayPeriods.PerYear(employee.PayFrequency));
                 if (interest > 0m)
                 {
-                    payslip.AddLine(LoanInterestLinePrefix + id.ToString(System.Globalization.CultureInfo.InvariantCulture), $"Interest on loan {reference}", PayElementType.Memo, interest, false);
+                    payslip.AddLine(LoanInterestLinePrefix + id.ToString(System.Globalization.CultureInfo.InvariantCulture), $"Interest on loan {reference}", PayElementType.Memo, interest, false,
+                        $"{rate:0.####}% a year on {Money(outstanding)} for one of {PayPeriods.PerYear(employee.PayFrequency)} periods");
                 }
 
                 decimal take = Math.Min(due, available);
                 if (take > 0m)
                 {
-                    payslip.AddLine(LoanLinePrefix + id.ToString(System.Globalization.CultureInfo.InvariantCulture), $"Loan {reference} repayment", PayElementType.Deduction, take, false);
+                    payslip.AddLine(LoanLinePrefix + id.ToString(System.Globalization.CultureInfo.InvariantCulture), $"Loan {reference} repayment", PayElementType.Deduction, take, false,
+                        take < due ? $"instalment {Money(installment)} (due {Money(due)}) held to {Money(take)} of net pay" : $"instalment {Money(installment)} on a balance of {Money(outstanding + interest)}");
                     available -= take;
                 }
             }
@@ -547,6 +558,43 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
         return payslip;
     }
+
+    private const string BasicNoteKey = "__BASICNOTE";
+
+    private static string Money(decimal value) => value.ToString("#,0.00", System.Globalization.CultureInfo.InvariantCulture);
+
+    // How an element's amount follows from its rule and the values it used — kept on the payslip line as the run's own trace.
+    private static string Workings(PayElement element, EmployeePayElement assignment, IReadOnlyDictionary<string, object?> vars)
+    {
+        decimal Number(string name) => vars.GetValueOrDefault(name) is decimal value ? value : 0m;
+        decimal rate = assignment.OverrideRate ?? element.Rate;
+        string basicNote = vars.GetValueOrDefault(BasicNoteKey) is string note ? $" ({note})" : string.Empty;
+        string text = element.Basis switch
+        {
+            CalculationBasis.FixedAmount => assignment.OverrideAmount is decimal own ? $"the employee's amount {Money(own)}" : $"fixed {Money(element.FixedAmount)}",
+            CalculationBasis.PercentOfBasic => $"{rate:0.####}% of basic {Money(Number("BASIC"))}{basicNote}",
+            CalculationBasis.PercentOfGross => $"{rate:0.####}% of gross {Money(Number("GROSS"))}",
+            CalculationBasis.RatePerUnit => $"{rate:0.####} × {assignment.Units ?? 0m:0.####} units",
+            CalculationBasis.PercentOfGroup => $"{rate:0.####}% of group {element.BasisGroup} {Money(Number(GroupVariable(element.BasisGroup)))}",
+            CalculationBasis.TaxTable => $"tax table {element.TaxTableCode ?? "in force"} on taxable {Money(Number("TAXABLE"))}"
+                + (Number(PeriodsPerYearVariable) is var perYear && perYear is > 0m and not 12m ? $" (bands × 12/{perYear:0})" : string.Empty)
+                + (element.CumulativeTax ? $", cumulative to period {Number(TaxPeriodVariable):0}" : string.Empty),
+            _ => FormulaWorkings(element.Formula ?? string.Empty, vars) + (FormulaUses(element.Formula, "BASIC") ? basicNote : string.Empty),
+        };
+        return text;
+    }
+
+    // A formula with the value of every variable it names.
+    private static string FormulaWorkings(string formula, IReadOnlyDictionary<string, object?> vars)
+    {
+        List<string> used = [.. System.Text.RegularExpressions.Regex.Matches(formula, "[A-Za-z_][A-Za-z0-9_]*").Select(m => m.Value).Distinct()
+            .Where(name => vars.GetValueOrDefault(name) is decimal)
+            .Select(name => $"{name} = {Money((decimal)vars[name]!)}")];
+        return used.Count == 0 ? formula : $"{formula} with {string.Join(", ", used)}";
+    }
+
+    private static bool FormulaUses(string? formula, string name)
+        => formula is not null && System.Text.RegularExpressions.Regex.IsMatch(formula, $"\\b{name}\\b");
 
     // The loan a payslip line repays (or was charged interest on), or null.
     private static long? LoanIdOf(string code)
