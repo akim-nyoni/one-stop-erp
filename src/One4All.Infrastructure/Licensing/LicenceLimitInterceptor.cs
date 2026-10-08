@@ -80,5 +80,45 @@ public sealed class LicenceLimitInterceptor : SaveChangesInterceptor
                 throw new LicenceLimitException(refused.Error.Message);
             }
         }
+
+        CheckTransactions(context);
+        CheckBudgetDepartments(context);
+    }
+
+    // Transactions a year (brief §11.3 "transactions_per_year"): journals dated in a calendar year, across the installation.
+    private void CheckTransactions(DbContext context)
+    {
+        foreach (IGrouping<int, Core.Accounting.JournalEntry> year in context.ChangeTracker.Entries<Core.Accounting.JournalEntry>()
+                     .Where(e => e.State == EntityState.Added).Select(e => e.Entity).GroupBy(j => j.PostingDate.Year))
+        {
+            DateOnly from = new(year.Key, 1, 1), to = new(year.Key, 12, 31);
+            int existing = context.Set<Core.Accounting.JournalEntry>().IgnoreQueryFilters().Count(j => j.PostingDate >= from && j.PostingDate <= to);
+            if (_licence.WithinLimit("transactions_per_year", existing + year.Count()) is { IsFailure: true } refused)
+            {
+                throw new LicenceLimitException(refused.Error.Message);
+            }
+        }
+    }
+
+    // Budget departments (brief §11.3: "budget_departments", the budgeting module's "departments"): the distinct departments budgeted for.
+    private void CheckBudgetDepartments(DbContext context)
+    {
+        List<string> adding = [.. context.ChangeTracker.Entries<Core.Budgeting.Budget>().Where(e => e.State == EntityState.Added)
+            .Select(e => e.Entity.Department).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase)];
+        if (adding.Count == 0)
+        {
+            return;
+        }
+
+        List<string> existing = [.. context.Set<Core.Budgeting.Budget>().IgnoreQueryFilters().Where(b => b.Department != null).Select(b => b.Department!).Distinct().ToList()
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+        int count = existing.Count + adding.Count(d => !existing.Contains(d, StringComparer.OrdinalIgnoreCase));
+        foreach (Core.Common.Result check in new[] { _licence.WithinLimit("budget_departments", count), _licence.WithinLimit("departments", count, LicenceModules.Budget) })
+        {
+            if (check.IsFailure)
+            {
+                throw new LicenceLimitException(check.Error.Message);
+            }
+        }
     }
 }

@@ -2449,6 +2449,8 @@ app.MapGet("/api/system/licence", async (One4All.Application.Abstractions.Licens
         ["waiting_list"] = await db.HousingApplicants.CountAsync(ct).ConfigureAwait(false),
         ["students"] = await db.Students.CountAsync(ct).ConfigureAwait(false),
         ["employees"] = await db.Employees.CountAsync(e => e.Status != One4All.Core.Payroll.EmployeeStatus.Terminated, ct).ConfigureAwait(false),
+        ["transactions_per_year"] = await db.Journals.CountAsync(j => j.PostingDate.Year == DateTime.Today.Year, ct).ConfigureAwait(false),
+        ["budget_departments"] = await db.Set<One4All.Core.Budgeting.Budget>().Where(b => b.Department != null).Select(b => b.Department).Distinct().CountAsync(ct).ConfigureAwait(false),
     };
     return Results.Ok(new
     {
