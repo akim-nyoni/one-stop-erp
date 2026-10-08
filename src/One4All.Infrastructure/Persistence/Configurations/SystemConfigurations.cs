@@ -8,6 +8,7 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
 {
     public void Configure(EntityTypeBuilder<Company> b)
     {
+        b.Property(x => x.PosChangeCurrency).HasMaxLength(3);
         b.ToTable("company", Schemas.System);
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).HasMaxLength(20);
@@ -41,6 +42,7 @@ internal sealed class CurrencyConfiguration : IEntityTypeConfiguration<Currency>
 {
     public void Configure(EntityTypeBuilder<Currency> b)
     {
+        b.Ignore(x => x.SmallestCashUnit);
         b.ToTable("currency", Schemas.System);
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).HasMaxLength(3);

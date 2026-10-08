@@ -1054,7 +1054,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         string saleNumber = $"POS{_terminalId}-{DateTime.Now:yyMMddHHmmss}-{++_saleSequence}";
-        PosSaleContext context = SaleContext(saleNumber) with { CustomerId = await AccountCustomerIdAsync().ConfigureAwait(true) };
+        PosChangeQuote? quote = await ChangeQuoteAsync().ConfigureAwait(true);
+        PosSaleContext context = SaleContext(saleNumber) with { CustomerId = await AccountCustomerIdAsync().ConfigureAwait(true), Change = quote };
         Result<CompleteSaleRequest> build = _ticket.BuildSale(context);
         if (build.IsFailure)
         {
@@ -1064,7 +1065,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
         CompleteSaleRequest request = build.Value;
         decimal change = _ticket.ChangeDue;
-        await CompleteAsync(request, saleNumber, change).ConfigureAwait(true);
+        await CompleteAsync(request, saleNumber, change, quote is null ? null : $"{quote.Amount.ToString("N2", CultureInfo.CurrentCulture)} {quote.Currency.Value}").ConfigureAwait(true);
     }
 
     /// <summary>The basket to split among payers, or null (with the reason shown) when there is nothing to split.</summary>
@@ -1203,7 +1204,21 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             DiscountAccountCode: NullIfBlank(DiscountAccountCode));
     }
 
-    private async Task CompleteAsync(CompleteSaleRequest request, string saleNumber, decimal change)
+    // The change in the configured change currency (null: give it in base, or none is owed).
+    private async Task<PosChangeQuote?> ChangeQuoteAsync()
+    {
+        if (_ticket.ChangeDue <= 0m)
+        {
+            return null;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        Result<PosChangeQuote?> quote = await scope.ServiceProvider.GetRequiredService<IPosService>().ChangeQuoteAsync(_companyId, _ticket.ChangeDue, DateOnly.FromDateTime(DateTime.Today))
+            .ConfigureAwait(true);
+        return quote.IsSuccess ? quote.Value : null;
+    }
+
+    private async Task CompleteAsync(CompleteSaleRequest request, string saleNumber, decimal change, string? changeShown = null)
     {
         try
         {
@@ -1242,7 +1257,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             PrescriptionReference = string.Empty;
             AccountCustomer = string.Empty;
             RebuildCart();
-            StatusMessage = $"Sale {saleNumber} posted (journal {result.Value.JournalNumber}). Change {change:N2}.{loyalty}{(printed is null ? string.Empty : $" Receipt not printed: {printed}")}";
+            StatusMessage = $"Sale {saleNumber} posted (journal {result.Value.JournalNumber}). Change {changeShown ?? change.ToString("N2", CultureInfo.CurrentCulture)}.{loyalty}{(printed is null ? string.Empty : $" Receipt not printed: {printed}")}";
         }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex) && request.Tenders.Any(t => t.TenderType == TenderType.Voucher))
         {

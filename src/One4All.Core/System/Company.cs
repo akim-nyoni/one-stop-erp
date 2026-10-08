@@ -103,6 +103,12 @@ public sealed class Company : SoftDeletableEntity
     public string? CashRoundingAccountCode { get; set; }
 
     /// <summary>
+    /// The currency the till gives change in when it is not the base currency (brief §4.1 multi-currency tendering): change is converted at the day's
+    /// rate and rounded to that currency's smallest cash unit, the difference posted to <see cref="CashRoundingAccountCode"/>. Null: change in base.
+    /// </summary>
+    public string? PosChangeCurrency { get; set; }
+
+    /// <summary>
     /// The withholding tax code deducted from any payment to a supplier without a valid tax clearance on the payment date when the
     /// payment names none itself (brief §3.5). Null: withholding only where a payment asks for it.
     /// </summary>

@@ -29,6 +29,15 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Point of Sale", Title = "Change currency and cash rounding",
+            Description = "The currency the till gives change in (blank: base), converted at the day's rate and rounded to its smallest note or coin; the base cash rounding "
+                + "increment (e.g. 0.05); and the account rounding differences go to.",
+            Fields = [Opt("Currency", "Change currency (blank: base)"), OptNum("Increment", "Base cash rounding increment"), Opt("Account", "Rounding difference account")],
+            Run = async (c, i) => Check(await c.Get<IPosService>().ConfigureChangeAsync(c.CompanyId, i.Optional("Currency"), i.OptionalNumber("Increment"), i.Optional("Account")).ConfigureAwait(true),
+                "Change settings saved."),
+        };
+        yield return new Operation
+        {
             Module = "Point of Sale", Title = "Activate a gift card", ListTitle = "Gift card stock", Description = "Loads a card of printed stock with its value when sold (Dr cash, Cr gift card liability).",
             Fields = [Req("Card", "Card number"), Num("Value", "Value"), Today(), Opt("Expiry", "Expires (yyyy-MM-dd, optional)"), Req("Cash", "Cash account", "1000"), Req("Liability", "Gift card liability account")],
             Run = async (c, i) =>

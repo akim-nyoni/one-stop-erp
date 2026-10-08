@@ -201,6 +201,11 @@ public sealed class PosService : IPosService
                 return rateResult.Error;
             }
 
+            if (tender.IsChange && tender.Currency != baseCurrency && tender.Currency.Value != company.PosChangeCurrency)
+            {
+                return Error.Rule("Pos.ChangeCurrency", $"Change is given in {baseCurrency.Value}{(company.PosChangeCurrency is string cc ? " or " + cc : string.Empty)}, not {tender.Currency.Value}.");
+            }
+
             // A staff purchase goes on the employee's staff account (a credit tender), recovered through payroll.
             if (tender.StaffEmployeeId is long staffId)
             {
@@ -248,9 +253,24 @@ public sealed class PosService : IPosService
         decimal difference = sale.NetTenderedBase - sale.TotalGross;
         if (Math.Abs(difference) > 0.0001m)
         {
-            // Cash rounding: a cash sale may be tendered up to half the smallest cash unit away from the exact total.
-            bool rounds = company.CashRoundingIncrement is decimal increment && increment > 0m && !string.IsNullOrWhiteSpace(company.CashRoundingAccountCode)
-                && Math.Abs(difference) <= (increment / 2m) + 0.0001m && sale.Tenders.Any(t => t.TenderType == TenderType.Cash);
+            // Cash rounding: a cash sale may be tendered up to half the smallest cash unit away from the exact total — in base, or in the change
+            // currency when change is given in it (half its smallest cash unit at the day's rate).
+            decimal tolerance = company.CashRoundingIncrement is decimal increment && increment > 0m ? increment / 2m : 0m;
+            if (company.PosChangeCurrency is string changeCode && changeCode != baseCurrency.Value)
+            {
+                CurrencyCode changeCurrency = CurrencyCode.Parse(changeCode);
+                decimal? given = request.Tenders.Where(t => t.IsChange && t.Currency == changeCurrency).Select(t => t.ExchangeRate).FirstOrDefault();
+                Result<decimal> changeRate = await ResolveRateAsync(baseCurrency, changeCurrency, given, request.SaleDate, ct).ConfigureAwait(false);
+                decimal? smallest = await _db.Currencies.AsNoTracking().Include(c => c.Denominations).Where(c => c.Code == changeCurrency).Select(c => (decimal?)c.SmallestCashUnit)
+                    .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+                if (changeRate.IsSuccess && smallest is decimal unit)
+                {
+                    tolerance = Math.Max(tolerance, unit * changeRate.Value / 2m);
+                }
+            }
+
+            bool rounds = tolerance > 0m && !string.IsNullOrWhiteSpace(company.CashRoundingAccountCode)
+                && Math.Abs(difference) <= tolerance + 0.0001m && sale.Tenders.Any(t => t.TenderType == TenderType.Cash);
             if (!rounds)
             {
                 return Error.Rule("Pos.Unbalanced", $"Tenders {sale.NetTenderedBase:0.00} do not equal the sale total {sale.TotalGross:0.00}.");
@@ -879,6 +899,49 @@ public sealed class PosService : IPosService
         }
 
         return currencies;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> ConfigureChangeAsync(long companyId, string? changeCurrency, decimal? roundingIncrement, string? roundingAccountCode, CancellationToken ct = default)
+    {
+        Company company = await _db.Companies.FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        string? code = string.IsNullOrWhiteSpace(changeCurrency) ? null : changeCurrency.Trim().ToUpperInvariant();
+        if (code is not null && code != company.BaseCurrency.Value
+            && (!CurrencyCode.TryParse(code, out CurrencyCode parsed) || !await _db.Currencies.AnyAsync(c => c.Code == parsed, ct).ConfigureAwait(false)))
+        {
+            return Result.Failure(Error.NotFound("Pos.ChangeCurrency", $"No currency {code} is set up."));
+        }
+
+        if (roundingIncrement is < 0m || ((roundingIncrement > 0m || (code is not null && code != company.BaseCurrency.Value)) && string.IsNullOrWhiteSpace(roundingAccountCode)))
+        {
+            return Result.Failure(Error.Validation("Pos.ChangeRounding", "Rounding needs a non-negative increment and the account its differences go to."));
+        }
+
+        company.PosChangeCurrency = code == company.BaseCurrency.Value ? null : code;
+        company.CashRoundingIncrement = roundingIncrement is > 0m ? roundingIncrement : null;
+        company.CashRoundingAccountCode = string.IsNullOrWhiteSpace(roundingAccountCode) ? null : roundingAccountCode.Trim();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<PosChangeQuote?>> ChangeQuoteAsync(long companyId, decimal changeDueBase, DateOnly date, CancellationToken ct = default)
+    {
+        Company company = await _db.Companies.AsNoTracking().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        if (company.PosChangeCurrency is not string code || code == company.BaseCurrency.Value || changeDueBase <= 0m)
+        {
+            return Result<PosChangeQuote?>.Success(null);
+        }
+
+        CurrencyCode currency = CurrencyCode.Parse(code);
+        Result<decimal> rate = await ResolveRateAsync(company.BaseCurrency, currency, null, date, ct).ConfigureAwait(false);
+        if (rate.IsFailure)
+        {
+            return rate.Error;
+        }
+
+        Currency setup = await _db.Currencies.AsNoTracking().Include(c => c.Denominations).FirstAsync(c => c.Code == currency, ct).ConfigureAwait(false);
+        return Result<PosChangeQuote?>.Success(PosChangeQuote.For(changeDueBase, currency, rate.Value, setup.SmallestCashUnit));
     }
 
     /// <inheritdoc />

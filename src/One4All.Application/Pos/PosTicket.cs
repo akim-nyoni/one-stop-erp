@@ -36,7 +36,31 @@ public sealed record PosSaleContext(
     bool AgeVerified = false,
     string? PrescriptionReference = null,
     string? DiscountAccountCode = null,
-    long? CustomerId = null);
+    long? CustomerId = null,
+    PosChangeQuote? Change = null);
+
+/// <summary>Change given in another currency, rounded to what can be handed over (brief §4.1).</summary>
+/// <param name="Currency">The change currency.</param>
+/// <param name="Rate">Units of base currency one unit of it buys.</param>
+/// <param name="Amount">The change handed over, in that currency (a multiple of its smallest cash unit).</param>
+/// <param name="BaseValue">Its base value.</param>
+/// <param name="Rounding">The change owed in base less what was handed over (to the rounding account; negative when the customer got more).</param>
+public sealed record PosChangeQuote(CurrencyCode Currency, decimal Rate, decimal Amount, decimal BaseValue, decimal Rounding)
+{
+    /// <summary>Quotes change owed in base in another currency, to the nearest multiple of its smallest cash unit.</summary>
+    /// <param name="changeDueBase">The change owed, in base.</param>
+    /// <param name="currency">The change currency.</param>
+    /// <param name="rate">Units of base one unit of it buys.</param>
+    /// <param name="smallestUnit">Its smallest cash unit.</param>
+    /// <returns>The quote.</returns>
+    public static PosChangeQuote For(decimal changeDueBase, CurrencyCode currency, decimal rate, decimal smallestUnit)
+    {
+        decimal unit = smallestUnit > 0m ? smallestUnit : 0.01m;
+        decimal amount = rate <= 0m ? 0m : Math.Round(changeDueBase / rate / unit, MidpointRounding.AwayFromZero) * unit;
+        decimal baseValue = decimal.Round(amount * rate, 4, MidpointRounding.ToEven);
+        return new PosChangeQuote(currency, rate, amount, baseValue, decimal.Round(changeDueBase - baseValue, 4, MidpointRounding.ToEven));
+    }
+}
 
 /// <summary>
 /// One line on a POS ticket. Prices are tax-exclusive (a menu/item <c>Price</c> is a net price, matching
@@ -484,7 +508,18 @@ public sealed class PosTicket
                 return Error.Validation("Pos.ChangeAccount", "No change account is configured.");
             }
 
-            tenders.Add(new PosTenderRequest(TenderType.Cash, context.Currency, ChangeDue, context.ChangeAccountCode, IsChange: true));
+            if (context.Change is PosChangeQuote quote && quote.Currency != context.Currency)
+            {
+                // Change in the configured change currency, rounded to its smallest cash unit; nothing handed over when it rounds to nil.
+                if (quote.Amount > 0m)
+                {
+                    tenders.Add(new PosTenderRequest(TenderType.Cash, quote.Currency, quote.Amount, context.ChangeAccountCode, IsChange: true, ExchangeRate: quote.Rate));
+                }
+            }
+            else
+            {
+                tenders.Add(new PosTenderRequest(TenderType.Cash, context.Currency, ChangeDue, context.ChangeAccountCode, IsChange: true));
+            }
         }
 
         CompleteSaleRequest sale = basket.Value;

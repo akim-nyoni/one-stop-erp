@@ -63,6 +63,10 @@ public sealed class Currency : SoftDeletableEntity
     /// <summary>The cash denominations available (notes and coins), for tender and change breakdown.</summary>
     public IReadOnlyCollection<CurrencyDenomination> Denominations => _denominations.AsReadOnly();
 
+    /// <summary>The smallest amount that can be handed over in cash: the smallest denomination, else the rounding increment, else one minor unit.</summary>
+    public decimal SmallestCashUnit => _denominations.Count > 0 ? _denominations.Min(d => d.FaceValue)
+        : RoundingIncrement > 0m ? RoundingIncrement : 1m / (decimal)Math.Pow(10, DecimalPlaces);
+
     /// <summary>Adds a denomination.</summary>
     /// <param name="faceValue">The face value (e.g. 20 for a $20 note).</param>
     /// <param name="isNote">True for a note, false for a coin.</param>

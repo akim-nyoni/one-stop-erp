@@ -27340,6 +27340,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("payslip_password_rule");
 
+                    b.Property<string>("PosChangeCurrency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("pos_change_currency");
+
                     b.Property<bool>("RaisePayrollRemittances")
                         .HasColumnType("boolean")
                         .HasColumnName("raise_payroll_remittances");

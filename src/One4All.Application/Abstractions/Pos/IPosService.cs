@@ -190,6 +190,15 @@ public interface IPosService
     Task<IReadOnlyList<TillCurrency>> TenderCurrenciesAsync(long companyId, DateOnly date, CancellationToken ct = default);
 
     /// <summary>
+    /// Sets how the till gives change (brief §4.1): the change currency (null: base), the base-currency cash rounding increment and the rounding account
+    /// the differences go to.
+    /// </summary>
+    Task<Result> ConfigureChangeAsync(long companyId, string? changeCurrency, decimal? roundingIncrement, string? roundingAccountCode, CancellationToken ct = default);
+
+    /// <summary>The change owed (in base) as handed over in the configured change currency at the day's rate, rounded to its smallest cash unit; null when change is given in base.</summary>
+    Task<Result<One4All.Application.Pos.PosChangeQuote?>> ChangeQuoteAsync(long companyId, decimal changeDueBase, DateOnly date, CancellationToken ct = default);
+
+    /// <summary>
     /// Voids/refunds a completed sale: posts the exact inverse of the sale's tender/revenue/tax journal
     /// (refunding the tenders) and reverses each cost-of-sales stock issue back into inventory at its original
     /// cost. Requires a reason; refuses a sale that is not completed. Returns the reversal journal number.
