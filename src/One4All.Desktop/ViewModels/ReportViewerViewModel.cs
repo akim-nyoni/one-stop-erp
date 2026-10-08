@@ -157,6 +157,10 @@ public sealed partial class ReportViewerViewModel : ObservableObject
             .Select(r => new ReportListItem(r.Code, r.Name, r.Module, r.DefinitionJson))
             .ToListAsync(ct).ConfigureAwait(true);
 
+        // The company's report set (its industries' documents and key reports) comes first, starred.
+        HashSet<string> featured = [.. await db.FeaturedReports.AsNoTracking().Where(f => f.CompanyId == _companyId).Select(f => f.ReportCode).ToListAsync(ct).ConfigureAwait(true)];
+        items = [.. items.Where(i => featured.Contains(i.Code)).Select(i => i with { Name = "★ " + i.Name }), .. items.Where(i => !featured.Contains(i.Code))];
+
         Reports.Clear();
         foreach (ReportListItem item in items)
         {

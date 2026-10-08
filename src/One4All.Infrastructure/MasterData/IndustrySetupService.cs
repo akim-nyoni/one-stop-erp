@@ -97,7 +97,50 @@ public sealed class IndustrySetupService : IIndustrySetupService
     }
 
     private static IndustrySetupResult Add(IndustrySetupResult a, IndustrySetupResult b)
-        => a with { Accounts = a.Accounts + b.Accounts, TaxCodes = a.TaxCodes + b.TaxCodes, Warehouses = a.Warehouses + b.Warehouses, Roles = a.Roles + b.Roles, DemoRecords = a.DemoRecords + b.DemoRecords };
+        => a with
+        {
+            Accounts = a.Accounts + b.Accounts, TaxCodes = a.TaxCodes + b.TaxCodes, Warehouses = a.Warehouses + b.Warehouses, Roles = a.Roles + b.Roles, DemoRecords = a.DemoRecords + b.DemoRecords,
+            ItemCategories = a.ItemCategories + b.ItemCategories, Terminals = a.Terminals + b.Terminals, FeaturedReports = a.FeaturedReports + b.FeaturedReports,
+        };
+
+    // The vertical's item categories, POS terminals at head office and report set; anything already there is kept as it is.
+    private async Task<(int Categories, int Terminals, int Reports)> ApplyExtrasAsync(long companyId, Vertical vertical, CancellationToken ct)
+    {
+        VerticalExtras extras = IndustryExtras.For(vertical);
+        int categories = 0, terminals = 0, reports = 0;
+        foreach ((string code, string name) in extras.ItemCategories)
+        {
+            string key = code.ToUpperInvariant();
+            if (!await _db.ItemCategories.AnyAsync(c => c.CompanyId == companyId && c.Code == key, ct).ConfigureAwait(false))
+            {
+                _db.ItemCategories.Add(new Core.Inventory.ItemCategory(companyId, code, name));
+                categories++;
+            }
+        }
+
+        long? headOffice = await _db.Branches.Where(b => b.CompanyId == companyId).OrderByDescending(b => b.IsHeadOffice).ThenBy(b => b.Id).Select(b => (long?)b.Id)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        foreach (TerminalSeed seed in extras.Terminals)
+        {
+            if (headOffice is long branch && !await _db.Set<Core.Pos.PosTerminal>().AnyAsync(t => t.CompanyId == companyId && t.Code == seed.Code, ct).ConfigureAwait(false))
+            {
+                _db.Set<Core.Pos.PosTerminal>().Add(new Core.Pos.PosTerminal(companyId, branch, seed.Code, seed.Name));
+                terminals++;
+            }
+        }
+
+        foreach (string code in extras.FeaturedReports)
+        {
+            if (!await _db.FeaturedReports.AnyAsync(f => f.CompanyId == companyId && f.ReportCode == code, ct).ConfigureAwait(false))
+            {
+                _db.FeaturedReports.Add(new Core.Reporting.FeaturedReport(companyId, code, vertical.ToString()));
+                reports++;
+            }
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return (categories, terminals, reports);
+    }
 
     // Counts a creation, treats an existing record as already done, and stops on anything else.
     private static Error? Tally(Result result, ref int count)
@@ -199,6 +242,7 @@ public sealed class IndustrySetupService : IIndustrySetupService
             }
         }
 
-        return new IndustrySetupResult(companyId, accounts, taxes, warehouses, roles, records);
+        (int itemCategories, int terminals, int featured) = await ApplyExtrasAsync(companyId, template.Vertical, ct).ConfigureAwait(false);
+        return new IndustrySetupResult(companyId, accounts, taxes, warehouses, roles, records, itemCategories, terminals, featured);
     }
 }

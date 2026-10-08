@@ -47,6 +47,14 @@ public sealed class IndustrySetupTests
         db.Items.Single(i => i.CompanyId == companyId && i.Code == "MILK").Category.Should().Be("Dairy");
         db.Roles.AsNoTracking().Include(r => r.Permissions).Single(r => r.NormalizedName == "RETAIL CASHIER").Permissions.Should().Contain(p => p.PermissionCode == "Pos.Sale");
 
+        // Item categories, a till at head office and the industries' report set.
+        setup.ItemCategories.Should().Be(IndustryExtras.For(Vertical.Core).ItemCategories.Count + IndustryExtras.For(Vertical.Retail).ItemCategories.Count
+            + IndustryExtras.For(Vertical.Construction).ItemCategories.Count);
+        db.ItemCategories.AsNoTracking().Where(c => c.CompanyId == companyId).Select(c => c.Code).Should().Contain(["GROC", "PLANT", "GEN"]);
+        setup.Terminals.Should().Be(1);
+        db.Set<One4All.Core.Pos.PosTerminal>().AsNoTracking().Single(t => t.CompanyId == companyId).Code.Should().Be("TILL01");
+        db.FeaturedReports.AsNoTracking().Where(f => f.CompanyId == companyId).Select(f => f.ReportCode).Should().Contain(["GL-TB", "POS-SUM", "JC186"]);
+
         // It posts straight away.
         (await scope.ServiceProvider.GetRequiredService<IPostingEngine>().PostAsync(new JournalRequest
         {
@@ -58,6 +66,7 @@ public sealed class IndustrySetupTests
         IndustrySetupResult school = (await wizard.AddVerticalAsync(companyId, Vertical.School)).Value;
         (school.Accounts, school.TaxCodes, school.Warehouses).Should().Be((IndustryTemplates.For(Vertical.School).Accounts.Count, 0, 1));
         IndustrySetupResult again = (await wizard.AddVerticalAsync(companyId, Vertical.School)).Value;
-        (again.Accounts, again.TaxCodes, again.Warehouses, again.Roles).Should().Be((0, 0, 0, 0));
+        (again.Accounts, again.TaxCodes, again.Warehouses, again.Roles, again.ItemCategories, again.Terminals, again.FeaturedReports).Should().Be((0, 0, 0, 0, 0, 0, 0));
+        school.Terminals.Should().Be(1, "the tuck shop till");
     }
 }

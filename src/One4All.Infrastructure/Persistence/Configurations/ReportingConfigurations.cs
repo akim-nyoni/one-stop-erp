@@ -74,3 +74,14 @@ internal sealed class ReportDefinitionVersionConfiguration : IEntityTypeConfigur
         b.HasIndex(x => new { x.ReportDefinitionId, x.Version }).IsUnique();
     }
 }
+
+internal sealed class FeaturedReportConfiguration : IEntityTypeConfiguration<Core.Reporting.FeaturedReport>
+{
+    public void Configure(EntityTypeBuilder<Core.Reporting.FeaturedReport> b)
+    {
+        b.ToTable("featured_report", Schemas.Reporting);
+        b.Property(x => x.ReportCode).HasMaxLength(40);
+        b.Property(x => x.Source).HasMaxLength(40);
+        b.HasIndex(x => new { x.CompanyId, x.ReportCode }).IsUnique();
+    }
+}

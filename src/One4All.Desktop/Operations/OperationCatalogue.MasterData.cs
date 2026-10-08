@@ -205,7 +205,8 @@ public static partial class OperationCatalogue
                     Code = i.Text("Code"), Name = i.Text("Name"), BaseCurrency = CurrencyCode.Parse(i.Text("Currency")), Verticals = verticals, FiscalYearStart = i.Date("Start"),
                     VatRatePercent = i.Number("Vat"), WithDemoData = i.Flag("Demo"),
                 }).ConfigureAwait(true));
-                return $"Company {done.CompanyId} set up: {done.Accounts} accounts, {done.TaxCodes} tax codes, {done.Warehouses} warehouses, {done.Roles} new roles, {done.DemoRecords} demo records.";
+                return $"Company {done.CompanyId} set up: {done.Accounts} accounts, {done.TaxCodes} tax codes, {done.Warehouses} warehouses, {done.Roles} new roles, {done.DemoRecords} demo records, "
+                    + $"{done.ItemCategories} item categories, {done.Terminals} POS terminal(s), {done.FeaturedReports} featured reports.";
             },
             List = async c => Table(await c.Db.Companies.AsNoTracking().OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
                 ("Id", x => x.Id), ("Code", x => x.Code), ("Name", x => x.Name), ("Base currency", x => x.BaseCurrency.Value)),
@@ -213,13 +214,14 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Add an industry to this company", ListTitle = "Chart of accounts",
-            Description = "Adds an industry's accounts, taxes, warehouses and roles to the current company, keeping everything already there.",
+            Description = "Adds an industry's accounts, taxes, warehouses, roles, item categories, POS terminal and report set to the current company, keeping everything already there.",
             Fields = [Pick("Industry", "Industry", Enum.GetNames<Vertical>()), Num("Vat", "VAT rate %", "15"), Tick("Demo", "Add demonstration data")],
             Run = async (c, i) =>
             {
                 IndustrySetupResult done = Check(await c.Get<IIndustrySetupService>().AddVerticalAsync(c.CompanyId, Enum.Parse<Vertical>(i.Text("Industry")), i.Number("Vat"), i.Flag("Demo"))
                     .ConfigureAwait(true));
-                return $"Added {done.Accounts} accounts, {done.TaxCodes} tax codes, {done.Warehouses} warehouses, {done.Roles} roles, {done.DemoRecords} demo records.";
+                return $"Added {done.Accounts} accounts, {done.TaxCodes} tax codes, {done.Warehouses} warehouses, {done.Roles} roles, {done.DemoRecords} demo records, "
+                    + $"{done.ItemCategories} item categories, {done.Terminals} POS terminal(s), {done.FeaturedReports} featured reports.";
             },
             List = async c => Table(await c.Db.Accounts.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.AccountCode).ToListAsync().ConfigureAwait(true),
                 ("Code", x => x.AccountCode), ("Name", x => x.Name), ("Type", x => x.Type), ("Control", x => x.ControlAccountType)),

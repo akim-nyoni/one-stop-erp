@@ -308,3 +308,14 @@ internal sealed class ItemWarehouseLevelConfiguration : IEntityTypeConfiguration
         b.HasIndex(x => new { x.ItemId, x.WarehouseId }).IsUnique();
     }
 }
+
+internal sealed class ItemCategoryConfiguration : IEntityTypeConfiguration<Core.Inventory.ItemCategory>
+{
+    public void Configure(EntityTypeBuilder<Core.Inventory.ItemCategory> b)
+    {
+        b.ToTable("item_category", Schemas.Inventory);
+        b.Property(x => x.Code).HasMaxLength(30);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}

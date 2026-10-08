@@ -197,6 +197,12 @@ public class One4AllDbContext : DbContext
     /// <summary>Stored report definitions.</summary>
     public DbSet<Core.Reporting.ReportDefinitionRecord> ReportDefinitions => Set<Core.Reporting.ReportDefinitionRecord>();
 
+    /// <summary>Reports featured for a company (its verticals' report set).</summary>
+    public DbSet<Core.Reporting.FeaturedReport> FeaturedReports => Set<Core.Reporting.FeaturedReport>();
+
+    /// <summary>Item categories.</summary>
+    public DbSet<Core.Inventory.ItemCategory> ItemCategories => Set<Core.Inventory.ItemCategory>();
+
     /// <summary>Customers (Sales Ledger).</summary>
     public DbSet<Core.Trading.Customer> Customers => Set<Core.Trading.Customer>();
 
