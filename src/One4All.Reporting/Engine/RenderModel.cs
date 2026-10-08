@@ -43,7 +43,7 @@ public sealed class ReportInput
 }
 
 /// <summary>A resolved, positioned cell ready to render.</summary>
-public sealed class RenderCell
+public sealed record RenderCell
 {
     /// <summary>The element kind.</summary>
     public ElementKind Kind { get; init; }
@@ -92,6 +92,38 @@ public sealed class RenderCell
 
     /// <summary>Border colour (hex).</summary>
     public string BorderColor { get; init; } = "#000000";
+
+    /// <summary>Gets the vertical alignment.</summary>
+    public ReportVAlign VAlign { get; init; }
+
+    /// <summary>Gets the left border width (null: the border thickness).</summary>
+    public double? BorderLeft { get; init; }
+
+    /// <summary>Gets the top border width (null: the border thickness).</summary>
+    public double? BorderTop { get; init; }
+
+    /// <summary>Gets the right border width (null: the border thickness).</summary>
+    public double? BorderRight { get; init; }
+
+    /// <summary>Gets the bottom border width (null: the border thickness).</summary>
+    public double? BorderBottom { get; init; }
+
+    /// <summary>Gets the padding in points.</summary>
+    public double Padding { get; init; } = 1;
+
+    /// <summary>Gets a value indicating whether text wraps.</summary>
+    public bool WordWrap { get; init; } = true;
+
+    /// <summary>Gets the rotation in degrees, clockwise (0, 90, 180, 270).</summary>
+    public int Rotation { get; init; }
+
+    /// <summary>The border widths, side by side (a rectangle always has at least a hairline).</summary>
+    /// <returns>Left, top, right and bottom.</returns>
+    public (double Left, double Top, double Right, double Bottom) Borders()
+    {
+        double all = BorderThickness > 0 || Kind == ElementKind.Rectangle ? Math.Max(BorderThickness, Kind == ElementKind.Rectangle ? 0.5 : 0) : 0;
+        return (BorderLeft ?? all, BorderTop ?? all, BorderRight ?? all, BorderBottom ?? all);
+    }
 
     /// <summary>Gets what clicking the cell opens (null: nothing).</summary>
     public string? DrillTarget { get; init; }

@@ -116,6 +116,33 @@ public sealed class ReportElement
     /// <summary>Border colour (hex).</summary>
     public string BorderColor { get; set; } = "#000000";
 
+    /// <summary>Gets or sets the left border width in points (null: the border thickness).</summary>
+    public double? BorderLeft { get; set; }
+
+    /// <summary>Gets or sets the top border width in points (null: the border thickness).</summary>
+    public double? BorderTop { get; set; }
+
+    /// <summary>Gets or sets the right border width in points (null: the border thickness).</summary>
+    public double? BorderRight { get; set; }
+
+    /// <summary>Gets or sets the bottom border width in points (null: the border thickness).</summary>
+    public double? BorderBottom { get; set; }
+
+    /// <summary>Gets or sets the space between the border and the text, in points.</summary>
+    public double Padding { get; set; } = 1;
+
+    /// <summary>Gets or sets a value indicating whether long text wraps onto further lines (otherwise one line, cut short).</summary>
+    public bool WordWrap { get; set; } = true;
+
+    /// <summary>Gets or sets a value indicating whether the font shrinks (to 5pt at most) until the text fits the box.</summary>
+    public bool AutoShrink { get; set; }
+
+    /// <summary>Gets or sets the text's rotation in degrees, clockwise (0, 90, 180 or 270).</summary>
+    public int Rotation { get; set; }
+
+    /// <summary>Gets or sets the text shown when a field or expression has no value.</summary>
+    public string? NullText { get; set; }
+
     /// <summary>An expression that, when true, suppresses (hides) this element.</summary>
     public string? SuppressWhen { get; set; }
 

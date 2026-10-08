@@ -63,7 +63,9 @@ public sealed class ReportDesignSession
         nameof(ReportElement.FontFamily), nameof(ReportElement.FontSize), nameof(ReportElement.Bold), nameof(ReportElement.Italic), nameof(ReportElement.Underline),
         nameof(ReportElement.Foreground), nameof(ReportElement.Background), nameof(ReportElement.HAlign), nameof(ReportElement.BorderThickness), nameof(ReportElement.BorderColor),
         nameof(ReportElement.SuppressWhen), nameof(ReportElement.DrillTarget), nameof(ReportElement.DrillField),
-        nameof(ReportElement.ChartCategoryField), nameof(ReportElement.ChartColor), nameof(ReportElement.ChartType), nameof(ReportElement.ChartSeriesField), nameof(ReportElement.SubReportCode), nameof(ReportElement.SubReportLinks),
+        nameof(ReportElement.ChartCategoryField), nameof(ReportElement.ChartColor), nameof(ReportElement.ChartType), nameof(ReportElement.ChartSeriesField),
+        nameof(ReportElement.VAlign), nameof(ReportElement.Padding), nameof(ReportElement.BorderLeft), nameof(ReportElement.BorderTop), nameof(ReportElement.BorderRight),
+        nameof(ReportElement.BorderBottom), nameof(ReportElement.WordWrap), nameof(ReportElement.AutoShrink), nameof(ReportElement.Rotation), nameof(ReportElement.NullText), nameof(ReportElement.SubReportCode), nameof(ReportElement.SubReportLinks),
         nameof(ReportElement.BarcodeSymbology),
     ];
 

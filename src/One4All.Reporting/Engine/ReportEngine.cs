@@ -228,7 +228,16 @@ public sealed class ReportEngine
                 ElementKind.Barcode => barcodeValue ?? string.Empty,
                 _ => ResolveText(element, ctx, scope, input),
             };
+            if (element.Kind is ElementKind.Field or ElementKind.Expression && element.NullText is string nullText && string.IsNullOrEmpty(text))
+            {
+                text = nullText;
+            }
+
             (string foreground, string? background, bool bold) = ApplyConditionalFormats(element, ctx);
+            double fontSize = element.AutoShrink && runs is null
+                ? Layouts.FittedFontSize(text, element.FontSize, Math.Max(1, (element.Rotation % 180 == 0 ? element.Width : element.Height) - (2 * element.Padding)),
+                    Math.Max(1, (element.Rotation % 180 == 0 ? element.Height : element.Width) - (2 * element.Padding)), element.WordWrap)
+                : element.FontSize;
             (string? drillTarget, string? drillKey) = DrillThrough.For(element, row);
 
             rendered.Cells.Add(new RenderCell
@@ -240,7 +249,7 @@ public sealed class ReportEngine
                 Width = element.Width,
                 Height = element.Height,
                 FontFamily = element.FontFamily,
-                FontSize = element.FontSize,
+                FontSize = fontSize,
                 Bold = bold,
                 Italic = element.Italic,
                 Underline = element.Underline,
@@ -249,6 +258,14 @@ public sealed class ReportEngine
                 HAlign = element.HAlign,
                 BorderThickness = element.BorderThickness,
                 BorderColor = element.BorderColor,
+                VAlign = element.VAlign,
+                BorderLeft = element.BorderLeft,
+                BorderTop = element.BorderTop,
+                BorderRight = element.BorderRight,
+                BorderBottom = element.BorderBottom,
+                Padding = element.Padding,
+                WordWrap = element.WordWrap,
+                Rotation = ((element.Rotation % 360) + 360) % 360 / 90 * 90,
                 DrillTarget = drillTarget,
                 DrillKey = drillKey,
                 Runs = runs,

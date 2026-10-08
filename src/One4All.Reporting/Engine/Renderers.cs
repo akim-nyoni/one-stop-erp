@@ -98,9 +98,26 @@ public sealed class HtmlReportRenderer : IReportRenderer
                 sb.Append(";text-decoration:underline");
             }
 
-            if (cell.BorderThickness > 0 || cell.Kind == ElementKind.Rectangle)
+            (double left, double top, double right, double bottom) = cell.Borders();
+            foreach ((string side, double width) in new[] { ("left", left), ("top", top), ("right", right), ("bottom", bottom) }.Where(b => b.Item2 > 0))
             {
-                sb.Append(";border:").Append(Px(Math.Max(cell.BorderThickness, 1))).Append("px solid ").Append(cell.BorderColor);
+                sb.Append(";border-").Append(side).Append(':').Append(Px(Math.Max(width, 1))).Append("px solid ").Append(cell.BorderColor);
+            }
+
+            sb.Append(";box-sizing:border-box;padding:").Append(Px(cell.Padding)).Append("pt");
+            if (cell.ImageData is null)
+            {
+                sb.Append(";display:flex;flex-direction:column;justify-content:").Append(cell.VAlign switch { ReportVAlign.Middle => "center", ReportVAlign.Bottom => "flex-end", _ => "flex-start" });
+            }
+
+            if (!cell.WordWrap)
+            {
+                sb.Append(";white-space:nowrap;overflow:hidden;text-overflow:ellipsis");
+            }
+
+            if (cell.Rotation != 0)
+            {
+                sb.Append(";transform:rotate(").Append(cell.Rotation.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append("deg)");
             }
 
             if (cell.ImageData is string image)

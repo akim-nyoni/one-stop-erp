@@ -80,8 +80,13 @@ public static class FixedReportDocument
             Text = cell.Text, FontFamily = new FontFamily(cell.FontFamily), FontSize = Math.Max(4, cell.FontSize * PointsToDips), FontWeight = cell.Bold ? FontWeights.Bold : FontWeights.Normal,
             FontStyle = cell.Italic ? FontStyles.Italic : FontStyles.Normal, Foreground = Brush(cell.Foreground) ?? Brushes.Black, TextTrimming = TextTrimming.CharacterEllipsis,
             TextAlignment = cell.HAlign switch { ReportHAlign.Center => TextAlignment.Center, ReportHAlign.Right => TextAlignment.Right, _ => TextAlignment.Left },
-            VerticalAlignment = VerticalAlignment.Center,
+            VerticalAlignment = cell.VAlign switch { ReportVAlign.Middle => VerticalAlignment.Center, ReportVAlign.Bottom => VerticalAlignment.Bottom, _ => VerticalAlignment.Top },
+            TextWrapping = cell.WordWrap ? TextWrapping.Wrap : TextWrapping.NoWrap,
         };
+        if (cell.Rotation != 0)
+        {
+            text.LayoutTransform = new RotateTransform(cell.Rotation);
+        }
         if (cell.Underline)
         {
             text.TextDecorations = TextDecorations.Underline;
@@ -103,8 +108,10 @@ public static class FixedReportDocument
         return new Border
         {
             Width = w, Height = h, Child = text, Background = Brush(cell.Background), BorderBrush = Brush(cell.BorderColor),
-            BorderThickness = new Thickness(cell.BorderThickness > 0 || cell.Kind == ElementKind.Rectangle ? Math.Max(0.5, cell.BorderThickness) * PointsToDips : 0),
-            Padding = new Thickness(1, 0, 1, 0),
+            BorderThickness = cell.Borders() is var (left, top, right, bottom)
+                ? new Thickness(left * PointsToDips, top * PointsToDips, right * PointsToDips, bottom * PointsToDips)
+                : default,
+            Padding = new Thickness(Math.Max(0, cell.Padding) * PointsToDips),
         };
     }
 

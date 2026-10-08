@@ -147,9 +147,10 @@ public sealed class PdfReportRenderer : IReportRenderer
 
     private static void RenderCell(IContainer container, RenderCell cell)
     {
-        if (cell.BorderThickness > 0 || cell.Kind == ElementKind.Rectangle)
+        (double left, double top, double right, double bottom) = cell.Borders();
+        if (left + top + right + bottom > 0)
         {
-            container = container.Border((float)Math.Max(cell.BorderThickness, 0.5)).BorderColor(cell.BorderColor);
+            container = container.BorderLeft((float)left).BorderTop((float)top).BorderRight((float)right).BorderBottom((float)bottom).BorderColor(cell.BorderColor);
         }
 
         if (cell.Background is not null)
@@ -176,6 +177,20 @@ public sealed class PdfReportRenderer : IReportRenderer
             }
         }
 
+        container = container.Padding((float)Math.Max(0, cell.Padding));
+        container = cell.Rotation switch
+        {
+            90 => container.RotateRight(),
+            180 => container.RotateRight().RotateRight(),
+            270 => container.RotateLeft(),
+            _ => container,
+        };
+        container = cell.VAlign switch
+        {
+            ReportVAlign.Middle => container.AlignMiddle(),
+            ReportVAlign.Bottom => container.AlignBottom(),
+            _ => container.AlignTop(),
+        };
         IContainer aligned = cell.HAlign switch
         {
             ReportHAlign.Right => container.AlignRight(),
@@ -185,6 +200,11 @@ public sealed class PdfReportRenderer : IReportRenderer
 
         aligned.Text(text =>
         {
+            if (!cell.WordWrap)
+            {
+                text.ClampLines(1);
+            }
+
             IEnumerable<RichRun> runs = cell.Runs is { Count: > 0 } rich ? rich : [new RichRun(cell.Text, cell.Bold, cell.Italic, cell.Underline)];
             foreach (RichRun run in runs.SelectMany(PageTokens))
             {

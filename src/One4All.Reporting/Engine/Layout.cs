@@ -170,12 +170,7 @@ public static class ReportLayout
             }
             : band;
 
-    private static RenderCell With(RenderCell c, string text) => new()
-    {
-        Kind = c.Kind, Text = text, X = c.X, Y = c.Y, Width = c.Width, Height = c.Height, FontFamily = c.FontFamily, FontSize = c.FontSize, Bold = c.Bold, Italic = c.Italic,
-        Underline = c.Underline, Foreground = c.Foreground, Background = c.Background, HAlign = c.HAlign, BorderThickness = c.BorderThickness, BorderColor = c.BorderColor,
-        DrillTarget = c.DrillTarget, DrillKey = c.DrillKey, Runs = c.Runs is null ? null : [new RichRun(text)], ImageData = c.ImageData,
-    };
+    private static RenderCell With(RenderCell c, string text) => c with { Text = text, Runs = c.Runs is null ? null : [new RichRun(text)] };
 }
 
 /// <summary>Helpers for repositioning rendered cells.</summary>
@@ -186,12 +181,34 @@ public static class Layouts
     /// <param name="x">Its new left.</param>
     /// <param name="y">Its new top.</param>
     /// <returns>The moved cell.</returns>
-    public static RenderCell Moved(RenderCell c, double x, double y) => new()
+    public static RenderCell Moved(RenderCell c, double x, double y) => (c ?? throw new ArgumentNullException(nameof(c))) with { X = x, Y = y };
+
+    /// <summary>The largest font size (down to 5pt) at which text fits a box, by an average glyph width of half the size.</summary>
+    /// <param name="text">The text.</param>
+    /// <param name="fontSize">The designed size.</param>
+    /// <param name="width">The box width (points).</param>
+    /// <param name="height">The box height (points).</param>
+    /// <param name="wrap">Whether the text may wrap.</param>
+    /// <returns>The size to use.</returns>
+    public static double FittedFontSize(string text, double fontSize, double width, double height, bool wrap)
     {
-        Kind = c.Kind, Text = c.Text, X = x, Y = y, Width = c.Width, Height = c.Height, FontFamily = c.FontFamily, FontSize = c.FontSize, Bold = c.Bold, Italic = c.Italic,
-        Underline = c.Underline, Foreground = c.Foreground, Background = c.Background, HAlign = c.HAlign, BorderThickness = c.BorderThickness, BorderColor = c.BorderColor,
-        DrillTarget = c.DrillTarget, DrillKey = c.DrillKey, Runs = c.Runs, ImageData = c.ImageData,
-    };
+        if (string.IsNullOrEmpty(text) || width <= 0)
+        {
+            return fontSize;
+        }
+
+        for (double size = fontSize; size > 5; size -= 0.5)
+        {
+            double lineWidth = text.Length * size * 0.5;
+            double lines = wrap ? Math.Ceiling(lineWidth / width) : 1;
+            if ((wrap || lineWidth <= width) && lines * size * 1.25 <= Math.Max(height, size * 1.25))
+            {
+                return size;
+            }
+        }
+
+        return 5;
+    }
 }
 
 /// <summary>Works out what a report value drills through to.</summary>
