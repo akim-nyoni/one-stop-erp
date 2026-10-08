@@ -41,6 +41,15 @@ public readonly record struct StandSaleResult(long OpenItemId, string SaleJourna
 /// </summary>
 public interface IHousingService
 {
+    /// <summary>Creates a housing scheme (council-delivered, PPP, cooperative, employer-assisted); a code already in use is refused.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="code">The scheme code.</param>
+    /// <param name="name">The scheme name.</param>
+    /// <param name="schemeType">The delivery model.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The scheme id.</returns>
+    Task<Result<long>> CreateSchemeAsync(long companyId, string code, string name, Core.Housing.SchemeType schemeType, CancellationToken ct = default);
+
     /// <summary>Acquires a parcel into the land bank: Dr Land &amp; Housing Stock (WIP), Cr the funding account.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="parcelNumber">The parcel/title reference.</param>

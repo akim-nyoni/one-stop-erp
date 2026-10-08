@@ -36,6 +36,26 @@ public sealed class HousingService : IHousingService
     }
 
     /// <inheritdoc />
+    public async Task<Result<long>> CreateSchemeAsync(long companyId, string code, string name, SchemeType schemeType, CancellationToken ct = default)
+    {
+        string key = (code ?? string.Empty).Trim().ToUpperInvariant();
+        if (key.Length == 0 || string.IsNullOrWhiteSpace(name) || !Enum.IsDefined(schemeType))
+        {
+            return Error.Validation("Hse.Scheme", "A scheme needs a code, a name and its delivery model.");
+        }
+
+        if (await _db.HousingSchemes.AnyAsync(x => x.CompanyId == companyId && x.Code == key, ct).ConfigureAwait(false))
+        {
+            return Error.Conflict("Hse.SchemeExists", $"Scheme {key} already exists.");
+        }
+
+        HousingScheme scheme = new(companyId, key, name.Trim(), schemeType);
+        _db.HousingSchemes.Add(scheme);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return scheme.Id;
+    }
+
+    /// <inheritdoc />
     public Task<Result<AcquisitionResult>> AcquireLandAsync(long companyId, string parcelNumber, string description, decimal areaSquareMetres, decimal cost, DateOnly date, string wipAccountCode, string fundingAccountCode, string documentNumber, CancellationToken ct = default)
         => _db.AtomicAsync(() => AcquireLandCoreAsync(companyId, parcelNumber, description, areaSquareMetres, cost, date, wipAccountCode, fundingAccountCode, documentNumber, ct), ct);
 

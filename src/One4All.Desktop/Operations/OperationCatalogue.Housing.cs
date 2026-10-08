@@ -1328,6 +1328,57 @@ public static partial class OperationCatalogue
                 ("Rule", x => x.Id), ("Scope", x => x.Scope), ("Scheme", x => x.SchemeId), ("Stand", x => x.StandId), ("From", x => D(x.EffectiveFrom)), ("Overhead %", x => Q(x.OverheadPercent)),
                 ("Margin %", x => Q(x.MarginPercent)), ("Approved", x => x.ApprovedOn is DateOnly a ? D(a) : "pending")),
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Land, schemes and stands", ListTitle = "Schemes",
+            Description = "Acquire land into land WIP at its cost; create a housing scheme; subdivide a parcel into stands (\"S1:300; S2:250\" — number:size m²), its cost apportioned "
+                + "equally or by area into stands available; sell a stand outright for cash (an invoice to the buyer, cost of sales out of stands available).",
+            Fields = [Pick("Step", "Step", ["Acquire land", "Create scheme", "Subdivide", "Sell stand"]), Opt("Parcel", "Parcel number"), Opt("Description", "Description / scheme name"),
+                Num("Area", "Area m² (acquire)", "0"), Num("Amount", "Cost (acquire) / price (sell)", "0"), Opt("Scheme", "Scheme code"), Pick("SchemeType", "Delivery model", Enum.GetNames<SchemeType>()),
+                Opt("Stands", "Stands: number:size m²; … (subdivide)"), Pick("Apportion", "Apportion cost", Enum.GetNames<ApportionMethod>()), Opt("Stand", "Stand number (sell)"),
+                Opt("Buyer", "Buyer customer code (sell)"), Opt("Wip", "Land WIP account"), Opt("Funding", "Funding / paid from account (acquire)"), Opt("Available", "Stands available account"),
+                Opt("Sales", "Sales account (sell)"), Opt("Cost", "Cost of sales account (sell)"), Opt("Document", "Document / invoice number"), Today()],
+            Run = async (c, i) =>
+            {
+                IHousingService housing = c.Get<IHousingService>();
+                DateOnly date = i.Date("Date");
+                switch (i.Text("Step"))
+                {
+                    case "Acquire land":
+                        AcquisitionResult acquired = Check(await housing.AcquireLandAsync(c.CompanyId, i.Optional("Parcel") ?? string.Empty, i.Optional("Description") ?? string.Empty, i.Number("Area"),
+                            i.Number("Amount"), date, i.Optional("Wip") ?? string.Empty, i.Optional("Funding") ?? string.Empty, i.Optional("Document") ?? string.Empty).ConfigureAwait(true));
+                        return $"Parcel acquired ({acquired.JournalNumber}).";
+                    case "Create scheme":
+                        return Check(await housing.CreateSchemeAsync(c.CompanyId, i.Optional("Scheme") ?? string.Empty, i.Optional("Description") ?? string.Empty, Enum.Parse<SchemeType>(i.Text("SchemeType")))
+                            .ConfigureAwait(true), _ => "Scheme created.");
+                    case "Subdivide":
+                        long parcel = await FindAsync(c.Db.LandParcels, x => x.CompanyId == c.CompanyId && x.ParcelNumber == (i.Optional("Parcel") ?? string.Empty).ToUpper(), x => x.Id, "land parcel",
+                            i.Optional("Parcel") ?? string.Empty).ConfigureAwait(true);
+                        long? scheme = i.Optional("Scheme") is string code
+                            ? await FindAsync(c.Db.HousingSchemes, x => x.CompanyId == c.CompanyId && x.Code == code.ToUpper(), x => x.Id, "scheme", code).ConfigureAwait(true) : null;
+                        List<NewStand> stands = [];
+                        foreach (string part in (i.Optional("Stands") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                            stands.Add(bits.Length == 2 && decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal size)
+                                ? new NewStand(bits[0], size) : throw new OperationException($"Write each stand as number:size m² (\"{part}\")."));
+                        }
+
+                        SubdivisionResult subdivided = Check(await housing.SubdivideAsync(c.CompanyId, parcel, scheme, stands, Enum.Parse<ApportionMethod>(i.Text("Apportion")), date,
+                            i.Optional("Wip") ?? string.Empty, i.Optional("Available") ?? string.Empty).ConfigureAwait(true));
+                        return $"{subdivided.StandIds.Count} stand(s) created ({subdivided.JournalNumber}).";
+                    default:
+                        long stand = await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == (i.Optional("Stand") ?? string.Empty).ToUpper(), x => x.Id, "stand",
+                            i.Optional("Stand") ?? string.Empty).ConfigureAwait(true);
+                        long buyer = await CustomerAsync(c, i.Optional("Buyer") ?? string.Empty).ConfigureAwait(true);
+                        string buyerName = await c.Db.Customers.AsNoTracking().Where(x => x.Id == buyer).Select(x => x.Name).FirstAsync().ConfigureAwait(true);
+                        StandSaleResult sold = Check(await housing.SellStandAsync(c.CompanyId, stand, buyer, buyerName, i.Number("Amount"), date, i.Optional("Sales") ?? string.Empty,
+                            i.Optional("Available") ?? string.Empty, i.Optional("Cost") ?? string.Empty, i.Optional("Document") ?? string.Empty).ConfigureAwait(true));
+                        return $"Sold: invoice posted ({sold.SaleJournalNumber}); cost of sales {M(sold.CostOfSales)} ({sold.CostOfSalesJournalNumber}).";
+                }
+            },
+            List = SchemesAsync,
+        };
     }
 
     private static async Task<System.Data.DataTable> SchemesAsync(OperationContext c)
