@@ -1187,6 +1187,147 @@ public static partial class OperationCatalogue
             },
             List = SchemesAsync,
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Land register", ListTitle = "Land disputes",
+            Description = "On a land parcel: register an encumbrance (servitude, caveat, mortgage, lease, restrictive condition, wayleave) and lift it; open a land dispute and move it "
+                + "reported → investigation → negotiation → mediation → litigation → judgment → resolved; dispose of land by sale, exchange (receiving a parcel in return), donation or "
+                + "expropriation, with the cost out and the gain or loss.",
+            Fields = [Pick("Step", "Step", ["Encumbrance", "Lift encumbrance", "Open dispute", "Advance dispute", "Dispose"]), Opt("Parcel", "Parcel number"), Pick("EncType", "Encumbrance type", Enum.GetNames<EncumbranceType>()),
+                OptNum("Encumbrance", "Encumbrance id (lift)"), Opt("Reference", "Reference / resolution"), Opt("Party", "In favour of / claimant / counterparty"), Opt("Text", "Description / particulars / note"),
+                Pick("DisputeType", "Dispute type", Enum.GetNames<LandDisputeType>()), Opt("Dispute", "Dispute number (advance)"), Pick("Stage", "Dispute stage", Enum.GetNames<LandDisputeStage>()),
+                Opt("Stand", "Stand number (dispute, optional)"), Pick("DisposalType", "Disposal", Enum.GetNames<LandDisposalType>()), Num("Area", "Area m² (disposal)", "0"), Num("Consideration", "Consideration", "0"),
+                Opt("LandAccount", "Land account"), Opt("Proceeds", "Proceeds account"), Opt("GainLoss", "Gain / loss account"), Opt("Exchange", "Parcel received in exchange: number"),
+                Num("ExchangeArea", "Parcel received: area m²", "0"), Today()],
+            Run = async (c, i) =>
+            {
+                ILandRegisterService register = c.Get<ILandRegisterService>();
+                string parcel = i.Optional("Parcel") ?? string.Empty;
+                DateOnly date = i.Date("Date");
+                switch (i.Text("Step"))
+                {
+                    case "Encumbrance":
+                        return Check(await register.RegisterEncumbranceAsync(new EncumbranceRegistration
+                        {
+                            CompanyId = c.CompanyId, ParcelNumber = parcel, Type = Enum.Parse<EncumbranceType>(i.Text("EncType")), Reference = i.Optional("Reference") ?? string.Empty,
+                            InFavourOf = i.Optional("Party") ?? string.Empty, Description = i.Optional("Text") ?? string.Empty, Date = date,
+                        }).ConfigureAwait(true), id => $"Encumbrance {id} registered.");
+                    case "Lift encumbrance":
+                        return Check(await register.LiftEncumbranceAsync(c.CompanyId, (long)(i.OptionalNumber("Encumbrance") ?? 0m), date, i.Optional("Reference") ?? string.Empty).ConfigureAwait(true), "Encumbrance lifted.");
+                    case "Open dispute":
+                        return $"Dispute {Check(await register.OpenDisputeAsync(new LandDisputeLodgement
+                        {
+                            CompanyId = c.CompanyId, ParcelNumber = parcel, StandNumber = i.Optional("Stand"), Type = Enum.Parse<LandDisputeType>(i.Text("DisputeType")), Claimant = i.Optional("Party") ?? string.Empty,
+                            Particulars = i.Optional("Text") ?? string.Empty, Date = date,
+                        }).ConfigureAwait(true))} opened.";
+                    case "Advance dispute":
+                        return Check(await register.AdvanceDisputeAsync(c.CompanyId, i.Optional("Dispute") ?? string.Empty, Enum.Parse<LandDisputeStage>(i.Text("Stage")), date, i.Optional("Text") ?? string.Empty)
+                            .ConfigureAwait(true), $"Moved to {i.Text("Stage")}.");
+                    default:
+                        LandDisposalResult disposed = Check(await register.DisposeAsync(new LandDisposalRequest
+                        {
+                            CompanyId = c.CompanyId, ParcelNumber = parcel, Type = Enum.Parse<LandDisposalType>(i.Text("DisposalType")), Counterparty = i.Optional("Party") ?? string.Empty,
+                            ResolutionReference = i.Optional("Reference") ?? string.Empty, Date = date, AreaSquareMetres = i.Number("Area"), Consideration = i.Number("Consideration"),
+                            LandAccountCode = i.Optional("LandAccount") ?? string.Empty, ProceedsAccountCode = i.Optional("Proceeds") ?? string.Empty, GainLossAccountCode = i.Optional("GainLoss") ?? string.Empty,
+                            ExchangeParcelNumber = i.Optional("Exchange"), ExchangeParcelDescription = i.Optional("Exchange") is string received ? $"Received in exchange for {parcel}" : null,
+                            ExchangeParcelArea = i.Number("ExchangeArea"),
+                        }).ConfigureAwait(true));
+                        return $"Disposal {disposed.DisposalNumber} ({disposed.JournalNumber}): cost out {M(disposed.CostDerecognised)}, {(disposed.GainOrLoss >= 0m ? "gain" : "loss")} {M(Math.Abs(disposed.GainOrLoss))}.";
+                }
+            },
+            List = async c => Table(await c.Db.Set<LandDispute>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.Id).Take(300).ToListAsync().ConfigureAwait(true),
+                ("Dispute", x => x.DisputeNumber), ("Parcel", x => x.LandParcelId), ("Type", x => x.Type), ("Claimant", x => x.Claimant), ("Opened", x => D(x.OpenedOn)), ("Stage", x => x.Stage),
+                ("Since", x => D(x.StageSince)), ("Outcome", x => x.Outcome)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Layout plans", ListTitle = "Layout plans",
+            Description = "Submits a layout plan for a land parcel with its stands by use (\"Residential:120; Commercial:6; Roads:4\"), approves it with the authority, amends it as a new "
+                + "version with the reason, shows every version with what changed, and reconciles the plan in force against the stands on the register.",
+            Fields = [Pick("Step", "Step", ["Submit", "Approve", "Amend", "History", "Reconcile"]), Req("Plan", "Plan number"), Opt("Parcel", "Land parcel number (submit / amend)"),
+                Opt("Planner", "Planner"), Pick("Density", "Density", Enum.GetNames<PlanDensity>()), Opt("Uses", "Stands by use: use:count; …"), Opt("Text", "Approval authority / amendment reason"), Today()],
+            Run = async (c, i) =>
+            {
+                ILayoutPlanService plans = c.Get<ILayoutPlanService>();
+                async Task<LayoutSubmission> Submission()
+                {
+                    Dictionary<StandUse, int> uses = [];
+                    foreach (string part in (i.Optional("Uses") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                        if (bits.Length != 2 || !Enum.TryParse(bits[0], ignoreCase: true, out StandUse use) || !int.TryParse(bits[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int count))
+                        {
+                            throw new OperationException($"Write each use as use:count (\"{part}\"); uses are {string.Join(", ", Enum.GetNames<StandUse>())}.");
+                        }
+
+                        uses[use] = count;
+                    }
+
+                    long parcel = await FindAsync(c.Db.LandParcels, x => x.CompanyId == c.CompanyId && x.ParcelNumber == (i.Optional("Parcel") ?? string.Empty).ToUpper(), x => x.Id, "land parcel",
+                        i.Optional("Parcel") ?? string.Empty).ConfigureAwait(true);
+                    return new LayoutSubmission
+                    {
+                        CompanyId = c.CompanyId, PlanNumber = i.Text("Plan"), LandParcelId = parcel, Planner = i.Optional("Planner") ?? string.Empty, Density = Enum.Parse<PlanDensity>(i.Text("Density")),
+                        Uses = uses, Date = i.Date("Date"), AmendmentReason = i.Optional("Text"),
+                    };
+                }
+
+                switch (i.Text("Step"))
+                {
+                    case "Submit":
+                        return Check(await plans.SubmitAsync(await Submission().ConfigureAwait(true)).ConfigureAwait(true), "Plan submitted.");
+                    case "Approve":
+                        return Check(await plans.ApproveAsync(c.CompanyId, i.Text("Plan"), i.Optional("Text") ?? string.Empty, i.Date("Date")).ConfigureAwait(true), "Plan approved.");
+                    case "Amend":
+                        return $"Amended as version {Check(await plans.AmendAsync(await Submission().ConfigureAwait(true)).ConfigureAwait(true))}.";
+                    case "History":
+                        IReadOnlyList<LayoutVersionEntry> versions = Check(await plans.HistoryAsync(c.CompanyId, i.Text("Plan")).ConfigureAwait(true));
+                        return string.Join(Environment.NewLine, versions.Select(v => $"v{v.Version} {D(v.SubmittedOn)} {v.Planner}, {v.Density}, {v.Stands} stands"
+                            + (v.ApprovedOn is DateOnly approved ? $", approved {D(approved)} ({v.ApprovalAuthority})" : ", not approved") + (v.AmendmentReason is null ? string.Empty : $" — {v.AmendmentReason}")));
+                    default:
+                        LayoutReconciliation rec = Check(await plans.ReconcileAsync(c.CompanyId, i.Text("Plan")).ConfigureAwait(true));
+                        return $"{rec.PlanNumber} v{rec.VersionInForce}: {rec.PlannedStands} planned, {rec.StandsOnRegister} on the register, difference {rec.Difference}.";
+                }
+            },
+            List = async c => Table(await c.Db.Set<LayoutPlan>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.PlanNumber).ToListAsync().ConfigureAwait(true),
+                ("Plan", x => x.PlanNumber), ("Parcel", x => x.LandParcelId)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Stand pricing", ListTitle = "Pricing rules",
+            Description = "Proposes a pricing rule — for one stand, a size band or a whole scheme, from a date: cost plus overhead %, levies per stand and per m², margin %, rounded — "
+                + "which another user approves; Quote shows a stand's price build-up under the rule in force.",
+            Fields = [Pick("Step", "Step", ["Propose", "Approve", "Quote"]), Pick("Scope", "Applies to", Enum.GetNames<PricingScope>()), Opt("Scheme", "Scheme code"), OptNum("MinSize", "Size band from (m²)"),
+                OptNum("MaxSize", "Size band to (m²)"), Opt("Stand", "Stand number (stand rule / quote)"), Num("Overhead", "Overhead %", "0"), Num("LevyStand", "Levy per stand", "0"),
+                Num("LevyM2", "Levy per m²", "0"), Num("Margin", "Margin %", "0"), Num("RoundTo", "Round to", "1"), OptNum("Rule", "Rule id (approve)"), Today()],
+            Run = async (c, i) =>
+            {
+                IStandPricingService pricing = c.Get<IStandPricingService>();
+                async Task<long?> StandId() => i.Optional("Stand") is string number
+                    ? await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == number.ToUpper(), x => x.Id, "stand", number).ConfigureAwait(true) : null;
+                switch (i.Text("Step"))
+                {
+                    case "Propose":
+                        long? scheme = i.Optional("Scheme") is string code
+                            ? await FindAsync(c.Db.HousingSchemes, x => x.CompanyId == c.CompanyId && x.Code == code.ToUpper(), x => x.Id, "scheme", code).ConfigureAwait(true) : null;
+                        return Check(await pricing.ProposeAsync(new PricingRuleInput
+                        {
+                            CompanyId = c.CompanyId, Scope = Enum.Parse<PricingScope>(i.Text("Scope")), SchemeId = scheme, MinSize = i.OptionalNumber("MinSize"), MaxSize = i.OptionalNumber("MaxSize"),
+                            StandId = await StandId().ConfigureAwait(true), EffectiveFrom = i.Date("Date"), OverheadPercent = i.Number("Overhead"), LevyPerStand = i.Number("LevyStand"),
+                            LevyPerSquareMetre = i.Number("LevyM2"), MarginPercent = i.Number("Margin"), RoundTo = i.Number("RoundTo"), UserId = c.UserId,
+                        }).ConfigureAwait(true), id => $"Rule {id} proposed; another user approves it.");
+                    case "Approve":
+                        return Check(await pricing.ApproveAsync(c.CompanyId, (long)(i.OptionalNumber("Rule") ?? 0m), c.UserId, i.Date("Date")).ConfigureAwait(true), "Rule approved.");
+                    default:
+                        StandPriceQuote quote = Check(await pricing.QuoteAsync(c.CompanyId, await StandId().ConfigureAwait(true) ?? 0L, i.Date("Date")).ConfigureAwait(true));
+                        return $"{quote.StandNumber} (rule {quote.RuleId}, {quote.Scope} from {D(quote.EffectiveFrom)}): cost {M(quote.BuildUp.Cost)} + overhead {M(quote.BuildUp.Overhead)} + levies "
+                            + $"{M(quote.BuildUp.Levy)} + margin {M(quote.BuildUp.Margin)} = {M(quote.BuildUp.Price)}.";
+                }
+            },
+            List = async c => Table(await c.Db.Set<StandPricingRule>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.Id).Take(200).ToListAsync().ConfigureAwait(true),
+                ("Rule", x => x.Id), ("Scope", x => x.Scope), ("Scheme", x => x.SchemeId), ("Stand", x => x.StandId), ("From", x => D(x.EffectiveFrom)), ("Overhead %", x => Q(x.OverheadPercent)),
+                ("Margin %", x => Q(x.MarginPercent)), ("Approved", x => x.ApprovedOn is DateOnly a ? D(a) : "pending")),
+        };
     }
 
     private static async Task<System.Data.DataTable> SchemesAsync(OperationContext c)
