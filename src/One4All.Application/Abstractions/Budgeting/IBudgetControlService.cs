@@ -8,7 +8,11 @@ namespace One4All.Application.Abstractions.Budgeting;
 /// <param name="Period">The period the budget moves in.</param>
 /// <param name="Amount">The amount; positive.</param>
 /// <param name="Justification">Why; required.</param>
-public sealed record VirementRequest(string FromAccountCode, string ToAccountCode, int Period, decimal Amount, string Justification);
+/// <param name="FromCostCentre">The cost centre giving up budget (null: the line without one).</param>
+/// <param name="ToCostCentre">The cost centre receiving it.</param>
+/// <param name="ToBudgetId">Another department's budget receiving it (same year and type), or null for the same budget.</param>
+public sealed record VirementRequest(string FromAccountCode, string ToAccountCode, int Period, decimal Amount, string Justification, string? FromCostCentre = null, string? ToCostCentre = null,
+    long? ToBudgetId = null);
 
 /// <summary>One account on the virement register.</summary>
 /// <param name="AccountCode">The account.</param>
@@ -83,6 +87,13 @@ public interface IBudgetControlService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success, or why it was refused.</returns>
     Task<Result> ApproveVirementAsync(long companyId, long virementId, long approverUserId, CancellationToken ct = default);
+
+    /// <summary>Replaces the company's virement approval bands (none: any other user may approve).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="bands">The bands.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or what is wrong with the bands.</returns>
+    Task<Result> SetVirementBandsAsync(long companyId, IReadOnlyList<One4All.Application.Budgeting.VirementBandRule> bands, CancellationToken ct = default);
 
     /// <summary>Rejects a virement.</summary>
     /// <param name="companyId">The company.</param>

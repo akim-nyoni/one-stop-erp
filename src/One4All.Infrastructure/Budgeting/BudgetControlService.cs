@@ -20,10 +20,27 @@ public sealed class BudgetControlService : IBudgetControlService
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="budgeting">The budgeting service, for availability.</param>
-    public BudgetControlService(One4AllDbContext db, IBudgetingService budgeting)
+    public BudgetControlService(One4AllDbContext db, IBudgetingService budgeting, Application.Abstractions.Security.IPermissionService? permissions = null)
     {
         _db = db;
         _budgeting = budgeting;
+        _permissions = permissions;
+    }
+
+    private readonly Application.Abstractions.Security.IPermissionService? _permissions;
+
+    /// <inheritdoc />
+    public async Task<Result> SetVirementBandsAsync(long companyId, IReadOnlyList<VirementBandRule> bands, CancellationToken ct = default)
+    {
+        if (VirementBanding.Problem(bands) is string problem)
+        {
+            return Result.Failure(Error.Validation("Budget.Virement.Bands", problem));
+        }
+
+        _db.Set<VirementBand>().RemoveRange(await _db.Set<VirementBand>().Where(b => b.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false));
+        _db.Set<VirementBand>().AddRange(bands.Select(b => new VirementBand(companyId, b.UpToAmount, b.Level)));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 
     /// <inheritdoc />
@@ -37,7 +54,10 @@ public sealed class BudgetControlService : IBudgetControlService
 
         string from = request.FromAccountCode.Trim();
         string to = request.ToAccountCode.Trim();
-        if (from == to)
+        string? fromCentre = string.IsNullOrWhiteSpace(request.FromCostCentre) ? null : request.FromCostCentre.Trim().ToUpperInvariant();
+        string? toCentre = string.IsNullOrWhiteSpace(request.ToCostCentre) ? null : request.ToCostCentre.Trim().ToUpperInvariant();
+        long? toBudget = request.ToBudgetId is long other && other != budgetId ? other : null;
+        if (from == to && fromCentre == toCentre && toBudget is null)
         {
             return Error.Validation("Budget.Virement.SameLine", "A virement moves budget between two different lines.");
         }
@@ -48,12 +68,22 @@ public sealed class BudgetControlService : IBudgetControlService
             return Error.Rule("Budget.Virement.NotActive", "Virements are made within an active budget.");
         }
 
+        // Between votes of different departments: the receiving budget is another active budget of the same year and type.
+        if (toBudget is long target && !await _db.Budgets.AnyAsync(b => b.Id == target && b.CompanyId == companyId && b.IsActive && b.FiscalYearId == budget.FiscalYearId && b.Type == budget.Type, ct)
+            .ConfigureAwait(false))
+        {
+            return Error.Rule("Budget.Virement.TargetBudget", "The receiving budget must be another active budget of the same year and type.");
+        }
+
         if (await SourceShortAsync(budget, from, request.Amount, ct).ConfigureAwait(false) is { } refused)
         {
             return refused;
         }
 
-        BudgetVirement virement = new(companyId, budgetId, from, to, request.Period, request.Amount, request.Justification.Trim(), requestedByUserId);
+        BudgetVirement virement = new(companyId, budgetId, from, to, request.Period, request.Amount, request.Justification.Trim(), requestedByUserId)
+        {
+            FromCostCentre = fromCentre, ToCostCentre = toCentre, ToBudgetId = toBudget,
+        };
         _db.Set<BudgetVirement>().Add(virement);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return virement.Id;
@@ -80,13 +110,26 @@ public sealed class BudgetControlService : IBudgetControlService
             return Result.Failure(refused);
         }
 
+        // Delegated limits: the band the amount falls in sets the authorisation level the approver needs (one more between budgets).
+        List<VirementBandRule> bands = await _db.Set<VirementBand>().AsNoTracking().Where(b => b.CompanyId == companyId).Select(b => new VirementBandRule(b.UpToAmount, b.Level))
+            .ToListAsync(ct).ConfigureAwait(false);
+        if (VirementBanding.RequiredLevel(bands, virement.Amount, virement.ToBudgetId is not null) is int level && _permissions is not null)
+        {
+            Core.Security.EffectivePermissions approver = await _permissions.ResolveAsync(approverUserId, ct).ConfigureAwait(false);
+            if (!Core.Security.OperationFlagsExtensions.AuthoriseLevels.Skip(level - 1).Any(flag => approver.Has("Budget.VirementApprove", flag)))
+            {
+                return Result.Failure(Error.Forbidden("Budget.Virement.Band", $"A virement of {virement.Amount:0.00} needs authorisation level {level} on Virement Approval."));
+            }
+        }
+
         if (!virement.Approve(approverUserId))
         {
             return Result.Failure(Error.Rule("Budget.Virement.SelfApproval", "A different user must approve a virement than the one who requested it."));
         }
 
-        budget.AddLine(virement.FromAccountCode, virement.Period, -virement.Amount, null, virement.Id);
-        budget.AddLine(virement.ToAccountCode, virement.Period, virement.Amount, null, virement.Id);
+        Budget receiving = virement.ToBudgetId is long target ? await _db.Budgets.Include(b => b.Lines).FirstAsync(b => b.Id == target, ct).ConfigureAwait(false) : budget;
+        budget.AddLine(virement.FromAccountCode, virement.Period, -virement.Amount, virement.FromCostCentre, virement.Id);
+        receiving.AddLine(virement.ToAccountCode, virement.Period, virement.Amount, virement.ToCostCentre, virement.Id);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }

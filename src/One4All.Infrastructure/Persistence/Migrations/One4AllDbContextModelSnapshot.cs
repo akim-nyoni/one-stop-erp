@@ -3401,6 +3401,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(8)")
                         .HasColumnName("from_account_code");
 
+                    b.Property<string>("FromCostCentre")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("from_cost_centre");
+
                     b.Property<string>("Justification")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -3445,6 +3450,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(8)
                         .HasColumnType("character varying(8)")
                         .HasColumnName("to_account_code");
+
+                    b.Property<long?>("ToBudgetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("to_budget_id");
+
+                    b.Property<string>("ToCostCentre")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("to_cost_centre");
 
                     b.HasKey("Id")
                         .HasName("pk_budget_virement");
@@ -3584,6 +3598,41 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_variance_comment_company_id_fiscal_year_id_as_at_period_acc");
 
                     b.ToTable("variance_comment", "bud");
+                });
+
+            modelBuilder.Entity("One4All.Core.Budgeting.VirementBand", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("integer")
+                        .HasColumnName("level");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal?>("UpToAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("up_to_amount");
+
+                    b.HasKey("Id")
+                        .HasName("pk_virement_band");
+
+                    b.HasIndex("CompanyId")
+                        .HasDatabaseName("ix_virement_band_company_id");
+
+                    b.ToTable("virement_band", "bud");
                 });
 
             modelBuilder.Entity("One4All.Core.Communications.DespatchBatch", b =>

@@ -53,6 +53,15 @@ public sealed class BudgetVirement : AuditableEntity, ICompanyScoped
         Status = VirementStatus.Pending;
     }
 
+    /// <summary>Gets the cost centre the budget leaves (null: the line without one).</summary>
+    public string? FromCostCentre { get; init; }
+
+    /// <summary>Gets the cost centre the budget goes to.</summary>
+    public string? ToCostCentre { get; init; }
+
+    /// <summary>Gets the budget receiving it when it moves to another department's budget (null: the same budget).</summary>
+    public long? ToBudgetId { get; init; }
+
     /// <inheritdoc />
     public long CompanyId { get; private set; }
 
@@ -117,4 +126,33 @@ public sealed class BudgetVirement : AuditableEntity, ICompanyScoped
         RejectionReason = reason;
         return true;
     }
+}
+
+/// <summary>A virement approval band (<c>bud.virement_band</c>): virements up to the amount need an approver with the authorisation level.</summary>
+public sealed class VirementBand : Entity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private VirementBand()
+    {
+    }
+
+    /// <summary>Creates a band.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="upToAmount">The largest amount in the band (null: no limit).</param>
+    /// <param name="level">The authorisation level (1–5).</param>
+    public VirementBand(long companyId, decimal? upToAmount, int level)
+    {
+        CompanyId = companyId;
+        UpToAmount = upToAmount;
+        Level = level;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>Gets the largest amount in the band (null: no limit).</summary>
+    public decimal? UpToAmount { get; private set; }
+
+    /// <summary>Gets the authorisation level the approver needs.</summary>
+    public int Level { get; private set; }
 }

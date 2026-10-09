@@ -58,6 +58,8 @@ internal sealed class BudgetVirementConfiguration : IEntityTypeConfiguration<Bud
         b.HasKey(x => x.Id);
         b.Property(x => x.FromAccountCode).HasMaxLength(8);
         b.Property(x => x.ToAccountCode).HasMaxLength(8);
+        b.Property(x => x.FromCostCentre).HasMaxLength(20);
+        b.Property(x => x.ToCostCentre).HasMaxLength(20);
         b.Property(x => x.Amount).HasPrecision(19, 4);
         b.Property(x => x.Justification).HasMaxLength(500);
         b.Property(x => x.RejectionReason).HasMaxLength(256);
@@ -241,5 +243,16 @@ internal sealed class BudgetOuterYearLineConfiguration : IEntityTypeConfiguratio
         b.Property(x => x.AccountCode).HasMaxLength(30);
         b.Property(x => x.CostCentre).HasMaxLength(30);
         b.Property(x => x.Amount).HasPrecision(19, 4);
+    }
+}
+
+internal sealed class VirementBandConfiguration : IEntityTypeConfiguration<VirementBand>
+{
+    public void Configure(EntityTypeBuilder<VirementBand> b)
+    {
+        b.ToTable("virement_band", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.UpToAmount).HasPrecision(19, 4);
+        b.HasIndex(x => x.CompanyId);
     }
 }

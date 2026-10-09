@@ -80,10 +80,13 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = budgeting, Title = "Virements", ListTitle = "Virements",
-            Description = "Moves budget from one vote to another within an approved budget: requested with a justification, approved or rejected by another user; "
-                + "the register shows each vote's original, virements in and out, and current amount.",
-            Fields = [Pick("Step", "Step", ["Request", "Approve", "Reject", "Register"]), OptNum("Budget", "Budget id (request, register)"), Opt("From", "From account"), Opt("To", "To account"),
-                Num("Period", "Period", "1"), Num("Amount", "Amount", "0"), Opt("Why", "Justification / rejection reason"), OptNum("Virement", "Virement id (approve, reject)")],
+            Description = "Moves budget from one vote to another — between cost centres, or to another department's budget of the same year — requested with a justification, approved "
+                + "or rejected by another user whose authorisation level covers the amount's band (Bands: limit:level; …, blank limit for the top band); the register shows each "
+                + "vote's original, virements in and out, and current amount.",
+            Fields = [Pick("Step", "Step", ["Request", "Approve", "Reject", "Register", "Bands"]), OptNum("Budget", "Budget id (request, register)"), Opt("From", "From account"), Opt("To", "To account"),
+                Opt("FromCentre", "From cost centre"), Opt("ToCentre", "To cost centre"), OptNum("ToBudget", "To budget id (another department)"),
+                Num("Period", "Period", "1"), Num("Amount", "Amount", "0"), Opt("Why", "Justification / rejection reason"), OptNum("Virement", "Virement id (approve, reject)"),
+                Opt("Bands", "Bands: limit:level; … (bands)")],
             Run = async (c, i) =>
             {
                 IBudgetControlService control = c.Get<IBudgetControlService>();
@@ -92,7 +95,19 @@ public static partial class OperationCatalogue
                 {
                     case "Request":
                         return Check(await control.RequestVirementAsync(c.CompanyId, budget, new VirementRequest(i.Optional("From") ?? string.Empty, i.Optional("To") ?? string.Empty, i.Whole("Period"),
-                            i.Number("Amount"), i.Optional("Why") ?? string.Empty), c.UserId).ConfigureAwait(true), id => $"Virement {id} awaits another user's approval.");
+                            i.Number("Amount"), i.Optional("Why") ?? string.Empty, i.Optional("FromCentre"), i.Optional("ToCentre"), (long?)i.OptionalNumber("ToBudget")), c.UserId).ConfigureAwait(true),
+                            id => $"Virement {id} awaits another user's approval.");
+                    case "Bands":
+                        List<One4All.Application.Budgeting.VirementBandRule> bands = [];
+                        foreach (string part in (i.Optional("Bands") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                            bands.Add(bits.Length == 2 && int.TryParse(bits[1], out int level)
+                                ? new One4All.Application.Budgeting.VirementBandRule(bits[0].Length == 0 ? null : decimal.Parse(bits[0], System.Globalization.CultureInfo.InvariantCulture), level)
+                                : throw new OperationException($"Write each band as limit:level (\"{part}\")."));
+                        }
+
+                        return Check(await control.SetVirementBandsAsync(c.CompanyId, bands).ConfigureAwait(true), bands.Count == 0 ? "Bands cleared." : "Bands saved.");
                     case "Approve":
                         return Check(await control.ApproveVirementAsync(c.CompanyId, virement, c.UserId).ConfigureAwait(true), "Virement approved; the budget is moved.");
                     case "Reject":
