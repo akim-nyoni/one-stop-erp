@@ -71,7 +71,7 @@ public static class BuiltInModules
         new ModuleDescriptor("SalesOrders", "Order Entry", LicenceModules.SalesOrders, "\U0001F5D2", "#00695C", ["sop"], [], []),
         new ModuleDescriptor("Pos", "Point of Sale", LicenceModules.PointOfSale, "\U0001F6D2", "#AD1457", [], ["pos.fiscal-retry"], ["Point of Sale", "Restaurant"]),
         new ModuleDescriptor("Voucher", "Voucher Management", LicenceModules.Vouchers, "\U0001F3AB", "#EF6C00", ["vouchers"], [], []),
-        new ModuleDescriptor("Municipal", "Municipality", LicenceModules.Municipal, "\U0001F3DB", "#3949AB", ["municipal"], [], ["Municipality"]),
+        new ModuleDescriptor("Municipal", "Municipality", LicenceModules.Municipal, "\U0001F3DB", "#3949AB", ["municipal"], ["servicedesk.escalate"], ["Municipality"]),
         new ModuleDescriptor("Housing", "Housing & Land", LicenceModules.Housing, "\U0001F3D8", "#00796B", ["housing"], ["housing.lapse-offers"], ["Housing"]),
         new ModuleDescriptor("School", "School Management", LicenceModules.School, "\U0001F393", "#7B1FA2", [], [], ["Sales & Schools"]),
         new ModuleDescriptor("JobCosting", "Job Costing", LicenceModules.JobCosting, "\U0001F3D7", "#4E342E", ["jobs"], [], ["Contracts"]),

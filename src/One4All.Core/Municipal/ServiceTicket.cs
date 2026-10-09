@@ -216,6 +216,22 @@ public sealed class ServiceTicket : AuditableEntity, ICompanyScoped
         _events.Add(new TicketEvent(TicketStatus.Closed, at, null, "Closed"));
     }
 
+    /// <summary>Gets when the ticket was escalated for breaching its resolution SLA (null: not escalated).</summary>
+    public DateTimeOffset? EscalatedAt { get; private set; }
+
+    /// <summary>Escalates a ticket past its resolution deadline: one priority step up (Critical stays), noted in its history.</summary>
+    /// <param name="at">When.</param>
+    public void Escalate(DateTimeOffset at)
+    {
+        EscalatedAt = at;
+        if (Priority < TicketPriority.Critical)
+        {
+            Priority = Priority + 1;
+        }
+
+        _events.Add(new TicketEvent(Status, at, null, $"Escalated: resolution overdue since {ResolutionDueAt:yyyy-MM-dd HH:mm}; priority now {Priority}"));
+    }
+
     /// <summary>Reopens a resolved ticket: the fault persists; it goes back to its officer and the fix no longer counts.</summary>
     /// <param name="reason">Why.</param>
     /// <param name="at">When.</param>

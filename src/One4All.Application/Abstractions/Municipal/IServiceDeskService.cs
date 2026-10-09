@@ -129,4 +129,14 @@ public interface IServiceDeskService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The board.</returns>
     Task<SlaBoard> SlaBoardAsync(long companyId, DateTimeOffset now, CancellationToken ct = default);
+
+    /// <summary>
+    /// Escalates every open ticket past its resolution deadline that has not been escalated: one priority step up, a note in its history and a
+    /// message to its officer (the SLA escalation job runs this on a schedule).
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="now">The moment.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The references escalated.</returns>
+    Task<IReadOnlyList<string>> EscalateBreachesAsync(long companyId, DateTimeOffset now, CancellationToken ct = default);
 }

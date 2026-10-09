@@ -229,6 +229,26 @@ public sealed class ServiceDeskService : IServiceDeskService
             resolvedHours.Count == 0 ? 0m : Math.Round((decimal)resolvedHours.Average(), 1, MidpointRounding.AwayFromZero));
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> EscalateBreachesAsync(long companyId, DateTimeOffset now, CancellationToken ct = default)
+    {
+        List<ServiceTicket> overdue = await _db.Set<ServiceTicket>().Include(t => t.Events)
+            .Where(t => t.CompanyId == companyId && t.EscalatedAt == null && t.ResolutionDueAt < now && t.Status != TicketStatus.Resolved && t.Status != TicketStatus.Closed)
+            .OrderBy(t => t.ResolutionDueAt).ToListAsync(ct).ConfigureAwait(false);
+        foreach (ServiceTicket ticket in overdue)
+        {
+            ticket.Escalate(now);
+            if (ticket.AssignedToUserId is long officer)
+            {
+                await _notifications.NotifyUserAsync(companyId, officer, $"Fault {ticket.Reference} escalated", $"{ticket.Description} was due by {ticket.ResolutionDueAt:yyyy-MM-dd HH:mm} and is now {ticket.Priority}.", ct)
+                    .ConfigureAwait(false);
+            }
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return [.. overdue.Select(t => t.Reference)];
+    }
+
     private async Task<Result<ServiceTicket>> FindAsync(long companyId, string reference, CancellationToken ct)
     {
         string key = (reference ?? string.Empty).Trim().ToUpperInvariant();
@@ -239,5 +259,25 @@ public sealed class ServiceDeskService : IServiceDeskService
         }
 
         return ticket;
+    }
+}
+
+/// <summary>Built-in task: escalate the fault tickets past their resolution deadline (brief §4.9 SLA escalation).</summary>
+public sealed class ServiceDeskEscalationTask : Application.Abstractions.Scheduling.IScheduledTask
+{
+    private readonly IServiceDeskService _desk;
+
+    /// <summary>Creates the task.</summary>
+    /// <param name="desk">The service desk.</param>
+    public ServiceDeskEscalationTask(IServiceDeskService desk) => _desk = desk;
+
+    /// <inheritdoc />
+    public string Key => "servicedesk.escalate";
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
+    {
+        IReadOnlyList<string> escalated = await _desk.EscalateBreachesAsync(companyId, runAt, ct).ConfigureAwait(false);
+        return escalated.Count == 0 ? "No fault tickets are past their resolution deadline." : $"{escalated.Count} ticket(s) escalated: {string.Join(", ", escalated)}.";
     }
 }
