@@ -626,9 +626,10 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Disassemble finished goods", ListTitle = "Bills of materials",
-            Description = "Takes finished units apart into their components; their cost is split over the components recovered at each one's average cost.",
+            Description = "Takes finished units apart into their components; their cost is split over the components recovered at each one's average cost, or by their "
+                + "relative sales value on the default price list (joint products: a carcass into cuts).",
             Fields = [Req("Bom", "BOM code"), Req("Warehouse", "Warehouse code"), Num("Quantity", "Units taken apart"), Today(), Req("Clearing", "Assembly clearing account"),
-                Opt("Recovered", "Recovered ITEM:qty;… (if not the BOM quantities)")],
+                Opt("Recovered", "Recovered ITEM:qty;… (if not the BOM quantities)"), Tick("BySales", "Split by sales value")],
             Run = async (c, i) =>
             {
                 long bom = await FindAsync(c.Db.BillsOfMaterials, b => b.CompanyId == c.CompanyId && b.Code.ToUpper() == i.Text("Bom").ToUpper(), b => b.Id, "BOM", i.Text("Bom")).ConfigureAwait(true);
@@ -641,7 +642,7 @@ public static partial class OperationCatalogue
                 AssemblyResult run = Check(await c.Get<IAssemblyService>().DisassembleAsync(new DisassemblyRequest
                 {
                     CompanyId = c.CompanyId, BillOfMaterialsId = bom, WarehouseId = await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true), Date = i.Date("Date"),
-                    Quantity = i.Number("Quantity"), Recovered = recovered, ClearingAccountCode = i.Text("Clearing"),
+                    Quantity = i.Number("Quantity"), Recovered = recovered, ClearingAccountCode = i.Text("Clearing"), BySalesValue = i.Flag("BySales"),
                 }).ConfigureAwait(true));
                 return $"Run {run.RunNumber}: {M(run.TotalCost)} moved into components.";
             },

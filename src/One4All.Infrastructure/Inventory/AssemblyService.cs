@@ -210,8 +210,27 @@ public sealed class AssemblyService : IAssemblyService
             .ToDictionaryAsync(b => b.ItemId, b => b.AverageCost, ct).ConfigureAwait(false);
         Dictionary<long, decimal?> standardCost = await _db.Items.AsNoTracking().Where(i => ids.Contains(i.Id)).ToDictionaryAsync(i => i.Id, i => i.StandardCost, ct).ConfigureAwait(false);
         List<(BomLine Line, decimal Standard, decimal Recovered)> recovered = [.. parts.Where(p => p.Recovered > 0m)];
-        IReadOnlyList<decimal> shares = BomRules.SplitCost(total, [.. recovered.Select(p =>
-            p.Recovered * (average.GetValueOrDefault(p.Line.ComponentItemId) is > 0m and var avg ? avg : standardCost.GetValueOrDefault(p.Line.ComponentItemId) ?? 0m))]);
+
+        // The cost is shared by what the components are worth: their cost, or — the joint-product method — their selling price on the default list.
+        Dictionary<long, decimal> sellingPrice = [];
+        if (request.BySalesValue)
+        {
+            PriceList? list = await _db.PriceLists.AsNoTracking().Include(p => p.Lines).FirstOrDefaultAsync(p => p.CompanyId == request.CompanyId && p.IsDefault && p.IsActive, ct).ConfigureAwait(false);
+            if (list is null)
+            {
+                return Error.Rule("Inv.NoDefaultPriceList", "Splitting by sales value needs an active default price list.");
+            }
+
+            sellingPrice = list.InForce(request.Date).Where(l => ids.Contains(l.ItemId)).GroupBy(l => l.ItemId).ToDictionary(g => g.Key, g => g.OrderBy(l => l.MinimumQuantity).First().UnitPrice);
+            if (recovered.All(p => sellingPrice.GetValueOrDefault(p.Line.ComponentItemId) <= 0m))
+            {
+                return Error.Rule("Inv.NoSalesValue", "None of the components recovered has a selling price on the default price list.");
+            }
+        }
+
+        IReadOnlyList<decimal> shares = BomRules.SplitCost(total, [.. recovered.Select(p => p.Recovered * (request.BySalesValue
+            ? sellingPrice.GetValueOrDefault(p.Line.ComponentItemId)
+            : average.GetValueOrDefault(p.Line.ComponentItemId) is > 0m and var avg ? avg : standardCost.GetValueOrDefault(p.Line.ComponentItemId) ?? 0m))]);
 
         AssemblyRun run = new(request.CompanyId, number.Value, bom.Id, bom.ParentItemId, request.WarehouseId, request.Date, request.Quantity, request.Quantity, total) { IsDisassembly = true };
         for (int i = 0; i < recovered.Count; i++)

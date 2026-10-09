@@ -201,7 +201,18 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
         }
 
         string currency = cheque.Currency.ToString();
-        string words = One4All.Reporting.Expressions.NumberToWords.Amount(cheque.Amount, currency == "USD" ? "Dollars" : currency, currency == "USD" ? "Cents" : "Cents");
+
+        // A company working in Portuguese writes its cheques in Portuguese (meticais, kwanzas…).
+        string? locale = await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.Locale).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        string words = locale is string l && l.StartsWith("pt", StringComparison.OrdinalIgnoreCase)
+            ? currency switch
+            {
+                "MZN" => One4All.Reporting.Expressions.NumberToWordsPortuguese.Amount(cheque.Amount, "metical", "meticais", "centavo", "centavos"),
+                "AOA" => One4All.Reporting.Expressions.NumberToWordsPortuguese.Amount(cheque.Amount, "kwanza", "kwanzas", "cêntimo", "cêntimos"),
+                "USD" => One4All.Reporting.Expressions.NumberToWordsPortuguese.Amount(cheque.Amount, "dólar", "dólares", "cêntimo", "cêntimos"),
+                _ => One4All.Reporting.Expressions.NumberToWordsPortuguese.Amount(cheque.Amount, currency, currency, "cêntimo", "cêntimos"),
+            }
+            : One4All.Reporting.Expressions.NumberToWords.Amount(cheque.Amount, currency == "USD" ? "Dollars" : currency, "Cents");
         string[] lines =
         [
             $"{cheque.Bank}                                        Cheque {cheque.ChequeNumber}",

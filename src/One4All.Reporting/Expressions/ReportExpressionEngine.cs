@@ -145,6 +145,9 @@ public sealed class ReportExpressionEngine
         _interpreter.SetFunction("Format", (Func<object?, string, string>)((v, f) => NumberToWords.Format(v, f)));
         _interpreter.SetFunction("NumberToWords", (Func<decimal, string>)(v => NumberToWords.Convert((long)v)));
         _interpreter.SetFunction("AmountToWords", (Func<decimal, string, string, string>)((v, major, minor) => NumberToWords.Amount(v, major, minor)));
+        _interpreter.SetFunction("NumberToWordsPt", (Func<decimal, string>)(v => NumberToWordsPortuguese.Convert((long)v)));
+        _interpreter.SetFunction("AmountToWordsPt", (Func<decimal, string, string, string, string, string>)((v, majorOne, majorMany, minorOne, minorMany)
+            => NumberToWordsPortuguese.Amount(v, majorOne, majorMany, minorOne, minorMany)));
     }
 
     // Whole units from a to b: "d" days, "w" weeks, "m" months, "q" quarters, "y" years (completed units, like an age).
