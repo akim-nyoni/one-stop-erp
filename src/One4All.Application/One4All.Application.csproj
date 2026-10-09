@@ -7,6 +7,7 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Localization\Strings\*.json" WithCulture="false" />
+    <EmbeddedResource Include="..\..\docs\coa\*.csv" LogicalName="coa.%(Filename).csv" WithCulture="false" />
   </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>

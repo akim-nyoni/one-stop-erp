@@ -1,0 +1,23 @@
+code,name,type,control,category,budget
+1260,Stand Instalment Receivables,Asset,,Receivables,
+1261,Tenant Debtors,Asset,,Receivables,
+1450,Land & Housing Stock (WIP),Asset,,Inventory,
+1451,Land Acquisition Costs,Asset,,Inventory,
+1452,Survey and Planning Costs,Asset,,Inventory,
+1453,Servicing Costs (Roads / Water / Sewer),Asset,,Inventory,
+1460,Stands Available for Sale,Asset,,Inventory,
+1675,Rental Housing Stock,Asset,,Non-current Assets,
+2330,Stand Deposits,Liability,,Other Current Liabilities,
+2331,Tenant Deposits,Liability,,Other Current Liabilities,
+2332,Deferred Financing Income,Liability,,Other Current Liabilities,
+2333,Development Levies Unspent,Liability,,Other Current Liabilities,
+4100,Land & Housing Sales,Income,,Revenue,
+4101,Instalment Interest,Income,,Revenue,
+4102,Transfer and Administration Fees,Income,,Revenue,
+4103,Application Fees,Income,,Revenue,
+4110,Rental Income,Income,,Revenue,
+4111,Development Levies,Income,,Revenue,
+5100,Cost of Land Sales,Expense,,Cost of Sales,
+5101,Repossession Losses,Expense,,Other Expenses,
+6570,Estate Maintenance,Expense,,Operating Expenses,yes
+6580,Conveyancing Fees,Expense,,Administration,yes

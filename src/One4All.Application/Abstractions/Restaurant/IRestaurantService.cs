@@ -408,6 +408,30 @@ public interface IRestaurantService
     Task<Result> TransferOrderAsync(long companyId, long orderId, long newTableId, CancellationToken ct = default);
 
     /// <summary>
+    /// Moves a quantity of a line from one open tab to another (brief §4.1: "transfer lines between tabs"): its share of the tax and its modifiers go
+    /// with it, and an item already sent to the kitchen is not sent again.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromOrderId">The tab it is on.</param>
+    /// <param name="lineId">The line.</param>
+    /// <param name="toOrderId">The tab it moves to.</param>
+    /// <param name="quantity">How much (null: all that is unbilled).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The new line's id.</returns>
+    Task<Result<long>> TransferLineAsync(long companyId, long fromOrderId, long lineId, long toOrderId, decimal? quantity = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// Merges one open tab into another (brief §4.1: "merge tabs"): everything unbilled moves across; a tab left with nothing billed is cancelled and its
+    /// table freed, one already part-billed stays open to settle its billed part.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromOrderId">The tab merged away.</param>
+    /// <param name="intoOrderId">The tab that keeps everything.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>How many lines moved.</returns>
+    Task<Result<int>> MergeOrdersAsync(long companyId, long fromOrderId, long intoOrderId, CancellationToken ct = default);
+
+    /// <summary>
     /// Fires the order's not-yet-fired lines to the kitchen as a kitchen order ticket (KOT). Operational
     /// only (no GL). New lines added later can be fired again as a further ticket (course firing).
     /// </summary>

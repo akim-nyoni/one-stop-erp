@@ -23,6 +23,9 @@ public enum DeviceConnection
 
     /// <summary>The Windows print spooler, raw (USB receipt and label printers installed in Windows).</summary>
     WindowsPrinter = 3,
+
+    /// <summary>A serial port: a COM port, or a USB device that appears as one (scales, pole displays, older printers).</summary>
+    Serial = 4,
 }
 
 /// <summary>One peripheral's settings.</summary>
@@ -42,6 +45,27 @@ public sealed class DeviceSettings
 
     /// <summary>Gets or sets the timeout in milliseconds.</summary>
     public int TimeoutMs { get; set; } = 3000;
+
+    /// <summary>Gets or sets the serial port (e.g. COM3).</summary>
+    public string? PortName { get; set; }
+
+    /// <summary>Gets or sets the serial speed.</summary>
+    public int BaudRate { get; set; } = 9600;
+
+    /// <summary>Gets or sets the serial parity.</summary>
+    public System.IO.Ports.Parity Parity { get; set; } = System.IO.Ports.Parity.None;
+
+    /// <summary>Gets or sets the serial data bits.</summary>
+    public int DataBits { get; set; } = 8;
+
+    /// <summary>Gets or sets the serial stop bits.</summary>
+    public System.IO.Ports.StopBits StopBits { get; set; } = System.IO.Ports.StopBits.One;
+
+    /// <summary>Gets or sets the serial flow control.</summary>
+    public System.IO.Ports.Handshake Handshake { get; set; } = System.IO.Ports.Handshake.None;
+
+    /// <summary>Gets or sets what a serial scale is sent to ask for the weight (null: "W" and a line end).</summary>
+    public string? ScaleRequest { get; set; }
 }
 
 /// <summary>The terminal's peripherals (<c>Pos:Devices</c>); the drawer opens through the receipt printer.</summary>
@@ -88,6 +112,7 @@ public sealed class DeviceProvider : IDeviceProvider
             DeviceConnection.Simulator => new SimulatedPrinter(),
             DeviceConnection.Network => new NetworkRawPrinter(options.Printer),
             DeviceConnection.WindowsPrinter when OperatingSystem.IsWindows() => new WindowsRawPrinter(options.Printer.PrinterName ?? string.Empty),
+            DeviceConnection.Serial => new SerialRawPrinter(options.Printer),
             _ => null,
         };
         Drawer = Printer is not null && options.DrawerOnPrinter ? new PrinterCashDrawer(Printer) : null;
@@ -95,12 +120,14 @@ public sealed class DeviceProvider : IDeviceProvider
         {
             DeviceConnection.Simulator => new SimulatedScale(options.SimulatedWeight),
             DeviceConnection.Network => new NetworkScale(options.Scale),
+            DeviceConnection.Serial => new SerialScale(options.Scale),
             _ => null,
         };
         Display = options.Display.Connection switch
         {
             DeviceConnection.Simulator => new SimulatedDisplay(),
             DeviceConnection.Network => new NetworkCustomerDisplay(options.Display),
+            DeviceConnection.Serial => new SerialCustomerDisplay(options.Display),
             _ => null,
         };
         CardTerminal = options.CardTerminal.Connection == DeviceConnection.Simulator ? new SimulatedCardTerminal(options.SimulatedCardLimit) : null;
@@ -109,6 +136,7 @@ public sealed class DeviceProvider : IDeviceProvider
             DeviceConnection.Simulator => new SimulatedPrinter(),
             DeviceConnection.Network => new NetworkRawPrinter(options.LabelPrinter),
             DeviceConnection.WindowsPrinter when OperatingSystem.IsWindows() => new WindowsRawPrinter(options.LabelPrinter.PrinterName ?? string.Empty),
+            DeviceConnection.Serial => new SerialRawPrinter(options.LabelPrinter),
             _ => null,
         };
         BarcodeRules = options.BarcodeRules.Count > 0 ? options.BarcodeRules : Barcodes.DefaultRules;

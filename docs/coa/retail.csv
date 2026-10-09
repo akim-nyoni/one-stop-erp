@@ -1,0 +1,30 @@
+code,name,type,control,category,budget
+1010,Till Floats,Asset,,Cash and Bank,
+1011,Card Settlement Clearing,Asset,,Cash and Bank,
+1012,Mobile Money Clearing,Asset,,Cash and Bank,
+1401,Inventory - Groceries,Asset,,Inventory,
+1402,Inventory - Fresh Produce,Asset,,Inventory,
+1403,Inventory - General Merchandise,Asset,,Inventory,
+1404,Inventory - Fuel,Asset,,Inventory,
+2310,Gift Card Liability,Liability,,Other Current Liabilities,
+2311,Lay-bye Deposits Held,Liability,,Other Current Liabilities,
+2312,Loyalty Points Liability,Liability,,Other Current Liabilities,
+2313,Container Deposits Held,Liability,,Other Current Liabilities,
+4010,Retail Sales,Income,,Revenue,
+4011,Sales - Groceries,Income,,Revenue,
+4012,Sales - Fresh Produce,Income,,Revenue,
+4013,Sales - General Merchandise,Income,,Revenue,
+4014,Sales - Fuel,Income,,Revenue,
+4015,Delivery Charges,Income,,Revenue,
+4020,Promotional Discounts,Income,,Revenue,
+4021,Loyalty Redemptions,Income,,Revenue,
+4910,Gift Card Breakage,Income,,Other Income,
+4911,Supplier Rebates,Income,,Other Income,
+5010,Stock Wastage,Expense,,Cost of Sales,
+5011,Stock Shrinkage,Expense,,Cost of Sales,
+5012,Stocktake Adjustments,Expense,,Cost of Sales,
+5020,Cash Over / Short,Expense,,Other Expenses,
+5021,Card Fees,Expense,,Finance Costs,yes
+5022,Mobile Money Fees,Expense,,Finance Costs,yes
+5030,Packaging,Expense,,Cost of Sales,yes
+6385,Store Promotions,Expense,,Administration,yes

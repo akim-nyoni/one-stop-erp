@@ -159,7 +159,7 @@ public sealed class IndustrySetupService : IIndustrySetupService
         int accounts = 0, taxes = 0, warehouses = 0, roles = 0, records = 0;
         foreach (AccountSeed account in template.Accounts)
         {
-            if (Tally(await _master.CreateAccountAsync(new NewAccount(companyId, account.Code, account.Name, account.Type, account.Control), ct).ConfigureAwait(false), ref accounts) is Error e)
+            if (Tally(await _master.CreateAccountAsync(new NewAccount(companyId, account.Code, account.Name, account.Type, account.Control, account.ReportCategory, account.BudgetEnabled), ct).ConfigureAwait(false), ref accounts) is Error e)
             {
                 return e;
             }

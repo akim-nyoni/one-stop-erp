@@ -294,6 +294,32 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
         return line;
     }
 
+    /// <summary>
+    /// Takes a quantity of another tab's line onto this one (brief §4.1: "transfer lines between tabs"): the same item, price, accounts, course and
+    /// modifiers, its share of the tax, and whether it has gone to the kitchen — so it is not fired again.
+    /// </summary>
+    /// <param name="source">The line on the other tab.</param>
+    /// <param name="quantity">How much of it moves (at most what is unbilled).</param>
+    /// <returns>The line created here.</returns>
+    public TableOrderLine TakeFrom(TableOrderLine source, decimal quantity)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        decimal tax = source.MoveOut(quantity);
+        TableOrderLine moved = AddLine(source.MenuItemId, source.Description, quantity, source.UnitPrice, tax, source.RevenueAccountCode, source.CostOfSalesAccountCode, source.Course,
+            source.SeatNumber);
+        foreach (OrderLineModifier modifier in source.Modifiers)
+        {
+            moved.AddModifier(modifier.Description, modifier.PriceDelta, modifier.IngredientItemId, modifier.IngredientQuantity);
+        }
+
+        if (source.Fired)
+        {
+            moved.MarkFired();
+        }
+
+        return moved;
+    }
+
     /// <summary>Marks the order billed and records the revenue journal.</summary>
     /// <param name="journalNumber">The revenue journal number.</param>
     public void MarkBilled(string journalNumber)
@@ -490,6 +516,23 @@ public sealed class TableOrderLine : Entity
         IsComped = true;
         CompReason = reason;
         AuthorizedByUserId = authorizedByUserId;
+    }
+
+    /// <summary>Takes a quantity off this line for another tab, with its share of the tax.</summary>
+    /// <param name="quantity">The quantity moving (above zero, at most what is unbilled).</param>
+    /// <returns>The tax that moves with it.</returns>
+    /// <exception cref="InvalidOperationException">Thrown for a voided or comped line, or more than is unbilled.</exception>
+    public decimal MoveOut(decimal quantity)
+    {
+        if (IsVoided || IsComped || quantity <= 0m || quantity > RemainingQuantity + 0.0001m)
+        {
+            throw new InvalidOperationException($"Cannot move {quantity} of '{Description}': it is voided or comped, or only {RemainingQuantity} is unbilled.");
+        }
+
+        decimal tax = Quantity == 0m ? 0m : decimal.Round(TaxAmount * quantity / Quantity, 4, MidpointRounding.ToEven);
+        Quantity = decimal.Round(Quantity - quantity, 4, MidpointRounding.ToEven);
+        TaxAmount -= tax;
+        return tax;
     }
 
     /// <summary>Bills a quantity of this line (split bills).</summary>

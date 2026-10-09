@@ -108,12 +108,12 @@ public static partial class OperationCatalogue
             Description = "Opens an order at a table or for takeaway / delivery, adds menu items (by course, seat and price level) and modifiers, voids or comps a line "
                 + "(with an authorising user), moves the order, sends it or a course to the kitchen, tracks a delivery, or shows its lines (with the line ids the other steps use).",
             Fields = [Pick("Step", "Step", ["Show order", "Open at table", "Open takeaway / delivery", "Add item", "Modifier", "Seat a line", "Void line", "Comp line", "Spend limit", "Move to table",
-                    "Change waiter", "Fire order", "Fire course", "Assign driver", "Delivery status", "Cancel order"]),
+                    "Move line to tab", "Merge into tab", "Change waiter", "Fire order", "Fire course", "Assign driver", "Delivery status", "Cancel order"]),
                 Req("Order", "Order number"), Opt("Table", "Table number"), Num("Party", "Party size", "2"), Pick("Type", "Order type", Enum.GetNames<OrderType>()), Opt("Customer", "Customer name"),
                 Opt("Phone", "Phone"), Opt("Address", "Delivery address"), Opt("Item", "Menu item code"), Num("Quantity", "Quantity", "1"), Pick("Course", "Course", Enum.GetNames<MenuCourse>()),
                 OptNum("Seat", "Seat number"), Opt("Level", "Price level"), OptNum("Line", "Line id"), Opt("Modifier", "Modifier description"), Num("Delta", "Modifier price change", "0"),
                 Opt("Ingredient", "Modifier ingredient item"), Num("IngredientQty", "Ingredient quantity", "0"), Opt("User", "Waiter / driver / authorised by (user name)"),
-                OptNum("Limit", "Spend limit (blank: none)"), Opt("Ticket", "Kitchen ticket number"), Pick("Delivery", "Delivery status", Enum.GetNames<DeliveryStatus>()), Opt("Reason", "Reason"), Today()],
+                OptNum("Limit", "Spend limit (blank: none)"), Opt("ToOrder", "Other tab's order number (move line / merge)"), Opt("Ticket", "Kitchen ticket number"), Pick("Delivery", "Delivery status", Enum.GetNames<DeliveryStatus>()), Opt("Reason", "Reason"), Today()],
             Run = async (c, i) =>
             {
                 IRestaurantService restaurant = c.Get<IRestaurantService>();
@@ -159,6 +159,12 @@ public static partial class OperationCatalogue
                         return Check(await restaurant.SetOrderSpendLimitAsync(c.CompanyId, order, i.OptionalNumber("Limit")).ConfigureAwait(true), "Spend limit set.");
                     case "Move to table":
                         return Check(await restaurant.TransferOrderAsync(c.CompanyId, order, await TableAsync(c, i.Optional("Table") ?? string.Empty).ConfigureAwait(true)).ConfigureAwait(true), "Order moved.");
+                    case "Move line to tab":
+                        return Check(await restaurant.TransferLineAsync(c.CompanyId, order, line, await OrderAsync(c, i.Optional("ToOrder") ?? string.Empty).ConfigureAwait(true),
+                            i.OptionalNumber("Quantity")).ConfigureAwait(true), id => $"Moved to {i.Optional("ToOrder")} (line {id}).");
+                    case "Merge into tab":
+                        return Check(await restaurant.MergeOrdersAsync(c.CompanyId, order, await OrderAsync(c, i.Optional("ToOrder") ?? string.Empty).ConfigureAwait(true)).ConfigureAwait(true),
+                            n => $"{n} line(s) moved into {i.Optional("ToOrder")}.");
                     case "Change waiter":
                         return Check(await restaurant.ReassignWaiterAsync(c.CompanyId, order, await UserOrMe().ConfigureAwait(true)).ConfigureAwait(true), "Waiter changed.");
                     case "Fire order":

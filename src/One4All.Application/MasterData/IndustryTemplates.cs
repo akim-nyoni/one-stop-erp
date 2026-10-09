@@ -43,7 +43,9 @@ public enum GrantLevel
 /// <param name="Name">The name.</param>
 /// <param name="Type">The type.</param>
 /// <param name="Control">The control type, if a control account.</param>
-public sealed record AccountSeed(string Code, string Name, AccountType Type, ControlAccountType? Control = null);
+/// <param name="ReportCategory">Where it shows on the financial statements (null: its type).</param>
+/// <param name="BudgetEnabled">Whether it is a budget vote.</param>
+public sealed record AccountSeed(string Code, string Name, AccountType Type, ControlAccountType? Control = null, string? ReportCategory = null, bool BudgetEnabled = false);
 
 /// <summary>A tax code to seed; a null rate takes the standard rate given at setup.</summary>
 /// <param name="Code">The code.</param>
@@ -172,13 +174,20 @@ public static class IndustryTemplates
     /// <summary>The template for an industry.</summary>
     /// <param name="vertical">The industry.</param>
     /// <returns>Its template.</returns>
-    public static VerticalTemplate For(Vertical vertical) => Templates[vertical];
+    public static VerticalTemplate For(Vertical vertical) => Charted[vertical];
+
+    // Each template with the full seed chart of its industry (docs/coa/{vertical}.csv, embedded): the accounts above keep their names and control
+    // types, take the chart's report category and budget flag, and the chart's further accounts follow.
+    private static readonly Dictionary<Vertical, VerticalTemplate> Charted = Templates.ToDictionary(t => t.Key, t => t.Value with
+    {
+        Accounts = ChartOfAccounts.Merge(t.Value.Accounts, ChartOfAccounts.Load(t.Key)),
+    });
 
     /// <summary>The templates to apply for a set of industries: Core first, then each industry once, in order.</summary>
     /// <param name="verticals">The industries chosen.</param>
     /// <returns>The templates.</returns>
     public static IReadOnlyList<VerticalTemplate> Plan(IEnumerable<Vertical> verticals)
-        => [Templates[Vertical.Core], .. verticals.Where(v => v != Vertical.Core).Distinct().Order().Select(v => Templates[v])];
+        => [Charted[Vertical.Core], .. verticals.Where(v => v != Vertical.Core).Distinct().Order().Select(v => Charted[v])];
 
     /// <summary>The operations a grant level gives, within what a permission offers.</summary>
     /// <param name="available">What the permission offers.</param>

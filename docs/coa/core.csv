@@ -1,0 +1,102 @@
+code,name,type,control,category,budget
+1000,Cash on Hand,Asset,,Cash and Bank,
+1001,Petty Cash,Asset,,Cash and Bank,
+1100,Bank,Asset,,Cash and Bank,
+1101,Bank - Foreign Currency,Asset,,Cash and Bank,
+1102,Bank - Call / Savings,Asset,,Cash and Bank,
+1150,Cash in Transit,Asset,,Cash and Bank,
+1200,Debtors Control,Asset,AccountsReceivable,Receivables,
+1210,Allowance for Credit Losses,Asset,,Receivables,
+1220,Staff Debtors,Asset,,Receivables,
+1230,Sundry Debtors,Asset,,Receivables,
+1300,Prepayments,Asset,,Other Current Assets,
+1310,Staff Loans,Asset,,Other Current Assets,
+1320,Deposits Paid,Asset,,Other Current Assets,
+1400,Inventory,Asset,Stock,Inventory,
+1410,Goods in Transit,Asset,,Inventory,
+1420,Inventory Provision,Asset,,Inventory,
+1600,"Property, Plant & Equipment",Asset,,Non-current Assets,
+1610,Land and Buildings,Asset,,Non-current Assets,
+1620,Motor Vehicles,Asset,,Non-current Assets,
+1630,Furniture and Fittings,Asset,,Non-current Assets,
+1640,Computer Equipment,Asset,,Non-current Assets,
+1650,Accumulated Depreciation,Asset,,Non-current Assets,
+1660,Capital Work in Progress,Asset,,Non-current Assets,
+1700,Intangible Assets,Asset,,Non-current Assets,
+1710,Accumulated Amortisation,Asset,,Non-current Assets,
+2100,Creditors Control,Liability,AccountsPayable,Payables,
+2110,Sundry Creditors,Liability,,Payables,
+2150,Goods Received Not Invoiced,Liability,GoodsReceivedNotInvoiced,Payables,
+2200,VAT Output,Liability,VatOutput,Tax,
+2210,VAT Input,Asset,VatInput,Tax,
+2220,Income Tax Payable,Liability,,Tax,
+2230,VAT Control (settlement),Liability,,Tax,
+2300,Accruals,Liability,,Accruals and Provisions,
+2305,Provision for Leave Pay,Liability,,Accruals and Provisions,
+2306,Provision for Bonuses,Liability,,Accruals and Provisions,
+2400,Payroll Control,Liability,PayrollControl,Payroll Liabilities,
+2410,PAYE Payable,Liability,,Payroll Liabilities,
+2420,Net Salaries Payable,Liability,,Payroll Liabilities,
+2430,Pension Fund Payable,Liability,,Payroll Liabilities,
+2440,Medical Aid Payable,Liability,,Payroll Liabilities,
+2450,Social Security Payable,Liability,,Payroll Liabilities,
+2460,Union Dues Payable,Liability,,Payroll Liabilities,
+2470,Third-party Deductions Payable,Liability,,Payroll Liabilities,
+2500,Long-term Loans,Liability,,Non-current Liabilities,
+2510,Lease Liabilities,Liability,,Non-current Liabilities,
+2900,Suspense,Liability,Suspense,Suspense,
+3000,Share Capital,Equity,,Equity,
+3100,Capital Reserves,Equity,,Equity,
+3150,Revaluation Reserve,Equity,,Equity,
+3200,Retained Earnings,Equity,RetainedEarnings,Equity,
+3300,Drawings / Dividends,Equity,,Equity,
+4000,Sales,Income,,Revenue,
+4005,Sales Returns and Allowances,Income,,Revenue,
+4900,Other Income,Income,,Other Income,
+4940,Interest Received,Income,,Other Income,
+4920,Profit on Disposal of Assets,Income,,Other Income,
+4930,Discount Received,Income,,Other Income,
+5000,Cost of Sales,Expense,,Cost of Sales,
+5050,Carriage Inwards,Expense,,Cost of Sales,
+6000,Salaries and Wages,Expense,,Employee Costs,yes
+6010,Overtime,Expense,,Employee Costs,yes
+6020,Allowances,Expense,,Employee Costs,yes
+6030,Employer Pension Contributions,Expense,,Employee Costs,yes
+6040,Employer Medical Aid,Expense,,Employee Costs,yes
+6050,Employer Social Security,Expense,,Employee Costs,yes
+6060,Staff Training,Expense,,Employee Costs,yes
+6070,Staff Welfare,Expense,,Employee Costs,yes
+6080,Leave Pay,Expense,,Employee Costs,yes
+6100,Rent,Expense,,Premises,yes
+6110,Rates and Taxes,Expense,,Premises,yes
+6120,Repairs and Maintenance,Expense,,Premises,yes
+6130,Cleaning and Security,Expense,,Premises,yes
+6200,Utilities,Expense,,Premises,yes
+6210,Electricity,Expense,,Premises,yes
+6220,Water,Expense,,Premises,yes
+6300,Telephone and Internet,Expense,,Administration,yes
+6310,Printing and Stationery,Expense,,Administration,yes
+6320,Postage and Courier,Expense,,Administration,yes
+6330,Insurance,Expense,,Administration,yes
+6340,Audit and Accounting Fees,Expense,,Administration,yes
+6350,Legal Fees,Expense,,Administration,yes
+6360,Consulting Fees,Expense,,Administration,yes
+6370,Subscriptions and Licences,Expense,,Administration,yes
+6380,Advertising and Marketing,Expense,,Administration,yes
+6390,Travel and Accommodation,Expense,,Administration,yes
+6395,Entertainment,Expense,,Administration,yes
+6600,Motor Vehicle Expenses,Expense,,Operating Expenses,yes
+6610,Fuel and Oil,Expense,,Operating Expenses,yes
+6700,Computer Expenses,Expense,,Operating Expenses,yes
+6800,Depreciation,Expense,,Depreciation and Amortisation,
+6810,Amortisation,Expense,,Depreciation and Amortisation,
+6850,Impairment Losses,Expense,,Depreciation and Amortisation,
+6860,Expected Credit Losses,Expense,,Other Expenses,
+6900,Bank Charges,Expense,,Finance Costs,yes
+6910,Interest Paid,Expense,,Finance Costs,
+6920,Loss on Disposal of Assets,Expense,,Other Expenses,
+6990,Sundry Expenses,Expense,,Other Expenses,yes
+7900,Rounding,Expense,Rounding,Other Expenses,
+8000,Exchange Gains,Income,FxGain,Other Income,
+8100,Exchange Losses,Expense,FxLoss,Finance Costs,
+9000,Income Tax Expense,Expense,,Taxation,

@@ -1,0 +1,38 @@
+code,name,type,control,category,budget
+1240,Consumer Debtors - Rates,Asset,,Receivables,
+1241,Consumer Debtors - Water,Asset,,Receivables,
+1242,Consumer Debtors - Refuse,Asset,,Receivables,
+1243,Consumer Debtors - Sewerage,Asset,,Receivables,
+1244,Consumer Debtors - Electricity,Asset,,Receivables,
+1250,Government Grants Receivable,Asset,,Receivables,
+1670,Infrastructure Assets - Roads,Asset,,Non-current Assets,
+1671,Infrastructure Assets - Water Network,Asset,,Non-current Assets,
+1672,Infrastructure Assets - Sewer Network,Asset,,Non-current Assets,
+1673,Community Assets,Asset,,Non-current Assets,
+1674,Investment Property,Asset,,Non-current Assets,
+2320,Consumer Deposits,Liability,,Other Current Liabilities,
+2321,Unspent Conditional Grants,Liability,,Other Current Liabilities,
+2322,Prepaid Electricity Sales Unearned,Liability,,Other Current Liabilities,
+4300,Property Rates,Income,,Revenue - Exchange and Non-exchange,
+4301,Property Rates Rebates,Income,,Revenue - Exchange and Non-exchange,
+4310,Water Sales,Income,,Revenue - Exchange and Non-exchange,
+4311,Electricity Sales,Income,,Revenue - Exchange and Non-exchange,
+4320,Refuse Removal,Income,,Revenue - Exchange and Non-exchange,
+4330,Sewerage,Income,,Revenue - Exchange and Non-exchange,
+4340,Interest on Arrears,Income,,Revenue - Exchange and Non-exchange,
+4350,Licences and Permits,Income,,Revenue - Exchange and Non-exchange,
+4351,Fines and Penalties,Income,,Revenue - Exchange and Non-exchange,
+4352,Building Plan Fees,Income,,Revenue - Exchange and Non-exchange,
+4353,Clearance Certificate Fees,Income,,Revenue - Exchange and Non-exchange,
+4360,Government Grants - Operating,Income,,Transfers and Subsidies,
+4361,Government Grants - Capital,Income,,Transfers and Subsidies,
+4370,Rental of Facilities,Income,,Revenue - Exchange and Non-exchange,
+5300,Bulk Water Purchases,Expense,,Bulk Purchases,yes
+5301,Bulk Electricity Purchases,Expense,,Bulk Purchases,yes
+6500,Indigent Subsidy,Expense,,Transfers and Subsidies,yes
+6510,Bad Debts,Expense,,Other Expenses,
+6520,Councillors' Remuneration,Expense,,Employee Costs,yes
+6530,Water Treatment Chemicals,Expense,,Operating Expenses,yes
+6540,Refuse Site Operations,Expense,,Operating Expenses,yes
+6550,Road Maintenance,Expense,,Operating Expenses,yes
+6560,Contracted Services,Expense,,Operating Expenses,yes

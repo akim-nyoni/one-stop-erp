@@ -1173,6 +1173,86 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
+    public async Task<Result<long>> TransferLineAsync(long companyId, long fromOrderId, long lineId, long toOrderId, decimal? quantity = null, CancellationToken ct = default)
+    {
+        Result<(TableOrder From, TableOrder To)> tabs = await OpenTabsAsync(companyId, fromOrderId, toOrderId, ct).ConfigureAwait(false);
+        if (tabs.IsFailure)
+        {
+            return tabs.Error;
+        }
+
+        TableOrderLine? line = tabs.Value.From.Lines.FirstOrDefault(l => l.Id == lineId);
+        if (line is null)
+        {
+            return Error.NotFound("Res.LineNotFound", $"Line {lineId} is not on order {fromOrderId}.");
+        }
+
+        decimal moving = quantity ?? line.RemainingQuantity;
+        if (line.IsVoided || line.IsComped || moving <= 0m || moving > line.RemainingQuantity)
+        {
+            return Error.Rule("Res.CannotMoveLine", $"Only an unbilled quantity of a live line can move; {line.RemainingQuantity:0.##} of '{line.Description}' is unbilled.");
+        }
+
+        TableOrderLine moved = tabs.Value.To.TakeFrom(line, moving);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return moved.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<int>> MergeOrdersAsync(long companyId, long fromOrderId, long intoOrderId, CancellationToken ct = default)
+    {
+        Result<(TableOrder From, TableOrder To)> tabs = await OpenTabsAsync(companyId, fromOrderId, intoOrderId, ct).ConfigureAwait(false);
+        if (tabs.IsFailure)
+        {
+            return tabs.Error;
+        }
+
+        (TableOrder from, TableOrder into) = tabs.Value;
+        List<TableOrderLine> live = [.. from.Lines.Where(l => !l.IsVoided && !l.IsComped && l.RemainingQuantity > 0m)];
+        foreach (TableOrderLine line in live)
+        {
+            into.TakeFrom(line, line.RemainingQuantity);
+        }
+
+        // Nothing billed on it: the merged-away tab closes and its table is free again; a part-billed tab stays to settle its billed part.
+        if (from.Lines.All(l => l.BilledQuantity == 0m))
+        {
+            from.Cancel();
+            if (from.TableId is long tableId && tableId != into.TableId)
+            {
+                await FreeTableAndGroupAsync(companyId, await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == tableId, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
+            }
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return live.Count;
+    }
+
+    // Two different open tabs of the company, with their lines.
+    private async Task<Result<(TableOrder From, TableOrder To)>> OpenTabsAsync(long companyId, long fromOrderId, long toOrderId, CancellationToken ct)
+    {
+        if (fromOrderId == toOrderId)
+        {
+            return Error.Validation("Res.SameOrder", "Choose two different tabs.");
+        }
+
+        List<TableOrder> orders = await _db.Set<TableOrder>().Include(o => o.Lines).ThenInclude(l => l.Modifiers)
+            .Where(o => o.CompanyId == companyId && (o.Id == fromOrderId || o.Id == toOrderId)).ToListAsync(ct).ConfigureAwait(false);
+        TableOrder? from = orders.FirstOrDefault(o => o.Id == fromOrderId), to = orders.FirstOrDefault(o => o.Id == toOrderId);
+        if (from is null || to is null)
+        {
+            return Error.NotFound("Res.OrderNotFound", $"Order {(from is null ? fromOrderId : toOrderId)} not found.");
+        }
+
+        if (from.Status != TableOrderStatus.Open || to.Status != TableOrderStatus.Open)
+        {
+            return Error.Rule("Res.OrderNotOpen", "Lines move only between open tabs.");
+        }
+
+        return (from, to);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<int>> RefreshMenuAvailabilityAsync(long companyId, long warehouseId, CancellationToken ct = default)
     {
         List<MenuItem> menu = await _db.Set<MenuItem>().Include(m => m.Recipe)

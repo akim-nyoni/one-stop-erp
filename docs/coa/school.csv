@@ -1,0 +1,28 @@
+code,name,type,control,category,budget
+1270,Fee Debtors,Asset,,Receivables,
+1271,Sponsor Debtors,Asset,,Receivables,
+1405,Uniform Shop Stock,Asset,,Inventory,
+1406,Tuck Shop Stock,Asset,,Inventory,
+1407,Boarding Stores,Asset,,Inventory,
+2340,Fees Received in Advance,Liability,,Other Current Liabilities,
+2341,Student Wallets,Liability,,Other Current Liabilities,
+2342,Deferred Tuition Income,Liability,,Other Current Liabilities,
+2343,Exam Fees Collected for Boards,Liability,,Other Current Liabilities,
+4200,Tuition Fees,Income,,Revenue,
+4201,Levies,Income,,Revenue,
+4202,Exam Fees,Income,,Revenue,
+4203,Trips and Excursions,Income,,Revenue,
+4210,Boarding Fees,Income,,Revenue,
+4220,Transport Fees,Income,,Revenue,
+4230,Uniform Sales,Income,,Revenue,
+4231,Tuck Shop Sales,Income,,Revenue,
+4240,Donations and Grants,Income,,Other Income,
+5400,Cost of Uniforms Sold,Expense,,Cost of Sales,
+5401,Cost of Tuck Shop Sales,Expense,,Cost of Sales,
+6400,Bursaries Granted,Expense,,Other Expenses,yes
+6401,Staff-child Discounts,Expense,,Other Expenses,yes
+6410,Teaching Materials,Expense,,Operating Expenses,yes
+6420,Boarding Food Costs,Expense,,Operating Expenses,yes
+6430,School Transport Running Costs,Expense,,Operating Expenses,yes
+6440,Sports and Clubs,Expense,,Operating Expenses,yes
+6450,Examination Costs,Expense,,Operating Expenses,yes

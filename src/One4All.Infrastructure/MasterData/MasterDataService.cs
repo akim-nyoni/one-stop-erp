@@ -151,6 +151,7 @@ public sealed class MasterDataService : IMasterDataService
             created.MakeControlAccount(control);
         }
 
+        created.BudgetEnabled = account.BudgetEnabled;
         _db.Accounts.Add(created);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return created.Id;
