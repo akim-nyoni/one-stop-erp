@@ -21,6 +21,7 @@ public partial class ShellWindow : Window
         _services = services;
         DataContext = viewModel;
         InitializeComponent();
+        BuildAreaMenus();
         FlowDirection = Localization.UiText.Direction;
         _idleLock = new IdleLock(services);
         Loaded += (_, _) => HideUnavailableOperations(viewModel);
@@ -89,6 +90,40 @@ public partial class ShellWindow : Window
         ShellViewModel vm = (ShellViewModel)DataContext;
         PosTerminalWindow terminal = new(_services, vm.UserId, vm.UserDisplayName) { Owner = this };
         terminal.Show();
+    }
+
+    // Each of Maintenance, Transactions, Enquiries and Utilities lists, after its own windows, the modules that have actions of that kind; each opens
+    // the module's console showing just those actions (Sage style).
+    private void BuildAreaMenus()
+    {
+        IReadOnlyList<Operations.Operation> all = Operations.OperationCatalogue.All();
+        foreach ((System.Windows.Controls.MenuItem menu, Application.Navigation.MenuArea area) in new[]
+        {
+            (MaintenanceMenu, Application.Navigation.MenuArea.Maintenance), (TransactionsMenu, Application.Navigation.MenuArea.Transactions),
+            (EnquiriesMenu, Application.Navigation.MenuArea.Enquiries), (UtilitiesMenu, Application.Navigation.MenuArea.Utilities),
+        })
+        {
+            List<string> modules = [.. Operations.OperationCatalogue.Modules.Where(m => all.Any(o => o.Module == m && o.MenuArea == area))];
+            if (modules.Count == 0)
+            {
+                continue;
+            }
+
+            menu.Items.Add(new System.Windows.Controls.Separator());
+            foreach (string module in modules)
+            {
+                System.Windows.Controls.MenuItem item = new() { Header = Localization.UiText.T(module) + "…", Tag = (module, area) };
+                item.Click += OpenArea_Click;
+                menu.Items.Add(item);
+            }
+        }
+    }
+
+    private void OpenArea_Click(object sender, RoutedEventArgs e)
+    {
+        ShellViewModel vm = (ShellViewModel)DataContext;
+        (string module, Application.Navigation.MenuArea area) = ((string, Application.Navigation.MenuArea))((FrameworkElement)sender).Tag;
+        new OperationsWindow(_services, vm.UserId, module, area) { Owner = this }.Show();
     }
 
     private void OpenOperations_Click(object sender, RoutedEventArgs e)

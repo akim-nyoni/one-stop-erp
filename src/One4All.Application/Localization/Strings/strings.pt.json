@@ -184,5 +184,10 @@
   "Received": "Recebido",
   "Due": "Vencimento",
   "Today": "Hoje",
-  "Commit": "Confirmar"
+  "Commit": "Confirmar",
+  "All Operations by Module": "Todas as operações por módulo",
+  "Maintenance": "Manutenção",
+  "Transactions": "Transações",
+  "Enquiries": "Consultas",
+  "Utilities": "Utilitários"
 }

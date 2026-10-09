@@ -81,6 +81,12 @@ public sealed class Operation
 
     /// <summary>Gets a value indicating whether the result is a printable document (shown in full, monospaced).</summary>
     public bool IsDocument { get; init; }
+
+    /// <summary>Gets where the action sits in the menus when its title would place it wrongly (null: worked out from the title).</summary>
+    public Application.Navigation.MenuArea? Area { get; init; }
+
+    /// <summary>Gets the menu the action sits under (Maintenance, Transactions, Enquiries or Utilities).</summary>
+    public Application.Navigation.MenuArea MenuArea => Area ?? Application.Navigation.MenuAreas.Classify(Title);
 }
 
 /// <summary>Raised by an operation when it cannot proceed; the message is shown to the user.</summary>

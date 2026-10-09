@@ -59,11 +59,37 @@
                 <Separator />
                 <MenuItem Header="{loc:T 'Exit'}" Click="Exit_Click" />
             </MenuItem>
-            <MenuItem Header="{loc:T '_View'}" />
-            <MenuItem Header="{loc:T '_Maintenance'}">
+            <MenuItem Header="{loc:T '_View'}">
+                <MenuItem Header="{loc:T 'All Operations by Module'}">
+                    <MenuItem Header="{loc:T 'System Manager — Companies, Accounts, Tax, Traders, Items…'}" Tag="System Manager" Click="OpenOperations_Click" />
+                    <Separator />
+                    <MenuItem Header="{loc:T 'General Ledger — Manual Journals, Funds, Projects, Fund Accounting…'}" Tag="General Ledger" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Customers — Invoices, Credit Notes, Receipts, Statements…'}" Tag="Customers" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Suppliers — Invoices, Credit Notes, Payments, Statements…'}" Tag="Suppliers" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Point of Sale — Refunds, Till Events, Gift Cards…'}" Tag="Point of Sale" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Restaurant — Menu, Tables, Orders, Kitchen, Billing, Reservations…'}" Tag="Restaurant" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Stock — Lots, Transfers, Stocktakes, Assembly, Pricing…'}" Tag="Stock" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Purchasing — Requisitions, Orders, Goods Received, Invoice Matching, Budget Gate…'}" Tag="Purchasing" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Budgeting — Preparation, Review &amp; Approval…'}" Tag="Budgeting" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'CRM — Leads, Activities &amp; Agenda…'}" Tag="CRM" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Municipality — Enquiry Desk, Meter Readings, Billing Runs, Statements…'}" Tag="Municipality" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Receipting — Cashier Session, Payments, Reversals…'}" Tag="Receipting" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Housing — Waiting List, Allocation Runs, Offers, Stands…'}" Tag="Housing" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Weighbridge…'}" Tag="Weighbridge" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Fixed Assets — Counts, Maintenance, CWIP…'}" Tag="Fixed Assets" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Contracts — Variations, BOQ, WBS, Subcontracts, Plant…'}" Tag="Contracts" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'HR &amp; Attendance…'}" Tag="HR &amp; Attendance" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Banking — Cheques, Standing Orders, Direct Debits…'}" Tag="Banking" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Approvals — Delegation &amp; Escalation…'}" Tag="Approvals" Click="OpenOperations_Click" />
+                    <MenuItem Header="{loc:T 'Sales &amp; Schools — Deliveries, Wallets…'}" Tag="Sales &amp; Schools" Click="OpenOperations_Click" />
+                    <Separator />
+                    <MenuItem Header="{loc:T 'Document Printer…'}" Tag="Documents" Click="OpenOperations_Click" />
+                </MenuItem>
+            </MenuItem>
+            <MenuItem x:Name="MaintenanceMenu" Header="{loc:T '_Maintenance'}">
                 <MenuItem Header="{loc:T 'Roles &amp; Permissions…'}" Click="OpenPermissionEditor_Click" />
             </MenuItem>
-            <MenuItem Header="{loc:T '_Transactions'}">
+            <MenuItem x:Name="TransactionsMenu" Header="{loc:T '_Transactions'}">
                 <MenuItem Header="{loc:T 'Point of Sale — Touch Terminal…'}" Click="OpenPosTerminal_Click" />
                 <Separator />
                 <MenuItem Header="{loc:T 'My Approvals…'}" Click="OpenApprovals_Click" />
@@ -75,32 +101,8 @@
                 <MenuItem Header="{loc:T 'Bank Reconciliation…'}" Click="OpenBankReconciliation_Click" />
                 <MenuItem Header="{loc:T 'Supplier Statement Reconciliation…'}" Click="OpenSupplierReconciliation_Click" />
             </MenuItem>
-            <MenuItem Header="{loc:T '_Operations'}">
-                <MenuItem Header="{loc:T 'System Manager — Companies, Accounts, Tax, Traders, Items…'}" Tag="System Manager" Click="OpenOperations_Click" />
-                <Separator />
-                <MenuItem Header="{loc:T 'General Ledger — Manual Journals, Funds, Projects, Fund Accounting…'}" Tag="General Ledger" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Customers — Invoices, Credit Notes, Receipts, Statements…'}" Tag="Customers" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Suppliers — Invoices, Credit Notes, Payments, Statements…'}" Tag="Suppliers" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Point of Sale — Refunds, Till Events, Gift Cards…'}" Tag="Point of Sale" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Restaurant — Menu, Tables, Orders, Kitchen, Billing, Reservations…'}" Tag="Restaurant" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Stock — Lots, Transfers, Stocktakes, Assembly, Pricing…'}" Tag="Stock" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Purchasing — Requisitions, Orders, Goods Received, Invoice Matching, Budget Gate…'}" Tag="Purchasing" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Budgeting — Preparation, Review &amp; Approval…'}" Tag="Budgeting" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'CRM — Leads, Activities &amp; Agenda…'}" Tag="CRM" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Municipality — Enquiry Desk, Meter Readings, Billing Runs, Statements…'}" Tag="Municipality" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Receipting — Cashier Session, Payments, Reversals…'}" Tag="Receipting" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Housing — Waiting List, Allocation Runs, Offers, Stands…'}" Tag="Housing" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Weighbridge…'}" Tag="Weighbridge" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Fixed Assets — Counts, Maintenance, CWIP…'}" Tag="Fixed Assets" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Contracts — Variations, BOQ, WBS, Subcontracts, Plant…'}" Tag="Contracts" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'HR &amp; Attendance…'}" Tag="HR &amp; Attendance" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Banking — Cheques, Standing Orders, Direct Debits…'}" Tag="Banking" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Approvals — Delegation &amp; Escalation…'}" Tag="Approvals" Click="OpenOperations_Click" />
-                <MenuItem Header="{loc:T 'Sales &amp; Schools — Deliveries, Wallets…'}" Tag="Sales &amp; Schools" Click="OpenOperations_Click" />
-                <Separator />
-                <MenuItem Header="{loc:T 'Document Printer…'}" Tag="Documents" Click="OpenOperations_Click" />
-            </MenuItem>
-            <MenuItem Header="{loc:T '_Enquiries'}">
+
+            <MenuItem x:Name="EnquiriesMenu" Header="{loc:T '_Enquiries'}">
                 <MenuItem Header="{loc:T 'Account Enquiry…'}" Click="OpenAccountEnquiry_Click" />
                 <MenuItem Header="{loc:T 'Analytics Dashboard…'}" Click="OpenAnalytics_Click" />
                 <MenuItem Header="{loc:T 'Credit Control…'}" Click="OpenCreditControl_Click" />
@@ -113,7 +115,7 @@
                 <MenuItem Header="{loc:T 'Report Designer…'}" Click="OpenBandedDesigner_Click" />
                 <MenuItem Header="{loc:T 'Quick Column Layout…'}" Click="OpenReportDesigner_Click" />
             </MenuItem>
-            <MenuItem Header="{loc:T '_Utilities'}">
+            <MenuItem x:Name="UtilitiesMenu" Header="{loc:T '_Utilities'}">
                 <MenuItem Header="{loc:T 'Period Close Checklist…'}" Click="OpenPeriodClose_Click" />
                 <MenuItem Header="{loc:T 'Bank Rules…'}" Click="OpenBankRules_Click" />
                 <MenuItem Header="{loc:T 'Audit Trail…'}" Click="OpenAuditTrail_Click" />

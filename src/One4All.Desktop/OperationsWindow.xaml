@@ -17,7 +17,7 @@
                 <ComboBox ItemsSource="{Binding Modules}" SelectedItem="{Binding Module}" Width="180" />
             </StackPanel>
             <StackPanel>
-                <TextBlock Text="{Binding Module, Converter={StaticResource Text}}" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
+                <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
                 <TextBlock Text="{loc:T 'Choose an action, fill the form and run it. Records are looked up by their codes; every rule is enforced by the posting services.'}"
                            Foreground="#667" FontSize="12" />
             </StackPanel>

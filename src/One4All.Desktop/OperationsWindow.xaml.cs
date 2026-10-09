@@ -15,10 +15,11 @@ public partial class OperationsWindow : Window
     /// <param name="services">The application service provider.</param>
     /// <param name="userId">The signed-in user.</param>
     /// <param name="module">The module to open on.</param>
-    public OperationsWindow(IServiceProvider services, long userId, string module)
+    /// <param name="area">The menu area to show (null: all the module's actions).</param>
+    public OperationsWindow(IServiceProvider services, long userId, string module, Application.Navigation.MenuArea? area = null)
     {
         _services = services;
-        DataContext = new OperationsViewModel(services, userId, module);
+        DataContext = new OperationsViewModel(services, userId, module, area);
         InitializeComponent();
     }
 

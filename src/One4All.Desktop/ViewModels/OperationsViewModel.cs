@@ -79,16 +79,26 @@ public sealed partial class OperationsViewModel : ObservableObject
     /// <param name="services">The application service provider.</param>
     /// <param name="userId">The signed-in user.</param>
     /// <param name="module">The module to open on.</param>
-    public OperationsViewModel(IServiceProvider services, long userId, string module)
+    /// <param name="area">The menu area to show (null: all the module's actions).</param>
+    public OperationsViewModel(IServiceProvider services, long userId, string module, Application.Navigation.MenuArea? area = null)
     {
         _services = services;
         _userId = userId;
+        Area = area;
         _module = OperationCatalogue.Modules.Contains(module) ? module : OperationCatalogue.Modules[0];
         ShowModule();
     }
 
     /// <summary>Gets the modules.</summary>
     public IReadOnlyList<string> Modules => OperationCatalogue.Modules;
+
+    /// <summary>Gets the menu area shown (null: all).</summary>
+    public Application.Navigation.MenuArea? Area { get; }
+
+    /// <summary>Gets the console's heading: the module, and the menu area when one was chosen.</summary>
+    public string Heading => Area is Application.Navigation.MenuArea area
+        ? $"{Localization.UiText.T(Module)} — {Localization.UiText.T(area.ToString())}"
+        : Localization.UiText.T(Module);
 
     /// <summary>Gets the module's operations.</summary>
     public ObservableCollection<Operation> Operations { get; } = [];
@@ -153,7 +163,8 @@ public sealed partial class OperationsViewModel : ObservableObject
     private void ShowModule()
     {
         Operations.Clear();
-        foreach (Operation operation in OperationCatalogue.All().Where(o => o.Module == Module))
+        OnPropertyChanged(nameof(Heading));
+        foreach (Operation operation in OperationCatalogue.All().Where(o => o.Module == Module && (Area is null || o.MenuArea == Area)))
         {
             Operations.Add(operation);
         }
