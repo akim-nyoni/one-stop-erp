@@ -54,3 +54,14 @@ public sealed class TExtension : MarkupExtension
     /// <inheritdoc />
     public override object ProvideValue(IServiceProvider serviceProvider) => UiText.T(Text);
 }
+
+/// <summary>Shows bound text (an operation's title, a field's label) in the company's language with its terms; untranslated text stays as it is.</summary>
+public sealed class TextConverter : System.Windows.Data.IValueConverter
+{
+    /// <inheritdoc />
+    public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        => value is string text ? UiText.T(text) : value;
+
+    /// <inheritdoc />
+    public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture) => System.Windows.Data.Binding.DoNothing;
+}

@@ -28,4 +28,8 @@ public partial class OperationsWindow : Window
         string? id = ListGrid.SelectedItem is System.Data.DataRowView row && row.Row.Table.Columns.Contains("Id") ? Convert.ToString(row["Id"], System.Globalization.CultureInfo.InvariantCulture) : null;
         new RecordHistoryWindow(_services, null, id) { Owner = this }.Show();
     }
+
+    // The list's column headers in the company's language (the table keeps its English column names for the code that reads them).
+    private void ListGrid_AutoGeneratingColumn(object sender, System.Windows.Controls.DataGridAutoGeneratingColumnEventArgs e)
+        => e.Column.Header = Localization.UiText.T(e.PropertyName);
 }
