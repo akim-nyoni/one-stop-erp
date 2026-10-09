@@ -87,6 +87,12 @@ public sealed class Company : SoftDeletableEntity
     /// </summary>
     public decimal? HousingMarketRatePercent { get; set; }
 
+    /// <summary>Gets or sets where budget utilisation alerts are emailed.</summary>
+    public string? BudgetAlertEmail { get; set; }
+
+    /// <summary>Gets or sets the utilisation thresholds alerted on, as percentages ("75, 90, 100"; blank: those).</summary>
+    public string? BudgetAlertThresholds { get; set; }
+
     /// <summary>Gets or sets the income account interest charged on staff loans is credited to.</summary>
     public string? StaffLoanInterestAccountCode { get; set; }
 

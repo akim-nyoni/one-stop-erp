@@ -120,6 +120,17 @@ internal sealed class BudgetCeilingConfiguration : IEntityTypeConfiguration<Budg
     }
 }
 
+internal sealed class BudgetAlertSentConfiguration : IEntityTypeConfiguration<BudgetAlertSent>
+{
+    public void Configure(EntityTypeBuilder<BudgetAlertSent> b)
+    {
+        b.ToTable("alert_sent", Schemas.Budget);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AccountCode).HasMaxLength(20);
+        b.HasIndex(x => new { x.CompanyId, x.FiscalYearId, x.AccountCode, x.Threshold }).IsUnique();
+    }
+}
+
 internal sealed class DepartmentUnitConfiguration : IEntityTypeConfiguration<DepartmentUnit>
 {
     public void Configure(EntityTypeBuilder<DepartmentUnit> b)

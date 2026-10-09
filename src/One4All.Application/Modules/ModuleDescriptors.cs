@@ -78,7 +78,7 @@ public static class BuiltInModules
         new ModuleDescriptor("FixedAssets", "Fixed Assets", LicenceModules.FixedAssets, "\U0001F5A5", "#37474F", [], [], ["Fixed Assets"]),
         new ModuleDescriptor("Crm", "CRM & Service Desk", LicenceModules.Crm, "\U0001F4DE", "#0277BD", ["crm", "messages"], [], ["CRM"]),
         new ModuleDescriptor("Payroll", "HR & Payroll", LicenceModules.Payroll, "\U0001F465", "#283593", ["hr", "payroll"], ["payroll.leave-accrual"], ["HR & Attendance"]),
-        new ModuleDescriptor("Budget", "Budgeting", LicenceModules.Budget, "\U0001F4CA", "#1B5E20", ["budgets"], ["budget.reconcile-commitments"], ["Budgeting"]),
+        new ModuleDescriptor("Budget", "Budgeting", LicenceModules.Budget, "\U0001F4CA", "#1B5E20", ["budgets"], ["budget.reconcile-commitments", "budget.notices"], ["Budgeting"]),
         new ModuleDescriptor("Reporting", "Reports & Designer", LicenceModules.Core, "\U0001F4C4", "#455A64", ["reports", "analytics"], ["reports.subscriptions", "reporting.refresh-snapshots"], []),
     ];
 }

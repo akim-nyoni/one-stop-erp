@@ -154,6 +154,7 @@ internal sealed class JournalEntryConfiguration : IEntityTypeConfiguration<Journ
         b.HasIndex(x => new { x.CompanyId, x.IdempotencyKey }).IsUnique().HasFilter("idempotency_key IS NOT NULL");
         b.Property(x => x.DocumentType).HasMaxLength(40);
         b.Property(x => x.DocumentNumber).HasMaxLength(40);
+        b.Property(x => x.Terminal).HasMaxLength(80);
         b.Property(x => x.Reference).HasMaxLength(80);
         b.Property(x => x.Narrative).HasMaxLength(512);
         b.Property(x => x.BaseCurrency).HasMaxLength(3);

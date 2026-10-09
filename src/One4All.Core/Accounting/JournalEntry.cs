@@ -73,6 +73,9 @@ public sealed class JournalEntry : AuditableEntity, ICompanyScoped
     /// <summary>The source document number.</summary>
     public string? DocumentNumber { get; set; }
 
+    /// <summary>Gets or sets the terminal or network address the journal was entered from.</summary>
+    public string? Terminal { get; set; }
+
     /// <summary>A user reference.</summary>
     public string? Reference { get; set; }
 

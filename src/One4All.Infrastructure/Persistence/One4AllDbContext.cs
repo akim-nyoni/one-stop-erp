@@ -605,6 +605,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the department hierarchy and budget holders.</summary>
     public DbSet<Core.Budgeting.DepartmentUnit> DepartmentUnits => Set<Core.Budgeting.DepartmentUnit>();
 
+    /// <summary>Gets the utilisation alerts already sent.</summary>
+    public DbSet<Core.Budgeting.BudgetAlertSent> BudgetAlertsSent => Set<Core.Budgeting.BudgetAlertSent>();
+
     /// <summary>Cashiering stations.</summary>
     public DbSet<Core.Receipting.CashierStation> CashierStations => Set<Core.Receipting.CashierStation>();
 

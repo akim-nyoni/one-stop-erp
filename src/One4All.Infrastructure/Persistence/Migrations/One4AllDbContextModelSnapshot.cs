@@ -662,6 +662,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("status");
 
+                    b.Property<string>("Terminal")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("terminal");
+
                     b.Property<string>("TransactionCurrency")
                         .IsRequired()
                         .HasMaxLength(3)
@@ -2672,6 +2677,54 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("budget", "bud");
                 });
 
+            modelBuilder.Entity("One4All.Core.Budgeting.BudgetAlertSent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("account_code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("FiscalYearId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("fiscal_year_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTimeOffset>("SentOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_on_utc");
+
+                    b.Property<decimal>("Threshold")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("threshold");
+
+                    b.HasKey("Id")
+                        .HasName("pk_alert_sent");
+
+                    b.HasIndex("CompanyId", "FiscalYearId", "AccountCode", "Threshold")
+                        .IsUnique()
+                        .HasDatabaseName("ix_alert_sent_company_id_fiscal_year_id_account_code_threshold");
+
+                    b.ToTable("alert_sent", "bud");
+                });
+
             modelBuilder.Entity("One4All.Core.Budgeting.BudgetCeiling", b =>
                 {
                     b.Property<long>("Id")
@@ -3451,6 +3504,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
+
+                    b.Property<DateOnly?>("SubmissionDeadline")
+                        .HasColumnType("date")
+                        .HasColumnName("submission_deadline");
 
                     b.HasKey("Id")
                         .HasName("pk_department_unit");
@@ -28364,6 +28421,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
                         .HasColumnName("base_currency");
+
+                    b.Property<string>("BudgetAlertEmail")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("budget_alert_email");
+
+                    b.Property<string>("BudgetAlertThresholds")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("budget_alert_thresholds");
 
                     b.Property<bool>("BudgetApprovalRequired")
                         .HasColumnType("boolean")

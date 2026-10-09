@@ -138,6 +138,9 @@ public sealed class DepartmentUnit : Entity, ICompanyScoped
 
     /// <summary>Gets or sets where the holder's monthly statement is sent.</summary>
     public string? BudgetHolderEmail { get; set; }
+
+    /// <summary>Gets or sets when the department's budget submission is due.</summary>
+    public DateOnly? SubmissionDeadline { get; set; }
 }
 
 /// <summary>What fund control did with a posting.</summary>

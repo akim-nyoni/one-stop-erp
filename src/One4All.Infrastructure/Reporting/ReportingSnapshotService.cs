@@ -110,26 +110,48 @@ public sealed class ReportingSnapshotService : IReportingSnapshotService
         DbConnection connection = await OpenAsync(ct).ConfigureAwait(false);
 
         // "<%" is word similarity (a near match to some word of the name), served by the trigram indexes; containment ranks first. The
-        // default threshold (0.6) misses a single dropped letter in a short word ("cemnt"), so this connection uses 0.45.
+        // default threshold (0.6) misses a single dropped letter in a short word ("cemnt"), so this connection uses 0.45. Names are compared
+        // without accents on either side (public.f_unaccent, an immutable wrapper the expression indexes use), so "Zoe" finds "Zoë".
         await connection.ExecuteAsync(new CommandDefinition("SELECT set_config('pg_trgm.word_similarity_threshold', '0.45', false)", cancellationToken: ct)).ConfigureAwait(false);
         IEnumerable<SearchRow> rows = await connection.QueryAsync<SearchRow>(new CommandDefinition(
             """
-            SELECT kind AS Kind, id AS Id, code AS Code, name AS Name, CASE WHEN name ILIKE @like OR code ILIKE @like THEN 1.0 ELSE score END AS Score
+            WITH q AS (SELECT public.f_unaccent(@text) AS text, public.f_unaccent(@like) AS pattern)
+            SELECT kind AS Kind, id AS Id, code AS Code, name AS Name, CASE WHEN contained THEN 1.0 ELSE score END AS Score
             FROM (
-                SELECT 'Item' AS kind, id, code, description AS name, word_similarity(@text, description) AS score FROM inv.item
-                WHERE company_id = @companyId AND NOT is_deleted AND (description ILIKE @like OR code ILIKE @like OR @text <% description)
+                SELECT 'Item' AS kind, i.id, i.code, i.description AS name, word_similarity(q.text, public.f_unaccent(i.description)) AS score,
+                       public.f_unaccent(i.description) ILIKE q.pattern OR i.code ILIKE @like AS contained
+                FROM inv.item i, q
+                WHERE i.company_id = @companyId AND NOT i.is_deleted
+                  AND (public.f_unaccent(i.description) ILIKE q.pattern OR i.code ILIKE @like OR q.text <% public.f_unaccent(i.description))
                 UNION ALL
-                SELECT 'Customer', id, code, name, word_similarity(@text, name) FROM ar.customer
-                WHERE company_id = @companyId AND NOT is_deleted AND (name ILIKE @like OR code ILIKE @like OR @text <% name)
+                SELECT 'Customer', c.id, c.code, c.name, word_similarity(q.text, public.f_unaccent(c.name)), public.f_unaccent(c.name) ILIKE q.pattern OR c.code ILIKE @like
+                FROM ar.customer c, q
+                WHERE c.company_id = @companyId AND NOT c.is_deleted AND (public.f_unaccent(c.name) ILIKE q.pattern OR c.code ILIKE @like OR q.text <% public.f_unaccent(c.name))
                 UNION ALL
-                SELECT 'Supplier', id, code, name, word_similarity(@text, name) FROM ap.supplier
-                WHERE company_id = @companyId AND NOT is_deleted AND (name ILIKE @like OR code ILIKE @like OR @text <% name)
+                SELECT 'Supplier', s.id, s.code, s.name, word_similarity(q.text, public.f_unaccent(s.name)), public.f_unaccent(s.name) ILIKE q.pattern OR s.code ILIKE @like
+                FROM ap.supplier s, q
+                WHERE s.company_id = @companyId AND NOT s.is_deleted AND (public.f_unaccent(s.name) ILIKE q.pattern OR s.code ILIKE @like OR q.text <% public.f_unaccent(s.name))
                 UNION ALL
-                SELECT 'Lead', id, email, name || coalesce(' (' || organisation || ')', ''), greatest(word_similarity(@text, name), word_similarity(@text, coalesce(organisation, ''))) FROM crm.lead
-                WHERE company_id = @companyId AND (name ILIKE @like OR organisation ILIKE @like OR @text <% name OR @text <% organisation)
+                SELECT 'Lead', l.id, l.email, l.name || coalesce(' (' || l.organisation || ')', ''),
+                       greatest(word_similarity(@text, l.name), word_similarity(@text, coalesce(l.organisation, ''))), l.name ILIKE @like OR l.organisation ILIKE @like
+                FROM crm.lead l
+                WHERE l.company_id = @companyId AND (l.name ILIKE @like OR l.organisation ILIKE @like OR @text <% l.name OR @text <% l.organisation)
                 UNION ALL
-                SELECT 'Account', id, account_code, name, word_similarity(@text, name) FROM gl.account
-                WHERE company_id = @companyId AND NOT is_deleted AND (name ILIKE @like OR account_code ILIKE @like OR @text <% name)
+                SELECT 'Account', a.id, a.account_code, a.name, word_similarity(@text, a.name), a.name ILIKE @like OR a.account_code ILIKE @like
+                FROM gl.account a
+                WHERE a.company_id = @companyId AND NOT a.is_deleted AND (a.name ILIKE @like OR a.account_code ILIKE @like OR @text <% a.name)
+                UNION ALL
+                SELECT 'Property', p.id, p.stand_number, p.stand_number || coalesce(' — ' || p.address, ''),
+                       word_similarity(q.text, public.f_unaccent(coalesce(p.address, ''))), p.stand_number ILIKE @like OR public.f_unaccent(coalesce(p.address, '')) ILIKE q.pattern
+                FROM mun.property p, q
+                WHERE p.company_id = @companyId AND NOT p.is_deleted
+                  AND (p.stand_number ILIKE @like OR public.f_unaccent(coalesce(p.address, '')) ILIKE q.pattern OR q.text <% public.f_unaccent(coalesce(p.address, '')))
+                UNION ALL
+                SELECT 'Student', st.id, st.admission_number, st.full_name, word_similarity(q.text, public.f_unaccent(st.full_name)),
+                       st.admission_number ILIKE @like OR public.f_unaccent(st.full_name) ILIKE q.pattern
+                FROM sch.student st, q
+                WHERE st.company_id = @companyId AND NOT st.is_deleted
+                  AND (st.admission_number ILIKE @like OR public.f_unaccent(st.full_name) ILIKE q.pattern OR q.text <% public.f_unaccent(st.full_name))
             ) hits
             ORDER BY 5 DESC, name
             LIMIT @take

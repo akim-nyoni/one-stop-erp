@@ -28,8 +28,11 @@ public sealed class PostingEngine : IPostingEngine
     /// <param name="scopes">Opens a separate unit of work to record a fund-control block that outlives the refused posting.</param>
     /// <param name="licence">The licence: nothing posts while it is read-only or unusable.</param>
     public PostingEngine(One4AllDbContext db, IServiceScopeFactory? scopes = null, Application.Abstractions.Licensing.ILicenceService? licence = null,
-        Application.Abstractions.Security.IPermissionService? permissions = null, One4All.Licensing.Core.IClock? clock = null)
+        Application.Abstractions.Security.IPermissionService? permissions = null, One4All.Licensing.Core.IClock? clock = null,
+        Application.Abstractions.Security.IAuditService? audit = null, Application.Abstractions.Security.ICurrentUser? caller = null)
     {
+        _audit = audit;
+        _caller = caller;
         _permissions = permissions;
         _clock = clock;
         _db = db;
@@ -40,6 +43,8 @@ public sealed class PostingEngine : IPostingEngine
     private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
     private readonly Application.Abstractions.Security.IPermissionService? _permissions;
     private readonly One4All.Licensing.Core.IClock? _clock;
+    private readonly Application.Abstractions.Security.IAuditService? _audit;
+    private readonly Application.Abstractions.Security.ICurrentUser? _caller;
 
     /// <inheritdoc />
     public Task<Result<PostingReceipt>> PostAsync(JournalRequest request, CancellationToken ct = default)
@@ -100,6 +105,7 @@ public sealed class PostingEngine : IPostingEngine
         JournalEntry journal = new(request.CompanyId, request.SourceModule, request.PostingDate, baseCurrency, request.TransactionCurrency)
         {
             IsManual = request.EnforceManualJournalRules,
+            Terminal = _caller?.Terminal ?? _caller?.ClientAddress,
         };
         journal.DocumentType = request.DocumentType;
         journal.DocumentNumber = request.DocumentNumber;
@@ -233,6 +239,11 @@ public sealed class PostingEngine : IPostingEngine
 
         _db.Journals.Add(journal);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (!held)
+        {
+            await Security.SemanticAudit.RecordAsync(_audit, _caller, request.CompanyId, journal.SourceModule, "JournalEntry", journalNumber, Core.Audit.AuditAction.Post,
+                $"{request.DocumentType} {request.DocumentNumber} {totalBaseDebit:0.00}".Trim(), ct: ct).ConfigureAwait(false);
+        }
 
         return new PostingReceipt(journal.Id, journalNumber, request.PostingDate, totalBaseDebit, held);
     }
@@ -277,6 +288,8 @@ public sealed class PostingEngine : IPostingEngine
         journal.MarkPosted(journal.JournalNumber, fiscalYear.Id, fiscalPeriod.Id, DateTimeOffset.UtcNow);
         await UpdatePeriodBalancesAsync(companyId, fiscalYear.Id, fiscalPeriod.Id, journal, ct).ConfigureAwait(false);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await Security.SemanticAudit.RecordAsync(_audit, _caller, companyId, journal.SourceModule, "JournalEntry", journal.JournalNumber, Core.Audit.AuditAction.Post,
+            $"Released {journal.DocumentType} {journal.DocumentNumber}".Trim(), ct: ct).ConfigureAwait(false);
 
         return new PostingReceipt(journal.Id, journal.JournalNumber, journal.PostingDate, journal.Lines.Sum(l => l.BaseDebit), false);
     }
@@ -387,6 +400,8 @@ public sealed class PostingEngine : IPostingEngine
         JournalEntry reversal = await _db.Journals.FirstAsync(j => j.Id == posted.Value.JournalId, ct).ConfigureAwait(false);
         reversal.MarkAsReversalOf(original.Id);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await Security.SemanticAudit.RecordAsync(_audit, _caller, companyId, original.SourceModule, "JournalEntry", original.JournalNumber, Core.Audit.AuditAction.Void,
+            $"Reversed by {posted.Value.JournalNumber}", reason, ct: ct).ConfigureAwait(false);
 
         return posted.Value;
     }

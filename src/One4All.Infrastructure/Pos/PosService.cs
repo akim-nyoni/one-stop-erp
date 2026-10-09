@@ -19,6 +19,8 @@ public sealed class PosService : IPosService
 {
     private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
     private readonly Application.Abstractions.Integration.IWebhookService? _webhooks;
+    private readonly Application.Abstractions.Security.IAuditService? _audit;
+    private readonly Application.Abstractions.Security.ICurrentUser? _caller;
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _postingEngine;
     private readonly IInventoryService _inventory;
@@ -36,8 +38,11 @@ public sealed class PosService : IPosService
     /// <param name="fiscal">The fiscal device (brief §3.5); none or a disabled one means sales are not fiscalised.</param>
     /// <param name="allocations">Settles a voided on-account sale's invoice against its credit.</param>
     public PosService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, Application.Abstractions.Licensing.ILicenceService? licence = null,
-        Application.Abstractions.Integration.IWebhookService? webhooks = null, IFiscalDeviceProvider? fiscal = null, Application.Abstractions.Trading.IAllocationService? allocations = null)
+        Application.Abstractions.Integration.IWebhookService? webhooks = null, IFiscalDeviceProvider? fiscal = null, Application.Abstractions.Trading.IAllocationService? allocations = null,
+        Application.Abstractions.Security.IAuditService? audit = null, Application.Abstractions.Security.ICurrentUser? caller = null)
     {
+        _audit = audit;
+        _caller = caller;
         _allocations = allocations;
         _fiscal = fiscal;
         _webhooks = webhooks;
@@ -557,6 +562,8 @@ public sealed class PosService : IPosService
             TillSessionId = sale.TillSessionId, SaleNumber = sale.SaleNumber, Reason = reason.Trim(), Reference = posting.Value.JournalNumber,
         });
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await Security.SemanticAudit.RecordAsync(_audit, _caller, companyId, "POS", "Sale", sale.SaleNumber, Core.Audit.AuditAction.Void, $"Voided by journal {posting.Value.JournalNumber}", reason,
+            ct: ct).ConfigureAwait(false);
         return posting.Value.JournalNumber;
     }
 

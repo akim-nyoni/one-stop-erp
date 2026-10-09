@@ -15,6 +15,7 @@ public sealed class WorkflowService : IWorkflowService
     private readonly IEnumerable<IWorkflowDocumentHandler> _handlers;
     private readonly Application.Abstractions.Communications.INotificationService? _notifications;
     private readonly Application.Abstractions.Security.ICurrentUser? _caller;
+    private readonly Application.Abstractions.Security.IAuditService? _audit;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
@@ -22,13 +23,15 @@ public sealed class WorkflowService : IWorkflowService
     /// <param name="handlers">What each module does when its document's workflow ends.</param>
     /// <param name="notifications">Tells approvers a document is waiting, and the requester the outcome.</param>
     public WorkflowService(One4AllDbContext db, IClock clock, IEnumerable<IWorkflowDocumentHandler>? handlers = null,
-        Application.Abstractions.Communications.INotificationService? notifications = null, Application.Abstractions.Security.ICurrentUser? caller = null)
+        Application.Abstractions.Communications.INotificationService? notifications = null, Application.Abstractions.Security.ICurrentUser? caller = null,
+        Application.Abstractions.Security.IAuditService? audit = null)
     {
         _db = db;
         _clock = clock;
         _handlers = handlers ?? [];
         _notifications = notifications;
         _caller = caller;
+        _audit = audit;
     }
 
     /// <inheritdoc />
@@ -188,6 +191,9 @@ public sealed class WorkflowService : IWorkflowService
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await Security.SemanticAudit.RecordAsync(_audit, _caller, instance.CompanyId, "Workflow", instance.DocumentType, instance.DocumentReference,
+            action == WorkflowActionType.Approve ? Core.Audit.AuditAction.Approve : Core.Audit.AuditAction.Reject,
+            $"{action} at stage {currentStage?.Name ?? "?"} — now {result.Value}" + (onBehalfOf is long principal ? $" (for user {principal})" : string.Empty), comment, userId, ct).ConfigureAwait(false);
         if (result.Value == WorkflowStatus.InProgress)
         {
             if (instance.CurrentStageSequence != currentStage?.Sequence && applicable.FirstOrDefault(s => s.Sequence == instance.CurrentStageSequence) is WorkflowStage next)
