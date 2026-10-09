@@ -1068,6 +1068,37 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Reserve stock for a sales order", ListTitle = "Stock reserved for orders",
+            Description = "Holds free stock in a warehouse for an order's lines still to despatch, first come first served; no other issue (a till sale, another order) can take it "
+                + "until the order despatches it. Release gives it back; cancelling the order releases it too.",
+            Fields = [Pick("Step", "Step", ["Reserve", "Release"]), Req("Order", "Order number"), Opt("Warehouse", "Warehouse code (reserve)")],
+            Run = async (c, i) =>
+            {
+                string number = i.Text("Order").Trim().ToUpperInvariant();
+                long order = await c.Db.Set<Core.SalesOrders.SalesOrder>().AsNoTracking().Where(o => o.CompanyId == c.CompanyId && o.OrderNumber == number).Select(o => (long?)o.Id)
+                    .FirstOrDefaultAsync().ConfigureAwait(true) ?? throw new OperationException($"No sales order {number}.");
+                ISalesOrderService orders = c.Get<ISalesOrderService>();
+                if (i.Text("Step") == "Release")
+                {
+                    return Check(await orders.ReleaseReservationsAsync(c.CompanyId, order).ConfigureAwait(true), "Reservations released.");
+                }
+
+                long warehouse = await WarehouseAsync(c, i.Optional("Warehouse") ?? throw new OperationException("Give the warehouse to reserve in.")).ConfigureAwait(true);
+                StockReservationResult held = Check(await orders.ReserveAsync(c.CompanyId, order, warehouse).ConfigureAwait(true));
+                return $"Reserved {Q(held.Reserved)}." + (held.Short > 0m ? $" {Q(held.Short)} could not be reserved (not free in that warehouse)." : string.Empty);
+            },
+            List = async c => Table(await (
+                    from o in c.Db.Set<Core.SalesOrders.SalesOrder>().AsNoTracking()
+                    from l in o.Lines
+                    join item in c.Db.Items.AsNoTracking() on l.ItemId equals item.Id
+                    join w in c.Db.Warehouses.AsNoTracking() on l.ReservedWarehouseId equals w.Id
+                    where o.CompanyId == c.CompanyId && l.ReservedQuantity > 0m
+                    orderby o.OrderNumber
+                    select new { o.OrderNumber, Item = item.Code, Warehouse = w.Code, l.ReservedQuantity, Outstanding = l.OrderedQuantity - l.DespatchedQuantity }).ToListAsync().ConfigureAwait(true),
+                ("Order", r => r.OrderNumber), ("Item", r => r.Item), ("Warehouse", r => r.Warehouse), ("Reserved", r => Q(r.ReservedQuantity)), ("Still to despatch", r => Q(r.Outstanding))),
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Create a customer contract", Description = "Agreed quantities at agreed prices for a period, drawn down by call-off orders.",
             Fields = [Req("Customer", "Customer code"), Req("Number", "Contract number"), Today("From", "From"), Today("To", "To"), Req("Lines", "Lines: ITEM:quantity:price; …")],
             Run = async (c, i) =>

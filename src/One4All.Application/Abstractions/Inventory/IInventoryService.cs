@@ -72,6 +72,9 @@ public sealed class IssueStockRequest
     /// <summary>Whether this is a till sale (let through under the control, recorded for review).</summary>
     public bool FromTill { get; init; }
 
+    /// <summary>The sales-order line despatching the stock (its own reservation may be used); every other issue leaves reserved stock alone.</summary>
+    public long? SalesOrderLineId { get; init; }
+
     /// <summary>The batches / serials issued (none: the earliest-expiry batches on hand are taken when the company enforces lot tracking).</summary>
     public IReadOnlyList<One4All.Application.Inventory.LotQuantity> Lots { get; init; } = [];
 

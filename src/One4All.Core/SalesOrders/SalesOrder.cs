@@ -171,6 +171,11 @@ public sealed class SalesOrder : AuditableEntity, ICompanyScoped
         }
 
         Status = SalesOrderStatus.Cancelled;
+        foreach (SalesOrderLine line in _lines)
+        {
+            line.ReleaseReservation();
+        }
+
         return Result.Success();
     }
 
@@ -255,9 +260,42 @@ public sealed class SalesOrderLine : Entity
     /// <summary>The quantity invoiced so far.</summary>
     public decimal InvoicedQuantity { get; private set; }
 
-    /// <summary>Records a despatched quantity.</summary>
+    /// <summary>Records a despatched quantity; it comes out of the line's reservation first.</summary>
     /// <param name="quantity">The quantity.</param>
-    public void Despatch(decimal quantity) => DespatchedQuantity += quantity;
+    public void Despatch(decimal quantity)
+    {
+        DespatchedQuantity += quantity;
+        ReservedQuantity = Math.Max(0m, ReservedQuantity - quantity);
+        if (ReservedQuantity == 0m)
+        {
+            ReservedWarehouseId = null;
+        }
+    }
+
+    /// <summary>Gets the stock held for the line in <see cref="ReservedWarehouseId"/>, which no other issue may take.</summary>
+    public decimal ReservedQuantity { get; private set; }
+
+    /// <summary>Gets the warehouse the reservation is held in.</summary>
+    public long? ReservedWarehouseId { get; private set; }
+
+    /// <summary>The quantity still to despatch that is not yet reserved.</summary>
+    public decimal UnreservedQuantity => Math.Max(0m, OrderedQuantity - DespatchedQuantity - ReservedQuantity);
+
+    /// <summary>Holds more stock for the line in a warehouse (a line reserves in one warehouse).</summary>
+    /// <param name="warehouseId">The warehouse.</param>
+    /// <param name="quantity">The quantity.</param>
+    public void Reserve(long warehouseId, decimal quantity)
+    {
+        ReservedWarehouseId = warehouseId;
+        ReservedQuantity += quantity;
+    }
+
+    /// <summary>Releases the line's reservation.</summary>
+    public void ReleaseReservation()
+    {
+        ReservedQuantity = 0m;
+        ReservedWarehouseId = null;
+    }
 
     /// <summary>Changes the ordered quantity and price (checked by the order).</summary>
     /// <param name="quantity">The quantity.</param>

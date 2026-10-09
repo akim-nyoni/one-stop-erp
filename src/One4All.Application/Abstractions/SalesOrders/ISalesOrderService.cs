@@ -162,6 +162,25 @@ public interface ISalesOrderService
     /// <returns>Success or an error.</returns>
     Task<Result> CancelOrderAsync(long companyId, long salesOrderId, string reason, CancellationToken ct = default);
 
+    /// <summary>
+    /// Reserves free stock in a warehouse for an order's lines still to despatch (brief §4.4): each line takes what is free there after other
+    /// orders' reservations, first come first served; reserved stock is then refused to every other issue until the order despatches it or
+    /// the reservation is released (cancelling the order releases it).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="salesOrderId">The order.</param>
+    /// <param name="warehouseId">The warehouse.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What was reserved and what is still short.</returns>
+    Task<Result<StockReservationResult>> ReserveAsync(long companyId, long salesOrderId, long warehouseId, CancellationToken ct = default);
+
+    /// <summary>Releases an order's reservations.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="salesOrderId">The order.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or the order is not found.</returns>
+    Task<Result> ReleaseReservationsAsync(long companyId, long salesOrderId, CancellationToken ct = default);
+
     /// <summary>Invoices the despatched-but-uninvoiced quantity, raising the AR invoice.</summary>
     /// <param name="request">The request.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -178,3 +197,8 @@ public interface ISalesOrderService
     /// <returns>Success, or an error.</returns>
     Task<Result> ConfirmDeliveryAsync(long companyId, string deliveryReference, DateOnly deliveredOn, string receivedBy, string? podReference, CancellationToken ct = default);
 }
+
+/// <summary>A reservation made for a sales order.</summary>
+/// <param name="Reserved">The quantity newly reserved.</param>
+/// <param name="Short">The quantity still to despatch that could not be reserved.</param>
+public readonly record struct StockReservationResult(decimal Reserved, decimal Short);

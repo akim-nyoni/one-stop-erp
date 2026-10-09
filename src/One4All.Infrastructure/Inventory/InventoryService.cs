@@ -195,6 +195,17 @@ public sealed class InventoryService : IInventoryService
             return Error.Rule("Inv.InsufficientStock", $"Item '{item.Code}' has {balance.QuantityOnHand} on hand, less than the {request.Quantity} to issue.");
         }
 
+        // Stock reserved for sales orders is not for anyone else: only the reserving order's despatch may take it.
+        if (!request.AllowNegative)
+        {
+            decimal free = await SalesOrders.StockReservations.FreeAsync(_db, request.CompanyId, request.ItemId, request.WarehouseId, request.SalesOrderLineId, ct, balance.QuantityOnHand)
+                .ConfigureAwait(false);
+            if (free < request.Quantity)
+            {
+                return Error.Rule("Inv.Reserved", $"Only {Math.Max(0m, free):0.###} of '{item.Code}' is free here; the rest is reserved for sales orders.");
+            }
+        }
+
         // Negative stock by exception: a reason and an authorised supervisor (a till sale is let through), and the event is kept.
         NegativeStockEvent? negative = null;
         decimal shortBy = request.Quantity - Math.Max(0m, balance.QuantityOnHand);

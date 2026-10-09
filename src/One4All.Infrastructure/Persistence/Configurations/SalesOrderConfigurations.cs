@@ -29,6 +29,8 @@ internal sealed class SalesOrderLineConfiguration : IEntityTypeConfiguration<Sal
         b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
         b.Property(x => x.TaxCode).HasMaxLength(20);
         b.Property(x => x.OrderedQuantity).HasPrecision(19, 4);
+        b.Property(x => x.ReservedQuantity).HasPrecision(18, 4);
+        b.HasIndex(x => new { x.ItemId, x.ReservedWarehouseId }).HasFilter("reserved_quantity > 0").HasDatabaseName("ix_sales_order_line_reserved");
         b.Property(x => x.UnitPrice).HasPrecision(19, 6);
         b.Property(x => x.DespatchedQuantity).HasPrecision(19, 4);
         b.Property(x => x.InvoicedQuantity).HasPrecision(19, 4);

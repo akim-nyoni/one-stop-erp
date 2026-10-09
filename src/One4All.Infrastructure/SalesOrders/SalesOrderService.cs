@@ -101,6 +101,68 @@ public sealed class SalesOrderService : ISalesOrderService
     }
 
     /// <inheritdoc />
+    public Task<Result<StockReservationResult>> ReserveAsync(long companyId, long salesOrderId, long warehouseId, CancellationToken ct = default)
+        => _db.AtomicAsync<StockReservationResult>(async () =>
+        {
+            SalesOrder? order = await _db.Set<SalesOrder>().Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == salesOrderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+            if (order is null)
+            {
+                return Error.NotFound("Sop.OrderNotFound", $"Sales order {salesOrderId} not found.");
+            }
+
+            if (order.Status == SalesOrderStatus.Cancelled)
+            {
+                return Error.Rule("Sop.OrderCancelled", $"Sales order {order.OrderNumber} is cancelled.");
+            }
+
+            if (!await _db.Warehouses.AnyAsync(w => w.Id == warehouseId && w.CompanyId == companyId, ct).ConfigureAwait(false))
+            {
+                return Error.NotFound("Inv.WarehouseNotFound", $"Warehouse {warehouseId} not found.");
+            }
+
+            decimal reserved = 0m, shortBy = 0m;
+            foreach (SalesOrderLine line in order.Lines.Where(l => l.UnreservedQuantity > 0m))
+            {
+                if (line.ReservedWarehouseId is long held && held != warehouseId)
+                {
+                    shortBy += line.UnreservedQuantity;
+                    continue;
+                }
+
+                decimal free = await StockReservations.FreeAsync(_db, companyId, line.ItemId, warehouseId, null, ct).ConfigureAwait(false);
+                decimal take = Math.Min(line.UnreservedQuantity, Math.Max(0m, free));
+                shortBy += line.UnreservedQuantity - take;
+                if (take > 0m)
+                {
+                    line.Reserve(warehouseId, take);
+                    reserved += take;
+                    await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+                }
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result<StockReservationResult>.Success(new StockReservationResult(reserved, shortBy));
+        }, ct);
+
+    /// <inheritdoc />
+    public async Task<Result> ReleaseReservationsAsync(long companyId, long salesOrderId, CancellationToken ct = default)
+    {
+        SalesOrder? order = await _db.Set<SalesOrder>().Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == salesOrderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Result.Failure(Error.NotFound("Sop.OrderNotFound", $"Sales order {salesOrderId} not found."));
+        }
+
+        foreach (SalesOrderLine line in order.Lines)
+        {
+            line.ReleaseReservation();
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result> CancelOrderAsync(long companyId, long salesOrderId, string reason, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(reason))
@@ -183,6 +245,7 @@ public sealed class SalesOrderService : ISalesOrderService
                     Date = request.Date,
                     Quantity = issued,
                     Reference = request.Reference,
+                    SalesOrderLineId = line.Id,
                 }, ct).ConfigureAwait(false);
 
                 if (issue.IsFailure)

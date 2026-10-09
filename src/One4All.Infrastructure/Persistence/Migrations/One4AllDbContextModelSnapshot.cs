@@ -26483,6 +26483,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("ordered_quantity");
 
+                    b.Property<decimal>("ReservedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("reserved_quantity");
+
+                    b.Property<long?>("ReservedWarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reserved_warehouse_id");
+
                     b.Property<string>("RevenueAccountCode")
                         .IsRequired()
                         .HasMaxLength(8)
@@ -26514,6 +26523,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SalesOrderId")
                         .HasDatabaseName("ix_sales_order_line_sales_order_id");
+
+                    b.HasIndex("ItemId", "ReservedWarehouseId")
+                        .HasDatabaseName("ix_sales_order_line_reserved")
+                        .HasFilter("reserved_quantity > 0");
 
                     b.ToTable("sales_order_line", "sop");
                 });
