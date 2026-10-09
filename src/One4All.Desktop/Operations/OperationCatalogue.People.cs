@@ -315,6 +315,29 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Tax credits", ListTitle = "Tax credits",
+            Description = "Credits taken off the tax the table works out, never below nil: a fixed amount a month (say an elderly credit from 65) or a percentage of a pay element "
+                + "(say half the medical-aid deduction), for everyone or only the employees given it.",
+            Fields = [Pick("Step", "Step", ["Save credit", "Give to employee", "Take from employee"]), Req("Code", "Credit code"), Opt("Name", "Name"),
+                Pick("Basis", "Basis", Enum.GetNames<TaxCreditBasis>()), Num("Amount", "Monthly amount (fixed)", "0"), Num("Percent", "Percent (of an element)", "0"), Opt("Element", "Pay element"),
+                OptNum("Age", "From age"), Tick("All", "Applies to every employee"), Opt("Employee", "Employee number (give / take)")],
+            Run = async (c, i) =>
+            {
+                IPayrollSetupService setup = c.Get<IPayrollSetupService>();
+                return i.Text("Step") switch
+                {
+                    "Save credit" => Check(await setup.SaveTaxCreditAsync(c.CompanyId, new TaxCreditInput(i.Text("Code"), i.Optional("Name") ?? i.Text("Code"), Enum.Parse<TaxCreditBasis>(i.Text("Basis")),
+                        i.Number("Amount"), i.Number("Percent"), i.Optional("Element"), (int?)i.OptionalNumber("Age"), i.Flag("All"))).ConfigureAwait(true), "Tax credit saved."),
+                    var step => Check(await setup.SetEmployeeTaxCreditAsync(c.CompanyId, i.Optional("Employee") ?? string.Empty, i.Text("Code"), step == "Give to employee").ConfigureAwait(true),
+                        step == "Give to employee" ? "Credit given." : "Credit taken away."),
+                };
+            },
+            List = async c => Table(await c.Db.Set<TaxCredit>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", t => t.Code), ("Name", t => t.Name), ("Basis", t => t.Basis), ("Amount", t => M(t.Amount)), ("Percent", t => Q(t.Percent)), ("Element", t => t.ElementCode),
+                ("From age", t => t.MinimumAge), ("Everyone", t => t.AppliesToAll), ("Active", t => t.IsActive)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Take leave", ListTitle = "Leave balances", Description = "Records leave taken over a period (never more than the balance).",
             Fields = [Req("Employee", "Employee number"), Req("Type", "Leave type", "ANNUAL"), Today("From", "From"), Today("To", "To"), Num("Days", "Days")],
             Run = async (c, i) => Check(await c.Get<IAttendanceService>().TakeLeaveAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Type"), i.Date("From"), i.Date("To"),

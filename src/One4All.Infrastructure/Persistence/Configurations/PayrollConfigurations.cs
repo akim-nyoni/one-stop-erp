@@ -647,3 +647,29 @@ internal sealed class VehicleBenefitScaleConfiguration : IEntityTypeConfiguratio
         b.HasIndex(x => new { x.CompanyId, x.Basis, x.EffectiveFrom });
     }
 }
+
+internal sealed class TaxCreditConfiguration : IEntityTypeConfiguration<TaxCredit>
+{
+    public void Configure(EntityTypeBuilder<TaxCredit> b)
+    {
+        b.ToTable("tax_credit", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.Basis).HasConversion<int>();
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Percent).HasPrecision(9, 4);
+        b.Property(x => x.ElementCode).HasMaxLength(20);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class EmployeeTaxCreditConfiguration : IEntityTypeConfiguration<EmployeeTaxCredit>
+{
+    public void Configure(EntityTypeBuilder<EmployeeTaxCredit> b)
+    {
+        b.ToTable("employee_tax_credit", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.EmployeeId, x.TaxCreditId }).IsUnique();
+    }
+}

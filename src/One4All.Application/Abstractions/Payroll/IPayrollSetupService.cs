@@ -262,6 +262,22 @@ public interface IPayrollSetupService
     /// <summary>Changes a pay element's amount, rate, formula or taxability.</summary>
     Task<Result> UpdatePayElementAsync(long companyId, string code, decimal? fixedAmount, decimal? rate, string? formula, bool? taxable, CancellationToken ct = default);
 
+    /// <summary>Saves a tax credit (brief §4.15.3): fixed a month, or a percentage of a pay element; for everyone or only those given it; optionally from an age.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="credit">The credit.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or what is wrong with it.</returns>
+    Task<Result> SaveTaxCreditAsync(long companyId, TaxCreditInput credit, CancellationToken ct = default);
+
+    /// <summary>Gives a tax credit to an employee, or takes it away.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="employeeNumber">The employee.</param>
+    /// <param name="creditCode">The credit.</param>
+    /// <param name="given">True to give it.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or an unknown employee or credit.</returns>
+    Task<Result> SetEmployeeTaxCreditAsync(long companyId, string employeeNumber, string creditCode, bool given, CancellationToken ct = default);
+
     /// <summary>Gives an employee a pay element (with its own amount, rate or units if they differ).</summary>
     Task<Result> AssignElementAsync(long companyId, string employeeNumber, string elementCode, decimal? overrideAmount = null, decimal? overrideRate = null, decimal? units = null, CancellationToken ct = default);
 
@@ -284,3 +300,15 @@ public interface IPayrollSetupService
     /// <summary>Approves (applies) or rejects a bank-detail change; the person who asked cannot decide it.</summary>
     Task<Result> DecideBankChangeAsync(long companyId, long requestId, bool approve, long decidedByUserId, string? note, CancellationToken ct = default);
 }
+
+/// <summary>A tax credit to save.</summary>
+/// <param name="Code">The code.</param>
+/// <param name="Name">The name.</param>
+/// <param name="Basis">How it is worked out.</param>
+/// <param name="Amount">The monthly amount (fixed).</param>
+/// <param name="Percent">The percentage (of an element).</param>
+/// <param name="ElementCode">The element it is a percentage of.</param>
+/// <param name="MinimumAge">The age it applies from (null: any).</param>
+/// <param name="AppliesToAll">Whether every employee has it.</param>
+/// <param name="IsActive">Whether it is in use.</param>
+public sealed record TaxCreditInput(string Code, string Name, TaxCreditBasis Basis, decimal Amount, decimal Percent, string? ElementCode, int? MinimumAge, bool AppliesToAll, bool IsActive = true);

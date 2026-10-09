@@ -317,6 +317,67 @@ public sealed class PayrollSetupService : IPayrollSetupService
     }
 
     /// <inheritdoc />
+    public async Task<Result> SaveTaxCreditAsync(long companyId, TaxCreditInput credit, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(credit);
+        string code = (credit.Code ?? string.Empty).Trim().ToUpperInvariant();
+        string? element = string.IsNullOrWhiteSpace(credit.ElementCode) ? null : credit.ElementCode.Trim().ToUpperInvariant();
+        if (code.Length == 0 || string.IsNullOrWhiteSpace(credit.Name) || credit.MinimumAge is < 0
+            || (credit.Basis == TaxCreditBasis.Fixed ? credit.Amount <= 0m : credit.Percent is <= 0m or > 100m || element is null))
+        {
+            return Result.Failure(Error.Validation("Pay.TaxCredit", "A tax credit needs a code, a name and a positive monthly amount — or a percentage up to 100 of a pay element."));
+        }
+
+        if (element is not null && !await _db.PayElements.AnyAsync(e => e.CompanyId == companyId && e.Code == element, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.NotFound("Pay.ElementNotFound", $"Pay element {element} not found."));
+        }
+
+        TaxCredit? saved = await _db.Set<TaxCredit>().FirstOrDefaultAsync(c => c.CompanyId == companyId && c.Code == code, ct).ConfigureAwait(false);
+        if (saved is null)
+        {
+            saved = new TaxCredit(companyId, code, credit.Name);
+            _db.Set<TaxCredit>().Add(saved);
+        }
+
+        saved.Name = credit.Name.Trim();
+        saved.Basis = credit.Basis;
+        saved.Amount = credit.Basis == TaxCreditBasis.Fixed ? credit.Amount : 0m;
+        saved.Percent = credit.Basis == TaxCreditBasis.PercentOfElement ? credit.Percent : 0m;
+        saved.ElementCode = credit.Basis == TaxCreditBasis.PercentOfElement ? element : null;
+        saved.MinimumAge = credit.MinimumAge;
+        saved.AppliesToAll = credit.AppliesToAll;
+        saved.IsActive = credit.IsActive;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetEmployeeTaxCreditAsync(long companyId, string employeeNumber, string creditCode, bool given, CancellationToken ct = default)
+    {
+        string number = (employeeNumber ?? string.Empty).Trim().ToUpperInvariant(), code = (creditCode ?? string.Empty).Trim().ToUpperInvariant();
+        long? employee = await _db.Employees.Where(e => e.CompanyId == companyId && e.EmployeeNumber == number).Select(e => (long?)e.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        long? credit = await _db.Set<TaxCredit>().Where(c => c.CompanyId == companyId && c.Code == code).Select(c => (long?)c.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (employee is null || credit is null)
+        {
+            return Result.Failure(Error.NotFound("Pay.TaxCreditNotFound", employee is null ? $"Employee {number} not found." : $"Tax credit {code} not found."));
+        }
+
+        EmployeeTaxCredit? link = await _db.Set<EmployeeTaxCredit>().FirstOrDefaultAsync(g => g.EmployeeId == employee && g.TaxCreditId == credit, ct).ConfigureAwait(false);
+        if (given && link is null)
+        {
+            _db.Set<EmployeeTaxCredit>().Add(new EmployeeTaxCredit(companyId, employee.Value, credit.Value));
+        }
+        else if (!given && link is not null)
+        {
+            _db.Set<EmployeeTaxCredit>().Remove(link);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result<long>> CreateTaxTableAsync(long companyId, string code, DateOnly effectiveFrom, CurrencyCode? currency, IReadOnlyList<TaxBandInput> bands, CancellationToken ct = default)
     {
         string key = (code ?? string.Empty).Trim().ToUpperInvariant();

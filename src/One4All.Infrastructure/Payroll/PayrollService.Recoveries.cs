@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Trading;
+using One4All.Application.Payroll;
 using One4All.Core.Common;
 using One4All.Core.Housing;
 using One4All.Core.Payroll;
@@ -28,6 +29,9 @@ public sealed partial class PayrollService
 
     /// <summary>The formula variable holding the period number in the tax year (the pay date's month).</summary>
     public const string TaxPeriodVariable = "TAXPERIOD";
+
+    // The employee's tax credits in force on the pay date (brief §4.15.3), taken off what the tax table works out.
+    private const string TaxCreditsKey = "__TAXCREDITS";
 
     /// <summary>The variable holding the employee's pay periods a year (12, 26 or 52).</summary>
     public const string PeriodsPerYearVariable = "PERIODSPERYEAR";
@@ -79,6 +83,9 @@ public sealed partial class PayrollService
                 .Select(l => new { p.EmployeeId, l.ElementCode, l.Type, l.Amount }))
             .ToListAsync(ct).ConfigureAwait(false);
         List<TaxTable> tables = taxCodes.Count == 0 ? [] : await _db.Set<TaxTable>().AsNoTracking().Include(t => t.Bands).Where(t => t.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        List<TaxCredit> credits = taxCodes.Count == 0 ? [] : await _db.Set<TaxCredit>().AsNoTracking().Where(c => c.CompanyId == companyId && c.IsActive).ToListAsync(ct).ConfigureAwait(false);
+        var given = credits.Count == 0 ? [] : await _db.Set<EmployeeTaxCredit>().AsNoTracking().Where(g => ids.Contains(g.EmployeeId)).Select(g => new { g.EmployeeId, g.TaxCreditId })
+            .ToListAsync(ct).ConfigureAwait(false);
 
         // The pay date's rate for each currency elements are paid in (split-currency tax converts at it).
         Dictionary<string, decimal> rates = new(StringComparer.Ordinal);
@@ -128,6 +135,8 @@ public sealed partial class PayrollService
                     + openings.Where(o => o.EmployeeId == e.Id && o.Code == PayrollYtdOpening.TaxableCode).Sum(o => o.Amount),
                 [TaxPeriodVariable] = (decimal)PayPeriods.Number(e.PayFrequency, asAt),
                 [TaxTablesKey] = tables,
+                [TaxCreditsKey] = credits.Where(c => (c.AppliesToAll || given.Any(g => g.EmployeeId == e.Id && g.TaxCreditId == c.Id)) && TaxCredits.Eligible(c.MinimumAge, e.DateOfBirth, asAt))
+                    .Select(c => new TaxCreditRule(c.Code, c.Basis, c.Amount, c.Percent, c.ElementCode)).ToList(),
                 [PayDateKey] = asAt,
                 [PayRatesKey] = rates,
                 [StaffPurchasesVariable] = Math.Max(0m, (tendered.FirstOrDefault(t => t.EmployeeId == e.Id)?.Amount ?? 0m) - (recovered.FirstOrDefault(r => r.EmployeeId == e.Id)?.Amount ?? 0m)),

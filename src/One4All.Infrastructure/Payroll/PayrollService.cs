@@ -666,18 +666,22 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         // The tables' bands are monthly: a weekly or fortnightly employee's period takes them scaled to the period (12/52, 12/26).
         decimal periodsPerYear = Number(PeriodsPerYearVariable) is > 0m and var perYear ? perYear : 12m;
         decimal scale = 12m / periodsPerYear;
+
+        // Tax credits come off the table's tax, never below nil.
+        decimal Credited(decimal amount) => TaxCredits.Apply(amount, TaxCredits.Total(vars.GetValueOrDefault(TaxCreditsKey) as IEnumerable<TaxCreditRule> ?? [], Number, scale));
         IEnumerable<PayeBand> Bands(decimal times) => table.Bands.Select(b => new PayeBand(b.From * times, b.To * times, b.RatePercent));
         decimal taxable = Number("TAXABLE");
         if (element.CumulativeTax)
         {
             decimal period = Math.Max(1m, Number(TaxPeriodVariable));
-            return PayeTable.Tax(Bands(period * scale), Number(YtdTaxableVariable) + taxable) - Number("YTD_" + element.Code);
+            return Credited(PayeTable.Tax(Bands(period * scale), Number(YtdTaxableVariable) + taxable) - Number("YTD_" + element.Code));
         }
 
         decimal annual = Number("ANNUALTAXABLE");
         decimal regular = taxable - annual;
         decimal tax = PayeTable.Tax(Bands(scale), regular);
         tax = annual == 0m ? tax : tax + PayeTable.Tax(Bands(12m), (regular * periodsPerYear) + annual) - PayeTable.Tax(Bands(12m), regular * periodsPerYear);
+        tax = Credited(tax);
         return element.SplitCurrencyTax ? SplitByCurrency(element, vars, tax, taxable, payDate) : tax;
     }
 
