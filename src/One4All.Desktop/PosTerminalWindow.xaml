@@ -363,6 +363,8 @@
                                 <Button Content="Z / Close" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#C0392B" Command="{Binding CloseTillCommand}" />
                                 <Button Content="Sync Offline" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#16A085" Command="{Binding FlushOfflineCommand}" />
                                 <Button Content="Receipt" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#2C3E50" Click="PrintReceipt_Click" />
+                                <Button Content="Hand over" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#6C3483" Command="{Binding HandOverCommand}"
+                                        ToolTip="Count the drawer; the next cashier enters their name and PIN in the supervisor boxes" />
                             </UniformGrid>
                         </StackPanel>
                     </Grid>

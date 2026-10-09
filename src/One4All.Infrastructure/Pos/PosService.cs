@@ -616,6 +616,48 @@ public sealed class PosService : IPosService
     public Task<Result<CashUpResult>> CashUpAndCloseAsync(CashUpRequest request, CancellationToken ct = default)
         => _db.AtomicAsync(() => CashUpAndCloseCoreAsync(request, ct), ct);
 
+    /// <inheritdoc />
+    public Task<Result<CashierHandover>> HandOverAsync(CashierHandoverRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return _db.AtomicAsync<CashierHandover>(async () =>
+        {
+            TillSession? session = await _db.TillSessions.AsNoTracking().FirstOrDefaultAsync(s => s.Id == request.TillSessionId, ct).ConfigureAwait(false);
+            if (session is null)
+            {
+                return Error.NotFound("Pos.SessionNotFound", $"Till session {request.TillSessionId} not found.");
+            }
+
+            if (session.CashierUserId == request.IncomingCashierUserId)
+            {
+                return Error.Rule("Pos.SameCashier", "The till is already in that cashier's name.");
+            }
+
+            if (request.Counts.Count > 0)
+            {
+                Result declared = await DeclareCountAsync(session.Id, request.Counts, request.CountedByUserId, ct).ConfigureAwait(false);
+                if (declared.IsFailure && declared.Error.Code != "Pos.CountDeclared")
+                {
+                    return declared.Error;
+                }
+            }
+
+            Result<CashUpResult> cashUp = await CashUpAndCloseCoreAsync(new CashUpRequest
+            {
+                TillSessionId = session.Id, CountedCash = request.CountedCash, Counts = request.Counts, CountedByUserId = request.CountedByUserId, Date = request.Date,
+                CashAccountCode = request.CashAccountCode, OverShortAccountCode = request.OverShortAccountCode,
+            }, ct).ConfigureAwait(false);
+            if (cashUp.IsFailure)
+            {
+                return cashUp.Error;
+            }
+
+            // The drawer stays: the incoming cashier starts with what was counted.
+            Result<long> opened = await OpenTillAsync(session.CompanyId, session.TerminalId, request.IncomingCashierUserId, cashUp.Value.CountedCash, ct).ConfigureAwait(false);
+            return opened.IsFailure ? opened.Error : Result<CashierHandover>.Success(new CashierHandover(cashUp.Value, opened.Value));
+        }, ct);
+    }
+
     // One unit of work: its postings and record changes commit together or not at all.
     private async Task<Result<CashUpResult>> CashUpAndCloseCoreAsync(CashUpRequest request, CancellationToken ct)
     {

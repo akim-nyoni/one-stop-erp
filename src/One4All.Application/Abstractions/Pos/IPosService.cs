@@ -234,6 +234,16 @@ public interface IPosService
     /// <returns>The cash-up result (Z-read, expected/counted/variance, variance journal).</returns>
     Task<Result<CashUpResult>> CashUpAndCloseAsync(CashUpRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// Hands the till to another cashier mid-shift (brief §4.1 cashier switch): the outgoing cashier's session is cashed up on their count and
+    /// closed, and a session opens on the same terminal for the incoming cashier with the counted cash as its float — one unit, so each
+    /// cashier answers for their own drawer.
+    /// </summary>
+    /// <param name="request">The hand-over.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The outgoing cash-up and the incoming session, or why not.</returns>
+    Task<Result<CashierHandover>> HandOverAsync(CashierHandoverRequest request, CancellationToken ct = default);
+
     /// <summary>Declares a till's cash count before the expected cash is seen (blind cash-up); final once declared.</summary>
     /// <param name="tillSessionId">The till session.</param>
     /// <param name="counts">The cash counted per currency.</param>
@@ -277,3 +287,36 @@ public interface ITillCashService
     /// <returns>The journal number.</returns>
     Task<Result<string>> RecordAsync(TillCashRequest request, CancellationToken ct = default);
 }
+
+/// <summary>A till handed from one cashier to another.</summary>
+public sealed class CashierHandoverRequest
+{
+    /// <summary>Gets the outgoing cashier's session.</summary>
+    public long TillSessionId { get; init; }
+
+    /// <summary>Gets the incoming cashier.</summary>
+    public long IncomingCashierUserId { get; init; }
+
+    /// <summary>Gets the cash counted in the drawer (base currency; used when <see cref="Counts"/> is empty).</summary>
+    public decimal CountedCash { get; init; }
+
+    /// <summary>Gets the cash counted per currency (empty: the counted cash).</summary>
+    public IReadOnlyList<One4All.Application.Pos.CashCount> Counts { get; init; } = [];
+
+    /// <summary>Gets who counted.</summary>
+    public long CountedByUserId { get; init; }
+
+    /// <summary>Gets the posting date for any variance.</summary>
+    public DateOnly Date { get; init; }
+
+    /// <summary>Gets the till's cash account.</summary>
+    public string CashAccountCode { get; init; } = string.Empty;
+
+    /// <summary>Gets the cash over/short account.</summary>
+    public string OverShortAccountCode { get; init; } = string.Empty;
+}
+
+/// <summary>A completed hand-over.</summary>
+/// <param name="OutgoingCashUp">The outgoing cashier's cash-up.</param>
+/// <param name="IncomingSessionId">The incoming cashier's session.</param>
+public sealed record CashierHandover(CashUpResult OutgoingCashUp, long IncomingSessionId);

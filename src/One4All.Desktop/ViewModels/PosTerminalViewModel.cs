@@ -91,7 +91,7 @@ public sealed class PosCartLineVm(PosTicketLine line)
 public sealed partial class PosTerminalViewModel : ObservableObject
 {
     private readonly IServiceProvider _services;
-    private readonly long _cashierUserId;
+    private long _cashierUserId;
     private readonly PosTicket _ticket = new();
     private readonly Dictionary<string, decimal> _taxRates = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<PosProductVm> _allProducts = [];
@@ -110,7 +110,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     {
         _services = services;
         _cashierUserId = cashierUserId;
-        CashierName = cashierName;
+        _cashierName = cashierName;
     }
 
     /// <summary>The product buttons for the selected category.</summary>
@@ -123,7 +123,61 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     public ObservableCollection<PosCartLineVm> Cart { get; } = [];
 
     /// <summary>The cashier's display name.</summary>
-    public string CashierName { get; }
+    [ObservableProperty]
+    private string _cashierName = string.Empty;
+
+    /// <summary>
+    /// Hands the till to the next cashier (they enter their name and PIN in the supervisor boxes): the drawer count closes this cashier's
+    /// session with its cash-up, and a session opens in the incoming cashier's name with the counted cash as float.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [RelayCommand]
+    private async Task HandOverAsync()
+    {
+        if (!IsSessionOpen || string.IsNullOrWhiteSpace(CountedCash) || string.IsNullOrWhiteSpace(CashAccountCode) || string.IsNullOrWhiteSpace(OverShortAccountCode))
+        {
+            StatusMessage = "To hand over, count the drawer and give the cash and over/short accounts, and the next cashier enters their name and PIN.";
+            return;
+        }
+
+        if (!CashCounts.TryParse(CountedCash, _currency.Value, out IReadOnlyList<CashCount> counts) || string.IsNullOrWhiteSpace(SupervisorName) || string.IsNullOrEmpty(SupervisorPin))
+        {
+            StatusMessage = "Type the count (120, or 120; ZAR 500), and the next cashier their name and PIN.";
+            return;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        AuthenticationResult incoming = await scope.ServiceProvider.GetRequiredService<IAuthenticationService>()
+            .AuthenticateByPinAsync(SupervisorName.Trim(), SupervisorPin, $"POS-{_terminalId}").ConfigureAwait(true);
+        SupervisorPin = string.Empty;
+        SupervisorPinCleared?.Invoke();
+        if (!incoming.Succeeded)
+        {
+            StatusMessage = incoming.Message;
+            return;
+        }
+
+        long next = incoming.UserId;
+
+        Result<CashierHandover> handed = await scope.ServiceProvider.GetRequiredService<IPosService>().HandOverAsync(new CashierHandoverRequest
+        {
+            TillSessionId = TillSessionId, IncomingCashierUserId = next, Counts = counts, CountedByUserId = _cashierUserId, Date = DateOnly.FromDateTime(DateTime.Today),
+            CashAccountCode = CashAccountCode.Trim(), OverShortAccountCode = OverShortAccountCode.Trim(),
+        }).ConfigureAwait(true);
+        if (handed.IsFailure)
+        {
+            StatusMessage = handed.Error.Message;
+            return;
+        }
+
+        CashUpResult r = handed.Value.OutgoingCashUp;
+        string outgoing = CashierName;
+        _cashierUserId = next;
+        CashierName = incoming.DisplayName;
+        TillSessionId = handed.Value.IncomingSessionId;
+        CountedCash = string.Empty;
+        StatusMessage = $"{outgoing} handed over: expected {r.ExpectedCash:N2}, counted {r.CountedCash:N2}. {CashierName} now has the till (session {TillSessionId}).";
+    }
 
     /// <summary>The GL account cash (and change) posts to.</summary>
     [ObservableProperty]
