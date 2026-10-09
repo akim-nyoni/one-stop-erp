@@ -64,6 +64,7 @@ public sealed class PromotionService : IPromotionService
         promotion.Priority = request.Priority;
         promotion.Compounding = request.Compounding;
         promotion.MemberOnly = request.MemberOnly;
+        promotion.CustomerTypes = request.CustomerTypes.Count == 0 ? null : string.Join(",", request.CustomerTypes.Select(t => t.Trim()).Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase));
         promotion.CouponCode = string.IsNullOrWhiteSpace(request.CouponCode) ? null : request.CouponCode.Trim().ToUpperInvariant();
         promotion.StartsOn = request.StartsOn;
         promotion.EndsOn = request.EndsOn;
@@ -86,7 +87,7 @@ public sealed class PromotionService : IPromotionService
         List<Promotion> running = [.. (await _db.Promotions.AsNoTracking().Include(p => p.Items)
                 .Where(p => p.CompanyId == request.CompanyId && p.IsActive && p.StartsOn <= date && (p.EndsOn == null || p.EndsOn >= date) && (p.BranchId == null || p.BranchId == request.BranchId))
                 .ToListAsync(ct).ConfigureAwait(false))
-            .Where(p => (!p.MemberOnly || request.IsMember) && (p.CouponCode is null || coupons.Contains(p.CouponCode)) && InWindow(p, time))];
+            .Where(p => (!p.MemberOnly || request.IsMember) && p.IsFor(request.CustomerType) && (p.CouponCode is null || coupons.Contains(p.CouponCode)) && InWindow(p, time))];
 
         List<string> categories = [.. running.Where(p => p.Category is not null).Select(p => p.Category!)];
         List<long> basketItems = [.. request.Lines.Select(l => l.ItemId).Distinct()];

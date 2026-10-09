@@ -125,7 +125,7 @@ public static partial class OperationCatalogue
             Fields = [Req("Code", "Code"), Req("Name", "Name on receipts"), Pick("Kind", "Kind", Enum.GetNames<PromotionKind>()), Req("Account", "Discount account"), Num("Quantity", "N / X", "0"),
                 Num("Reward", "Y", "0"), OptNum("Price", "Set price"), OptNum("Percent", "Percent off"), Opt("Category", "Category"), Opt("Items", "Items"), Opt("RewardItems", "Reward items"),
                 Opt("Courses", "Meal courses: A,B|C|D"), Num("Priority", "Priority (lower first)", "10"), Tick("Compounding", "Stacks on other promotions"), Tick("Member", "Members only"),
-                Opt("Coupon", "Coupon code"), Today("From", "Starts"), new("To", "Ends", FieldKind.Date, Required: false), Opt("DailyFrom", "Happy hour from (HH:mm)"), Opt("DailyTo", "Happy hour to (HH:mm)")],
+                Opt("Types", "For customer types (',', blank: all)"), Opt("Coupon", "Coupon code"), Today("From", "Starts"), new("To", "Ends", FieldKind.Date, Required: false), Opt("DailyFrom", "Happy hour from (HH:mm)"), Opt("DailyTo", "Happy hour to (HH:mm)")],
             Run = async (c, i) =>
             {
                 static IReadOnlyList<string> Codes(string? text) => [.. (text ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
@@ -136,7 +136,8 @@ public static partial class OperationCatalogue
                     Quantity = i.Whole("Quantity"), RewardQuantity = i.Whole("Reward"), Price = i.OptionalNumber("Price"), Percent = i.OptionalNumber("Percent"), Category = i.Optional("Category"),
                     Items = Codes(i.Optional("Items")), RewardItems = Codes(i.Optional("RewardItems")),
                     Courses = [.. (i.Optional("Courses") ?? string.Empty).Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Codes)],
-                    Priority = i.Whole("Priority"), Compounding = i.Flag("Compounding"), MemberOnly = i.Flag("Member"), CouponCode = i.Optional("Coupon"), StartsOn = i.Date("From"),
+                    Priority = i.Whole("Priority"), Compounding = i.Flag("Compounding"), MemberOnly = i.Flag("Member"), CustomerTypes = Codes(i.Optional("Types")), CouponCode = i.Optional("Coupon"),
+                    StartsOn = i.Date("From"),
                     EndsOn = i.OptionalDate("To"), DailyFrom = Clock(i.Optional("DailyFrom")), DailyTo = Clock(i.Optional("DailyTo")),
                 }).ConfigureAwait(true), id => $"Promotion {i.Text("Code").ToUpperInvariant()} saved.");
             },
@@ -248,7 +249,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Price a basket with promotions", Description = "Shows what the running promotions take off a basket at a date and time.",
             Fields = [Req("Lines", "Lines: ITEM:quantity; … (at the default price list)"), Req("When", "When (yyyy-MM-dd HH:mm)", DateTime.Now.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)),
-                Tick("Member", "Loyalty member"), Opt("Coupons", "Coupon codes (',')"), Req("Prices", "Unit prices: ITEM:price; …")],
+                Tick("Member", "Loyalty member"), Opt("Type", "Customer type"), Opt("Coupons", "Coupon codes (',')"), Req("Prices", "Unit prices: ITEM:price; …")],
             Run = async (c, i) =>
             {
                 Dictionary<string, decimal> prices = i.Pairs("Prices").ToDictionary(p => p.Code.ToUpperInvariant(), p => p.Quantity);
@@ -259,7 +260,8 @@ public static partial class OperationCatalogue
                 }
 
                 BasketPricing priced = await c.Get<IPromotionService>().PriceBasketAsync(new BasketRequest(c.CompanyId, null, DateTime.Parse(i.Text("When"), System.Globalization.CultureInfo.InvariantCulture),
-                    i.Flag("Member"), [.. (i.Optional("Coupons") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)], lines)).ConfigureAwait(true);
+                    i.Flag("Member"), [.. (i.Optional("Coupons") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)], lines, i.Optional("Type")))
+                    .ConfigureAwait(true);
                 return string.Join(Environment.NewLine, priced.Lines.Select(l => $"{Q(l.Quantity),6} × item {l.ItemId,-6} gross {M(l.Gross),10}  less {M(l.Discount),8}  net {M(l.Net),10}  {string.Join(",", l.PromotionCodes)}"))
                     + Environment.NewLine + $"Savings: {string.Join("; ", priced.Applied.Select(a => $"{a.Name} {M(a.Saving)}"))}";
             },

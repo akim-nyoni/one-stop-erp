@@ -24,11 +24,32 @@ public sealed class SchoolBillingService : ISchoolBillingService
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="salesLedger">The AR ledger fees are raised on.</param>
-    public SchoolBillingService(One4AllDbContext db, ISalesLedgerService salesLedger, IAllocationService? allocations = null)
+    public SchoolBillingService(One4AllDbContext db, ISalesLedgerService salesLedger, IAllocationService? allocations = null,
+        Application.Abstractions.Communications.IStatementDespatchService? despatch = null)
     {
+        _despatch = despatch;
         _allocations = allocations;
         _db = db;
         _salesLedger = salesLedger;
+    }
+
+    private readonly Application.Abstractions.Communications.IStatementDespatchService? _despatch;
+
+    /// <inheritdoc />
+    public async Task<Result<Application.Abstractions.Communications.StatementDespatch>> SendFeeRemindersAsync(long companyId, DateOnly asAt, string templateCode, string language,
+        decimal minimumBalance, CancellationToken ct = default)
+    {
+        if (_despatch is null)
+        {
+            return Error.Rule("School.NoDespatch", "Sending reminders is not available.");
+        }
+
+        // Whoever pays for an enrolled student: the sponsor where there is one, otherwise the guardian.
+        List<long> payers = await _db.Students.AsNoTracking().Where(s => s.CompanyId == companyId && s.IsEnrolled)
+            .Select(s => s.SponsorCustomerId ?? s.GuardianCustomerId).Distinct().ToListAsync(ct).ConfigureAwait(false);
+        return payers.Count == 0
+            ? Error.Rule("School.NoPayers", "No enrolled student has anyone paying for them.")
+            : await _despatch.QueueAsync(companyId, asAt, templateCode, language, Math.Max(0.01m, minimumBalance), payers, $"Fee reminders {asAt:yyyy-MM-dd}", ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

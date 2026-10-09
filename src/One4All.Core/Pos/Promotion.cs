@@ -95,6 +95,16 @@ public sealed class Promotion : AuditableEntity, ICompanyScoped
     /// <summary>Gets or sets the coupon code the basket must present, if any.</summary>
     public string? CouponCode { get; set; }
 
+    /// <summary>Gets or sets the customer types it is for, comma-separated (null: every customer).</summary>
+    public string? CustomerTypes { get; set; }
+
+    /// <summary>Whether a customer of a type may have it.</summary>
+    /// <param name="customerType">The customer's type (null: an unnamed or untyped customer).</param>
+    /// <returns>True when eligible.</returns>
+    public bool IsFor(string? customerType)
+        => CustomerTypes is null || (customerType is not null && CustomerTypes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Contains(customerType.Trim(), StringComparer.OrdinalIgnoreCase));
+
     /// <summary>Gets or sets the first day it runs.</summary>
     public DateOnly StartsOn { get; set; }
 

@@ -1717,9 +1717,13 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             }
 
             IReadOnlyList<BasketItem> basket = _ticket.PromotionBasket();
+
+            // A loyalty member on the sale gets members' promotions; an account customer's type picks promotions for that type.
+            string? customerType = string.IsNullOrWhiteSpace(AccountCustomer) ? null : await scope.ServiceProvider.GetRequiredService<One4AllDbContext>().Customers.AsNoTracking()
+                .Where(c => c.CompanyId == _companyId && c.Code.ToUpper() == AccountCustomer.Trim().ToUpperInvariant()).Select(c => c.CustomerType).FirstOrDefaultAsync().ConfigureAwait(true);
             BasketPricing pricing = basket.Count == 0 ? new BasketPricing([], [])
-                : await scope.ServiceProvider.GetRequiredService<IPromotionService>().PriceBasketAsync(new BasketRequest(_companyId, _branchId, DateTime.Now, IsMember: false, _coupons, basket))
-                    .ConfigureAwait(true);
+                : await scope.ServiceProvider.GetRequiredService<IPromotionService>().PriceBasketAsync(new BasketRequest(_companyId, _branchId, DateTime.Now,
+                    IsMember: !string.IsNullOrWhiteSpace(LoyaltyMember), _coupons, basket, customerType)).ConfigureAwait(true);
             _ticket.ApplyPromotions(pricing);
             RenderCart();
         }

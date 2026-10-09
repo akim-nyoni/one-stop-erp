@@ -21126,6 +21126,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<string>("CustomerTypes")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("customer_types");
+
                     b.Property<TimeOnly?>("DailyFrom")
                         .HasColumnType("time without time zone")
                         .HasColumnName("daily_from");

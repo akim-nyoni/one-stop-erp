@@ -54,6 +54,9 @@ public sealed record PromotionRequest
     /// <summary>Gets a value indicating whether it is for members only.</summary>
     public bool MemberOnly { get; init; }
 
+    /// <summary>Gets the customer types it is for (empty: every customer).</summary>
+    public IReadOnlyList<string> CustomerTypes { get; init; } = [];
+
     /// <summary>Gets the coupon code it needs.</summary>
     public string? CouponCode { get; init; }
 
@@ -86,7 +89,7 @@ public readonly record struct BasketItem(long ItemId, decimal Quantity, decimal 
 /// <param name="IsMember">Whether the customer is a loyalty member.</param>
 /// <param name="Coupons">Coupon codes presented.</param>
 /// <param name="Lines">The lines.</param>
-public sealed record BasketRequest(long CompanyId, long? BranchId, DateTime At, bool IsMember, IReadOnlyList<string> Coupons, IReadOnlyList<BasketItem> Lines);
+public sealed record BasketRequest(long CompanyId, long? BranchId, DateTime At, bool IsMember, IReadOnlyList<string> Coupons, IReadOnlyList<BasketItem> Lines, string? CustomerType = null);
 
 /// <summary>A priced basket line: its promotion discount, the promotion and the account it posts to.</summary>
 /// <param name="ItemId">The item.</param>

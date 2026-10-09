@@ -92,4 +92,17 @@ public interface ISchoolBillingService
     /// unused part of it (deferred fees: from deferred income, the recognition schedule cut short).
     /// </summary>
     Task<Result<WithdrawalResult>> WithdrawAsync(long companyId, long studentId, DateOnly leftOn, long feeStructureId, string invoiceNumberPrefix, CancellationToken ct = default);
+
+    /// <summary>
+    /// Emails a fee reminder to everyone paying for an enrolled student who owes at least the minimum (brief §4.11 bulk reminders): each
+    /// guardian or sponsor gets their statement; those without an email address are counted for a printed letter.
+    /// </summary>
+    /// <param name="companyId">The school.</param>
+    /// <param name="asAt">The statement date.</param>
+    /// <param name="templateCode">The email template.</param>
+    /// <param name="language">The language.</param>
+    /// <param name="minimumBalance">The smallest balance worth a reminder.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What was queued.</returns>
+    Task<Result<Communications.StatementDespatch>> SendFeeRemindersAsync(long companyId, DateOnly asAt, string templateCode, string language, decimal minimumBalance, CancellationToken ct = default);
 }

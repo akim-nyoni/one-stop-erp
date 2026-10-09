@@ -118,6 +118,7 @@ internal sealed class PromotionConfiguration : IEntityTypeConfiguration<Promotio
 {
     public void Configure(EntityTypeBuilder<Promotion> b)
     {
+        b.Property(x => x.CustomerTypes).HasMaxLength(200);
         b.ToTable("promotion", Schemas.PointOfSale);
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).HasMaxLength(30);

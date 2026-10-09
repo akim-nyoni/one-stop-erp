@@ -1146,6 +1146,19 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Send fee reminders",
+            Description = "Emails every guardian or sponsor paying for an enrolled student who owes at least the minimum their statement; those without an email address are "
+                + "counted for a printed letter.",
+            Fields = [Today("Date", "As at"), Req("Template", "Email template", "FEES"), Num("Minimum", "Smallest balance", "1")],
+            Run = async (c, i) =>
+            {
+                var sent = Check(await c.Get<ISchoolBillingService>().SendFeeRemindersAsync(c.CompanyId, i.Date("Date"), i.Text("Template"), Localization.UiText.Catalog.Culture.TwoLetterISOLanguageName,
+                    i.Number("Minimum")).ConfigureAwait(true));
+                return $"{sent.Queued} reminder(s) queued; {sent.NoEmail} to print (no email address); {sent.BelowMinimum} below the minimum.";
+            },
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Confirm a delivery (proof of delivery)", ListTitle = "Deliveries not yet confirmed",
             Description = "Records who received a despatched delivery, when, and the signed POD reference.",
             Fields = [Req("Delivery", "Delivery reference"), Today(), Req("ReceivedBy", "Received by"), Opt("Pod", "POD reference")],
