@@ -307,6 +307,8 @@ internal sealed class PaymentRunBatchConfiguration : IEntityTypeConfiguration<Pa
 {
     public void Configure(EntityTypeBuilder<PaymentRunBatch> b)
     {
+        b.Property(x => x.Method).HasConversion<int>();
+        b.Property(x => x.FirstChequeNumber).HasMaxLength(20);
         b.ToTable("payment_run", Schemas.AccountsPayable, t => t.HasCheckConstraint("ck_payment_run_approver", "approved_by_user_id IS NULL OR approved_by_user_id <> proposed_by_user_id"));
         b.HasKey(x => x.Id);
         b.Property(x => x.Number).HasMaxLength(30);

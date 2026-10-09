@@ -922,6 +922,14 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Print a cheque", ListTitle = "Cheque register (latest 100)",
+            Description = "Lays a cheque out for its leaf: date, payee, the amount in figures and in words, and the payment it settles (voided or cancelled cheques are not printed).",
+            Fields = [Req("Bank", "Bank account code"), Req("Number", "Cheque number")],
+            Run = async (c, i) => Check(await c.Get<Application.Abstractions.Documents.IDocumentLayoutService>().ChequeAsync(c.CompanyId, i.Text("Bank"), i.Text("Number")).ConfigureAwait(true)),
+            List = ChequesAsync,
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Mark a cheque presented / cancelled", ListTitle = "Cheque register (latest 100)", Description = "Presented when it clears the bank; cancelled (with a reason) when stopped.",
             Fields = [Req("Bank", "Bank account code"), Req("Number", "Cheque number"), Pick("Action", "Action", "Presented", "Cancelled"), Today(), Opt("Reason", "Reason (cancel)")],
             Run = async (c, i) =>

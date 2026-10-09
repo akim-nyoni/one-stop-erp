@@ -183,6 +183,40 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
     }
 
     /// <inheritdoc />
+    public async Task<Result<string>> ChequeAsync(long companyId, string bankAccountCode, string chequeNumber, CancellationToken ct = default)
+    {
+        string code = (bankAccountCode ?? string.Empty).Trim().ToUpperInvariant(), number = (chequeNumber ?? string.Empty).Trim();
+        var cheque = await (from c in _db.Cheques.AsNoTracking()
+                            join b in _db.BankAccounts.AsNoTracking() on c.BankAccountId equals b.Id
+                            where c.CompanyId == companyId && b.Code == code && c.ChequeNumber == number
+                            select new { c.ChequeNumber, c.IssuedOn, c.Payee, c.Amount, c.DocumentNumber, c.Status, Bank = b.Name, b.Currency }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (cheque is null)
+        {
+            return Error.NotFound("Doc.ChequeNotFound", $"No cheque {number} on bank account {code}.");
+        }
+
+        if (cheque.Status is Core.Banking.ChequeStatus.Voided or Core.Banking.ChequeStatus.Cancelled)
+        {
+            return Error.Rule("Doc.ChequeNotLive", $"Cheque {number} is {cheque.Status}; it is not printed.");
+        }
+
+        string currency = cheque.Currency.ToString();
+        string words = One4All.Reporting.Expressions.NumberToWords.Amount(cheque.Amount, currency == "USD" ? "Dollars" : currency, currency == "USD" ? "Cents" : "Cents");
+        string[] lines =
+        [
+            $"{cheque.Bank}                                        Cheque {cheque.ChequeNumber}",
+            $"                                                    Date {cheque.IssuedOn:dd/MM/yyyy}",
+            $"Pay   {cheque.Payee}",
+            $"The sum of  {words} only",
+            $"                                                    {currency} ***{cheque.Amount.ToString("N2", CultureInfo.InvariantCulture)}***",
+            string.Empty,
+            $"For payment {cheque.DocumentNumber}                         ______________________  ______________________",
+            "                                                    Signatory               Signatory",
+        ];
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<string>> MunicipalBillAsync(long companyId, string standNumber, DateOnly month, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
     {
         DateOnly first = new(month.Year, month.Month, 1), last = first.AddMonths(1).AddDays(-1);

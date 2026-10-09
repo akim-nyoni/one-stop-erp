@@ -219,8 +219,8 @@ public static partial class OperationCatalogue
                 + "first); someone other than the proposer approves it, which pays exactly what it holds. Require approval stops direct payment runs for the company.",
             Fields = [Pick("Step", "Step", ["Save proposal", "Set line", "Approve", "Cancel", "Show", "Require approval", "Allow direct runs"]), Opt("Run", "Run number"),
                 Today("Date", "Payment date"), Today("Due", "Pay invoices due on or before"), Req("Bank", "Bank account", "1100"), Opt("Currency", "Currency (blank: all)"),
-                Opt("Wht", "Withholding tax code"), Opt("Layout", "Bank file layout"), Opt("Supplier", "Supplier code (set line)"), Tick("Include", "Pay this supplier", true),
-                OptNum("Amount", "Amount (blank: all due)")],
+                Opt("Wht", "Withholding tax code"), Opt("Layout", "Bank file layout"), Pick("Method", "Pay by", Enum.GetNames<PaymentRunMethod>()), Opt("Cheque", "First cheque number (cheques)"),
+                Opt("Supplier", "Supplier code (set line)"), Tick("Include", "Pay this supplier", true), OptNum("Amount", "Amount (blank: all due)")],
             Run = async (c, i) =>
             {
                 IPaymentRunService runs = c.Get<IPaymentRunService>();
@@ -240,14 +240,16 @@ public static partial class OperationCatalogue
                         return Show(Check(await runs.SaveProposalAsync(new PaymentRunRequest
                         {
                             CompanyId = c.CompanyId, PaymentDate = i.Date("Date"), DueOnOrBefore = i.Date("Due"), BankAccountCode = i.Text("Bank"), Currency = i.Optional("Currency"),
-                            WithholdingTaxCode = i.Optional("Wht"), EftLayoutCode = i.Optional("Layout"),
+                            WithholdingTaxCode = i.Optional("Wht"), EftLayoutCode = i.Optional("Layout"), Method = Enum.Parse<PaymentRunMethod>(i.Text("Method")),
+                            FirstChequeNumber = i.Optional("Cheque"),
                         }, c.UserId).ConfigureAwait(true)));
                     case "Set line":
                         return Show(Check(await runs.SetLineAsync(c.CompanyId, run, i.Text("Supplier"), i.Optional("Currency") ?? string.Empty, i.Flag("Include"), i.OptionalNumber("Amount"))
                             .ConfigureAwait(true)));
                     case "Approve":
                         PaymentRunResult paid = Check(await runs.ApproveAsync(c.CompanyId, run, c.UserId).ConfigureAwait(true));
-                        return $"Run {run} approved: {paid.Lines.Count(l => l.PaymentNumber.Length > 0)} payment(s), {M(paid.Total)} base.";
+                        return $"Run {run} approved: {paid.Lines.Count(l => l.PaymentNumber.Length > 0)} payment(s), {M(paid.Total)} base."
+                            + (paid.ChequeNumbers is { Count: > 0 } cheques ? $" Cheques {cheques[0]} to {cheques[^1]} written; print them from Banking." : string.Empty);
                     case "Cancel":
                         return Check(await runs.CancelAsync(c.CompanyId, run).ConfigureAwait(true), $"Run {run} cancelled.");
                     default:

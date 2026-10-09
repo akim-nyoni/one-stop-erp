@@ -55,6 +55,14 @@ public interface IDocumentLayoutService
     /// <returns>The document text, or an error.</returns>
     Task<Result<string>> SupplierDebitNoteAsync(long companyId, string documentNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default);
 
+    /// <summary>A cheque for printing on the leaf: date, payee, the amount in figures and in words, and the payment it settles.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="bankAccountCode">The bank account (its code).</param>
+    /// <param name="chequeNumber">The cheque number.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The cheque text, or an error (a voided or cancelled cheque is not printed).</returns>
+    Task<Result<string>> ChequeAsync(long companyId, string bankAccountCode, string chequeNumber, CancellationToken ct = default);
+
     /// <summary>A ratepayer's municipal bill for a stand and month: each service charged in the month's billing runs, the balance brought forward and the total due.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="standNumber">The stand.</param>

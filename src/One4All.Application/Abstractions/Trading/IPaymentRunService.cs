@@ -29,6 +29,12 @@ public sealed class PaymentRunRequest
     /// <summary>Gets the bank file layout the EFT file is written in (the generic pipe-delimited file when null).</summary>
     public string? EftLayoutCode { get; init; }
 
+    /// <summary>Gets how the run pays: an EFT file (the default), a cheque to each supplier, or cash.</summary>
+    public Core.Trading.PaymentRunMethod Method { get; init; }
+
+    /// <summary>Gets the first cheque number of a cheque run; each supplier's cheque follows on.</summary>
+    public string? FirstChequeNumber { get; init; }
+
     /// <summary>Only invoices in this currency (all when blank).</summary>
     public string? Currency { get; init; }
 }
@@ -53,7 +59,7 @@ public readonly record struct PaymentRunLine(long SupplierId, string SupplierCod
 /// <param name="Lines">The per-supplier payment lines.</param>
 /// <param name="Total">The total paid, in base currency.</param>
 /// <param name="EftFile">A generated bank EFT file (template format).</param>
-public sealed record PaymentRunResult(IReadOnlyList<PaymentRunLine> Lines, decimal Total, byte[] EftFile);
+public sealed record PaymentRunResult(IReadOnlyList<PaymentRunLine> Lines, decimal Total, byte[] EftFile, IReadOnlyList<string>? ChequeNumbers = null);
 
 /// <summary>One supplier's line in a payment run proposal (nothing posted).</summary>
 /// <param name="SupplierId">The supplier.</param>

@@ -68,6 +68,12 @@ public sealed class PaymentRunBatch : AuditableEntity, ICompanyScoped
     /// <summary>The bank file layout.</summary>
     public string? EftLayoutCode { get; set; }
 
+    /// <summary>Gets or sets how the run pays (EFT file, cheques or cash).</summary>
+    public PaymentRunMethod Method { get; set; }
+
+    /// <summary>Gets or sets the first cheque number of a cheque run (the rest follow on).</summary>
+    public string? FirstChequeNumber { get; set; }
+
     /// <summary>The currency it was limited to, if any.</summary>
     public string? Currency { get; set; }
 
@@ -168,4 +174,17 @@ public sealed class PaymentRunBatchLine : Entity
         Amount = amount ?? Due;
         return Result.Success();
     }
+}
+
+/// <summary>How a supplier payment run pays (brief §4.4).</summary>
+public enum PaymentRunMethod
+{
+    /// <summary>A bank (EFT) file for the bank to pay.</summary>
+    Eft = 0,
+
+    /// <summary>A cheque to each supplier, numbered on from the first cheque.</summary>
+    Cheque = 1,
+
+    /// <summary>Paid in cash: no file, no cheques.</summary>
+    Cash = 2,
 }

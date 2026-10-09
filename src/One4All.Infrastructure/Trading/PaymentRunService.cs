@@ -21,8 +21,10 @@ public sealed class PaymentRunService : IPaymentRunService
     /// <param name="db">The database context.</param>
     /// <param name="purchaseLedger">The AP posting service.</param>
     /// <param name="allocationService">The allocation service.</param>
-    public PaymentRunService(One4AllDbContext db, IPurchaseLedgerService purchaseLedger, IAllocationService allocationService, Lazy<Application.Abstractions.Workflow.IWorkflowService>? workflow = null)
+    public PaymentRunService(One4AllDbContext db, IPurchaseLedgerService purchaseLedger, IAllocationService allocationService, Lazy<Application.Abstractions.Workflow.IWorkflowService>? workflow = null,
+        Application.Abstractions.Banking.IChequeService? cheques = null)
     {
+        _cheques = cheques;
         _workflow = workflow;
         _db = db;
         _purchaseLedger = purchaseLedger;
@@ -46,8 +48,30 @@ public sealed class PaymentRunService : IPaymentRunService
 
     // Pays the run: everything due, or — for an approved saved run — only its included lines at their approved amounts (a part-payment
     // settles the oldest invoices first).
+    private readonly Application.Abstractions.Banking.IChequeService? _cheques;
+
+    // The cheque number so many on from the first, keeping its width ("000123" → "000124").
+    internal static string? ChequeNumber(string first, int offset)
+        => long.TryParse(first, out long start) && start >= 0 ? (start + offset).ToString(System.Globalization.CultureInfo.InvariantCulture).PadLeft(first.Length, '0') : null;
+
     private async Task<Result<PaymentRunResult>> PayAsync(PaymentRunRequest request, IReadOnlyDictionary<(long SupplierId, string Currency), decimal>? approved, CancellationToken ct)
     {
+        // A cheque run writes cheques from the bank account's cheque book, numbered on from the first.
+        long chequeBank = 0;
+        if (request.Method == Core.Trading.PaymentRunMethod.Cheque)
+        {
+            if (string.IsNullOrWhiteSpace(request.FirstChequeNumber) || ChequeNumber(request.FirstChequeNumber.Trim(), 0) is null || _cheques is null)
+            {
+                return Error.Validation("Ap.ChequeNumber", "A cheque run needs the first cheque number (digits).");
+            }
+
+            chequeBank = await _db.BankAccounts.Where(b => b.CompanyId == request.CompanyId && b.GlAccountCode == request.BankAccountCode.Trim()).Select(b => b.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (chequeBank == 0)
+            {
+                return Error.NotFound("Ap.ChequeBank", $"No bank account is kept on ledger account {request.BankAccountCode} to write cheques from.");
+            }
+        }
+
         Core.Banking.BankFileLayout? layout = null;
         if (!string.IsNullOrWhiteSpace(request.EftLayoutCode))
         {
@@ -179,8 +203,25 @@ public sealed class PaymentRunService : IPaymentRunService
             lines.Add(new PaymentRunLine(supplier.Id, supplier.Code, supplier.Name, currency.Value, toPay, paymentNumber, touched.Count, creditsApplied, withheld));
         }
 
-        byte[] eft = layout is null ? BuildEftFile(request, [.. lines.Where(l => l.Amount > 0m)], suppliers) : LayoutEftFile(request, layout, [.. lines.Where(l => l.Amount > 0m)], suppliers);
-        return new PaymentRunResult(lines, totalBase, eft);
+        List<string> chequeNumbers = [];
+        if (request.Method == Core.Trading.PaymentRunMethod.Cheque)
+        {
+            foreach (PaymentRunLine line in lines.Where(l => l.NetPaid > 0m))
+            {
+                string number = ChequeNumber(request.FirstChequeNumber!.Trim(), chequeNumbers.Count)!;
+                Result<long> written = await _cheques!.IssueAsync(request.CompanyId, chequeBank, number, request.PaymentDate, line.SupplierName, line.NetPaid, line.PaymentNumber, ct).ConfigureAwait(false);
+                if (written.IsFailure)
+                {
+                    return written.Error;
+                }
+
+                chequeNumbers.Add(number);
+            }
+        }
+
+        byte[] eft = request.Method != Core.Trading.PaymentRunMethod.Eft ? []
+            : layout is null ? BuildEftFile(request, [.. lines.Where(l => l.Amount > 0m)], suppliers) : LayoutEftFile(request, layout, [.. lines.Where(l => l.Amount > 0m)], suppliers);
+        return new PaymentRunResult(lines, totalBase, eft, chequeNumbers);
     }
 
     /// <inheritdoc />
@@ -235,6 +276,8 @@ public sealed class PaymentRunService : IPaymentRunService
             WithholdingTaxCode = string.IsNullOrWhiteSpace(request.WithholdingTaxCode) ? null : request.WithholdingTaxCode.Trim(),
             EftLayoutCode = string.IsNullOrWhiteSpace(request.EftLayoutCode) ? null : request.EftLayoutCode.Trim(),
             Currency = string.IsNullOrWhiteSpace(request.Currency) ? null : request.Currency.Trim().ToUpperInvariant(),
+            Method = request.Method,
+            FirstChequeNumber = string.IsNullOrWhiteSpace(request.FirstChequeNumber) ? null : request.FirstChequeNumber.Trim(),
         };
         foreach (PaymentProposalLine line in proposal.Value.Lines.Where(l => l.ToPay > 0m || l.OnHold || l.BankChangePending).OrderBy(l => l.SupplierCode, StringComparer.Ordinal))
         {
@@ -321,7 +364,7 @@ public sealed class PaymentRunService : IPaymentRunService
             Result<PaymentRunResult> paid = await PayAsync(new PaymentRunRequest
             {
                 CompanyId = companyId, PaymentDate = batch.PaymentDate, DueOnOrBefore = batch.DueOnOrBefore, BankAccountCode = batch.BankAccountCode, SupplierIds = [.. agreed.Keys.Select(k => k.SupplierId).Distinct()],
-                WithholdingTaxCode = batch.WithholdingTaxCode, EftLayoutCode = batch.EftLayoutCode, Currency = batch.Currency,
+                WithholdingTaxCode = batch.WithholdingTaxCode, EftLayoutCode = batch.EftLayoutCode, Currency = batch.Currency, Method = batch.Method, FirstChequeNumber = batch.FirstChequeNumber,
             }, agreed, ct).ConfigureAwait(false);
             if (paid.IsFailure)
             {
