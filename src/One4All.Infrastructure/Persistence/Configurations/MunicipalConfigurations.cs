@@ -145,6 +145,8 @@ internal sealed class BillingRunConfiguration : IEntityTypeConfiguration<Billing
         b.Property(x => x.ServiceType).HasConversion<int>();
         b.Property(x => x.Status).HasConversion<int>();
         b.Property(x => x.Ward).HasMaxLength(60);
+        b.Property(x => x.RouteCode).HasMaxLength(20);
+        b.Property(x => x.Cycle).HasConversion<int?>();
         b.Property(x => x.InvoicePrefix).HasMaxLength(20);
         b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.BillingRunId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Lines).UsePropertyAccessMode(PropertyAccessMode.Field);

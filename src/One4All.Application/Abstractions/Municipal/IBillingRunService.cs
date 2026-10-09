@@ -21,6 +21,12 @@ public sealed class BillingRunProposal
     /// <summary>The council service to bill (null: the category's connections without one).</summary>
     public string? ServiceCode { get; init; }
 
+    /// <summary>Gets the meter-reading route to bill (null: every route): stands with a meter on the route.</summary>
+    public string? RouteCode { get; init; }
+
+    /// <summary>Gets the billing cycle to bill (null: every cycle): stands whose tariff for the service is on that cycle.</summary>
+    public BillingCycle? Cycle { get; init; }
+
     /// <summary>The bill-number prefix (bills are numbered prefix-property-yyyyMM).</summary>
     public string InvoicePrefix { get; init; } = string.Empty;
 
@@ -139,4 +145,13 @@ public interface IBillingRunService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success, or why it was refused.</returns>
     Task<Result> CancelAsync(long companyId, string runNumber, CancellationToken ct = default);
+
+    /// <summary>Emails a posted run's bills: each ratepayer billed in the run with an email address is sent their statement (brief §4.9 bill delivery).</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="runNumber">The run.</param>
+    /// <param name="templateCode">The email template.</param>
+    /// <param name="language">The language.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What was queued (ratepayers without email are counted for printing), or the run is not posted.</returns>
+    Task<Result<Communications.StatementDespatch>> DespatchBillsAsync(long companyId, string runNumber, string templateCode, string language, CancellationToken ct = default);
 }

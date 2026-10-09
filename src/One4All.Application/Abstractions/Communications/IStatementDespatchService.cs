@@ -25,4 +25,17 @@ public interface IStatementDespatchService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>What was queued, or why nothing could be.</returns>
     Task<Result<StatementDespatch>> QueueAsync(long companyId, DateOnly asAt, string templateCode, string language, decimal minimumBalance, CancellationToken ct = default);
+
+    /// <summary>Queues the statements of some customers only (a billing run's ratepayers).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAt">The statement date.</param>
+    /// <param name="templateCode">The email template.</param>
+    /// <param name="language">The language.</param>
+    /// <param name="minimumBalance">The smallest balance worth a statement.</param>
+    /// <param name="customerIds">The customers.</param>
+    /// <param name="title">The despatch batch title.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What was queued, or why nothing could be.</returns>
+    Task<Result<StatementDespatch>> QueueAsync(long companyId, DateOnly asAt, string templateCode, string language, decimal minimumBalance, IReadOnlyCollection<long> customerIds, string title,
+        CancellationToken ct = default);
 }

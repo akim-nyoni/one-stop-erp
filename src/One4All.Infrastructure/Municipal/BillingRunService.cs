@@ -17,6 +17,28 @@ public sealed class BillingRunService : IBillingRunService
     private readonly Lazy<Application.Abstractions.Workflow.IWorkflowService>? _workflow;
     private readonly INumberSequenceService _numbers;
     private readonly ISalesLedgerService _ar;
+    private readonly Application.Abstractions.Communications.IStatementDespatchService? _despatch;
+
+    /// <inheritdoc />
+    public async Task<Result<Application.Abstractions.Communications.StatementDespatch>> DespatchBillsAsync(long companyId, string runNumber, string templateCode, string language,
+        CancellationToken ct = default)
+    {
+        BillingRun? run = await _db.Set<BillingRun>().Include(r => r.Lines).AsNoTracking().FirstOrDefaultAsync(r => r.CompanyId == companyId && r.RunNumber == runNumber.Trim(), ct).ConfigureAwait(false);
+        if (run is null)
+        {
+            return Error.NotFound("Mun.RunNotFound", $"Billing run {runNumber} not found.");
+        }
+
+        List<long> ratepayers = [.. run.Lines.Where(l => l.IsPosted).Select(l => l.RatepayerCustomerId).Distinct()];
+        if (ratepayers.Count == 0)
+        {
+            return Error.Rule("Mun.RunNotPosted", $"Run {run.RunNumber} has no posted bills to send.");
+        }
+
+        return _despatch is null
+            ? Error.Rule("Mun.NoDespatch", "Bill delivery is not available.")
+            : await _despatch.QueueAsync(companyId, run.BillDate, templateCode, language, 0.01m, ratepayers, $"Bills {run.RunNumber} {run.BillDate:yyyy-MM}", ct).ConfigureAwait(false);
+    }
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
@@ -24,8 +46,9 @@ public sealed class BillingRunService : IBillingRunService
     /// <param name="ar">The receivables ledger.</param>
     /// <param name="webhooks">Publishes generated bills.</param>
     public BillingRunService(One4AllDbContext db, INumberSequenceService numbers, ISalesLedgerService ar, Application.Abstractions.Integration.IWebhookService? webhooks = null,
-        Lazy<Application.Abstractions.Workflow.IWorkflowService>? workflow = null)
+        Lazy<Application.Abstractions.Workflow.IWorkflowService>? workflow = null, Application.Abstractions.Communications.IStatementDespatchService? despatch = null)
     {
+        _despatch = despatch;
         _workflow = workflow;
         _webhooks = webhooks;
         _db = db;
@@ -64,7 +87,28 @@ public sealed class BillingRunService : IBillingRunService
         string prefix = proposal.InvoicePrefix.Trim();
         BillingRun run = new(proposal.CompanyId, number.Value, proposal.ServiceType, proposal.BillDate, string.IsNullOrWhiteSpace(proposal.Ward) ? null : proposal.Ward.Trim(), prefix, proposal.UserId);
         run.ServiceCode = serviceCode;
-        List<long> propertyIds = await MunicipalCharges.PropertiesToBillAsync(_db, proposal.CompanyId, proposal.ServiceType, proposal.BillDate, run.Ward, ct, serviceCode).ConfigureAwait(false);
+
+        // A run can follow the meter readers' routes or bill one billing cycle (quarterly accounts on their own, say).
+        List<long>? meterIds = null, tariffIds = null;
+        if (!string.IsNullOrWhiteSpace(proposal.RouteCode))
+        {
+            run.RouteCode = proposal.RouteCode.Trim().ToUpperInvariant();
+            ReadingRoute? route = await _db.Set<ReadingRoute>().Include(r => r.Stops).AsNoTracking().FirstOrDefaultAsync(r => r.CompanyId == proposal.CompanyId && r.Code == run.RouteCode, ct).ConfigureAwait(false);
+            if (route is null)
+            {
+                return Error.NotFound("Mun.RouteNotFound", $"Reading route {run.RouteCode} not found.");
+            }
+
+            meterIds = [.. route.Stops.Select(s => s.MeterId)];
+        }
+
+        if (proposal.Cycle is BillingCycle cycle)
+        {
+            run.Cycle = cycle;
+            tariffIds = await _db.Set<Tariff>().Where(t => t.CompanyId == proposal.CompanyId && t.ServiceType == proposal.ServiceType && t.Cycle == cycle).Select(t => t.Id).ToListAsync(ct).ConfigureAwait(false);
+        }
+
+        List<long> propertyIds = await MunicipalCharges.PropertiesToBillAsync(_db, proposal.CompanyId, proposal.ServiceType, proposal.BillDate, run.Ward, ct, serviceCode, meterIds, tariffIds).ConfigureAwait(false);
         Dictionary<long, string> numbers = propertyIds.ToDictionary(id => id, id => $"{prefix}-{id}-{proposal.BillDate:yyyyMM}");
         HashSet<string> alreadyRaised = await MunicipalCharges.AlreadyRaisedAsync(_db, proposal.CompanyId, numbers.Values, ct).ConfigureAwait(false);
 

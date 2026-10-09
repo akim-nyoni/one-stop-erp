@@ -141,10 +141,12 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Billing run", ListTitle = "Billing runs",
-            Description = "Propose a run for a service (and ward), review its exceptions, include or exclude stands, then approve to post the bills — someone other than the proposer approves.",
-            Fields = [Pick("Step", "Step", ["Propose", "Show exceptions", "Exclude a stand", "Include a stand", "Approve", "Resume posting", "Cancel"]), Pick("Service", "Service", Enum.GetNames<ServiceType>()),
-                Today("BillDate", "Bill date"), Opt("Ward", "Ward (blank: all)"), Opt("ServiceCode", "Council service code (blank: the category's own)"), Opt("Prefix", "Invoice prefix", "MB"),
-                Opt("Run", "Run number"), Opt("Stand", "Stand number")],
+            Description = "Propose a run for a service (limited to a ward, a meter-reading route or a billing cycle if you like), review its exceptions, include or exclude stands, then approve "
+                + "to post the bills — someone other than the proposer approves. Email bills sends each ratepayer billed in a posted run their statement (those without email are counted for printing).",
+            Fields = [Pick("Step", "Step", ["Propose", "Show exceptions", "Exclude a stand", "Include a stand", "Approve", "Resume posting", "Email bills", "Cancel"]), Pick("Service", "Service", Enum.GetNames<ServiceType>()),
+                Today("BillDate", "Bill date"), Opt("Ward", "Ward (blank: all)"), Opt("Route", "Reading route (blank: all)"), Pick("Cycle", "Billing cycle", ["Any", .. Enum.GetNames<BillingCycle>()]),
+                Opt("ServiceCode", "Council service code (blank: the category's own)"), Opt("Prefix", "Invoice prefix", "MB"), Opt("Run", "Run number"), Opt("Stand", "Stand number"),
+                Opt("Template", "Email template (email bills)", "BILL")],
             Run = async (c, i) =>
             {
                 IBillingRunService runs = c.Get<IBillingRunService>();
@@ -156,8 +158,12 @@ public static partial class OperationCatalogue
                         return Summary(Check(await runs.ProposeAsync(new BillingRunProposal
                         {
                             CompanyId = c.CompanyId, ServiceType = Enum.Parse<ServiceType>(i.Text("Service")), BillDate = i.Date("BillDate"), Ward = i.Optional("Ward"),
-                            InvoicePrefix = i.Optional("Prefix") ?? "MB", UserId = c.UserId, ServiceCode = i.Optional("ServiceCode"),
+                            InvoicePrefix = i.Optional("Prefix") ?? "MB", UserId = c.UserId, ServiceCode = i.Optional("ServiceCode"), RouteCode = i.Optional("Route"),
+                            Cycle = i.Text("Cycle") == "Any" ? null : Enum.Parse<BillingCycle>(i.Text("Cycle")),
                         }).ConfigureAwait(true)));
+                    case "Email bills":
+                        var sent = Check(await runs.DespatchBillsAsync(c.CompanyId, i.Text("Run"), i.Optional("Template") ?? "BILL", Localization.UiText.Catalog.Culture.TwoLetterISOLanguageName).ConfigureAwait(true));
+                        return $"{sent.Queued} bill(s) queued for email; {sent.NoEmail} ratepayer(s) without an email address to print and post.";
                     case "Show exceptions":
                         IReadOnlyList<BillingRunLineView> lines = Check(await runs.LinesAsync(c.CompanyId, i.Text("Run"), exceptionsOnly: true).ConfigureAwait(true));
                         return lines.Count == 0 ? "No exceptions." : string.Join(Environment.NewLine, lines.Select(l =>
@@ -177,6 +183,7 @@ public static partial class OperationCatalogue
             },
             List = async c => Table(await c.Db.Set<BillingRun>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Take(100).ToListAsync().ConfigureAwait(true),
                 ("Run", r => r.RunNumber), ("Service", r => r.ServiceType), ("Bill date", r => r.BillDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Ward", r => r.Ward),
+                ("Route", r => r.RouteCode), ("Cycle", r => r.Cycle),
                 ("Status", r => r.Status), ("Proposed by", r => r.ProposedByUserId)),
         };
         yield return new Operation

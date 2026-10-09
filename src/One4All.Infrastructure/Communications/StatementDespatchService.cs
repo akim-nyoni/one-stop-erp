@@ -30,12 +30,21 @@ public sealed class StatementDespatchService : IStatementDespatchService
     }
 
     /// <inheritdoc />
-    public async Task<Result<StatementDespatch>> QueueAsync(long companyId, DateOnly asAt, string templateCode, string language, decimal minimumBalance, CancellationToken ct = default)
+    public Task<Result<StatementDespatch>> QueueAsync(long companyId, DateOnly asAt, string templateCode, string language, decimal minimumBalance, CancellationToken ct = default)
+        => QueueCoreAsync(companyId, asAt, templateCode, language, minimumBalance, null, $"Statements {asAt:yyyy-MM-dd}", ct);
+
+    /// <inheritdoc />
+    public Task<Result<StatementDespatch>> QueueAsync(long companyId, DateOnly asAt, string templateCode, string language, decimal minimumBalance, IReadOnlyCollection<long> customerIds, string title,
+        CancellationToken ct = default)
+        => QueueCoreAsync(companyId, asAt, templateCode, language, minimumBalance, customerIds, title, ct);
+
+    private async Task<Result<StatementDespatch>> QueueCoreAsync(long companyId, DateOnly asAt, string templateCode, string language, decimal minimumBalance, IReadOnlyCollection<long>? only, string title,
+        CancellationToken ct)
     {
         // Balances as at the date: original amounts less allocations made by then, net of credits.
         Dictionary<long, decimal> balances = (await OpenItemsAsAt.LoadAsync(_db, companyId, TradingLedger.AccountsReceivable, asAt, ct).ConfigureAwait(false))
             .GroupBy(i => i.Item.TraderId).ToDictionary(g => g.Key, g => g.Sum(i => i.Signed(LedgerSign.Debit)));
-        List<long> owing = [.. balances.Where(b => b.Value > 0m).Select(b => b.Key)];
+        List<long> owing = [.. balances.Where(b => b.Value > 0m && (only is null || only.Contains(b.Key))).Select(b => b.Key)];
         List<Customer> customers = await _db.Customers.AsNoTracking().Where(c => c.CompanyId == companyId && owing.Contains(c.Id)).OrderBy(c => c.Code).ToListAsync(ct).ConfigureAwait(false);
 
         List<DespatchRecipient> recipients = [];
@@ -77,7 +86,7 @@ public sealed class StatementDespatchService : IStatementDespatchService
             return new StatementDespatch(null, 0, noEmail, belowMinimum);
         }
 
-        Result<long> batch = await _messages.QueueAsync(companyId, $"Statements {asAt:yyyy-MM-dd}", templateCode, language, MessageChannel.Email, recipients, ct).ConfigureAwait(false);
+        Result<long> batch = await _messages.QueueAsync(companyId, title, templateCode, language, MessageChannel.Email, recipients, ct).ConfigureAwait(false);
         return batch.IsFailure ? batch.Error : new StatementDespatch(batch.Value, recipients.Count, noEmail, belowMinimum);
     }
 }

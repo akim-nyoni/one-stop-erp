@@ -99,6 +99,12 @@ public sealed class BillingRun : AuditableEntity, ICompanyScoped
     /// <summary>Gets or sets the council service the run bills (null: the built-in category's own connections).</summary>
     public string? ServiceCode { get; set; }
 
+    /// <summary>Gets or sets the meter-reading route the run was limited to (null: every route).</summary>
+    public string? RouteCode { get; set; }
+
+    /// <summary>Gets or sets the billing cycle the run was limited to (null: every cycle).</summary>
+    public BillingCycle? Cycle { get; set; }
+
     /// <summary>Where it stands.</summary>
     public BillingRunStatus Status { get; private set; }
 

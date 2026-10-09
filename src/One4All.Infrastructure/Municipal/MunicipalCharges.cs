@@ -40,14 +40,18 @@ internal static class MunicipalCharges
     /// <param name="ward">Only this ward, if given.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The property ids.</returns>
-    public static Task<List<long>> PropertiesToBillAsync(One4AllDbContext db, long companyId, ServiceType serviceType, DateOnly date, string? ward, CancellationToken ct, string? serviceCode = null)
+    /// <param name="meterIds">Only stands with one of these meters (a reading route), or null.</param>
+    /// <param name="tariffIds">Only stands whose link to the service is on one of these tariffs (a billing cycle), or null.</param>
+    public static Task<List<long>> PropertiesToBillAsync(One4AllDbContext db, long companyId, ServiceType serviceType, DateOnly date, string? ward, CancellationToken ct, string? serviceCode = null,
+        IReadOnlyCollection<long>? meterIds = null, IReadOnlyCollection<long>? tariffIds = null)
     {
         // Connected by the month end and either running (not cut off) or ended within the month.
         (DateOnly monthStart, DateOnly monthEnd) = ProRata.Month(date);
         string? onlyWard = string.IsNullOrWhiteSpace(ward) ? null : ward.Trim();
         return db.Set<Property>()
             .Where(p => p.CompanyId == companyId && (onlyWard == null || p.Ward == onlyWard) && p.Services.Any(s => s.ServiceType == serviceType && s.ServiceCode == serviceCode && s.StartDate <= monthEnd
-                && ((s.IsActive && (s.EndDate == null || s.EndDate >= monthStart)) || (s.EndDate != null && s.EndDate >= monthStart))))
+                && ((s.IsActive && (s.EndDate == null || s.EndDate >= monthStart)) || (s.EndDate != null && s.EndDate >= monthStart)) && (tariffIds == null || tariffIds.Contains(s.TariffId)))
+                && (meterIds == null || p.Services.Any(s => s.MeterId != null && meterIds.Contains(s.MeterId.Value))))
             .OrderBy(p => p.Id)
             .Select(p => p.Id)
             .ToListAsync(ct);

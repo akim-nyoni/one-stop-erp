@@ -14527,6 +14527,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<int?>("Cycle")
+                        .HasColumnType("integer")
+                        .HasColumnName("cycle");
+
                     b.Property<string>("InvoicePrefix")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -14548,6 +14552,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("ProposedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("proposed_by_user_id");
+
+                    b.Property<string>("RouteCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("route_code");
 
                     b.Property<long>("RowVersion")
                         .HasColumnType("bigint")
