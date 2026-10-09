@@ -128,6 +128,8 @@ public static class DependencyInjection
         services.AddScoped<Housing.AllocationService>();
         services.AddScoped<Application.Abstractions.Housing.IAllocationService>(sp => sp.GetRequiredService<Housing.AllocationService>());
         services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Housing.AllocationRunWorkflowHandler>();
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Housing.StandPriceWorkflowHandler>();
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Housing.OwnershipTransferWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Housing.IInstalmentSaleService, Housing.InstalmentSaleService>();
         services.AddScoped<Application.Abstractions.Housing.IRentalHousingService, Housing.RentalHousingService>();
         services.AddScoped<Application.Abstractions.Housing.IRentalOccupancyService, Housing.RentalOccupancyService>();

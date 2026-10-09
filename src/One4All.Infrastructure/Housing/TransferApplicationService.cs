@@ -3,6 +3,7 @@ using One4All.Application.Abstractions.Housing;
 using One4All.Application.Abstractions.Municipal;
 using One4All.Application.Abstractions.Numbering;
 using One4All.Application.Abstractions.Security;
+using One4All.Application.Abstractions.Workflow;
 using One4All.Application.Housing;
 using One4All.Application.Municipal;
 using One4All.Core.Common;
@@ -25,6 +26,7 @@ public sealed class TransferApplicationService : ITransferApplicationService
     private readonly IPermissionService _permissions;
     private readonly IHousingService _housing;
     private readonly IOwnershipService _ownership;
+    private readonly Lazy<IWorkflowService>? _workflow;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
@@ -32,8 +34,10 @@ public sealed class TransferApplicationService : ITransferApplicationService
     /// <param name="permissions">The permission resolver.</param>
     /// <param name="housing">The stand register.</param>
     /// <param name="ownership">The municipal owner register.</param>
-    public TransferApplicationService(One4AllDbContext db, INumberSequenceService numbers, IPermissionService permissions, IHousingService housing, IOwnershipService ownership)
+    public TransferApplicationService(One4AllDbContext db, INumberSequenceService numbers, IPermissionService permissions, IHousingService housing, IOwnershipService ownership,
+        Lazy<IWorkflowService>? workflow = null)
     {
+        _workflow = workflow;
         _db = db;
         _numbers = numbers;
         _permissions = permissions;
@@ -187,7 +191,11 @@ public sealed class TransferApplicationService : ITransferApplicationService
         Clearance clearance = await MunicipalClearanceAsync(application, date, ct).ConfigureAwait(false);
         application.Submit(userId, clearance.CertificateNumber);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return Result.Success();
+
+        // When ownership transfers have an approval workflow, it approves the transfer instead of the two approving officers.
+        Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, companyId, WorkflowDocumentTypes.OwnershipTransfer, application.ApplicationNumber,
+            application.Consideration, userId, ct).ConfigureAwait(false);
+        return governed.IsFailure ? Result.Failure(governed.Error) : Result.Success();
     }
 
     /// <inheritdoc />
@@ -208,6 +216,11 @@ public sealed class TransferApplicationService : ITransferApplicationService
         if (application.Status != TransferStatus.Submitted)
         {
             return Result.Failure(Error.Rule("Hse.TransferNotSubmitted", $"{application.ApplicationNumber} is {application.Status}; only a submitted application can be approved."));
+        }
+
+        if (await Workflow.WorkflowGate.InProgressAsync(_db, companyId, WorkflowDocumentTypes.OwnershipTransfer, application.ApplicationNumber, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Workflow.WorkflowGate.Governed(WorkflowDocumentTypes.OwnershipTransfer, application.ApplicationNumber));
         }
 
         // SOD-HSE-05: who verified or submitted it cannot approve it; and two different approvers.
@@ -380,4 +393,37 @@ public sealed class TransferApplicationService : ITransferApplicationService
     }
 
     private sealed record Clearance(bool Satisfied, string Detail, string? CertificateNumber, long? PropertyId);
+}
+
+/// <summary>Concludes an ownership transfer's approval workflow: approval approves it for completion, anything else rejects it.</summary>
+internal sealed class OwnershipTransferWorkflowHandler : IWorkflowDocumentHandler
+{
+    private readonly One4AllDbContext _db;
+
+    public OwnershipTransferWorkflowHandler(One4AllDbContext db) => _db = db;
+
+    public string DocumentType => WorkflowDocumentTypes.OwnershipTransfer;
+
+    public async Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+    {
+        TransferApplication? application = await _db.Set<TransferApplication>().Include(a => a.Approvals)
+            .FirstOrDefaultAsync(a => a.CompanyId == companyId && a.ApplicationNumber == documentReference && a.Status == TransferStatus.Submitted, ct).ConfigureAwait(false);
+        if (application is null)
+        {
+            return Result.Success();
+        }
+
+        DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+        if (outcome == Core.Workflow.WorkflowStatus.Approved)
+        {
+            application.ApproveThroughWorkflow(new TransferApproval(decidedByUserId, today));
+        }
+        else
+        {
+            application.Reject(today, string.IsNullOrWhiteSpace(comment) ? "Turned down in the approval workflow" : comment.Trim());
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
 }

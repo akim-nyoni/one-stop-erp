@@ -62,4 +62,10 @@ public static class WorkflowDocumentTypes
 
     /// <summary>A proposed housing allocation run (reference: the run number).</summary>
     public const string AllocationRun = "AllocationRun";
+
+    /// <summary>A proposed stand pricing rule (reference: <c>PR-</c> and the rule id).</summary>
+    public const string StandPrice = "StandPrice";
+
+    /// <summary>A submitted stand ownership transfer (reference: the application number).</summary>
+    public const string OwnershipTransfer = "OwnershipTransfer";
 }

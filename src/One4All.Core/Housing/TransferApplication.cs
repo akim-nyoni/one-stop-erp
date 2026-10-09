@@ -191,6 +191,14 @@ public sealed class TransferApplication : AuditableEntity, ICompanyScoped
         }
     }
 
+    /// <summary>Approves it through the approval workflow, whose stages take the place of the two approvers.</summary>
+    /// <param name="approval">The workflow's final approval.</param>
+    public void ApproveThroughWorkflow(TransferApproval approval)
+    {
+        _approvals.Add(approval);
+        Status = TransferStatus.Approved;
+    }
+
     /// <summary>Records it completed.</summary>
     /// <param name="date">When.</param>
     public void Complete(DateOnly date)

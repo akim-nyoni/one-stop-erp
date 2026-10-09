@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Housing;
 using One4All.Application.Abstractions.Security;
+using One4All.Application.Abstractions.Workflow;
 using One4All.Application.Housing;
 using One4All.Core.Common;
 using One4All.Core.Housing;
@@ -16,18 +17,24 @@ public sealed class StandPricingService : IStandPricingService
 
     private readonly One4AllDbContext _db;
     private readonly IPermissionService _permissions;
+    private readonly Lazy<IWorkflowService>? _workflow;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="permissions">The permission resolver.</param>
-    public StandPricingService(One4AllDbContext db, IPermissionService permissions)
+    public StandPricingService(One4AllDbContext db, IPermissionService permissions, Lazy<IWorkflowService>? workflow = null)
     {
+        _workflow = workflow;
         _db = db;
         _permissions = permissions;
     }
 
     /// <inheritdoc />
-    public async Task<Result<long>> ProposeAsync(PricingRuleInput input, CancellationToken ct = default)
+    public Task<Result<long>> ProposeAsync(PricingRuleInput input, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ProposeCoreAsync(input, ct), ct);
+
+    // One unit of work: the rule and its approval workflow (when prices have one) start together.
+    private async Task<Result<long>> ProposeCoreAsync(PricingRuleInput input, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(input);
         bool scoped = input.Scope switch
@@ -59,7 +66,9 @@ public sealed class StandPricingService : IStandPricingService
             input.OverheadPercent, input.LevyPerStand, input.LevyPerSquareMetre, input.MarginPercent, input.RoundTo, input.UserId);
         _db.Set<StandPricingRule>().Add(rule);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return rule.Id;
+        Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, input.CompanyId, WorkflowDocumentTypes.StandPrice, $"PR-{rule.Id}", input.MarginPercent, input.UserId, ct)
+            .ConfigureAwait(false);
+        return governed.IsFailure ? Result<long>.Failure(governed.Error) : rule.Id;
     }
 
     /// <inheritdoc />
@@ -84,6 +93,11 @@ public sealed class StandPricingService : IStandPricingService
         if (rule.ProposedByUserId == userId)
         {
             return Result.Failure(Error.Rule("Hse.SelfApproval", "A price must be approved by someone other than who proposed it."));
+        }
+
+        if (await Workflow.WorkflowGate.InProgressAsync(_db, companyId, WorkflowDocumentTypes.StandPrice, $"PR-{rule.Id}", ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Workflow.WorkflowGate.Governed(WorkflowDocumentTypes.StandPrice, $"PR-{rule.Id}"));
         }
 
         rule.Approve(userId, date);
@@ -135,5 +149,28 @@ internal static class StandPrices
         PriceBuildUp price = StandPricing.Build(stand.AllocatedCost, stand.SizeSquareMetres,
             new PricingTerms(rule.OverheadPercent, rule.LevyPerStand, rule.LevyPerSquareMetre, rule.MarginPercent, rule.RoundTo));
         return new StandPriceQuote(stand.StandNumber, rule.Id, rule.Scope, rule.EffectiveFrom, price);
+    }
+}
+
+/// <summary>Concludes a pricing rule's approval workflow: approval puts the price into force; a rejection leaves it unapproved, never applied.</summary>
+internal sealed class StandPriceWorkflowHandler : IWorkflowDocumentHandler
+{
+    private readonly One4AllDbContext _db;
+
+    public StandPriceWorkflowHandler(One4AllDbContext db) => _db = db;
+
+    public string DocumentType => WorkflowDocumentTypes.StandPrice;
+
+    public async Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+    {
+        if (outcome != Core.Workflow.WorkflowStatus.Approved || !long.TryParse(documentReference.AsSpan(3), out long ruleId))
+        {
+            return Result.Success();
+        }
+
+        StandPricingRule? rule = await _db.Set<StandPricingRule>().FirstOrDefaultAsync(r => r.Id == ruleId && r.CompanyId == companyId && r.ApprovedOn == null, ct).ConfigureAwait(false);
+        rule?.Approve(decidedByUserId, DateOnly.FromDateTime(DateTime.Today));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 }
