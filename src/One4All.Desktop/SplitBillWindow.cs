@@ -42,10 +42,49 @@ public sealed class SplitBillWindow : Window
 
         Button even = new() { Content = "Split evenly", Padding = new Thickness(12, 3, 12, 3), Margin = new Thickness(0, 0, 8, 0) };
         even.Click += (_, _) => Fill(SplitBill.Evenly(_lines, Ways));
+
+        // Or by percentages / amounts, one per payer: 60/40, or 30.00/45.50.
+        TextBox shares = new() { Width = 120, Margin = new Thickness(0, 0, 6, 0), VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "One per payer, separated by /" };
+        Button byPercent = new() { Content = "By %", Padding = new Thickness(10, 3, 10, 3), Margin = new Thickness(0, 0, 6, 0) };
+        Button byAmount = new() { Content = "By amount", Padding = new Thickness(10, 3, 10, 3), Margin = new Thickness(0, 0, 12, 0) };
+        void SplitBy(bool percent)
+        {
+            List<decimal> values = [];
+            foreach (string part in shares.Text.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (!decimal.TryParse(part, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal value))
+                {
+                    _problem.Text = $"\"{part}\" is not a number.";
+                    return;
+                }
+
+                values.Add(value);
+            }
+
+            if (values.Count != Ways)
+            {
+                _ways.SelectedItem = Math.Clamp(values.Count, 2, 8);
+            }
+
+            Core.Common.Result<IReadOnlyList<IReadOnlyList<SplitShare>>> split = percent ? SplitBill.ByPercent(_lines, values) : SplitBill.ByAmount(_lines, values);
+            if (split.IsFailure)
+            {
+                _problem.Text = split.Error.Message;
+                return;
+            }
+
+            Fill(split.Value);
+        }
+
+        byPercent.Click += (_, _) => SplitBy(true);
+        byAmount.Click += (_, _) => SplitBy(false);
         StackPanel bar = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(10) };
         bar.Children.Add(new TextBlock { Text = "Payers", VerticalAlignment = VerticalAlignment.Center });
         bar.Children.Add(_ways);
         bar.Children.Add(even);
+        bar.Children.Add(shares);
+        bar.Children.Add(byPercent);
+        bar.Children.Add(byAmount);
         bar.Children.Add(new TextBlock { Text = "Type each payer's quantity of every line; each line must be shared out in full.", VerticalAlignment = VerticalAlignment.Center, Foreground = Brushes.Gray });
         _ways.SelectionChanged += (_, _) => Rebuild();
 

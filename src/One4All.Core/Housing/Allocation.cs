@@ -169,6 +169,9 @@ public sealed class AllocationRun : AuditableEntity, ICompanyScoped
         ApprovedOn = date;
     }
 
+    /// <summary>Gets or sets the allocation committee's resolution approving the list (brief §4.10.2).</summary>
+    public string? CommitteeResolution { get; set; }
+
     /// <summary>Cancels it and its pairings.</summary>
     public void Cancel()
     {
@@ -264,6 +267,20 @@ public sealed class StandAllocation : Entity
         DecidedOn = date;
     }
 
+    /// <summary>Steps out of the live offers for a moment while a swap moves the other allottee onto this stand (one live offer per stand).</summary>
+    public void HoldForSwap() => Status = AllocationStatus.Cancelled;
+
+    /// <summary>Takes a stand (and its frozen price) in a swap, back in the offer's status.</summary>
+    /// <param name="standId">The stand.</param>
+    /// <param name="price">Its frozen price.</param>
+    /// <param name="status">The offer's status.</param>
+    public void TakeStand(long standId, decimal? price, AllocationStatus status)
+    {
+        StandId = standId;
+        OfferedPrice = price;
+        Status = status;
+    }
+
     /// <summary>Closes it.</summary>
     /// <param name="status">Declined, lapsed or cancelled.</param>
     /// <param name="date">When.</param>
@@ -287,6 +304,9 @@ public enum ExclusionReason
 
     /// <summary>The spouse already holds a stand or a live allocation (one household, one stand).</summary>
     SpouseHolds = 3,
+
+    /// <summary>Declined or let lapse an offer of the stand a substitution run fills.</summary>
+    DeclinedStand = 4,
 }
 
 /// <summary>A listed applicant left out of an allocation run, recorded when the run is proposed (<c>hse.allocation_exclusion</c>).</summary>
@@ -314,4 +334,57 @@ public sealed class AllocationExclusion : Entity
 
     /// <summary>Why.</summary>
     public ExclusionReason Reason { get; private set; }
+}
+
+/// <summary>A stand swap between two allottees (<c>hse.stand_swap</c>): the document behind the exchange.</summary>
+public sealed class StandSwap : AuditableEntity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private StandSwap()
+    {
+        FirstCertificate = string.Empty;
+        SecondCertificate = string.Empty;
+        Reference = string.Empty;
+        Reason = string.Empty;
+    }
+
+    /// <summary>Records a swap.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="firstCertificate">One allottee's certificate.</param>
+    /// <param name="secondCertificate">The other's.</param>
+    /// <param name="date">When.</param>
+    /// <param name="reference">The swap document (the parties' signed request).</param>
+    /// <param name="reason">Why.</param>
+    /// <param name="approvedByUserId">Who approved it.</param>
+    public StandSwap(long companyId, string firstCertificate, string secondCertificate, DateOnly date, string reference, string reason, long approvedByUserId)
+    {
+        CompanyId = companyId;
+        FirstCertificate = firstCertificate;
+        SecondCertificate = secondCertificate;
+        Date = date;
+        Reference = reference;
+        Reason = reason;
+        ApprovedByUserId = approvedByUserId;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>Gets one allottee's certificate.</summary>
+    public string FirstCertificate { get; private set; }
+
+    /// <summary>Gets the other's certificate.</summary>
+    public string SecondCertificate { get; private set; }
+
+    /// <summary>Gets when.</summary>
+    public DateOnly Date { get; private set; }
+
+    /// <summary>Gets the swap document.</summary>
+    public string Reference { get; private set; }
+
+    /// <summary>Gets why.</summary>
+    public string Reason { get; private set; }
+
+    /// <summary>Gets who approved it.</summary>
+    public long ApprovedByUserId { get; private set; }
 }

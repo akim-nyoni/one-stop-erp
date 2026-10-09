@@ -100,6 +100,52 @@ public static class SplitBill
         return parts;
     }
 
+    /// <summary>Splits every line by percentages (60/40, say): each payer takes that share of every line's quantity, the last absorbing the rounding.</summary>
+    /// <param name="lines">The basket's lines.</param>
+    /// <param name="percents">Each payer's percentage; they add up to 100.</param>
+    /// <returns>The parts, or why the percentages will not do.</returns>
+    public static Result<IReadOnlyList<IReadOnlyList<SplitShare>>> ByPercent(IReadOnlyList<PosSaleLineRequest> lines, IReadOnlyList<decimal> percents)
+    {
+        if (percents.Count < 2 || percents.Any(p => p <= 0m) || percents.Sum() != 100m)
+        {
+            return Result<IReadOnlyList<IReadOnlyList<SplitShare>>>.Failure(Error.Validation("Pos.SplitPercent", "Give two or more positive percentages adding up to 100."));
+        }
+
+        List<List<SplitShare>> parts = [.. percents.Select(_ => new List<SplitShare>())];
+        for (int i = 0; i < lines.Count; i++)
+        {
+            decimal given = 0m;
+            for (int p = 0; p < percents.Count; p++)
+            {
+                decimal share = p == percents.Count - 1 ? lines[i].Quantity - given : Math.Round(lines[i].Quantity * percents[p] / 100m, 4, MidpointRounding.ToZero);
+                given += share;
+                if (share > 0m)
+                {
+                    parts[p].Add(new SplitShare(i, share));
+                }
+            }
+        }
+
+        return parts;
+    }
+
+    /// <summary>Splits the bill by the amounts each payer will pay (30.00 and 45.50, say), as the matching percentages of every line.</summary>
+    /// <param name="lines">The basket's lines.</param>
+    /// <param name="amounts">Each payer's amount; they add up to the bill.</param>
+    /// <returns>The parts, or why the amounts will not do.</returns>
+    public static Result<IReadOnlyList<IReadOnlyList<SplitShare>>> ByAmount(IReadOnlyList<PosSaleLineRequest> lines, IReadOnlyList<decimal> amounts)
+    {
+        decimal total = Gross(lines);
+        if (amounts.Count < 2 || amounts.Any(a => a <= 0m) || Math.Abs(amounts.Sum() - total) > 0.01m)
+        {
+            return Result<IReadOnlyList<IReadOnlyList<SplitShare>>>.Failure(Error.Validation("Pos.SplitAmount", $"Give two or more positive amounts adding up to the bill, {total:0.00}."));
+        }
+
+        List<decimal> percents = [.. amounts.Take(amounts.Count - 1).Select(a => Math.Round(a / total * 100m, 6, MidpointRounding.AwayFromZero))];
+        percents.Add(100m - percents.Sum());
+        return ByPercent(lines, percents);
+    }
+
     /// <summary>A part's gross (net plus tax) — what its payer must tender.</summary>
     /// <param name="lines">The part's lines.</param>
     /// <returns>The gross.</returns>

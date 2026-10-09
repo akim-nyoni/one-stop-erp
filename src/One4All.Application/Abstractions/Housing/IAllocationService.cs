@@ -29,6 +29,9 @@ public sealed class AllocationProposal
 
     /// <summary>How long offers stay open once the run is approved (used when an approval workflow approves it).</summary>
     public int OfferDays { get; init; } = 30;
+
+    /// <summary>Only these stands (a substitution run for stands declined or lapsed), or empty for every free stand in the scheme.</summary>
+    public IReadOnlyList<string> StandNumbers { get; init; } = [];
 }
 
 /// <summary>A pairing on an allocation list.</summary>
@@ -81,6 +84,32 @@ public interface IAllocationService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The approved list, or why it was refused.</returns>
     Task<Result<AllocationRunView>> ApproveAsync(long companyId, string runNumber, long approverUserId, DateOnly date, int offerDays, CancellationToken ct = default);
+
+    /// <summary>Approves a proposed run on the allocation committee's resolution, which the run keeps (brief §4.10.2).</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="runNumber">The run.</param>
+    /// <param name="approverUserId">The approver (not the proposer).</param>
+    /// <param name="date">The approval date.</param>
+    /// <param name="offerDays">Days the offers stay open.</param>
+    /// <param name="committeeResolution">The committee's resolution.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The approved list, or why it was refused.</returns>
+    Task<Result<AllocationRunView>> ApproveByCommitteeAsync(long companyId, string runNumber, long approverUserId, DateOnly date, int offerDays, string committeeResolution, CancellationToken ct = default);
+
+    /// <summary>
+    /// Swaps the stands of two allottees whose offers are live and whose stands are not yet sold, in the same scheme (brief §4.10.2): the
+    /// stands and their frozen prices change hands, recorded in a swap document.
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="firstCertificate">One allottee's certificate.</param>
+    /// <param name="secondCertificate">The other's.</param>
+    /// <param name="date">When.</param>
+    /// <param name="reference">The swap document.</param>
+    /// <param name="reason">Why.</param>
+    /// <param name="userId">Who approved it.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why the two cannot swap.</returns>
+    Task<Result> SwapAsync(long companyId, string firstCertificate, string secondCertificate, DateOnly date, string reference, string reason, long userId, CancellationToken ct = default);
 
     /// <summary>Cancels a proposed run, freeing its stands and applicants.</summary>
     /// <param name="companyId">The council.</param>

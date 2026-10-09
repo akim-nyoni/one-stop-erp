@@ -9,6 +9,7 @@ internal sealed class MenuItemConfiguration : IEntityTypeConfiguration<MenuItem>
     public void Configure(EntityTypeBuilder<MenuItem> b)
     {
         b.ToTable("menu_item", Schemas.Restaurant);
+        b.Property(x => x.PrepStation).HasMaxLength(30);
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).HasMaxLength(30);
         b.Property(x => x.Name).HasMaxLength(120);
@@ -245,6 +246,7 @@ internal sealed class KitchenTicketConfiguration : IEntityTypeConfiguration<Kitc
     public void Configure(EntityTypeBuilder<KitchenTicket> b)
     {
         b.ToTable("kitchen_ticket", Schemas.Restaurant);
+        b.Property(x => x.Station).HasMaxLength(30);
         b.HasKey(x => x.Id);
         b.Property(x => x.TicketNumber).HasMaxLength(40);
         b.Property(x => x.Course).HasConversion<int>();

@@ -109,7 +109,9 @@ public static partial class OperationCatalogue
             Module = module, Title = "Allocation run", ListTitle = "Allocation runs",
             Description = "Propose a run for a scheme's available stands (seniority, score, or a seeded ballot anyone can re-run to verify), approve it (someone else; offers go out with a deadline), "
                 + "cancel it, or verify a ballot's draw.",
-            Fields = [Pick("Step", "Step", ["Propose", "Approve", "Cancel", "Verify draw"]), Opt("Scheme", "Scheme code (propose)"), Pick("Category", "Category", Enum.GetNames<HousingCategory>()),
+            Fields = [Pick("Step", "Step", ["Propose", "Approve", "Cancel", "Verify draw", "Swap stands"]), Opt("Stands", "Only these stands (substitution run; ',')"),
+                Opt("Resolution", "Committee resolution (approve)"), Opt("Certificate", "Certificate (swap)"), Opt("Other", "Other certificate (swap)"), Opt("Document", "Swap document"),
+                Opt("Reason", "Swap reason"), Opt("Scheme", "Scheme code (propose)"), Pick("Category", "Category", Enum.GetNames<HousingCategory>()),
                 Pick("Method", "Method", Enum.GetNames<AllocationMethod>()), OptNum("Seed", "Ballot seed (blank: random)"), Opt("Run", "Run number"), Today("Date", "Date"), Num("OfferDays", "Days to accept an offer", "30")],
             Run = async (c, i) =>
             {
@@ -127,9 +129,15 @@ public static partial class OperationCatalogue
                         {
                             CompanyId = c.CompanyId, SchemeId = scheme, Category = Enum.Parse<HousingCategory>(i.Text("Category")), Method = Enum.Parse<AllocationMethod>(i.Text("Method")),
                             Seed = (long?)i.OptionalNumber("Seed"), AsAtDate = i.Date("Date"), UserId = c.UserId, OfferDays = i.Whole("OfferDays"),
+                            StandNumbers = [.. (i.Optional("Stands") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)],
                         }).ConfigureAwait(true)));
                     case "Approve":
-                        return Show(Check(await allocation.ApproveAsync(c.CompanyId, i.Text("Run"), c.UserId, i.Date("Date"), i.Whole("OfferDays")).ConfigureAwait(true)));
+                        return Show(Check(await (i.Optional("Resolution") is string resolution
+                            ? allocation.ApproveByCommitteeAsync(c.CompanyId, i.Text("Run"), c.UserId, i.Date("Date"), i.Whole("OfferDays"), resolution)
+                            : allocation.ApproveAsync(c.CompanyId, i.Text("Run"), c.UserId, i.Date("Date"), i.Whole("OfferDays"))).ConfigureAwait(true)));
+                    case "Swap stands":
+                        return Check(await allocation.SwapAsync(c.CompanyId, i.Optional("Certificate") ?? string.Empty, i.Optional("Other") ?? string.Empty, i.Date("Date"),
+                            i.Optional("Document") ?? string.Empty, i.Optional("Reason") ?? string.Empty, c.UserId).ConfigureAwait(true), "Stands swapped.");
                     case "Cancel":
                         _ = Check(await allocation.CancelAsync(c.CompanyId, i.Text("Run")).ConfigureAwait(true), string.Empty);
                         return "Run cancelled.";

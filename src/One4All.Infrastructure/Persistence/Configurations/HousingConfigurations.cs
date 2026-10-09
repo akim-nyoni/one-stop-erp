@@ -123,6 +123,7 @@ internal sealed class AllocationRunConfiguration : IEntityTypeConfiguration<Allo
         b.Property(x => x.Method).HasConversion<int>();
         b.Property(x => x.Status).HasConversion<int>();
         b.Property(x => x.InputCandidates).HasMaxLength(100_000);
+        b.Property(x => x.CommitteeResolution).HasMaxLength(120);
         b.Property(x => x.InputStands).HasMaxLength(100_000);
         b.Property(x => x.InputHash).HasMaxLength(64);
         b.HasMany(x => x.Allocations).WithOne().HasForeignKey(x => x.AllocationRunId).OnDelete(DeleteBehavior.Restrict);
@@ -1319,5 +1320,18 @@ internal sealed class LodgerPermitConfiguration : IEntityTypeConfiguration<Lodge
         b.Ignore(x => x.LastDay);
         b.HasOne<Tenancy>().WithMany().HasForeignKey(x => x.TenancyId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.CompanyId, x.PermitNumber }).IsUnique();
+    }
+}
+
+internal sealed class StandSwapConfiguration : IEntityTypeConfiguration<StandSwap>
+{
+    public void Configure(EntityTypeBuilder<StandSwap> b)
+    {
+        b.ToTable("stand_swap", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.FirstCertificate).HasMaxLength(40);
+        b.Property(x => x.SecondCertificate).HasMaxLength(40);
+        b.Property(x => x.Reference).HasMaxLength(80);
+        b.Property(x => x.Reason).HasMaxLength(300);
     }
 }

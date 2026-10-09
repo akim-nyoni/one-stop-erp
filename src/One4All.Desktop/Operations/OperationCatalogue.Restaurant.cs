@@ -16,8 +16,9 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Menu items", ListTitle = "Menu",
             Description = "Creates a menu item with its recipe (ingredients ITEM:quantity; … issued from stock when billed), sets a price for a price level (happy hour, staff…), "
-                + "marks an item available or not, or refreshes availability from the stock of a warehouse.",
-            Fields = [Pick("Step", "Step", ["Create", "Price level", "Available", "Unavailable", "Refresh availability"]), Opt("Code", "Menu item code"), Opt("Name", "Name (create)"),
+                + "marks an item available or not, refreshes availability from the stock of a warehouse, sends an item to a preparation station (grill, bar…) — fired orders "
+                + "give each station its own ticket — and shows a station's queue.",
+            Fields = [Pick("Step", "Step", ["Create", "Price level", "Available", "Unavailable", "Refresh availability", "Prep station", "Station queue"]), Opt("Station", "Preparation station"), Opt("Code", "Menu item code"), Opt("Name", "Name (create)"),
                 Num("Price", "Price", "0"), Opt("Revenue", "Revenue account (create)"), Opt("Cost", "Cost of sales account (create)"), Opt("Tax", "Tax code (create)"),
                 Opt("Recipe", "Recipe: ITEM:quantity; … (create)"), Opt("Level", "Price level"), Opt("Warehouse", "Warehouse (refresh)")],
             Run = async (c, i) =>
@@ -38,6 +39,16 @@ public static partial class OperationCatalogue
 
                         return Check(await restaurant.CreateMenuItemAsync(c.CompanyId, code, i.Optional("Name") ?? code, i.Number("Price"), i.Optional("Revenue") ?? string.Empty,
                             i.Optional("Cost") ?? string.Empty, recipe, i.Optional("Tax")).ConfigureAwait(true), _ => $"Menu item {code} created.");
+                    case "Station queue":
+                        IReadOnlyList<StationTicket> queue = await restaurant.StationQueueAsync(c.CompanyId, i.Optional("Station")).ConfigureAwait(true);
+                        return queue.Count == 0 ? "Nothing waiting." : string.Join(Environment.NewLine, queue.Select(t =>
+                            $"{t.TicketNumber,-16} {t.Status,-10} {string.Join(", ", t.Lines.Select(l => $"{Q(l.Quantity)} × {l.Description}"))}"));
+                    case "Prep station":
+                        MenuItem menu = await c.Db.Set<MenuItem>().FirstOrDefaultAsync(m => m.CompanyId == c.CompanyId && m.Code == code.ToUpper()).ConfigureAwait(true)
+                            ?? throw new OperationException($"No menu item {code}.");
+                        menu.PrepStation = i.Optional("Station")?.Trim();
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return menu.PrepStation is null ? $"{code} is made in the kitchen." : $"{code} is made at {menu.PrepStation}.";
                     case "Refresh availability":
                         int changed = Check(await restaurant.RefreshMenuAvailabilityAsync(c.CompanyId, await WarehouseAsync(c, i.Optional("Warehouse") ?? string.Empty).ConfigureAwait(true)).ConfigureAwait(true));
                         return $"{changed} menu item(s) changed availability.";
@@ -52,7 +63,8 @@ public static partial class OperationCatalogue
                 };
             },
             List = async c => Table(await c.Db.Set<MenuItem>().AsNoTracking().Where(m => m.CompanyId == c.CompanyId).OrderBy(m => m.Code).ToListAsync().ConfigureAwait(true),
-                ("Item", m => m.Code), ("Name", m => m.Name), ("Price", m => M(m.Price)), ("Tax", m => m.TaxCode ?? string.Empty), ("Available", m => m.IsAvailable)),
+                ("Item", m => m.Code), ("Name", m => m.Name), ("Price", m => M(m.Price)), ("Tax", m => m.TaxCode ?? string.Empty), ("Available", m => m.IsAvailable),
+                ("Station", m => m.PrepStation ?? string.Empty)),
         };
         yield return new Operation
         {

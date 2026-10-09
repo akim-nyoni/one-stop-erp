@@ -60,6 +60,9 @@ public sealed class KitchenTicket : AuditableEntity, ICompanyScoped
     /// <summary>The course this ticket fires, if it is a single-course ticket.</summary>
     public MenuCourse? Course { get; private set; }
 
+    /// <summary>Gets or sets the preparation station the ticket goes to (null: the kitchen).</summary>
+    public string? Station { get; set; }
+
     /// <summary>The status.</summary>
     public KitchenTicketStatus Status { get; private set; }
 

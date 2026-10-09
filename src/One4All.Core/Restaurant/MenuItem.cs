@@ -54,6 +54,9 @@ public sealed class MenuItem : SoftDeletableEntity, ICompanyScoped
     /// <summary>The category (starters, mains, drinks…).</summary>
     public string? Category { get; set; }
 
+    /// <summary>Gets or sets the preparation station it is made at (grill, bar, pastry…); its lines go on that station's ticket (null: the kitchen).</summary>
+    public string? PrepStation { get; set; }
+
     /// <summary>The selling price (tax-exclusive net).</summary>
     public decimal Price { get; set; }
 

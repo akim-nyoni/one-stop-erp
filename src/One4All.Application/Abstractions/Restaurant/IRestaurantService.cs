@@ -486,6 +486,13 @@ public interface IRestaurantService
     /// <returns>Success or an error.</returns>
     Task<Result> AdvanceTicketAsync(long companyId, long ticketId, KitchenTicketStatus status, CancellationToken ct = default);
 
+    /// <summary>A preparation station's queue (the kitchen display): its tickets not yet served, oldest first, with their lines.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="station">The station (null: the kitchen's own tickets).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The queue.</returns>
+    Task<IReadOnlyList<StationTicket>> StationQueueAsync(long companyId, string? station, CancellationToken ct = default);
+
     /// <summary>
     /// Books a table for a guest at a future time. Refuses a party larger than the table seats and a clash
     /// with another live booking on the same table within the turn-time window. Operational only (no GL).
@@ -642,3 +649,10 @@ public interface IRestaurantService
     /// <returns>The gratuity quote (Applies=false when no policy, party too small, or nothing ordered).</returns>
     Task<Result<AutoGratuityQuote>> QuoteAutoGratuityAsync(long companyId, long orderId, CancellationToken ct = default);
 }
+
+/// <summary>A ticket on a preparation station's display.</summary>
+/// <param name="TicketId">The ticket.</param>
+/// <param name="TicketNumber">Its number.</param>
+/// <param name="Status">Where it is.</param>
+/// <param name="Lines">What to make: description and quantity.</param>
+public sealed record StationTicket(long TicketId, string TicketNumber, KitchenTicketStatus Status, IReadOnlyList<(string Description, decimal Quantity)> Lines);

@@ -1403,16 +1403,7 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.NothingToFire", "There are no new lines to fire to the kitchen.");
         }
 
-        KitchenTicket ticket = new(companyId, orderId, ticketNumber, date);
-        foreach (TableOrderLine line in toFire)
-        {
-            ticket.AddLine(line.MenuItemId, line.Description, line.Quantity);
-            line.MarkFired();
-        }
-
-        _db.Set<KitchenTicket>().Add(ticket);
-        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return ticket.Id;
+        return await FireAsync(companyId, orderId, ticketNumber, date, null, toFire, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -1435,16 +1426,43 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.NothingToFire", $"There are no unfired {course} lines to fire.");
         }
 
-        KitchenTicket ticket = new(companyId, orderId, ticketNumber, date, course);
-        foreach (TableOrderLine line in toFire)
+        return await FireAsync(companyId, orderId, ticketNumber, date, course, toFire, ct).ConfigureAwait(false);
+    }
+
+    // Each preparation station gets its own ticket for its lines (the bar its drinks, the grill its steaks); with more than one station the
+    // tickets are numbered by station. The first ticket's id is returned.
+    private async Task<Result<long>> FireAsync(long companyId, long orderId, string ticketNumber, DateOnly date, MenuCourse? course, List<TableOrderLine> toFire, CancellationToken ct)
+    {
+        List<long> menuIds = [.. toFire.Select(l => l.MenuItemId).Distinct()];
+        Dictionary<long, string?> stations = await _db.Set<MenuItem>().AsNoTracking().Where(m => menuIds.Contains(m.Id)).ToDictionaryAsync(m => m.Id, m => m.PrepStation, ct).ConfigureAwait(false);
+        List<IGrouping<string?, TableOrderLine>> byStation = [.. toFire.GroupBy(l => stations.GetValueOrDefault(l.MenuItemId)).OrderBy(g => g.Key ?? string.Empty, StringComparer.Ordinal)];
+        List<KitchenTicket> tickets = [];
+        foreach (IGrouping<string?, TableOrderLine> group in byStation)
         {
-            ticket.AddLine(line.MenuItemId, line.Description, line.Quantity);
-            line.MarkFired();
+            string number = byStation.Count == 1 ? ticketNumber : $"{ticketNumber}-{group.Key ?? "KITCHEN"}";
+            KitchenTicket ticket = new(companyId, orderId, number, date, course) { Station = group.Key };
+            foreach (TableOrderLine line in group)
+            {
+                ticket.AddLine(line.MenuItemId, line.Description, line.Quantity);
+                line.MarkFired();
+            }
+
+            tickets.Add(ticket);
         }
 
-        _db.Set<KitchenTicket>().Add(ticket);
+        _db.Set<KitchenTicket>().AddRange(tickets);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return ticket.Id;
+        return tickets[0].Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<StationTicket>> StationQueueAsync(long companyId, string? station, CancellationToken ct = default)
+    {
+        string? only = string.IsNullOrWhiteSpace(station) ? null : station.Trim();
+        List<KitchenTicket> tickets = await _db.Set<KitchenTicket>().AsNoTracking().Include(t => t.Lines)
+            .Where(t => t.CompanyId == companyId && t.Station == only && t.Status != KitchenTicketStatus.Served)
+            .OrderBy(t => t.Id).ToListAsync(ct).ConfigureAwait(false);
+        return [.. tickets.Select(t => new StationTicket(t.Id, t.TicketNumber, t.Status, [.. t.Lines.Select(l => (l.Description, l.Quantity))]))];
     }
 
     /// <inheritdoc />
