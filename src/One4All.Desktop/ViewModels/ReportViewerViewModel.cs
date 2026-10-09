@@ -139,6 +139,10 @@ public sealed partial class ReportViewerViewModel : ObservableObject
     [ObservableProperty]
     private string _statusMessage = string.Empty;
 
+    /// <summary>Row filters for any report, by its columns: "Branch=HQ; Currency=USD; CostCentre=ADM".</summary>
+    [ObservableProperty]
+    private string _rowFilter = string.Empty;
+
     /// <summary>True while a report is running.</summary>
     [ObservableProperty]
     private bool _isBusy;
@@ -348,6 +352,11 @@ public sealed partial class ReportViewerViewModel : ObservableObject
             }
 
             parameters[input.Name] = ReportParameterValues.Parse(input.Definition, input.Value);
+        }
+
+        foreach (KeyValuePair<string, object?> filter in Application.Reporting.ReportRowFilters.Parse(RowFilter))
+        {
+            parameters[filter.Key] = filter.Value;
         }
 
         return parameters;

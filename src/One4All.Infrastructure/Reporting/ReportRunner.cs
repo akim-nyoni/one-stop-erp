@@ -141,6 +141,7 @@ public sealed class ReportRunner : IReportRunner
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = provider is null
             ? []
             : await provider.GetRowsAsync(companyId, command, ReportParameterValues.ForQuery(definition, parameters), ct).ConfigureAwait(false);
+        rows = Application.Reporting.ReportRowFilters.Apply(rows, parameters);
         return Application.Security.FieldSensitivity.Strip(rows, hiddenFields);
     }
 
