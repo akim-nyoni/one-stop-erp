@@ -2304,12 +2304,15 @@ api.MapPost("/api/gl/journals/{journalId:long}/reject", async (long journalId, l
 
 api.MapPost("/api/gl/journals/import", async (long companyId, long userId, HttpRequest http, One4All.Application.Abstractions.Accounting.IJournalImportService import, CancellationToken ct) =>
 {
-    using StreamReader reader = new(http.Body, Encoding.UTF8);
-    string csv = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+    // A CSV body, or an Excel workbook (its first sheet).
+    using MemoryStream body = new();
+    await http.Body.CopyToAsync(body, ct).ConfigureAwait(false);
+    byte[] file = body.ToArray();
+    string csv = One4All.Application.Onboarding.XlsxReader.IsWorkbook(file) ? One4All.Application.Onboarding.XlsxReader.ToCsv(file) : Encoding.UTF8.GetString(file);
     return ValueResponse(await import.ImportAsync(companyId, csv, userId, ct).ConfigureAwait(false));
 })
 .RequireAuthorization()
-.Accepts<string>("text/csv", "text/plain")
+.Accepts<string>("text/csv", "text/plain", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 .WithName("ImportJournals");
 
 api.MapPost("/api/gl/allocation-rules", async (One4All.Application.Abstractions.Accounting.AllocationRuleRequest request, One4All.Application.Abstractions.Accounting.IOverheadAllocationService allocation, CancellationToken ct) =>

@@ -109,6 +109,40 @@ public sealed class CashForecastService : ICashForecastService
             }
         }
 
+        // Flows keyed in by hand.
+        foreach (CashForecastEntry entry in await _db.Set<CashForecastEntry>().AsNoTracking().Where(e => e.CompanyId == companyId && e.Date < end).ToListAsync(ct).ConfigureAwait(false))
+        {
+            lines.AddRange(entry.Dates().Where(d => d >= from && d < end).Select(d => new CashFlowLine(d, CashFlowSource.Manual, entry.Description, entry.Amount)));
+        }
+
         return CashForecastBuilder.Build(from, weeks, opening, minimumBalance, lines);
+    }
+
+    /// <inheritdoc />
+    public async Task<Core.Common.Result<long>> AddEntryAsync(long companyId, DateOnly date, decimal amount, string description, DateOnly? repeatMonthlyUntil = null, CancellationToken ct = default)
+    {
+        if (amount == 0m || string.IsNullOrWhiteSpace(description) || repeatMonthlyUntil < date)
+        {
+            return Core.Common.Error.Validation("Cash.Entry", "A forecast entry needs an amount, a description and a repeat that ends after it starts.");
+        }
+
+        CashForecastEntry entry = new(companyId, date, amount, description.Trim()) { RepeatMonthlyUntil = repeatMonthlyUntil };
+        _db.Set<CashForecastEntry>().Add(entry);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return entry.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Core.Common.Result> RemoveEntryAsync(long companyId, long entryId, CancellationToken ct = default)
+    {
+        CashForecastEntry? entry = await _db.Set<CashForecastEntry>().FirstOrDefaultAsync(e => e.Id == entryId && e.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (entry is null)
+        {
+            return Core.Common.Result.Failure(Core.Common.Error.NotFound("Cash.EntryNotFound", $"Forecast entry {entryId} not found."));
+        }
+
+        _db.Set<CashForecastEntry>().Remove(entry);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Core.Common.Result.Success();
     }
 }

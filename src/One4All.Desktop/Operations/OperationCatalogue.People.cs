@@ -821,10 +821,23 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Cash-flow forecast", ListTitle = "Bank accounts",
             Description = "Week by week from the bank balances: receivables and payables by due date, saved payment runs on their dates, open sales and purchase orders on "
-                + "delivery plus terms, standing orders and payroll (repeating the last regular run). Weeks where cash would fall below the minimum are marked.",
-            Fields = [Today("From", "From"), Num("Weeks", "Weeks", "13"), Num("Minimum", "Minimum cash to hold", "0"), Tick("Detail", "Show every flow")],
+                + "delivery plus terms, standing orders, payroll (repeating the last regular run) and flows keyed in by hand (once or monthly). Weeks where cash would fall "
+                + "below the minimum are marked.",
+            Fields = [Pick("Step", "Step", ["Forecast", "Add a flow", "Remove a flow"]), Today("From", "From"), Num("Weeks", "Weeks", "13"), Num("Minimum", "Minimum cash to hold", "0"),
+                Tick("Detail", "Show every flow"), Num("Amount", "Flow amount (+ in, − out)", "0"), Opt("What", "Flow description"), Opt("Until", "Repeat monthly until (yyyy-mm-dd)"),
+                OptNum("Entry", "Flow id (remove)")],
             Run = async (c, i) =>
             {
+                Application.Abstractions.Banking.ICashForecastService forecast = c.Get<Application.Abstractions.Banking.ICashForecastService>();
+                switch (i.Text("Step"))
+                {
+                    case "Add a flow":
+                        return Check(await forecast.AddEntryAsync(c.CompanyId, i.Date("From"), i.Number("Amount"), i.Optional("What") ?? string.Empty,
+                            i.Optional("Until") is string until ? DateOnly.Parse(until, System.Globalization.CultureInfo.InvariantCulture) : null).ConfigureAwait(true), id => $"Flow {id} added to the forecast.");
+                    case "Remove a flow":
+                        return Check(await forecast.RemoveEntryAsync(c.CompanyId, (long)(i.OptionalNumber("Entry") ?? 0m)).ConfigureAwait(true), "Flow removed.");
+                }
+
                 Application.Banking.CashForecast f = await c.Get<Application.Abstractions.Banking.ICashForecastService>().ForecastAsync(c.CompanyId, i.Date("From"), i.Whole("Weeks"), i.Number("Minimum"))
                     .ConfigureAwait(true);
                 List<string> text =

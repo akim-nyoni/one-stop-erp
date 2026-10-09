@@ -89,3 +89,15 @@ internal sealed class BankFileLayoutConfiguration : IEntityTypeConfiguration<Ban
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
     }
 }
+
+internal sealed class CashForecastEntryConfiguration : IEntityTypeConfiguration<CashForecastEntry>
+{
+    public void Configure(EntityTypeBuilder<CashForecastEntry> b)
+    {
+        b.ToTable("cash_forecast_entry", Schemas.CashBook);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.Date });
+    }
+}

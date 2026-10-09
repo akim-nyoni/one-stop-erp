@@ -52,8 +52,30 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return posted;
         }, ct);
 
+    /// <inheritdoc />
+    public Task<Result<TradingPostingResult>> PostDebitNoteAsync(SalesInvoiceRequest request, string originalInvoiceNumber, CancellationToken ct = default)
+        => _db.AtomicAsync<TradingPostingResult>(async () =>
+        {
+            string original = (originalInvoiceNumber ?? string.Empty).Trim();
+            if (!await _db.OpenItems.AnyAsync(o => o.CompanyId == request.CompanyId && o.Ledger == TradingLedger.AccountsReceivable && o.TraderId == request.CustomerId
+                    && o.ItemType == OpenItemType.Invoice && o.DocumentNumber == original, ct).ConfigureAwait(false))
+            {
+                return Error.NotFound("Ar.OriginalInvoice", $"Invoice {original} is not on this customer's account.");
+            }
+
+            SalesInvoiceRequest note = new()
+            {
+                CompanyId = request.CompanyId, CustomerId = request.CustomerId, DocumentNumber = request.DocumentNumber, DocumentDate = request.DocumentDate, Currency = request.Currency,
+                NetAmount = request.NetAmount, TaxAmount = request.TaxAmount, CreditLimitOverrideByUserId = request.CreditLimitOverrideByUserId, EnteredByUserId = request.EnteredByUserId,
+                SalesAccountCode = request.SalesAccountCode, RevenueLines = request.RevenueLines, TaxAccountCode = request.TaxAccountCode, TaxCode = request.TaxCode,
+                ExchangeRate = request.ExchangeRate, RateOverrideByUserId = request.RateOverrideByUserId,
+                Narrative = string.IsNullOrWhiteSpace(request.Narrative) ? $"Debit note on {original}" : $"{request.Narrative.Trim()} (on {original})",
+            };
+            return await PostInvoiceCoreAsync(note, ct, OpenItemType.DebitNote).ConfigureAwait(false);
+        }, ct);
+
     // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
-    private async Task<Result<TradingPostingResult>> PostInvoiceCoreAsync(SalesInvoiceRequest request, CancellationToken ct)
+    private async Task<Result<TradingPostingResult>> PostInvoiceCoreAsync(SalesInvoiceRequest request, CancellationToken ct, OpenItemType itemType = OpenItemType.Invoice)
     {
         Customer? customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == request.CustomerId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
         if (customer is null)
@@ -160,7 +182,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             lines.Add(Line(request.TaxAccountCode, JournalSide.Credit, request.TaxAmount, rate, baseTax, request.TaxCode));
         }
 
-        Result<TradingPostingResult> opened = await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.Invoice,
+        Result<TradingPostingResult> opened = await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, itemType,
             LedgerSign.Debit, request.DocumentNumber, request.DocumentDate, customer.DueDateFor(request.DocumentDate),
             request.Currency, rate, gross, baseGross, request.Narrative, lines, ct).ConfigureAwait(false);
 
@@ -1121,6 +1143,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     {
         (TradingLedger.AccountsReceivable, OpenItemType.Invoice) => "SalesInvoice",
         (TradingLedger.AccountsReceivable, OpenItemType.CreditNote) => "SalesCreditNote",
+        (TradingLedger.AccountsReceivable, OpenItemType.DebitNote) => "SalesDebitNote",
         (TradingLedger.AccountsReceivable, OpenItemType.Receipt) => "CustomerReceipt",
         (TradingLedger.AccountsReceivable, OpenItemType.Journal) => "ReceiptReversal",
         (TradingLedger.AccountsPayable, OpenItemType.Invoice) => "PurchaseInvoice",

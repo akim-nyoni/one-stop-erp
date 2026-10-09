@@ -413,12 +413,13 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Import journals from a file",
-            Description = "Imports manual journals from a CSV file, all or nothing (a file with any problem imports nothing); journals over the approval threshold wait for a second "
-                + "user's approval instead of posting.",
-            Fields = [Req("File", "CSV file path")],
+            Description = "Imports manual journals from a CSV file or an Excel workbook (its first sheet), all or nothing (a file with any problem imports nothing); journals over "
+                + "the approval threshold wait for a second user's approval instead of posting.",
+            Fields = [Req("File", "CSV or .xlsx file path")],
             Run = async (c, i) =>
             {
-                string csv = await System.IO.File.ReadAllTextAsync(i.Text("File")).ConfigureAwait(true);
+                byte[] file = await System.IO.File.ReadAllBytesAsync(i.Text("File")).ConfigureAwait(true);
+                string csv = Application.Onboarding.XlsxReader.IsWorkbook(file) ? Application.Onboarding.XlsxReader.ToCsv(file) : System.Text.Encoding.UTF8.GetString(file);
                 IReadOnlyList<ImportedJournalResult> imported = Check(await c.Get<IJournalImportService>().ImportAsync(c.CompanyId, csv, c.UserId).ConfigureAwait(true));
                 return string.Join(Environment.NewLine, imported.Select(j => $"{j.Reference,-14} {j.JournalNumber}{(j.AwaitingApproval ? " (awaiting approval)" : string.Empty)}"));
             },

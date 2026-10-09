@@ -23,6 +23,9 @@ public enum CashFlowSource
 
     /// <summary>Payroll: net pay on the pay day, deductions remitted ten days later (from the last regular run).</summary>
     Payroll = 7,
+
+    /// <summary>Flows keyed into the forecast by hand.</summary>
+    Manual = 8,
 }
 
 /// <summary>One forecast cash flow (positive in, negative out).</summary>

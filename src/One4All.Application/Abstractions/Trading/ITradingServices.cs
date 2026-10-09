@@ -34,6 +34,16 @@ public interface ISalesLedgerService
     /// <returns>The posting result.</returns>
     Task<Result<TradingPostingResult>> PostInvoiceAsync(SalesInvoiceRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// Posts a debit note to a customer (brief §4.4): a further charge against an invoice already raised — an undercharge, a price adjustment,
+    /// a re-delivery — posted like an invoice and kept as a debit-note open item referring to the original.
+    /// </summary>
+    /// <param name="request">The charge (its document number is the debit note's).</param>
+    /// <param name="originalInvoiceNumber">The invoice it adds to.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The posting, or the original invoice is not the customer's.</returns>
+    Task<Result<TradingPostingResult>> PostDebitNoteAsync(SalesInvoiceRequest request, string originalInvoiceNumber, CancellationToken ct = default);
+
     /// <summary>Posts a receipt: Dr bank, Cr AR control; creates an AR (credit) open item.</summary>
     /// <param name="request">The receipt request.</param>
     /// <param name="ct">Cancellation token.</param>
