@@ -17,6 +17,27 @@ public interface IAttendanceService
     /// <returns>The record id, or an error.</returns>
     Task<Result<long>> TakeLeaveAsync(long companyId, long employeeId, string leaveType, DateOnly fromDate, DateOnly toDate, decimal days, CancellationToken ct = default);
 
+    /// <summary>
+    /// Cancels leave not yet begun (all its days back to the balance), or cuts it short when the employee is recalled: it ends the day before
+    /// they return and the days not taken go back (pro rata to the calendar days unless given).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="leaveRecordId">The leave taken.</param>
+    /// <param name="returnedOn">The day back at work (null or on/before the start: cancelled outright).</param>
+    /// <param name="daysBack">The working days given back when curtailed (null: pro rata).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The days given back.</returns>
+    Task<Result<decimal>> CancelLeaveAsync(long companyId, long leaveRecordId, DateOnly? returnedOn, decimal? daysBack = null, CancellationToken ct = default);
+
+    /// <summary>Who is on leave between two dates (brief §4.15 leave calendar), optionally for one department.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="from">The first day.</param>
+    /// <param name="to">The last day.</param>
+    /// <param name="department">The department (null: all).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The leave in the window, by start date.</returns>
+    Task<IReadOnlyList<LeaveCalendarEntry>> LeaveCalendarAsync(long companyId, DateOnly from, DateOnly to, string? department = null, CancellationToken ct = default);
+
     /// <summary>Pays out leave days instead of taking them, at a daily rate, reducing the balance.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="employeeId">The employee.</param>
@@ -51,3 +72,14 @@ public interface IAttendanceService
     /// <returns>Success, or an error.</returns>
     Task<Result> ApproveOvertimeAsync(long companyId, long attendanceId, long approverUserId, CancellationToken ct = default);
 }
+
+/// <summary>A period of leave on the calendar.</summary>
+/// <param name="LeaveRecordId">The leave record.</param>
+/// <param name="EmployeeNumber">The employee.</param>
+/// <param name="Name">Their name.</param>
+/// <param name="Department">Their department.</param>
+/// <param name="LeaveType">The leave type.</param>
+/// <param name="From">The first day.</param>
+/// <param name="To">The last day.</param>
+/// <param name="Days">The working days.</param>
+public sealed record LeaveCalendarEntry(long LeaveRecordId, string EmployeeNumber, string Name, string? Department, string LeaveType, DateOnly From, DateOnly To, decimal Days);

@@ -323,6 +323,51 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Leave calendar and recall", ListTitle = "Leave this month",
+            Description = "Shows who is on leave between two dates (optionally one department); cancels leave not yet begun, or cuts it short when someone is recalled — the days "
+                + "not taken go back to the balance (pro rata unless given).",
+            Fields = [Pick("Step", "Step", ["Calendar", "Cancel or recall"]), Today("From", "From"), Today("To", "To"), Opt("Department", "Department (calendar)"),
+                OptNum("Leave", "Leave record id (cancel)"), Opt("Returned", "Back at work on (yyyy-mm-dd; blank: cancel outright)"), OptNum("DaysBack", "Days given back (blank: pro rata)")],
+            Run = async (c, i) =>
+            {
+                IAttendanceService attendance = c.Get<IAttendanceService>();
+                if (i.Text("Step") == "Calendar")
+                {
+                    IReadOnlyList<LeaveCalendarEntry> calendar = await attendance.LeaveCalendarAsync(c.CompanyId, i.Date("From"), i.Date("To"), i.Optional("Department")).ConfigureAwait(true);
+                    return calendar.Count == 0 ? "Nobody is on leave then." : string.Join(Environment.NewLine, calendar.Select(e =>
+                        $"#{e.LeaveRecordId,-6} {e.EmployeeNumber,-10} {e.Name,-24} {e.LeaveType,-10} {D(e.From)} – {D(e.To)}  {Q(e.Days)} day(s)  {e.Department}"));
+                }
+
+                DateOnly? returned = i.Optional("Returned") is string r ? DateOnly.Parse(r, System.Globalization.CultureInfo.InvariantCulture) : null;
+                decimal back = Check(await attendance.CancelLeaveAsync(c.CompanyId, (long)(i.OptionalNumber("Leave") ?? 0m), returned, i.OptionalNumber("DaysBack")).ConfigureAwait(true));
+                return $"{Q(back)} day(s) back to the balance.";
+            },
+            List = async c =>
+            {
+                DateOnly today = DateOnly.FromDateTime(DateTime.Today), first = new(today.Year, today.Month, 1);
+                return Table(await c.Get<IAttendanceService>().LeaveCalendarAsync(c.CompanyId, first, first.AddMonths(1).AddDays(-1)).ConfigureAwait(true),
+                    ("Id", e => e.LeaveRecordId), ("Employee", e => e.EmployeeNumber), ("Name", e => e.Name), ("Type", e => e.LeaveType), ("From", e => D(e.From)), ("To", e => D(e.To)),
+                    ("Days", e => Q(e.Days)), ("Department", e => e.Department));
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Bonus and gratuity provisions", ListTitle = "Leave balances",
+            Description = "Trues up the 13th-cheque bonus provision (earned through the bonus year) or the gratuity provision (days' pay per year of service) to what active "
+                + "employees have earned to the date, posting the movement between the expense and the provision.",
+            Fields = [Pick("Kind", "Provision", Enum.GetNames<PayrollProvisionKind>()), Today(), Today("YearStart", "Bonus year starts"), Num("Months", "Months' pay a year (bonus)", "1"),
+                Num("DaysPerYear", "Days' pay per year of service (gratuity)", "15"), Num("WorkingDays", "Working days a month (gratuity)", "26"), Req("Expense", "Expense account"),
+                Req("Provision", "Provision account"), Req("Document", "Document number")],
+            Run = async (c, i) => $"Provision now {M(Check(await c.Get<ILeaveService>().RaisePayrollProvisionAsync(new PayrollProvisionRequest
+            {
+                CompanyId = c.CompanyId, Kind = Enum.Parse<PayrollProvisionKind>(i.Text("Kind")), Date = i.Date("Date"), YearStart = i.Date("YearStart"), MonthsOfPay = i.Number("Months"),
+                DaysPerYear = i.Number("DaysPerYear"), WorkingDaysPerMonth = i.Number("WorkingDays"), ExpenseAccountCode = i.Text("Expense"), ProvisionAccountCode = i.Text("Provision"),
+                DocumentNumber = i.Text("Document"),
+            }).ConfigureAwait(true)))}.",
+            List = LeaveBalancesAsync,
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Encash leave", ListTitle = "Leave balances", Description = "Pays out leave days at a daily rate.",
             Fields = [Req("Employee", "Employee number"), Req("Type", "Leave type", "ANNUAL"), Today(), Num("Days", "Days"), Num("Rate", "Daily rate")],
             Run = async (c, i) => Check(await c.Get<IAttendanceService>().EncashLeaveAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Type"), i.Date("Date"),

@@ -82,6 +82,53 @@ public sealed class LeaveService : ILeaveService
     }
 
     /// <inheritdoc />
+    public Task<Result<decimal>> RaisePayrollProvisionAsync(PayrollProvisionRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return _db.AtomicAsync(async () =>
+        {
+            if (string.IsNullOrWhiteSpace(request.ExpenseAccountCode) || string.IsNullOrWhiteSpace(request.ProvisionAccountCode) || string.IsNullOrWhiteSpace(request.DocumentNumber)
+                || (request.Kind == PayrollProvisionKind.Gratuity ? request.DaysPerYear <= 0m || request.WorkingDaysPerMonth <= 0m : request.MonthsOfPay <= 0m))
+            {
+                return Error.Validation("Pay.Provision", "A provision needs its accounts, a document number and a positive rate (months' pay for a bonus, days per year for gratuity).");
+            }
+
+            // Target = what the active employees have earned to the date.
+            var staff = await _db.Employees.AsNoTracking().Where(e => e.CompanyId == request.CompanyId && e.Status == EmployeeStatus.Active)
+                .Select(e => new { e.BasicSalary, e.EngagementDate }).ToListAsync(ct).ConfigureAwait(false);
+            decimal target = staff.Sum(e => request.Kind == PayrollProvisionKind.Bonus
+                ? Application.Payroll.PayrollProvisions.BonusEarned(e.BasicSalary, e.EngagementDate, request.YearStart, request.Date, request.MonthsOfPay)
+                : Application.Payroll.PayrollProvisions.GratuityEarned(e.BasicSalary, e.EngagementDate, request.Date, request.DaysPerYear, request.WorkingDaysPerMonth));
+            string provision = request.ProvisionAccountCode.Trim(), expense = request.ExpenseAccountCode.Trim();
+            decimal provided = await (
+                from l in _db.Set<JournalLine>()
+                join j in _db.Journals on l.JournalEntryId equals j.Id
+                where j.CompanyId == request.CompanyId && j.Status == JournalStatus.Posted && j.PostingDate <= request.Date && l.AccountCode == provision
+                select (decimal?)(l.BaseCredit - l.BaseDebit)).SumAsync(ct).ConfigureAwait(false) ?? 0m;
+            decimal delta = decimal.Round(target - provided, 2, MidpointRounding.AwayFromZero);
+            if (delta == 0m)
+            {
+                return Result<decimal>.Success(target);
+            }
+
+            Company company = await _db.Set<Company>().FirstAsync(c => c.Id == request.CompanyId, ct).ConfigureAwait(false);
+            (string debit, string credit) = delta > 0m ? (expense, provision) : (provision, expense);
+            Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+            {
+                CompanyId = request.CompanyId, SourceModule = "GL", PostingDate = request.Date, TransactionCurrency = company.BaseCurrency,
+                DocumentType = request.Kind == PayrollProvisionKind.Bonus ? "PAY-BONUS-PROV" : "PAY-GRAT-PROV", DocumentNumber = request.DocumentNumber.Trim(),
+                Narrative = $"{request.Kind} provision true-up to {target:0.00}",
+                Lines =
+                [
+                    new JournalLineRequest { AccountCode = debit, Side = JournalSide.Debit, TransactionAmount = Math.Abs(delta) },
+                    new JournalLineRequest { AccountCode = credit, Side = JournalSide.Credit, TransactionAmount = Math.Abs(delta) },
+                ],
+            }, ct).ConfigureAwait(false);
+            return posted.IsFailure ? Result<decimal>.Failure(posted.Error) : Result<decimal>.Success(target);
+        }, ct);
+    }
+
+    /// <inheritdoc />
     public Task<Result<decimal>> RaiseLeaveProvisionAsync(long companyId, DateOnly date, decimal dailyRate, string leaveExpenseAccountCode, string leaveProvisionAccountCode, string documentNumber, CancellationToken ct = default)
         => _db.AtomicAsync(() => RaiseLeaveProvisionCoreAsync(companyId, date, dailyRate, leaveExpenseAccountCode, leaveProvisionAccountCode, documentNumber, ct), ct);
 

@@ -64,6 +64,25 @@ public sealed class LeaveRecord : Entity, ICompanyScoped
 
     /// <summary>Gets the amount paid (encashments).</summary>
     public decimal Amount { get; private set; }
+
+    /// <summary>Gets whether the leave was cancelled before it began (its days went back to the balance).</summary>
+    public bool IsCancelled { get; private set; }
+
+    /// <summary>Cancels leave not yet begun.</summary>
+    public void Cancel()
+    {
+        IsCancelled = true;
+        Days = 0m;
+    }
+
+    /// <summary>Cuts leave short when the employee is recalled: it ends the day before they return.</summary>
+    /// <param name="returnedOn">The day they are back at work.</param>
+    /// <param name="daysBack">The days returned to the balance.</param>
+    public void Curtail(DateOnly returnedOn, decimal daysBack)
+    {
+        ToDate = returnedOn.AddDays(-1);
+        Days -= daysBack;
+    }
 }
 
 /// <summary>How an employee's day went.</summary>

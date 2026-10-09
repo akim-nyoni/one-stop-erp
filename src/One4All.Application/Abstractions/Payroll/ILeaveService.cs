@@ -41,4 +41,54 @@ public interface ILeaveService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The provision level (target liability) after the true-up.</returns>
     Task<Result<decimal>> RaiseLeaveProvisionAsync(long companyId, DateOnly date, decimal dailyRate, string leaveExpenseAccountCode, string leaveProvisionAccountCode, string documentNumber, CancellationToken ct = default);
+
+    /// <summary>Trues up the bonus or gratuity provision to what active employees have earned to the date, posting the movement.</summary>
+    /// <param name="request">The provision.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The provision level (the target) after the true-up.</returns>
+    Task<Result<decimal>> RaisePayrollProvisionAsync(PayrollProvisionRequest request, CancellationToken ct = default);
+}
+
+/// <summary>A payroll liability built up between paydays.</summary>
+public enum PayrollProvisionKind
+{
+    /// <summary>The annual bonus (13th cheque), earned through the bonus year.</summary>
+    Bonus = 0,
+
+    /// <summary>Gratuity, earned for each year of service.</summary>
+    Gratuity = 1,
+}
+
+/// <summary>Trues up a bonus or gratuity provision to what active employees have earned (brief §4.15).</summary>
+public sealed class PayrollProvisionRequest
+{
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>Gets the provision.</summary>
+    public PayrollProvisionKind Kind { get; init; }
+
+    /// <summary>Gets the as-at date (the journal's date).</summary>
+    public DateOnly Date { get; init; }
+
+    /// <summary>Gets the first day of the bonus year (bonus).</summary>
+    public DateOnly YearStart { get; init; }
+
+    /// <summary>Gets the months' pay a full year's bonus is worth (bonus; 1 = a 13th cheque).</summary>
+    public decimal MonthsOfPay { get; init; } = 1m;
+
+    /// <summary>Gets the days' pay earned per year of service (gratuity).</summary>
+    public decimal DaysPerYear { get; init; }
+
+    /// <summary>Gets the working days a month's pay covers (gratuity's daily rate).</summary>
+    public decimal WorkingDaysPerMonth { get; init; } = 26m;
+
+    /// <summary>Gets the expense account.</summary>
+    public string ExpenseAccountCode { get; init; } = string.Empty;
+
+    /// <summary>Gets the provision (liability) account.</summary>
+    public string ProvisionAccountCode { get; init; } = string.Empty;
+
+    /// <summary>Gets the journal's document number.</summary>
+    public string DocumentNumber { get; init; } = string.Empty;
 }

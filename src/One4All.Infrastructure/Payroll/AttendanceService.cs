@@ -33,7 +33,7 @@ public sealed class AttendanceService : IAttendanceService
             return Error.Validation("Hr.LeaveDates", "Leave needs an end on or after its start and positive days no more than the days in the range.");
         }
 
-        if (await _db.LeaveRecords.AnyAsync(l => l.EmployeeId == employeeId && l.Kind == LeaveRecordKind.Taken && l.FromDate <= toDate && l.ToDate >= fromDate, ct).ConfigureAwait(false))
+        if (await _db.LeaveRecords.AnyAsync(l => l.EmployeeId == employeeId && l.Kind == LeaveRecordKind.Taken && !l.IsCancelled && l.FromDate <= toDate && l.ToDate >= fromDate, ct).ConfigureAwait(false))
         {
             return Error.Conflict("Hr.LeaveOverlap", "The employee already has leave in those dates.");
         }
@@ -48,6 +48,60 @@ public sealed class AttendanceService : IAttendanceService
         _db.LeaveRecords.Add(record);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return record.Id;
+    }
+
+    /// <inheritdoc />
+    public Task<Result<decimal>> CancelLeaveAsync(long companyId, long leaveRecordId, DateOnly? returnedOn, decimal? daysBack = null, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            LeaveRecord? record = await _db.LeaveRecords.FirstOrDefaultAsync(l => l.Id == leaveRecordId && l.CompanyId == companyId && l.Kind == LeaveRecordKind.Taken && !l.IsCancelled, ct)
+                .ConfigureAwait(false);
+            if (record is null)
+            {
+                return Error.NotFound("Hr.LeaveNotFound", $"No leave {leaveRecordId} to cancel.");
+            }
+
+            decimal back;
+            if (returnedOn is not DateOnly back0 || back0 <= record.FromDate)
+            {
+                back = record.Days;
+                record.Cancel();
+            }
+            else if (back0 > record.ToDate)
+            {
+                return Error.Rule("Hr.LeaveOver", $"The leave ended on {record.ToDate:yyyy-MM-dd}; there is nothing to give back.");
+            }
+            else
+            {
+                decimal calendar = record.ToDate.DayNumber - record.FromDate.DayNumber + 1;
+                back = daysBack ?? decimal.Round(record.Days * (record.ToDate.DayNumber - back0.DayNumber + 1) / calendar, 2, MidpointRounding.AwayFromZero);
+                if (back < 0m || back > record.Days)
+                {
+                    return Error.Validation("Hr.LeaveDaysBack", $"Between 0 and {record.Days} days can be given back.");
+                }
+
+                record.Curtail(back0, back);
+            }
+
+            EmployeeLeaveBalance? balance = await _db.Set<EmployeeLeaveBalance>().FirstOrDefaultAsync(b => b.EmployeeId == record.EmployeeId && b.LeaveType == record.LeaveType, ct)
+                .ConfigureAwait(false);
+            balance?.Restore(back);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result<decimal>.Success(back);
+        }, ct);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<LeaveCalendarEntry>> LeaveCalendarAsync(long companyId, DateOnly from, DateOnly to, string? department = null, CancellationToken ct = default)
+    {
+        string? only = string.IsNullOrWhiteSpace(department) ? null : department.Trim();
+        DateOnly first = from, last = to;
+        return await (
+                from l in _db.LeaveRecords.AsNoTracking()
+                join e in _db.Employees.AsNoTracking() on l.EmployeeId equals e.Id
+                where l.CompanyId == companyId && l.Kind == LeaveRecordKind.Taken && !l.IsCancelled && l.FromDate <= last && l.ToDate >= first && (only == null || e.Department == only)
+                orderby l.FromDate, e.EmployeeNumber
+                select new LeaveCalendarEntry(l.Id, e.EmployeeNumber, e.FullName, e.Department, l.LeaveType, l.FromDate, l.ToDate, l.Days))
+            .ToListAsync(ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

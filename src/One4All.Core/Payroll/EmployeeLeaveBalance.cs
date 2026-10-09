@@ -44,6 +44,10 @@ public sealed class EmployeeLeaveBalance : AuditableEntity, ICompanyScoped
     /// <param name="days">The days to accrue.</param>
     public void Accrue(decimal days) => AccruedDays = decimal.Round(AccruedDays + days, 4, MidpointRounding.ToEven);
 
+    /// <summary>Gives back leave days taken (cancelled or curtailed leave).</summary>
+    /// <param name="days">The days given back.</param>
+    public void Restore(decimal days) => TakenDays = Math.Max(0m, decimal.Round(TakenDays - days, 4, MidpointRounding.ToEven));
+
     /// <summary>Records leave taken.</summary>
     /// <param name="days">The days taken.</param>
     public void Take(decimal days)
