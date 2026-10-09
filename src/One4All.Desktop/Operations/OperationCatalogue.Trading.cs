@@ -273,17 +273,30 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = credit, Title = "Dunning reminders",
-            Description = "Lists the customers due a reminder by how long their oldest debt is overdue (first reminder, second, final notice — days configurable), or renders the "
-                + "reminder letter for one customer.",
-            Fields = [Pick("Step", "Step", ["Assess", "Letter"]), Opt("Customer", "Customer code (letter)"), Num("First", "First reminder after (days)", "7"), Num("Second", "Second after (days)", "30"),
-                Num("Final", "Final notice after (days)", "60"), Today("Date", "As at")],
+            Description = "Lists the customers due a reminder by how long their oldest debt is overdue (first reminder, second, final notice — days configurable, or a dunning "
+                + "group's own; exempt groups are not chased), renders one customer's letter, or emails every letter due (not the same level again within the resend days). "
+                + "Groups and customer types are kept here too.",
+            Fields = [Pick("Step", "Step", ["Assess", "Letter", "Send", "Save group", "Set customer"]), Opt("Customer", "Customer code (letter / set customer)"),
+                Num("First", "First reminder after (days)", "7"), Num("Second", "Second after (days)", "30"), Num("Final", "Final notice after (days)", "60"), Today("Date", "As at"),
+                Opt("Template", "Email template (send)", "REMINDER"), Num("Resend", "Resend after (days)", "14"), Opt("Group", "Dunning group code"), Opt("GroupName", "Group name (save group)"),
+                Tick("Exempt", "Group is not chased"), Opt("Type", "Customer type (set customer)")],
             Run = async (c, i) =>
             {
                 IDunningService dunning = c.Get<IDunningService>();
                 One4All.Application.Trading.DunningStages stages = new(i.Whole("First"), i.Whole("Second"), i.Whole("Final"));
-                if (i.Text("Step") == "Letter")
+                switch (i.Text("Step"))
                 {
-                    return Check(await dunning.RenderReminderTextAsync(c.CompanyId, await CustomerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true), i.Date("Date"), stages).ConfigureAwait(true));
+                    case "Letter":
+                        return Check(await dunning.RenderReminderTextAsync(c.CompanyId, await CustomerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true), i.Date("Date"), stages).ConfigureAwait(true));
+                    case "Send":
+                        DunningSend sent = Check(await dunning.SendAsync(c.CompanyId, i.Date("Date"), stages, i.Optional("Template") ?? "REMINDER", Localization.UiText.Catalog.Culture.TwoLetterISOLanguageName,
+                            i.Whole("Resend")).ConfigureAwait(true));
+                        return $"{sent.Queued} reminder(s) queued for email; {sent.NoEmail} to post (no email address); {sent.AlreadySent} already sent recently.";
+                    case "Save group":
+                        return Check(await dunning.SaveGroupAsync(c.CompanyId, new DunningGroupInput(i.Optional("Group") ?? string.Empty, i.Optional("GroupName") ?? i.Optional("Group") ?? string.Empty, stages,
+                            i.Flag("Exempt"))).ConfigureAwait(true), "Dunning group saved.");
+                    case "Set customer":
+                        return Check(await dunning.SetCustomerAsync(c.CompanyId, i.Optional("Customer") ?? string.Empty, i.Optional("Group"), i.Optional("Type")).ConfigureAwait(true), "Customer updated.");
                 }
 
                 IReadOnlyList<DunningNotice> notices = Check(await dunning.AssessAsync(c.CompanyId, i.Date("Date"), stages).ConfigureAwait(true));

@@ -113,6 +113,12 @@ public sealed class Customer : SoftDeletableEntity, ICompanyScoped
     /// <summary>The email address statements and notices are sent to (brief §8).</summary>
     public string? Email { get; set; }
 
+    /// <summary>Gets or sets the customer type (retail, corporate, government…) promotions and reports select by.</summary>
+    public string? CustomerType { get; set; }
+
+    /// <summary>Gets or sets the dunning group whose timetable the customer is chased on (null: the standard stages).</summary>
+    public string? DunningGroupCode { get; set; }
+
     /// <summary>The mobile number SMS reminders are sent to (brief §8).</summary>
     public string? MobileNumber { get; set; }
 

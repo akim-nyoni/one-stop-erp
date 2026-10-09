@@ -18,7 +18,126 @@ public sealed class DunningService : IDunningService
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
-    public DunningService(One4AllDbContext db) => _db = db;
+    public DunningService(One4AllDbContext db, Application.Abstractions.Communications.INotificationService? messages = null)
+    {
+        _db = db;
+        _messages = messages;
+    }
+
+    private readonly Application.Abstractions.Communications.INotificationService? _messages;
+
+    /// <inheritdoc />
+    public async Task<Result> SaveGroupAsync(long companyId, DunningGroupInput group, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(group);
+        string code = (group.Code ?? string.Empty).Trim().ToUpperInvariant();
+        DunningStages s = group.Stages;
+        if (code.Length == 0 || string.IsNullOrWhiteSpace(group.Name) || (!group.IsExempt && (s.FirstReminderDays < 1 || s.SecondReminderDays <= s.FirstReminderDays || s.FinalNoticeDays <= s.SecondReminderDays)))
+        {
+            return Result.Failure(Error.Validation("Ar.DunningGroup", "A dunning group needs a code, a name and rising reminder days (first, second, final)."));
+        }
+
+        DunningGroup? saved = await _db.Set<DunningGroup>().FirstOrDefaultAsync(g => g.CompanyId == companyId && g.Code == code, ct).ConfigureAwait(false);
+        if (saved is null)
+        {
+            saved = new DunningGroup(companyId, code, group.Name);
+            _db.Set<DunningGroup>().Add(saved);
+        }
+
+        saved.Name = group.Name.Trim();
+        (saved.FirstReminderDays, saved.SecondReminderDays, saved.FinalNoticeDays, saved.IsExempt) = (s.FirstReminderDays, s.SecondReminderDays, s.FinalNoticeDays, group.IsExempt);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetCustomerAsync(long companyId, string customerCode, string? groupCode, string? customerType, CancellationToken ct = default)
+    {
+        string code = (customerCode ?? string.Empty).Trim().ToUpperInvariant();
+        Customer? customer = await _db.Customers.FirstOrDefaultAsync(c => c.CompanyId == companyId && c.Code == code, ct).ConfigureAwait(false);
+        if (customer is null)
+        {
+            return Result.Failure(Error.NotFound("Ar.CustomerNotFound", $"Customer {code} not found."));
+        }
+
+        string? group = string.IsNullOrWhiteSpace(groupCode) ? null : groupCode.Trim().ToUpperInvariant();
+        if (group is not null && !await _db.Set<DunningGroup>().AnyAsync(g => g.CompanyId == companyId && g.Code == group, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.NotFound("Ar.DunningGroupNotFound", $"Dunning group {group} not found."));
+        }
+
+        customer.DunningGroupCode = group;
+        customer.CustomerType = string.IsNullOrWhiteSpace(customerType) ? null : customerType.Trim();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<DunningSend>> SendAsync(long companyId, DateOnly asAtDate, DunningStages stages, string templateCode, string language, int resendDays = 14, CancellationToken ct = default)
+    {
+        if (_messages is null)
+        {
+            return Error.Rule("Ar.NoMessaging", "Sending reminders is not available.");
+        }
+
+        Result<IReadOnlyList<DunningNotice>> assessed = await AssessAsync(companyId, asAtDate, stages, ct).ConfigureAwait(false);
+        if (assessed.IsFailure)
+        {
+            return assessed.Error;
+        }
+
+        DateOnly since = asAtDate.AddDays(-Math.Max(0, resendDays));
+        List<long> ids = [.. assessed.Value.Select(n => n.CustomerId)];
+        var logs = await _db.Set<DunningLog>().AsNoTracking().Where(l => l.CompanyId == companyId && ids.Contains(l.CustomerId) && l.SentOn > since).Select(l => new { l.CustomerId, l.Level })
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, Customer> customers = await _db.Customers.AsNoTracking().Where(c => ids.Contains(c.Id)).ToDictionaryAsync(c => c.Id, ct).ConfigureAwait(false);
+        List<Application.Abstractions.Communications.DespatchRecipient> recipients = [];
+        List<DunningNotice> sent = [];
+        int noEmail = 0, already = 0;
+        foreach (DunningNotice notice in assessed.Value)
+        {
+            if (logs.Any(l => l.CustomerId == notice.CustomerId && l.Level == notice.Level))
+            {
+                already++;
+                continue;
+            }
+
+            Customer customer = customers[notice.CustomerId];
+            if (string.IsNullOrWhiteSpace(customer.Email))
+            {
+                noEmail++;
+                continue;
+            }
+
+            Result<string> letter = await RenderReminderTextAsync(companyId, customer.Id, asAtDate, stages, ct: ct).ConfigureAwait(false);
+            if (letter.IsFailure)
+            {
+                return letter.Error;
+            }
+
+            recipients.Add(new Application.Abstractions.Communications.DespatchRecipient(customer.Email.Trim(), new Dictionary<string, string>
+            {
+                ["Name"] = customer.Name, ["Account"] = customer.Code, ["Level"] = notice.LevelLabel,
+                ["Overdue"] = notice.OverdueAmount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture), ["Letter"] = letter.Value,
+            }));
+            sent.Add(notice);
+        }
+
+        if (recipients.Count == 0)
+        {
+            return new DunningSend(null, 0, noEmail, already);
+        }
+
+        Result<long> batch = await _messages.QueueAsync(companyId, $"Reminders {asAtDate:yyyy-MM-dd}", templateCode, language, Core.Communications.MessageChannel.Email, recipients, ct).ConfigureAwait(false);
+        if (batch.IsFailure)
+        {
+            return batch.Error;
+        }
+
+        _db.Set<DunningLog>().AddRange(sent.Select(n => new DunningLog(companyId, n.CustomerId, n.Level, asAtDate, n.OverdueAmount)));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new DunningSend(batch.Value, recipients.Count, noEmail, already);
+    }
 
     /// <inheritdoc />
     public async Task<Result<IReadOnlyList<DunningNotice>>> AssessAsync(long companyId, DateOnly asAtDate, DunningStages stages, CancellationToken ct = default)
@@ -35,6 +154,12 @@ public sealed class DunningService : IDunningService
             .Where(c => c.CompanyId == companyId)
             .ToDictionaryAsync(c => c.Id, c => c.Name, ct).ConfigureAwait(false);
 
+        // A customer in a dunning group is chased on the group's timetable, or not at all when the group is exempt.
+        Dictionary<string, DunningGroup> groups = await _db.Set<DunningGroup>().AsNoTracking().Where(g => g.CompanyId == companyId).ToDictionaryAsync(g => g.Code, ct).ConfigureAwait(false);
+        Dictionary<long, string> membership = groups.Count == 0 ? [] : await _db.Customers.AsNoTracking().Where(c => c.CompanyId == companyId && c.DunningGroupCode != null)
+            .ToDictionaryAsync(c => c.Id, c => c.DunningGroupCode!, ct).ConfigureAwait(false);
+        DunningGroup? GroupOf(long customerId) => membership.TryGetValue(customerId, out string? code) ? groups.GetValueOrDefault(code) : null;
+
         // A customer who has promised to pay, and whose promised date has not passed, is not chased meanwhile.
         HashSet<long> promised = [.. await _db.Set<PaymentPromise>()
             .Where(p => p.CompanyId == companyId && p.Status == PromiseStatus.Open && p.MadeOn <= asAtDate && p.PayBy >= asAtDate)
@@ -48,8 +173,14 @@ public sealed class DunningService : IDunningService
         foreach (IGrouping<long, OpenItem> byCustomer in overdue.GroupBy(o => o.TraderId))
         {
             // Payments and credit notes not yet allocated count against the oldest invoices first.
+            DunningGroup? group = GroupOf(byCustomer.Key);
+            if (group is { IsExempt: true })
+            {
+                continue;
+            }
+
             NetOverdue net = Dunning.ApplyCredits(byCustomer.Select(o => new OverdueItem(o.DueDate, o.OutstandingBase)), credits.GetValueOrDefault(byCustomer.Key), asAtDate);
-            int level = Dunning.LevelFor(net.OldestDaysOverdue, stages);
+            int level = Dunning.LevelFor(net.OldestDaysOverdue, group is null ? stages : new DunningStages(group.FirstReminderDays, group.SecondReminderDays, group.FinalNoticeDays));
             if (level < 1 || net.Amount <= 0m)
             {
                 continue;

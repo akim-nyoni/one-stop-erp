@@ -9,6 +9,8 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
     public void Configure(EntityTypeBuilder<Customer> b)
     {
         b.Property(x => x.DeliveryZone).HasMaxLength(20);
+        b.Property(x => x.CustomerType).HasMaxLength(30);
+        b.Property(x => x.DunningGroupCode).HasMaxLength(20);
         b.ToTable("customer", Schemas.AccountsReceivable);
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).HasMaxLength(20);
@@ -335,5 +337,28 @@ internal sealed class PaymentRunBatchLineConfiguration : IEntityTypeConfiguratio
         b.Property(x => x.Amount).HasPrecision(19, 4);
         b.Property(x => x.Note).HasMaxLength(100);
         b.Property(x => x.PaymentNumber).HasMaxLength(30);
+    }
+}
+
+internal sealed class DunningGroupConfiguration : IEntityTypeConfiguration<DunningGroup>
+{
+    public void Configure(EntityTypeBuilder<DunningGroup> b)
+    {
+        b.ToTable("dunning_group", Schemas.AccountsReceivable);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(120);
+        b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+    }
+}
+
+internal sealed class DunningLogConfiguration : IEntityTypeConfiguration<DunningLog>
+{
+    public void Configure(EntityTypeBuilder<DunningLog> b)
+    {
+        b.ToTable("dunning_log", Schemas.AccountsReceivable);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Overdue).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CustomerId, x.Level, x.SentOn });
     }
 }

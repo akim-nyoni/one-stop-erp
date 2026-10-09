@@ -30116,6 +30116,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(3)")
                         .HasColumnName("currency");
 
+                    b.Property<string>("CustomerType")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("customer_type");
+
                     b.Property<string>("DefaultTaxCode")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -30133,6 +30138,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("delivery_zone");
+
+                    b.Property<string>("DunningGroupCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("dunning_group_code");
 
                     b.Property<string>("Email")
                         .HasMaxLength(200)
@@ -30356,6 +30366,120 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_debt_case_write_off_approver", "write_off_approved_by_user_id IS NULL OR write_off_approved_by_user_id <> write_off_requested_by_user_id");
                         });
+                });
+
+            modelBuilder.Entity("One4All.Core.Trading.DunningGroup", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<int>("FinalNoticeDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("final_notice_days");
+
+                    b.Property<int>("FirstReminderDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("first_reminder_days");
+
+                    b.Property<bool>("IsExempt")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_exempt");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("SecondReminderDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("second_reminder_days");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dunning_group");
+
+                    b.HasIndex("CompanyId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_dunning_group_company_id_code");
+
+                    b.ToTable("dunning_group", "ar");
+                });
+
+            modelBuilder.Entity("One4All.Core.Trading.DunningLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("integer")
+                        .HasColumnName("level");
+
+                    b.Property<decimal>("Overdue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("overdue");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<DateOnly>("SentOn")
+                        .HasColumnType("date")
+                        .HasColumnName("sent_on");
+
+                    b.HasKey("Id")
+                        .HasName("pk_dunning_log");
+
+                    b.HasIndex("CustomerId", "Level", "SentOn")
+                        .HasDatabaseName("ix_dunning_log_customer_id_level_sent_on");
+
+                    b.ToTable("dunning_log", "ar");
                 });
 
             modelBuilder.Entity("One4All.Core.Trading.LaybyLine", b =>
