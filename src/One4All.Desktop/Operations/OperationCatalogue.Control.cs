@@ -79,6 +79,47 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = budgeting, Title = "Budget methods and forecasts", ListTitle = "Budgets",
+            Description = "Builds a draft budget incrementally from a prior year's actuals or budget with an uplift (accounts the draft already has are left alone); reforecasts a budget "
+                + "with the actuals to a period and the budget for the rest (a new Reforecast version); and shows its cash budget — each line turned into cash by its timing "
+                + "(prefix:p0/p1/…; e.g. 4:50/30/20 collects sales over three months) from the opening cash.",
+            Fields = [Pick("Step", "Step", ["Build from prior-year actuals", "Build from prior-year budget", "Reforecast", "Cash budget"]), Num("Budget", "Budget id"),
+                OptNum("SourceYear", "Prior fiscal year id (build)"), Num("Uplift", "Uplift % (build)", "0"), Opt("Prefix", "Accounts starting (build; blank: all)"),
+                Num("AsAt", "Actuals to period (reforecast)", "6"), Opt("Label", "Reforecast label"), Opt("Timings", "Cash timings: prefix:p0/p1/…; …"), Num("Opening", "Opening cash", "0")],
+            Run = async (c, i) =>
+            {
+                IBudgetMethodService methods = c.Get<IBudgetMethodService>();
+                long budget = (long)i.Number("Budget");
+                switch (i.Text("Step"))
+                {
+                    case "Reforecast":
+                        return Check(await methods.ReforecastAsync(c.CompanyId, budget, i.Whole("AsAt"), i.Optional("Label") ?? string.Empty).ConfigureAwait(true), id => $"Reforecast budget {id} created.");
+                    case "Cash budget":
+                        List<One4All.Application.Budgeting.CashTiming> timings = [];
+                        foreach (string part in (i.Optional("Timings") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                            timings.Add(bits.Length == 2
+                                ? new One4All.Application.Budgeting.CashTiming(bits[0], [.. bits[1].Split('/').Select(p => decimal.Parse(p.Trim(), System.Globalization.CultureInfo.InvariantCulture))])
+                                : throw new OperationException($"Write each timing as prefix:p0/p1/… (\"{part}\")."));
+                        }
+
+                        var cash = Check(await methods.CashBudgetAsync(c.CompanyId, budget, timings, i.Number("Opening")).ConfigureAwait(true));
+                        return string.Join(Environment.NewLine, cash.Months.Select(m => $"P{m.Period,-3} opening {M(m.Opening),14}  in {M(m.Receipts),12}  out {M(m.Payments),12}  closing {M(m.Closing),14}"))
+                            + Environment.NewLine + $"After the year end: {M(cash.CarryOut)}";
+                    default:
+                        return Check(await methods.BuildIncrementalAsync(new IncrementalBudgetRequest
+                        {
+                            CompanyId = c.CompanyId, BudgetId = budget, Basis = i.Text("Step").EndsWith("budget", StringComparison.Ordinal) ? IncrementalBasis.PriorYearBudget : IncrementalBasis.PriorYearActual,
+                            SourceFiscalYearId = (long)(i.OptionalNumber("SourceYear") ?? 0m), UpliftPercent = i.Number("Uplift"), AccountPrefix = i.Optional("Prefix"),
+                        }).ConfigureAwait(true), n => $"{n} line(s) added.");
+                }
+            },
+            List = async c => Table(await c.Db.Set<Core.Budgeting.Budget>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Take(100).ToListAsync().ConfigureAwait(true),
+                ("Id", b => b.Id), ("Label", b => b.Label), ("Type", b => b.Type), ("Department", b => b.Department), ("Version", b => b.VersionNumber), ("Active", b => b.IsActive)),
+        };
+        yield return new Operation
+        {
             Module = budgeting, Title = "Virements", ListTitle = "Virements",
             Description = "Moves budget from one vote to another — between cost centres, or to another department's budget of the same year — requested with a justification, approved "
                 + "or rejected by another user whose authorisation level covers the amount's band (Bands: limit:level; …, blank limit for the top band); the register shows each "
