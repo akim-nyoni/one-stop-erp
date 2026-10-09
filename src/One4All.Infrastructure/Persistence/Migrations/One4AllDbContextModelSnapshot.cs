@@ -14226,6 +14226,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("haulage_zone_code");
 
+                    b.Property<string>("InvoiceNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("invoice_number");
+
                     b.Property<bool>("IsComplete")
                         .HasColumnType("boolean")
                         .HasColumnName("is_complete");

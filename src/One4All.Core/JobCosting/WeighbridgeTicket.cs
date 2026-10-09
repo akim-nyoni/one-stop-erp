@@ -231,6 +231,13 @@ public sealed class WeighbridgeTicket : AuditableEntity, ICompanyScoped
     /// <summary>Gets or sets the concrete batch (assembly run) the load came from.</summary>
     public string? BatchRunNumber { get; set; }
 
+    /// <summary>Gets the sales invoice the load was billed on (null: not yet invoiced); a ticket is invoiced once.</summary>
+    public string? InvoiceNumber { get; private set; }
+
+    /// <summary>Marks the load billed on an invoice.</summary>
+    /// <param name="invoiceNumber">The invoice number.</param>
+    public void MarkInvoiced(string invoiceNumber) => InvoiceNumber = invoiceNumber;
+
     /// <summary>Starts an outbound ticket: the empty vehicle is weighed first (tare), loaded second (gross).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="ticketNumber">The ticket number.</param>

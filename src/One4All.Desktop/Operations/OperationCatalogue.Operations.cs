@@ -56,6 +56,28 @@ public static partial class OperationCatalogue
             },
             List = OpenTicketsAsync,
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Invoice weighbridge loads", ListTitle = "Completed loads not yet invoiced",
+            Description = "Bills a customer for every completed outbound load up to the invoice date that has not been invoiced: net tonnes at the price, plus each load's haulage, "
+                + "with tax on top. Each ticket is marked with the invoice so it is never billed twice.",
+            Fields = [Req("Customer", "Customer code"), Req("Invoice", "Invoice number"), Today(), Num("Price", "Price per tonne"), Req("Sales", "Sales account", "4000"),
+                Opt("Haulage", "Haulage revenue account (blank = sales)"), Opt("TaxCode", "Tax code")],
+            Run = async (c, i) =>
+            {
+                WeighbridgeInvoice done = Check(await c.Get<IWeighbridgeService>().InvoiceTicketsAsync(new WeighbridgeInvoiceRequest
+                {
+                    CompanyId = c.CompanyId, CustomerId = await CustomerAsync(c, i.Text("Customer")).ConfigureAwait(true), DocumentNumber = i.Text("Invoice"), DocumentDate = i.Date("Date"),
+                    PricePerTonne = i.Number("Price"), SalesAccountCode = i.Text("Sales"), HaulageAccountCode = i.Optional("Haulage"), TaxCode = i.Optional("TaxCode"), EnteredByUserId = c.UserId,
+                }).ConfigureAwait(true));
+                return $"Invoiced {done.Tickets.Count} load(s), {Q(done.Tonnes)} t: product {M(done.Product)}, haulage {M(done.Haulage)}, tax {M(done.Tax)}, total {M(done.Total)}.";
+            },
+            List = async c => Table(await c.Db.WeighbridgeTickets.AsNoTracking()
+                    .Where(t => t.CompanyId == c.CompanyId && t.IsComplete && t.Direction == WeighDirection.Outbound && t.CustomerId != null && t.InvoiceNumber == null)
+                    .OrderBy(t => t.Date).ThenBy(t => t.Id).ToListAsync().ConfigureAwait(true),
+                ("Ticket", t => t.TicketNumber), ("Date", t => D(t.Date)), ("Vehicle", t => t.VehicleRegistration), ("Product", t => t.Product), ("Net t", t => Q(t.NetTonnes)),
+                ("Haulage", t => M(t.HaulageCharge)), ("Site", t => t.SiteName)),
+        };
     }
 
     private static async Task<System.Data.DataTable> OpenTicketsAsync(OperationContext c)

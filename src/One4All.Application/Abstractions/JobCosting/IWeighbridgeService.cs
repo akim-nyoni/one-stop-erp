@@ -94,6 +94,49 @@ public sealed class SecondWeighRequest
 /// <param name="NetCubicMetres">The net m³.</param>
 /// <param name="HaulageCharge">The haulage charged.</param>
 /// <param name="Overloaded">Whether the gross exceeded the vehicle's legal maximum.</param>
+/// <summary>Bills a customer for the loads weighed out to them (brief §4.14: tickets flow to delivery notes and invoices).</summary>
+public sealed class WeighbridgeInvoiceRequest
+{
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>Gets the customer billed.</summary>
+    public long CustomerId { get; init; }
+
+    /// <summary>Gets the invoice number.</summary>
+    public string DocumentNumber { get; init; } = string.Empty;
+
+    /// <summary>Gets the invoice date; completed outbound tickets dated on or before it and not yet invoiced are billed.</summary>
+    public DateOnly DocumentDate { get; init; }
+
+    /// <summary>Gets the price per net tonne of product.</summary>
+    public decimal PricePerTonne { get; init; }
+
+    /// <summary>Gets the revenue account for the product.</summary>
+    public string SalesAccountCode { get; init; } = string.Empty;
+
+    /// <summary>Gets the revenue account for haulage (defaults to the sales account).</summary>
+    public string? HaulageAccountCode { get; init; }
+
+    /// <summary>Gets the tax code charged on top (null: no tax).</summary>
+    public string? TaxCode { get; init; }
+
+    /// <summary>Gets the user raising the invoice.</summary>
+    public long? EnteredByUserId { get; init; }
+}
+
+/// <summary>An invoice raised from weighbridge tickets.</summary>
+/// <param name="Tickets">The tickets billed.</param>
+/// <param name="Tonnes">The net tonnes billed.</param>
+/// <param name="Product">The product value.</param>
+/// <param name="Haulage">The haulage charged.</param>
+/// <param name="Tax">The tax.</param>
+public readonly record struct WeighbridgeInvoice(IReadOnlyList<string> Tickets, decimal Tonnes, decimal Product, decimal Haulage, decimal Tax)
+{
+    /// <summary>The invoice total.</summary>
+    public decimal Total => Product + Haulage + Tax;
+}
+
 public readonly record struct WeighbridgeCompletion(decimal NetTonnes, decimal NetCubicMetres, decimal HaulageCharge, bool Overloaded);
 
 /// <summary>Weighbridge operations (brief §4.x and §14 L): two weighs per ticket, manual-weight control, haulage, stockpile issues.</summary>
@@ -113,4 +156,10 @@ public interface IWeighbridgeService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The completion, or an error.</returns>
     Task<Result<WeighbridgeCompletion>> SecondWeighAsync(SecondWeighRequest request, CancellationToken ct = default);
+
+    /// <summary>Invoices a customer for their completed, un-invoiced outbound loads: net tonnes at the price plus each load's haulage, with tax on top.</summary>
+    /// <param name="request">The invoice.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What was billed, or nothing to bill, an unknown tax code or a posting failure.</returns>
+    Task<Result<WeighbridgeInvoice>> InvoiceTicketsAsync(WeighbridgeInvoiceRequest request, CancellationToken ct = default);
 }

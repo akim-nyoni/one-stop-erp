@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Inventory;
 using One4All.Application.Abstractions.JobCosting;
 using One4All.Application.Abstractions.Numbering;
+using One4All.Application.Abstractions.Trading;
 using One4All.Application.JobCosting;
 using One4All.Core.Common;
 using One4All.Core.Inventory;
@@ -24,12 +25,90 @@ public sealed class WeighbridgeService : IWeighbridgeService
     /// <param name="inventory">Issues stockpile stock.</param>
     /// <param name="numbers">Numbers the tickets.</param>
     /// <param name="clock">Stamps time in and out.</param>
-    public WeighbridgeService(One4AllDbContext db, IInventoryService inventory, INumberSequenceService numbers, IClock clock)
+    /// <param name="ar">Posts the customer's invoice.</param>
+    public WeighbridgeService(One4AllDbContext db, IInventoryService inventory, INumberSequenceService numbers, IClock clock, ISalesLedgerService ar)
     {
         _db = db;
         _inventory = inventory;
         _numbers = numbers;
         _clock = clock;
+        _ar = ar;
+    }
+
+    private readonly ISalesLedgerService _ar;
+
+    /// <inheritdoc />
+    public Task<Result<WeighbridgeInvoice>> InvoiceTicketsAsync(WeighbridgeInvoiceRequest request, CancellationToken ct = default)
+        => _db.AtomicAsync(() => InvoiceTicketsCoreAsync(request, ct), ct);
+
+    // One unit of work: the invoice posts and the tickets are marked billed together, so no load is billed twice or missed.
+    private async Task<Result<WeighbridgeInvoice>> InvoiceTicketsCoreAsync(WeighbridgeInvoiceRequest request, CancellationToken ct)
+    {
+        if (request.PricePerTonne <= 0m || string.IsNullOrWhiteSpace(request.SalesAccountCode) || string.IsNullOrWhiteSpace(request.DocumentNumber))
+        {
+            return Error.Validation("Wb.Invoice", "An invoice number, a price per tonne and a sales account are required.");
+        }
+
+        Core.Trading.Customer? customer = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == request.CustomerId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
+        if (customer is null)
+        {
+            return Error.NotFound("Wb.Customer", "Customer not found.");
+        }
+
+        List<WeighbridgeTicket> tickets = await _db.WeighbridgeTickets
+            .Where(t => t.CompanyId == request.CompanyId && t.CustomerId == request.CustomerId && t.Direction == WeighDirection.Outbound && t.IsComplete
+                && t.InvoiceNumber == null && t.Date <= request.DocumentDate)
+            .OrderBy(t => t.Date).ThenBy(t => t.Id).ToListAsync(ct).ConfigureAwait(false);
+        if (tickets.Count == 0)
+        {
+            return Error.Rule("Wb.NothingToInvoice", $"{customer.Name} has no completed loads to invoice up to {request.DocumentDate:yyyy-MM-dd}.");
+        }
+
+        decimal product = tickets.Sum(t => decimal.Round(t.NetTonnes * request.PricePerTonne, 2, MidpointRounding.AwayFromZero));
+        decimal haulage = tickets.Sum(t => t.HaulageCharge);
+        string salesAccount = request.SalesAccountCode.Trim();
+        string haulageAccount = string.IsNullOrWhiteSpace(request.HaulageAccountCode) ? salesAccount : request.HaulageAccountCode.Trim();
+        decimal tax = 0m;
+        string? taxAccount = null, taxCode = null;
+        if (!string.IsNullOrWhiteSpace(request.TaxCode))
+        {
+            taxCode = request.TaxCode.Trim().ToUpperInvariant();
+            Core.Accounting.TaxCode? code = await _db.Set<Core.Accounting.TaxCode>().Include(t => t.Rates).AsNoTracking()
+                .FirstOrDefaultAsync(t => t.CompanyId == request.CompanyId && t.Code == taxCode, ct).ConfigureAwait(false);
+            if (code?.OutputAccountCode is null)
+            {
+                return Error.NotFound("Wb.TaxCode", $"Tax code {taxCode} with an output-tax account not found.");
+            }
+
+            taxAccount = code.OutputAccountCode;
+            tax = decimal.Round((product + haulage) * code.RateOn(request.DocumentDate) / 100m, 2, MidpointRounding.AwayFromZero);
+        }
+
+        List<RevenueLine> lines = [new RevenueLine(salesAccount, product)];
+        if (haulage > 0m)
+        {
+            lines.Add(new RevenueLine(haulageAccount, haulage));
+        }
+
+        string invoice = request.DocumentNumber.Trim().ToUpperInvariant();
+        Result<TradingPostingResult> posted = await _ar.PostInvoiceAsync(new SalesInvoiceRequest
+        {
+            CompanyId = request.CompanyId, CustomerId = customer.Id, DocumentNumber = invoice, DocumentDate = request.DocumentDate, Currency = customer.Currency,
+            NetAmount = product + haulage, TaxAmount = tax, TaxAccountCode = taxAccount, TaxCode = taxCode, SalesAccountCode = salesAccount, RevenueLines = lines,
+            EnteredByUserId = request.EnteredByUserId, Narrative = $"Weighbridge loads {tickets[0].TicketNumber} to {tickets[^1].TicketNumber}",
+        }, ct).ConfigureAwait(false);
+        if (posted.IsFailure)
+        {
+            return posted.Error;
+        }
+
+        foreach (WeighbridgeTicket ticket in tickets)
+        {
+            ticket.MarkInvoiced(invoice);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new WeighbridgeInvoice([.. tickets.Select(t => t.TicketNumber)], tickets.Sum(t => t.NetTonnes), product, haulage, tax);
     }
 
     /// <inheritdoc />
