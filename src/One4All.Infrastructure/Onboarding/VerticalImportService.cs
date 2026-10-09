@@ -21,10 +21,138 @@ public sealed class VerticalImportService : IVerticalImportService
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="engine">Posts the opening journals.</param>
-    public VerticalImportService(One4AllDbContext db, IPostingEngine engine)
+    public VerticalImportService(One4AllDbContext db, IPostingEngine engine, Application.Abstractions.Budgeting.IBudgetingService? budgeting = null)
     {
         _db = db;
         _engine = engine;
+        _budgeting = budgeting;
+    }
+
+    private readonly Application.Abstractions.Budgeting.IBudgetingService? _budgeting;
+
+    /// <inheritdoc />
+    public async Task<ImportReport> ImportStandsAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "stand", "parcel", "size");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        Dictionary<string, long> parcels = await _db.LandParcels.Where(p => p.CompanyId == companyId).ToDictionaryAsync(p => p.ParcelNumber.ToUpper(), p => p.Id, ct).ConfigureAwait(false);
+        Dictionary<string, long> schemes = await _db.HousingSchemes.Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Code.ToUpper(), s => s.Id, ct).ConfigureAwait(false);
+        HashSet<string> existing = [.. await _db.HousingStands.Where(s => s.CompanyId == companyId).Select(s => s.StandNumber).ToListAsync(ct).ConfigureAwait(false)];
+        List<ImportError> errors = [];
+        List<(string Stand, string Parcel, long? Scheme, decimal Size, decimal Cost, Core.Housing.StandStatus Status)> toCreate = [];
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        int skipped = 0;
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string stand = Code(row.Text("stand")), parcel = Code(row.Text("parcel")), scheme = Code(row.Text("scheme"));
+                decimal size = row.Number("size") ?? 0m, cost = row.Number("cost") ?? 0m;
+                Core.Housing.StandStatus status = Core.Housing.StandStatus.Available;
+                if (stand.Length == 0 || parcel.Length == 0 || size <= 0m || cost < 0m
+                    || (row.Text("status") is string given && (!Enum.TryParse(given, true, out status) || !Core.Housing.StandLifecycle.Unencumbered.Contains(status))))
+                {
+                    return "A stand needs a number, a parcel, a size above zero, a cost not below zero and, if given, a status from raw land to available "
+                        + "(sold and allocated stands come in through their agreements).";
+                }
+
+                long? schemeId = null;
+                if (scheme.Length > 0)
+                {
+                    if (!schemes.TryGetValue(scheme, out long id))
+                    {
+                        return $"Scheme {scheme} is not on the register.";
+                    }
+
+                    schemeId = id;
+                }
+
+                if (!seen.Add(stand))
+                {
+                    return $"Stand {stand} appears twice.";
+                }
+
+                if (existing.Contains(stand))
+                {
+                    skipped++;
+                    return null;
+                }
+
+                toCreate.Add((stand, parcel, schemeId, size, cost, status));
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, skipped, errors, commit, ct, async () =>
+        {
+            foreach (IGrouping<string, (string Stand, string Parcel, long? Scheme, decimal Size, decimal Cost, Core.Housing.StandStatus Status)> group in toCreate.GroupBy(s => s.Parcel))
+            {
+                if (!parcels.TryGetValue(group.Key, out long parcelId))
+                {
+                    Core.Housing.LandParcel parcel = new(companyId, group.Key, $"Parcel {group.Key} (migrated)", group.Sum(s => s.Size), group.Sum(s => s.Cost));
+                    _db.LandParcels.Add(parcel);
+                    await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+                    parcelId = parcel.Id;
+                }
+
+                _db.HousingStands.AddRange(group.Select(s => new Core.Housing.HousingStand(companyId, parcelId, s.Scheme, s.Stand, s.Size, s.Cost, null, s.Status)));
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return toCreate.Count;
+        }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<ImportReport> ImportBudgetAsync(long companyId, string csv, DateOnly yearDate, string label, Core.Budgeting.BudgetType type, string? department, bool commit,
+        CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "account", "period", "amount");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        long? yearId = await _db.FiscalYears.Where(y => y.CompanyId == companyId && y.StartDate <= yearDate && y.EndDate >= yearDate).Select(y => (long?)y.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (yearId is null || _budgeting is null || string.IsNullOrWhiteSpace(label))
+        {
+            return new ImportReport(rows.Count, 0, 0, [new ImportError(0, yearId is null ? $"No fiscal year contains {yearDate:yyyy-MM-dd}." : "A budget import needs a label.")], false);
+        }
+
+        HashSet<string> accounts = await AccountsAsync(companyId, ct).ConfigureAwait(false);
+        List<ImportError> errors = [];
+        List<Application.Abstractions.Budgeting.NewBudgetLine> lines = [];
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string account = Code(row.Text("account"));
+                decimal? period = row.Number("period"), amount = row.Number("amount");
+                if (!accounts.Contains(account))
+                {
+                    return $"Account {account} is not in the chart.";
+                }
+
+                if (period is not decimal p || p != decimal.Truncate(p) || p < 1m || p > 13m || amount is null)
+                {
+                    return "A budget line needs a period from 1 to 13 and an amount.";
+                }
+
+                lines.Add(new Application.Abstractions.Budgeting.NewBudgetLine(account, (int)p, amount.Value, row.Text("cost_centre"), row.Number("quantity")));
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, 0, errors, commit, ct, async () =>
+        {
+            Result<long> created = await _budgeting.CreateBudgetAsync(companyId, yearId.Value, label.Trim(), type, string.IsNullOrWhiteSpace(department) ? null : department.Trim(), lines, ct)
+                .ConfigureAwait(false);
+            return created.IsFailure ? created.Error : lines.Count;
+        }).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

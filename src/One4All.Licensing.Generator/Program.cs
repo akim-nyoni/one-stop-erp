@@ -1,3 +1,4 @@
+using System.Text;
 using One4All.Licensing.Core;
 
 namespace One4All.Licensing.Generator;
@@ -44,6 +45,16 @@ public static class Program
         string kid = a.GetValueOrDefault("kid", $"key-{DateTime.UtcNow:yyyy-MM}");
         string outDir = a.GetValueOrDefault("out", ".");
         string? passphrase = a.GetValueOrDefault("passphrase");
+        if (string.IsNullOrEmpty(passphrase) && !a.ContainsKey("plaintext"))
+        {
+            passphrase = Prompt("Passphrase to protect the private key: ");
+            if (Prompt("Repeat the passphrase: ") != passphrase || passphrase.Length < 8)
+            {
+                Console.Error.WriteLine("The passphrases differ or are shorter than 8 characters; nothing was written.");
+                return 1;
+            }
+        }
+
         Directory.CreateDirectory(outDir);
 
         Ed25519KeyPair pair = Ed25519KeyPair.Generate();
@@ -129,6 +140,32 @@ public static class Program
         return 0;
     }
 
+    // Reads a secret from the console without echoing it.
+    private static string Prompt(string label)
+    {
+        if (Console.IsInputRedirected)
+        {
+            throw new InvalidOperationException($"{label.TrimEnd(' ', ':')} is needed: supply it with --passphrase.");
+        }
+
+        Console.Write(label);
+        StringBuilder typed = new();
+        for (ConsoleKeyInfo key = Console.ReadKey(intercept: true); key.Key != ConsoleKey.Enter; key = Console.ReadKey(intercept: true))
+        {
+            if (key.Key == ConsoleKey.Backspace)
+            {
+                typed.Length = Math.Max(0, typed.Length - 1);
+            }
+            else if (!char.IsControl(key.KeyChar))
+            {
+                typed.Append(key.KeyChar);
+            }
+        }
+
+        Console.WriteLine();
+        return typed.ToString();
+    }
+
     private static string LoadPrivateKey(string keyPath, string? passphrase)
     {
         string content = File.ReadAllText(keyPath).Trim();
@@ -138,7 +175,7 @@ public static class Program
                 ?? throw new InvalidOperationException("Key file is not a valid protected key.");
             if (string.IsNullOrEmpty(passphrase))
             {
-                throw new InvalidOperationException("The private key is encrypted; supply --passphrase.");
+                passphrase = Console.IsInputRedirected ? throw new InvalidOperationException("The private key is encrypted; supply --passphrase.") : Prompt("Key passphrase: ");
             }
 
             return protectedKey.Unprotect(passphrase);

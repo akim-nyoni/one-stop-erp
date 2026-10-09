@@ -124,8 +124,13 @@ public sealed class LicenceService : ILicenceService
 
         _current = active is null
             ? LicenseValidationResult.Failure(LicenseStatus.Invalid, "No licence installed.", _clock)
-            : _validator.Validate(active.Token, _fingerprint.Value, _revoked);
+            : TrialPeriod.Apply(_validator.Validate(active.Token, _fingerprint.Value, _revoked), await FirstActivatedAsync(db, active.Token, active.InstalledOnUtc, ct).ConfigureAwait(false), _clock);
     }
+
+    // When this licence was first installed on this database (a trial runs from then).
+    private static async Task<DateTimeOffset> FirstActivatedAsync(One4AllDbContext db, string token, DateTimeOffset fallback, CancellationToken ct)
+        => await db.Set<InstalledLicence>().Where(l => l.Token == token).OrderBy(l => l.InstalledOnUtc).Select(l => (DateTimeOffset?)l.InstalledOnUtc).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+            ?? fallback;
 
     /// <inheritdoc />
     public async Task<LicenseValidationResult> InstallAsync(string licenceToken, CancellationToken ct = default)
@@ -154,6 +159,9 @@ public sealed class LicenceService : ILicenceService
 
         db.Set<InstalledLicence>().Add(new InstalledLicence(licenceToken.Trim(), _clock.UtcNow, currentUser.UserId));
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        // A trial counts from its first installation here: installing it again does not start it over.
+        validation = TrialPeriod.Apply(validation, await FirstActivatedAsync(db, licenceToken.Trim(), _clock.UtcNow, ct).ConfigureAwait(false), _clock);
         await scope.ServiceProvider.GetRequiredService<IAuditService>().RecordAsync(new AuditEvent(null, currentUser.UserId, currentUser.UserName, "Licensing", "Licence",
             validation.Payload?.LicenceId, Core.Audit.AuditAction.LicenceChange, $"Installed: {validation.Status}",
             System.Text.Json.JsonSerializer.Serialize(new { Customer = validation.Payload?.Customer.Name, Edition = validation.Payload?.Edition.ToString(), validation.Payload?.ValidTo })), ct).ConfigureAwait(false);

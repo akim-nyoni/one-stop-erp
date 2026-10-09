@@ -407,6 +407,23 @@ public sealed class LicenceDesk
         return rows;
     }
 
+    /// <summary>The text a certificate's QR code carries: licence, customer, end date and the first 16 hex digits of the token's SHA-256.</summary>
+    /// <param name="licence">The licence.</param>
+    /// <returns>The code.</returns>
+    public static string VerificationCode(IssuedLicence licence)
+    {
+        ArgumentNullException.ThrowIfNull(licence);
+        string fingerprint = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(licence.Token)))[..16];
+        return $"O4A-LIC|{licence.LicenceId}|{licence.CustomerId}|{licence.ValidTo?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "perpetual"}|{fingerprint}";
+    }
+
+    private static byte[] Qr(string text)
+    {
+        using QRCoder.QRCodeGenerator generator = new();
+        using QRCoder.QRCodeData data = generator.CreateQrCode(text, QRCoder.QRCodeGenerator.ECCLevel.M);
+        return new QRCoder.PngByteQRCode(data).GetGraphic(4);
+    }
+
     /// <summary>A printable licence certificate (HTML: print to PDF from any browser).</summary>
     /// <param name="licenceId">The licence.</param>
     /// <returns>The HTML.</returns>
@@ -429,6 +446,10 @@ public sealed class LicenceDesk
         }
 
         html.Append(CultureInfo.InvariantCulture, $"</table><h3>Activation string</h3><p><code>{E(licence.Token)}</code></p>");
+
+        // A QR code a phone can read to check the certificate against the vendor's register: the licence, customer, end date and a fingerprint of the token.
+        string check = VerificationCode(licence);
+        html.Append(CultureInfo.InvariantCulture, $"<h3>Verification</h3><p><img alt=\"Licence QR code\" src=\"data:image/png;base64,{Convert.ToBase64String(Qr(check))}\"><br><code>{E(check)}</code></p>");
         if (licence.RevokedAt is not null)
         {
             html.Append(CultureInfo.InvariantCulture, $"<p style=\"color:#b71c1c\"><b>REVOKED</b> {licence.RevokedAt:yyyy-MM-dd}: {E(licence.RevokedReason)}</p>");

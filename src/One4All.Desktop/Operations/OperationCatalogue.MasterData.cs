@@ -10,6 +10,7 @@ using One4All.Application.Abstractions.Security;
 using One4All.Application.MasterData;
 using One4All.Core.Security;
 using One4All.Core.Accounting;
+using One4All.Core.Budgeting;
 using One4All.Core.Inventory;
 using One4All.Core.System;
 using static One4All.Desktop.Operations.Ops;
@@ -143,7 +144,7 @@ public static partial class OperationCatalogue
                     .ConfigureAwait(true), ("Id", a => a.Id), ("Record", a => a.Target), ("Number", a => a.TargetKey), ("File", a => a.FileName), ("KB", a => a.SizeBytes / 1024),
                 ("Uploaded", a => a.UploadedOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Description", a => a.Description)),
         };
-        string[] imports = ["Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "PayrollYtd", "Properties", "Meters", "Students"];
+        string[] imports = ["Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "PayrollYtd", "Properties", "Meters", "Students", "Stands", "Budget"];
         yield return new Operation
         {
             Module = module, Title = "Import master data or opening balances", ListTitle = "Opening balance reconciliation",
@@ -155,11 +156,15 @@ public static partial class OperationCatalogue
                 + "PayrollYtd: employee_number,tax_year,code,amount (TAXABLE for taxable pay so far, or a pay element such as PAYE for tax already deducted). "
                 + "Properties: stand,ward,ratepayer[,valuation,size,connected,services e.g. Water:WAT1;Refuse:REF1]. "
                 + "Meters: serial,stand,service,reading,date[,digits,multiplier]. Students: admission,name,grade,guardian[,boarder,admitted]. "
+                + "Stands: stand,parcel,size[,cost,scheme,status] (a parcel not yet registered is created from its stands). Budget: account,period,amount[,cost_centre,quantity] for the year of the date. "
                 + "The list also shows the fixed asset and staff loan registers against their accounts.",
-            Fields = [Pick("Kind", "What", imports), Req("File", "CSV file path"), Today("Date", "Opening date"), Req("Suspense", "Migration suspense account", "2900"), Tick("Commit", "Commit")],
+            Fields = [Pick("Kind", "What", imports), Req("File", "CSV or Excel (.xlsx, first sheet) file path"), Today("Date", "Opening date"), Req("Suspense", "Migration suspense account", "2900"),
+                Opt("Label", "Budget label (budget)"), Pick("BudgetType", "Budget type (budget)", Enum.GetNames<BudgetType>()), Opt("Department", "Budget department (budget; blank: whole company)"),
+                Tick("Commit", "Commit")],
             Run = async (c, i) =>
             {
-                string csv = await System.IO.File.ReadAllTextAsync(i.Text("File")).ConfigureAwait(true);
+                byte[] file = await System.IO.File.ReadAllBytesAsync(i.Text("File")).ConfigureAwait(true);
+                string csv = Application.Onboarding.XlsxReader.IsWorkbook(file) ? Application.Onboarding.XlsxReader.ToCsv(file) : System.Text.Encoding.UTF8.GetString(file);
                 IOpeningBalanceService ob = c.Get<IOpeningBalanceService>();
                 IVerticalImportService registers = c.Get<IVerticalImportService>();
                 bool commit = i.Flag("Commit");
@@ -178,6 +183,9 @@ public static partial class OperationCatalogue
                     "Properties" => await registers.ImportPropertiesAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "Meters" => await registers.ImportMetersAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "Students" => await registers.ImportStudentsAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
+                    "Stands" => await registers.ImportStandsAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
+                    "Budget" => await registers.ImportBudgetAsync(c.CompanyId, csv, i.Date("Date"), i.Optional("Label") ?? string.Empty, Enum.Parse<BudgetType>(i.Text("BudgetType")),
+                        i.Optional("Department"), commit).ConfigureAwait(true),
                     _ => await ob.ImportTrialBalanceAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),
                 };
                 string head = $"{report.Rows} row(s): {(report.Committed ? $"{report.Created} written" : "nothing written")}, {report.Skipped} already there, {report.Errors.Count} error(s).";

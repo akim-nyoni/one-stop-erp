@@ -56,6 +56,15 @@ public interface IVerticalImportService
     /// <summary>Students: <c>admission, name, grade, guardian</c> (customer code) (optional <c>boarder, admitted</c>).</summary>
     Task<ImportReport> ImportStudentsAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
 
+    /// <summary>
+    /// Housing stands: <c>stand, parcel, size</c> (optional <c>cost, scheme, status</c>). A parcel not yet on the register is created from its stands (area and cost
+    /// their totals); nothing is posted — the land's value comes in with the trial balance.
+    /// </summary>
+    Task<ImportReport> ImportStandsAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
+
+    /// <summary>A budget: <c>account, period, amount</c> (optional <c>cost_centre, quantity</c>), created for the fiscal year containing the date.</summary>
+    Task<ImportReport> ImportBudgetAsync(long companyId, string csv, DateOnly yearDate, string label, Core.Budgeting.BudgetType type, string? department, bool commit, CancellationToken ct = default);
+
     /// <summary>The fixed-asset and staff-loan registers against the accounts they are held in.</summary>
     Task<Result<IReadOnlyList<RegisterCheck>>> ReconcileRegistersAsync(long companyId, CancellationToken ct = default);
 }

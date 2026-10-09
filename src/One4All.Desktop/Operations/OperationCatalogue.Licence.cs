@@ -43,6 +43,8 @@ public static partial class OperationCatalogue
                             p is null || p.Limits.Count == 0 ? string.Empty : "Limits: " + string.Join(", ", p.Limits.Select(l => $"{l.Key} {l.Value?.ToString(CultureInfo.InvariantCulture) ?? "unlimited"}")),
                             licence.Warning ?? string.Empty,
                             $"Machine: {licence.MachineFingerprint}",
+                            "Usage: " + string.Join(", ", (await c.Get<ILicenceUsageService>().UsageAsync().ConfigureAwait(true))
+                                .Select(u => $"{u.Key} {u.Used}{(u.Limit is int limit ? $"/{limit}" + (u.PercentUsed >= 90m ? " (nearly full)" : string.Empty) : string.Empty)}")),
                         }.Where(l => l.Length > 0));
                 }
             },

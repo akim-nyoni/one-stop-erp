@@ -417,6 +417,7 @@ public static class DependencyInjection
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();
         services.AddSingleton<IMachineIdProvider, WmiMachineIdProvider>();
         services.AddSingleton<ILicenceService, LicenceService>();
+        services.AddScoped<ILicenceUsageService, LicenceUsageService>();
 
         // Offline sync (outbox + replay engine + handlers).
         services.AddSingleton<Application.Offline.OfflineSyncOptions>();
