@@ -914,8 +914,9 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             Employee? e = employees.GetValueOrDefault(g.Key);
             decimal net = slips.Where(p => p.EmployeeId == g.Key).OrderBy(p => p.PayDate).Select(p => p.NetPay).LastOrDefault();
             string primary = e is null ? "?" : e.PaymentMethod == PayMethod.MobileMoney ? $"MobileMoney {e.MobileMoneyNumber ?? "—"}" : $"{e.PaymentMethod} {e.BankAccountNumber ?? "—"}";
-            return Row(("Employee", Name(employees, g.Key)), ("Primary", primary), ("Splits", string.Join("; ", g.Select(s => $"{s.Method} {s.Destination} {Money(s.Amount)}"))), ("Net", Money(net)),
-                ("Remainder", Math.Max(0m, net - g.Sum(s => s.Amount))));
+            return Row(("Employee", Name(employees, g.Key)), ("Primary", primary),
+                ("Splits", string.Join("; ", g.Select(s => $"{s.Method} {s.Destination} {(s.Percent is decimal p ? $"{p:0.##}%" : Money(s.Amount))}"))), ("Net", Money(net)),
+                ("Remainder", Math.Max(0m, net - g.Sum(s => s.AmountFrom(net)))));
         })];
     }
 

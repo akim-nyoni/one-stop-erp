@@ -18093,6 +18093,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("method");
 
+                    b.Property<decimal?>("Percent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("percent");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()

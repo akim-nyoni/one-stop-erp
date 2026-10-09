@@ -313,15 +313,36 @@ public sealed class EmployeePaymentSplit : Entity, ICompanyScoped
     /// <param name="employeeId">The employee.</param>
     /// <param name="method">How this part is paid.</param>
     /// <param name="destination">The bank account or wallet.</param>
-    /// <param name="amount">The fixed amount sent there each period.</param>
-    public EmployeePaymentSplit(long companyId, long employeeId, PayMethod method, string destination, decimal amount)
+    /// <param name="amount">The fixed amount sent there each period (0 when a percentage is given).</param>
+    /// <param name="percent">The share of net pay sent there instead of a fixed amount (brief §4.15.1: "60% to bank A, 40% to mobile money").</param>
+    public EmployeePaymentSplit(long companyId, long employeeId, PayMethod method, string destination, decimal amount, decimal? percent = null)
     {
         CompanyId = companyId;
         EmployeeId = employeeId;
         Method = method;
         Destination = destination;
         Amount = amount;
+        Percent = percent;
     }
+
+    /// <summary>Gets the share of net pay sent there (null: the fixed amount).</summary>
+    public decimal? Percent { get; private set; }
+
+    /// <summary>What this split takes from a net pay: its percentage of it, or its fixed amount.</summary>
+    /// <param name="netPay">The net pay.</param>
+    /// <returns>The amount (before what is left limits it).</returns>
+    public decimal AmountFrom(decimal netPay) => Percent is decimal percent ? decimal.Round(netPay * percent / 100m, 2, MidpointRounding.AwayFromZero) : Amount;
+
+    /// <summary>Why a split cannot be set: neither or both of an amount and a percentage, or the employee's percentages above 100.</summary>
+    /// <param name="amount">The fixed amount.</param>
+    /// <param name="percent">The percentage.</param>
+    /// <param name="otherPercents">The employee's other splits' percentages.</param>
+    /// <returns>The problem, or null.</returns>
+    public static string? Problem(decimal? amount, decimal? percent, decimal otherPercents)
+        => (amount is null) == (percent is null) ? "Give either a fixed amount or a percentage of net pay."
+            : amount is <= 0m ? "The amount must be above zero."
+            : percent is <= 0m or > 100m ? "The percentage must be above 0 and at most 100."
+            : percent is decimal p && otherPercents + p > 100m ? $"That takes the splits to {otherPercents + p:0.##}% of net pay." : null;
 
     /// <summary>Gets the company.</summary>
     public long CompanyId { get; private set; }

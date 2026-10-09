@@ -361,6 +361,7 @@ internal sealed class EmployeePaymentSplitConfiguration : IEntityTypeConfigurati
         b.Property(x => x.Method).HasConversion<int>();
         b.Property(x => x.Destination).HasMaxLength(80);
         b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Percent).HasPrecision(9, 4);
         b.HasIndex(x => x.EmployeeId);
     }
 }

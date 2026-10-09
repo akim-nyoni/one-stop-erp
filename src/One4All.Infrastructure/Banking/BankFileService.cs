@@ -87,7 +87,7 @@ public sealed class BankFileService : IBankFileService
             decimal remaining = slip.NetPay;
             foreach (EmployeePaymentSplit split in splits.Where(s => s.EmployeeId == employee.Id))
             {
-                decimal amount = Math.Min(split.Amount, remaining);
+                decimal amount = Math.Min(split.AmountFrom(slip.NetPay), remaining);
                 if (amount > 0m)
                 {
                     payments.Add((bank, reference, employee.FullName, employee.BankBranch ?? string.Empty, split.Destination, amount));
