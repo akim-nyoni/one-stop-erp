@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Municipal;
+using One4All.Application.Abstractions.Trading;
 using One4All.Application.Municipal;
 using One4All.Core.Common;
 using One4All.Core.Municipal;
@@ -14,9 +15,97 @@ public sealed class OwnershipService : IOwnershipService
 
     private readonly One4AllDbContext _db;
 
+    private readonly ISalesLedgerService _ar;
+
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
-    public OwnershipService(One4AllDbContext db) => _db = db;
+    /// <param name="ar">Posts the transfer settlement.</param>
+    public OwnershipService(One4AllDbContext db, ISalesLedgerService ar)
+    {
+        _db = db;
+        _ar = ar;
+    }
+
+    /// <inheritdoc />
+    public Task<Result<IReadOnlyList<TransferSettlementLine>>> SettleTransferAsync(long companyId, long propertyId, DateOnly transferDate, CancellationToken ct = default)
+        => _db.AtomicAsync(() => SettleCoreAsync(companyId, propertyId, transferDate, ct), ct);
+
+    // One unit of work: the seller's and the buyer's documents post together or not at all.
+    private async Task<Result<IReadOnlyList<TransferSettlementLine>>> SettleCoreAsync(long companyId, long propertyId, DateOnly transferDate, CancellationToken ct)
+    {
+        Property? property = await _db.Properties.Include(p => p.Services).AsNoTracking().FirstOrDefaultAsync(p => p.Id == propertyId && p.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (property is null)
+        {
+            return Error.NotFound("Mun.PropertyNotFound", $"Property {propertyId} not found.");
+        }
+
+        List<PropertyOwner> owners = await _db.Set<PropertyOwner>().AsNoTracking().Where(o => o.PropertyId == propertyId && o.IsRatepayer).ToListAsync(ct).ConfigureAwait(false);
+        PropertyOwner? seller = owners.FirstOrDefault(o => o.OwnedTo == transferDate.AddDays(-1));
+        PropertyOwner? buyer = owners.FirstOrDefault(o => o.OwnedFrom == transferDate && o.Reference != RegisterReference);
+        if (seller is null || buyer is null)
+        {
+            return Error.NotFound("Mun.NoTransfer", $"Stand {property.StandNumber} was not transferred on {transferDate:yyyy-MM-dd}.");
+        }
+
+        if ((await MunicipalCharges.AlreadyRaisedAsync(_db, companyId, [$"{buyer.Reference}-S1", $"{buyer.Reference}-B1"], ct).ConfigureAwait(false)).Count > 0)
+        {
+            return Error.Conflict("Mun.TransferSettled", $"The transfer under {buyer.Reference} has already been settled.");
+        }
+
+        decimal valuation = ValuationRoll.ValueAt(await ValuationHistory.LoadAsync(_db, property.Id, ct).ConfigureAwait(false), transferDate, property.Valuation);
+        List<(TransferSettlementLine Line, string Account)> lines = [];
+        foreach (PropertyServiceLink link in property.Services.Where(s => s.IsActive && s.MeterId == null && s.StartDate < transferDate))
+        {
+            Tariff? linked = await _db.Set<Tariff>().Include(t => t.Blocks).Include(t => t.Seasons).AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == link.TariffId && t.CompanyId == companyId, ct).ConfigureAwait(false);
+            if (linked is null)
+            {
+                continue;
+            }
+
+            Tariff tariff = TariffVersions.InForce(await TariffVersions.LoadAsync(_db, linked, ct).ConfigureAwait(false), linked, transferDate);
+            CycleSlot slot = BillingCycles.Slot(tariff.Cycle, tariff.CycleStartMonth, tariff.Instalments, transferDate);
+            decimal charge = decimal.Round(tariff.CalculateCharge(0m, valuation, property.SizeSquareMetres, slot.PeriodStart.Month) * link.Quantity, 2, MidpointRounding.AwayFromZero);
+            decimal billed = TransferApportionment.BilledSoFar(charge, slot);
+            decimal share = TransferApportionment.SellerShare(charge, slot, transferDate);
+            if (charge > 0m && billed != share)
+            {
+                lines.Add((new TransferSettlementLine(tariff.Code, slot.PeriodStart, slot.PeriodEnd, charge, billed, share, billed - share), tariff.RevenueAccountCode));
+            }
+        }
+
+        Dictionary<long, Core.Trading.Customer> customers = await _db.Customers.AsNoTracking().Where(c => c.Id == seller.CustomerId || c.Id == buyer.CustomerId)
+            .ToDictionaryAsync(c => c.Id, ct).ConfigureAwait(false);
+        int n = 0;
+        foreach (var group in lines.GroupBy(l => (l.Account, Credit: l.Line.Settlement > 0m)))
+        {
+            n++;
+            decimal amount = Math.Abs(group.Sum(l => l.Line.Settlement));
+            string narrative = $"Transfer of stand {property.StandNumber} on {transferDate:yyyy-MM-dd}: " + string.Join(", ", group.Select(l => $"{l.Line.TariffCode} {l.Line.PeriodStart:yyyy-MM-dd} to {l.Line.PeriodEnd:yyyy-MM-dd}"));
+            Core.Trading.Customer from = customers[group.Key.Credit ? seller.CustomerId : buyer.CustomerId], to = customers[group.Key.Credit ? buyer.CustomerId : seller.CustomerId];
+            Result<TradingPostingResult> credited = await _ar.PostCreditNoteAsync(new SalesCreditNoteRequest
+            {
+                CompanyId = companyId, CustomerId = from.Id, DocumentNumber = $"{buyer.Reference}-{(group.Key.Credit ? "S" : "B")}{n}", DocumentDate = transferDate, Currency = from.Currency,
+                NetAmount = amount, SalesAccountCode = group.Key.Account, Narrative = narrative, ReasonCode = "TRANSFER",
+            }, ct).ConfigureAwait(false);
+            if (credited.IsFailure)
+            {
+                return credited.Error;
+            }
+
+            Result<TradingPostingResult> charged = await _ar.PostInvoiceAsync(new SalesInvoiceRequest
+            {
+                CompanyId = companyId, CustomerId = to.Id, DocumentNumber = $"{buyer.Reference}-{(group.Key.Credit ? "B" : "S")}{n}", DocumentDate = transferDate, Currency = to.Currency,
+                NetAmount = amount, SalesAccountCode = group.Key.Account, Narrative = narrative,
+            }, ct).ConfigureAwait(false);
+            if (charged.IsFailure)
+            {
+                return charged.Error;
+            }
+        }
+
+        return Result.Success<IReadOnlyList<TransferSettlementLine>>([.. lines.Select(l => l.Line)]);
+    }
 
     /// <inheritdoc />
     public Task<Result> RegisterOwnersAsync(long companyId, long propertyId, IReadOnlyList<OwnerShare> owners, DateOnly ownedFrom, string? deedsReference, CancellationToken ct = default)

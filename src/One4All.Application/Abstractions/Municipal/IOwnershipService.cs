@@ -56,4 +56,27 @@ public interface IOwnershipService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The history.</returns>
     Task<IReadOnlyList<OwnerEntry>> HistoryAsync(long companyId, long propertyId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Settles the current period's fixed charges between the seller and buyer of a property transferred on a date (brief §4.9): for each
+    /// unmetered service, what the seller was billed for the period is compared with the days they owned it; a surplus is credited to the
+    /// seller and invoiced to the buyer (a shortfall the other way round). Metered services settle on the final reading. Run once, after the
+    /// period has been billed.
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="propertyId">The property.</param>
+    /// <param name="transferDate">The transfer date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The settlement per tariff, or no transfer on the date, or already settled.</returns>
+    Task<Result<IReadOnlyList<TransferSettlementLine>>> SettleTransferAsync(long companyId, long propertyId, DateOnly transferDate, CancellationToken ct = default);
 }
+
+/// <summary>A tariff's settlement on a transfer.</summary>
+/// <param name="TariffCode">The tariff.</param>
+/// <param name="PeriodStart">The first day of the period the transfer falls in.</param>
+/// <param name="PeriodEnd">The last day of that period.</param>
+/// <param name="PeriodCharge">The period's charge.</param>
+/// <param name="BilledToSeller">What the seller was billed for the period so far.</param>
+/// <param name="SellerShare">The seller's share for the days they owned the property.</param>
+/// <param name="Settlement">Credited to the seller and charged to the buyer (negative: the other way round).</param>
+public sealed record TransferSettlementLine(string TariffCode, DateOnly PeriodStart, DateOnly PeriodEnd, decimal PeriodCharge, decimal BilledToSeller, decimal SellerShare, decimal Settlement);

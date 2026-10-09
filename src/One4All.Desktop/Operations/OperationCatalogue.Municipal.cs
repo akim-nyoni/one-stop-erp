@@ -459,7 +459,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Property ownership",
             Description = "Registers a stand's owners and their shares (\"CUST1:50:R; CUST2:50\" — R marks the ratepayer), transfers it to buyers against a clearance certificate, "
                 + "and shows the owners now or the full history.",
-            Fields = [Pick("Step", "Step", ["Register", "Transfer", "Owners", "History"]), Req("Stand", "Stand number"), Opt("Owners", "Owners: CUSTOMER:share[:R]; …"), Opt("Clearance", "Clearance certificate (transfer)"),
+            Fields = [Pick("Step", "Step", ["Register", "Transfer", "Settle transfer", "Owners", "History"]), Req("Stand", "Stand number"), Opt("Owners", "Owners: CUSTOMER:share[:R]; …"), Opt("Clearance", "Clearance certificate (transfer)"),
                 Opt("Deeds", "Deeds reference"), Today()],
             Run = async (c, i) =>
             {
@@ -485,6 +485,11 @@ public static partial class OperationCatalogue
                 {
                     case "Register":
                         return Check(await ownership.RegisterOwnersAsync(c.CompanyId, property, await Shares().ConfigureAwait(true), i.Date("Date"), i.Optional("Deeds")).ConfigureAwait(true), "Owners registered.");
+                    case "Settle transfer":
+                        IReadOnlyList<TransferSettlementLine> settled = Check(await ownership.SettleTransferAsync(c.CompanyId, property, i.Date("Date")).ConfigureAwait(true));
+                        return settled.Count == 0 ? "Nothing to settle: the seller was billed exactly for their days." : string.Join(Environment.NewLine, settled.Select(l =>
+                            $"{l.TariffCode,-12} {l.PeriodStart:yyyy-MM-dd} – {l.PeriodEnd:yyyy-MM-dd}  charge {M(l.PeriodCharge)}, billed {M(l.BilledToSeller)}, seller's share {M(l.SellerShare)}: "
+                            + (l.Settlement > 0m ? $"{M(l.Settlement)} credited to the seller, charged to the buyer" : $"{M(-l.Settlement)} charged to the seller, credited to the buyer")));
                     case "Transfer":
                         return Check(await ownership.TransferAsync(c.CompanyId, property, await Shares().ConfigureAwait(true), i.Date("Date"), i.Optional("Clearance") ?? string.Empty, i.Optional("Deeds")).ConfigureAwait(true),
                             "Transferred.");
