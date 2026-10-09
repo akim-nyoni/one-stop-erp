@@ -14,6 +14,7 @@ internal sealed class StocktakeSessionConfiguration : IEntityTypeConfiguration<S
         b.Property(x => x.Reference).HasMaxLength(60);
         b.Property(x => x.Status).HasConversion<int>();
         b.Property(x => x.RecountTolerancePercent).HasPrecision(9, 4);
+        b.Property(x => x.PendingAdjustmentAccountCode).HasMaxLength(20);
         b.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.StocktakeSessionId).OnDelete(DeleteBehavior.Cascade);
         b.HasIndex(x => new { x.CompanyId, x.WarehouseId });
     }

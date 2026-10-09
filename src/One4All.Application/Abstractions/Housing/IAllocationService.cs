@@ -26,6 +26,9 @@ public sealed class AllocationProposal
 
     /// <summary>Who proposes it.</summary>
     public long UserId { get; init; }
+
+    /// <summary>How long offers stay open once the run is approved (used when an approval workflow approves it).</summary>
+    public int OfferDays { get; init; } = 30;
 }
 
 /// <summary>A pairing on an allocation list.</summary>

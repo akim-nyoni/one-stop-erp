@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Housing;
 using One4All.Application.Abstractions.Numbering;
+using One4All.Application.Abstractions.Workflow;
 using One4All.Application.Housing;
 using One4All.Core.Common;
 using One4All.Core.Housing;
@@ -24,13 +25,18 @@ public sealed class AllocationService : IAllocationService
     /// <param name="numbers">The number sequences.</param>
     /// <param name="waitingList">The waiting list, for rankings.</param>
     /// <param name="municipalLink">The link to the municipal register.</param>
-    public AllocationService(One4AllDbContext db, INumberSequenceService numbers, IWaitingListService waitingList, IHousingMunicipalLinkService municipalLink)
+    /// <param name="workflow">Routes a proposed run through the approval workflow when one is defined for allocation runs.</param>
+    public AllocationService(One4AllDbContext db, INumberSequenceService numbers, IWaitingListService waitingList, IHousingMunicipalLinkService municipalLink,
+        Lazy<IWorkflowService>? workflow = null)
     {
         _db = db;
         _numbers = numbers;
         _waitingList = waitingList;
         _municipalLink = municipalLink;
+        _workflow = workflow;
     }
+
+    private readonly Lazy<IWorkflowService>? _workflow;
 
     /// <inheritdoc />
     public Task<Result<AllocationRunView>> ProposeAsync(AllocationProposal proposal, CancellationToken ct = default)
@@ -117,8 +123,16 @@ public sealed class AllocationService : IAllocationService
                 : spouseHolds.Contains(left.Id) && !liveApplicants.Contains(left.Id) ? ExclusionReason.SpouseHolds : ExclusionReason.LiveAllocation);
         }
 
+        run.OfferDays = proposal.OfferDays < 1 ? 30 : proposal.OfferDays;
         _db.Set<AllocationRun>().Add(run);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, proposal.CompanyId, WorkflowDocumentTypes.AllocationRun, run.RunNumber, run.Allocations.Count,
+            proposal.UserId, ct).ConfigureAwait(false);
+        if (governed.IsFailure)
+        {
+            return governed.Error;
+        }
+
         return await ViewAsync(run, ct).ConfigureAwait(false);
     }
 
@@ -127,6 +141,25 @@ public sealed class AllocationService : IAllocationService
         => _db.AtomicAsync(() => ApproveCoreAsync(companyId, runNumber, approverUserId, date, offerDays, ct), ct);
 
     private async Task<Result<AllocationRunView>> ApproveCoreAsync(long companyId, string runNumber, long approverUserId, DateOnly date, int offerDays, CancellationToken ct)
+    {
+        string reference = (runNumber ?? string.Empty).Trim();
+        if (await Workflow.WorkflowGate.InProgressAsync(_db, companyId, WorkflowDocumentTypes.AllocationRun, reference, ct).ConfigureAwait(false))
+        {
+            return Workflow.WorkflowGate.Governed(WorkflowDocumentTypes.AllocationRun, reference);
+        }
+
+        return await ConcludeApprovalAsync(companyId, reference, approverUserId, date, offerDays, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Approves a proposed run: offers go out (the workflow's approval lands here too).</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="runNumber">The run.</param>
+    /// <param name="approverUserId">The approver.</param>
+    /// <param name="date">The approval date.</param>
+    /// <param name="offerDays">How long offers stay open.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The run, or why it cannot be approved.</returns>
+    internal async Task<Result<AllocationRunView>> ConcludeApprovalAsync(long companyId, string runNumber, long approverUserId, DateOnly date, int offerDays, CancellationToken ct)
     {
         if (offerDays < 1)
         {
@@ -344,5 +377,39 @@ public sealed class AllocationService : IAllocationService
         List<AllocationLine> lines = [.. run.Allocations.OrderBy(a => a.Sequence)
             .Select(a => new AllocationLine(a.Sequence, stands[a.StandId], applicants[a.ApplicantId], a.Status, a.CertificateNumber, a.OfferedPrice))];
         return new AllocationRunView(run.RunNumber, run.Method, run.Seed, run.InputHash, run.Status, lines);
+    }
+}
+
+/// <summary>Concludes an allocation run's approval workflow: approval sends the offers, anything else cancels the run.</summary>
+internal sealed class AllocationRunWorkflowHandler : IWorkflowDocumentHandler
+{
+    private readonly One4AllDbContext _db;
+    private readonly AllocationService _service;
+
+    public AllocationRunWorkflowHandler(One4AllDbContext db, AllocationService service)
+    {
+        _db = db;
+        _service = service;
+    }
+
+    public string DocumentType => WorkflowDocumentTypes.AllocationRun;
+
+    public async Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+    {
+        AllocationRun? run = await _db.Set<AllocationRun>().AsNoTracking().FirstOrDefaultAsync(r => r.CompanyId == companyId && r.RunNumber == documentReference && r.Status == AllocationRunStatus.Proposed, ct)
+            .ConfigureAwait(false);
+        if (run is null)
+        {
+            return Result.Success();
+        }
+
+        if (outcome != Core.Workflow.WorkflowStatus.Approved)
+        {
+            return await _service.CancelAsync(companyId, documentReference, ct).ConfigureAwait(false);
+        }
+
+        Result<AllocationRunView> approved = await _service.ConcludeApprovalAsync(companyId, documentReference, decidedByUserId, DateOnly.FromDateTime(DateTime.Today), run.OfferDays, ct)
+            .ConfigureAwait(false);
+        return approved.IsFailure ? Result.Failure(approved.Error) : Result.Success();
     }
 }

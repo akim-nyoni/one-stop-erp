@@ -5,7 +5,7 @@ namespace One4All.Application.Abstractions.Inventory;
 /// <summary>The result of posting a stocktake.</summary>
 /// <param name="AdjustmentsPosted">The number of counted lines whose variance was posted.</param>
 /// <param name="TotalVarianceValue">The net variance value posted (+ surplus, − shortage), at moving-average cost.</param>
-public readonly record struct StocktakePostResult(int AdjustmentsPosted, decimal TotalVarianceValue);
+public readonly record struct StocktakePostResult(int AdjustmentsPosted, decimal TotalVarianceValue, bool AwaitingApproval = false);
 
 /// <summary>A line of the blind count sheet: what to count, never what the system holds.</summary>
 /// <param name="ItemId">The item.</param>
@@ -75,6 +75,7 @@ public interface IStocktakeService
     /// <param name="date">The posting date.</param>
     /// <param name="adjustmentAccountCode">The stock-adjustment account for the variances.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>The post result, or an error.</returns>
-    Task<Result<StocktakePostResult>> PostAsync(long companyId, long stocktakeId, DateOnly date, string adjustmentAccountCode, CancellationToken ct = default);
+    /// <param name="postedByUserId">Who posts it (the initiator when a stocktake approval workflow holds the posting).</param>
+    /// <returns>The post result (awaiting approval when a workflow now holds it), or an error.</returns>
+    Task<Result<StocktakePostResult>> PostAsync(long companyId, long stocktakeId, DateOnly date, string adjustmentAccountCode, CancellationToken ct = default, long? postedByUserId = null);
 }

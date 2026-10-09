@@ -675,8 +675,10 @@ public static partial class OperationCatalogue
             Fields = [Num("Stocktake", "Stocktake id"), Today(), Req("Account", "Stock adjustment account")],
             Run = async (c, i) =>
             {
-                StocktakePostResult result = Check(await c.Get<IStocktakeService>().PostAsync(c.CompanyId, (long)i.Number("Stocktake"), i.Date("Date"), i.Text("Account")).ConfigureAwait(true));
-                return $"{result.AdjustmentsPosted} adjustment(s), net variance {M(result.TotalVarianceValue)}.";
+                StocktakePostResult result = Check(await c.Get<IStocktakeService>().PostAsync(c.CompanyId, (long)i.Number("Stocktake"), i.Date("Date"), i.Text("Account"), postedByUserId: c.UserId)
+                    .ConfigureAwait(true));
+                return result.AwaitingApproval ? "The variances are held for approval; they post when the stocktake workflow approves them."
+                    : $"{result.AdjustmentsPosted} adjustment(s), net variance {M(result.TotalVarianceValue)}.";
             },
             List = CountSheetsAsync,
         };

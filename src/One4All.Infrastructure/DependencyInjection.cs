@@ -94,7 +94,9 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Procurement.IPurchaseOrderAmendmentService, Procurement.PurchaseOrderAmendmentService>();
         services.AddScoped<Application.Abstractions.Procurement.IDeliveryScheduleService, Procurement.DeliveryScheduleService>();
         services.AddScoped<Application.Abstractions.Budgeting.IBudgetGateService, Budgeting.BudgetGateService>();
-        services.AddScoped<Application.Abstractions.Budgeting.IBudgetPreparationService, Budgeting.BudgetPreparationService>();
+        services.AddScoped<Budgeting.BudgetPreparationService>();
+        services.AddScoped<Application.Abstractions.Budgeting.IBudgetPreparationService>(sp => sp.GetRequiredService<Budgeting.BudgetPreparationService>());
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Budgeting.BudgetWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Budgeting.IBudgetPlanningService, Budgeting.BudgetPlanningService>();
         services.AddScoped<Application.Abstractions.Budgeting.IBudgetWorkbookService, Budgeting.BudgetWorkbookService>();
         services.AddScoped<Application.Abstractions.Procurement.IRebateService, Procurement.RebateService>();
@@ -122,7 +124,9 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Municipal.ICemeteryService, Municipal.CemeteryService>();
         services.AddScoped<Application.Abstractions.Municipal.IServiceDeskService, Municipal.ServiceDeskService>();
         services.AddScoped<Application.Abstractions.Housing.IWaitingListService, Housing.WaitingListService>();
-        services.AddScoped<Application.Abstractions.Housing.IAllocationService, Housing.AllocationService>();
+        services.AddScoped<Housing.AllocationService>();
+        services.AddScoped<Application.Abstractions.Housing.IAllocationService>(sp => sp.GetRequiredService<Housing.AllocationService>());
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Housing.AllocationRunWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Housing.IInstalmentSaleService, Housing.InstalmentSaleService>();
         services.AddScoped<Application.Abstractions.Housing.IRentalHousingService, Housing.RentalHousingService>();
         services.AddScoped<Application.Abstractions.Housing.IRentalOccupancyService, Housing.RentalOccupancyService>();
@@ -282,7 +286,9 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.SalesOrders.IPickListService, SalesOrders.PickListService>();
         services.AddScoped<Application.Abstractions.Accounting.IIntercompanyService, Accounting.IntercompanyService>();
         services.AddScoped<Application.Abstractions.Accounting.IPeriodCloseService, Accounting.PeriodCloseService>();
-        services.AddScoped<Application.Abstractions.Inventory.IStocktakeService, Inventory.StocktakeService>();
+        services.AddScoped<Inventory.StocktakeService>();
+        services.AddScoped<Application.Abstractions.Inventory.IStocktakeService>(sp => sp.GetRequiredService<Inventory.StocktakeService>());
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Inventory.StocktakeWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Inventory.IReplenishmentService, Inventory.ReplenishmentService>();
         services.AddScoped<Application.Abstractions.Inventory.IStockProvisionService, Inventory.StockProvisionService>();
         services.AddScoped<Application.Abstractions.Inventory.ILandedCostService, Inventory.LandedCostService>();
@@ -378,7 +384,9 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Payroll.IPayrollVariableService, Payroll.PayrollService>();
         services.AddScoped<Application.Abstractions.Payroll.IPayrollRemittanceService, Payroll.PayrollService>();
         services.AddScoped<Application.Abstractions.Banking.IBankFileService, Banking.BankFileService>();
-        services.AddScoped<Application.Abstractions.Payroll.IEmployeeSelfService, Payroll.EmployeeSelfService>();
+        services.AddScoped<Payroll.EmployeeSelfService>();
+        services.AddScoped<Application.Abstractions.Payroll.IEmployeeSelfService>(sp => sp.GetRequiredService<Payroll.EmployeeSelfService>());
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Payroll.LeaveWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Payroll.IPayslipDistributionService, Payroll.PayslipDistributionService>();
         services.AddScoped<Application.Abstractions.Payroll.IPayrollAccountingService, Payroll.PayrollAccountingService>();
         services.AddScoped<Application.Abstractions.SalesOrders.IDeliveryChargeService, SalesOrders.DeliveryChargeService>();

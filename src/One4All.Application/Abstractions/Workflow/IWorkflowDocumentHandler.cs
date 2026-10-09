@@ -50,4 +50,16 @@ public static class WorkflowDocumentTypes
 
     /// <summary>A school bursary request.</summary>
     public const string Bursary = "Bursary";
+
+    /// <summary>An employee's leave application (reference: <c>LV-</c> and the application id).</summary>
+    public const string LeaveApplication = "LeaveApplication";
+
+    /// <summary>A stocktake's variance posting (reference: <c>ST-</c> and the stocktake id).</summary>
+    public const string Stocktake = "Stocktake";
+
+    /// <summary>A recommended budget awaiting approval (reference: <c>BUD-</c> and the budget id).</summary>
+    public const string Budget = "Budget";
+
+    /// <summary>A proposed housing allocation run (reference: the run number).</summary>
+    public const string AllocationRun = "AllocationRun";
 }

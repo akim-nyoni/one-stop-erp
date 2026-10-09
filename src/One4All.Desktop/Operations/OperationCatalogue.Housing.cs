@@ -126,7 +126,7 @@ public static partial class OperationCatalogue
                         return Show(Check(await allocation.ProposeAsync(new AllocationProposal
                         {
                             CompanyId = c.CompanyId, SchemeId = scheme, Category = Enum.Parse<HousingCategory>(i.Text("Category")), Method = Enum.Parse<AllocationMethod>(i.Text("Method")),
-                            Seed = (long?)i.OptionalNumber("Seed"), AsAtDate = i.Date("Date"), UserId = c.UserId,
+                            Seed = (long?)i.OptionalNumber("Seed"), AsAtDate = i.Date("Date"), UserId = c.UserId, OfferDays = i.Whole("OfferDays"),
                         }).ConfigureAwait(true)));
                     case "Approve":
                         return Show(Check(await allocation.ApproveAsync(c.CompanyId, i.Text("Run"), c.UserId, i.Date("Date"), i.Whole("OfferDays")).ConfigureAwait(true)));

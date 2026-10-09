@@ -99,6 +99,28 @@ public sealed class StocktakeSession : AuditableEntity, ICompanyScoped
 
     /// <summary>Marks the session posted.</summary>
     public void MarkPosted() => Status = StocktakeStatus.Posted;
+
+    /// <summary>Gets the date the variances post on once the approval workflow approves them (null: not awaiting approval).</summary>
+    public DateOnly? PendingPostingDate { get; private set; }
+
+    /// <summary>Gets the stock-adjustment account the variances post to once approved.</summary>
+    public string? PendingAdjustmentAccountCode { get; private set; }
+
+    /// <summary>Holds the posting for the approval workflow.</summary>
+    /// <param name="date">The posting date.</param>
+    /// <param name="adjustmentAccountCode">The stock-adjustment account.</param>
+    public void HoldForApproval(DateOnly date, string adjustmentAccountCode)
+    {
+        PendingPostingDate = date;
+        PendingAdjustmentAccountCode = adjustmentAccountCode;
+    }
+
+    /// <summary>Releases a posting the workflow turned down, so the counts can be corrected and posted again.</summary>
+    public void ReleaseHold()
+    {
+        PendingPostingDate = null;
+        PendingAdjustmentAccountCode = null;
+    }
 }
 
 /// <summary>One counted item on a <see cref="StocktakeSession"/>.</summary>

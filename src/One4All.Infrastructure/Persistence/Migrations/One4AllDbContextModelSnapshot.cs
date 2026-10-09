@@ -5692,6 +5692,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<int>("OfferDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("offer_days");
+
                     b.Property<long>("ProposedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("proposed_by_user_id");
@@ -12820,6 +12824,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("PendingAdjustmentAccountCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("pending_adjustment_account_code");
+
+                    b.Property<DateOnly?>("PendingPostingDate")
+                        .HasColumnType("date")
+                        .HasColumnName("pending_posting_date");
 
                     b.Property<decimal?>("RecountTolerancePercent")
                         .HasPrecision(9, 4)

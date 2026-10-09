@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Budgeting;
+using One4All.Application.Abstractions.Workflow;
 using One4All.Licensing.Core;
 using One4All.Core.Budgeting;
 using One4All.Core.Common;
@@ -16,11 +17,20 @@ public sealed class BudgetPreparationService : IBudgetPreparationService
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="clock">Stamps each step.</param>
-    public BudgetPreparationService(One4AllDbContext db, IClock clock)
+    /// <param name="workflow">Routes a recommended budget through the approval workflow when one is defined for budgets.</param>
+    public BudgetPreparationService(One4AllDbContext db, IClock clock, Lazy<IWorkflowService>? workflow = null)
     {
         _db = db;
         _clock = clock;
+        _workflow = workflow;
     }
+
+    private readonly Lazy<IWorkflowService>? _workflow;
+
+    /// <summary>The workflow reference of a budget.</summary>
+    /// <param name="budgetId">The budget.</param>
+    /// <returns>The reference.</returns>
+    internal static string Reference(long budgetId) => $"BUD-{budgetId}";
 
     /// <inheritdoc />
     public Task<Result> SubmitAsync(long companyId, long budgetId, long userId, string? comment = null, CancellationToken ct = default)
@@ -111,7 +121,20 @@ public sealed class BudgetPreparationService : IBudgetPreparationService
 
     /// <inheritdoc />
     public Task<Result> RecommendAsync(long companyId, long budgetId, long userId, string? comment = null, CancellationToken ct = default)
-        => StepAsync(companyId, budgetId, [BudgetStatus.UnderReview], b => b.MoveTo(BudgetStatus.Recommended), BudgetReviewAction.Recommended, userId, comment, ct);
+        => _db.AtomicAsync(async () =>
+        {
+            // Recommended for approval: when budgets have an approval workflow, the budget goes through it (and is approved only by it).
+            Result stepped = await StepAsync(companyId, budgetId, [BudgetStatus.UnderReview], b => b.MoveTo(BudgetStatus.Recommended), BudgetReviewAction.Recommended, userId, comment, ct)
+                .ConfigureAwait(false);
+            if (stepped.IsFailure)
+            {
+                return stepped;
+            }
+
+            decimal total = await _db.Set<BudgetLine>().Where(l => l.BudgetId == budgetId).SumAsync(l => l.Amount, ct).ConfigureAwait(false);
+            Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, companyId, WorkflowDocumentTypes.Budget, Reference(budgetId), total, userId, ct).ConfigureAwait(false);
+            return governed.IsFailure ? Result.Failure(governed.Error) : Result.Success();
+        }, ct);
 
     /// <inheritdoc />
     public async Task<Result> ApproveAsync(long companyId, long budgetId, long userId, string resolutionReference, CancellationToken ct = default)
@@ -121,6 +144,23 @@ public sealed class BudgetPreparationService : IBudgetPreparationService
             return Result.Failure(Error.Validation("Budget.ResolutionRequired", "Record the board or council resolution approving the budget."));
         }
 
+        if (await Workflow.WorkflowGate.InProgressAsync(_db, companyId, WorkflowDocumentTypes.Budget, Reference(budgetId), ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Workflow.WorkflowGate.Governed(WorkflowDocumentTypes.Budget, Reference(budgetId)));
+        }
+
+        return await ConcludeApprovalAsync(companyId, budgetId, userId, resolutionReference, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Approves a recommended budget (the workflow's approval lands here too).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="budgetId">The budget.</param>
+    /// <param name="userId">The approver.</param>
+    /// <param name="resolutionReference">The resolution approving it.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    internal async Task<Result> ConcludeApprovalAsync(long companyId, long budgetId, long userId, string resolutionReference, CancellationToken ct)
+    {
         Budget? budget = await LoadAsync(companyId, budgetId, ct).ConfigureAwait(false);
         if (budget is null)
         {
@@ -169,6 +209,17 @@ public sealed class BudgetPreparationService : IBudgetPreparationService
         return changed;
     }
 
+    /// <summary>Returns a recommended budget the workflow turned down to its preparers.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="budgetId">The budget.</param>
+    /// <param name="userId">Who turned it down.</param>
+    /// <param name="comment">Why.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    internal Task<Result> ConcludeRejectionAsync(long companyId, long budgetId, long userId, string? comment, CancellationToken ct)
+        => StepAsync(companyId, budgetId, [BudgetStatus.Recommended], b => b.MoveTo(BudgetStatus.Returned), BudgetReviewAction.Returned, userId,
+            string.IsNullOrWhiteSpace(comment) ? "Turned down in the approval workflow" : comment, ct);
+
     private Task<Budget?> LoadAsync(long companyId, long budgetId, CancellationToken ct)
         => _db.Set<Budget>().Include(b => b.Lines).FirstOrDefaultAsync(b => b.Id == budgetId && b.CompanyId == companyId, ct);
 
@@ -189,5 +240,27 @@ public sealed class BudgetPreparationService : IBudgetPreparationService
         _db.Add(new BudgetReviewEvent(budget.Id, budget.Round, action, userId, _clock.UtcNow, string.IsNullOrWhiteSpace(comment) ? null : comment.Trim()));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
+    }
+}
+
+/// <summary>Concludes a budget's approval workflow: approval approves it (the last approver's comment is the resolution), anything else returns it.</summary>
+internal sealed class BudgetWorkflowHandler : IWorkflowDocumentHandler
+{
+    private readonly BudgetPreparationService _service;
+
+    public BudgetWorkflowHandler(BudgetPreparationService service) => _service = service;
+
+    public string DocumentType => WorkflowDocumentTypes.Budget;
+
+    public Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+    {
+        if (!long.TryParse(documentReference.AsSpan(4), out long budgetId))
+        {
+            return Task.FromResult(Result.Success());
+        }
+
+        return outcome == Core.Workflow.WorkflowStatus.Approved
+            ? _service.ConcludeApprovalAsync(companyId, budgetId, decidedByUserId, string.IsNullOrWhiteSpace(comment) ? $"Approval workflow {documentReference}" : comment, ct)
+            : _service.ConcludeRejectionAsync(companyId, budgetId, decidedByUserId, comment, ct);
     }
 }

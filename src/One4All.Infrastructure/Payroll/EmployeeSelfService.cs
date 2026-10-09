@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Payroll;
+using One4All.Application.Abstractions.Workflow;
 using One4All.Application.Payroll;
 using One4All.Core.Common;
 using One4All.Core.Payroll;
@@ -20,15 +21,23 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
 
     private readonly One4AllDbContext _db;
     private readonly IAttendanceService _attendance;
+    private readonly Lazy<IWorkflowService>? _workflow;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="attendance">The attendance service (approved leave is taken through it).</param>
-    public EmployeeSelfService(One4AllDbContext db, IAttendanceService attendance)
+    /// <param name="workflow">Routes applications through the approval workflow when one is defined for leave.</param>
+    public EmployeeSelfService(One4AllDbContext db, IAttendanceService attendance, Lazy<IWorkflowService>? workflow = null)
     {
         _db = db;
         _attendance = attendance;
+        _workflow = workflow;
     }
+
+    /// <summary>The workflow reference of a leave application.</summary>
+    /// <param name="applicationId">The application.</param>
+    /// <returns>The reference.</returns>
+    internal static string LeaveReference(long applicationId) => $"LV-{applicationId}";
 
     /// <inheritdoc />
     public async Task<Result<SelfServiceProfile>> ProfileAsync(long userId, CancellationToken ct = default)
@@ -117,7 +126,11 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
     }
 
     /// <inheritdoc />
-    public async Task<Result<long>> ApplyForLeaveAsync(long userId, string leaveType, DateOnly fromDate, DateOnly toDate, decimal days, CancellationToken ct = default)
+    public Task<Result<long>> ApplyForLeaveAsync(long userId, string leaveType, DateOnly fromDate, DateOnly toDate, decimal days, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ApplyForLeaveCoreAsync(userId, leaveType, fromDate, toDate, days, ct), ct);
+
+    // One unit of work: the application and its approval workflow (when leave has one) start together.
+    private async Task<Result<long>> ApplyForLeaveCoreAsync(long userId, string leaveType, DateOnly fromDate, DateOnly toDate, decimal days, CancellationToken ct)
     {
         Result<IReadOnlyList<LeaveBalanceView>> balances = await LeaveBalancesAsync(userId, ct).ConfigureAwait(false);
         if (balances.IsFailure)
@@ -142,7 +155,9 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
         LeaveApplication application = new(me.CompanyId, me.Id, balance!.LeaveType, fromDate, toDate, days);
         _db.LeaveApplications.Add(application);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return application.Id;
+        Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, me.CompanyId, WorkflowDocumentTypes.LeaveApplication, LeaveReference(application.Id), days, userId, ct)
+            .ConfigureAwait(false);
+        return governed.IsFailure ? Result<long>.Failure(governed.Error) : application.Id;
     }
 
     /// <inheritdoc />
@@ -214,6 +229,25 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
 
     private async Task<Result<SelfServiceStatus>> DecideLeaveCoreAsync(long companyId, long applicationId, bool approve, long deciderUserId, string? note, CancellationToken ct)
     {
+        string reference = LeaveReference(applicationId);
+        if (await Workflow.WorkflowGate.InProgressAsync(_db, companyId, WorkflowDocumentTypes.LeaveApplication, reference, ct).ConfigureAwait(false))
+        {
+            return Workflow.WorkflowGate.Governed(WorkflowDocumentTypes.LeaveApplication, reference);
+        }
+
+        return await ConcludeLeaveAsync(companyId, applicationId, approve, deciderUserId, note, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Decides a leave application: approval takes the leave through attendance.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="applicationId">The application.</param>
+    /// <param name="approve">True to approve.</param>
+    /// <param name="deciderUserId">Who decided.</param>
+    /// <param name="note">Their note.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The new status.</returns>
+    internal async Task<Result<SelfServiceStatus>> ConcludeLeaveAsync(long companyId, long applicationId, bool approve, long deciderUserId, string? note, CancellationToken ct)
+    {
         LeaveApplication? application = await _db.LeaveApplications.FirstOrDefaultAsync(a => a.Id == applicationId && a.CompanyId == companyId, ct).ConfigureAwait(false);
         if (application is null || application.Status != SelfServiceStatus.Pending)
         {
@@ -275,5 +309,26 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
                 e.MobileMoneyNumber = value;
                 break;
         }
+    }
+}
+
+/// <summary>Concludes a leave application's approval workflow: approval takes the leave, anything else declines it.</summary>
+internal sealed class LeaveWorkflowHandler : IWorkflowDocumentHandler
+{
+    private readonly EmployeeSelfService _service;
+
+    public LeaveWorkflowHandler(EmployeeSelfService service) => _service = service;
+
+    public string DocumentType => WorkflowDocumentTypes.LeaveApplication;
+
+    public async Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+    {
+        if (!long.TryParse(documentReference.AsSpan(3), out long applicationId))
+        {
+            return Result.Success();
+        }
+
+        Result<SelfServiceStatus> decided = await _service.ConcludeLeaveAsync(companyId, applicationId, outcome == Core.Workflow.WorkflowStatus.Approved, decidedByUserId, comment, ct).ConfigureAwait(false);
+        return decided.IsFailure && decided.Error.Code != "Ess.RequestNotFound" ? Result.Failure(decided.Error) : Result.Success();
     }
 }

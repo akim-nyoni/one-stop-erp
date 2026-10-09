@@ -133,6 +133,9 @@ public sealed class AllocationRun : AuditableEntity, ICompanyScoped
     /// <summary>Who approved it.</summary>
     public long? ApprovedByUserId { get; private set; }
 
+    /// <summary>Gets or sets how long offers stay open once approved through the approval workflow.</summary>
+    public int OfferDays { get; set; } = 30;
+
     /// <summary>When it was approved.</summary>
     public DateOnly? ApprovedOn { get; private set; }
 

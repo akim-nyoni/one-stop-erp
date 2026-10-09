@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Inventory;
+using One4All.Application.Abstractions.Workflow;
 using One4All.Core.Common;
 using One4All.Core.Inventory;
 using One4All.Infrastructure.Persistence;
@@ -15,14 +16,17 @@ public sealed class StocktakeService : IStocktakeService
 {
     private readonly One4AllDbContext _db;
     private readonly IInventoryService _inventory;
+    private readonly Lazy<IWorkflowService>? _workflow;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="inventory">The inventory service that posts the variance adjustments.</param>
-    public StocktakeService(One4AllDbContext db, IInventoryService inventory)
+    /// <param name="workflow">Holds the posting for approval when a stocktake workflow is defined.</param>
+    public StocktakeService(One4AllDbContext db, IInventoryService inventory, Lazy<IWorkflowService>? workflow = null)
     {
         _db = db;
         _inventory = inventory;
+        _workflow = workflow;
     }
 
     /// <inheritdoc />
@@ -124,11 +128,13 @@ public sealed class StocktakeService : IStocktakeService
     }
 
     /// <inheritdoc />
-    public Task<Result<StocktakePostResult>> PostAsync(long companyId, long stocktakeId, DateOnly date, string adjustmentAccountCode, CancellationToken ct = default)
-        => _db.AtomicAsync(() => PostCoreAsync(companyId, stocktakeId, date, adjustmentAccountCode, ct), ct);
+    public Task<Result<StocktakePostResult>> PostAsync(long companyId, long stocktakeId, DateOnly date, string adjustmentAccountCode, CancellationToken ct = default, long? postedByUserId = null)
+        => _db.AtomicAsync(() => PostCoreAsync(companyId, stocktakeId, date, adjustmentAccountCode, ct, approved: false, postedByUserId), ct);
 
-    // One unit of work: every variance adjustment and the session's close commit together.
-    private async Task<Result<StocktakePostResult>> PostCoreAsync(long companyId, long stocktakeId, DateOnly date, string adjustmentAccountCode, CancellationToken ct)
+    // One unit of work: every variance adjustment and the session's close commit together. When a stocktake workflow is defined the
+    // posting is held until it approves (then the workflow posts it, approved).
+    internal async Task<Result<StocktakePostResult>> PostCoreAsync(long companyId, long stocktakeId, DateOnly date, string adjustmentAccountCode, CancellationToken ct, bool approved,
+        long? postedByUserId = null)
     {
         if (string.IsNullOrWhiteSpace(adjustmentAccountCode))
         {
@@ -145,6 +151,30 @@ public sealed class StocktakeService : IStocktakeService
         if (due > 0)
         {
             return Error.Rule("Stocktake.RecountsDue", $"{due} count(s) are outside the tolerance and must be recounted before posting.");
+        }
+
+        if (!approved)
+        {
+            string reference = $"ST-{session.Id}";
+            if (await Workflow.WorkflowGate.InProgressAsync(_db, companyId, WorkflowDocumentTypes.Stocktake, reference, ct).ConfigureAwait(false))
+            {
+                return Workflow.WorkflowGate.Governed(WorkflowDocumentTypes.Stocktake, reference);
+            }
+
+            decimal varianceValue = session.Lines.Where(l => l.IsCounted).Sum(l => Math.Abs(l.CountedQuantity!.Value - l.SystemQuantity) * l.AverageCost);
+            Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, companyId, WorkflowDocumentTypes.Stocktake, reference, decimal.Round(varianceValue, 2),
+                postedByUserId ?? 0, ct).ConfigureAwait(false);
+            if (governed.IsFailure)
+            {
+                return governed.Error;
+            }
+
+            if (governed.Value)
+            {
+                session.HoldForApproval(date, adjustmentAccountCode.Trim());
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+                return new StocktakePostResult(0, 0m, AwaitingApproval: true);
+            }
         }
 
         int posted = 0;
@@ -179,5 +209,41 @@ public sealed class StocktakeService : IStocktakeService
             .ConfigureAwait(false);
 
         return session is { Status: StocktakeStatus.Draft } ? session : null;
+    }
+}
+
+/// <summary>Concludes a stocktake's approval workflow: approval posts the held variances, anything else releases them for correction.</summary>
+internal sealed class StocktakeWorkflowHandler : IWorkflowDocumentHandler
+{
+    private readonly One4AllDbContext _db;
+    private readonly StocktakeService _service;
+
+    public StocktakeWorkflowHandler(One4AllDbContext db, StocktakeService service)
+    {
+        _db = db;
+        _service = service;
+    }
+
+    public string DocumentType => WorkflowDocumentTypes.Stocktake;
+
+    public async Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+    {
+        StocktakeSession? session = long.TryParse(documentReference.AsSpan(3), out long id)
+            ? await _db.Set<StocktakeSession>().FirstOrDefaultAsync(s => s.Id == id && s.CompanyId == companyId && s.Status == StocktakeStatus.Draft, ct).ConfigureAwait(false)
+            : null;
+        if (session?.PendingPostingDate is not DateOnly date || session.PendingAdjustmentAccountCode is not string account)
+        {
+            return Result.Success();
+        }
+
+        if (outcome != Core.Workflow.WorkflowStatus.Approved)
+        {
+            session.ReleaseHold();
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result.Success();
+        }
+
+        Result<StocktakePostResult> posted = await _service.PostCoreAsync(companyId, id, date, account, ct, approved: true).ConfigureAwait(false);
+        return posted.IsFailure ? Result.Failure(posted.Error) : Result.Success();
     }
 }
