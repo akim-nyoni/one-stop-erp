@@ -46,9 +46,7 @@ public sealed partial class ShellViewModel : ObservableObject
         UserId = auth.UserId;
         UserDisplayName = auth.DisplayName;
 
-        LicenseValidationResult status = licence.Current;
-        string customer = status.Payload?.Customer.Name ?? "Unlicensed";
-        LicenceStatusText = licence.Warning is string warning ? $"{customer}  •  {status.Status}  •  {warning}" : $"{customer}  •  {status.Status}";
+        _licenceStatusText = StatusLine(licence);
 
         // Navigation is built from the registered modules that are licensed and permitted (brief §10).
         Registry = registry ?? new ModuleRegistry();
@@ -90,7 +88,19 @@ public sealed partial class ShellViewModel : ObservableObject
     public string UserDisplayName { get; }
 
     /// <summary>The licence status line for the status bar.</summary>
-    public string LicenceStatusText { get; }
+    [ObservableProperty]
+    private string _licenceStatusText;
+
+    /// <summary>Re-reads the licence status (the desktop re-checks it every hour, as the server does).</summary>
+    /// <param name="licence">The licence service.</param>
+    public void RefreshLicence(ILicenceService licence) => LicenceStatusText = StatusLine(licence);
+
+    private static string StatusLine(ILicenceService licence)
+    {
+        LicenseValidationResult status = licence.Current;
+        string customer = status.Payload?.Customer.Name ?? "Unlicensed";
+        return licence.Warning is string warning ? $"{customer}  •  {status.Status}  •  {warning}" : $"{customer}  •  {status.Status}";
+    }
 
     /// <summary>The root of the System Tree.</summary>
     public NavNode TreeRoot { get; } = new("One4All") { IsExpanded = true };

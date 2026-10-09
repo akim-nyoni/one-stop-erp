@@ -392,7 +392,8 @@ public static partial class OperationCatalogue
                 + "(late renewals with a penalty %), or revokes it.",
             Fields = [Pick("Step", "Step", ["Issue", "Inspection", "Renew", "Revoke"]), Pick("Kind", "Licence kind", Enum.GetNames<CouncilLicenceKind>()), Opt("Holder", "Holder customer code (issue)"),
                 Opt("Stand", "Stand number (optional)"), Opt("Description", "Description / inspector / reason"), Num("Cycle", "Renewal cycle (months)", "12"), Num("Fee", "Fee / penalty %", "0"),
-                Opt("Account", "Revenue / penalty account"), Opt("Licence", "Licence number"), Tick("Passed", "Inspection passed", true), Opt("Notes", "Notes"), Today()],
+                Opt("Account", "Revenue / penalty account"), Opt("Deferred", "Fees-in-advance account (issue; blank: revenue at once)"), Opt("Licence", "Licence number"),
+                Tick("Passed", "Inspection passed", true), Opt("Notes", "Notes"), Today()],
             Run = async (c, i) =>
             {
                 ICouncilLicensingService licensing = c.Get<ICouncilLicensingService>();
@@ -405,6 +406,7 @@ public static partial class OperationCatalogue
                             CompanyId = c.CompanyId, Kind = Enum.Parse<CouncilLicenceKind>(i.Text("Kind")), HolderCustomerId = await CustomerAsync(c, i.Optional("Holder") ?? string.Empty).ConfigureAwait(true),
                             PropertyId = i.Optional("Stand") is string stand ? await PropertyAsync(c, stand).ConfigureAwait(true) : null, Description = i.Optional("Description") ?? string.Empty,
                             IssuedOn = i.Date("Date"), CycleMonths = i.Whole("Cycle"), Fee = i.Number("Fee"), RevenueAccountCode = i.Optional("Account") ?? string.Empty,
+                            DeferredIncomeAccountCode = i.Optional("Deferred"),
                         }).ConfigureAwait(true));
                         return $"Licence {issued.LicenceNumber}, expires {issued.ExpiresOn:yyyy-MM-dd}{(issued.FeeInvoiceNumber is null ? string.Empty : $"; fee invoice {issued.FeeInvoiceNumber}")}.";
                     case "Inspection":

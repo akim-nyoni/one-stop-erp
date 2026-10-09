@@ -114,6 +114,9 @@ public sealed class CouncilLicence : AuditableEntity, ICompanyScoped
     /// <summary>The revenue account the fee is credited to.</summary>
     public string RevenueAccountCode { get; private set; }
 
+    /// <summary>Gets or sets the liability account the fee is held in and earned from over the licence's cycle (null: revenue at once).</summary>
+    public string? DeferredIncomeAccountCode { get; set; }
+
     /// <summary>Where it stands.</summary>
     public CouncilLicenceStatus Status { get; private set; }
 

@@ -220,7 +220,11 @@ public sealed class User : SoftDeletableEntity
         _overrides.RemoveAll(o =>
             string.Equals(o.PermissionCode, permissionCode, StringComparison.OrdinalIgnoreCase) &&
             o.IsGrant == isGrant);
-        _overrides.Add(new UserPermissionOverrideEntity(permissionCode, operations, isGrant));
+        if (operations != OperationFlags.None)
+        {
+            // No operations is no override: the user inherits the feature from their roles again.
+            _overrides.Add(new UserPermissionOverrideEntity(permissionCode, operations, isGrant));
+        }
     }
 
     private void RotateSecurityStamp() => SecurityStamp = Guid.NewGuid().ToString("N");

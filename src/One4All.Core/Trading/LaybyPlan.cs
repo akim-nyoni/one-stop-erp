@@ -109,6 +109,16 @@ public sealed class LaybyPlan : AuditableEntity, ICompanyScoped
     /// <summary>The price of the goods.</summary>
     public decimal Total => _lines.Sum(l => decimal.Round(l.Quantity * l.UnitPrice, 2, MidpointRounding.AwayFromZero));
 
+    /// <summary>Gets or sets the tax code the prices include (null: no tax on the sale).</summary>
+    public string? TaxCode { get; set; }
+
+    /// <summary>The tax a tax-inclusive total holds at a rate.</summary>
+    /// <param name="total">The tax-inclusive total.</param>
+    /// <param name="ratePercent">The rate.</param>
+    /// <returns>The tax.</returns>
+    public static decimal TaxIn(decimal total, decimal ratePercent)
+        => ratePercent <= 0m ? 0m : decimal.Round(total * ratePercent / (100m + ratePercent), 2, MidpointRounding.AwayFromZero);
+
     /// <summary>What is still to pay.</summary>
     public decimal Balance => Total - Paid;
 

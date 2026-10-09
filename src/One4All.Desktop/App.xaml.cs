@@ -36,8 +36,18 @@ public partial class App : System.Windows.Application
         {
             string connectionString = ResolveConnectionString();
 
-            LicensingOptions licensing = new() { Enforce = true };
-            licensing.TrustedKeys[DevLicensing.KeyId] = DevLicensing.PublicKeyBase64;
+            // The vendor's keys come from the Licensing section; only a development install (appsettings.Development.json beside the app, which is
+            // never shipped, or DOTNET_ENVIRONMENT=Development) also trusts the development key and falls back to the development licence.
+            IConfigurationRoot config = new ConfigurationBuilder().SetBasePath(AppContext.BaseDirectory).AddJsonFile("appsettings.json", optional: true)
+                .AddJsonFile("appsettings.Development.json", optional: true).Build();
+            LicensingOptions licensing = new();
+            config.GetSection(LicensingOptions.SectionName).Bind(licensing);
+            licensing.Enforce = config.GetValue("Licensing:Enforce", true);
+            _development = IsDevelopment();
+            if (_development)
+            {
+                licensing.TrustedKeys[DevLicensing.KeyId] = DevLicensing.PublicKeyBase64;
+            }
 
             ServiceCollection services = new();
             services.AddOne4AllInfrastructure(connectionString, licensing);
@@ -101,11 +111,19 @@ public partial class App : System.Windows.Application
 
         ILicenceService licence = Services.GetRequiredService<ILicenceService>();
         await licence.ReloadAsync().ConfigureAwait(false);
-        if (!licence.Current.IsUsable && !licence.Current.IsReadOnly)
+        if (_development && !licence.Current.IsUsable && !licence.Current.IsReadOnly)
         {
             await licence.InstallAsync(DevLicensing.LicenceToken).ConfigureAwait(false);
         }
     }
+
+    private bool _development;
+
+    // A development install: appsettings.Development.json beside the app (never shipped) or DOTNET_ENVIRONMENT / ONE4ALL_ENVIRONMENT = Development.
+    private static bool IsDevelopment()
+        => File.Exists(Path.Combine(AppContext.BaseDirectory, "appsettings.Development.json"))
+            || string.Equals(Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"), "Development", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(Environment.GetEnvironmentVariable("ONE4ALL_ENVIRONMENT"), "Development", StringComparison.OrdinalIgnoreCase);
 
     // The till's peripherals from appsettings (Pos:Devices); ONE4ALL_POS_SIMULATE=1 puts every device on its simulator.
     private static One4All.Infrastructure.Pos.PosDeviceOptions PosDevices()

@@ -20,4 +20,23 @@ public interface IPermissionService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The violated SoD rules.</returns>
     Task<IReadOnlyList<SodRule>> GetSodViolationsAsync(long userId, CancellationToken ct = default);
+
+    /// <summary>The grants a user inherits from their roles, directly and through groups, before their own overrides.</summary>
+    /// <param name="userId">The user id.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The role grants.</returns>
+    Task<IReadOnlyList<PermissionGrant>> RoleGrantsAsync(long userId, CancellationToken ct = default);
+
+    /// <summary>Sets a user's grant and deny overrides for features (brief §5.2); a feature with neither inherits from the roles again.</summary>
+    /// <param name="userId">The user id.</param>
+    /// <param name="overrides">Each feature's grant and deny operations.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or an unknown user or feature.</returns>
+    Task<Core.Common.Result> SetOverridesAsync(long userId, IReadOnlyList<UserOverrideEdit> overrides, CancellationToken ct = default);
 }
+
+/// <summary>A feature's override on the permission grid.</summary>
+/// <param name="PermissionCode">The <c>Module.Feature</c> code.</param>
+/// <param name="Grant">The operations granted beyond the roles.</param>
+/// <param name="Deny">The operations denied whatever the roles give.</param>
+public sealed record UserOverrideEdit(string PermissionCode, OperationFlags Grant, OperationFlags Deny);

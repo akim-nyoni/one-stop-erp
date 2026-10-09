@@ -33,6 +33,47 @@ public sealed class PermissionService : IPermissionService
             return EffectivePermissions.None;
         }
 
+        List<PermissionGrant> grants = await GrantsAsync(user, ct).ConfigureAwait(false);
+        IEnumerable<PermissionOverride> overrides = user.Overrides.Select(o => o.ToOverride());
+
+        return PermissionResolution.Resolve(grants, overrides, user.IsSystemAdministrator);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PermissionGrant>> RoleGrantsAsync(long userId, CancellationToken ct = default)
+    {
+        User? user = await _db.Users.Include(u => u.Roles).Include(u => u.Groups).AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false);
+        return user is null ? [] : await GrantsAsync(user, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Core.Common.Result> SetOverridesAsync(long userId, IReadOnlyList<UserOverrideEdit> overrides, CancellationToken ct = default)
+    {
+        User? user = await _db.Users.Include(u => u.Overrides).FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false);
+        if (user is null)
+        {
+            return Core.Common.Result.Failure(Core.Common.Error.NotFound("Perm.User", "User not found."));
+        }
+
+        foreach (UserOverrideEdit edit in overrides)
+        {
+            PermissionDefinition? feature = PermissionCatalogue.Find(edit.PermissionCode);
+            if (feature is null)
+            {
+                return Core.Common.Result.Failure(Core.Common.Error.Validation("Perm.Feature", $"Unknown feature {edit.PermissionCode}."));
+            }
+
+            user.SetOverride(feature.Code, edit.Grant & feature.Available, isGrant: true);
+            user.SetOverride(feature.Code, edit.Deny & feature.Available, isGrant: false);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Core.Common.Result.Success();
+    }
+
+    // The grants of the user's roles, directly assigned and through group membership.
+    private async Task<List<PermissionGrant>> GrantsAsync(User user, CancellationToken ct)
+    {
         // Role ids from direct assignments and from group membership.
         HashSet<long> roleIds = user.Roles.Select(r => r.RoleId).ToHashSet();
 
@@ -57,9 +98,7 @@ public sealed class PermissionService : IPermissionService
                 .ConfigureAwait(false);
         }
 
-        IEnumerable<PermissionOverride> overrides = user.Overrides.Select(o => o.ToOverride());
-
-        return PermissionResolution.Resolve(grants, overrides, user.IsSystemAdministrator);
+        return grants;
     }
 
     /// <inheritdoc />

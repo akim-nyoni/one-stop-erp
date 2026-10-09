@@ -21,8 +21,9 @@ public partial class ShellWindow : Window
         _services = services;
         DataContext = viewModel;
         InitializeComponent();
-        BuildAreaMenus();
+        BuildAreaMenus(viewModel);
         FlowDirection = Localization.UiText.Direction;
+        StartLicenceChecks(viewModel);
         _idleLock = new IdleLock(services);
         Loaded += (_, _) => HideUnavailableOperations(viewModel);
     }
@@ -94,7 +95,36 @@ public partial class ShellWindow : Window
 
     // Each of Maintenance, Transactions, Enquiries and Utilities lists, after its own windows, the modules that have actions of that kind; each opens
     // the module's console showing just those actions (Sage style).
-    private void BuildAreaMenus()
+    // Every hour the licence is re-read (an expiry, a revocation list or a new licence installed elsewhere takes effect), and from seven days
+    // before expiry — or while it is in grace, read-only or unusable — the user is reminded once a day (brief §11.5).
+    private void StartLicenceChecks(ShellViewModel viewModel)
+    {
+        Application.Abstractions.Licensing.ILicenceService licence = (Application.Abstractions.Licensing.ILicenceService)_services.GetService(typeof(Application.Abstractions.Licensing.ILicenceService))!;
+        DateOnly? lastReminded = null;
+        void Remind()
+        {
+            DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+            if (Application.Licensing.LicenceReminder.ShouldRemind(licence.Current.Status, licence.DaysUntilExpiry, lastReminded, today) && licence.Warning is string warning)
+            {
+                lastReminded = today;
+                MessageBox.Show(this, warning + Environment.NewLine + Environment.NewLine + Localization.UiText.T("Contact your vendor for a new licence."), Localization.UiText.T("Licence"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        System.Windows.Threading.DispatcherTimer timer = new() { Interval = TimeSpan.FromHours(1) };
+        timer.Tick += async (_, _) =>
+        {
+            await licence.ReloadAsync().ConfigureAwait(true);
+            viewModel.RefreshLicence(licence);
+            Remind();
+        };
+        timer.Start();
+        Loaded += (_, _) => Remind();
+        Closed += (_, _) => timer.Stop();
+    }
+
+    private void BuildAreaMenus(ShellViewModel viewModel)
     {
         IReadOnlyList<Operations.Operation> all = Operations.OperationCatalogue.All();
         foreach ((System.Windows.Controls.MenuItem menu, Application.Navigation.MenuArea area) in new[]
@@ -103,7 +133,7 @@ public partial class ShellWindow : Window
             (EnquiriesMenu, Application.Navigation.MenuArea.Enquiries), (UtilitiesMenu, Application.Navigation.MenuArea.Utilities),
         })
         {
-            List<string> modules = [.. Operations.OperationCatalogue.Modules.Where(m => all.Any(o => o.Module == m && o.MenuArea == area))];
+            List<string> modules = [.. Operations.OperationCatalogue.Modules.Where(m => all.Any(o => o.Module == m && o.MenuArea == area) && viewModel.IsMenuEntryAvailable(m))];
             if (modules.Count == 0)
             {
                 continue;

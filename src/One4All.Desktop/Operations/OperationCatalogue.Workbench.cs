@@ -259,7 +259,8 @@ public static partial class OperationCatalogue
                 + "(the forfeit % kept, the rest refunded) or defaults every overdue plan.",
             Fields = [Pick("Step", "Step", ["Open", "Pay", "Cancel", "Default overdue"]), Opt("Plan", "Plan number"), Opt("Customer", "Customer code (open)"), Opt("Warehouse", "Warehouse (open)"),
                 Opt("Lines", "Goods: ITEM:quantity@price; … (open)"), Num("Amount", "Deposit / payment", "0"), Num("MinDeposit", "Minimum deposit %", "10"), Num("Forfeit", "Forfeit % on cancel", "10"),
-                Today("Final", "Final payment date (open)"), Opt("Bank", "Bank / refund account"), Opt("Deposits", "Lay-by deposits account"), Opt("Revenue", "Revenue account"), Opt("Forfeits", "Forfeiture income account"), Today()],
+                Today("Final", "Final payment date (open)"), Opt("Bank", "Bank / refund account"), Opt("Deposits", "Lay-by deposits account"), Opt("Revenue", "Revenue account"), Opt("Forfeits", "Forfeiture income account"),
+                Opt("TaxCode", "Tax code the prices include (open)"), Today()],
             Run = async (c, i) =>
             {
                 Application.Abstractions.Trading.ILaybyService laybys = c.Get<Application.Abstractions.Trading.ILaybyService>();
@@ -285,7 +286,7 @@ public static partial class OperationCatalogue
                             WarehouseId = await WarehouseAsync(c, i.Optional("Warehouse") ?? string.Empty).ConfigureAwait(true), OpenedOn = i.Date("Date"), FinalDate = i.Date("Final"), Deposit = i.Number("Amount"),
                             MinimumDepositPercent = i.Number("MinDeposit"), ForfeitPercent = i.Number("Forfeit"), BankAccountCode = i.Optional("Bank") ?? string.Empty,
                             DepositAccountCode = i.Optional("Deposits") ?? string.Empty, RevenueAccountCode = i.Optional("Revenue") ?? string.Empty, ForfeitureAccountCode = i.Optional("Forfeits") ?? string.Empty,
-                            Lines = lines,
+                            Lines = lines, TaxCode = i.Optional("TaxCode"),
                         }).ConfigureAwait(true), _ => "Lay-by opened; the goods are reserved.");
                     case "Pay":
                         Application.Abstractions.Trading.LaybyPayment paid = Check(await laybys.PayAsync(c.CompanyId, await PlanId().ConfigureAwait(true), i.Date("Date"), i.Number("Amount"), i.Optional("Bank") ?? string.Empty)

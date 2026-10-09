@@ -70,6 +70,7 @@ public sealed class CouncilLicensingService : ICouncilLicensingService
         }
 
         DateOnly expires = request.IssuedOn.AddMonths(request.CycleMonths).AddDays(-1);
+        string? deferred = string.IsNullOrWhiteSpace(request.DeferredIncomeAccountCode) ? null : request.DeferredIncomeAccountCode.Trim().ToUpperInvariant();
         string? invoice = null;
         if (request.Fee > 0m)
         {
@@ -77,16 +78,21 @@ public sealed class CouncilLicensingService : ICouncilLicensingService
             Result<TradingPostingResult> invoiced = await _ar.PostInvoiceAsync(new SalesInvoiceRequest
             {
                 CompanyId = request.CompanyId, CustomerId = holder.Id, DocumentNumber = invoice, DocumentDate = request.IssuedOn, Currency = holder.Currency,
-                NetAmount = request.Fee, SalesAccountCode = request.RevenueAccountCode, Narrative = $"{request.Kind} licence {number.Value} to {expires:yyyy-MM-dd}",
+                NetAmount = request.Fee, SalesAccountCode = deferred ?? request.RevenueAccountCode, Narrative = $"{request.Kind} licence {number.Value} to {expires:yyyy-MM-dd}",
             }, ct).ConfigureAwait(false);
             if (invoiced.IsFailure)
             {
                 return invoiced.Error;
             }
+
+            Defer(request.CompanyId, invoice, $"{request.Kind} licence {number.Value}", deferred, request.RevenueAccountCode.Trim(), request.Fee, request.IssuedOn, expires);
         }
 
         CouncilLicence licence = new(request.CompanyId, number.Value, request.Kind, holder.Id, request.PropertyId, request.Description.Trim(),
-            request.IssuedOn, expires, request.CycleMonths, request.Fee, request.RevenueAccountCode.Trim());
+            request.IssuedOn, expires, request.CycleMonths, request.Fee, request.RevenueAccountCode.Trim())
+        {
+            DeferredIncomeAccountCode = deferred,
+        };
         _db.Set<CouncilLicence>().Add(licence);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new IssuedLicence(licence.LicenceNumber, licence.ExpiresOn, invoice);
@@ -175,7 +181,7 @@ public sealed class CouncilLicensingService : ICouncilLicensingService
             List<RevenueLine> lines = [];
             if (terms.Fee > 0m)
             {
-                lines.Add(new RevenueLine(licence.RevenueAccountCode, terms.Fee));
+                lines.Add(new RevenueLine(licence.DeferredIncomeAccountCode ?? licence.RevenueAccountCode, terms.Fee));
             }
 
             if (terms.Penalty > 0m)
@@ -196,9 +202,24 @@ public sealed class CouncilLicensingService : ICouncilLicensingService
             }
         }
 
+        if (invoice is not null && terms.Fee > 0m)
+        {
+            Defer(companyId, invoice, $"{licence.Kind} licence {licence.LicenceNumber} renewal", licence.DeferredIncomeAccountCode, licence.RevenueAccountCode, terms.Fee,
+                terms.NewExpiry.AddMonths(-licence.CycleMonths).AddDays(1), terms.NewExpiry);
+        }
+
         licence.Renew(terms.NewExpiry);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new LicenceRenewed(terms, invoice);
+    }
+
+    // A fee held in the deferred account is earned evenly over the licence's cycle by the deferred-income run.
+    private void Defer(long companyId, string invoice, string description, string? deferredAccount, string revenueAccount, decimal fee, DateOnly from, DateOnly to)
+    {
+        if (deferredAccount is not null)
+        {
+            _db.Set<Core.Accounting.DeferredIncomeSchedule>().Add(new Core.Accounting.DeferredIncomeSchedule(companyId, invoice, description, deferredAccount, revenueAccount, fee, from, to));
+        }
     }
 
     /// <inheritdoc />

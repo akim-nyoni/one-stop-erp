@@ -33,6 +33,9 @@ public sealed class IssueLicenceRequest
 
     /// <summary>The revenue account the fee is credited to.</summary>
     public string RevenueAccountCode { get; init; } = string.Empty;
+
+    /// <summary>The liability account the fee is held in and earned month by month over the cycle (brief §3.7; null: revenue when invoiced).</summary>
+    public string? DeferredIncomeAccountCode { get; init; }
 }
 
 /// <summary>A licence that has been issued.</summary>

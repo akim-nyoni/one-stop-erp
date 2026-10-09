@@ -4,118 +4,139 @@ using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using One4All.Application.Abstractions.Security;
 using One4All.Core.Common;
 using One4All.Core.Security;
 using One4All.Infrastructure.Persistence;
 
 namespace One4All.Desktop.ViewModels;
 
-/// <summary>A role in the picker.</summary>
-/// <param name="Id">The role id.</param>
-/// <param name="Name">The role name.</param>
-/// <param name="IsSystemRole">Whether it is a built-in system role.</param>
-public sealed record RoleItem(long Id, string Name, bool IsSystemRole)
+/// <summary>A role or a user in the picker: a role's grants are edited outright, a user's as grant/deny overrides on top of their roles.</summary>
+/// <param name="Id">The role or user id.</param>
+/// <param name="Name">The name.</param>
+/// <param name="IsUser">True for a user.</param>
+/// <param name="IsSystem">A built-in role, or a system administrator.</param>
+public sealed record RoleItem(long Id, string Name, bool IsUser = false, bool IsSystem = false)
 {
     /// <summary>The display label.</summary>
-    public string Display => IsSystemRole ? $"{Name} (system)" : Name;
+    public string Display => (IsUser ? "User: " : "Role: ") + Name + (IsSystem ? (IsUser ? " (administrator)" : " (system)") : string.Empty);
 }
 
 /// <summary>
-/// One permission row on the grid: the common operation flags as editable checkboxes, enabled only where the
-/// permission actually offers that operation. Non-common flags on the role's grant (authorise levels, price/
-/// credit overrides, back-dating, …) are preserved untouched so editing the grid never silently drops them.
+/// One operation cell. For a role it is ticked or not; for a user it is three-state: ticked grants, cleared denies and the indeterminate
+/// state inherits from the roles, shaded green when the user ends up with the operation.
 /// </summary>
-public sealed partial class PermissionRowViewModel : ObservableObject
+public sealed partial class PermissionCellViewModel : ObservableObject
 {
-    /// <summary>The common operations shown as grid columns, in order.</summary>
-    public static readonly OperationFlags[] CoreOperations =
-    [
-        OperationFlags.View, OperationFlags.Create, OperationFlags.Edit, OperationFlags.Delete,
-        OperationFlags.Print, OperationFlags.Export, OperationFlags.Post, OperationFlags.Approve, OperationFlags.VoidReverse,
-    ];
+    private readonly bool _inherited;
 
-    private static readonly OperationFlags CoreMask = CoreOperations.Aggregate(OperationFlags.None, (a, f) => a | f);
+    /// <summary>Creates a cell.</summary>
+    /// <param name="flag">The operation.</param>
+    /// <param name="offered">Whether the feature offers it.</param>
+    /// <param name="forUser">True for a user's override cell.</param>
+    /// <param name="inherited">Whether the user's roles give it.</param>
+    /// <param name="value">The initial state.</param>
+    public PermissionCellViewModel(OperationFlags flag, bool offered, bool forUser, bool inherited, bool? value)
+    {
+        Flag = flag;
+        Offered = offered;
+        ThreeState = forUser;
+        _inherited = inherited;
+        _value = value;
+    }
 
+    /// <summary>The operation.</summary>
+    public OperationFlags Flag { get; }
+
+    /// <summary>Whether the feature offers the operation.</summary>
+    public bool Offered { get; }
+
+    /// <summary>True for a user's grant/deny/inherit cell.</summary>
+    public bool ThreeState { get; }
+
+    /// <summary>The cell state: ticked, cleared, or (users only) null to inherit.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Shade), nameof(Tip))]
+    private bool? _value;
+
+    /// <summary>Whether the subject ends up with the operation.</summary>
+    public bool Effective => Offered && (Value ?? _inherited);
+
+    /// <summary>The cell background: green when a user has the operation, transparent otherwise.</summary>
+    public string Shade => ThreeState && Effective ? "#DDF1E3" : "Transparent";
+
+    /// <summary>The cell tooltip.</summary>
+    public string Tip => !Offered ? $"{Flag}: not offered"
+        : !ThreeState ? Flag.ToString()
+        : Value switch
+        {
+            true => $"{Flag}: granted to this user",
+            false => $"{Flag}: denied to this user",
+            _ => $"{Flag}: {(_inherited ? "allowed" : "not allowed")} by the user's roles",
+        };
+}
+
+/// <summary>One feature row on the grid with a cell for every operation flag.</summary>
+public sealed class PermissionRowViewModel
+{
     private readonly OperationFlags _available;
-    private readonly OperationFlags _preservedNonCore;
 
-    /// <summary>Creates a row from a catalogue definition and the role's current grant.</summary>
-    /// <param name="definition">The permission definition.</param>
-    /// <param name="current">The role's currently granted operations for this permission.</param>
+    /// <summary>Creates a row for a role's grant.</summary>
+    /// <param name="definition">The feature.</param>
+    /// <param name="current">The role's granted operations.</param>
     public PermissionRowViewModel(PermissionDefinition definition, OperationFlags current)
+        : this(definition, PermissionCells.Columns.Select(f => (bool?)((definition.Available & f) == f && (current & f) == f)), forUser: false, OperationFlags.None)
+    {
+    }
+
+    /// <summary>Creates a row for a user's overrides.</summary>
+    /// <param name="definition">The feature.</param>
+    /// <param name="inherited">The operations the user's roles give.</param>
+    /// <param name="grant">The user's grant override.</param>
+    /// <param name="deny">The user's deny override.</param>
+    public PermissionRowViewModel(PermissionDefinition definition, OperationFlags inherited, OperationFlags grant, OperationFlags deny)
+        : this(definition, PermissionCells.Columns.Select(f => PermissionCells.CellOf(f, grant, deny)), forUser: true, inherited)
+    {
+    }
+
+    private PermissionRowViewModel(PermissionDefinition definition, IEnumerable<bool?> values, bool forUser, OperationFlags inherited)
     {
         Code = definition.Code;
         Module = definition.Module;
         Feature = definition.Name;
         _available = definition.Available;
-        _preservedNonCore = current & ~CoreMask;
-
-        _view = Has(current, OperationFlags.View);
-        _create = Has(current, OperationFlags.Create);
-        _edit = Has(current, OperationFlags.Edit);
-        _delete = Has(current, OperationFlags.Delete);
-        _print = Has(current, OperationFlags.Print);
-        _export = Has(current, OperationFlags.Export);
-        _post = Has(current, OperationFlags.Post);
-        _approve = Has(current, OperationFlags.Approve);
-        _voidReverse = Has(current, OperationFlags.VoidReverse);
-
-        bool Has(OperationFlags ops, OperationFlags flag) => (_available & flag) == flag && (ops & flag) == flag;
+        Cells = [.. PermissionCells.Columns.Zip(values, (flag, value) =>
+            new PermissionCellViewModel(flag, (_available & flag) == flag, forUser, (inherited & flag) == flag, (_available & flag) == flag ? value : forUser ? null : false))];
     }
 
     /// <summary>The permission code.</summary>
     public string Code { get; }
 
-    /// <summary>The owning module.</summary>
+    /// <summary>The owning module (the grid groups by it).</summary>
     public string Module { get; }
 
     /// <summary>The feature name.</summary>
     public string Feature { get; }
 
-    /// <summary>True when the permission offers each operation (drives per-cell enablement).</summary>
-    public bool CanView => Offers(OperationFlags.View);
-    public bool CanCreate => Offers(OperationFlags.Create);
-    public bool CanEdit => Offers(OperationFlags.Edit);
-    public bool CanDelete => Offers(OperationFlags.Delete);
-    public bool CanPrint => Offers(OperationFlags.Print);
-    public bool CanExport => Offers(OperationFlags.Export);
-    public bool CanPost => Offers(OperationFlags.Post);
-    public bool CanApprove => Offers(OperationFlags.Approve);
-    public bool CanVoidReverse => Offers(OperationFlags.VoidReverse);
+    /// <summary>A cell per operation, in <see cref="PermissionCells.Columns"/> order.</summary>
+    public PermissionCellViewModel[] Cells { get; }
 
-    [ObservableProperty] private bool _view;
-    [ObservableProperty] private bool _create;
-    [ObservableProperty] private bool _edit;
-    [ObservableProperty] private bool _delete;
-    [ObservableProperty] private bool _print;
-    [ObservableProperty] private bool _export;
-    [ObservableProperty] private bool _post;
-    [ObservableProperty] private bool _approve;
-    [ObservableProperty] private bool _voidReverse;
+    /// <summary>A role's operations: the ticked cells the feature offers.</summary>
+    /// <returns>The operations.</returns>
+    public OperationFlags CurrentOperations() => PermissionCells.FromCells([.. Cells.Select(c => c.Value)], _available).Grant;
 
-    private bool Offers(OperationFlags flag) => (_available & flag) == flag;
-
-    /// <summary>The composed operations to grant: the ticked (and offered) common flags plus preserved others.</summary>
-    public OperationFlags CurrentOperations()
+    /// <summary>A user's overrides.</summary>
+    /// <returns>The grant and deny operations.</returns>
+    public UserOverrideEdit Overrides()
     {
-        OperationFlags ops = _preservedNonCore;
-        if (View) { ops |= OperationFlags.View; }
-        if (Create) { ops |= OperationFlags.Create; }
-        if (Edit) { ops |= OperationFlags.Edit; }
-        if (Delete) { ops |= OperationFlags.Delete; }
-        if (Print) { ops |= OperationFlags.Print; }
-        if (Export) { ops |= OperationFlags.Export; }
-        if (Post) { ops |= OperationFlags.Post; }
-        if (Approve) { ops |= OperationFlags.Approve; }
-        if (VoidReverse) { ops |= OperationFlags.VoidReverse; }
-        return ops & _available; // never grant an operation the permission does not offer
+        (OperationFlags grant, OperationFlags deny) = PermissionCells.FromCells([.. Cells.Select(c => c.Value)], _available);
+        return new UserOverrideEdit(Code, grant, deny);
     }
 }
 
 /// <summary>
-/// Backs the permission-grid editor: choose a role and tick the operations it may perform per feature, then
-/// save. Grants are applied through the <see cref="Role"/> aggregate (which removes empty grants), and the
-/// full catalogue is written each save so stale grants are cleaned up.
+/// Backs the permission grid (brief §5.2): pick a role and tick every operation it may perform per feature, or pick a user and grant or deny
+/// operations on top of their roles. Features are grouped by module.
 /// </summary>
 public sealed partial class PermissionGridViewModel : ObservableObject
 {
@@ -128,20 +149,21 @@ public sealed partial class PermissionGridViewModel : ObservableObject
         _services = services;
         PermissionsView = CollectionViewSource.GetDefaultView(Permissions);
         PermissionsView.Filter = MatchesFilter;
+        PermissionsView.GroupDescriptions.Add(new PropertyGroupDescription(nameof(PermissionRowViewModel.Module)));
         PermissionsView.SortDescriptions.Add(new SortDescription(nameof(PermissionRowViewModel.Module), ListSortDirection.Ascending));
         PermissionsView.SortDescriptions.Add(new SortDescription(nameof(PermissionRowViewModel.Feature), ListSortDirection.Ascending));
     }
 
-    /// <summary>The roles available to edit.</summary>
+    /// <summary>The roles and users available to edit.</summary>
     public ObservableCollection<RoleItem> Roles { get; } = [];
 
     /// <summary>The permission rows (all catalogue features).</summary>
     public ObservableCollection<PermissionRowViewModel> Permissions { get; } = [];
 
-    /// <summary>The filtered/sorted view bound to the grid.</summary>
+    /// <summary>The filtered, grouped view bound to the grid.</summary>
     public ICollectionView PermissionsView { get; }
 
-    /// <summary>The selected role; changing it reloads the grid from that role's grants.</summary>
+    /// <summary>The selected role or user; changing it reloads the grid.</summary>
     [ObservableProperty]
     private RoleItem? _selectedRole;
 
@@ -151,23 +173,24 @@ public sealed partial class PermissionGridViewModel : ObservableObject
 
     /// <summary>A status line for the footer.</summary>
     [ObservableProperty]
-    private string _statusMessage = "Select a role to edit its permissions.";
+    private string _statusMessage = "Select a role, or a user to grant or deny operations on top of their roles.";
 
-    /// <summary>Loads the roles.</summary>
+    /// <summary>Loads the roles and users.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task.</returns>
     public async Task LoadAsync(CancellationToken ct = default)
     {
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
 
-        List<RoleItem> roles = await db.Roles
-            .OrderBy(r => r.Name)
-            .Select(r => new RoleItem(r.Id, r.Name, r.IsSystemRole))
-            .ToListAsync(ct).ConfigureAwait(true);
+        List<RoleItem> roles = await db.Roles.OrderBy(r => r.Name).Select(r => new RoleItem(r.Id, r.Name, false, r.IsSystemRole)).ToListAsync(ct).ConfigureAwait(true);
+        List<RoleItem> users = await db.Users.Where(u => u.IsActive).OrderBy(u => u.Username)
+            .Select(u => new RoleItem(u.Id, u.DisplayName + " (" + u.Username + ")", true, u.IsSystemAdministrator)).ToListAsync(ct).ConfigureAwait(true);
 
         Roles.Clear();
-        foreach (RoleItem role in roles)
+        foreach (RoleItem item in roles.Concat(users))
         {
-            Roles.Add(role);
+            Roles.Add(item);
         }
     }
 
@@ -183,33 +206,63 @@ public sealed partial class PermissionGridViewModel : ObservableObject
 
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
-
-        Role? role = await db.Roles.Include(r => r.Permissions).FirstOrDefaultAsync(r => r.Id == value.Id).ConfigureAwait(true);
-        Dictionary<string, OperationFlags> grants = role?.Permissions
-            .ToDictionary(p => p.PermissionCode, p => p.Operations, StringComparer.OrdinalIgnoreCase) ?? [];
-
-        foreach (PermissionDefinition definition in PermissionCatalogue.All)
+        if (value.IsUser)
         {
-            OperationFlags current = grants.GetValueOrDefault(definition.Code, OperationFlags.None);
-            Permissions.Add(new PermissionRowViewModel(definition, current));
+            User? user = await db.Users.Include(u => u.Overrides).AsNoTracking().FirstOrDefaultAsync(u => u.Id == value.Id).ConfigureAwait(true);
+            IReadOnlyList<PermissionGrant> roleGrants = await scope.ServiceProvider.GetRequiredService<IPermissionService>().RoleGrantsAsync(value.Id).ConfigureAwait(true);
+            Dictionary<string, OperationFlags> inherited = roleGrants.GroupBy(g => g.PermissionCode, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Aggregate(OperationFlags.None, (a, x) => a | x.Operations), StringComparer.OrdinalIgnoreCase);
+            List<UserPermissionOverrideEntity> overrides = [.. user?.Overrides ?? []];
+            OperationFlags Override(string code, bool isGrant) => overrides
+                .Where(o => o.IsGrant == isGrant && string.Equals(o.PermissionCode, code, StringComparison.OrdinalIgnoreCase)).Aggregate(OperationFlags.None, (a, o) => a | o.Operations);
+            foreach (PermissionDefinition definition in PermissionCatalogue.All)
+            {
+                Permissions.Add(new PermissionRowViewModel(definition, inherited.GetValueOrDefault(definition.Code), Override(definition.Code, true), Override(definition.Code, false)));
+            }
+
+            StatusMessage = value.IsSystem
+                ? $"{value.Name} is a system administrator and has every operation; overrides apply only if that is removed."
+                : $"Overrides for {value.Name}: tick to grant, clear to deny, leave indeterminate to inherit from the roles (green = allowed).";
+        }
+        else
+        {
+            Role? role = await db.Roles.Include(r => r.Permissions).AsNoTracking().FirstOrDefaultAsync(r => r.Id == value.Id).ConfigureAwait(true);
+            Dictionary<string, OperationFlags> grants = role?.Permissions.ToDictionary(p => p.PermissionCode, p => p.Operations, StringComparer.OrdinalIgnoreCase) ?? [];
+            foreach (PermissionDefinition definition in PermissionCatalogue.All)
+            {
+                Permissions.Add(new PermissionRowViewModel(definition, grants.GetValueOrDefault(definition.Code, OperationFlags.None)));
+            }
+
+            StatusMessage = $"Editing role {value.Name}: {Permissions.Count} features.";
         }
 
         PermissionsView.Refresh();
-        StatusMessage = $"Editing {value.Name}: {Permissions.Count} features.";
     }
 
-    /// <summary>Saves the grid to the selected role.</summary>
+    /// <summary>Saves the grid to the selected role or user.</summary>
+    /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or a validation error.</returns>
     public async Task<Result> SaveAsync(CancellationToken ct = default)
     {
         if (SelectedRole is null)
         {
-            return Result.Failure(Error.Validation("Perm.NoRole", "Select a role first."));
+            return Result.Failure(Error.Validation("Perm.NoRole", "Select a role or a user first."));
         }
 
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
-        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        if (SelectedRole.IsUser)
+        {
+            Result saved = await scope.ServiceProvider.GetRequiredService<IPermissionService>()
+                .SetOverridesAsync(SelectedRole.Id, [.. Permissions.Select(p => p.Overrides())], ct).ConfigureAwait(true);
+            if (saved.IsSuccess)
+            {
+                StatusMessage = $"Saved overrides for {SelectedRole.Name} at {DateTime.Now:HH:mm:ss}.";
+            }
 
+            return saved;
+        }
+
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
         Role? role = await db.Roles.Include(r => r.Permissions).FirstOrDefaultAsync(r => r.Id == SelectedRole.Id, ct).ConfigureAwait(true);
         if (role is null)
         {

@@ -52,6 +52,9 @@ public sealed class LaybyRequest
 
     /// <summary>The goods.</summary>
     public IReadOnlyList<LaybyLineRequest> Lines { get; init; } = [];
+
+    /// <summary>Gets the tax code the prices include; output tax is accounted for when the sale completes and the goods leave (null: untaxed).</summary>
+    public string? TaxCode { get; init; }
 }
 
 /// <summary>The outcome of a lay-bye payment.</summary>

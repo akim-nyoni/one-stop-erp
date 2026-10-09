@@ -50,8 +50,17 @@ public sealed class LaybyService : ILaybyService
             return Error.Conflict("Layby.Duplicate", $"Lay-bye {request.PlanNumber} already exists.");
         }
 
+        string? taxCode = string.IsNullOrWhiteSpace(request.TaxCode) ? null : request.TaxCode.Trim().ToUpperInvariant();
+        if (taxCode is not null && !await _db.Set<TaxCode>().AnyAsync(t => t.CompanyId == request.CompanyId && t.Code == taxCode && t.OutputAccountCode != null, ct).ConfigureAwait(false))
+        {
+            return Error.NotFound("Layby.TaxCode", $"Tax code {taxCode} with an output-tax account not found.");
+        }
+
         LaybyPlan plan = new(request.CompanyId, request.CustomerId, request.PlanNumber.Trim(), request.WarehouseId, request.OpenedOn, request.FinalDate, request.ForfeitPercent,
-            request.DepositAccountCode.Trim(), request.RevenueAccountCode.Trim(), request.ForfeitureAccountCode.Trim());
+            request.DepositAccountCode.Trim(), request.RevenueAccountCode.Trim(), request.ForfeitureAccountCode.Trim())
+        {
+            TaxCode = taxCode,
+        };
         foreach (LaybyLineRequest line in request.Lines)
         {
             plan.AddLine(line.ItemId, line.Quantity, line.UnitPrice);
@@ -106,8 +115,18 @@ public sealed class LaybyService : ILaybyService
         if (completed)
         {
             // The sale is made now: the payments held become revenue, and the goods leave stock.
-            Result<PostingReceipt> sale = await PostAsync(plan, date, $"Lay-bye {plan.PlanNumber} completed",
-                [(plan.DepositAccountCode, JournalSide.Debit, plan.Total), (plan.RevenueAccountCode, JournalSide.Credit, plan.Total)], ct).ConfigureAwait(false);
+            // The prices include tax: the tax point is the sale, so the output tax comes out of the revenue now.
+            List<(string Account, JournalSide Side, decimal Amount)> saleLines = [(plan.DepositAccountCode, JournalSide.Debit, plan.Total)];
+            TaxCode? tax = plan.TaxCode is null ? null
+                : await _db.Set<TaxCode>().Include(t => t.Rates).AsNoTracking().FirstOrDefaultAsync(t => t.CompanyId == companyId && t.Code == plan.TaxCode, ct).ConfigureAwait(false);
+            decimal taxAmount = tax is null ? 0m : LaybyPlan.TaxIn(plan.Total, tax.RateOn(date));
+            saleLines.Add((plan.RevenueAccountCode, JournalSide.Credit, plan.Total - taxAmount));
+            if (taxAmount > 0m)
+            {
+                saleLines.Add((tax!.OutputAccountCode!, JournalSide.Credit, taxAmount));
+            }
+
+            Result<PostingReceipt> sale = await PostAsync(plan, date, $"Lay-bye {plan.PlanNumber} completed", saleLines, ct).ConfigureAwait(false);
             if (sale.IsFailure)
             {
                 return sale.Error;
