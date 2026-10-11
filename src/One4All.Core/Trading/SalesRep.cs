@@ -10,6 +10,9 @@ public enum CommissionBasis
 
     /// <summary>Money collected from the rep's customers.</summary>
     Collected = 2,
+
+    /// <summary>Gross margin: revenue invoiced to the rep's customers less the cost of the goods despatched to them.</summary>
+    Margin = 3,
 }
 
 /// <summary>

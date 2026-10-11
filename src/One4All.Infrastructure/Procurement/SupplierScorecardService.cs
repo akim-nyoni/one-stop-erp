@@ -45,7 +45,14 @@ public sealed class SupplierScorecardService : ISupplierScorecardService
             .Select(g => new { SupplierId = g.Key, Amount = g.Sum(i => i.OriginalBase) })
             .ToDictionaryAsync(s => s.SupplierId, s => s.Amount, ct).ConfigureAwait(false);
 
-        HashSet<long> active = [.. deliveries.Select(d => d.SupplierId), .. returns.Keys, .. spend.Keys];
+        // Purchase price variance: invoices matched to orders in the period, at invoice prices against order prices.
+        var matched = await _db.Set<InvoicedOrderLine>().AsNoTracking()
+            .Where(l => l.CompanyId == companyId && l.Date >= first && l.Date <= last)
+            .GroupBy(l => l.SupplierId)
+            .Select(g => new { SupplierId = g.Key, AtOrder = g.Sum(l => l.Quantity * l.OrderPrice), AtInvoice = g.Sum(l => l.Quantity * l.InvoicePrice) })
+            .ToDictionaryAsync(m => m.SupplierId, ct).ConfigureAwait(false);
+
+        HashSet<long> active = [.. deliveries.Select(d => d.SupplierId), .. returns.Keys, .. spend.Keys, .. matched.Keys];
         var suppliers = await _db.Suppliers.AsNoTracking()
             .Where(s => s.CompanyId == companyId && active.Contains(s.Id))
             .Select(s => new { s.Id, s.Code, s.Name })
@@ -62,7 +69,9 @@ public sealed class SupplierScorecardService : ISupplierScorecardService
                 supplier.Id, supplier.Code, supplier.Name, mine.Count, judged.Count, judged.Count(j => j),
                 received, returned, spend.GetValueOrDefault(supplier.Id),
                 SupplierScoring.Rate(judged.Count(j => j), judged.Count),
-                SupplierScoring.Rate(received - returned, received)));
+                SupplierScoring.Rate(received - returned, received),
+                matched.TryGetValue(supplier.Id, out var m) ? decimal.Round(m.AtInvoice - m.AtOrder, 2, MidpointRounding.AwayFromZero) : 0m,
+                matched.TryGetValue(supplier.Id, out var n) ? SupplierScoring.Rate(n.AtInvoice - n.AtOrder, n.AtOrder) : null));
         }
 
         return scores;

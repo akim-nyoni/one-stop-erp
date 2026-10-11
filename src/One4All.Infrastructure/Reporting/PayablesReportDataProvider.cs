@@ -182,7 +182,8 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ScorecardAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
         => [.. (await _scorecard.ScorecardAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).OrderBy(s => s.SupplierName, StringComparer.Ordinal)
             .Select(s => Row(("Supplier", s.SupplierName), ("Deliveries", s.Deliveries), ("OnTime", s.OnTimePercent is decimal o ? $"{o:0.#}% of {s.DeliveriesJudged}" : "—"),
-                ("Received", Qty(s.QuantityReceived)), ("Returned", Qty(s.QuantityReturned)), ("Quality", s.QualityPercent is decimal q ? $"{q:0.#}%" : "—"), ("Spend", s.Spend)))];
+                ("Received", Qty(s.QuantityReceived)), ("Returned", Qty(s.QuantityReturned)), ("Quality", s.QualityPercent is decimal q ? $"{q:0.#}%" : "—"), ("Spend", s.Spend),
+                ("PriceVariance", s.PriceVariance), ("PriceVariancePct", s.PriceVariancePercent is decimal v ? $"{v:+0.#;-0.#;0}%" : "—")))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BalancesAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {

@@ -12,9 +12,11 @@ namespace One4All.Application.Abstractions.Procurement;
 /// <param name="Spend">Invoiced spend in base currency.</param>
 /// <param name="OnTimePercent">Deliveries on time as a percentage of those judged; null when none could be.</param>
 /// <param name="QualityPercent">Units kept as a percentage of those received; null when nothing was received.</param>
+/// <param name="PriceVariance">Invoiced above (positive) or below the order prices on lines matched in the period.</param>
+/// <param name="PriceVariancePercent">The variance as a percentage of the matched lines at order prices; null when nothing was matched.</param>
 public sealed record SupplierScore(
     long SupplierId, string SupplierCode, string SupplierName, int Deliveries, int DeliveriesJudged, int DeliveriesOnTime,
-    decimal QuantityReceived, decimal QuantityReturned, decimal Spend, decimal? OnTimePercent, decimal? QualityPercent);
+    decimal QuantityReceived, decimal QuantityReturned, decimal Spend, decimal? OnTimePercent, decimal? QualityPercent, decimal PriceVariance = 0m, decimal? PriceVariancePercent = null);
 
 /// <summary>
 /// The supplier performance scorecard (brief §4.3): on-time delivery against orders' required-by dates, quality as the

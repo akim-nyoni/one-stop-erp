@@ -230,12 +230,46 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = customers, Title = "Sales commissions", ListTitle = "Sales reps",
-            Description = "A sales rep's commission statement for a period (by customer, on the rep's basis), or the month-end accrual of every rep's commission earned.",
-            Fields = [Pick("Step", "Step", ["Statement", "Accrue"]), Opt("Rep", "Sales rep code (statement)"), Today("From", "From"), Today("To", "To / month end"), Opt("Expense", "Commission expense account (accrue)"),
-                Opt("Payable", "Commission payable account (accrue)")],
+            Description = "A sales rep's commission statement for a period (by customer, on the rep's basis: invoiced, collected or gross margin), or the month-end accrual of "
+                + "every rep's commission earned. Save a rep sets up or changes one; Assign customer puts a customer with a rep.",
+            Fields = [Pick("Step", "Step", ["Statement", "Accrue", "Save rep", "Assign customer"]), Opt("Rep", "Sales rep code"), Today("From", "From"), Today("To", "To / month end"),
+                Opt("Expense", "Commission expense account (accrue)"), Opt("Payable", "Commission payable account (accrue)"), Opt("Name", "Rep name (save rep)"),
+                Pick("Basis", "Commission basis", Enum.GetNames<Core.Trading.CommissionBasis>()), Num("Rate", "Commission %", "0"), Opt("Customer", "Customer code (assign)")],
             Run = async (c, i) =>
             {
                 Application.Abstractions.Trading.ICommissionService commissions = c.Get<Application.Abstractions.Trading.ICommissionService>();
+                string repCode = (i.Optional("Rep") ?? string.Empty).Trim().ToUpperInvariant();
+                if (i.Text("Step") == "Save rep")
+                {
+                    if (repCode.Length == 0 || i.Number("Rate") < 0m || i.Number("Rate") > 100m)
+                    {
+                        throw new OperationException("A rep needs a code and a commission rate from 0 to 100%.");
+                    }
+
+                    Core.Trading.SalesRep? saved = await c.Db.Set<Core.Trading.SalesRep>().FirstOrDefaultAsync(r => r.CompanyId == c.CompanyId && r.Code == repCode).ConfigureAwait(true);
+                    Core.Trading.CommissionBasis basis = Enum.Parse<Core.Trading.CommissionBasis>(i.Text("Basis"));
+                    if (saved is null)
+                    {
+                        c.Db.Add(new Core.Trading.SalesRep(c.CompanyId, repCode, i.Optional("Name") ?? repCode, basis, i.Number("Rate")));
+                    }
+                    else
+                    {
+                        (saved.Name, saved.Basis, saved.RatePercent) = (i.Optional("Name") ?? saved.Name, basis, i.Number("Rate"));
+                    }
+
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Sales rep {repCode} saved: {basis} at {Q(i.Number("Rate"))}%.";
+                }
+
+                if (i.Text("Step") == "Assign customer")
+                {
+                    long repId = await FindAsync(c.Db.Set<Core.Trading.SalesRep>(), r => r.CompanyId == c.CompanyId && r.Code == repCode, r => r.Id, "sales rep", repCode).ConfigureAwait(true);
+                    long customerId = await CustomerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true);
+                    (await c.Db.Customers.SingleAsync(x => x.Id == customerId).ConfigureAwait(true)).SalesRepId = repId;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"{i.Optional("Customer")} now earns {repCode} commission.";
+                }
+
                 if (i.Text("Step") == "Statement")
                 {
                     long rep = await FindAsync(c.Db.Set<Core.Trading.SalesRep>(), r => r.CompanyId == c.CompanyId && r.Code == (i.Optional("Rep") ?? string.Empty).ToUpper(), r => r.Id, "sales rep",
@@ -250,7 +284,7 @@ public static partial class OperationCatalogue
                 return accrued.Count == 0 ? "Nothing to accrue." : string.Join(Environment.NewLine, accrued.Select(a => $"{a.RepCode,-10} earned {M(a.Earned),12}  booked now {M(a.Booked),12}"));
             },
             List = async c => Table(await c.Db.Set<Core.Trading.SalesRep>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Code).ToListAsync().ConfigureAwait(true),
-                ("Rep", r => r.Code), ("Active", r => r.IsActive)),
+                ("Rep", r => r.Code), ("Name", r => r.Name), ("Basis", r => r.Basis), ("Rate %", r => Q(r.RatePercent)), ("Active", r => r.IsActive)),
         };
         yield return new Operation
         {

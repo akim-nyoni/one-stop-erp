@@ -325,13 +325,15 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Supplier scorecard",
-            Description = "Each supplier active in a period: deliveries on time against the orders' required-by dates, quality as the share of goods not returned, and spend.",
+            Description = "Each supplier active in a period: deliveries on time against the orders' required-by dates, quality as the share of goods not returned, spend, and "
+                + "the purchase price variance — invoiced above or below the order prices.",
             Fields = [Today("From", "From"), Today("To", "To")],
             Run = async (c, i) =>
             {
                 IReadOnlyList<SupplierScore> scores = await c.Get<ISupplierScorecardService>().ScorecardAsync(c.CompanyId, i.Date("From"), i.Date("To")).ConfigureAwait(true);
                 return scores.Count == 0 ? "No supplier activity in the period." : string.Join(Environment.NewLine, scores.Select(x =>
-                    $"{x.SupplierCode,-10} {x.SupplierName,-28} deliveries {x.Deliveries,4}  on time {(x.OnTimePercent is decimal t ? $"{t:0.#}%" : "-"),7}  quality {(x.QualityPercent is decimal q ? $"{q:0.#}%" : "-"),7}  spend {M(x.Spend),14}"));
+                    $"{x.SupplierCode,-10} {x.SupplierName,-28} deliveries {x.Deliveries,4}  on time {(x.OnTimePercent is decimal t ? $"{t:0.#}%" : "-"),7}  quality {(x.QualityPercent is decimal q ? $"{q:0.#}%" : "-"),7}  spend {M(x.Spend),14}"
+                    + $"  price var {M(x.PriceVariance),10}{(x.PriceVariancePercent is decimal v ? $" ({v:+0.#;-0.#;0}%)" : string.Empty)}"));
             },
         };
     }

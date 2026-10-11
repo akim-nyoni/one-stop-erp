@@ -256,3 +256,17 @@ internal sealed class PurchaseOrderDeliveryConfiguration : IEntityTypeConfigurat
         b.HasIndex(x => new { x.PurchaseOrderLineId, x.DueDate });
     }
 }
+
+internal sealed class InvoicedOrderLineConfiguration : IEntityTypeConfiguration<InvoicedOrderLine>
+{
+    public void Configure(EntityTypeBuilder<InvoicedOrderLine> b)
+    {
+        b.ToTable("invoiced_order_line", Schemas.Purchasing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.InvoiceNumber).HasMaxLength(60);
+        b.Property(x => x.Quantity).HasPrecision(19, 4);
+        b.Property(x => x.OrderPrice).HasPrecision(19, 6);
+        b.Property(x => x.InvoicePrice).HasPrecision(19, 6);
+        b.HasIndex(x => new { x.CompanyId, x.SupplierId, x.Date });
+    }
+}

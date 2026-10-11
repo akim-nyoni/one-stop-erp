@@ -114,7 +114,7 @@ public sealed class CommissionService : ICommissionService
         List<long> ids = [.. customers.Keys];
 
         Dictionary<long, decimal> bases;
-        if (rep.Basis == CommissionBasis.Invoiced)
+        if (rep.Basis is CommissionBasis.Invoiced or CommissionBasis.Margin)
         {
             // Net revenue: the income lines of the customers' invoice and credit-note journals, so tax is left out.
             bases = await (
@@ -127,6 +127,24 @@ public sealed class CommissionService : ICommissionService
                 group line by item.TraderId into g
                 select new { CustomerId = g.Key, Amount = g.Sum(l => l.BaseCredit - l.BaseDebit) })
                 .ToDictionaryAsync(x => x.CustomerId, x => x.Amount, ct).ConfigureAwait(false);
+
+            if (rep.Basis == CommissionBasis.Margin)
+            {
+                // The cost of the goods despatched to each customer in the period (their sales orders' deliveries), unless the issue was reversed.
+                var costs = await (
+                    from delivery in _db.SalesDeliveries
+                    join order in _db.Set<Core.SalesOrders.SalesOrder>() on delivery.SalesOrderId equals order.Id
+                    join movement in _db.StockMovements on new { delivery.CompanyId, Reference = (string?)delivery.Reference } equals new { movement.CompanyId, movement.Reference }
+                    where delivery.CompanyId == rep.CompanyId && ids.Contains(order.CustomerId) && delivery.DespatchedOn >= start && delivery.DespatchedOn <= end
+                          && movement.Type == Core.Inventory.StockMovementType.Issue && !movement.IsReversed
+                    group movement by order.CustomerId into g
+                    select new { CustomerId = g.Key, Cost = g.Sum(m => m.Value) })
+                    .ToListAsync(ct).ConfigureAwait(false);
+                foreach (var cost in costs)
+                {
+                    bases[cost.CustomerId] = bases.GetValueOrDefault(cost.CustomerId) - Math.Abs(cost.Cost);
+                }
+            }
         }
         else
         {

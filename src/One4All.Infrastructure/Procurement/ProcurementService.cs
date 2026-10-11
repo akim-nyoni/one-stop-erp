@@ -408,6 +408,8 @@ public sealed class ProcurementService : IProcurementService
             }
 
             line.Invoice(invLine.Quantity);
+            _db.Set<InvoicedOrderLine>().Add(new InvoicedOrderLine(request.CompanyId, order.SupplierId, line.Id, request.InvoiceNumber.Trim(), request.Date, invLine.Quantity, line.UnitPrice,
+                invLine.UnitPrice));
         }
 
         // The budget gate at invoice posting: only spend beyond what the order committed is checked again.

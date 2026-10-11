@@ -22244,6 +22244,65 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("invoice_dispute_line", "pop");
                 });
 
+            modelBuilder.Entity("One4All.Core.Procurement.InvoicedOrderLine", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("InvoiceNumber")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("invoice_number");
+
+                    b.Property<decimal>("InvoicePrice")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("invoice_price");
+
+                    b.Property<decimal>("OrderPrice")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("order_price");
+
+                    b.Property<long>("PurchaseOrderLineId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("purchase_order_line_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_invoiced_order_line");
+
+                    b.HasIndex("CompanyId", "SupplierId", "Date")
+                        .HasDatabaseName("ix_invoiced_order_line_company_id_supplier_id_date");
+
+                    b.ToTable("invoiced_order_line", "pop");
+                });
+
             modelBuilder.Entity("One4All.Core.Procurement.PurchaseOrder", b =>
                 {
                     b.Property<long>("Id")
