@@ -114,6 +114,7 @@ public partial class ReportViewerWindow : Window
         }
 
         PrintDialog dialog = new() { UserPageRangeEnabled = true };
+        await PrintPreferences.ApplyWorkstationAsync(dialog, _services, _viewModel.CompanyId, Core.System.PrintPurpose.Reports).ConfigureAwait(true);
         PrintPreferences.Apply(dialog, _viewModel.SelectedReport.DefinitionJson);
         if (dialog.ShowDialog() != true)
         {

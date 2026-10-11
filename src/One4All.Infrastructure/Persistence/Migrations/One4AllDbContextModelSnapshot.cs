@@ -30233,6 +30233,61 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("terminology_override", "sys");
                 });
 
+            modelBuilder.Entity("One4All.Core.System.WorkstationPrinter", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<int>("Copies")
+                        .HasColumnType("integer")
+                        .HasColumnName("copies");
+
+                    b.Property<string>("PrinterName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("printer_name");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer")
+                        .HasColumnName("purpose");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("Tray")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("tray");
+
+                    b.Property<string>("Workstation")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("workstation");
+
+                    b.HasKey("Id")
+                        .HasName("pk_workstation_printer");
+
+                    b.HasIndex("CompanyId", "Workstation", "Purpose")
+                        .IsUnique()
+                        .HasDatabaseName("ix_workstation_printer_company_id_workstation_purpose");
+
+                    b.ToTable("workstation_printer", "sys", t =>
+                        {
+                            t.HasCheckConstraint("ck_workstation_printer_copies", "copies BETWEEN 1 AND 99");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Trading.Allocation", b =>
                 {
                     b.Property<long>("Id")

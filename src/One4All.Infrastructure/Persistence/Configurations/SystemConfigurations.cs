@@ -200,3 +200,17 @@ internal sealed class IdempotencyRecordConfiguration : IEntityTypeConfiguration<
         b.HasIndex(x => x.StartedOnUtc);
     }
 }
+
+internal sealed class WorkstationPrinterConfiguration : IEntityTypeConfiguration<WorkstationPrinter>
+{
+    public void Configure(EntityTypeBuilder<WorkstationPrinter> b)
+    {
+        b.ToTable("workstation_printer", Schemas.System, t => t.HasCheckConstraint("ck_workstation_printer_copies", "copies BETWEEN 1 AND 99"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Workstation).HasMaxLength(64);
+        b.Property(x => x.Purpose).HasConversion<int>();
+        b.Property(x => x.PrinterName).HasMaxLength(200);
+        b.Property(x => x.Tray).HasMaxLength(40);
+        b.HasIndex(x => new { x.CompanyId, x.Workstation, x.Purpose }).IsUnique();
+    }
+}

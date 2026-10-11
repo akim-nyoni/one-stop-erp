@@ -347,6 +347,27 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "System Manager", Title = "Printers per workstation", ListTitle = "Printers",
+            Description = "The printer, tray and copies a workstation uses for each kind of printing (reports, documents, receipts, cheques, labels, payslips). Workstation * is the "
+                + "default for every computer without its own; this computer's name is filled in. The report viewer's print dialog opens on the chosen printer.",
+            Fields = [Pick("Step", "Step", ["Set", "Remove"]), Req("Workstation", "Workstation (computer name, or *)", Environment.MachineName),
+                Pick("Purpose", "Purpose", Enum.GetNames<Core.System.PrintPurpose>()),
+                new OperationField("Printer", "Printer", FieldKind.Choice, Required: false, Choices: [], ChoicesFrom: _ => Task.FromResult(Reporting.PrintPreferences.InstalledPrinters())),
+                Opt("Tray", "Tray (Auto, Manual, Cassette, Tractor)"), Num("Copies", "Copies", "1")],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.System.IWorkstationPrinterService printers = c.Get<Application.Abstractions.System.IWorkstationPrinterService>();
+                Core.System.PrintPurpose purpose = Enum.Parse<Core.System.PrintPurpose>(i.Text("Purpose"));
+                return i.Text("Step") == "Set"
+                    ? Check(await printers.SetAsync(c.CompanyId, new Application.Abstractions.System.PrinterSetting(i.Text("Workstation"), purpose, i.Optional("Printer") ?? string.Empty,
+                        i.Optional("Tray"), i.Whole("Copies"))).ConfigureAwait(true), "Printer set.")
+                    : Check(await printers.RemoveAsync(c.CompanyId, i.Text("Workstation"), purpose).ConfigureAwait(true), "Printer removed; the default applies.");
+            },
+            List = async c => Table(await c.Get<Application.Abstractions.System.IWorkstationPrinterService>().ListAsync(c.CompanyId).ConfigureAwait(true),
+                ("Workstation", p => p.Workstation), ("Purpose", p => p.Purpose), ("Printer", p => p.PrinterName), ("Tray", p => p.Tray ?? "default"), ("Copies", p => p.Copies)),
+        };
+        yield return new Operation
+        {
             Module = "System Manager", Title = "Archive an audit year", ListTitle = "Audit log by year",
             Description = "Moves a closed year of the audit log out of the live table into the archive schema (still readable, never deleted). It needs the "
                 + "licence holder's signed authorisation for that year (MA1. token), years go oldest first, and the hash chain carries on across the gap.",

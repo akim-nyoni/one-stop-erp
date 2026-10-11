@@ -1,5 +1,8 @@
 using System.Printing;
 using System.Windows.Controls;
+using Microsoft.Extensions.DependencyInjection;
+using One4All.Application.Abstractions.System;
+using One4All.Core.System;
 using One4All.Reporting.Model;
 
 namespace One4All.Desktop.Reporting;
@@ -34,6 +37,71 @@ public static class PrintPreferences
             DuplexMode.ShortEdge => Duplexing.TwoSidedShortEdge,
             _ => dialog.PrintTicket.Duplexing,
         };
+    }
+
+    /// <summary>
+    /// Preselects this workstation's printer, tray and copies for the purpose (set under System Manager › Printers per workstation). A printer this
+    /// computer cannot reach is ignored, leaving the user's default.
+    /// </summary>
+    /// <param name="dialog">The print dialog.</param>
+    /// <param name="services">The application services.</param>
+    /// <param name="companyId">The company.</param>
+    /// <param name="purpose">What is being printed.</param>
+    /// <returns>A task.</returns>
+    public static async Task ApplyWorkstationAsync(PrintDialog dialog, IServiceProvider services, long companyId, PrintPurpose purpose)
+    {
+        ArgumentNullException.ThrowIfNull(dialog);
+        ArgumentNullException.ThrowIfNull(services);
+        PrinterSetting? setting;
+        using (IServiceScope scope = services.CreateScope())
+        {
+            setting = await scope.ServiceProvider.GetRequiredService<IWorkstationPrinterService>().ResolveAsync(companyId, Environment.MachineName, purpose).ConfigureAwait(true);
+        }
+
+        if (setting is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using LocalPrintServer server = new();
+            PrintQueue? queue = server.GetPrintQueues([EnumeratedPrintQueueTypes.Local, EnumeratedPrintQueueTypes.Connections])
+                .FirstOrDefault(q => string.Equals(q.FullName, setting.PrinterName, StringComparison.OrdinalIgnoreCase) || string.Equals(q.Name, setting.PrinterName, StringComparison.OrdinalIgnoreCase));
+            if (queue is null)
+            {
+                return;
+            }
+
+            dialog.PrintQueue = queue;
+            dialog.PrintTicket = queue.DefaultPrintTicket;
+        }
+        catch (PrintSystemException)
+        {
+            return;
+        }
+
+        if (Bin(setting.Tray) is InputBin bin)
+        {
+            dialog.PrintTicket.InputBin = bin;
+        }
+
+        dialog.PrintTicket.CopyCount = setting.Copies;
+    }
+
+    /// <summary>The printers this computer can print to, for choosing one.</summary>
+    /// <returns>The printer names.</returns>
+    public static IReadOnlyList<string> InstalledPrinters()
+    {
+        try
+        {
+            using LocalPrintServer server = new();
+            return [.. server.GetPrintQueues([EnumeratedPrintQueueTypes.Local, EnumeratedPrintQueueTypes.Connections]).Select(q => q.FullName).Order(StringComparer.OrdinalIgnoreCase)];
+        }
+        catch (PrintSystemException)
+        {
+            return [];
+        }
     }
 
     /// <summary>The printer input bin a tray name stands for.</summary>
