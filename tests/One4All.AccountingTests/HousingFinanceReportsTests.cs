@@ -52,7 +52,7 @@ public sealed class HousingFinanceReportsTests
         {
             CompanyId = companyId, StandId = standId, BuyerCustomerId = buyer.Id, CashPrice = 13000m, Deposit = 1000m, AnnualRatePercent = 12m, Method = InterestMethod.ReducingBalance,
             TermMonths = 12, SignedOn = new DateOnly(2026, 1, 10), FirstDueDate = new DateOnly(2026, 2, 1), SalesAccountCode = "4100", StandsAvailableAccountCode = "1460",
-            CostOfSalesAccountCode = "5100", InterestAccountCode = "4965", BankAccountCode = "1100",
+            CostOfSalesAccountCode = "5100", InterestAccountCode = "4965", BankAccountCode = "1100", Tenure = InstalmentTenure.RentToBuy,
         })).Value;
         (await sales.RaiseDueAsync(companyId, new DateOnly(2026, 3, 31))).IsSuccess.Should().BeTrue();
 
@@ -91,7 +91,7 @@ public sealed class HousingFinanceReportsTests
         string schedule = await Render("H44", sale.AgreementNumber);
         schedule.Should().Contain("1066.19").And.Contain("Raised").And.Contain("Future").And.Contain("2026-02-01");
         string ageing = await Render("H45");
-        ageing.Should().Contain("Finance Buyer").And.Contain("\"10,098.16\",0.00,0.00,\"1,066.19\",\"1,066.19\"").And.NotContain("Finance Tenant"); // unbilled principal current; Mar 75 days, Feb 103 days
+        ageing.Should().Contain("Rent-to-buy,").And.Contain("Finance Buyer").And.Contain("\"10,098.16\",0.00,0.00,\"1,066.19\",\"1,066.19\"").And.NotContain("Finance Tenant"); // unbilled principal current; Mar 75 days, Feb 103 days
         (await Render("H46")).Should().Contain(sale.AgreementNumber).And.Contain(",2,2026-01-10,2132.38"); // two unpaid instalments; the deposit was the last payment
         string rent = await Render("H75");
         rent.Should().Contain("Flat").And.Contain("Finance Tenant").And.NotContain("Finance Buyer");

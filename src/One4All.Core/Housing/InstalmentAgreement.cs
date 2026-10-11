@@ -2,6 +2,19 @@ using One4All.Core.Common;
 
 namespace One4All.Core.Housing;
 
+/// <summary>The tenure an instalment agreement buys (brief §4.10.5).</summary>
+public enum InstalmentTenure
+{
+    /// <summary>A sale on instalments.</summary>
+    InstalmentSale = 1,
+
+    /// <summary>Rent-to-buy.</summary>
+    RentToBuy = 2,
+
+    /// <summary>A lease with an option to purchase.</summary>
+    LeaseWithOption = 3,
+}
+
 /// <summary>How interest is charged on an instalment sale (brief §4.10.5).</summary>
 public enum InterestMethod
 {
@@ -126,6 +139,9 @@ public sealed class InstalmentAgreement : AuditableEntity, ICompanyScoped
         FinancingDiscount = discount;
         DeferredFinancingAccountCode = accountCode;
     }
+
+    /// <summary>The tenure the instalments buy (brief §4.10.5): an instalment sale, rent-to-buy or a lease with an option to purchase.</summary>
+    public InstalmentTenure Tenure { get; set; } = InstalmentTenure.InstalmentSale;
 
     /// <summary>Where it stands.</summary>
     public InstalmentAgreementStatus Status { get; private set; }

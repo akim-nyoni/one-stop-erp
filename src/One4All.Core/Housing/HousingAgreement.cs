@@ -19,6 +19,21 @@ public enum AgreementType
 
     /// <summary>A cooperative allocation.</summary>
     Cooperative = 5,
+
+    /// <summary>Rent-to-buy: rent paid towards the price, ownership passing when it is paid.</summary>
+    RentToBuy = 6,
+
+    /// <summary>A lease with an option to purchase.</summary>
+    LeaseWithOption = 7,
+
+    /// <summary>A site-and-service scheme allocation (a serviced stand, the holder builds).</summary>
+    SiteAndService = 8,
+
+    /// <summary>A lodger permit.</summary>
+    LodgerPermit = 9,
+
+    /// <summary>A long lease (for example 99 years) with rent reviews.</summary>
+    LongLease = 10,
 }
 
 /// <summary>

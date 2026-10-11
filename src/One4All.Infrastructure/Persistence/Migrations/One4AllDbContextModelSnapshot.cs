@@ -7812,6 +7812,12 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("status");
 
+                    b.Property<int>("Tenure")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("tenure");
+
                     b.Property<int>("TermMonths")
                         .HasColumnType("integer")
                         .HasColumnName("term_months");

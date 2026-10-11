@@ -134,8 +134,8 @@ public static class HousingReports
         yield return Listing("H44", "Instalment Amortisation Schedule", "Housing", "Each instalment's capital, interest and balance — for one agreement or all.", "HousingAmortisation",
             [new Column("Agreement", "Agreement", 90), new Column("Number", "No.", 40), new Column("Due", "Due", 80), new Column("Interest", "Interest", 80), new Column("Principal", "Capital", 80),
              new Column("Balance", "Balance", 90), new Column("State", "State", 70), new Column("Amount", "Instalment", 90, true)], [("AgreementNumber", ParameterType.String)]);
-        yield return Listing("H45", "Housing Debtors Age Analysis", "Housing", "Instalment-sale debtors aged 30/60/90/120+ by scheme, as at any date.", "HousingDebtorsAgeing",
-            [new Column("Scheme", "Scheme", 100), new Column("Debtor", "Debtor", 160), new Column("Current", "Current", 75), new Column("D30", "1-30", 70), new Column("D60", "31-60", 70),
+        yield return Listing("H45", "Housing Debtors Age Analysis", "Housing", "Instalment debtors aged 30/60/90/120+ by tenure type and scheme, as at any date.", "HousingDebtorsAgeing",
+            [new Column("Tenure", "Tenure", 110), new Column("Scheme", "Scheme", 100), new Column("Debtor", "Debtor", 160), new Column("Current", "Current", 75), new Column("D30", "1-30", 70), new Column("D60", "31-60", 70),
              new Column("D90", "61-90", 70), new Column("D120", "91-120", 70), new Column("Over120", "120+", 70), new Column("Total", "Total", 90, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("H46", "Instalment Arrears & Default Report", "Housing", "Active instalment sales with overdue instalments, amount owing and last payment.", "HousingInstalmentArrears",
             [new Column("Agreement", "Agreement", 90), new Column("Stand", "Stand", 70), new Column("Buyer", "Buyer", 150), new Column("Overdue", "Overdue inst.", 80), new Column("LastPaid", "Last paid", 80),

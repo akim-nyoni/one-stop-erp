@@ -37,6 +37,9 @@ public sealed class InstalmentSaleRequest
     /// <summary>The first instalment's due date.</summary>
     public DateOnly FirstDueDate { get; init; }
 
+    /// <summary>The tenure the instalments buy.</summary>
+    public One4All.Core.Housing.InstalmentTenure Tenure { get; init; } = One4All.Core.Housing.InstalmentTenure.InstalmentSale;
+
     /// <summary>The stand sales revenue account.</summary>
     public string SalesAccountCode { get; init; } = string.Empty;
 

@@ -913,8 +913,10 @@ public sealed class HousingReportDataProvider : IReportDataProvider
     {
         List<InstalmentDebtor> debtors = await InstalmentDebtorsAsync(companyId, asAt, ct).ConfigureAwait(false);
         Dictionary<long, string> names = await CustomerNamesAsync(companyId, ct).ConfigureAwait(false);
-        return [.. debtors.Where(d => d.Owing != 0m).OrderBy(d => d.Scheme, StringComparer.Ordinal).ThenBy(d => names.GetValueOrDefault(d.BuyerId), StringComparer.Ordinal)
-            .Select(d => AgeingRow("Scheme", d.Scheme, "Debtor", names.GetValueOrDefault(d.BuyerId, "?"), DebtorAgeing.AgeInstalments(d.Owing, d.NotYetBilled, d.Raised, asAt)))];
+        return [.. debtors.Where(d => d.Owing != 0m).OrderBy(d => d.Tenure, StringComparer.Ordinal).ThenBy(d => d.Scheme, StringComparer.Ordinal)
+            .ThenBy(d => names.GetValueOrDefault(d.BuyerId), StringComparer.Ordinal)
+            .Select(d => Row(new[] { ("Tenure", (object?)d.Tenure) }.Concat(AgeingRow("Scheme", d.Scheme, "Debtor", names.GetValueOrDefault(d.BuyerId, "?"),
+                DebtorAgeing.AgeInstalments(d.Owing, d.NotYetBilled, d.Raised, asAt)).Select(kv => (kv.Key, kv.Value))).ToArray()))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> InstalmentArrearsAsync(long companyId, DateOnly asAt, CancellationToken ct)
@@ -947,7 +949,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             decimal notYetBilled = g.Sum(a => a.Lines.Where(l => l.Raised && l.DueDate <= asAt).OrderBy(l => l.Number).Select(l => (decimal?)l.BalanceAfter).LastOrDefault() ?? a.Financed);
             return new InstalmentDebtor(g.Key, string.Join(", ", g.Select(a => stands.TryGetValue(a.StandId, out var s) ? s.Scheme : "?").Distinct().Order(StringComparer.Ordinal)),
                 string.Join(", ", g.Select(a => a.AgreementNumber).Order(StringComparer.Ordinal)), string.Join(", ", g.Select(a => stands.TryGetValue(a.StandId, out var s) ? s.StandNumber : "?")),
-                owing.GetValueOrDefault(g.Key), notYetBilled, raised);
+                owing.GetValueOrDefault(g.Key), notYetBilled, raised, string.Join(", ", g.Select(a => TenureName(a.Tenure)).Distinct().Order(StringComparer.Ordinal)));
         })];
     }
 
@@ -955,7 +957,15 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         => Row((groupColumn, group), (nameColumn, name), ("Current", Money(bands[0])), ("D30", Money(bands[1])), ("D60", Money(bands[2])), ("D90", Money(bands[3])),
             ("D120", Money(bands[4])), ("Over120", Money(bands[5])), ("Total", bands.Sum()));
 
-    private sealed record InstalmentDebtor(long BuyerId, string Scheme, string Agreements, string Stands, decimal Owing, decimal NotYetBilled, List<(DateOnly Due, decimal Amount)> Raised);
+    private sealed record InstalmentDebtor(long BuyerId, string Scheme, string Agreements, string Stands, decimal Owing, decimal NotYetBilled, List<(DateOnly Due, decimal Amount)> Raised,
+        string Tenure);
+
+    private static string TenureName(InstalmentTenure tenure) => tenure switch
+    {
+        InstalmentTenure.RentToBuy => "Rent-to-buy",
+        InstalmentTenure.LeaseWithOption => "Lease with option to purchase",
+        _ => "Instalment sale",
+    };
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EarlySettlementsAsync(long companyId, CancellationToken ct)
     {
@@ -1362,7 +1372,8 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         List<HousingStand> delivered = [.. stands.Where(s => s.Ownership.Where(o => o.ChangeType is OwnershipChangeType.Allocation or OwnershipChangeType.Sale)
             .Select(o => (DateOnly?)o.EffectiveDate).Min() is DateOnly first && first.Year == asAt.Year && first <= asAt)];
         List<long> ids = [.. delivered.Select(s => s.Id)];
-        HashSet<long> instalment = [.. await _db.Set<InstalmentAgreement>().AsNoTracking().Where(a => ids.Contains(a.StandId)).Select(a => a.StandId).ToListAsync(ct).ConfigureAwait(false)];
+        Dictionary<long, InstalmentTenure> instalment = (await _db.Set<InstalmentAgreement>().AsNoTracking().Where(a => ids.Contains(a.StandId)).Select(a => new { a.StandId, a.Tenure, a.Id })
+            .ToListAsync(ct).ConfigureAwait(false)).GroupBy(a => a.StandId).ToDictionary(g => g.Key, g => g.OrderByDescending(a => a.Id).First().Tenure);
         HashSet<long> leased = [.. await _db.Set<StandLease>().AsNoTracking().Where(l => ids.Contains(l.StandId)).Select(l => l.StandId).ToListAsync(ct).ConfigureAwait(false)];
         HashSet<long> cooperative = [.. await _db.Set<CooperativeStand>().AsNoTracking().Where(c => ids.Contains(c.StandId)).Select(c => c.StandId).ToListAsync(ct).ConfigureAwait(false)];
         List<long> holders = [.. delivered.Where(s => s.CurrentHolderCustomerId != null).Select(s => s.CurrentHolderCustomerId!.Value)];
@@ -1370,7 +1381,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         Dictionary<string, HousingCategory> categories = (await _db.HousingApplicants.AsNoTracking().Where(a => a.CompanyId == companyId).Select(a => new { a.IdNumber, a.Category }).ToListAsync(ct).ConfigureAwait(false))
             .GroupBy(a => a.IdNumber).ToDictionary(g => g.Key, g => g.First().Category);
         return [.. delivered.Select(s => (Density: HousingDensity.ForStand(s.SizeSquareMetres).ToString(),
-                Tenure: leased.Contains(s.Id) ? "Leasehold" : cooperative.Contains(s.Id) ? "Cooperative" : instalment.Contains(s.Id) ? "Instalment sale" : "Freehold",
+                Tenure: leased.Contains(s.Id) ? "Leasehold" : cooperative.Contains(s.Id) ? "Cooperative" : instalment.TryGetValue(s.Id, out InstalmentTenure t) ? TenureName(t) : "Freehold",
                 Category: s.CurrentHolderCustomerId is long h && holderIds.GetValueOrDefault(h) is string id && categories.TryGetValue(id, out HousingCategory c) ? c.ToString() : "Not on the waiting list"))
             .GroupBy(x => x).OrderBy(g => g.Key.Density, StringComparer.Ordinal).ThenBy(g => g.Key.Tenure, StringComparer.Ordinal).ThenBy(g => g.Key.Category, StringComparer.Ordinal)
             .Select(g => Row(("Density", g.Key.Density), ("Tenure", g.Key.Tenure), ("Category", g.Key.Category), ("Stands", g.Count())))];

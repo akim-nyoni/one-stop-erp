@@ -160,6 +160,7 @@ internal sealed class InstalmentAgreementConfiguration : IEntityTypeConfiguratio
     {
         b.ToTable("instalment_agreement", Schemas.Housing, t => t.HasCheckConstraint("ck_instalment_agreement_terms", "cash_price > 0 AND deposit >= 0 AND deposit < cash_price AND term_months >= 1 AND annual_rate_percent >= 0"));
         b.HasKey(x => x.Id);
+        b.Property(x => x.Tenure).HasConversion<int>().HasDefaultValue(InstalmentTenure.InstalmentSale).HasSentinel((InstalmentTenure)0);
         b.Property(x => x.AgreementNumber).HasMaxLength(30);
         b.Property(x => x.CashPrice).HasPrecision(19, 4);
         b.Property(x => x.Deposit).HasPrecision(19, 4);

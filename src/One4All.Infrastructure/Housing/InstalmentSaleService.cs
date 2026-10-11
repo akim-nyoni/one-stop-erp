@@ -106,7 +106,10 @@ public sealed class InstalmentSaleService : IInstalmentSaleService
         }
 
         InstalmentAgreement agreement = new(request.CompanyId, number.Value, request.StandId, buyer.Id, request.CashPrice, request.Deposit, request.AnnualRatePercent,
-            request.Method, request.TermMonths, request.SignedOn, request.InterestAccountCode.Trim());
+            request.Method, request.TermMonths, request.SignedOn, request.InterestAccountCode.Trim())
+        {
+            Tenure = Enum.IsDefined(request.Tenure) ? request.Tenure : InstalmentTenure.InstalmentSale,
+        };
         // A long plan below the market rate carries a financing component: the sale is its present value, the rest is interest earned over the term.
         foreach (PlannedInstalment line in schedule)
         {
