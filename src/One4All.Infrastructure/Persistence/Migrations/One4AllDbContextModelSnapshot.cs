@@ -2632,6 +2632,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("approved_by_user_id");
 
+                    b.Property<decimal?>("BudgetRate")
+                        .HasPrecision(19, 8)
+                        .HasColumnType("numeric(19,8)")
+                        .HasColumnName("budget_rate");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -2643,6 +2648,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
 
                     b.Property<long?>("DeletedByUserId")
                         .HasColumnType("bigint")

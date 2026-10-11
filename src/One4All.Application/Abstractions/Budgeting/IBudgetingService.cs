@@ -96,6 +96,18 @@ public interface IBudgetingService
     Task<Result<long>> CreateBudgetAsync(long companyId, long fiscalYearId, string label, BudgetType type, string? department, IReadOnlyList<NewBudgetLine> lines, CancellationToken ct = default);
 
     /// <summary>
+    /// Prepares an unsealed budget in a currency at a budget rate held on the header (brief §4.16): its lines are planned in that currency and their
+    /// base equivalents kept at the rate, so a new rate re-states them; the FX variance then measures against the budget rate. Null clears it.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="budgetId">The budget.</param>
+    /// <param name="currency">The currency, or null for the base currency.</param>
+    /// <param name="rate">The budget rate (base per unit of the currency).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why it was refused.</returns>
+    Task<Result> SetBudgetCurrencyAsync(long companyId, long budgetId, CurrencyCode? currency, decimal? rate, CancellationToken ct = default);
+
+    /// <summary>
     /// Records an actual volume against a budgeted account (units sold, tonnes, hours) for the volume variance. Refused for an unknown
     /// account (<c>Budget.AccountNotFound</c>) or a zero quantity (<c>Budget.VolumeZero</c>).
     /// </summary>

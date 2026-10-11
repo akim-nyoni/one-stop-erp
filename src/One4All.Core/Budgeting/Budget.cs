@@ -144,6 +144,42 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
     /// <summary>The reason for this version (audit trail).</summary>
     public string? Reason { get; set; }
 
+    /// <summary>The currency the budget is prepared in, when not the base currency (brief §4.16 header currency).</summary>
+    public CurrencyCode? Currency { get; private set; }
+
+    /// <summary>The budget rate (base per unit of <see cref="Currency"/>) its base equivalents are kept at.</summary>
+    public decimal? BudgetRate { get; private set; }
+
+    /// <summary>
+    /// Prepares the budget in a currency at a budget rate. Lines planned in the budget currency (or with no currency of their own) keep their
+    /// budget-currency amount and have their base equivalent re-stated at the new rate; lines in another currency and driver-based lines keep theirs.
+    /// Clearing the currency leaves every line at its base amount.
+    /// </summary>
+    /// <param name="currency">The currency, or null for the base currency.</param>
+    /// <param name="rate">The budget rate.</param>
+    public void SetCurrency(CurrencyCode? currency, decimal? rate)
+    {
+        foreach (BudgetLine line in _lines.Where(l => l.DriverCode is null))
+        {
+            bool onHeader = Currency is not null && line.Currency == Currency && line.PlannedRate == BudgetRate;
+            if (currency is CurrencyCode to && rate is decimal r && (onHeader || line.Currency is null))
+            {
+                decimal inCurrency = onHeader ? line.Amount / BudgetRate!.Value : line.Amount / r;
+                line.SetAmount(decimal.Round(inCurrency * r, 2, MidpointRounding.AwayFromZero));
+                line.Currency = to;
+                line.PlannedRate = r;
+            }
+            else if (currency is null && onHeader)
+            {
+                line.Currency = null;
+                line.PlannedRate = null;
+            }
+        }
+
+        Currency = currency;
+        BudgetRate = currency is null ? null : rate;
+    }
+
     /// <summary>
     /// The seal: a SHA-256 hash of the lines as approved, set when the budget is approved or activated, so an approved
     /// budget can be proved unaltered years later (brief §4.18.3). Virement lines are not part of it.

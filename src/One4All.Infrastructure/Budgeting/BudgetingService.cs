@@ -58,6 +58,36 @@ public sealed class BudgetingService : IBudgetingService
     }
 
     /// <inheritdoc />
+    public async Task<Result> SetBudgetCurrencyAsync(long companyId, long budgetId, CurrencyCode? currency, decimal? rate, CancellationToken ct = default)
+    {
+        Budget? budget = await _db.Set<Budget>().Include(b => b.Lines).FirstOrDefaultAsync(b => b.CompanyId == companyId && b.Id == budgetId, ct).ConfigureAwait(false);
+        if (budget is null)
+        {
+            return Result.Failure(Error.NotFound("Budget.NotFound", $"Budget {budgetId} not found."));
+        }
+
+        if (budget.IsSealed)
+        {
+            return Result.Failure(Error.Rule("Budget.Sealed", "An approved, sealed budget cannot change currency; revise it as a new version."));
+        }
+
+        CurrencyCode baseCurrency = await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+        if (currency == baseCurrency)
+        {
+            currency = null;
+        }
+
+        if (currency is not null && rate is not > 0m)
+        {
+            return Result.Failure(Error.Validation("Budget.PlannedRate", $"A budget in {currency} needs a positive budget rate."));
+        }
+
+        budget.SetCurrency(currency, rate);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result<long>> RecordActualVolumeAsync(long companyId, string accountCode, string? department, DateOnly date, decimal quantity, string reference, CancellationToken ct = default)
     {
         string account = (accountCode ?? string.Empty).Trim();

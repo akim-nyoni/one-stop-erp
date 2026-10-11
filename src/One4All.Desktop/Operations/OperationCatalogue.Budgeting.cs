@@ -104,6 +104,20 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Set a budget's currency and rate", ListTitle = "Budgets in preparation",
+            Description = "Prepares a budget in a currency at a budget rate held on its header: the lines are planned in that currency and their base equivalents follow the rate, "
+                + "so a new rate re-states them, and the FX variance is measured against it. Blank currency (or the base currency) returns the budget to base.",
+            Fields = [Num("Budget", "Budget id"), CurrencyPick("Currency", "Budget currency"), OptNum("Rate", "Budget rate (base per unit)")],
+            Run = async (c, i) =>
+            {
+                Core.Accounting.CurrencyCode? currency = i.Optional("Currency") is string code ? Core.Accounting.CurrencyCode.Parse(code) : null;
+                return Check(await c.Get<IBudgetingService>().SetBudgetCurrencyAsync(c.CompanyId, (long)i.Number("Budget"), currency, i.OptionalNumber("Rate")).ConfigureAwait(true),
+                    currency is null ? "The budget is in the base currency." : $"The budget is in {currency} at {i.OptionalNumber("Rate"):0.######}; base equivalents re-stated.");
+            },
+            List = BudgetsInPreparationAsync,
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set an assumption", ListTitle = "Assumptions",
             Description = "A named assumption for the year (inflation, fee, headcount cost…). Driver-based lines are quantity × its value; untick Apply to preview what would change.",
             Fields = [Num("Year", "Fiscal year id"), Req("Code", "Assumption code"), Num("Value", "Value"), Opt("Name", "Name"), Opt("Unit", "Unit"), Tick("Apply", "Apply")],
