@@ -54,6 +54,9 @@
         <SolidColorBrush x:Key="EdgeBrush" Color="Transparent" />
         <Thickness x:Key="Edge">0</Thickness>
     </Window.Resources>
+    <Window.InputBindings>
+        <KeyBinding Key="F9" Command="{Binding NextCurrencyCommand}" />
+    </Window.InputBindings>
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
@@ -345,9 +348,38 @@
                                 <TextBox Text="{Binding VoucherNumber, UpdateSourceTrigger=PropertyChanged}" />
                             </DockPanel>
                             <DockPanel Margin="2,0,2,4">
-                                <TextBlock Text="Pay in" Foreground="{DynamicResource Muted}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                <ComboBox ItemsSource="{Binding TenderCurrencies}" SelectedItem="{Binding SelectedTenderCurrency}" DisplayMemberPath="Code" Width="80" Margin="0,0,6,0" />
-                                <TextBlock Text="{Binding BalanceInTenderCurrencyText}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                                <TextBlock DockPanel.Dock="Top" Margin="2,0,0,2" FontSize="11" Foreground="{DynamicResource Muted}">
+                                    <Run Text="{Binding PayingInText, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="  — click a currency or press F9" />
+                                </TextBlock>
+                                <TextBlock DockPanel.Dock="Bottom" Text="{Binding BalanceInTenderCurrencyText}" Margin="2,2,0,0" FontWeight="SemiBold" />
+                                <ItemsControl ItemsSource="{Binding CurrencyButtons}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding Code}" ToolTip="{Binding Tip}" MinWidth="64" Height="40" Margin="2" FontSize="15" FontWeight="SemiBold" Cursor="Hand"
+                                                    Command="{Binding DataContext.PayInCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding Code}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button">
+                                                        <Setter Property="Background" Value="#D5D8DC" />
+                                                        <Setter Property="Foreground" Value="#1C2833" />
+                                                        <Setter Property="BorderThickness" Value="1" />
+                                                        <Setter Property="BorderBrush" Value="#ABB2B9" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                <Setter Property="Background" Value="#1F618D" />
+                                                                <Setter Property="Foreground" Value="White" />
+                                                                <Setter Property="BorderThickness" Value="2" />
+                                                                <Setter Property="BorderBrush" Value="#F4D03F" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </DockPanel>
                             <DockPanel Margin="2,0,2,4">
                                 <Button DockPanel.Dock="Right" Content="ACCOUNT" Style="{StaticResource PadButton}" Height="36" Width="100" FontSize="14" Background="#5D6D7E" Command="{Binding TenderAccountCommand}" />

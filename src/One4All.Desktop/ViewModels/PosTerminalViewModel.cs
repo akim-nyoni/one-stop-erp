@@ -220,6 +220,39 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
     partial void OnSelectedTenderCurrencyChanged(TillCurrency? value) => RefreshTotals();
 
+    /// <summary>
+    /// The currency buttons on the till: one per currency taken today, the selected one highlighted, each one's tooltip giving its rate and
+    /// the balance due in it — one click (or F9 to cycle) switches the currency the next tender is in.
+    /// </summary>
+    public IReadOnlyList<CurrencyButton> CurrencyButtons => [.. TenderCurrencies.Select(c => new CurrencyButton(c, c.Code.Value, c == SelectedTenderCurrency,
+        c.Code == _currency ? $"{c.Code.Value} (base): {_ticket.BalanceDue.ToString("N2", CultureInfo.CurrentCulture)} due"
+            : $"{c.Code.Value} at {c.Rate.ToString("0.######", CultureInfo.CurrentCulture)}: {_ticket.BalanceDueIn(c.Rate).ToString("N2", CultureInfo.CurrentCulture)} {c.Code.Value} due"))];
+
+    /// <summary>The currency the next tender is in, as shown on the till.</summary>
+    public string PayingInText => SelectedTenderCurrency is { } c ? $"Paying in {c.Code.Value}" : "Paying in base";
+
+    /// <summary>Takes the next tender in a currency (a currency button).</summary>
+    /// <param name="code">The currency.</param>
+    [RelayCommand]
+    private void PayIn(string? code)
+    {
+        if (TenderCurrencies.FirstOrDefault(c => c.Code.Value == code) is { } currency)
+        {
+            SelectedTenderCurrency = currency;
+        }
+    }
+
+    /// <summary>Moves to the next currency the till takes (F9).</summary>
+    [RelayCommand]
+    private void NextCurrency()
+    {
+        if (TenderCurrencies.Count > 1)
+        {
+            int at = SelectedTenderCurrency is null ? -1 : TenderCurrencies.IndexOf(SelectedTenderCurrency);
+            SelectedTenderCurrency = TenderCurrencies[(at + 1) % TenderCurrencies.Count];
+        }
+    }
+
     /// <summary>The balance due in the selected tender currency (blank in base).</summary>
     public string BalanceInTenderCurrencyText => SelectedTenderCurrency is { } currency && currency.Code != _currency
         ? $"{_ticket.BalanceDueIn(currency.Rate).ToString("N2", CultureInfo.CurrentCulture)} {currency.Code.Value} @ {currency.Rate.ToString("0.######", CultureInfo.CurrentCulture)}"
@@ -1807,6 +1840,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
     private void RefreshTotals()
     {
+        OnPropertyChanged(nameof(CurrencyButtons));
+        OnPropertyChanged(nameof(PayingInText));
         OnPropertyChanged(nameof(SubtotalText));
         OnPropertyChanged(nameof(TaxText));
         OnPropertyChanged(nameof(GrossText));
@@ -1816,3 +1851,10 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         OnPropertyChanged(nameof(BalanceInTenderCurrencyText));
     }
 }
+
+/// <summary>A currency button on the till.</summary>
+/// <param name="Currency">The currency.</param>
+/// <param name="Code">Its code (the button's label).</param>
+/// <param name="IsSelected">Whether the next tender is in it.</param>
+/// <param name="Tip">Its rate and the balance due in it.</param>
+public sealed record CurrencyButton(TillCurrency Currency, string Code, bool IsSelected, string Tip);

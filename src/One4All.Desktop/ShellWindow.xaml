@@ -91,6 +91,7 @@
             </MenuItem>
             <MenuItem x:Name="TransactionsMenu" Header="{loc:T '_Transactions'}">
                 <MenuItem Header="{loc:T 'Point of Sale — Touch Terminal…'}" Click="OpenPosTerminal_Click" />
+                <MenuItem Header="{loc:T 'Teller — Take a Payment…'}" Click="OpenTeller_Click" />
                 <Separator />
                 <MenuItem Header="{loc:T 'My Approvals…'}" Click="OpenApprovals_Click" />
                 <MenuItem Header="{loc:T 'My Notifications…'}" Click="OpenNotifications_Click" />

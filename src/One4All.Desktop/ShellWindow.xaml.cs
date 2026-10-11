@@ -86,6 +86,12 @@ public partial class ShellWindow : Window
         editor.Show();
     }
 
+    private void OpenTeller_Click(object sender, RoutedEventArgs e)
+    {
+        ShellViewModel vm = (ShellViewModel)DataContext;
+        new TellerWindow(_services, vm.UserId) { Owner = this }.Show();
+    }
+
     private void OpenPosTerminal_Click(object sender, RoutedEventArgs e)
     {
         ShellViewModel vm = (ShellViewModel)DataContext;

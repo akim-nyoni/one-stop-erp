@@ -20,6 +20,10 @@ public sealed partial class OperationFieldVm : ObservableObject
         _value = field.Default;
         _dateValue = field.Kind == FieldKind.Date && DateTime.TryParse(field.Default, System.Globalization.CultureInfo.InvariantCulture, out DateTime d) ? d : null;
         _isTicked = field.Default == "True";
+        foreach (string choice in field.Choices ?? [])
+        {
+            Choices.Add(choice);
+        }
     }
 
     /// <summary>Gets the definition.</summary>
@@ -40,8 +44,8 @@ public sealed partial class OperationFieldVm : ObservableObject
     /// <summary>Gets a value indicating whether it is a choice.</summary>
     public bool IsChoice => Field.Kind == FieldKind.Choice;
 
-    /// <summary>Gets the choices.</summary>
-    public IReadOnlyList<string> Choices => Field.Choices ?? [];
+    /// <summary>Gets the choices (loaded from the database for a field that names where from).</summary>
+    public System.Collections.ObjectModel.ObservableCollection<string> Choices { get; } = [];
 
     /// <summary>The typed or chosen value.</summary>
     [ObservableProperty]
@@ -154,9 +158,33 @@ public sealed partial class OperationsViewModel : ObservableObject
         Failed = false;
         List = null;
         StatusMessage = value?.Description ?? "Choose an action.";
+        _ = LoadChoicesAsync();
         if (value?.List is not null)
         {
             _ = RefreshAsync();
+        }
+    }
+
+    // Choices that come from the database (the company's currencies…) are read when the form opens; the first is taken unless one is set.
+    private async Task LoadChoicesAsync()
+    {
+        foreach (OperationFieldVm field in Fields.Where(f => f.Field.ChoicesFrom is not null).ToList())
+        {
+            try
+            {
+                IReadOnlyList<string> choices = await InScopeAsync(c => field.Field.ChoicesFrom!(c)).ConfigureAwait(true);
+                field.Choices.Clear();
+                foreach (string choice in choices)
+                {
+                    field.Choices.Add(choice);
+                }
+
+                field.Value ??= choices.FirstOrDefault();
+            }
+            catch (InvalidOperationException)
+            {
+                // No company yet: the field stays empty and the operation uses its default.
+            }
         }
     }
 

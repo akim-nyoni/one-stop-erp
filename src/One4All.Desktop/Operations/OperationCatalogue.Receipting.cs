@@ -44,9 +44,9 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Take a payment", ListTitle = "My receipts today",
             Description = "A payment on an account (customer code, or a stand number for its ratepayer), allocated oldest first unless chosen otherwise; or a sundry receipt or deposit to an account. "
-                + "Tick Preview to see the allocation without posting.",
+                + "Pick the currency the payer hands over (the company's currencies are listed); a foreign-currency payment converts at today's rate. Tick Preview to see the allocation without posting.",
             Fields = [Pick("Kind", "Payment for", ["Account", "Sundry", "Deposit"]), Opt("Payer", "Customer code or stand number (account)"), Num("Amount", "Amount"),
-                Pick("Tender", "Tender", Enum.GetNames<TenderType>()), Opt("Reference", "Tender reference (card, cheque, mobile money)"), Opt("Account", "GL account (sundry / deposit)"),
+                CurrencyPick("Currency", "Currency paid in"), Pick("Tender", "Tender", Enum.GetNames<TenderType>()), Opt("Reference", "Tender reference (card, cheque, mobile money)"), Opt("Account", "GL account (sundry / deposit)"),
                 Opt("Narrative", "Narrative"), Pick("Strategy", "Allocate", Enum.GetNames<ReceiptAllocationStrategy>().Where(s => s != nameof(ReceiptAllocationStrategy.UserDirected)).ToArray()),
                 Today("Date", "Date"), Opt("Cash", "Cash account", "1000"), Tick("Preview", "Preview only")],
             Run = async (c, i) =>
@@ -73,6 +73,7 @@ public static partial class OperationCatalogue
                 {
                     CompanyId = c.CompanyId, SessionId = await MySessionAsync(c).ConfigureAwait(true), PayerKind = customer is null ? PayerKind.Anonymous : PayerKind.ArCustomer,
                     PayerAccountId = customer, Date = i.Date("Date"), CashAccountCode = i.Optional("Cash") ?? "1000", AllocationStrategy = strategy, Lines = [line],
+                    Currency = i.Optional("Currency") is string paidIn ? Core.Accounting.CurrencyCode.Parse(paidIn) : null,
                     Tenders = [new ReceiptTenderRequest(Enum.Parse<TenderType>(i.Text("Tender")), amount, i.Optional("Reference"))],
                 }).ConfigureAwait(true));
                 return $"Receipt {receipt.ReceiptNumber}: {M(receipt.Total)} — {M(receipt.AllocatedToDebt)} to the account, {M(receipt.CreditOnAccount)} credit on account.";

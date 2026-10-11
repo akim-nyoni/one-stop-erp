@@ -34,7 +34,9 @@ public enum FieldKind
 /// <param name="Default">The starting value.</param>
 /// <param name="Required">Whether it must be filled.</param>
 /// <param name="Choices">The options, for a choice.</param>
-public sealed record OperationField(string Name, string Label, FieldKind Kind = FieldKind.Text, string? Default = null, bool Required = true, IReadOnlyList<string>? Choices = null);
+/// <param name="ChoicesFrom">Loads the options when the form opens (the company's currencies, say), for a choice.</param>
+public sealed record OperationField(string Name, string Label, FieldKind Kind = FieldKind.Text, string? Default = null, bool Required = true, IReadOnlyList<string>? Choices = null,
+    Func<OperationContext, Task<IReadOnlyList<string>>>? ChoicesFrom = null);
 
 /// <summary>What an operation runs against: a scoped service provider, the company and the signed-in user.</summary>
 /// <param name="Services">The scope's services.</param>
@@ -385,4 +387,15 @@ public static class Ops
     /// <param name="choices">The options (the first is the default).</param>
     /// <returns>The field.</returns>
     public static OperationField Pick(string name, string label, params string[] choices) => new(name, label, FieldKind.Choice, choices[0], Choices: choices);
+
+    /// <summary>A currency dropdown: the company's base currency first, then every currency it has exchange rates for.</summary>
+    /// <param name="name">The field name.</param>
+    /// <param name="label">The label.</param>
+    /// <returns>The field.</returns>
+    public static OperationField CurrencyPick(string name, string label) => new(name, label, FieldKind.Choice, Required: false, Choices: [], ChoicesFrom: async c =>
+    {
+        Core.Accounting.CurrencyCode baseCurrency = await c.Db.Companies.Where(x => x.Id == c.CompanyId).Select(x => x.BaseCurrency).FirstAsync().ConfigureAwait(true);
+        List<Core.Accounting.CurrencyCode> others = await c.Db.ExchangeRates.Where(r => r.ToCurrency == baseCurrency).Select(r => r.FromCurrency).Distinct().ToListAsync().ConfigureAwait(true);
+        return [baseCurrency.Value, .. others.Select(o => o.Value).Where(o => o != baseCurrency.Value).Order(StringComparer.Ordinal)];
+    });
 }
