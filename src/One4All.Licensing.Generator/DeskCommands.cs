@@ -94,9 +94,17 @@ internal static class DeskCommands
 
                 return rows.Any(r => r.Error is not null) ? 4 : 0;
             case "certificate":
-                string path = a.GetValueOrDefault("out", "certificate.html");
-                File.WriteAllText(path, desk.Certificate(Need(a, "licence")));
-                Console.WriteLine($"Certificate written to {path} (open and print to PDF).");
+                string path = a.GetValueOrDefault("out", "certificate.pdf");
+                if (path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    File.WriteAllBytes(path, desk.CertificatePdf(Need(a, "licence")));
+                }
+                else
+                {
+                    File.WriteAllText(path, desk.Certificate(Need(a, "licence")));
+                }
+
+                Console.WriteLine($"Certificate written to {path}.");
                 return 0;
             default: // log
                 (int entries, int? broken) = desk.VerifyLog();

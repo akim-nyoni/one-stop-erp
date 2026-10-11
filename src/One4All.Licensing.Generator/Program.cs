@@ -232,7 +232,7 @@ public static class Program
         Console.WriteLine("  revoke      --licence <id> --reason <why>         crl [--out file.crl]   (signed revocation list)");
         Console.WriteLine("  expiring    [--days 30]                            history --customer <ref>");
         Console.WriteLine("  bulk        --csv <customer_id,customer_name,edition,type,term[,modules]>");
-        Console.WriteLine("  certificate --licence <id> [--out cert.html]       log [--export log.csv]   (verifies the hash chain)");
+        Console.WriteLine("  certificate --licence <id> [--out cert.pdf|.html]     log [--export log.csv]   (verifies the hash chain)");
         Console.WriteLine("  request     [--customer <ref>] [--site <name>]     (offline activation request code for this machine)");
     }
 }

@@ -98,6 +98,8 @@ public sealed class LicenceDeskTests : IDisposable
         LicenceDesk reopened = new(_folder, _keys.PrivateKeyBase64, "desk-k", () => Now);
         reopened.Licences.Should().HaveCount(5);
         reopened.Certificate(bound.LicenceId).Should().Contain("Gweru &lt;Hardware&gt; &amp; Co").And.Contain("REVOKED").And.Contain(bound.Token);
+        string pdf = System.Text.Encoding.Latin1.GetString(reopened.CertificatePdf(bound.LicenceId));
+        pdf.Should().StartWith("%PDF-1.4").And.EndWith("%%EOF\n").And.Contain("(Gweru <Hardware> & Co").And.Contain("REVOKED").And.Contain(" re f").And.Contain(bound.Token[..64]);
         reopened.PublishRevocationList().Sequence.Should().Be(2);
     }
 

@@ -424,6 +424,45 @@ public sealed class LicenceDesk
         return new QRCoder.PngByteQRCode(data).GetGraphic(4);
     }
 
+    /// <summary>The licence certificate as a PDF: customer, licence, modules with their end dates, the activation string and the verification QR code.</summary>
+    /// <param name="licenceId">The licence.</param>
+    /// <returns>The PDF bytes.</returns>
+    public byte[] CertificatePdf(string licenceId)
+    {
+        IssuedLicence licence = Find(licenceId);
+        VendorCustomer? customer = Customer(licence.CustomerId);
+        List<CertificateLine> lines =
+        [
+            new("One4All ERP - Licence Certificate", CertificateStyle.Title),
+            new($"{customer?.Name} ({licence.CustomerId})", CertificateStyle.Heading),
+            new(customer?.Contact ?? string.Empty),
+            new(string.Empty),
+            new($"Licence {licence.LicenceId}"),
+            new($"{licence.Edition} edition, {licence.LicenceType}, issued {licence.IssuedAt:yyyy-MM-dd} ({licence.Action})"),
+            new($"Valid {licence.ValidFrom:yyyy-MM-dd} to {licence.ValidTo?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "perpetual"}"
+                + (licence.Fingerprints.Count > 0 ? $", bound to {licence.Fingerprints.Count} machine(s)" : string.Empty)),
+            new(string.Empty),
+            new("Modules", CertificateStyle.Heading),
+            .. licence.Modules.Select(m => new CertificateLine($"{m.Code,-12} valid to {m.ValidTo?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "the end of the licence"}")),
+            new(string.Empty),
+            new("Activation string", CertificateStyle.Heading),
+            .. CertificateLayout.Wrap(licence.Token, 64).Select(piece => new CertificateLine(piece, CertificateStyle.Code)),
+            new(string.Empty),
+            new("Verification", CertificateStyle.Heading),
+            .. CertificateLayout.Wrap(VerificationCode(licence), 64).Select(piece => new CertificateLine(piece, CertificateStyle.Code)),
+        ];
+        if (licence.RevokedAt is not null)
+        {
+            lines.Add(new CertificateLine(string.Empty));
+            lines.Add(new CertificateLine($"REVOKED {licence.RevokedAt:yyyy-MM-dd}: {licence.RevokedReason}", CertificateStyle.Warning));
+        }
+
+        using QRCoder.QRCodeGenerator generator = new();
+        using QRCoder.QRCodeData data = generator.CreateQrCode(VerificationCode(licence), QRCoder.QRCodeGenerator.ECCLevel.M);
+        List<IReadOnlyList<bool>> modules = [.. data.ModuleMatrix.Select(row => (IReadOnlyList<bool>)[.. row.Cast<bool>()])];
+        return CertificateLayout.Build(lines, modules);
+    }
+
     /// <summary>A printable licence certificate (HTML: print to PDF from any browser).</summary>
     /// <param name="licenceId">The licence.</param>
     /// <returns>The HTML.</returns>
