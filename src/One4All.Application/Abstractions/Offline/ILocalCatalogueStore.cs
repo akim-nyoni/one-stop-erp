@@ -66,6 +66,12 @@ public sealed record PosOfflineSnapshot
     /// <summary>Gets the customers.</summary>
     public IReadOnlyList<OfflineCustomer> Customers { get; init; } = [];
 
+    /// <summary>Gets the promotions running when the snapshot was taken or later, so offline sales are priced as online ones.</summary>
+    public IReadOnlyList<One4All.Application.Pos.PromotionDefinition> Promotions { get; init; } = [];
+
+    /// <summary>Gets the terminal's branch (for branch promotions).</summary>
+    public long? BranchId { get; init; }
+
     /// <summary>Finds the tile a scanned or typed code names: its barcode, PLU or item code (any case).</summary>
     /// <param name="code">The code.</param>
     /// <returns>The tile, or null.</returns>

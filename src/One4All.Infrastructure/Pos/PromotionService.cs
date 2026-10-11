@@ -81,40 +81,15 @@ public sealed class PromotionService : IPromotionService
     /// <inheritdoc />
     public async Task<BasketPricing> PriceBasketAsync(BasketRequest request, CancellationToken ct = default)
     {
-        DateOnly date = DateOnly.FromDateTime(request.At);
-        TimeOnly time = TimeOnly.FromDateTime(request.At);
-        HashSet<string> coupons = new(request.Coupons.Select(c => c.Trim().ToUpperInvariant()));
-        List<Promotion> running = [.. (await _db.Promotions.AsNoTracking().Include(p => p.Items)
-                .Where(p => p.CompanyId == request.CompanyId && p.IsActive && p.StartsOn <= date && (p.EndsOn == null || p.EndsOn >= date) && (p.BranchId == null || p.BranchId == request.BranchId))
-                .ToListAsync(ct).ConfigureAwait(false))
-            .Where(p => (!p.MemberOnly || request.IsMember) && p.IsFor(request.CustomerType) && (p.CouponCode is null || coupons.Contains(p.CouponCode)) && InWindow(p, time))];
-
-        List<string> categories = [.. running.Where(p => p.Category is not null).Select(p => p.Category!)];
+        IReadOnlyList<PromotionDefinition> running = await DefinitionsAsync(request.CompanyId, DateOnly.FromDateTime(request.At), ct).ConfigureAwait(false);
         List<long> basketItems = [.. request.Lines.Select(l => l.ItemId).Distinct()];
         Dictionary<long, string?> itemCategory = await _db.Items.Where(i => basketItems.Contains(i.Id)).ToDictionaryAsync(i => i.Id, i => i.Category, ct).ConfigureAwait(false);
-        List<PromotionRule> rules = [.. running.Select(p => new PromotionRule(p.Code, p.Kind, p.Priority, p.Compounding, p.Quantity, p.RewardQuantity, p.Price, p.Percent,
-            new HashSet<long>(p.Items.Where(i => i.Group == 0).Select(i => i.ItemId)
-                .Concat(p.Category is null ? [] : itemCategory.Where(c => string.Equals(c.Value, p.Category, StringComparison.OrdinalIgnoreCase)).Select(c => c.Key))),
-            p.Kind == PromotionKind.BuyXGetY ? new HashSet<long>(p.Items.Where(i => i.Group == 1).Select(i => i.ItemId)) : [],
-            p.Kind == PromotionKind.MealDeal ? [.. p.Items.Where(i => i.Group > 0).GroupBy(i => i.Group).OrderBy(g => g.Key).Select(g => (IReadOnlySet<long>)new HashSet<long>(g.Select(i => i.ItemId)))] : [],
-            p.DiscountAccountCode))];
-
-        IReadOnlyList<LineDiscount> discounts = PromotionEngine.Apply(request.Lines.Select((l, i) => new BasketLine(i, l.ItemId, l.Quantity, l.UnitPrice)), rules);
-        List<PricedLine> lines = [.. request.Lines.Select((l, i) =>
-        {
-            List<LineDiscount> mine = [.. discounts.Where(d => d.Line == i)];
-            return new PricedLine(l.ItemId, l.Quantity, decimal.Round(l.Quantity * l.UnitPrice, 2, MidpointRounding.AwayFromZero), mine.Sum(d => d.Amount), [.. mine.Select(d => d.PromotionCode)],
-                mine.FirstOrDefault()?.DiscountAccountCode);
-        })];
-        Dictionary<string, string> names = running.ToDictionary(p => p.Code, p => p.Name);
-        return new BasketPricing(lines, [.. discounts.GroupBy(d => d.PromotionCode).Select(g => (g.Key, names[g.Key], g.Sum(d => d.Amount)))]);
+        return PromotionPricing.Price(running, request, itemCategory);
     }
 
-    // A happy hour may run across midnight (e.g. 22:00 to 02:00).
-    private static bool InWindow(Promotion p, TimeOnly time) => (p.DailyFrom, p.DailyTo) switch
-    {
-        (TimeOnly from, TimeOnly to) when from <= to => time >= from && time < to,
-        (TimeOnly from, TimeOnly to) => time >= from || time < to,
-        _ => true,
-    };
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PromotionDefinition>> DefinitionsAsync(long companyId, DateOnly from, CancellationToken ct = default)
+        => [.. (await _db.Promotions.AsNoTracking().Include(p => p.Items)
+                .Where(p => p.CompanyId == companyId && p.IsActive && (p.EndsOn == null || p.EndsOn >= from)).ToListAsync(ct).ConfigureAwait(false))
+            .Select(PromotionDefinition.From)];
 }

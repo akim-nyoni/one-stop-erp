@@ -127,4 +127,11 @@ public interface IPromotionService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The priced basket.</returns>
     Task<BasketPricing> PriceBasketAsync(BasketRequest request, CancellationToken ct = default);
+
+    /// <summary>The active promotions running on or after a date, detached for the till's offline snapshot.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="from">The first day of interest.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The promotion definitions.</returns>
+    Task<IReadOnlyList<One4All.Application.Pos.PromotionDefinition>> DefinitionsAsync(long companyId, DateOnly from, CancellationToken ct = default);
 }

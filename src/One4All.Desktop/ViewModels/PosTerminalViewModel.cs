@@ -495,8 +495,23 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             return;
         }
 
+        IReadOnlyList<One4All.Application.Pos.PromotionDefinition> promotions = _snapshot?.Promotions ?? [];
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            promotions = await scope.ServiceProvider.GetRequiredService<IPromotionService>().DefinitionsAsync(_companyId, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true);
+            long terminal = _terminalId;
+            _branchId ??= await scope.ServiceProvider.GetRequiredService<One4AllDbContext>().PosTerminals.AsNoTracking().Where(t => t.Id == terminal)
+                .Select(t => (long?)t.BranchId).FirstOrDefaultAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            // Keep the promotions saved last time.
+        }
+
         _snapshot = new PosOfflineSnapshot
         {
+            Promotions = promotions, BranchId = _branchId,
             TakenUtc = DateTimeOffset.UtcNow, CompanyId = _companyId, BaseCurrency = _currency.Value, WarehouseId = _warehouseId, TerminalId = _terminalId,
             OpenSessionId = openSessionId, TaxRates = new Dictionary<string, decimal>(_taxRates, StringComparer.OrdinalIgnoreCase), Tiles = _tiles,
             Accounts = new Dictionary<string, string>
@@ -1912,6 +1927,27 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         _repricing = true;
+        if (!_online && _snapshot is not null)
+        {
+            // Offline: the promotions saved with the catalogue, priced by the same rules as online.
+            try
+            {
+                IReadOnlyList<BasketItem> offlineBasket = _ticket.PromotionBasket();
+                Dictionary<long, string?> categories = _snapshot.Tiles.GroupBy(t => t.ItemId).ToDictionary(g => g.Key, g => (string?)g.First().Category);
+                BasketPricing offlinePricing = offlineBasket.Count == 0 ? new BasketPricing([], [])
+                    : One4All.Application.Pos.PromotionPricing.Price(_snapshot.Promotions, new BasketRequest(_companyId, _snapshot.BranchId, DateTime.Now,
+                        IsMember: !string.IsNullOrWhiteSpace(LoyaltyMember), _coupons, offlineBasket), categories);
+                _ticket.ApplyPromotions(offlinePricing);
+                RenderCart();
+            }
+            finally
+            {
+                _repricing = false;
+            }
+
+            return;
+        }
+
         try
         {
             await using AsyncServiceScope scope = _services.CreateAsyncScope();
