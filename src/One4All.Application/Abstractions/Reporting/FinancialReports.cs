@@ -347,6 +347,14 @@ public interface IGeneralLedgerReports
     /// <returns>The trial balance.</returns>
     Task<TrialBalanceReport> TrialBalanceAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
 
+    /// <summary>Produces the trial balance as at a date with the common report options (unposted journals, reporting currency).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAtDate">The as-at date.</param>
+    /// <param name="options">The options.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The trial balance.</returns>
+    Task<TrialBalanceReport> TrialBalanceAsync(long companyId, DateOnly asAtDate, LedgerReportOptions options, CancellationToken ct = default);
+
     /// <summary>
     /// Produces a summarised trial balance grouped by account type (Asset/Liability/Equity/Income/Expense) —
     /// each type's net debit and credit totals as at a date. Balances overall because the detailed trial
@@ -365,6 +373,15 @@ public interface IGeneralLedgerReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The income statement.</returns>
     Task<IncomeStatement> IncomeStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
+
+    /// <summary>Produces the statement of profit or loss with the common report options.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromDate">Start of the range.</param>
+    /// <param name="toDate">End of the range.</param>
+    /// <param name="options">The options.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The income statement.</returns>
+    Task<IncomeStatement> IncomeStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, LedgerReportOptions options, CancellationToken ct = default);
 
     /// <summary>
     /// Produces the income statement for a single department over a date range — the same profit-and-loss,
@@ -396,6 +413,14 @@ public interface IGeneralLedgerReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The balance sheet.</returns>
     Task<BalanceSheet> BalanceSheetAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
+
+    /// <summary>Produces the statement of financial position with the common report options.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAtDate">The as-at date.</param>
+    /// <param name="options">The options.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The balance sheet.</returns>
+    Task<BalanceSheet> BalanceSheetAsync(long companyId, DateOnly asAtDate, LedgerReportOptions options, CancellationToken ct = default);
 
     /// <summary>Produces the Statement of Cash Flows for a date range (movement method, classified by account tag).</summary>
     /// <param name="companyId">The company.</param>
@@ -432,4 +457,17 @@ public interface IGeneralLedgerReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The journal, or null when the company has no journal with that number.</returns>
     Task<JournalDetail?> JournalDetailAsync(long companyId, string journalNumber, CancellationToken ct = default);
+}
+
+/// <summary>
+/// The common report options (brief §14 common parameters "Include unposted Y/N" and "Currency: transaction / base / reporting"): whether draft
+/// and deferred journals count as well as posted ones, and the reporting currency the base amounts are translated into at a rate.
+/// </summary>
+/// <param name="IncludeUnposted">Count draft and deferred journals too (a preview of what posting them would do).</param>
+/// <param name="ReportingCurrency">The reporting currency, or null for the base currency.</param>
+/// <param name="Rate">Reporting-currency units per unit of base currency (1 for the base currency).</param>
+public sealed record LedgerReportOptions(bool IncludeUnposted = false, string? ReportingCurrency = null, decimal Rate = 1m)
+{
+    /// <summary>Posted journals in the base currency.</summary>
+    public static LedgerReportOptions Default { get; } = new();
 }

@@ -29,22 +29,32 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
             .ConfigureAwait(false);
     }
 
+    private Task<Dictionary<string, (decimal debit, decimal credit)>> SumByAccountAsync(long companyId, DateOnly? from, DateOnly to, CancellationToken ct)
+        => SumByAccountAsync(companyId, from, to, LedgerReportOptions.Default, ct);
+
     private async Task<Dictionary<string, (decimal debit, decimal credit)>> SumByAccountAsync(
-        long companyId, DateOnly? from, DateOnly to, CancellationToken ct)
+        long companyId, DateOnly? from, DateOnly to, LedgerReportOptions options, CancellationToken ct)
     {
-        // Filter lines by their posted journal via a correlated subquery, then group by account code
+        // Filter lines by their journal (posted, or also draft / deferred when asked) via a correlated subquery, then group by account code
         // in SQL. This translates cleanly (no projected-record grouping).
+        bool unposted = options.IncludeUnposted;
         var totals = await _db.Set<JournalLine>()
             .Where(l => _db.Journals.Any(j =>
-                j.Id == l.JournalEntryId && j.CompanyId == companyId && j.Status == JournalStatus.Posted &&
+                j.Id == l.JournalEntryId && j.CompanyId == companyId
+                && (j.Status == JournalStatus.Posted || (unposted && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred))) &&
                 j.PostingDate <= to && (from == null || j.PostingDate >= from)))
             .GroupBy(l => l.AccountCode)
             .Select(g => new { Code = g.Key, Debit = g.Sum(x => x.BaseDebit), Credit = g.Sum(x => x.BaseCredit) })
             .ToListAsync(ct)
             .ConfigureAwait(false);
 
-        return totals.ToDictionary(t => t.Code, t => (t.Debit, t.Credit));
+        return options.Rate == 1m
+            ? totals.ToDictionary(t => t.Code, t => (t.Debit, t.Credit))
+            : totals.ToDictionary(t => t.Code, t => (decimal.Round(t.Debit * options.Rate, 2, MidpointRounding.AwayFromZero), decimal.Round(t.Credit * options.Rate, 2, MidpointRounding.AwayFromZero)));
     }
+
+    private async Task<string> CurrencyAsync(long companyId, LedgerReportOptions options, CancellationToken ct)
+        => string.IsNullOrWhiteSpace(options.ReportingCurrency) ? await BaseCurrencyAsync(companyId, ct).ConfigureAwait(false) : options.ReportingCurrency.Trim().ToUpperInvariant();
 
     private async Task<Dictionary<string, (decimal debit, decimal credit)>> SumByAccountForDepartmentAsync(
         long companyId, DateOnly from, DateOnly to, string department, CancellationToken ct)
@@ -157,11 +167,15 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
     }
 
     /// <inheritdoc />
-    public async Task<TrialBalanceReport> TrialBalanceAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+    public Task<TrialBalanceReport> TrialBalanceAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+        => TrialBalanceAsync(companyId, asAtDate, LedgerReportOptions.Default, ct);
+
+    /// <inheritdoc />
+    public async Task<TrialBalanceReport> TrialBalanceAsync(long companyId, DateOnly asAtDate, LedgerReportOptions options, CancellationToken ct = default)
     {
         Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);
-        Dictionary<string, (decimal debit, decimal credit)> sums = await SumByAccountAsync(companyId, null, asAtDate, ct).ConfigureAwait(false);
-        string currency = await BaseCurrencyAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> sums = await SumByAccountAsync(companyId, null, asAtDate, options, ct).ConfigureAwait(false);
+        string currency = await CurrencyAsync(companyId, options, ct).ConfigureAwait(false);
 
         List<TrialBalanceRow> rows = [];
         decimal totalDebit = 0m;
@@ -187,20 +201,28 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
     }
 
     /// <inheritdoc />
-    public async Task<IncomeStatement> IncomeStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    public Task<IncomeStatement> IncomeStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+        => IncomeStatementAsync(companyId, fromDate, toDate, LedgerReportOptions.Default, ct);
+
+    /// <inheritdoc />
+    public async Task<IncomeStatement> IncomeStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, LedgerReportOptions options, CancellationToken ct = default)
     {
         Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);
-        Dictionary<string, (decimal debit, decimal credit)> sums = await SumByAccountAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
-        string currency = await BaseCurrencyAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> sums = await SumByAccountAsync(companyId, fromDate, toDate, options, ct).ConfigureAwait(false);
+        string currency = await CurrencyAsync(companyId, options, ct).ConfigureAwait(false);
         return BuildIncomeStatement(companyId, fromDate, toDate, currency, sums, accounts);
     }
 
     /// <inheritdoc />
-    public async Task<BalanceSheet> BalanceSheetAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+    public Task<BalanceSheet> BalanceSheetAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+        => BalanceSheetAsync(companyId, asAtDate, LedgerReportOptions.Default, ct);
+
+    /// <inheritdoc />
+    public async Task<BalanceSheet> BalanceSheetAsync(long companyId, DateOnly asAtDate, LedgerReportOptions options, CancellationToken ct = default)
     {
         Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);
-        Dictionary<string, (decimal debit, decimal credit)> sums = await SumByAccountAsync(companyId, null, asAtDate, ct).ConfigureAwait(false);
-        string currency = await BaseCurrencyAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> sums = await SumByAccountAsync(companyId, null, asAtDate, options, ct).ConfigureAwait(false);
+        string currency = await CurrencyAsync(companyId, options, ct).ConfigureAwait(false);
 
         List<StatementLine> assets = [];
         List<StatementLine> liabilities = [];

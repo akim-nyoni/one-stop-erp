@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Reporting;
 
 namespace One4All.Infrastructure.Reporting;
@@ -14,10 +15,43 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
     };
 
     private readonly IGeneralLedgerReports _reports;
+    private readonly Persistence.One4AllDbContext? _db;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="reports">The GL report services.</param>
     public GeneralLedgerReportDataProvider(IGeneralLedgerReports reports) => _reports = reports;
+
+    /// <summary>Creates the provider with the database the reporting-currency rates come from.</summary>
+    /// <param name="reports">The ledger reports.</param>
+    /// <param name="db">The database context.</param>
+    public GeneralLedgerReportDataProvider(IGeneralLedgerReports reports, Persistence.One4AllDbContext db)
+        : this(reports) => _db = db;
+
+    // The common parameters: IncludeUnposted (true / yes / 1) and ReportingCurrency, translated at the spot rate on the date (base when no rate is held).
+    private async Task<LedgerReportOptions> OptionsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, DateOnly date, CancellationToken ct)
+    {
+        bool unposted = parameters.TryGetValue("IncludeUnposted", out object? flag) && flag switch
+        {
+            bool b => b,
+            string s => s.Trim().ToUpperInvariant() is "TRUE" or "YES" or "Y" or "1",
+            _ => false,
+        };
+        string? currency = parameters.TryGetValue("ReportingCurrency", out object? value) && value is string code && code.Trim().Length == 3 ? code.Trim().ToUpperInvariant() : null;
+        if (currency is null || _db is null)
+        {
+            return new LedgerReportOptions(unposted);
+        }
+
+        Core.Accounting.CurrencyCode baseCurrency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+        if (baseCurrency.Value == currency)
+        {
+            return new LedgerReportOptions(unposted);
+        }
+
+        decimal? rate = await Accounting.ExchangeRateResolver.FindAsync(_db, baseCurrency, Core.Accounting.CurrencyCode.Parse(currency), Core.System.ExchangeRateType.Spot, date, ct)
+            .ConfigureAwait(false);
+        return rate is decimal r and > 0m ? new LedgerReportOptions(unposted, currency, r) : new LedgerReportOptions(unposted);
+    }
 
     /// <inheritdoc />
     public bool CanHandle(string command) => Commands.Contains(command);
@@ -47,7 +81,8 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TrialBalanceAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
     {
-        TrialBalanceReport tb = await _reports.TrialBalanceAsync(companyId, ReportParameters.Date(parameters, "AsAtDate"), ct).ConfigureAwait(false);
+        DateOnly asAt = ReportParameters.Date(parameters, "AsAtDate");
+        TrialBalanceReport tb = await _reports.TrialBalanceAsync(companyId, asAt, await OptionsAsync(companyId, parameters, asAt, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
         return tb.Rows.Select(r => Row(new()
         {
             ["AccountCode"] = r.AccountCode,
@@ -72,7 +107,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
     {
         DateOnly to = ReportParameters.Date(parameters, "ToDate");
         DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
-        IncomeStatement report = await _reports.IncomeStatementAsync(companyId, from, to, ct).ConfigureAwait(false);
+        IncomeStatement report = await _reports.IncomeStatementAsync(companyId, from, to, await OptionsAsync(companyId, parameters, to, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
 
         List<IReadOnlyDictionary<string, object?>> rows = [];
         rows.AddRange(report.Income.Select(l => Row(new() { ["Category"] = "Income", ["AccountCode"] = l.AccountCode, ["AccountName"] = l.AccountName, ["Amount"] = l.Amount })));
@@ -83,7 +118,8 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BalanceSheetAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
     {
-        BalanceSheet report = await _reports.BalanceSheetAsync(companyId, ReportParameters.Date(parameters, "AsAtDate"), ct).ConfigureAwait(false);
+        DateOnly balanceDate = ReportParameters.Date(parameters, "AsAtDate");
+        BalanceSheet report = await _reports.BalanceSheetAsync(companyId, balanceDate, await OptionsAsync(companyId, parameters, balanceDate, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
 
         List<IReadOnlyDictionary<string, object?>> rows = [];
         rows.AddRange(report.Assets.Select(l => Row(new() { ["Category"] = "Asset", ["AccountCode"] = l.AccountCode, ["AccountName"] = l.AccountName, ["Amount"] = l.Amount })));

@@ -24,6 +24,8 @@ public static class SystemReports
         };
         def.DataSources.Add(new ReportDataSource { Name = "Main", Kind = DataSourceKind.InMemory, Command = "TrialBalance" });
         def.Parameters.Add(new ReportParameter { Name = "AsAtDate", Type = ParameterType.Date, Prompt = "As at date" });
+        def.Parameters.Add(new ReportParameter { Name = "IncludeUnposted", Type = ParameterType.Boolean, Prompt = "Include unposted (draft and deferred) journals", Required = false });
+        def.Parameters.Add(new ReportParameter { Name = "ReportingCurrency", Type = ParameterType.String, Prompt = "Reporting currency (blank: base)", Required = false });
 
         def.Bands.Add(new ReportBand
         {
@@ -217,7 +219,7 @@ public static class SystemReports
     public static ReportDefinition IncomeStatement() => Listing(IncomeStatementCode, "Income Statement", "GeneralLedger",
         "Income and expenses for a period; the difference is the net profit.", "IncomeStatement",
         [new Column("Category", "Section", 120), new Column("AccountName", "Account", 250), new Column("Amount", "Amount", 100, true)],
-        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String)]);
 
     /// <summary>The code of the statement laid out by a reporting tree.</summary>
     public const string TreeStatementCode = "GL-TREE";
@@ -293,7 +295,7 @@ public static class SystemReports
     public static ReportDefinition BalanceSheet() => Listing(BalanceSheetCode, "Balance Sheet", "GeneralLedger",
         "Assets, liabilities and equity as at a date; assets equal liabilities plus equity.", "BalanceSheet",
         [new Column("Category", "Section", 120), new Column("AccountName", "Account", 250), new Column("Amount", "Amount", 100, true)],
-        [("AsAtDate", ParameterType.Date)]);
+        [("AsAtDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String)]);
 
     /// <summary>Builds the Statement of Cash Flows definition (IAS 7, movement method).</summary>
     /// <returns>The definition.</returns>
