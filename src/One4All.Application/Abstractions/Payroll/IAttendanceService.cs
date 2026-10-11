@@ -71,7 +71,26 @@ public interface IAttendanceService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success, or an error.</returns>
     Task<Result> ApproveOvertimeAsync(long companyId, long attendanceId, long approverUserId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Imports a time-clock export (brief §4.15): each employee's punches paired into days (first in, last out) and recorded as present, late
+    /// against the rostered shift, with the hours beyond the shift as overtime awaiting approval. Days already recorded are left alone; unknown
+    /// badges and unreadable lines are reported. All or nothing.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="export">The export (badge,date time per line).</param>
+    /// <param name="overtimeMultiplier">The overtime rate (1.5 = time and a half).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What was imported.</returns>
+    Task<Result<ClockImport>> ImportClockAsync(long companyId, string export, decimal overtimeMultiplier = 1.5m, CancellationToken ct = default);
 }
+
+/// <summary>A time-clock import.</summary>
+/// <param name="DaysRecorded">Days recorded.</param>
+/// <param name="AlreadyRecorded">Days left alone because they were recorded before.</param>
+/// <param name="UnknownBadges">Badges matching no employee.</param>
+/// <param name="Problems">Lines that could not be read.</param>
+public sealed record ClockImport(int DaysRecorded, int AlreadyRecorded, IReadOnlyList<string> UnknownBadges, IReadOnlyList<string> Problems);
 
 /// <summary>A period of leave on the calendar.</summary>
 /// <param name="LeaveRecordId">The leave record.</param>

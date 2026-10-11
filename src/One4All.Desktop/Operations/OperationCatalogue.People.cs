@@ -346,6 +346,23 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Import time-clock punches", ListTitle = "Leave balances",
+            Description = "Reads the clock's export (badge,date time per line; CSV or Excel): each employee's first punch in and last punch out make the day, late against the "
+                + "rostered shift, with the hours beyond the shift as overtime awaiting approval. Days already recorded are left alone.",
+            Fields = [Req("File", "Export file (CSV or .xlsx)"), Num("Rate", "Overtime rate", "1.5")],
+            Run = async (c, i) =>
+            {
+                byte[] file = await System.IO.File.ReadAllBytesAsync(i.Text("File")).ConfigureAwait(true);
+                string text = Application.Onboarding.XlsxReader.IsWorkbook(file) ? Application.Onboarding.XlsxReader.ToCsv(file) : System.Text.Encoding.UTF8.GetString(file);
+                ClockImport imported = Check(await c.Get<IAttendanceService>().ImportClockAsync(c.CompanyId, text, i.Number("Rate")).ConfigureAwait(true));
+                return string.Join(Environment.NewLine, new[] { $"{imported.DaysRecorded} day(s) recorded; {imported.AlreadyRecorded} already on file." }
+                    .Concat(imported.UnknownBadges.Count == 0 ? [] : [$"Unknown badges: {string.Join(", ", imported.UnknownBadges)}."])
+                    .Concat(imported.Problems));
+            },
+            List = LeaveBalancesAsync,
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Leave calendar and recall", ListTitle = "Leave this month",
             Description = "Shows who is on leave between two dates (optionally one department); cancels leave not yet begun, or cuts it short when someone is recalled — the days "
                 + "not taken go back to the balance (pro rata unless given).",

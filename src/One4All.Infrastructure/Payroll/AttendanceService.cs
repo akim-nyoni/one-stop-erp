@@ -174,6 +174,58 @@ public sealed class AttendanceService : IAttendanceService
     }
 
     /// <inheritdoc />
+    public Task<Result<ClockImport>> ImportClockAsync(long companyId, string export, decimal overtimeMultiplier = 1.5m, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            if (overtimeMultiplier < 1m)
+            {
+                return Error.Validation("Hr.OvertimeRate", "The overtime rate must be at least 1.");
+            }
+
+            IReadOnlyList<Application.Payroll.ClockDay> days = Application.Payroll.ClockPunches.Days(export, out IReadOnlyList<string> problems);
+            if (days.Count == 0)
+            {
+                return Error.Validation("Hr.ClockEmpty", problems.Count == 0 ? "The file holds no punches." : $"No punches could be read. {problems[0]}");
+            }
+
+            List<string> badges = [.. days.Select(d => d.EmployeeNumber).Distinct()];
+            Dictionary<string, long> employees = await _db.Employees.AsNoTracking().Where(e => e.CompanyId == companyId && badges.Contains(e.EmployeeNumber))
+                .ToDictionaryAsync(e => e.EmployeeNumber, e => e.Id, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
+            List<long> ids = [.. employees.Values];
+            DateOnly first = days.Min(d => d.Date), last = days.Max(d => d.Date);
+            HashSet<(long, DateOnly)> recorded = [.. (await _db.AttendanceRecords.AsNoTracking().Where(a => ids.Contains(a.EmployeeId) && a.Date >= first && a.Date <= last)
+                .Select(a => new { a.EmployeeId, a.Date }).ToListAsync(ct).ConfigureAwait(false)).Select(a => (a.EmployeeId, a.Date))];
+            var shifts = await (from r in _db.Set<RosterEntry>()
+                                join s in _db.Set<Shift>() on r.ShiftId equals s.Id
+                                where ids.Contains(r.EmployeeId) && r.Date >= first && r.Date <= last
+                                select new { r.EmployeeId, r.Date, s.Start, s.End }).ToListAsync(ct).ConfigureAwait(false);
+
+            int done = 0, skipped = 0;
+            foreach (Application.Payroll.ClockDay day in days.Where(d => employees.ContainsKey(d.EmployeeNumber)))
+            {
+                long employee = employees[day.EmployeeNumber];
+                if (recorded.Contains((employee, day.Date)))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                var shift = shifts.FirstOrDefault(s => s.EmployeeId == employee && s.Date == day.Date);
+                decimal overtime = Application.Payroll.ClockPunches.Overtime(day, shift?.Start, shift?.End);
+                Result<long> saved = await RecordDayAsync(companyId, employee, day.Date, AttendanceStatus.Present, day.ClockIn, day.ClockOut, 0, overtime, overtime > 0m ? overtimeMultiplier : 1m, ct)
+                    .ConfigureAwait(false);
+                if (saved.IsFailure)
+                {
+                    return saved.Error;
+                }
+
+                done++;
+            }
+
+            return Result<ClockImport>.Success(new ClockImport(done, skipped, [.. badges.Where(b => !employees.ContainsKey(b))], problems));
+        }, ct);
+
+    /// <inheritdoc />
     public async Task<Result> ApproveOvertimeAsync(long companyId, long attendanceId, long approverUserId, CancellationToken ct = default)
     {
         AttendanceRecord? record = await _db.AttendanceRecords.FirstOrDefaultAsync(a => a.Id == attendanceId && a.CompanyId == companyId, ct).ConfigureAwait(false);
