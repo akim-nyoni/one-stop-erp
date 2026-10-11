@@ -55,4 +55,23 @@ public interface IBudgetNotificationService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>What was sent.</returns>
     Task<Result<BudgetNotices>> AlertAsync(long companyId, DateOnly asAt, CancellationToken ct = default);
+
+    /// <summary>
+    /// The monthly budget-holder statement (brief §4.18 "a monthly budget-holder statement pushed by email"): each department with a budget holder's
+    /// address gets its active budget against actuals to the period of the date, account by account — budget and actual to date, the variance, the
+    /// share used of the year's budget — with the votes past the company's utilisation thresholds called out.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAt">The date (its fiscal year and period are used).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What was sent: messages, and departments covered.</returns>
+    Task<Result<BudgetNotices>> HolderStatementsAsync(long companyId, DateOnly asAt, CancellationToken ct = default);
+
+    /// <summary>The budget-holder statement text for one department (what <see cref="HolderStatementsAsync"/> sends).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="department">The department.</param>
+    /// <param name="asAt">The date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The statement, or why there is none.</returns>
+    Task<Result<string>> HolderStatementAsync(long companyId, string department, DateOnly asAt, CancellationToken ct = default);
 }

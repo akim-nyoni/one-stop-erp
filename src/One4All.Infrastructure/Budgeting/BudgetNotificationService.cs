@@ -22,11 +22,21 @@ public sealed class BudgetNotificationService : IBudgetNotificationService
     private readonly IBudgetControlService _control;
     private readonly INotificationService _notifications;
     private readonly IClock _clock;
+    private readonly IBudgetingService? _budgets;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="control">Works out utilisation.</param>
     /// <param name="notifications">Queues the emails.</param>
+    /// <param name="clock">The clock.</param>
+    /// <param name="budgets">The budgets compared with actuals for the budget-holder statements.</param>
+    public BudgetNotificationService(One4AllDbContext db, IBudgetControlService control, INotificationService notifications, IClock clock, IBudgetingService budgets)
+        : this(db, control, notifications, clock) => _budgets = budgets;
+
+    /// <summary>Creates the service without budget-holder statements.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="control">The vote book.</param>
+    /// <param name="notifications">The outbound messages.</param>
     /// <param name="clock">The clock.</param>
     public BudgetNotificationService(One4AllDbContext db, IBudgetControlService control, INotificationService notifications, IClock clock)
     {
@@ -151,6 +161,90 @@ public sealed class BudgetNotificationService : IBudgetNotificationService
         return new BudgetNotices(1, fresh.Count);
     }
 
+    /// <inheritdoc />
+    public async Task<Result<BudgetNotices>> HolderStatementsAsync(long companyId, DateOnly asAt, CancellationToken ct = default)
+    {
+        List<DepartmentUnit> units = await _db.DepartmentUnits.AsNoTracking().Where(u => u.CompanyId == companyId && u.BudgetHolderEmail != null).OrderBy(u => u.Department)
+            .ToListAsync(ct).ConfigureAwait(false);
+        int sent = 0;
+        foreach (DepartmentUnit unit in units.Where(u => !string.IsNullOrWhiteSpace(u.BudgetHolderEmail)))
+        {
+            Result<string> statement = await HolderStatementAsync(companyId, unit.Department, asAt, ct).ConfigureAwait(false);
+            if (statement.IsFailure)
+            {
+                continue;
+            }
+
+            Result<long> queued = await _notifications.QueueDirectAsync(companyId, $"Budget statement {unit.Department} {asAt:yyyy-MM}", MessageChannel.Email, [unit.BudgetHolderEmail!.Trim()],
+                $"Budget statement for {unit.Department}, {asAt:MMMM yyyy}", $"Dear {unit.BudgetHolder ?? "budget holder"},{Environment.NewLine}{Environment.NewLine}{statement.Value}", null, ct)
+                .ConfigureAwait(false);
+            if (queued.IsFailure)
+            {
+                return queued.Error;
+            }
+
+            sent++;
+        }
+
+        return new BudgetNotices(sent, units.Count);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<string>> HolderStatementAsync(long companyId, string department, DateOnly asAt, CancellationToken ct = default)
+    {
+        if (_budgets is null)
+        {
+            return Error.Rule("Budget.NoStatements", "Budget-holder statements are not available here.");
+        }
+
+        string key = (department ?? string.Empty).Trim();
+        FiscalYear? year = await _db.FiscalYears.AsNoTracking().Include(y => y.Periods)
+            .FirstOrDefaultAsync(y => y.CompanyId == companyId && y.StartDate <= asAt && y.EndDate >= asAt, ct).ConfigureAwait(false);
+        FiscalPeriod? period = year?.Periods.FirstOrDefault(p => p.Contains(asAt));
+        if (year is null || period is null)
+        {
+            return Error.NotFound("Budget.NoYear", $"No fiscal period contains {asAt:yyyy-MM-dd}.");
+        }
+
+        Result<BudgetVsActualReport> toDate = await _budgets.BudgetVsActualAsync(companyId, year.Id, BudgetType.OriginalApproved, key, period.PeriodNumber, ct).ConfigureAwait(false);
+        if (toDate.IsFailure)
+        {
+            return toDate.Error;
+        }
+
+        int lastPeriod = year.Periods.Max(p => p.PeriodNumber);
+        Result<BudgetVsActualReport> wholeYear = await _budgets.BudgetVsActualAsync(companyId, year.Id, BudgetType.OriginalApproved, key, lastPeriod, ct).ConfigureAwait(false);
+        Dictionary<string, decimal> annual = wholeYear.IsSuccess ? wholeYear.Value.Rows.ToDictionary(r => r.AccountCode, r => r.Budget) : [];
+        Dictionary<string, string> names = await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.AccountCode, a => a.Name, ct).ConfigureAwait(false);
+        Company company = await _db.Companies.AsNoTracking().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        decimal[] thresholds = Thresholds(company.BudgetAlertThresholds);
+
+        StringBuilder text = new($"Budget statement for {key}, period {period.PeriodNumber} of {year.Code} (to {period.EndDate:yyyy-MM-dd}).{Environment.NewLine}{Environment.NewLine}");
+        text.AppendLine(CultureInfo.InvariantCulture, $"{"Account",-10} {"Name",-28} {"Budget to date",15} {"Actual to date",15} {"Variance",13} {"Year used",9}");
+        List<string> flagged = [];
+        foreach (BudgetVsActualRow row in toDate.Value.Rows.OrderBy(r => r.AccountCode, StringComparer.Ordinal))
+        {
+            decimal year12 = annual.GetValueOrDefault(row.AccountCode, row.Budget);
+            decimal used = year12 == 0m ? 0m : decimal.Round(row.Actual / year12 * 100m, 1, MidpointRounding.AwayFromZero);
+            string name = names.GetValueOrDefault(row.AccountCode, "?");
+            text.AppendLine(CultureInfo.InvariantCulture, $"{row.AccountCode,-10} {(name.Length > 28 ? name[..28] : name),-28} {row.Budget,15:N2} {row.Actual,15:N2} {row.Budget - row.Actual,13:N2} {used,8:0.0}%");
+            if (thresholds.Where(t => used >= t).DefaultIfEmpty(0m).Max() is decimal crossed && crossed > 0m)
+            {
+                flagged.Add($"{row.AccountCode} {name}: {used:0.0}% of the year's budget used — past {crossed:0.#}%");
+            }
+        }
+
+        decimal budget = toDate.Value.Rows.Sum(r => r.Budget), actual = toDate.Value.Rows.Sum(r => r.Actual);
+        text.AppendLine(CultureInfo.InvariantCulture, $"{"Total",-39} {budget,15:N2} {actual,15:N2} {budget - actual,13:N2}");
+        if (flagged.Count > 0)
+        {
+            text.AppendLine().AppendLine("Past a utilisation threshold:");
+            flagged.ForEach(f => text.AppendLine(CultureInfo.InvariantCulture, $"  {f}"));
+        }
+
+        return text.ToString();
+    }
+
     // The company's thresholds ("75, 90, 100"), or 75 / 90 / 100.
     private static decimal[] Thresholds(string? text)
     {
@@ -185,6 +279,11 @@ public sealed class BudgetNoticesTask : IScheduledTask
         List<string> done = [];
         Result<BudgetNotices> alerts = await _notices.AlertAsync(companyId, today, ct).ConfigureAwait(false);
         done.Add(alerts.IsSuccess ? $"{alerts.Value.Items} new utilisation alert(s)" : alerts.Error.Message);
+        if (today.Day == 1)
+        {
+            Result<BudgetNotices> statements = await _notices.HolderStatementsAsync(companyId, today.AddDays(-1), ct).ConfigureAwait(false);
+            done.Add(statements.IsSuccess ? $"{statements.Value.Messages} budget-holder statement(s)" : statements.Error.Message);
+        }
 
         // Reminders for the year being prepared: the next fiscal year if there is one, else this one.
         long? preparing = await _db.FiscalYears.AsNoTracking().Where(y => y.CompanyId == companyId && y.EndDate >= today).OrderByDescending(y => y.StartDate > today).ThenBy(y => y.StartDate)

@@ -104,6 +104,26 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Budget-holder statements", ListTitle = "Budgets in preparation",
+            Description = "Each department's active budget against actuals to the period of the date — budget and actual to date, the variance and the share of the year's "
+                + "budget used, with votes past the utilisation thresholds called out. Preview shows one department's; Send emails every budget holder with an address "
+                + "(the scheduled budget notices send them on the first of each month for the month just ended).",
+            Fields = [Pick("Step", "Step", ["Preview", "Send"]), Opt("Department", "Department (preview)"), Today("Date", "As at")],
+            Run = async (c, i) =>
+            {
+                IBudgetNotificationService notices = c.Get<IBudgetNotificationService>();
+                if (i.Text("Step") == "Preview")
+                {
+                    return Check(await notices.HolderStatementAsync(c.CompanyId, i.Optional("Department") ?? string.Empty, i.Date("Date")).ConfigureAwait(true));
+                }
+
+                BudgetNotices sent = Check(await notices.HolderStatementsAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true));
+                return $"{sent.Messages} statement(s) queued for {sent.Items} department(s) with a budget holder address.";
+            },
+            List = BudgetsInPreparationAsync,
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set a budget's currency and rate", ListTitle = "Budgets in preparation",
             Description = "Prepares a budget in a currency at a budget rate held on its header: the lines are planned in that currency and their base equivalents follow the rate, "
                 + "so a new rate re-states them, and the FX variance is measured against it. Blank currency (or the base currency) returns the budget to base.",
