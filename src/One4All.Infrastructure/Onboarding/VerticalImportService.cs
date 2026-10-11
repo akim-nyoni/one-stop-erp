@@ -626,6 +626,171 @@ public sealed class VerticalImportService : IVerticalImportService
     }
 
     /// <inheritdoc />
+    public async Task<ImportReport> ImportAccountsAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "code", "name", "type");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        HashSet<string> existing = [.. await _db.Accounts.Where(a => a.CompanyId == companyId).Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false)];
+        List<ImportError> errors = [];
+        List<LedgerAccount> toCreate = [];
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        int skipped = 0;
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string code = Code(row.Text("code")), name = row.Text("name") ?? string.Empty;
+                bool manual = true, budget = true;
+                if (code.Length is 0 or > 8 || name.Length == 0 || !Enum.TryParse(row.Text("type"), true, out AccountType type) || !Enum.IsDefined(type)
+                    || (row.Text("manual") is string m && !bool.TryParse(m, out manual)) || (row.Text("budget") is string b && !bool.TryParse(b, out budget)))
+                {
+                    return "An account needs a code of up to 8 characters, a name, a type (Asset, Liability, Equity, Income, Expense) and, if given, manual / budget true or false.";
+                }
+
+                if (!seen.Add(code))
+                {
+                    return $"Account {code} appears twice.";
+                }
+
+                if (existing.Contains(code))
+                {
+                    skipped++;
+                    return null;
+                }
+
+                toCreate.Add(new LedgerAccount(companyId, code, name, type, row.Text("category")) { AllowManualJournal = manual, BudgetEnabled = budget, IsActive = true });
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, skipped, errors, commit, ct, async () =>
+        {
+            _db.Accounts.AddRange(toCreate);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return toCreate.Count;
+        }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<ImportReport> ImportWarehousesAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "code", "name");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        HashSet<string> existing = [.. await _db.Warehouses.Where(w => w.CompanyId == companyId).Select(w => w.Code).ToListAsync(ct).ConfigureAwait(false)];
+        List<ImportError> errors = [];
+        List<Core.Inventory.Warehouse> toCreate = [];
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        int skipped = 0;
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string code = Code(row.Text("code")), name = row.Text("name") ?? string.Empty;
+                if (code.Length == 0 || name.Length == 0)
+                {
+                    return "A warehouse needs a code and a name.";
+                }
+
+                if (!seen.Add(code))
+                {
+                    return $"Warehouse {code} appears twice.";
+                }
+
+                if (existing.Contains(code))
+                {
+                    skipped++;
+                    return null;
+                }
+
+                toCreate.Add(new Core.Inventory.Warehouse(companyId, code, name));
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, skipped, errors, commit, ct, async () =>
+        {
+            _db.Warehouses.AddRange(toCreate);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return toCreate.Count;
+        }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<ImportReport> ImportRentalUnitsAsync(long companyId, string csv, DateOnly asAt, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "code", "description", "type", "rooms", "rent", "rent_account");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        HashSet<string> accounts = [.. await _db.Accounts.Where(a => a.CompanyId == companyId).Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false)];
+        HashSet<string> existing = [.. await _db.Set<Core.Housing.RentalUnit>().Where(u => u.CompanyId == companyId).Select(u => u.Code).ToListAsync(ct).ConfigureAwait(false)];
+        List<ImportError> errors = [];
+        List<Core.Housing.RentalUnit> toCreate = [];
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        int skipped = 0;
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string code = Code(row.Text("code")), description = row.Text("description") ?? string.Empty, account = (row.Text("rent_account") ?? string.Empty).Trim();
+                decimal rooms = row.Number("rooms") ?? -1m, rent = row.Number("rent") ?? -1m;
+                decimal? most = row.Number("max_occupants");
+                if (code.Length == 0 || description.Length == 0 || !Enum.TryParse(row.Text("type"), true, out Core.Housing.RentalUnitType type) || !Enum.IsDefined(type)
+                    || rooms < 0m || rooms != decimal.Truncate(rooms) || rent < 0m || most is <= 0m)
+                {
+                    return "A rental unit needs a code, a description, a type (House, Flat, Room, HostelBed, Cottage), whole rooms, a rent of zero or more and, if given, a positive occupancy limit.";
+                }
+
+                if (!accounts.Contains(account))
+                {
+                    return $"Rent account {account} does not exist.";
+                }
+
+                if (!seen.Add(code))
+                {
+                    return $"Unit {code} appears twice.";
+                }
+
+                if (existing.Contains(code))
+                {
+                    skipped++;
+                    return null;
+                }
+
+                Core.Housing.RentalUnit unit = new(companyId, code, description, type, (int)rooms, rent, account, row.Date("vacant_since") ?? asAt)
+                {
+                    Suburb = row.Text("suburb"),
+                    MaxOccupants = most is decimal m ? (int)m : null,
+                };
+                if (row.Text("vacant_since") is null)
+                {
+                    unit.Let();
+                }
+
+                toCreate.Add(unit);
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, skipped, errors, commit, ct, async () =>
+        {
+            _db.Set<Core.Housing.RentalUnit>().AddRange(toCreate);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return toCreate.Count;
+        }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<IReadOnlyList<RegisterCheck>>> ReconcileRegistersAsync(long companyId, CancellationToken ct = default)
     {
         var assets = await _db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == companyId && a.Status != FixedAssetStatus.Disposed)

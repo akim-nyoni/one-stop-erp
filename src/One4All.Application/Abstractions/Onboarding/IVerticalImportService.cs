@@ -65,6 +65,21 @@ public interface IVerticalImportService
     /// <summary>A budget: <c>account, period, amount</c> (optional <c>cost_centre, quantity</c>), created for the fiscal year containing the date.</summary>
     Task<ImportReport> ImportBudgetAsync(long companyId, string csv, DateOnly yearDate, string label, Core.Budgeting.BudgetType type, string? department, bool commit, CancellationToken ct = default);
 
+    /// <summary>
+    /// The chart of accounts: <c>code, name, type</c> (Asset, Liability, Equity, Income or Expense) (optional <c>category, manual, budget</c>; manual and budget
+    /// true / false, both true when blank). Accounts already on the chart are left alone.
+    /// </summary>
+    Task<ImportReport> ImportAccountsAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
+
+    /// <summary>Warehouses and stores: <c>code, name</c>. Codes already there are left alone.</summary>
+    Task<ImportReport> ImportWarehousesAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
+
+    /// <summary>
+    /// Council rental units: <c>code, description, type, rooms, rent, rent_account</c> (optional <c>vacant_since, suburb, max_occupants</c>). A unit with no
+    /// vacant date is taken as let; let units get their tenancies through the rental screens. Codes already there are left alone.
+    /// </summary>
+    Task<ImportReport> ImportRentalUnitsAsync(long companyId, string csv, DateOnly asAt, bool commit, CancellationToken ct = default);
+
     /// <summary>The fixed-asset and staff-loan registers against the accounts they are held in.</summary>
     Task<Result<IReadOnlyList<RegisterCheck>>> ReconcileRegistersAsync(long companyId, CancellationToken ct = default);
 }

@@ -144,11 +144,14 @@ public static partial class OperationCatalogue
                     .ConfigureAwait(true), ("Id", a => a.Id), ("Record", a => a.Target), ("Number", a => a.TargetKey), ("File", a => a.FileName), ("KB", a => a.SizeBytes / 1024),
                 ("Uploaded", a => a.UploadedOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Description", a => a.Description)),
         };
-        string[] imports = ["Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "PayrollYtd", "Properties", "Meters", "Students", "Stands", "Budget"];
+        string[] imports = ["Accounts", "Warehouses", "Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "PayrollYtd",
+            "Properties", "Meters", "Students", "Stands", "RentalUnits", "Budget"];
         yield return new Operation
         {
             Module = module, Title = "Import master data or opening balances", ListTitle = "Opening balance reconciliation",
             Description = "Loads a CSV template (header row; dates yyyy-MM-dd). Untick Commit to preview: nothing is written while any row has an error. "
+                + "Accounts: code,name,type[,category,manual,budget]. Warehouses: code,name. "
+                + "RentalUnits: code,description,type,rooms,rent,rent_account[,vacant_since,suburb,max_occupants] (no vacant date: let). "
                 + "Customers/Suppliers: code,name,currency[,credit_limit]. Items: code,description[,type,revenue_account,cost_account,category]. Stock: item,warehouse,quantity,unit_cost. "
                 + "Receivables/Payables: trader,document,date,amount (negative = credit). TrialBalance: account,debit,credit. "
                 + "FixedAssets: asset_number,description,class,acquired,cost,accumulated,life_months,cost_account,accum_account,expense_account[,residual,method,rate]. "
@@ -170,6 +173,9 @@ public static partial class OperationCatalogue
                 bool commit = i.Flag("Commit");
                 ImportReport report = i.Text("Kind") switch
                 {
+                    "Accounts" => await registers.ImportAccountsAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
+                    "Warehouses" => await registers.ImportWarehousesAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
+                    "RentalUnits" => await registers.ImportRentalUnitsAsync(c.CompanyId, csv, i.Date("Date"), commit).ConfigureAwait(true),
                     "Customers" => await ob.ImportCustomersAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "Suppliers" => await ob.ImportSuppliersAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "Items" => await ob.ImportItemsAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
