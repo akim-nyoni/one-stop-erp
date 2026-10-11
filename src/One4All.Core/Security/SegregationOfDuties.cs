@@ -96,6 +96,18 @@ public static class SegregationOfDutiesCatalogue
         return rules;
     }
 
+    /// <summary>
+    /// The rules in force: the built-in rules, each replaced by a configured rule of the same code (an inactive one switches it off), plus the
+    /// configured rules of new codes (brief §5.4: the SoD rules table is maintained by the security administrator). Pure.
+    /// </summary>
+    /// <param name="configured">The configured rules and whether each is active.</param>
+    /// <returns>The active rules, by code.</returns>
+    public static IReadOnlyList<SodRule> Effective(IEnumerable<(SodRule Rule, bool IsActive)> configured)
+    {
+        Dictionary<string, (SodRule Rule, bool IsActive)> byCode = configured.ToDictionary(c => c.Rule.Code, StringComparer.OrdinalIgnoreCase);
+        return [.. All.Where(r => !byCode.ContainsKey(r.Code)).Concat(byCode.Values.Where(c => c.IsActive).Select(c => c.Rule)).OrderBy(r => r.Code, StringComparer.Ordinal)];
+    }
+
     /// <summary>Returns every default rule that the supplied permissions violate.</summary>
     /// <param name="permissions">The principal's resolved permissions.</param>
     /// <returns>The violated rules.</returns>

@@ -207,3 +207,20 @@ internal sealed class PasswordHistoryConfiguration : IEntityTypeConfiguration<Pa
         b.HasIndex(x => new { x.UserId, x.SetOnUtc });
     }
 }
+
+internal sealed class SodRuleSettingConfiguration : IEntityTypeConfiguration<SodRuleSetting>
+{
+    public void Configure(EntityTypeBuilder<SodRuleSetting> b)
+    {
+        b.ToTable("sod_rule", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).HasMaxLength(20);
+        b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.PermissionA).HasMaxLength(120);
+        b.Property(x => x.PermissionB).HasMaxLength(120);
+        b.Property(x => x.OperationA).HasColumnType("bigint");
+        b.Property(x => x.OperationB).HasColumnType("bigint");
+        b.Property(x => x.Severity).HasConversion<int>();
+        b.HasIndex(x => x.Code).IsUnique();
+    }
+}

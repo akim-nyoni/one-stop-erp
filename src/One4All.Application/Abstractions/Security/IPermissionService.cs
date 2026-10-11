@@ -33,6 +33,18 @@ public interface IPermissionService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success, or an unknown user or feature.</returns>
     Task<Core.Common.Result> SetOverridesAsync(long userId, IReadOnlyList<UserOverrideEdit> overrides, CancellationToken ct = default);
+
+    /// <summary>The segregation-of-duties rules in force: the built-in ones as re-tuned or switched off in the rules table, and the rules added there.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The rules.</returns>
+    Task<IReadOnlyList<SodRule>> SodRulesAsync(CancellationToken ct = default);
+
+    /// <summary>Saves a rule in the SoD rules table: a new conflict, or a built-in rule's code to re-tune it or (inactive) switch it off.</summary>
+    /// <param name="rule">The rule.</param>
+    /// <param name="isActive">Whether it is in force.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or what is wrong with it.</returns>
+    Task<Core.Common.Result> SaveSodRuleAsync(SodRule rule, bool isActive, CancellationToken ct = default);
 }
 
 /// <summary>A feature's override on the permission grid.</summary>

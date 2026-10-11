@@ -111,6 +111,27 @@ public static partial class OperationCatalogue
                 await OptionalUserAsync(c, i.Optional("Manager")).ConfigureAwait(true)).ConfigureAwait(true), "Manager set."),
             List = WaitingOnMeAsync,
         };
+        yield return new Operation
+        {
+            Module = module, Title = "Segregation-of-duties rules", ListTitle = "Rules in force",
+            Description = "The conflicts no one person may hold (create a supplier and approve its payment, say). Add a rule, re-tune a built-in one by its code, or switch it "
+                + "off (inactive); the control reports and role assignments check the rules in force. Operations by name: Create, Edit, Approve, Post…",
+            Fields = [Req("Code", "Rule code"), Req("Name", "What the conflict is"), Req("PermissionA", "Permission (e.g. Purchasing.Supplier)"), Req("OperationsA", "Its operations (Create, Edit…)"),
+                Req("PermissionB", "Conflicting permission"), Req("OperationsB", "Its operations"), Pick("Severity", "Severity", Enum.GetNames<Core.Security.SodSeverity>()), Tick("Active", "In force", true)],
+            Run = async (c, i) =>
+            {
+                static Core.Security.OperationFlags Flags(string text) => text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Aggregate(Core.Security.OperationFlags.None, (all, name) => all | (Enum.TryParse(name, true, out Core.Security.OperationFlags flag) ? flag
+                        : throw new OperationException($"No operation called {name}.")));
+                Core.Security.SodRule rule = new(i.Text("Code"), i.Text("Name"), i.Text("PermissionA"), Flags(i.Text("OperationsA")), i.Text("PermissionB"), Flags(i.Text("OperationsB")),
+                    Enum.Parse<Core.Security.SodSeverity>(i.Text("Severity")));
+                return Check(await c.Get<One4All.Application.Abstractions.Security.IPermissionService>().SaveSodRuleAsync(rule, i.Flag("Active")).ConfigureAwait(true),
+                    i.Flag("Active") ? "Rule saved." : "Rule switched off.");
+            },
+            List = async c => Table(await c.Get<One4All.Application.Abstractions.Security.IPermissionService>().SodRulesAsync().ConfigureAwait(true),
+                ("Code", r => r.Code), ("Rule", r => r.Name), ("Permission", r => $"{r.PermissionA} {r.OperationA}"), ("Conflicts with", r => $"{r.PermissionB} {r.OperationB}"),
+                ("Severity", r => r.Severity)),
+        };
     }
 
     private static async Task<DataTable> WaitingOnMeAsync(OperationContext c)

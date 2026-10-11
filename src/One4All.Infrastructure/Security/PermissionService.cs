@@ -105,6 +105,45 @@ public sealed class PermissionService : IPermissionService
     public async Task<IReadOnlyList<SodRule>> GetSodViolationsAsync(long userId, CancellationToken ct = default)
     {
         EffectivePermissions permissions = await ResolveAsync(userId, ct).ConfigureAwait(false);
-        return SegregationOfDutiesCatalogue.Violations(permissions).ToList();
+        return [.. (await SodRulesAsync(ct).ConfigureAwait(false)).Where(r => r.IsViolatedBy(permissions))];
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<SodRule>> SodRulesAsync(CancellationToken ct = default)
+        => SegregationOfDutiesCatalogue.Effective((await _db.Set<SodRuleSetting>().AsNoTracking().ToListAsync(ct).ConfigureAwait(false)).Select(s => (s.ToRule(), s.IsActive)));
+
+    /// <inheritdoc />
+    public async Task<Core.Common.Result> SaveSodRuleAsync(SodRule rule, bool isActive, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        PermissionDefinition? a = PermissionCatalogue.Find(rule.PermissionA), b = PermissionCatalogue.Find(rule.PermissionB);
+        if (string.IsNullOrWhiteSpace(rule.Code) || string.IsNullOrWhiteSpace(rule.Name))
+        {
+            return Core.Common.Result.Failure(Core.Common.Error.Validation("Sod.Rule", "A rule needs a code and a name."));
+        }
+
+        if (a is null || b is null)
+        {
+            return Core.Common.Result.Failure(Core.Common.Error.Validation("Sod.Permission", $"Unknown permission {(a is null ? rule.PermissionA : rule.PermissionB)}."));
+        }
+
+        if (rule.OperationA == OperationFlags.None || rule.OperationB == OperationFlags.None || (a.Available & rule.OperationA) != rule.OperationA
+            || (b.Available & rule.OperationB) != rule.OperationB || (a.Code == b.Code && rule.OperationA == rule.OperationB))
+        {
+            return Core.Common.Result.Failure(Core.Common.Error.Validation("Sod.Operations", "Each side needs operations its permission offers, and the two sides must differ."));
+        }
+
+        string code = rule.Code.Trim().ToUpperInvariant();
+        SodRuleSetting? saved = await _db.Set<SodRuleSetting>().FirstOrDefaultAsync(s => s.Code == code, ct).ConfigureAwait(false);
+        if (saved is null)
+        {
+            saved = new SodRuleSetting(code);
+            _db.Set<SodRuleSetting>().Add(saved);
+        }
+
+        (saved.Name, saved.PermissionA, saved.OperationA, saved.PermissionB, saved.OperationB, saved.Severity, saved.IsActive) =
+            (rule.Name.Trim(), a.Code, rule.OperationA, b.Code, rule.OperationB, rule.Severity, isActive);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Core.Common.Result.Success();
     }
 }
