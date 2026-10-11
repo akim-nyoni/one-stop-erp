@@ -98,6 +98,34 @@
                             </TextBox.InputBindings>
                         </TextBox>
                     </DockPanel>
+                    <!-- Product finder filters (brand, supplier, price band, in stock, on promotion, sold this week) -->
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                        <Button Content="Filters…" Style="{StaticResource PadButton}" Height="30" Width="90" FontSize="13" Background="#34495E" Command="{Binding ToggleFinderCommand}"
+                                DockPanel.Dock="Left" ToolTip="Find items by brand, supplier, price band, stock, promotion or recent sales" />
+                        <WrapPanel Margin="8,0,0,0" VerticalAlignment="Center">
+                            <WrapPanel.Style>
+                                <Style TargetType="WrapPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsFinderOpen}" Value="True"><Setter Property="Visibility" Value="Visible" /></DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </WrapPanel.Style>
+                            <TextBlock Text="Brand" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <ComboBox IsEditable="True" Width="110" ItemsSource="{Binding FinderBrands}" Text="{Binding FinderBrand, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0" />
+                            <TextBlock Text="Supplier" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <ComboBox IsEditable="True" Width="100" ItemsSource="{Binding FinderSuppliers}" Text="{Binding FinderSupplier, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,0" />
+                            <TextBlock Text="Price" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <TextBox Width="55" Text="{Binding FinderMinPrice, UpdateSourceTrigger=PropertyChanged}" ToolTip="Lowest price" />
+                            <TextBlock Text="–" Foreground="{DynamicResource Muted}" VerticalAlignment="Center" Margin="3,0" />
+                            <TextBox Width="55" Text="{Binding FinderMaxPrice, UpdateSourceTrigger=PropertyChanged}" ToolTip="Highest price" Margin="0,0,8,0" />
+                            <CheckBox Content="In stock" IsChecked="{Binding FinderInStock}" Foreground="{DynamicResource Ink}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <CheckBox Content="On promotion" IsChecked="{Binding FinderPromotion}" Foreground="{DynamicResource Ink}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <CheckBox Content="Sold this week" IsChecked="{Binding FinderRecent}" Foreground="{DynamicResource Ink}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <Button Content="Find" Width="60" Height="26" Command="{Binding ApplyFinderCommand}" Margin="0,0,4,0" />
+                            <Button Content="Clear" Width="60" Height="26" Command="{Binding ClearFinderCommand}" />
+                        </WrapPanel>
+                    </DockPanel>
                     <ListBox DockPanel.Dock="Top" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}"
                              Background="Transparent" BorderThickness="0" Margin="0,0,0,8">
                         <ListBox.ItemsPanel>

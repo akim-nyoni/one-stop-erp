@@ -46,6 +46,85 @@ public sealed class PosCatalogueService : IPosCatalogueService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<PosTile>> FindAsync(long companyId, PosFinderFilter filter, DateOnly asAt, int take = 60, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+        IQueryable<Item> items = Sellable(companyId);
+        if (!string.IsNullOrWhiteSpace(filter.Category))
+        {
+            // The category and everything under it.
+            List<(string Code, string? Parent)> tree = [.. (await _db.ItemCategories.AsNoTracking().Where(c => c.CompanyId == companyId).Select(c => new { c.Code, c.ParentCode })
+                .ToListAsync(ct).ConfigureAwait(false)).Select(c => (c.Code, c.ParentCode))];
+            HashSet<string> under = new(StringComparer.OrdinalIgnoreCase) { filter.Category.Trim() };
+            for (bool grew = true; grew;)
+            {
+                grew = false;
+                foreach ((string code, string? parent) in tree.Where(c => c.Parent is not null && under.Contains(c.Parent) && !under.Contains(c.Code)))
+                {
+                    grew |= under.Add(code);
+                }
+            }
+
+            List<string> categories = [.. under.Select(c => c.ToUpperInvariant())];
+            items = items.Where(i => i.Category != null && categories.Contains(i.Category.ToUpper()));
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Brand))
+        {
+            string brand = filter.Brand.Trim().ToUpperInvariant();
+            items = items.Where(i => i.Brand != null && i.Brand.ToUpper() == brand);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.SupplierCode))
+        {
+            string supplier = filter.SupplierCode.Trim().ToUpperInvariant();
+            IQueryable<long> supplied = from s in _db.Set<ItemSupplier>()
+                                        join v in _db.Suppliers on s.SupplierId equals v.Id
+                                        where s.CompanyId == companyId && v.Code == supplier
+                                        select s.ItemId;
+            items = items.Where(i => supplied.Contains(i.Id));
+        }
+
+        if (filter.InStockOnly)
+        {
+            items = items.Where(i => _db.StockBalances.Any(b => b.ItemId == i.Id && b.QuantityOnHand > 0m));
+        }
+
+        if (filter.SoldWithinDays is int days and > 0)
+        {
+            DateOnly since = asAt.AddDays(-days);
+            IQueryable<long> sold = _db.Sales.Where(s => s.CompanyId == companyId && s.Status == SaleStatus.Completed && s.SaleDate >= since && s.SaleDate <= asAt)
+                .SelectMany(s => s.Lines).Select(l => l.ItemId);
+            items = items.Where(i => sold.Contains(i.Id));
+        }
+
+        if (filter.PromotionOnly)
+        {
+            var running = await _db.Promotions.AsNoTracking().Include(p => p.Items)
+                .Where(p => p.CompanyId == companyId && p.IsActive && p.StartsOn <= asAt && (p.EndsOn == null || p.EndsOn >= asAt)).ToListAsync(ct).ConfigureAwait(false);
+            List<long> promoted = [.. running.SelectMany(p => p.Items).Select(i => i.ItemId).Distinct()];
+            List<string> promotedCategories = [.. running.Where(p => p.Category != null).Select(p => p.Category!.ToUpperInvariant()).Distinct()];
+            items = items.Where(i => promoted.Contains(i.Id) || (i.Category != null && promotedCategories.Contains(i.Category.ToUpper())));
+        }
+
+        List<Item> found = await items.OrderBy(i => i.Description).Take(Math.Clamp(take, 1, 500) * 4).ToListAsync(ct).ConfigureAwait(false);
+        return [.. (await PriceAsync(companyId, found, ct).ConfigureAwait(false))
+            .Where(t => (filter.MinPrice is not decimal min || t.UnitPrice >= min) && (filter.MaxPrice is not decimal max || t.UnitPrice <= max))
+            .Take(Math.Clamp(take, 1, 500))];
+    }
+
+    /// <inheritdoc />
+    public async Task<(IReadOnlyList<string> Brands, IReadOnlyList<string> Suppliers)> FinderChoicesAsync(long companyId, CancellationToken ct = default)
+    {
+        List<string> brands = await Sellable(companyId).Where(i => i.Brand != null && i.Brand != string.Empty).Select(i => i.Brand!).Distinct().OrderBy(b => b).ToListAsync(ct).ConfigureAwait(false);
+        List<string> suppliers = await (from s in _db.Set<ItemSupplier>().AsNoTracking()
+                                        join v in _db.Suppliers.AsNoTracking() on s.SupplierId equals v.Id
+                                        where s.CompanyId == companyId
+                                        select v.Code).Distinct().OrderBy(c => c).ToListAsync(ct).ConfigureAwait(false);
+        return (brands, suppliers);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<PosTile>> FavouritesAsync(long companyId, long? terminalId, CancellationToken ct = default)
     {
         // The till's own favourites first, then the ones for every till; an item pinned twice shows once.

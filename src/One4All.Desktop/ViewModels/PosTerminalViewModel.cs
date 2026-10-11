@@ -620,6 +620,125 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         return false;
     }
 
+    /// <summary>The finder's brand filter (blank: any).</summary>
+    [ObservableProperty]
+    private string _finderBrand = string.Empty;
+
+    /// <summary>The finder's supplier filter (blank: any).</summary>
+    [ObservableProperty]
+    private string _finderSupplier = string.Empty;
+
+    /// <summary>The finder's lowest price (blank: none).</summary>
+    [ObservableProperty]
+    private string _finderMinPrice = string.Empty;
+
+    /// <summary>The finder's highest price (blank: none).</summary>
+    [ObservableProperty]
+    private string _finderMaxPrice = string.Empty;
+
+    /// <summary>Only items with stock on hand.</summary>
+    [ObservableProperty]
+    private bool _finderInStock;
+
+    /// <summary>Only items on a promotion.</summary>
+    [ObservableProperty]
+    private bool _finderPromotion;
+
+    /// <summary>Only items sold in the last week.</summary>
+    [ObservableProperty]
+    private bool _finderRecent;
+
+    /// <summary>Whether the finder's filter bar is open.</summary>
+    [ObservableProperty]
+    private bool _isFinderOpen;
+
+    /// <summary>The brands to choose from.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<string> FinderBrands { get; } = [];
+
+    /// <summary>The suppliers to choose from.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<string> FinderSuppliers { get; } = [];
+
+    /// <summary>Opens or closes the filter bar (loading the brands and suppliers the first time).</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private async Task ToggleFinderAsync()
+    {
+        IsFinderOpen = !IsFinderOpen;
+        if (!IsFinderOpen || FinderBrands.Count + FinderSuppliers.Count > 0 || !_online)
+        {
+            return;
+        }
+
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            (IReadOnlyList<string> brands, IReadOnlyList<string> suppliers) = await scope.ServiceProvider.GetRequiredService<IPosCatalogueService>().FinderChoicesAsync(_companyId)
+                .ConfigureAwait(true);
+            foreach (string brand in brands)
+            {
+                FinderBrands.Add(brand);
+            }
+
+            foreach (string supplier in suppliers)
+            {
+                FinderSuppliers.Add(supplier);
+            }
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            _online = false;
+        }
+    }
+
+    /// <summary>Shows the items that pass the finder's filters (within the chosen category).</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private async Task ApplyFinderAsync()
+    {
+        static decimal? Price(string text) => decimal.TryParse(text, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.CurrentCulture, out decimal value) ? value : null;
+        PosFinderFilter filter = new(SelectedCategory == "All" ? null : SelectedCategory, NullIfBlank(FinderBrand), NullIfBlank(FinderSupplier), Price(FinderMinPrice), Price(FinderMaxPrice),
+            FinderInStock, FinderPromotion, FinderRecent ? 7 : null);
+        if (!_online)
+        {
+            // Offline: the price band applies to the tiles on hand; the other filters need the server.
+            Products.Clear();
+            foreach (PosProductVm product in _allProducts.Where(p => (filter.Category is null || InCategory(p, filter.Category))
+                && (filter.MinPrice is not decimal min || p.Price >= min) && (filter.MaxPrice is not decimal max || p.Price <= max)))
+            {
+                Products.Add(product);
+            }
+
+            StatusMessage = "Offline: only the category and price band filter the tiles.";
+            return;
+        }
+
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            IReadOnlyList<PosTile> hits = await scope.ServiceProvider.GetRequiredService<IPosCatalogueService>()
+                .FindAsync(_companyId, filter, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true);
+            Products.Clear();
+            foreach (PosTile hit in hits)
+            {
+                Products.Add(_allProducts.FirstOrDefault(p => p.ItemId == hit.ItemId) ?? Product(hit));
+            }
+
+            StatusMessage = hits.Count == 0 ? "No item passes those filters." : $"{hits.Count} item(s) found.";
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            _online = false;
+            StatusMessage = "The server cannot be reached; the finder works on the tiles on hand.";
+        }
+    }
+
+    /// <summary>Clears the finder's filters and shows the chosen category again.</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void ClearFinder()
+    {
+        FinderBrand = FinderSupplier = FinderMinPrice = FinderMaxPrice = string.Empty;
+        FinderInStock = FinderPromotion = FinderRecent = false;
+        ApplyCategoryFilter();
+    }
+
     // What was typed matches no tile here: ask the server, which also knows alias and pack barcodes and synonyms.
     private async Task SearchServerAsync(string text)
     {

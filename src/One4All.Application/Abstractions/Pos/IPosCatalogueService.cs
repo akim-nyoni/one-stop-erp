@@ -55,6 +55,24 @@ public interface IPosCatalogueService
     /// <returns>The tiles, best match first.</returns>
     Task<IReadOnlyList<PosTile>> SearchAsync(long companyId, string term, int take = 30, CancellationToken ct = default);
 
+    /// <summary>
+    /// The till's product finder (brief §4.4 "filters: department, category, brand, supplier, price band, in-stock only, promo only, recently sold"):
+    /// the sellable items that pass every filter given, priced, by name.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="filter">The filters.</param>
+    /// <param name="asAt">Today (promotions in force, recent sales).</param>
+    /// <param name="take">How many to return.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The tiles.</returns>
+    Task<IReadOnlyList<PosTile>> FindAsync(long companyId, PosFinderFilter filter, DateOnly asAt, int take = 60, CancellationToken ct = default);
+
+    /// <summary>The brands and supplier codes the finder can filter on.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The brands and supplier codes, sorted.</returns>
+    Task<(IReadOnlyList<string> Brands, IReadOnlyList<string> Suppliers)> FinderChoicesAsync(long companyId, CancellationToken ct = default);
+
     /// <summary>The till's favourites: its own first, then those for every till.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="terminalId">The terminal.</param>
@@ -86,3 +104,15 @@ public interface IPosCatalogueService
     /// <returns>The tiles.</returns>
     Task<IReadOnlyList<PosTile>> CategoryTilesAsync(long companyId, string categoryCode, CancellationToken ct = default);
 }
+
+/// <summary>The till's product finder filters; each one left empty does not filter.</summary>
+/// <param name="Category">The category (its sub-categories included), or null.</param>
+/// <param name="Brand">The brand, or null.</param>
+/// <param name="SupplierCode">Items this supplier supplies, or null.</param>
+/// <param name="MinPrice">The lowest price, or null.</param>
+/// <param name="MaxPrice">The highest price, or null.</param>
+/// <param name="InStockOnly">Only items with stock on hand.</param>
+/// <param name="PromotionOnly">Only items on a promotion in force.</param>
+/// <param name="SoldWithinDays">Only items sold at the tills in the last so many days, or null.</param>
+public sealed record PosFinderFilter(string? Category = null, string? Brand = null, string? SupplierCode = null, decimal? MinPrice = null, decimal? MaxPrice = null,
+    bool InStockOnly = false, bool PromotionOnly = false, int? SoldWithinDays = null);
