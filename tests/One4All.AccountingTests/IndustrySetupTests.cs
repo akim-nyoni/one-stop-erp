@@ -41,7 +41,8 @@ public sealed class IndustrySetupTests
         setup.Accounts.Should().Be(expectedAccounts);
         setup.TaxCodes.Should().Be(4);
         setup.Warehouses.Should().Be(4);
-        setup.DemoRecords.Should().Be(6);
+        setup.DemoRecords.Should().Be(IndustryTemplates.Plan([Vertical.Retail, Vertical.Construction]).Sum(t => t.DemoCustomers.Count + t.DemoSuppliers.Count + t.DemoItems.Count));
+        db.Items.Single(i => i.CompanyId == companyId && i.Code == "CEMENT").Category.Should().Be("Materials");
         db.TaxCodes.AsNoTracking().Include(t => t.Rates).Single(t => t.CompanyId == companyId && t.Code == "VAT").Rates.Single().RatePercent.Should().Be(14.5m);
         db.Accounts.Single(a => a.CompanyId == companyId && a.AccountCode == "2350").ControlAccountType.Should().Be(ControlAccountType.Retention);
         db.Items.Single(i => i.CompanyId == companyId && i.Code == "MILK").Category.Should().Be("Dairy");
@@ -54,6 +55,7 @@ public sealed class IndustrySetupTests
         setup.Terminals.Should().Be(1);
         db.Set<One4All.Core.Pos.PosTerminal>().AsNoTracking().Single(t => t.CompanyId == companyId).Code.Should().Be("TILL01");
         db.FeaturedReports.AsNoTracking().Where(f => f.CompanyId == companyId).Select(f => f.ReportCode).Should().Contain(["GL-TB", "POS-SUM", "JC186"]);
+
 
         // It posts straight away.
         (await scope.ServiceProvider.GetRequiredService<IPostingEngine>().PostAsync(new JournalRequest

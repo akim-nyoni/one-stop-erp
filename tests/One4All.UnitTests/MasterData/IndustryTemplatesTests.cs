@@ -21,6 +21,16 @@ public sealed class IndustryTemplatesTests
     }
 
     [Fact]
+    public void Every_industry_brings_demonstration_data_and_codes_do_not_clash()
+    {
+        IReadOnlyList<VerticalTemplate> all = IndustryTemplates.Plan(Enum.GetValues<Vertical>());
+        all.Where(t => t.Vertical != Vertical.Core).Should().OnlyContain(t => t.DemoCustomers.Count + t.DemoSuppliers.Count + t.DemoItems.Count > 0);
+        all.SelectMany(t => t.DemoCustomers).Select(c => c.Code).Should().OnlyHaveUniqueItems();
+        all.SelectMany(t => t.DemoSuppliers).Select(c => c.Code).Should().OnlyHaveUniqueItems();
+        all.SelectMany(t => t.DemoItems).Select(i => i.Code).Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
     public void Taxes_post_to_template_accounts_and_roles_grant_real_permissions()
     {
         IReadOnlyList<VerticalTemplate> all = IndustryTemplates.Plan(Enum.GetValues<Vertical>());

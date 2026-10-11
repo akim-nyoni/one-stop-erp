@@ -143,7 +143,8 @@ public static class IndustryTemplates
                 new("Revenue Clerk", [("Municipal", GrantLevel.Use), ("Sales.Receipt", GrantLevel.Use)]),
                 new("Billing Officer", [("Municipal", GrantLevel.Full)]),
             ],
-            [], [], []),
+            [("RP-DEMO1", "Demo Ratepayer One"), ("RP-DEMO2", "Demo Ratepayer Two")], [("CHEMSUP", "Water Treatment Chemicals Supplier")],
+            [new("WMETER15", "Water meter 15mm", ItemType.Stock, "Meters", "4310", "5000")]),
         [Vertical.Housing] = new(Vertical.Housing,
             [
                 new("1450", "Land & Housing Stock (WIP)", AccountType.Asset), new("1460", "Stands Available for Sale", AccountType.Asset),
@@ -152,7 +153,7 @@ public static class IndustryTemplates
             ],
             [], [],
             [new("Housing Officer", [("Housing", GrantLevel.Use)]), new("Housing Manager", [("Housing", GrantLevel.Full)])],
-            [], [], []),
+            [("BEN-DEMO1", "Demo Beneficiary")], [("SURVEYOR", "Land Surveyors")], []),
         [Vertical.School] = new(Vertical.School,
             [
                 new("4200", "Tuition Fees", AccountType.Income), new("4210", "Boarding Fees", AccountType.Income), new("4220", "Transport Fees", AccountType.Income),
@@ -160,7 +161,8 @@ public static class IndustryTemplates
             ],
             [], [("TUCK", "Tuck Shop")],
             [new("Bursar", [("School", GrantLevel.Full), ("Sales.Receipt", GrantLevel.Use)])],
-            [], [], []),
+            [("GDN-DEMO1", "Demo Guardian")], [("UNIFORMS", "School Uniform Supplier")],
+            [new("UNIFORM", "School uniform set", ItemType.Stock, "Uniforms", "4000", "5000")]),
         [Vertical.Construction] = new(Vertical.Construction,
             [
                 new("1470", "Contract Work in Progress", AccountType.Asset, ControlAccountType.WorkInProgress), new("1480", "Retention Receivable", AccountType.Asset),
@@ -171,7 +173,8 @@ public static class IndustryTemplates
             [new("WHT", "Withholding tax on contractors", TaxType.Withholding, 10m, "2370", null)],
             [("YARD", "Site Yard")],
             [new("Contracts Manager", [("JobCosting", GrantLevel.Full), ("Procurement", GrantLevel.Use)])],
-            [], [], []),
+            [("CLIENT-DEMO", "Demo Contract Client")], [("SUBCON", "Demo Subcontractor"), ("BUILDMAT", "Building Materials Supplier")],
+            [new("CEMENT", "Cement 50kg", ItemType.Stock, "Materials", "4400", "5200")]),
         [Vertical.Hospitality] = new(Vertical.Hospitality,
             [
                 new("1413", "Inventory - Liquor", AccountType.Asset), new("2380", "Tips & Service Charge Payable", AccountType.Liability),
