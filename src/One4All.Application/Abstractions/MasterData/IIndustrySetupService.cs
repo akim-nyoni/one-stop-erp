@@ -37,7 +37,7 @@ public sealed class IndustrySetupRequest
 /// <param name="Roles">Starter roles added.</param>
 /// <param name="DemoRecords">Demonstration customers, suppliers and items added.</param>
 public sealed record IndustrySetupResult(long CompanyId, int Accounts, int TaxCodes, int Warehouses, int Roles, int DemoRecords, int ItemCategories = 0, int Terminals = 0,
-    int FeaturedReports = 0);
+    int FeaturedReports = 0, int Layouts = 0);
 
 /// <summary>
 /// The Industry Setup Wizard (brief §12): creates a company for chosen industries — chart of accounts, tax codes, warehouses, a fiscal

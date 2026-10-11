@@ -12,7 +12,16 @@ public sealed record TerminalSeed(string Code, string Name);
 /// <param name="ItemCategories">Item categories (code, name).</param>
 /// <param name="Terminals">POS terminals.</param>
 /// <param name="FeaturedReports">Report codes featured for the company.</param>
-public sealed record VerticalExtras(IReadOnlyList<(string Code, string Name)> ItemCategories, IReadOnlyList<TerminalSeed> Terminals, IReadOnlyList<string> FeaturedReports);
+/// <param name="DocumentLayouts">
+/// Document layouts the company gets its own copy of, on the paper the industry prints them on (report code, paper: A4, A5, Letter, Receipt58,
+/// Receipt80) — a till receipt on an 80 mm roll, a council counter receipt on A5.
+/// </param>
+public sealed record VerticalExtras(IReadOnlyList<(string Code, string Name)> ItemCategories, IReadOnlyList<TerminalSeed> Terminals, IReadOnlyList<string> FeaturedReports,
+    IReadOnlyList<(string ReportCode, string Paper)>? DocumentLayouts = null)
+{
+    /// <summary>The document layouts (none when not given).</summary>
+    public IReadOnlyList<(string ReportCode, string Paper)> Layouts => DocumentLayouts ?? [];
+}
 
 /// <summary>The extras per vertical. Pure.</summary>
 public static class IndustryExtras
@@ -24,19 +33,23 @@ public static class IndustryExtras
         [Vertical.Retail] = new(
             [("GROC", "Groceries"), ("BEV", "Beverages"), ("FRESH", "Fresh produce"), ("HOME", "Household"), ("PERS", "Personal care")],
             [new TerminalSeed("TILL01", "Front till")],
-            ["POS-SUM", "POS103", "POS102", "POS105", "POS107", "POS122", "INV79", "INV-VAL", "INV-AGE"]),
+            ["POS-SUM", "POS103", "POS102", "POS105", "POS107", "POS122", "INV79", "INV-VAL", "INV-AGE"],
+            [("RC35", "Receipt80"), ("RC24", "A5")]),
         [Vertical.Municipal] = new([("STAT", "Stationery"), ("METR", "Meters & fittings"), ("CHEM", "Water treatment chemicals")], [],
-            ["M144", "M146", "M147", "M148", "M149", "M151", "M152", "M153", "RC35", "RC1", "RC2"]),
+            ["M144", "M146", "M147", "M148", "M149", "M151", "M152", "M153", "RC35", "RC1", "RC2"],
+            [("RC35", "A5"), ("RC24", "A5")]),
         [Vertical.Housing] = new([("BLDG", "Building materials"), ("SERV", "Servicing materials")], [],
             ["H1", "H2", "H18", "H27", "H74", "H43", "RC35"]),
         [Vertical.School] = new([("UNIF", "Uniforms"), ("BOOK", "Books & stationery"), ("TUCK", "Tuck shop")],
             [new TerminalSeed("TUCK01", "Tuck shop till")],
-            ["SC173", "SC175", "SC176", "SC177", "SC179", "SC180", "SC181", "RC35"]),
+            ["SC173", "SC175", "SC176", "SC177", "SC179", "SC180", "SC181", "RC35"],
+            [("RC35", "A5")]),
         [Vertical.Construction] = new([("MATL", "Materials"), ("PLANT", "Plant & equipment"), ("SUBC", "Subcontract")], [],
             ["JC186", "JC189", "JC191", "JC193", "JOB-IPC", "INV98"]),
         [Vertical.Hospitality] = new([("FOOD", "Food"), ("BEV", "Beverages"), ("LIQ", "Liquor"), ("LINEN", "Consumables & linen")],
             [new TerminalSeed("BAR01", "Bar till"), new TerminalSeed("REST01", "Restaurant till")],
-            ["POS-SUM", "POS103", "POS105", "POS107", "INV79", "INV-VAL"]),
+            ["POS-SUM", "POS103", "POS105", "POS107", "INV79", "INV-VAL"],
+            [("RC35", "Receipt80"), ("RES-KOT", "Receipt80")]),
     };
 
     /// <summary>The extras for a vertical.</summary>

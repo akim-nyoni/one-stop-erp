@@ -101,13 +101,14 @@ public sealed class IndustrySetupService : IIndustrySetupService
         {
             Accounts = a.Accounts + b.Accounts, TaxCodes = a.TaxCodes + b.TaxCodes, Warehouses = a.Warehouses + b.Warehouses, Roles = a.Roles + b.Roles, DemoRecords = a.DemoRecords + b.DemoRecords,
             ItemCategories = a.ItemCategories + b.ItemCategories, Terminals = a.Terminals + b.Terminals, FeaturedReports = a.FeaturedReports + b.FeaturedReports,
+            Layouts = a.Layouts + b.Layouts,
         };
 
     // The vertical's item categories, POS terminals at head office and report set; anything already there is kept as it is.
-    private async Task<(int Categories, int Terminals, int Reports)> ApplyExtrasAsync(long companyId, Vertical vertical, CancellationToken ct)
+    private async Task<(int Categories, int Terminals, int Reports, int Layouts)> ApplyExtrasAsync(long companyId, Vertical vertical, CancellationToken ct)
     {
         VerticalExtras extras = IndustryExtras.For(vertical);
-        int categories = 0, terminals = 0, reports = 0;
+        int categories = 0, terminals = 0, reports = 0, layouts = 0;
         foreach ((string code, string name) in extras.ItemCategories)
         {
             string key = code.ToUpperInvariant();
@@ -138,8 +139,32 @@ public sealed class IndustrySetupService : IIndustrySetupService
             }
         }
 
+        // The industry's document layouts: the company's own copy of the shipped report on the industry's paper (a company copy already there is kept).
+        foreach ((string code, string paper) in extras.Layouts)
+        {
+            Core.Reporting.ReportDefinitionRecord? system = await _db.ReportDefinitions.AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Scope == Core.Reporting.ReportScope.System && r.Code == code, ct).ConfigureAwait(false);
+            if (system is null || !Enum.TryParse(paper, out One4All.Reporting.Model.PaperSize size)
+                || _db.ReportDefinitions.Local.Any(r => r.Scope == Core.Reporting.ReportScope.Company && r.CompanyId == companyId && r.Code == code)
+                || await _db.ReportDefinitions.AnyAsync(r => r.Scope == Core.Reporting.ReportScope.Company && r.CompanyId == companyId && r.Code == code, ct).ConfigureAwait(false))
+            {
+                continue;
+            }
+
+            One4All.Reporting.Model.ReportDefinition definition = One4All.Reporting.Model.ReportDefinitionSerializer.Deserialize(system.DefinitionJson);
+            definition.Page.PaperSize = size;
+            if (size is One4All.Reporting.Model.PaperSize.Receipt58 or One4All.Reporting.Model.PaperSize.Receipt80)
+            {
+                definition.Page.MarginLeft = definition.Page.MarginRight = definition.Page.MarginTop = definition.Page.MarginBottom = 6;
+            }
+
+            _db.ReportDefinitions.Add(new Core.Reporting.ReportDefinitionRecord(code, system.Name, One4All.Reporting.Model.ReportDefinitionSerializer.Serialize(definition),
+                Core.Reporting.ReportScope.Company, companyId: companyId, module: system.Module));
+            layouts++;
+        }
+
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return (categories, terminals, reports);
+        return (categories, terminals, reports, layouts);
     }
 
     // Counts a creation, treats an existing record as already done, and stops on anything else.
@@ -242,7 +267,7 @@ public sealed class IndustrySetupService : IIndustrySetupService
             }
         }
 
-        (int itemCategories, int terminals, int featured) = await ApplyExtrasAsync(companyId, template.Vertical, ct).ConfigureAwait(false);
-        return new IndustrySetupResult(companyId, accounts, taxes, warehouses, roles, records, itemCategories, terminals, featured);
+        (int itemCategories, int terminals, int featured, int layouts) = await ApplyExtrasAsync(companyId, template.Vertical, ct).ConfigureAwait(false);
+        return new IndustrySetupResult(companyId, accounts, taxes, warehouses, roles, records, itemCategories, terminals, featured, layouts);
     }
 }

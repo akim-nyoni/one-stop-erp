@@ -15,6 +15,8 @@ public sealed class IndustryReportSetTests
         foreach (Vertical vertical in Enum.GetValues<Vertical>())
         {
             IndustryExtras.For(vertical).FeaturedReports.Should().OnlyContain(code => codes.Contains(code), $"{vertical}'s report set names catalogue reports");
+            IndustryExtras.For(vertical).Layouts.Where(l => !codes.Contains(l.ReportCode) || !Enum.GetNames<One4All.Reporting.Model.PaperSize>().Contains(l.Paper))
+                .Should().BeEmpty($"{vertical}'s layouts name catalogue reports and known papers");
         }
     }
 }

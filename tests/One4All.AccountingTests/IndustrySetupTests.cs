@@ -28,6 +28,7 @@ public sealed class IndustrySetupTests
         await using ServiceProvider provider = _fixture.BuildServiceProvider();
         await using AsyncServiceScope scope = provider.CreateAsyncScope();
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        await scope.ServiceProvider.GetRequiredService<One4All.Infrastructure.Persistence.Seeding.ReportCatalogueSeeder>().SeedAsync();
         await Scenario.SeedAsync(db); // currencies
         IIndustrySetupService wizard = scope.ServiceProvider.GetRequiredService<IIndustrySetupService>();
 
@@ -56,6 +57,11 @@ public sealed class IndustrySetupTests
         db.Set<One4All.Core.Pos.PosTerminal>().AsNoTracking().Single(t => t.CompanyId == companyId).Code.Should().Be("TILL01");
         db.FeaturedReports.AsNoTracking().Where(f => f.CompanyId == companyId).Select(f => f.ReportCode).Should().Contain(["GL-TB", "POS-SUM", "JC186"]);
 
+        // The retail receipt layouts: the company's own copy of the official receipt on an 80 mm roll.
+        setup.Layouts.Should().Be(2);
+        One4All.Core.Reporting.ReportDefinitionRecord receipt = db.ReportDefinitions.AsNoTracking()
+            .Single(r => r.Scope == One4All.Core.Reporting.ReportScope.Company && r.CompanyId == companyId && r.Code == "RC35");
+        One4All.Reporting.Model.ReportDefinitionSerializer.Deserialize(receipt.DefinitionJson).Page.PaperSize.Should().Be(One4All.Reporting.Model.PaperSize.Receipt80);
 
         // It posts straight away.
         (await scope.ServiceProvider.GetRequiredService<IPostingEngine>().PostAsync(new JournalRequest
