@@ -202,6 +202,7 @@ internal sealed class RentalUnitConfiguration : IEntityTypeConfiguration<RentalU
         b.Property(x => x.UnitType).HasConversion<int>();
         b.Property(x => x.MonthlyRent).HasPrecision(19, 4);
         b.Property(x => x.RentAccountCode).HasMaxLength(20);
+        b.Property(x => x.Suburb).HasMaxLength(80);
         b.Ignore(x => x.IsLet);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
     }
@@ -218,6 +219,7 @@ internal sealed class TenancyConfiguration : IEntityTypeConfiguration<Tenancy>
         b.Property(x => x.Deposit).HasPrecision(19, 4);
         b.Property(x => x.DepositAccountCode).HasMaxLength(20);
         b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.IncomeCategory).HasConversion<int?>();
         b.HasOne<RentalUnit>().WithMany().HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.CompanyId, x.TenancyNumber }).IsUnique();
         b.HasIndex(x => x.UnitId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_tenancy_one_active_per_unit");
@@ -226,6 +228,20 @@ internal sealed class TenancyConfiguration : IEntityTypeConfiguration<Tenancy>
         b.Navigation(x => x.RentChanges).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasMany(x => x.Occupants).WithOne().HasForeignKey(x => x.TenancyId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Occupants).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class RentTariffConfiguration : IEntityTypeConfiguration<RentTariff>
+{
+    public void Configure(EntityTypeBuilder<RentTariff> b)
+    {
+        b.ToTable("rent_tariff", Schemas.Housing, t => t.HasCheckConstraint("ck_rent_tariff_rent", "monthly_rent >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.UnitType).HasConversion<int>();
+        b.Property(x => x.Suburb).HasMaxLength(80);
+        b.Property(x => x.IncomeCategory).HasConversion<int?>();
+        b.Property(x => x.MonthlyRent).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.UnitType, x.Suburb, x.IncomeCategory, x.EffectiveFrom }).IsUnique().AreNullsDistinct(false);
     }
 }
 

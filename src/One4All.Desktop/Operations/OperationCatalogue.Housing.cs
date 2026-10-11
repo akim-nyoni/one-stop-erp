@@ -174,6 +174,46 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Rent tariffs and review", ListTitle = "Rent tariffs",
+            Description = "Tariff: the monthly rent for a kind of unit from the first of a month, optionally only in one suburb and for one income category (the most specific "
+                + "applies). Suburb / Income category: place a unit, classify a tenant household. Apply tariffs: from the first of a month every unit's asking rent and every "
+                + "running tenancy's rent follows its tariff. Review by %: raises every rent (or one unit type's) by a percentage.",
+            Fields = [Pick("Step", "Step", ["Tariff", "Apply tariffs", "Review by %", "Suburb", "Income category"]), Pick("Type", "Unit type", ["(any)", .. Enum.GetNames<RentalUnitType>()]),
+                Opt("Suburb", "Suburb (blank: any)"), Pick("Category", "Income category", ["(any)", .. Enum.GetNames<RentIncomeCategory>()]), Num("Rent", "Monthly rent / percentage", "0"),
+                Opt("Unit", "Unit code (suburb)"), Opt("Tenancy", "Tenancy number (income category)"), Today("Date", "Effective from (first of the month)")],
+            Run = async (c, i) =>
+            {
+                IRentalHousingService rentals = c.Get<IRentalHousingService>();
+                RentalUnitType? type = i.Text("Type") == "(any)" ? null : Enum.Parse<RentalUnitType>(i.Text("Type"));
+                RentIncomeCategory? category = i.Text("Category") == "(any)" ? null : Enum.Parse<RentIncomeCategory>(i.Text("Category"));
+                switch (i.Text("Step"))
+                {
+                    case "Tariff":
+                        if (type is not RentalUnitType unitType)
+                        {
+                            return "Choose the unit type the tariff is for.";
+                        }
+
+                        return Check(await rentals.SetRentTariffAsync(c.CompanyId, unitType, i.Optional("Suburb"), category, i.Date("Date"), i.Number("Rent")).ConfigureAwait(true), "Tariff saved.");
+                    case "Apply tariffs":
+                        RentReviewResult applied = Check(await rentals.ApplyRentTariffsAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true));
+                        return $"{applied.UnitsReviewed} unit(s) and {applied.TenanciesReviewed} tenancy(ies) moved to the tariff.";
+                    case "Review by %":
+                        RentReviewResult reviewed = Check(await rentals.ReviewRentsAsync(c.CompanyId, i.Date("Date"), i.Number("Rent"), type).ConfigureAwait(true));
+                        return $"{reviewed.UnitsReviewed} unit(s) and {reviewed.TenanciesReviewed} tenancy(ies) reviewed.";
+                    case "Suburb":
+                        return Check(await rentals.SetUnitSuburbAsync(c.CompanyId, i.Text("Unit"), i.Optional("Suburb")).ConfigureAwait(true), "Suburb saved.");
+                    default:
+                        return Check(await rentals.SetIncomeCategoryAsync(c.CompanyId, i.Text("Tenancy"), category).ConfigureAwait(true), "Income category saved.");
+                }
+            },
+            List = async c => Table(await c.Db.Set<RentTariff>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId)
+                    .OrderBy(t => t.UnitType).ThenBy(t => t.Suburb).ThenBy(t => t.IncomeCategory).ThenByDescending(t => t.EffectiveFrom).Take(500).ToListAsync().ConfigureAwait(true),
+                ("Unit type", t => t.UnitType), ("Suburb", t => t.Suburb ?? "(any)"), ("Category", t => t.IncomeCategory?.ToString() ?? "(any)"), ("From", t => D(t.EffectiveFrom)),
+                ("Rent", t => M(t.MonthlyRent))),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Rental units and tenancies", ListTitle = "Tenancies",
             Description = "Add unit: a council rental unit with its rooms and rent. Let: a tenancy to a customer (the deposit is held as a liability). Rent run: bills every tenancy "
                 + "for a month (lodger fees included). End: final rent, the deposit applied to arrears and the rest refunded. Occupancy limit: the most people a unit may house.",

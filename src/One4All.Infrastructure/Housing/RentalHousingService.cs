@@ -228,6 +228,105 @@ public sealed class RentalHousingService : IRentalHousingService
     }
 
     /// <inheritdoc />
+    public async Task<Result> SetRentTariffAsync(long companyId, RentalUnitType unitType, string? suburb, RentIncomeCategory? category, DateOnly effectiveFrom, decimal monthlyRent,
+        CancellationToken ct = default)
+    {
+        if (effectiveFrom.Day != 1 || monthlyRent < 0m || !Enum.IsDefined(unitType) || category is RentIncomeCategory c && !Enum.IsDefined(c))
+        {
+            return Result.Failure(Error.Validation("Hse.RentTariff", "A rent tariff starts on the first of a month, for a known unit type and category, and cannot be negative."));
+        }
+
+        string? place = string.IsNullOrWhiteSpace(suburb) ? null : suburb.Trim();
+        RentTariff? existing = await _db.Set<RentTariff>().FirstOrDefaultAsync(t => t.CompanyId == companyId && t.UnitType == unitType && t.Suburb == place
+            && t.IncomeCategory == category && t.EffectiveFrom == effectiveFrom, ct).ConfigureAwait(false);
+        if (existing is null)
+        {
+            _db.Set<RentTariff>().Add(new RentTariff(companyId, unitType, place, category, effectiveFrom, monthlyRent));
+        }
+        else
+        {
+            existing.MonthlyRent = monthlyRent;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetUnitSuburbAsync(long companyId, string unitCode, string? suburb, CancellationToken ct = default)
+    {
+        string code = (unitCode ?? string.Empty).Trim().ToUpperInvariant();
+        RentalUnit? unit = await _db.Set<RentalUnit>().FirstOrDefaultAsync(u => u.CompanyId == companyId && u.Code == code, ct).ConfigureAwait(false);
+        if (unit is null)
+        {
+            return Result.Failure(Error.NotFound("Hse.UnitNotFound", $"Rental unit {code} was not found."));
+        }
+
+        unit.Suburb = string.IsNullOrWhiteSpace(suburb) ? null : suburb.Trim();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetIncomeCategoryAsync(long companyId, string tenancyNumber, RentIncomeCategory? category, CancellationToken ct = default)
+    {
+        string number = (tenancyNumber ?? string.Empty).Trim();
+        Tenancy? tenancy = await _db.Set<Tenancy>().FirstOrDefaultAsync(t => t.CompanyId == companyId && t.TenancyNumber == number, ct).ConfigureAwait(false);
+        if (tenancy is null)
+        {
+            return Result.Failure(Error.NotFound("Hse.TenancyNotFound", $"Tenancy {number} was not found."));
+        }
+
+        tenancy.IncomeCategory = category;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public Task<Result<RentReviewResult>> ApplyRentTariffsAsync(long companyId, DateOnly effectiveFrom, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            if (effectiveFrom.Day != 1)
+            {
+                return Error.Validation("Hse.RentReview", "A rent review takes effect from the first of a month.");
+            }
+
+            List<RentTariffRate> rates = await _db.Set<RentTariff>().AsNoTracking().Where(t => t.CompanyId == companyId && t.EffectiveFrom <= effectiveFrom)
+                .Select(t => new RentTariffRate(t.UnitType, t.Suburb, t.IncomeCategory, t.EffectiveFrom, t.MonthlyRent)).ToListAsync(ct).ConfigureAwait(false);
+            if (rates.Count == 0)
+            {
+                return Error.Validation("Hse.NoTariffs", $"No rent tariff is in force on {effectiveFrom:yyyy-MM-dd}.");
+            }
+
+            Dictionary<long, RentalUnit> units = await _db.Set<RentalUnit>().Where(u => u.CompanyId == companyId).ToDictionaryAsync(u => u.Id, ct).ConfigureAwait(false);
+            int unitsChanged = 0;
+            foreach (RentalUnit unit in units.Values)
+            {
+                if (RentTariffs.Rent(rates, unit.UnitType, unit.Suburb, null, effectiveFrom) is decimal asking && asking != unit.MonthlyRent)
+                {
+                    unit.MonthlyRent = asking;
+                    unitsChanged++;
+                }
+            }
+
+            List<Tenancy> running = await _db.Set<Tenancy>().Include(t => t.RentChanges)
+                .Where(t => t.CompanyId == companyId && t.Status == TenancyStatus.Active).ToListAsync(ct).ConfigureAwait(false);
+            int tenanciesChanged = 0;
+            foreach (Tenancy tenancy in running.Where(t => t.RentChanges.All(c => c.EffectiveFrom != effectiveFrom)))
+            {
+                RentalUnit unit = units[tenancy.UnitId];
+                if (RentTariffs.Rent(rates, unit.UnitType, unit.Suburb, tenancy.IncomeCategory, effectiveFrom) is decimal rent && rent != tenancy.RentOn(effectiveFrom))
+                {
+                    tenancy.ChangeRent(effectiveFrom, rent);
+                    tenanciesChanged++;
+                }
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result<RentReviewResult>.Success(new RentReviewResult(unitsChanged, tenanciesChanged));
+        }, ct);
+
+    /// <inheritdoc />
     public Task<Result<RentReviewResult>> ReviewRentsAsync(long companyId, DateOnly effectiveFrom, decimal percent, RentalUnitType? unitType, CancellationToken ct = default)
         => _db.AtomicAsync(() => ReviewCoreAsync(companyId, effectiveFrom, percent, unitType, ct), ct);
 

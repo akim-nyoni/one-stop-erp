@@ -108,6 +108,44 @@ public interface IRentalHousingService
     /// <returns>What was reviewed, or why it was refused.</returns>
     Task<Result<RentReviewResult>> ReviewRentsAsync(long companyId, DateOnly effectiveFrom, decimal percent, RentalUnitType? unitType, CancellationToken ct = default);
 
+    /// <summary>Sets a rent tariff (replacing one for the same unit type, suburb, category and date).</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="unitType">The kind of unit.</param>
+    /// <param name="suburb">Only in this suburb, or null for any.</param>
+    /// <param name="category">Only for this income category, or null for any.</param>
+    /// <param name="effectiveFrom">The first of the month it applies from.</param>
+    /// <param name="monthlyRent">The monthly rent.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why it was refused.</returns>
+    Task<Result> SetRentTariffAsync(long companyId, RentalUnitType unitType, string? suburb, RentIncomeCategory? category, DateOnly effectiveFrom, decimal monthlyRent, CancellationToken ct = default);
+
+    /// <summary>Places a unit in a suburb, for the tariffs.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="unitCode">The unit.</param>
+    /// <param name="suburb">The suburb, or null.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why it was refused.</returns>
+    Task<Result> SetUnitSuburbAsync(long companyId, string unitCode, string? suburb, CancellationToken ct = default);
+
+    /// <summary>Records a tenant household's income category, for the tariffs.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="tenancyNumber">The tenancy.</param>
+    /// <param name="category">The category, or null.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why it was refused.</returns>
+    Task<Result> SetIncomeCategoryAsync(long companyId, string tenancyNumber, RentIncomeCategory? category, CancellationToken ct = default);
+
+    /// <summary>
+    /// The tariff rent review run: from the first of a month, every unit's asking rent becomes its tariff (unit type and suburb) and every running tenancy
+    /// whose tariff (adding the household's income category) differs from what it pays gets a rent change. Units and tenancies no tariff covers keep
+    /// their rent; tenancies already changed from that date are left alone, so a rerun changes nothing.
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="effectiveFrom">The first of the month.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>How many units and tenancies changed, or why it was refused.</returns>
+    Task<Result<RentReviewResult>> ApplyRentTariffsAsync(long companyId, DateOnly effectiveFrom, CancellationToken ct = default);
+
     /// <summary>The void units as at a date, longest void first, with the rent lost.</summary>
     /// <param name="companyId">The council.</param>
     /// <param name="asAtDate">The date.</param>

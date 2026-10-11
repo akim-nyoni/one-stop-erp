@@ -9019,6 +9019,76 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.RentTariff", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
+
+                    b.Property<int?>("IncomeCategory")
+                        .HasColumnType("integer")
+                        .HasColumnName("income_category");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("MonthlyRent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("monthly_rent");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("Suburb")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("suburb");
+
+                    b.Property<int>("UnitType")
+                        .HasColumnType("integer")
+                        .HasColumnName("unit_type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rent_tariff");
+
+                    b.HasIndex("CompanyId", "UnitType", "Suburb", "IncomeCategory", "EffectiveFrom")
+                        .IsUnique()
+                        .HasDatabaseName("ix_rent_tariff_company_id_unit_type_suburb_income_category_eff");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("CompanyId", "UnitType", "Suburb", "IncomeCategory", "EffectiveFrom"), false);
+
+                    b.ToTable("rent_tariff", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_rent_tariff_rent", "monthly_rent >= 0");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.RentalUnit", b =>
                 {
                     b.Property<long>("Id")
@@ -9082,6 +9152,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("RowVersion")
                         .HasColumnType("bigint")
                         .HasColumnName("row_version");
+
+                    b.Property<string>("Suburb")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("suburb");
 
                     b.Property<int>("UnitType")
                         .HasColumnType("integer")
@@ -10499,6 +10574,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("EndDate")
                         .HasColumnType("date")
                         .HasColumnName("end_date");
+
+                    b.Property<int?>("IncomeCategory")
+                        .HasColumnType("integer")
+                        .HasColumnName("income_category");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")

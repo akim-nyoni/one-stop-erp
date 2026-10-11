@@ -2,6 +2,66 @@ using One4All.Core.Common;
 
 namespace One4All.Core.Housing;
 
+/// <summary>A tenant household's income category for rent tariffs (brief §4.10.7).</summary>
+public enum RentIncomeCategory
+{
+    /// <summary>Low income.</summary>
+    Low = 1,
+
+    /// <summary>Middle income.</summary>
+    Middle = 2,
+
+    /// <summary>High income.</summary>
+    High = 3,
+}
+
+/// <summary>
+/// A rent tariff (<c>hse.rent_tariff</c>, brief §4.10.7): the monthly rent for a kind of unit, optionally only in one suburb and only for one income
+/// category, from a date. The most specific tariff in force wins; later effective dates escalate it.
+/// </summary>
+public sealed class RentTariff : AuditableEntity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private RentTariff()
+    {
+    }
+
+    /// <summary>Sets a tariff.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="unitType">The kind of unit.</param>
+    /// <param name="suburb">Only in this suburb, or null for any.</param>
+    /// <param name="incomeCategory">Only for this income category, or null for any.</param>
+    /// <param name="effectiveFrom">The first day it applies.</param>
+    /// <param name="monthlyRent">The monthly rent.</param>
+    public RentTariff(long companyId, RentalUnitType unitType, string? suburb, RentIncomeCategory? incomeCategory, DateOnly effectiveFrom, decimal monthlyRent)
+    {
+        CompanyId = companyId;
+        UnitType = unitType;
+        Suburb = suburb;
+        IncomeCategory = incomeCategory;
+        EffectiveFrom = effectiveFrom;
+        MonthlyRent = monthlyRent;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The kind of unit.</summary>
+    public RentalUnitType UnitType { get; private set; }
+
+    /// <summary>Only in this suburb, or null for any.</summary>
+    public string? Suburb { get; private set; }
+
+    /// <summary>Only for this income category, or null for any.</summary>
+    public RentIncomeCategory? IncomeCategory { get; private set; }
+
+    /// <summary>The first day it applies.</summary>
+    public DateOnly EffectiveFrom { get; private set; }
+
+    /// <summary>The monthly rent.</summary>
+    public decimal MonthlyRent { get; set; }
+}
+
 /// <summary>The kind of council rental unit (brief §4.10.7).</summary>
 public enum RentalUnitType
 {
@@ -77,6 +137,9 @@ public sealed class RentalUnit : AuditableEntity, ICompanyScoped
     /// <summary>The rental income account.</summary>
     public string RentAccountCode { get; private set; }
 
+    /// <summary>The suburb the unit stands in (rent tariffs can differ by suburb), or null.</summary>
+    public string? Suburb { get; set; }
+
     /// <summary>The first day it has been empty, or null while let.</summary>
     public DateOnly? VacantSince { get; private set; }
 
@@ -144,6 +207,9 @@ public sealed class Tenancy : AuditableEntity, ICompanyScoped
 
     /// <inheritdoc />
     public long CompanyId { get; private set; }
+
+    /// <summary>The tenant household's income category (rent tariffs can differ by it), or null.</summary>
+    public RentIncomeCategory? IncomeCategory { get; set; }
 
     /// <summary>The tenancy number.</summary>
     public string TenancyNumber { get; private set; }
