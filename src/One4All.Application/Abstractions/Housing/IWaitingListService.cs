@@ -102,6 +102,25 @@ public interface IWaitingListService
     /// <returns>Success, or why it was refused.</returns>
     Task<Result> SetPolicyAsync(long companyId, WaitingListPolicyInput input, CancellationToken ct = default);
 
+    /// <summary>The council's waiting-list thresholds and weights (the defaults until it sets its own).</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The terms.</returns>
+    Task<WaitingListTerms> PolicyAsync(long companyId, CancellationToken ct = default);
+
+    /// <summary>Sets the further qualification rules: first-time buyers only, refusing forfeiters, rates clearance and the income ceiling per category.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="rules">The rules.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why it was refused.</returns>
+    Task<Result> SetQualificationRulesAsync(long companyId, QualificationRules rules, CancellationToken ct = default);
+
+    /// <summary>The further qualification rules in force.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The rules.</returns>
+    Task<QualificationRules> QualificationRulesAsync(long companyId, CancellationToken ct = default);
+
     /// <summary>Registers an applicant, refusing a duplicate ID, an existing owner or someone who does not qualify.</summary>
     /// <param name="application">The application.</param>
     /// <param name="ct">Cancellation token.</param>

@@ -103,7 +103,18 @@ public sealed class WaitingListService : IWaitingListService
         bool ownsProperty = await OwnsPropertyAsync(application.CompanyId, idNumber, ct).ConfigureAwait(false)
             || (spouseId is not null && await OwnsPropertyAsync(application.CompanyId, spouseId, ct).ConfigureAwait(false));
         bool previouslyAllocated = existing?.Status == ApplicantStatus.Allocated;
-        IReadOnlyList<string> problems = WaitingListRules.Problems(facts, terms, ownsProperty, previouslyAllocated, application.RegistrationDate);
+        List<string> problems = [.. WaitingListRules.Problems(facts, terms, ownsProperty, previouslyAllocated, application.RegistrationDate)];
+        QualificationRules rules = await QualificationRulesAsync(application.CompanyId, ct).ConfigureAwait(false);
+        if (rules != QualificationRules.None)
+        {
+            List<string> householdIds = [idNumber, .. spouseId is null ? Array.Empty<string>() : [spouseId]];
+            List<long> customers = await _db.Customers.AsNoTracking().Where(c => c.CompanyId == application.CompanyId && c.NationalIdNumber != null && householdIds.Contains(c.NationalIdNumber))
+                .Select(c => c.Id).ToListAsync(ct).ConfigureAwait(false);
+            problems.AddRange(WaitingListRules.Problems(rules, new QualificationFacts(application.Category, application.MonthlyIncome,
+                await EverHeldPropertyAsync(application.CompanyId, customers, ct).ConfigureAwait(false), await ForfeitedAsync(application.CompanyId, customers, ct).ConfigureAwait(false),
+                await OverdueAsync(application.CompanyId, customers, application.RegistrationDate, ct).ConfigureAwait(false))));
+        }
+
         if (problems.Count > 0)
         {
             return Error.Rule("Hse.NotQualified", string.Join(" ", problems));
@@ -169,6 +180,90 @@ public sealed class WaitingListService : IWaitingListService
         => new(a.DateOfBirth ?? a.RegistrationDate, a.ResidentSince ?? a.RegistrationDate, a.RegistrationDate, a.Dependants, a.HasDisability, a.MonthlyIncome, a.Tenure);
 
     private static string NormaliseId(string? value) => (value ?? string.Empty).Replace(" ", string.Empty, StringComparison.Ordinal).Trim().ToUpperInvariant();
+
+    /// <inheritdoc />
+    public Task<WaitingListTerms> PolicyAsync(long companyId, CancellationToken ct = default) => TermsAsync(companyId, ct);
+
+    /// <inheritdoc />
+    public async Task<Result> SetQualificationRulesAsync(long companyId, QualificationRules rules, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+        if (rules.CategoryIncomeCeilings.Any(c => c.Value < 0m || !Enum.IsDefined(c.Key)))
+        {
+            return Result.Failure(Error.Validation("Hse.Policy", "An income ceiling cannot be negative and must be for a known category."));
+        }
+
+        WaitingListPolicy? policy = await _db.Set<WaitingListPolicy>().FirstOrDefaultAsync(p => p.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (policy is null)
+        {
+            policy = new WaitingListPolicy(companyId);
+            _db.Set<WaitingListPolicy>().Add(policy);
+        }
+
+        policy.FirstTimeBuyersOnly = rules.FirstTimeBuyersOnly;
+        policy.RefuseForfeited = rules.RefuseForfeited;
+        policy.RequireRatesClearance = rules.RequireRatesClearance;
+        List<WaitingListIncomeCeiling> ceilings = await _db.Set<WaitingListIncomeCeiling>().Where(c => c.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        _db.Set<WaitingListIncomeCeiling>().RemoveRange(ceilings.Where(c => !rules.CategoryIncomeCeilings.ContainsKey(c.Category)));
+        foreach ((HousingCategory category, decimal ceiling) in rules.CategoryIncomeCeilings)
+        {
+            if (ceilings.FirstOrDefault(c => c.Category == category) is WaitingListIncomeCeiling found)
+            {
+                found.MaximumMonthlyIncome = ceiling;
+            }
+            else
+            {
+                _db.Set<WaitingListIncomeCeiling>().Add(new WaitingListIncomeCeiling(companyId, category, ceiling));
+            }
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<QualificationRules> QualificationRulesAsync(long companyId, CancellationToken ct = default)
+    {
+        var policy = await _db.Set<WaitingListPolicy>().AsNoTracking().Where(p => p.CompanyId == companyId)
+            .Select(p => new { p.FirstTimeBuyersOnly, p.RefuseForfeited, p.RequireRatesClearance }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        Dictionary<HousingCategory, decimal> ceilings = await _db.Set<WaitingListIncomeCeiling>().AsNoTracking().Where(c => c.CompanyId == companyId)
+            .ToDictionaryAsync(c => c.Category, c => c.MaximumMonthlyIncome, ct).ConfigureAwait(false);
+        return policy is null && ceilings.Count == 0
+            ? QualificationRules.None
+            : new QualificationRules(policy?.FirstTimeBuyersOnly ?? false, policy?.RefuseForfeited ?? false, policy?.RequireRatesClearance ?? false, ceilings);
+    }
+
+    // Whether any of the household's accounts has ever held a council stand or owned property on the municipal register.
+    private async Task<bool> EverHeldPropertyAsync(long companyId, List<long> customers, CancellationToken ct)
+        => customers.Count > 0
+            && (await _db.Set<HousingStand>().AnyAsync(s => s.CompanyId == companyId && (s.CurrentHolderCustomerId != null && customers.Contains(s.CurrentHolderCustomerId.Value)
+                    || s.Ownership.Any(o => o.HolderCustomerId != null && customers.Contains(o.HolderCustomerId.Value))), ct).ConfigureAwait(false)
+                || await _db.Set<PropertyOwner>().AnyAsync(o => o.CompanyId == companyId && customers.Contains(o.CustomerId), ct).ConfigureAwait(false));
+
+    // Whether an instalment agreement of the household's ended in repossession or cancellation.
+    private async Task<bool> ForfeitedAsync(long companyId, List<long> customers, CancellationToken ct)
+    {
+        if (customers.Count == 0)
+        {
+            return false;
+        }
+
+        List<InstalmentAgreement> agreements = await _db.Set<InstalmentAgreement>().AsNoTracking().Where(a => a.CompanyId == companyId && customers.Contains(a.BuyerCustomerId))
+            .ToListAsync(ct).ConfigureAwait(false);
+        if (agreements.Any(a => a.Status == InstalmentAgreementStatus.Repossessed))
+        {
+            return true;
+        }
+
+        List<string> numbers = [.. agreements.Select(a => a.AgreementNumber)];
+        return numbers.Count > 0 && await _db.Set<AgreementCancellation>().AnyAsync(c => c.CompanyId == companyId && numbers.Contains(c.AgreementNumber), ct).ConfigureAwait(false);
+    }
+
+    // What the household owes on the receivables ledger past its due date.
+    private async Task<decimal> OverdueAsync(long companyId, List<long> customers, DateOnly asAt, CancellationToken ct)
+        => customers.Count == 0 ? 0m : await _db.OpenItems.AsNoTracking()
+            .Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsReceivable && customers.Contains(i.TraderId) && i.OutstandingBase != 0m)
+            .SumAsync(i => i.Sign == Core.Trading.LedgerSign.Debit ? (i.DueDate < asAt ? i.OutstandingBase : 0m) : -i.OutstandingBase, ct).ConfigureAwait(false);
 
     private async Task<WaitingListTerms> TermsAsync(long companyId, CancellationToken ct)
     {

@@ -12,6 +12,25 @@ namespace One4All.Application.Housing;
 /// <param name="Tenure">Where the applicant lives now.</param>
 public sealed record ApplicantFacts(DateOnly DateOfBirth, DateOnly ResidentSince, DateOnly RegistrationDate, int Dependants, bool HasDisability, decimal MonthlyIncome, CurrentTenure Tenure);
 
+/// <summary>The configurable qualification rules beyond age, residency and income (brief §4.10.3).</summary>
+/// <param name="FirstTimeBuyersOnly">Only those who have never held a stand or owned property qualify.</param>
+/// <param name="RefuseForfeited">Those whose earlier stand was repossessed or agreement cancelled do not qualify.</param>
+/// <param name="RequireRatesClearance">Applicants must be clear of overdue rates and charges.</param>
+/// <param name="CategoryIncomeCeilings">The income ceiling per category.</param>
+public sealed record QualificationRules(bool FirstTimeBuyersOnly, bool RefuseForfeited, bool RequireRatesClearance, IReadOnlyDictionary<HousingCategory, decimal> CategoryIncomeCeilings)
+{
+    /// <summary>No further rules.</summary>
+    public static QualificationRules None { get; } = new(false, false, false, new Dictionary<HousingCategory, decimal>());
+}
+
+/// <summary>What the further qualification rules look at for one household.</summary>
+/// <param name="Category">The category applied for.</param>
+/// <param name="MonthlyIncome">The monthly income.</param>
+/// <param name="EverHeldProperty">Whether the household has ever held a stand or owned property in the area.</param>
+/// <param name="Forfeited">Whether an earlier stand was repossessed or an agreement cancelled.</param>
+/// <param name="OverdueCharges">What the household owes the council past its due date.</param>
+public sealed record QualificationFacts(HousingCategory Category, decimal MonthlyIncome, bool EverHeldProperty, bool Forfeited, decimal OverdueCharges);
+
 /// <summary>The qualification thresholds and score weights in force.</summary>
 /// <param name="MinimumAge">The minimum age.</param>
 /// <param name="MinimumResidencyYears">The minimum years resident.</param>
@@ -106,6 +125,38 @@ public static class WaitingListRules
         if (previouslyAllocated)
         {
             problems.Add("Already allocated a stand or unit.");
+        }
+
+        return problems;
+    }
+
+    /// <summary>The reasons a household fails the further qualification rules (none: it passes them).</summary>
+    /// <param name="rules">The rules in force.</param>
+    /// <param name="facts">The household.</param>
+    /// <returns>The reasons.</returns>
+    public static IReadOnlyList<string> Problems(QualificationRules rules, QualificationFacts facts)
+    {
+        ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(facts);
+        List<string> problems = [];
+        if (rules.CategoryIncomeCeilings.TryGetValue(facts.Category, out decimal ceiling) && facts.MonthlyIncome > ceiling)
+        {
+            problems.Add($"Monthly income {facts.MonthlyIncome:0.00} is above the {ceiling:0.00} limit for {facts.Category}.");
+        }
+
+        if (rules.FirstTimeBuyersOnly && facts.EverHeldProperty)
+        {
+            problems.Add("Not a first-time buyer: has held a stand or owned property in the area before.");
+        }
+
+        if (rules.RefuseForfeited && facts.Forfeited)
+        {
+            problems.Add("An earlier stand was repossessed or its agreement cancelled.");
+        }
+
+        if (rules.RequireRatesClearance && facts.OverdueCharges > 0m)
+        {
+            problems.Add($"Owes {facts.OverdueCharges:0.00} in overdue rates and charges; a clearance is required.");
         }
 
         return problems;

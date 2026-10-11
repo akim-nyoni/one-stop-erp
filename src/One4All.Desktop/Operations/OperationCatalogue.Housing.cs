@@ -15,6 +15,60 @@ public static partial class OperationCatalogue
         const string module = "Housing";
         yield return new Operation
         {
+            Module = module, Title = "Waiting-list policy and qualification rules", ListTitle = "Rules in force",
+            Description = "Policy: who qualifies (minimum age, years resident, overall income ceiling) and the points each factor earns. Qualification rules: first-time buyers "
+                + "only, refuse those whose earlier stand was repossessed or agreement cancelled, require a rates clearance, and an income ceiling per category (blank removes it). "
+                + "Registration checks every rule, for the applicant and the spouse.",
+            Fields = [Pick("Step", "Step", ["Policy", "Qualification rules"]), Num("MinAge", "Minimum age", "18"), Num("Years", "Minimum years resident", "0"),
+                OptNum("Income", "Overall income ceiling (blank: none)"), Num("PerYearOnList", "Points per year on the list", "10"), Num("PerYearResident", "Points per year resident", "2"),
+                Num("PerDependant", "Points per dependant", "5"), Num("Disability", "Points for a disability", "15"), Num("Homeless", "Points if homeless", "20"),
+                Num("Lodger", "Points if lodging", "8"), Tick("FirstTime", "First-time buyers only"), Tick("Forfeited", "Refuse earlier forfeiture"), Tick("Clearance", "Require rates clearance"),
+                Pick("Category", "Category for the ceiling", Enum.GetNames<HousingCategory>()), OptNum("Ceiling", "Its income ceiling (blank: none)")],
+            Run = async (c, i) =>
+            {
+                IWaitingListService list = c.Get<IWaitingListService>();
+                if (i.Text("Step") == "Policy")
+                {
+                    return Check(await list.SetPolicyAsync(c.CompanyId, new WaitingListPolicyInput(new WaitingListTerms(i.Whole("MinAge"), i.Whole("Years"), i.OptionalNumber("Income"),
+                        i.Number("PerYearOnList"), i.Number("PerYearResident"), i.Number("PerDependant"), i.Number("Disability"), i.Number("Homeless"), i.Number("Lodger")))).ConfigureAwait(true),
+                        "Policy saved.");
+                }
+
+                Dictionary<HousingCategory, decimal> ceilings = new((await list.QualificationRulesAsync(c.CompanyId).ConfigureAwait(true)).CategoryIncomeCeilings);
+                HousingCategory category = Enum.Parse<HousingCategory>(i.Text("Category"));
+                if (i.OptionalNumber("Ceiling") is decimal ceiling)
+                {
+                    ceilings[category] = ceiling;
+                }
+                else
+                {
+                    ceilings.Remove(category);
+                }
+
+                return Check(await list.SetQualificationRulesAsync(c.CompanyId, new QualificationRules(i.Flag("FirstTime"), i.Flag("Forfeited"), i.Flag("Clearance"), ceilings))
+                    .ConfigureAwait(true), "Qualification rules saved.");
+            },
+            List = async c =>
+            {
+                IWaitingListService list = c.Get<IWaitingListService>();
+                WaitingListTerms t = await list.PolicyAsync(c.CompanyId).ConfigureAwait(true);
+                QualificationRules q = await list.QualificationRulesAsync(c.CompanyId).ConfigureAwait(true);
+                List<(string Rule, string Value)> rows =
+                [
+                    ("Minimum age", t.MinimumAge.ToString(CultureInfo.InvariantCulture)), ("Minimum years resident", t.MinimumResidencyYears.ToString(CultureInfo.InvariantCulture)),
+                    ("Overall income ceiling", t.MaximumMonthlyIncome is decimal m ? M(m) : "none"), ("First-time buyers only", q.FirstTimeBuyersOnly ? "Yes" : "No"),
+                    ("Refuse earlier forfeiture", q.RefuseForfeited ? "Yes" : "No"), ("Rates clearance required", q.RequireRatesClearance ? "Yes" : "No"),
+                    .. q.CategoryIncomeCeilings.OrderBy(x => x.Key).Select(x => ($"Income ceiling: {x.Key}", M(x.Value))),
+                    ("Points per year on the list", t.PointsPerYearOnList.ToString("0.##", CultureInfo.InvariantCulture)),
+                    ("Points per year resident", t.PointsPerYearResident.ToString("0.##", CultureInfo.InvariantCulture)),
+                    ("Points per dependant", t.PointsPerDependant.ToString("0.##", CultureInfo.InvariantCulture)),
+                    ("Disability / homeless / lodger points", $"{t.DisabilityPoints:0.##} / {t.HomelessPoints:0.##} / {t.LodgerPoints:0.##}"),
+                ];
+                return Table(rows, ("Rule", r => r.Rule), ("Setting", r => r.Value));
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Register a waiting-list applicant", ListTitle = "Applicants",
             Description = "Registers an applicant (a second registration with the same national ID is refused) and gives the waiting-list number and priority score.",
             Fields = [Req("Id", "National ID"), Req("Name", "Full name"), Pick("Category", "Category", Enum.GetNames<HousingCategory>()), Req("Born", "Date of birth (yyyy-MM-dd)"),

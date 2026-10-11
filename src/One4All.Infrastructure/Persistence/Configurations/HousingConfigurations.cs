@@ -1026,6 +1026,18 @@ internal sealed class ServicingChargeConfiguration : IEntityTypeConfiguration<Se
     }
 }
 
+internal sealed class WaitingListIncomeCeilingConfiguration : IEntityTypeConfiguration<WaitingListIncomeCeiling>
+{
+    public void Configure(EntityTypeBuilder<WaitingListIncomeCeiling> b)
+    {
+        b.ToTable("waiting_list_income_ceiling", Schemas.Housing, t => t.HasCheckConstraint("ck_waiting_list_income_ceiling", "maximum_monthly_income >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Category).HasConversion<int>();
+        b.Property(x => x.MaximumMonthlyIncome).HasPrecision(19, 4);
+        b.HasIndex(x => new { x.CompanyId, x.Category }).IsUnique();
+    }
+}
+
 internal sealed class WaitingListPolicyConfiguration : IEntityTypeConfiguration<WaitingListPolicy>
 {
     public void Configure(EntityTypeBuilder<WaitingListPolicy> b)

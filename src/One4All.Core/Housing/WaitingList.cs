@@ -100,4 +100,45 @@ public sealed class WaitingListPolicy : AuditableEntity, ICompanyScoped
 
     /// <summary>Points for lodging or staying with relatives.</summary>
     public decimal LodgerPoints { get; set; } = 8m;
+
+    /// <summary>Only first-time buyers qualify: nobody who has ever held a council stand or owned property on the municipal register.</summary>
+    public bool FirstTimeBuyersOnly { get; set; }
+
+    /// <summary>Nobody whose earlier stand was repossessed or whose agreement was cancelled qualifies.</summary>
+    public bool RefuseForfeited { get; set; }
+
+    /// <summary>Applicants must be clear of overdue rates and charges.</summary>
+    public bool RequireRatesClearance { get; set; }
+}
+
+/// <summary>
+/// An income ceiling for one waiting-list category (<c>hse.waiting_list_income_ceiling</c>, brief §4.10.3 "maximum income for a category"):
+/// applicants for the category earning more do not qualify. It applies alongside the policy's overall ceiling.
+/// </summary>
+public sealed class WaitingListIncomeCeiling : Entity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private WaitingListIncomeCeiling()
+    {
+    }
+
+    /// <summary>Sets a ceiling.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="category">The category.</param>
+    /// <param name="maximumMonthlyIncome">The highest monthly income that qualifies.</param>
+    public WaitingListIncomeCeiling(long companyId, HousingCategory category, decimal maximumMonthlyIncome)
+    {
+        CompanyId = companyId;
+        Category = category;
+        MaximumMonthlyIncome = maximumMonthlyIncome;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The category.</summary>
+    public HousingCategory Category { get; private set; }
+
+    /// <summary>The highest monthly income that qualifies.</summary>
+    public decimal MaximumMonthlyIncome { get; set; }
 }

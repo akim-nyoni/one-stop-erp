@@ -11362,6 +11362,45 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.WaitingListIncomeCeiling", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Category")
+                        .HasColumnType("integer")
+                        .HasColumnName("category");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("MaximumMonthlyIncome")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("maximum_monthly_income");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_waiting_list_income_ceiling");
+
+                    b.HasIndex("CompanyId", "Category")
+                        .IsUnique()
+                        .HasDatabaseName("ix_waiting_list_income_ceiling_company_id_category");
+
+                    b.ToTable("waiting_list_income_ceiling", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_waiting_list_income_ceiling", "maximum_monthly_income >= 0");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.WaitingListPolicy", b =>
                 {
                     b.Property<long>("Id")
@@ -11387,6 +11426,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(9, 2)
                         .HasColumnType("numeric(9,2)")
                         .HasColumnName("disability_points");
+
+                    b.Property<bool>("FirstTimeBuyersOnly")
+                        .HasColumnType("boolean")
+                        .HasColumnName("first_time_buyers_only");
 
                     b.Property<decimal>("HomelessPoints")
                         .HasPrecision(9, 2)
@@ -11433,6 +11476,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(9, 2)
                         .HasColumnType("numeric(9,2)")
                         .HasColumnName("points_per_year_resident");
+
+                    b.Property<bool>("RefuseForfeited")
+                        .HasColumnType("boolean")
+                        .HasColumnName("refuse_forfeited");
+
+                    b.Property<bool>("RequireRatesClearance")
+                        .HasColumnType("boolean")
+                        .HasColumnName("require_rates_clearance");
 
                     b.Property<long>("RowVersion")
                         .HasColumnType("bigint")
