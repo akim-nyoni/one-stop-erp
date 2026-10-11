@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Housing;
+using One4All.Application.Abstractions.Trading;
 using One4All.Core.Common;
 using One4All.Core.Housing;
+using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
 
 namespace One4All.Infrastructure.Housing;
@@ -10,10 +12,152 @@ namespace One4All.Infrastructure.Housing;
 public sealed class CooperativeService : ICooperativeService
 {
     private readonly One4AllDbContext _db;
+    private readonly ISalesLedgerService _ar;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
-    public CooperativeService(One4AllDbContext db) => _db = db;
+    /// <param name="ar">The receivables ledger the cooperative's account is kept on.</param>
+    public CooperativeService(One4AllDbContext db, ISalesLedgerService ar)
+    {
+        _db = db;
+        _ar = ar;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> LinkAccountAsync(long companyId, string cooperativeCode, long customerId, CancellationToken ct = default)
+    {
+        Result<Cooperative> found = await FindAsync(companyId, cooperativeCode, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return Result.Failure(found.Error);
+        }
+
+        if (!await _db.Customers.AnyAsync(c => c.CompanyId == companyId && c.Id == customerId, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.NotFound("Hse.CustomerNotFound", "The customer account was not found."));
+        }
+
+        if (await _db.Set<Cooperative>().AnyAsync(c => c.CompanyId == companyId && c.Id != found.Value.Id && c.AccountCustomerId == customerId, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.Conflict("Hse.AccountInUse", "That account is already another cooperative's."));
+        }
+
+        found.Value.AccountCustomerId = customerId;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> ChargeAsync(long companyId, string cooperativeCode, DateOnly date, decimal amount, string incomeAccountCode, string reference, CancellationToken ct = default)
+    {
+        Result<(Cooperative Cooperative, Customer Account)> found = await AccountAsync(companyId, cooperativeCode, amount, reference, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return Result.Failure(found.Error);
+        }
+
+        Result<TradingPostingResult> invoiced = await _ar.PostInvoiceAsync(new SalesInvoiceRequest
+        {
+            CompanyId = companyId, CustomerId = found.Value.Account.Id, DocumentNumber = reference.Trim(), DocumentDate = date, Currency = found.Value.Account.Currency, NetAmount = amount,
+            SalesAccountCode = (incomeAccountCode ?? string.Empty).Trim(), Narrative = $"Charge to cooperative {found.Value.Cooperative.Code}",
+        }, ct).ConfigureAwait(false);
+        return invoiced.IsFailure ? Result.Failure(invoiced.Error) : Result.Success();
+    }
+
+    /// <inheritdoc />
+    public Task<Result> RecordContributionAsync(long companyId, string cooperativeCode, string memberIdNumber, DateOnly date, decimal amount, string bankAccountCode, string reference,
+        CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            Result<(Cooperative Cooperative, Customer Account)> found = await AccountAsync(companyId, cooperativeCode, amount, reference, ct).ConfigureAwait(false);
+            if (found.IsFailure)
+            {
+                return Result.Failure(found.Error);
+            }
+
+            string id = NormaliseId(memberIdNumber);
+            CooperativeMember? member = found.Value.Cooperative.Members.FirstOrDefault(m => m.IdNumber == id && m.IsActive);
+            if (member is null)
+            {
+                return Result.Failure(Error.NotFound("Hse.MemberNotFound", $"ID {id} is not an active member of {found.Value.Cooperative.Code}."));
+            }
+
+            Result<TradingPostingResult> receipted = await _ar.PostReceiptAsync(new ReceiptRequest
+            {
+                CompanyId = companyId, CustomerId = found.Value.Account.Id, DocumentNumber = reference.Trim(), ReceiptDate = date, Currency = found.Value.Account.Currency, Amount = amount,
+                BankAccountCode = (bankAccountCode ?? string.Empty).Trim(), Narrative = $"Contribution by {member.FullName} to cooperative {found.Value.Cooperative.Code}",
+            }, ct).ConfigureAwait(false);
+            if (receipted.IsFailure)
+            {
+                return Result.Failure(receipted.Error);
+            }
+
+            _db.Set<CooperativeContribution>().Add(new CooperativeContribution(companyId, found.Value.Cooperative.Id, member.Id, date, amount, reference.Trim()));
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result.Success();
+        }, ct);
+
+    /// <inheritdoc />
+    public async Task<Result<CooperativeStatement>> StatementAsync(long companyId, string cooperativeCode, DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        Result<Cooperative> found = await FindAsync(companyId, cooperativeCode, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return found.Error;
+        }
+
+        Cooperative cooperative = found.Value;
+        if (cooperative.AccountCustomerId is not long account)
+        {
+            return Error.Rule("Hse.NoAccount", $"Cooperative {cooperative.Code} has no account linked.");
+        }
+
+        if (to < from)
+        {
+            return Error.Validation("Hse.StatementDates", "The statement ends before it starts.");
+        }
+
+        var items = await _db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == account && i.DocumentDate <= to)
+            .Select(i => new { i.DocumentDate, i.DocumentNumber, i.ItemType, i.Narrative, Signed = i.Sign == LedgerSign.Debit ? i.OriginalBase : -i.OriginalBase, i.Id })
+            .ToListAsync(ct).ConfigureAwait(false);
+        decimal opening = items.Where(i => i.DocumentDate < from).Sum(i => i.Signed);
+        decimal running = opening;
+        List<CooperativeStatementLine> lines = [];
+        foreach (var item in items.Where(i => i.DocumentDate >= from).OrderBy(i => i.DocumentDate).ThenBy(i => i.Id))
+        {
+            running += item.Signed;
+            lines.Add(new CooperativeStatementLine(item.DocumentDate, item.DocumentNumber, item.Narrative ?? item.ItemType.ToString(), Math.Max(item.Signed, 0m), Math.Max(-item.Signed, 0m), running));
+        }
+
+        var paid = await _db.Set<CooperativeContribution>().AsNoTracking().Where(c => c.CooperativeId == cooperative.Id && c.Date >= from && c.Date <= to)
+            .GroupBy(c => c.MemberId).Select(g => new { g.Key, Total = g.Sum(c => c.Amount) }).ToListAsync(ct).ConfigureAwait(false);
+        List<MemberContributions> contributions = [.. paid.Select(p => cooperative.Members.First(m => m.Id == p.Key)).Zip(paid, (m, p) => new MemberContributions(m.IdNumber, m.FullName, p.Total))
+            .OrderBy(m => m.FullName, StringComparer.Ordinal)];
+        return new CooperativeStatement($"{cooperative.Code} {cooperative.Name}", from, to, opening, lines, running, contributions);
+    }
+
+    // The cooperative with its linked account, for a positive amount and a reference.
+    private async Task<Result<(Cooperative Cooperative, Customer Account)>> AccountAsync(long companyId, string cooperativeCode, decimal amount, string reference, CancellationToken ct)
+    {
+        if (amount <= 0m || string.IsNullOrWhiteSpace(reference))
+        {
+            return Error.Validation("Hse.CooperativeAmount", "A charge or contribution needs a positive amount and a reference.");
+        }
+
+        Result<Cooperative> found = await FindAsync(companyId, cooperativeCode, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return found.Error;
+        }
+
+        Customer? account = found.Value.AccountCustomerId is long id ? await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id, ct).ConfigureAwait(false) : null;
+        if (account is null)
+        {
+            return Error.Rule("Hse.NoAccount", $"Cooperative {found.Value.Code} has no account linked.");
+        }
+
+        return (found.Value, account);
+    }
 
     /// <inheritdoc />
     public async Task<Result<long>> RegisterAsync(long companyId, string code, string name, string registrationNumber, CancellationToken ct = default)

@@ -6185,6 +6185,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<long?>("AccountCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("account_customer_id");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -6230,11 +6234,71 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_cooperative");
 
+                    b.HasIndex("CompanyId", "AccountCustomerId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_cooperative_company_id_account_customer_id")
+                        .HasFilter("account_customer_id IS NOT NULL");
+
                     b.HasIndex("CompanyId", "Code")
                         .IsUnique()
                         .HasDatabaseName("ix_cooperative_company_id_code");
 
                     b.ToTable("cooperative", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.CooperativeContribution", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CooperativeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cooperative_id");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long>("MemberId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("member_id");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cooperative_contribution");
+
+                    b.HasIndex("MemberId")
+                        .HasDatabaseName("ix_cooperative_contribution_member_id");
+
+                    b.HasIndex("CooperativeId", "Date")
+                        .HasDatabaseName("ix_cooperative_contribution_cooperative_id_date");
+
+                    b.ToTable("cooperative_contribution", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_cooperative_contribution_amount", "amount > 0");
+                        });
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.CooperativeMember", b =>
@@ -33536,6 +33600,23 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_compensation_step_compensation_claim_compensation_claim_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.CooperativeContribution", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.Cooperative", null)
+                        .WithMany()
+                        .HasForeignKey("CooperativeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cooperative_contribution_cooperative_cooperative_id");
+
+                    b.HasOne("One4All.Core.Housing.CooperativeMember", null)
+                        .WithMany()
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_cooperative_contribution_cooperative_member_member_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.CooperativeMember", b =>

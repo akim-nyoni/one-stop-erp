@@ -249,8 +249,9 @@ public static class HousingReports
         yield return Listing("H85", "Developer / Joint Venture Reconciliation", "Housing", "Stands contracted vs delivered per quota, overdue milestones and penalties.", "HousingDevelopers",
             [new Column("Agreement", "Agreement", 90), new Column("Quota", "Quota", 80), new Column("Contracted", "Contracted", 70), new Column("HandedOver", "Delivered", 70), new Column("Outstanding", "Outstanding", 75),
              new Column("OverdueMilestones", "Overdue milestones", 200), new Column("PenaltyAccrued", "Penalty accrued", 100, true)], [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("H86", "Housing Cooperative Register", "Housing", "Cooperatives with active members, stands held and stands sub-allocated.", "HousingCooperatives",
+        yield return Listing("H86", "Housing Cooperative Register", "Housing", "Cooperatives with active members, members' contributions, the balance on the cooperative's account, stands held and stands sub-allocated.", "HousingCooperatives",
             [new Column("Cooperative", "Code", 80), new Column("Name", "Name", 180), new Column("Registration", "Registration", 100), new Column("Members", "Members", 60),
+             new Column("Contributed", "Contributed", 90), new Column("Balance", "Balance owed", 90),
              new Column("Stands", "Stands", 60), new Column("SubAllocated", "Sub-allocated", 80)], []);
         yield return Listing("H87", "Informal Settlement / Enumeration Register", "Housing", "Settlements with ward, cut-off date, households counted and eligible.", "HousingSettlements",
             [new Column("Settlement", "Code", 80), new Column("Name", "Name", 160), new Column("Ward", "Ward", 80), new Column("CutOff", "Cut-off", 80), new Column("Households", "Households", 70),

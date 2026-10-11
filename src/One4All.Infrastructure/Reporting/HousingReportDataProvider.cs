@@ -632,7 +632,15 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         List<Cooperative> cooperatives = await _db.Set<Cooperative>().AsNoTracking().Include(c => c.Members).Where(c => c.CompanyId == companyId).OrderBy(c => c.Code).ToListAsync(ct).ConfigureAwait(false);
         var stands = (await _db.Set<CooperativeStand>().AsNoTracking().Where(s => s.CompanyId == companyId).Select(s => new { s.CooperativeId, s.MemberId }).ToListAsync(ct).ConfigureAwait(false))
             .GroupBy(s => s.CooperativeId).ToDictionary(g => g.Key, g => (Held: g.Count(), Sub: g.Count(s => s.MemberId != null)));
+        Dictionary<long, decimal> contributed = await _db.Set<CooperativeContribution>().AsNoTracking().Where(x => x.CompanyId == companyId).GroupBy(x => x.CooperativeId)
+            .Select(g => new { g.Key, Total = g.Sum(x => x.Amount) }).ToDictionaryAsync(x => x.Key, x => x.Total, ct).ConfigureAwait(false);
+        List<long> accounts = [.. cooperatives.Where(c => c.AccountCustomerId != null).Select(c => c.AccountCustomerId!.Value)];
+        Dictionary<long, decimal> owing = await _db.OpenItems.AsNoTracking()
+            .Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsReceivable && accounts.Contains(i.TraderId) && i.OutstandingBase != 0m)
+            .GroupBy(i => i.TraderId).Select(g => new { g.Key, Total = g.Sum(i => i.Sign == Core.Trading.LedgerSign.Debit ? i.OutstandingBase : -i.OutstandingBase) })
+            .ToDictionaryAsync(x => x.Key, x => x.Total, ct).ConfigureAwait(false);
         return [.. cooperatives.Select(c => Row(("Cooperative", c.Code), ("Name", c.Name), ("Registration", c.RegistrationNumber), ("Members", c.Members.Count(m => m.IsActive)),
+            ("Contributed", Money(contributed.GetValueOrDefault(c.Id))), ("Balance", c.AccountCustomerId is long a ? Money(owing.GetValueOrDefault(a)) : "no account"),
             ("Stands", stands.GetValueOrDefault(c.Id).Held), ("SubAllocated", stands.GetValueOrDefault(c.Id).Sub)))];
     }
 

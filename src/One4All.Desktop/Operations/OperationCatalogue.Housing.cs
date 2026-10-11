@@ -732,9 +732,13 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Housing cooperatives", ListTitle = "Cooperatives",
-            Description = "Registers a cooperative, adds and removes members, allocates stands to it (\"S1,S2\") and sub-allocates each to a member; Stands lists what it holds and to whom.",
-            Fields = [Pick("Step", "Step", ["Register", "Add member", "Remove member", "Allocate stands", "Sub-allocate", "Stands"]), Req("Cooperative", "Cooperative code"), Opt("Name", "Name / member name"),
-                Opt("Registration", "Registration number"), Opt("IdNumber", "Member national ID"), Opt("Stands", "Stand number(s), comma-separated"), Today()],
+            Description = "Registers a cooperative, adds and removes members, allocates stands to it (\"S1,S2\") and sub-allocates each to a member; Stands lists what it holds and to whom. "
+                + "Account: links its receivables account (customer code). Charge: invoices it. Contribution: a member's payment receipted on its account. Statement: its account for the "
+                + "period from the date in Since to Date, with each member's contributions.",
+            Fields = [Pick("Step", "Step", ["Register", "Add member", "Remove member", "Allocate stands", "Sub-allocate", "Stands", "Account", "Charge", "Contribution", "Statement"]),
+                Req("Cooperative", "Cooperative code"), Opt("Name", "Name / member name"), Opt("Registration", "Registration number"), Opt("IdNumber", "Member national ID"),
+                Opt("Stands", "Stand number(s), comma-separated"), Opt("Customer", "Account customer code"), Num("Amount", "Amount", "0"), Opt("Account", "Income account (charge) / bank (contribution)"),
+                Opt("Reference", "Document / receipt number"), Opt("Since", "Statement from (yyyy-MM-dd)"), Today()],
             Run = async (c, i) =>
             {
                 ICooperativeService cooperatives = c.Get<ICooperativeService>();
@@ -763,6 +767,22 @@ public static partial class OperationCatalogue
                     case "Sub-allocate":
                         List<long> stand = await StandIds().ConfigureAwait(true);
                         return Check(await cooperatives.SubAllocateAsync(c.CompanyId, code, stand.FirstOrDefault(), i.Optional("IdNumber") ?? string.Empty, i.Date("Date")).ConfigureAwait(true), "Sub-allocated.");
+                    case "Account":
+                        return Check(await cooperatives.LinkAccountAsync(c.CompanyId, code, await CustomerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true)).ConfigureAwait(true),
+                            "Account linked.");
+                    case "Charge":
+                        return Check(await cooperatives.ChargeAsync(c.CompanyId, code, i.Date("Date"), i.Number("Amount"), i.Optional("Account") ?? string.Empty, i.Optional("Reference") ?? string.Empty)
+                            .ConfigureAwait(true), "Charged.");
+                    case "Contribution":
+                        return Check(await cooperatives.RecordContributionAsync(c.CompanyId, code, i.Optional("IdNumber") ?? string.Empty, i.Date("Date"), i.Number("Amount"),
+                            i.Optional("Account") ?? string.Empty, i.Optional("Reference") ?? string.Empty).ConfigureAwait(true), "Contribution receipted.");
+                    case "Statement":
+                        DateOnly since = i.Optional("Since") is string text ? DateOnly.ParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture) : new DateOnly(i.Date("Date").Year, 1, 1);
+                        CooperativeStatement statement = Check(await cooperatives.StatementAsync(c.CompanyId, code, since, i.Date("Date")).ConfigureAwait(true));
+                        return string.Join(Environment.NewLine, new[] { $"{statement.Cooperative}: {D(statement.From)} to {D(statement.To)}", $"Opening balance {M(statement.Opening),14}" }
+                            .Concat(statement.Lines.Select(l => $"{D(l.Date)}  {l.Reference,-14} {l.Description,-46} {(l.Debit == 0m ? string.Empty : M(l.Debit)),12} {(l.Credit == 0m ? string.Empty : M(l.Credit)),12} {M(l.Balance),14}"))
+                            .Append($"Closing balance {M(statement.Closing),14}")
+                            .Concat(statement.Contributions.Select(m => $"  contributed by {m.FullName} ({m.IdNumber}): {M(m.Total)}")));
                     default:
                         IReadOnlyList<CooperativeStandEntry> held = Check(await cooperatives.StandsAsync(c.CompanyId, code).ConfigureAwait(true));
                         return held.Count == 0 ? "No stands." : string.Join(Environment.NewLine, held.Select(h => $"{h.StandNumber,-12} {D(h.AllocatedOn)}  {h.MemberName ?? "(not sub-allocated)"}"));

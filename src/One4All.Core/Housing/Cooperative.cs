@@ -43,6 +43,9 @@ public sealed class Cooperative : AuditableEntity, ICompanyScoped
     /// <summary>Its registration number.</summary>
     public string RegistrationNumber { get; private set; }
 
+    /// <summary>The cooperative's own receivables account with the council (charges, contributions, statement), once linked.</summary>
+    public long? AccountCustomerId { get; set; }
+
     /// <summary>Its members.</summary>
     public IReadOnlyList<CooperativeMember> Members => _members.AsReadOnly();
 
@@ -142,4 +145,52 @@ public sealed class CooperativeStand : AuditableEntity, ICompanyScoped
         MemberId = memberId;
         SubAllocatedOn = date;
     }
+}
+
+/// <summary>
+/// A member's contribution to the cooperative (<c>hse.cooperative_contribution</c>, brief §4.10.8): paid to the council and receipted on the
+/// cooperative's account, so the cooperative's statement shows its members' money against what it owes.
+/// </summary>
+public sealed class CooperativeContribution : Entity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private CooperativeContribution()
+    {
+        Reference = string.Empty;
+    }
+
+    /// <summary>Records a contribution.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="cooperativeId">The cooperative.</param>
+    /// <param name="memberId">The member who paid.</param>
+    /// <param name="date">When.</param>
+    /// <param name="amount">How much.</param>
+    /// <param name="reference">The receipt reference.</param>
+    public CooperativeContribution(long companyId, long cooperativeId, long memberId, DateOnly date, decimal amount, string reference)
+    {
+        CompanyId = companyId;
+        CooperativeId = cooperativeId;
+        MemberId = memberId;
+        Date = date;
+        Amount = amount;
+        Reference = reference;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The cooperative.</summary>
+    public long CooperativeId { get; private set; }
+
+    /// <summary>The member who paid.</summary>
+    public long MemberId { get; private set; }
+
+    /// <summary>When.</summary>
+    public DateOnly Date { get; private set; }
+
+    /// <summary>How much.</summary>
+    public decimal Amount { get; private set; }
+
+    /// <summary>The receipt reference.</summary>
+    public string Reference { get; private set; }
 }

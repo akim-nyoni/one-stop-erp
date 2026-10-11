@@ -474,6 +474,20 @@ internal sealed class CompensationClaimConfiguration : IEntityTypeConfiguration<
     }
 }
 
+internal sealed class CooperativeContributionConfiguration : IEntityTypeConfiguration<CooperativeContribution>
+{
+    public void Configure(EntityTypeBuilder<CooperativeContribution> b)
+    {
+        b.ToTable("cooperative_contribution", Schemas.Housing, t => t.HasCheckConstraint("ck_cooperative_contribution_amount", "amount > 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Reference).HasMaxLength(40);
+        b.HasOne<Cooperative>().WithMany().HasForeignKey(x => x.CooperativeId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<CooperativeMember>().WithMany().HasForeignKey(x => x.MemberId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CooperativeId, x.Date });
+    }
+}
+
 internal sealed class CooperativeConfiguration : IEntityTypeConfiguration<Cooperative>
 {
     public void Configure(EntityTypeBuilder<Cooperative> b)
@@ -483,6 +497,7 @@ internal sealed class CooperativeConfiguration : IEntityTypeConfiguration<Cooper
         b.Property(x => x.Code).HasMaxLength(30);
         b.Property(x => x.Name).HasMaxLength(200);
         b.Property(x => x.RegistrationNumber).HasMaxLength(60);
+        b.HasIndex(x => new { x.CompanyId, x.AccountCustomerId }).IsUnique().HasFilter("account_customer_id IS NOT NULL");
         b.HasMany(x => x.Members).WithOne().HasForeignKey(x => x.CooperativeId).OnDelete(DeleteBehavior.Restrict);
         b.Navigation(x => x.Members).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
