@@ -34,6 +34,9 @@ public static class IndustryExtras
             ["SC173", "SC175", "SC176", "SC177", "SC179", "SC180", "SC181", "RC35"]),
         [Vertical.Construction] = new([("MATL", "Materials"), ("PLANT", "Plant & equipment"), ("SUBC", "Subcontract")], [],
             ["JC186", "JC189", "JC191", "JC193", "JOB-IPC", "INV98"]),
+        [Vertical.Hospitality] = new([("FOOD", "Food"), ("BEV", "Beverages"), ("LIQ", "Liquor"), ("LINEN", "Consumables & linen")],
+            [new TerminalSeed("BAR01", "Bar till"), new TerminalSeed("REST01", "Restaurant till")],
+            ["POS-SUM", "POS103", "POS105", "POS107", "INV79", "INV-VAL"]),
     };
 
     /// <summary>The extras for a vertical.</summary>

@@ -23,6 +23,9 @@ public enum Vertical
 
     /// <summary>Contracting: work in progress, retentions, subcontractors.</summary>
     Construction = 5,
+
+    /// <summary>Hospitality: bars, restaurants and lodges — food, beverage and liquor sales and costs, tabs, tips and functions.</summary>
+    Hospitality = 6,
 }
 
 /// <summary>How much of a permission a starter role gets.</summary>
@@ -169,6 +172,24 @@ public static class IndustryTemplates
             [("YARD", "Site Yard")],
             [new("Contracts Manager", [("JobCosting", GrantLevel.Full), ("Procurement", GrantLevel.Use)])],
             [], [], []),
+        [Vertical.Hospitality] = new(Vertical.Hospitality,
+            [
+                new("1413", "Inventory - Liquor", AccountType.Asset), new("2380", "Tips & Service Charge Payable", AccountType.Liability),
+                new("2382", "Open Tabs Clearing", AccountType.Liability), new("4500", "Food Sales", AccountType.Income), new("4501", "Beverage Sales", AccountType.Income),
+                new("4502", "Liquor Sales", AccountType.Income), new("5500", "Cost of Food", AccountType.Expense), new("5501", "Cost of Beverages", AccountType.Expense),
+                new("5502", "Cost of Liquor", AccountType.Expense), new("5503", "Spillage & Kitchen Wastage", AccountType.Expense),
+            ],
+            [],
+            [("KITCHEN", "Kitchen"), ("BAR", "Bar"), ("CELLAR", "Cellar Store")],
+            [
+                new("Waiter", [("Pos.Sale", GrantLevel.Use), ("Pos.TillSession", GrantLevel.Use), ("Inventory.Item", GrantLevel.Read)]),
+                new("Restaurant Manager", [("Pos", GrantLevel.Full), ("Inventory", GrantLevel.Full), ("Procurement", GrantLevel.Use)]),
+            ],
+            [], [("BEVDIST", "Beverage Distributors"), ("FRESHMKT", "Fresh Market Produce")],
+            [
+                new("LAGER", "Lager 340ml", ItemType.Stock, "Liquor", "4502", "5502"), new("COLA", "Cola 330ml", ItemType.Stock, "Beverages", "4501", "5501"),
+                new("BURGER", "Beef burger and chips", ItemType.Stock, "Food", "4500", "5500"),
+            ]),
     };
 
     /// <summary>The template for an industry.</summary>

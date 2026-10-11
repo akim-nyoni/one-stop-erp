@@ -1,0 +1,28 @@
+code,name,type,control,category,budget
+1013,Waiter Floats,Asset,,Cash and Bank,
+1014,Tips Clearing,Asset,,Cash and Bank,
+1411,Inventory - Food,Asset,,Inventory,
+1412,Inventory - Non-alcoholic Beverages,Asset,,Inventory,
+1413,Inventory - Liquor,Asset,,Inventory,
+1414,Inventory - Linen & Consumables,Asset,,Inventory,
+2380,Tips & Service Charge Payable,Liability,,Other Current Liabilities,
+2381,Function & Room Deposits Held,Liability,,Other Current Liabilities,
+2382,Open Tabs Clearing,Liability,,Other Current Liabilities,
+4500,Food Sales,Income,,Revenue,
+4501,Beverage Sales,Income,,Revenue,
+4502,Liquor Sales,Income,,Revenue,
+4503,Accommodation,Income,,Revenue,
+4504,Functions & Events,Income,,Revenue,
+4505,Service Charge Income,Income,,Revenue,
+4506,Happy-hour & Promotional Discounts,Income,,Revenue,
+4507,Cover Charges,Income,,Revenue,
+5500,Cost of Food,Expense,,Cost of Sales,
+5501,Cost of Beverages,Expense,,Cost of Sales,
+5502,Cost of Liquor,Expense,,Cost of Sales,
+5503,Spillage & Kitchen Wastage,Expense,,Cost of Sales,
+5504,Staff Meals,Expense,,Cost of Sales,yes
+5505,Complimentary Meals & Drinks,Expense,,Cost of Sales,yes
+6460,Laundry & Linen,Expense,,Administration,yes
+6461,Kitchen Gas & Fuel,Expense,,Administration,yes
+6462,Music & Entertainment Licences,Expense,,Administration,yes
+6463,Liquor Licence Fees,Expense,,Administration,yes
