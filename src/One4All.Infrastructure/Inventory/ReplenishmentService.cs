@@ -82,7 +82,8 @@ public sealed class ReplenishmentService : IReplenishmentService
         {
             decimal level = levels.TryGetValue(item.Id, out ItemWarehouseLevel? own) ? own.ReorderLevel : item.ReorderLevel;
             decimal reorderQuantity = own?.ReorderQuantity ?? item.ReorderQuantity;
-            decimal daily = usage.GetValueOrDefault(item.Id);
+            // The moving average, scaled by the season of the month the lead time ends in.
+            decimal daily = usage.GetValueOrDefault(item.Id) * SeasonalFactors.For(item.SeasonalFactors, DateOnly.FromDateTime(DateTime.Today).AddDays(item.LeadTimeDays));
 
             // The forecast reorder point: the moving-average usage over the lead time (never below the set minimum).
             level = Math.Max(level, Math.Ceiling(daily * item.LeadTimeDays));
@@ -173,6 +174,11 @@ public sealed class ReplenishmentService : IReplenishmentService
             return Result.Failure(Error.Validation("Replenish.LeadTime", "A usage forecast needs the lead time it has to cover."));
         }
 
+        if (!SeasonalFactors.TryParse(policy.SeasonalFactors, out decimal[]? factors))
+        {
+            return Result.Failure(Error.Validation("Replenish.Seasonal", "Seasonal factors are twelve numbers from 0 to 99, January first, separated by commas."));
+        }
+
         Item? item = await _db.Items.FirstOrDefaultAsync(i => i.Id == itemId && i.CompanyId == companyId, ct).ConfigureAwait(false);
         if (item is null)
         {
@@ -184,6 +190,7 @@ public sealed class ReplenishmentService : IReplenishmentService
         item.MaximumStock = policy.MaximumStock;
         item.LeadTimeDays = policy.LeadTimeDays;
         item.ForecastWindowDays = policy.ForecastWindowDays;
+        item.SeasonalFactors = factors is null ? null : SeasonalFactors.Format(factors);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }

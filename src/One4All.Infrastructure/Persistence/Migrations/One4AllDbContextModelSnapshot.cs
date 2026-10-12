@@ -12705,6 +12705,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<string>("SeasonalFactors")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("seasonal_factors");
+
                     b.Property<int?>("ShelfLifeDays")
                         .HasColumnType("integer")
                         .HasColumnName("shelf_life_days");

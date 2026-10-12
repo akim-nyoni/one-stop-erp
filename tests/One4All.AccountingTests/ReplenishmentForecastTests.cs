@@ -67,5 +67,11 @@ public sealed class ReplenishmentForecastTests
 
         // 4 on hand, minimum 10 → up to the maximum 50 (the maximum wins over the fixed reorder quantity).
         suggestions.Single(s => s.ItemId == minMax.Id).SuggestedQuantity.Should().Be(46m);
+
+        // In season (a factor of 2 for every month here) the forecast usage doubles: reorder point 6 × 10 = 60.
+        (await replenish.SetPolicyAsync(companyId, forecast.Id, new ReplenishmentPolicy(5m, 0m, 200m, 10, 30) { SeasonalFactors = "1,2" })).Error.Code.Should().Be("Replenish.Seasonal");
+        (await replenish.SetPolicyAsync(companyId, forecast.Id, new ReplenishmentPolicy(5m, 0m, 200m, 10, 30) { SeasonalFactors = "2,2,2,2,2,2,2,2,2,2,2,2" })).IsSuccess.Should().BeTrue();
+        ReplenishmentSuggestion seasonal = (await replenish.SuggestAsync(companyId)).Single(s => s.ItemId == forecast.Id);
+        (seasonal.AverageDailyUsage, seasonal.ReorderLevel).Should().Be((6m, 60m));
     }
 }

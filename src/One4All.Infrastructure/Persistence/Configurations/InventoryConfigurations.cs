@@ -52,6 +52,7 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
     public void Configure(EntityTypeBuilder<Item> b)
     {
         b.Property(x => x.LongDescription).HasColumnType("text");
+        b.Property(x => x.SeasonalFactors).HasMaxLength(120);
         b.Property(x => x.LengthCm).HasPrecision(12, 3);
         b.Property(x => x.WidthCm).HasPrecision(12, 3);
         b.Property(x => x.HeightCm).HasPrecision(12, 3);

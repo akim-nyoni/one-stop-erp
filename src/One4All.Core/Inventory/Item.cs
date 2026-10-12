@@ -85,6 +85,12 @@ public sealed class Item : SoftDeletableEntity, ICompanyScoped
     /// <summary>Days of issues the moving-average usage forecast looks back over; 0: no forecast.</summary>
     public int ForecastWindowDays { get; set; }
 
+    /// <summary>
+    /// Gets or sets the twelve monthly seasonal factors (January first, comma separated, e.g. "0.8,0.8,1,1,1.2,…") the forecast usage is
+    /// multiplied by for the month the lead time ends in; null: no seasonality.
+    /// </summary>
+    public string? SeasonalFactors { get; set; }
+
     /// <summary>The minimum age a buyer must be (the till asks for the age check); null: none.</summary>
     public int? MinimumAge { get; set; }
 

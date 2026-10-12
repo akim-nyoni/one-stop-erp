@@ -24,7 +24,11 @@ public sealed record ReplenishmentSuggestion(long ItemId, string ItemCode, strin
 /// <param name="MaximumStock">Order up to this (0: none).</param>
 /// <param name="LeadTimeDays">Days from order to receipt.</param>
 /// <param name="ForecastWindowDays">Days of issues the moving-average forecast looks back over (0: none); the reorder point rises to cover the lead time's usage.</param>
-public sealed record ReplenishmentPolicy(decimal ReorderLevel, decimal ReorderQuantity, decimal MaximumStock, int LeadTimeDays, int ForecastWindowDays);
+public sealed record ReplenishmentPolicy(decimal ReorderLevel, decimal ReorderQuantity, decimal MaximumStock, int LeadTimeDays, int ForecastWindowDays)
+{
+    /// <summary>The twelve monthly seasonal factors (January first, comma separated); null or blank: none.</summary>
+    public string? SeasonalFactors { get; init; }
+}
 
 /// <summary>An item and quantity to include on a replenishment purchase order.</summary>
 /// <param name="ItemId">The item.</param>
