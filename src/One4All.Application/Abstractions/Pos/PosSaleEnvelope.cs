@@ -54,7 +54,8 @@ public sealed record PosSaleEnvelope(
     IReadOnlyList<PosSaleLineEnvelope> Lines,
     IReadOnlyList<PosTenderEnvelope> Tenders,
     bool AgeVerified = false,
-    string? PrescriptionReference = null)
+    string? PrescriptionReference = null,
+    string? OfflineSessionKey = null)
 {
     /// <summary>The operation kind used to route this envelope to its replay handler.</summary>
     public const string Kind = "PosSale";
@@ -80,4 +81,20 @@ public sealed record PosSaleEnvelope(
             .Select(t => new PosTenderRequest(t.TenderType, CurrencyCode.Parse(t.Currency), t.Amount, t.AccountCode, t.IsChange))
             .ToList(),
     };
+}
+
+/// <summary>
+/// A till opened while the terminal could not reach the central database (brief §4.1 offline mode): replayed before the sales captured in it,
+/// which carry its <see cref="OfflineKey"/> in place of a session id.
+/// </summary>
+/// <param name="CompanyId">The company.</param>
+/// <param name="TerminalId">The terminal.</param>
+/// <param name="CashierUserId">The cashier.</param>
+/// <param name="OpeningFloat">The opening float.</param>
+/// <param name="OpenedUtc">When it was opened at the terminal.</param>
+/// <param name="OfflineKey">The key the terminal gave the session.</param>
+public sealed record PosOpenTillEnvelope(long CompanyId, long TerminalId, long CashierUserId, decimal OpeningFloat, DateTimeOffset OpenedUtc, string OfflineKey)
+{
+    /// <summary>The operation kind.</summary>
+    public const string Kind = "PosOpenTill";
 }

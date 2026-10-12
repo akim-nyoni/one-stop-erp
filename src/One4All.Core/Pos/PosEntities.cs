@@ -164,6 +164,9 @@ public sealed class TillSession : AuditableEntity, ICompanyScoped
     /// <summary>The opening float.</summary>
     public decimal OpeningFloat { get; private set; }
 
+    /// <summary>Gets or sets the key a till opened offline was given at the terminal (its sales find it by this when they sync).</summary>
+    public string? OfflineKey { get; set; }
+
     /// <summary>The sequential Z-read number, assigned on close.</summary>
     public int? ZReadNumber { get; private set; }
 

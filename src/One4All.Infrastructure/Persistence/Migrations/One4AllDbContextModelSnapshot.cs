@@ -23367,6 +23367,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<string>("OfflineKey")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("offline_key");
+
                     b.Property<DateTimeOffset>("OpenedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("opened_on_utc");
@@ -23396,6 +23401,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_till_session");
+
+                    b.HasIndex("CompanyId", "OfflineKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_till_session_company_id_offline_key")
+                        .HasFilter("offline_key IS NOT NULL");
 
                     b.HasIndex("TerminalId", "ZReadNumber")
                         .HasDatabaseName("ix_till_session_terminal_id_z_read_number");

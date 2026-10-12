@@ -885,9 +885,28 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
         decimal floatAmount = decimal.TryParse(OpeningFloat, NumberStyles.Number, CultureInfo.CurrentCulture, out decimal f) ? f : 0m;
 
-        await using AsyncServiceScope scope = _services.CreateAsyncScope();
-        IPosService pos = scope.ServiceProvider.GetRequiredService<IPosService>();
-        Result<long> result = await pos.OpenTillAsync(_companyId, _terminalId, _cashierUserId, floatAmount).ConfigureAwait(true);
+        Result<long> result;
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            IPosService pos = scope.ServiceProvider.GetRequiredService<IPosService>();
+            result = await pos.OpenTillAsync(_companyId, _terminalId, _cashierUserId, floatAmount).ConfigureAwait(true);
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex) && _snapshot is not null)
+        {
+            // Offline: open the till here under a key; it opens centrally when the connection returns, before the sales rung up in it.
+            string offlineKey = $"OFF-{_terminalId}-{Guid.NewGuid():N}";
+            _offlineSessionKey = offlineKey.Length > 40 ? offlineKey[..40] : offlineKey;
+            PosOpenTillEnvelope open = new(_companyId, _terminalId, _cashierUserId, floatAmount, DateTimeOffset.UtcNow, _offlineSessionKey);
+            await LocalQueue.EnqueueAsync(new LocalOfflineEntry(Guid.NewGuid(), _companyId, PosOpenTillEnvelope.Kind, JsonSerializer.Serialize(open), open.OpenedUtc)).ConfigureAwait(true);
+            PendingOfflineCount = await LocalQueue.CountAsync().ConfigureAwait(true);
+            TillSessionId = 0;
+            IsSessionOpen = true;
+            UpdateSyncState();
+            StatusMessage = "Offline: till opened here. Sales queue on this terminal and the till opens centrally when the connection returns.";
+            return;
+        }
+
         if (result.IsFailure)
         {
             StatusMessage = result.Error.Message;
@@ -1833,11 +1852,30 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             request.SaleNumber, request.SaleDate, request.WarehouseId, _currency.Value, request.TaxAccountCode,
             request.Lines.Select(l => new PosSaleLineEnvelope(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode)).ToList(),
             request.Tenders.Select(t => new PosTenderEnvelope(t.TenderType, t.Currency.Value, t.Amount, t.AccountCode, t.IsChange)).ToList(),
-            request.AgeVerified, request.PrescriptionReference);
+            request.AgeVerified, request.PrescriptionReference, request.TillSessionId == 0 ? _offlineSessionKey : null);
 
         LocalOfflineEntry entry = new(Guid.NewGuid(), request.CompanyId, PosSaleEnvelope.Kind, JsonSerializer.Serialize(envelope), DateTimeOffset.UtcNow);
         await LocalQueue.EnqueueAsync(entry).ConfigureAwait(true);
         PendingOfflineCount = await LocalQueue.CountAsync().ConfigureAwait(true);
+        UpdateSyncState();
+    }
+
+    // The key of a till opened offline, until it has synced and has a session id.
+    private string? _offlineSessionKey;
+
+    // When the terminal last synced its queue with the central database.
+    private DateTimeOffset? _lastSyncedUtc;
+
+    /// <summary>Where the terminal's offline queue stands: online or offline, how much is queued and when it last synced.</summary>
+    [ObservableProperty]
+    private string _syncState = string.Empty;
+
+    private void UpdateSyncState()
+    {
+        string last = _lastSyncedUtc is DateTimeOffset at ? $"last synced {at.ToLocalTime():HH:mm}" : "not synced yet";
+        SyncState = PendingOfflineCount > 0 || _offlineSessionKey is not null
+            ? $"OFFLINE • {PendingOfflineCount} queued • {last}" + (_offlineSessionKey is null ? string.Empty : " • till opened offline")
+            : _lastSyncedUtc is null ? string.Empty : $"Online • {last}";
     }
 
     /// <summary>Hands locally-captured sales to the central outbox and drains it (used on reconnect).</summary>
@@ -1864,8 +1902,21 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
             IOfflineSyncService sync = scope.ServiceProvider.GetRequiredService<IOfflineSyncService>();
             OfflineSyncReport report = await sync.SyncPendingAsync().ConfigureAwait(true);
-            StatusMessage = $"Synced {report.Synced} offline sale(s)"
+            _lastSyncedUtc = DateTimeOffset.UtcNow;
+            StatusMessage = $"Synced {report.Synced} offline operation(s)"
                 + (report.DeadLettered > 0 ? $", {report.DeadLettered} could not be posted" : string.Empty) + ".";
+
+            // A till opened offline now has its central session: carry on trading in it.
+            if (_offlineSessionKey is string key)
+            {
+                One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+                if (await db.Set<TillSession>().Where(s => s.CompanyId == _companyId && s.OfflineKey == key).Select(s => (long?)s.Id).FirstOrDefaultAsync().ConfigureAwait(true) is long id)
+                {
+                    TillSessionId = id;
+                    _offlineSessionKey = null;
+                    await SaveSnapshotAsync(id).ConfigureAwait(true);
+                }
+            }
         }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
         {
@@ -1874,6 +1925,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         finally
         {
             PendingOfflineCount = await LocalQueue.CountAsync().ConfigureAwait(true);
+            UpdateSyncState();
         }
     }
 

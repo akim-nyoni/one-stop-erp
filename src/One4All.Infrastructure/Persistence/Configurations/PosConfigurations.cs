@@ -25,6 +25,8 @@ internal sealed class TillSessionConfiguration : IEntityTypeConfiguration<TillSe
         b.ToTable("till_session", Schemas.PointOfSale);
         b.HasKey(x => x.Id);
         b.Property(x => x.OpeningFloat).HasPrecision(19, 4);
+        b.Property(x => x.OfflineKey).HasMaxLength(40);
+        b.HasIndex(x => new { x.CompanyId, x.OfflineKey }).IsUnique().HasFilter("offline_key IS NOT NULL");
         b.Property(x => x.Status).HasConversion<int>();
         b.HasIndex(x => new { x.TerminalId, x.ZReadNumber });
     }

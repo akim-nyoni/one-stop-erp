@@ -83,6 +83,27 @@ public sealed class PosService : IPosService
     }
 
     /// <inheritdoc />
+    public async Task<Result<long>> OpenTillOfflineAsync(long companyId, long terminalId, long cashierUserId, decimal openingFloat, DateTimeOffset openedUtc, string offlineKey,
+        CancellationToken ct = default)
+    {
+        string key = (offlineKey ?? string.Empty).Trim();
+        if (key.Length == 0 || openingFloat < 0m)
+        {
+            return Error.Validation("Pos.OfflineTill", "A till opened offline needs its key and a float that is not negative.");
+        }
+
+        if (await _db.Set<TillSession>().Where(s => s.CompanyId == companyId && s.OfflineKey == key).Select(s => (long?)s.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false) is long existing)
+        {
+            return existing;
+        }
+
+        TillSession session = new(companyId, terminalId, cashierUserId, openedUtc, openingFloat) { OfflineKey = key };
+        _db.Set<TillSession>().Add(session);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return session.Id;
+    }
+
+    /// <inheritdoc />
     public Task<Result<CompleteSaleResult>> CompleteSaleAsync(CompleteSaleRequest request, CancellationToken ct = default)
         => _db.AtomicAsync(() => CompleteSaleCoreAsync(request, ct), ct);
 

@@ -74,7 +74,7 @@
                           Checked="Contrast_Changed" Unchecked="Contrast_Changed" ToolTip="Black background, white and yellow text, outlined buttons (accessibility)" />
             <Border DockPanel.Dock="Right" Background="#E67E22" CornerRadius="12" Padding="12,4" Margin="0,0,12,0" VerticalAlignment="Center"
                     Visibility="{Binding PendingOfflineCount, Converter={StaticResource CountToVis}}">
-                <TextBlock Text="{Binding PendingOfflineCount, StringFormat='OFFLINE • {0} queued'}" Foreground="{DynamicResource Ink}" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SyncState}" Foreground="{DynamicResource Ink}" FontSize="13" FontWeight="SemiBold" />
             </Border>
             <TextBlock Text="{Binding CashierName, StringFormat='Cashier: {0}'}" Foreground="{DynamicResource Muted}" FontSize="14"
                        DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,16,0" />

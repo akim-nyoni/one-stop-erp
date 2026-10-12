@@ -164,6 +164,12 @@ public interface IPosService
     /// <returns>The opened session id.</returns>
     Task<Result<long>> OpenTillAsync(long companyId, long terminalId, long cashierUserId, decimal openingFloat, CancellationToken ct = default);
 
+    /// <summary>
+    /// Opens the till a terminal opened offline, at the time it was opened there, under its offline key; replaying the same key again returns the
+    /// session already opened.
+    /// </summary>
+    Task<Result<long>> OpenTillOfflineAsync(long companyId, long terminalId, long cashierUserId, decimal openingFloat, DateTimeOffset openedUtc, string offlineKey, CancellationToken ct = default);
+
     /// <summary>Completes a sale: posts the tender/revenue/tax journal and issues stock (cost of sales).</summary>
     /// <param name="request">The sale request.</param>
     /// <param name="ct">Cancellation token.</param>

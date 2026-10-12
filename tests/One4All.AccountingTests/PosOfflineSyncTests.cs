@@ -122,4 +122,47 @@ public sealed class PosOfflineSyncTests
             (await sync.SyncPendingAsync()).Processed.Should().Be(0);
         }
     }
+
+    [SkippableFact]
+    public async Task A_till_opened_offline_syncs_before_its_sales()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        Branch branch = new(companyId, "HO", "Head Office");
+        db.Branches.Add(branch);
+        await db.SaveChangesAsync();
+        PosTerminal terminal = new(companyId, branch.Id, "OFFTILL", "Offline Till");
+        Item item = new(companyId, "OFFSODA", "Soda") { CostOfSalesAccountCode = "5000", RevenueAccountCode = "4000" };
+        Warehouse wh = new(companyId, "OFFWH", "Shop");
+        db.AddRange(terminal, item, wh);
+        await db.SaveChangesAsync();
+        (await scope.ServiceProvider.GetRequiredService<IInventoryService>().ReceiveAsync(new ReceiveStockRequest
+        {
+            CompanyId = companyId, ItemId = item.Id, WarehouseId = wh.Id, Date = new DateOnly(2026, 3, 1), Quantity = 10m, UnitCost = 1m, CreditAccountCode = "1100",
+        })).IsSuccess.Should().BeTrue();
+
+        string key = $"OFF-{companyId}-T1";
+        DateTimeOffset opened = new(2026, 3, 2, 7, 0, 0, TimeSpan.Zero);
+        PosSaleEnvelope sale = new(companyId, terminal.Id, 0, 1, $"OFFS-{companyId}", new DateOnly(2026, 3, 2), wh.Id, "USD", "2200",
+            [new PosSaleLineEnvelope(item.Id, "Soda", 2m, 2m, 4m, 0m, "4000")], [new PosTenderEnvelope(TenderType.Cash, "USD", 4m, "1000", IsChange: false)], OfflineSessionKey: key);
+        IOfflineOutbox outbox = scope.ServiceProvider.GetRequiredService<IOfflineOutbox>();
+        IOfflineSyncService sync = scope.ServiceProvider.GetRequiredService<IOfflineSyncService>();
+
+        // The sale alone cannot post until its till has synced.
+        (await outbox.EnqueueAsync(new OfflineOperation(companyId, Guid.NewGuid(), PosSaleEnvelope.Kind, JsonSerializer.Serialize(sale), opened.AddMinutes(5)))).Should().BeTrue();
+        (await sync.SyncPendingAsync()).Synced.Should().Be(0);
+
+        (await outbox.EnqueueAsync(new OfflineOperation(companyId, Guid.NewGuid(), PosOpenTillEnvelope.Kind,
+            JsonSerializer.Serialize(new PosOpenTillEnvelope(companyId, terminal.Id, 1, 50m, opened, key)), opened))).Should().BeTrue();
+        await sync.SyncPendingAsync();
+        await sync.SyncPendingAsync();
+
+        TillSession session = await db.Set<TillSession>().AsNoTracking().SingleAsync(s => s.CompanyId == companyId && s.OfflineKey == key);
+        (session.OpeningFloat, session.OpenedOnUtc).Should().Be((50m, opened));
+        (await db.Set<Sale>().AsNoTracking().SingleAsync(s => s.CompanyId == companyId && s.SaleNumber == $"OFFS-{companyId}")).TillSessionId.Should().Be(session.Id);
+        (await scope.ServiceProvider.GetRequiredService<IPosService>().OpenTillOfflineAsync(companyId, terminal.Id, 1, 50m, opened, key)).Value.Should().Be(session.Id);
+    }
 }
