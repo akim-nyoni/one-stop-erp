@@ -25,7 +25,58 @@ public sealed class BudgetPreparationService : IBudgetPreparationService
         _workflow = workflow;
     }
 
+    /// <summary>Creates the service with department isolation.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="clock">The clock.</param>
+    /// <param name="permissions">The users' permissions (the all-departments grant).</param>
+    /// <param name="scopes">The users' data scopes (department scopes).</param>
+    /// <param name="workflow">Routes a recommended budget through the approval workflow when one is defined for budgets.</param>
+    public BudgetPreparationService(One4AllDbContext db, IClock clock, Application.Abstractions.Security.IPermissionService permissions,
+        Application.Abstractions.Security.IDataScopeService scopes, Lazy<IWorkflowService>? workflow = null)
+        : this(db, clock, workflow)
+    {
+        _permissions = permissions;
+        _scopes = scopes;
+    }
+
     private readonly Lazy<IWorkflowService>? _workflow;
+    private readonly Application.Abstractions.Security.IPermissionService? _permissions;
+    private readonly Application.Abstractions.Security.IDataScopeService? _scopes;
+
+    /// <inheritdoc />
+    public async Task<IReadOnlySet<string>?> DepartmentsForAsync(long companyId, long userId, CancellationToken ct = default)
+    {
+        if (_permissions is null || userId <= 0)
+        {
+            return null;
+        }
+
+        Core.Security.EffectivePermissions rights = await _permissions.ResolveAsync(userId, ct).ConfigureAwait(false);
+        bool all = rights.IsSuperAdministrator || rights.Has("Budget.ViewAllDepartments", Core.Security.OperationFlags.View);
+        List<string?> own = await _db.Set<Core.Payroll.Employee>().Where(e => e.CompanyId == companyId && e.UserId == userId).Select(e => e.Department).ToListAsync(ct).ConfigureAwait(false);
+        if (_scopes is not null && (await _scopes.ForUserAsync(userId, ct).ConfigureAwait(false)).AllowedValues(Core.Security.ScopeDimension.Department) is IReadOnlyList<string> scoped)
+        {
+            own.AddRange(scoped);
+        }
+
+        return Application.Budgeting.BudgetDepartmentAccess.Confined(all, own);
+    }
+
+    // The budget holder's side (submit, revise): only within the user's departments.
+    private async Task<Result> DepartmentGuardAsync(long companyId, long budgetId, long userId, CancellationToken ct)
+    {
+        IReadOnlySet<string>? confined = await DepartmentsForAsync(companyId, userId, ct).ConfigureAwait(false);
+        if (confined is null)
+        {
+            return Result.Success();
+        }
+
+        string? department = await _db.Set<Budget>().Where(b => b.Id == budgetId && b.CompanyId == companyId).Select(b => b.Department).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return Application.Budgeting.BudgetDepartmentAccess.Allows(confined, department)
+            ? Result.Success()
+            : Result.Failure(Error.Forbidden("Budget.OtherDepartment",
+                $"This is {(department is null ? "the company-wide budget" : $"the {department} budget")}; you prepare only {string.Join(", ", confined.Order(StringComparer.OrdinalIgnoreCase))}."));
+    }
 
     /// <summary>The workflow reference of a budget.</summary>
     /// <param name="budgetId">The budget.</param>
@@ -33,8 +84,12 @@ public sealed class BudgetPreparationService : IBudgetPreparationService
     internal static string Reference(long budgetId) => $"BUD-{budgetId}";
 
     /// <inheritdoc />
-    public Task<Result> SubmitAsync(long companyId, long budgetId, long userId, string? comment = null, CancellationToken ct = default)
-        => StepAsync(companyId, budgetId, [BudgetStatus.Draft, BudgetStatus.Returned], b => b.Submit(userId), BudgetReviewAction.Submitted, userId, comment, ct);
+    public async Task<Result> SubmitAsync(long companyId, long budgetId, long userId, string? comment = null, CancellationToken ct = default)
+    {
+        Result allowed = await DepartmentGuardAsync(companyId, budgetId, userId, ct).ConfigureAwait(false);
+        return allowed.IsFailure ? allowed
+            : await StepAsync(companyId, budgetId, [BudgetStatus.Draft, BudgetStatus.Returned], b => b.Submit(userId), BudgetReviewAction.Submitted, userId, comment, ct).ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public Task<Result> StartReviewAsync(long companyId, long budgetId, long userId, CancellationToken ct = default)
@@ -101,6 +156,12 @@ public sealed class BudgetPreparationService : IBudgetPreparationService
     /// <inheritdoc />
     public async Task<Result> ReviseAsync(long companyId, long budgetId, long userId, ProposedFigure figure, CancellationToken ct = default)
     {
+        Result allowed = await DepartmentGuardAsync(companyId, budgetId, userId, ct).ConfigureAwait(false);
+        if (allowed.IsFailure)
+        {
+            return allowed;
+        }
+
         Budget? budget = await LoadAsync(companyId, budgetId, ct).ConfigureAwait(false);
         if (budget is null)
         {

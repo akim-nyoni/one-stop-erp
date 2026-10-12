@@ -35,6 +35,13 @@ public interface IBudgetPreparationService
     /// <returns>Success or why not.</returns>
     Task<Result> SubmitAsync(long companyId, long budgetId, long userId, string? comment = null, CancellationToken ct = default);
 
+    /// <summary>The departments whose budgets a user may see and prepare, or null when every department (Finance, or a user tied to no department).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="userId">The user.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The departments, or null for all.</returns>
+    Task<IReadOnlySet<string>?> DepartmentsForAsync(long companyId, long userId, CancellationToken ct = default);
+
     /// <summary>Finance takes up a submitted budget for review.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="budgetId">The budget.</param>

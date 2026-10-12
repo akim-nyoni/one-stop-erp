@@ -249,7 +249,14 @@ public static partial class OperationCatalogue
     }
 
     private static async Task<DataTable> BudgetsInPreparationAsync(OperationContext c)
-        => Table(await c.Db.Set<Budget>().AsNoTracking().Include(b => b.Lines).Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Take(200).ToListAsync().ConfigureAwait(true),
+    {
+        // A department's preparers see their own department's budgets only (Finance sees every department).
+        IReadOnlySet<string>? departments = await c.Get<IBudgetPreparationService>().DepartmentsForAsync(c.CompanyId, c.UserId).ConfigureAwait(true);
+        List<string> visible = departments is null ? [] : [.. departments.Select(d => d.ToUpperInvariant())];
+        return Table(await c.Db.Set<Budget>().AsNoTracking().Include(b => b.Lines)
+                .Where(b => b.CompanyId == c.CompanyId && (departments == null || (b.Department != null && visible.Contains(b.Department.ToUpper()))))
+                .OrderByDescending(b => b.Id).Take(200).ToListAsync().ConfigureAwait(true),
             ("Id", b => b.Id), ("Budget", b => $"{b.Label} v{b.VersionNumber}"), ("Type", b => b.Type), ("Department", b => b.Department), ("Status", b => b.Status), ("Round", b => b.Round),
             ("Total", b => M(b.AnnualTotal)), ("Resolution", b => b.ResolutionReference), ("Active", b => b.IsActive));
+    }
 }
