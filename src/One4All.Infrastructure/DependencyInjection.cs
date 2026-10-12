@@ -439,6 +439,7 @@ public static class DependencyInjection
         services.AddSingleton<Application.Abstractions.Offline.ILocalDataProtector>(_ => Offline.LocalDataProtector.Default());
         services.AddSingleton<Application.Abstractions.Offline.ILocalOfflineQueue>(sp => Offline.FileLocalOfflineQueue.Default(sp.GetRequiredService<Application.Abstractions.Offline.ILocalDataProtector>()));
         services.AddSingleton<Application.Abstractions.Offline.ILocalCatalogueStore>(sp => Offline.FileLocalCatalogueStore.Default(sp.GetRequiredService<Application.Abstractions.Offline.ILocalDataProtector>()));
+        services.AddSingleton<Application.Abstractions.Offline.ILocalParkedSaleStore>(sp => Offline.FileLocalParkedSaleStore.Default(sp.GetRequiredService<Application.Abstractions.Offline.ILocalDataProtector>()));
         services.AddScoped<Application.Abstractions.Offline.IOfflineOutbox, Offline.EfOfflineOutbox>();
         services.AddScoped<Application.Abstractions.Offline.IOfflineOperationHandler, Offline.PosSaleOfflineHandler>();
         services.AddScoped<Application.Abstractions.Offline.IOfflineSyncService, Application.Offline.OfflineSyncService>();

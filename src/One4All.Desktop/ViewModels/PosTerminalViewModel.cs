@@ -1369,6 +1369,18 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         string tag = string.IsNullOrWhiteSpace(ParkTag) ? $"Park {DateTime.Now:HH:mm}" : ParkTag.Trim();
+        if (!_online)
+        {
+            // Offline: the tab is sealed on this computer and listed with the others.
+            await LocalParked.ParkAsync(new LocalParkedSale(Guid.NewGuid(), tag, DateTimeOffset.Now, _ticket.SaleLines(NullIfBlank(DiscountAccountCode)))).ConfigureAwait(true);
+            _ticket.Clear();
+            ParkTag = string.Empty;
+            RebuildCart();
+            await RefreshParkedAsync().ConfigureAwait(true);
+            StatusMessage = $"Sale parked on this till as \"{tag}\" (offline).";
+            return;
+        }
+
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         Result<long> parked = await scope.ServiceProvider.GetRequiredService<IParkedSaleService>()
             .ParkAsync(_companyId, _terminalId, tag, _cashierUserId, _ticket.SaleLines(NullIfBlank(DiscountAccountCode))).ConfigureAwait(true);
@@ -1401,6 +1413,18 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             return;
         }
 
+        if (chosen.Id < 0 && _localTabs.TryGetValue(chosen.Id, out Guid localId))
+        {
+            // A tab parked here offline.
+            LocalParkedSale? local = await LocalParked.TakeAsync(localId).ConfigureAwait(true);
+            Result restored = local is null ? Result.Failure(Error.NotFound("Pos.ParkedGone", "That tab is no longer on this till."))
+                : _ticket.Load(local.Lines, l => l.LineNet == 0m ? 0m : Math.Round(l.TaxAmount / l.LineNet, 4));
+            StatusMessage = restored.IsSuccess ? $"Resumed \"{chosen.Tag}\"." : restored.Error.Message;
+            RebuildCart();
+            await RefreshParkedAsync().ConfigureAwait(true);
+            return;
+        }
+
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         Result<IReadOnlyList<PosSaleLineRequest>> lines = await scope.ServiceProvider.GetRequiredService<IParkedSaleService>()
             .ResumeAsync(_companyId, chosen.Id, _terminalId, _cashierUserId).ConfigureAwait(true);
@@ -1414,14 +1438,40 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [RelayCommand]
     private async Task RefreshParkedAsync()
     {
-        await using AsyncServiceScope scope = _services.CreateAsyncScope();
-        IReadOnlyList<ParkedSaleSummary> parked = await scope.ServiceProvider.GetRequiredService<IParkedSaleService>().ParkedAsync(_companyId).ConfigureAwait(true);
+        IReadOnlyList<ParkedSaleSummary> parked = [];
+        if (_online)
+        {
+            try
+            {
+                await using AsyncServiceScope scope = _services.CreateAsyncScope();
+                parked = await scope.ServiceProvider.GetRequiredService<IParkedSaleService>().ParkedAsync(_companyId).ConfigureAwait(true);
+            }
+            catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+            {
+                _online = false;
+            }
+        }
+
+        // The tabs parked on this till while offline, listed with negative ids.
+        _localTabs.Clear();
+        List<ParkedSaleSummary> local = [];
+        foreach (LocalParkedSale tab in await LocalParked.ListAsync().ConfigureAwait(true))
+        {
+            long id = -(local.Count + 1);
+            _localTabs[id] = tab.Id;
+            local.Add(new ParkedSaleSummary(id, $"{tab.Tag} (this till)", _terminalId, tab.Lines.Count, tab.Total, tab.ParkedAt));
+        }
+
         ParkedSales.Clear();
-        foreach (ParkedSaleSummary sale in parked)
+        foreach (ParkedSaleSummary sale in parked.Concat(local))
         {
             ParkedSales.Add(sale);
         }
     }
+
+    private readonly Dictionary<long, Guid> _localTabs = [];
+
+    private ILocalParkedSaleStore LocalParked => _services.GetRequiredService<ILocalParkedSaleStore>();
 
     // A supervisor's user name and PIN, checked now: they must hold the permission and not be the cashier.
     private async Task<long?> SupervisorAsync(string permission, OperationFlags needed)

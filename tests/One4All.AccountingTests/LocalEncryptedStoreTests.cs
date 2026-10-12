@@ -109,4 +109,24 @@ public sealed class LocalEncryptedStoreTests : IDisposable
 
     private static PosTile Tile(long id, string code, string name, string? barcode, string? plu, decimal price)
         => new(id, code, name, "Grocery", price, "4000", "VAT", barcode, plu);
+
+    [Fact]
+    public async Task Tabs_parked_offline_are_sealed_listed_and_taken_once()
+    {
+        LocalDataProtector protector = new(_dir);
+        Application.Abstractions.Offline.LocalParkedSale tab = new(Guid.NewGuid(), "Table 4", DateTimeOffset.Now,
+            [new Application.Abstractions.Pos.PosSaleLineRequest(7, "Lager", 2m, 1.5m, 3m, 0.45m, "4502")]);
+        FileLocalParkedSaleStore store = new(_dir, protector);
+        await store.ParkAsync(tab);
+        await store.ParkAsync(tab with { Id = Guid.NewGuid(), Tag = "Bar 2", ParkedAt = DateTimeOffset.Now.AddMinutes(1) });
+
+        FileLocalParkedSaleStore reopened = new(_dir, new LocalDataProtector(_dir));
+        (await reopened.ListAsync()).Select(t => t.Tag).Should().Equal("Table 4", "Bar 2");
+        (await reopened.ListAsync())[0].Total.Should().Be(3.45m);
+        System.Text.Encoding.UTF8.GetString(await File.ReadAllBytesAsync(Path.Combine(_dir, "pos-parked.o4a"))).Should().NotContain("Lager", "the file is sealed");
+
+        (await reopened.TakeAsync(tab.Id))!.Lines.Should().ContainSingle(l => l.Description == "Lager" && l.Quantity == 2m);
+        (await reopened.TakeAsync(tab.Id)).Should().BeNull("a tab is resumed once");
+        (await reopened.ListAsync()).Should().ContainSingle(t => t.Tag == "Bar 2");
+    }
 }
