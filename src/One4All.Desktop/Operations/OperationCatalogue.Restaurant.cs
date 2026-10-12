@@ -22,6 +22,34 @@ public static partial class OperationCatalogue
         const string module = "Restaurant";
         yield return new Operation
         {
+            Module = "Restaurant", Title = "Floor plan and tab warnings", ListTitle = "Floor plan",
+            Description = "Place each table on the floor plan grid (across, down) with its shape; the plan shows every table, its open tab, the tab's total and how long it has "
+                + "been open. Tab warnings flag a tab open longer than so many minutes or running over a total (0 turns either off).",
+            Fields = [Pick("Step", "Step", ["Place table", "Tab warnings", "Warnings now"]), Opt("Table", "Table number"), Num("X", "Across (0–99)", "0"), Num("Y", "Down (0–99)", "0"),
+                Pick("Shape", "Shape", Enum.GetNames<TableShape>()), Num("Minutes", "Warn after (minutes)", "90"), Num("Amount", "Warn over (total)", "0")],
+            Run = async (c, i) =>
+            {
+                IFloorPlanService floor = c.Get<IFloorPlanService>();
+                switch (i.Text("Step"))
+                {
+                    case "Tab warnings":
+                        return Check(await floor.SetTabWarningsAsync(c.CompanyId, i.Whole("Minutes"), i.Number("Amount")).ConfigureAwait(true), "Tab warnings set.");
+                    case "Warnings now":
+                        IReadOnlyList<FloorTable> flagged = await floor.WarningsAsync(c.CompanyId, DateTimeOffset.UtcNow).ConfigureAwait(true);
+                        return flagged.Count == 0 ? "No tab needs attention." : string.Join(Environment.NewLine, flagged.Select(t =>
+                            $"Table {t.TableNumber,-6} {t.OrderNumber,-12} {M(t.TabTotal),12}  {t.Warning}"));
+                    default:
+                        return Check(await floor.PlaceTableAsync(c.CompanyId, i.Optional("Table") ?? string.Empty, i.Whole("X"), i.Whole("Y"), Enum.Parse<TableShape>(i.Text("Shape"))).ConfigureAwait(true),
+                            "Table placed.");
+                }
+            },
+            List = async c => Table(await c.Get<IFloorPlanService>().PlanAsync(c.CompanyId, DateTimeOffset.UtcNow).ConfigureAwait(true),
+                ("Table", t => t.TableNumber), ("Seats", t => t.Seats), ("At", t => t.X is int x ? $"{x},{t.Y}" : "-"), ("Shape", t => t.Shape), ("Status", t => t.Status),
+                ("Tab", t => t.OrderNumber ?? string.Empty), ("Total", t => t.OrderNumber is null ? string.Empty : M(t.TabTotal)), ("Open (min)", t => t.OrderNumber is null ? string.Empty : t.MinutesOpen.ToString(CultureInfo.InvariantCulture)),
+                ("Warning", t => t.Warning ?? string.Empty)),
+        };
+        yield return new Operation
+        {
             Module = "Restaurant", Title = "Kitchen station printers", ListTitle = "Station printers",
             Description = "Which printer each preparation station's tickets print on (KITCHEN for dishes with no station): a Windows printer by name, or a network printer by host "
                 + "and port. A station with no printer works from its kitchen display. Reprint sends a ticket (and its per-station tickets) again, marked REPRINT.",

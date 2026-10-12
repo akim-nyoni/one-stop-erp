@@ -27156,6 +27156,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(8)")
                         .HasColumnName("service_charge_account_code");
 
+                    b.Property<decimal>("TabWarningAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("tab_warning_amount");
+
+                    b.Property<int>("TabWarningMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("tab_warning_minutes");
+
                     b.HasKey("Id")
                         .HasName("pk_policy");
 
@@ -27211,6 +27220,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<int?>("PlanX")
+                        .HasColumnType("integer")
+                        .HasColumnName("plan_x");
+
+                    b.Property<int?>("PlanY")
+                        .HasColumnType("integer")
+                        .HasColumnName("plan_y");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -27224,6 +27241,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long?>("SectionId")
                         .HasColumnType("bigint")
                         .HasColumnName("section_id");
+
+                    b.Property<int>("Shape")
+                        .HasColumnType("integer")
+                        .HasColumnName("shape");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer")

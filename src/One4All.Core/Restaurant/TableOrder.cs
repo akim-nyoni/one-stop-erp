@@ -48,6 +48,15 @@ public sealed class RestaurantTable : SoftDeletableEntity, ICompanyScoped
     /// <summary>The floor-plan section this table sits in, if any.</summary>
     public long? SectionId { get; private set; }
 
+    /// <summary>Gets or sets the table's column on the floor plan grid (null: not placed).</summary>
+    public int? PlanX { get; set; }
+
+    /// <summary>Gets or sets the table's row on the floor plan grid (null: not placed).</summary>
+    public int? PlanY { get; set; }
+
+    /// <summary>Gets or sets the table's shape on the floor plan.</summary>
+    public TableShape Shape { get; set; }
+
     /// <summary>Assigns the table to a floor-plan section (or clears it with null).</summary>
     /// <param name="sectionId">The section, or null to unassign.</param>
     public void AssignToSection(long? sectionId) => SectionId = sectionId;
@@ -547,4 +556,20 @@ public sealed class TableOrderLine : Entity
 
         BilledQuantity = decimal.Round(BilledQuantity + quantity, 4, MidpointRounding.ToEven);
     }
+}
+
+/// <summary>How a table is drawn on the floor plan.</summary>
+public enum TableShape
+{
+    /// <summary>A square or rectangular table.</summary>
+    Square = 0,
+
+    /// <summary>A round table.</summary>
+    Round = 1,
+
+    /// <summary>A booth.</summary>
+    Booth = 2,
+
+    /// <summary>A bar counter seat.</summary>
+    BarSeat = 3,
 }

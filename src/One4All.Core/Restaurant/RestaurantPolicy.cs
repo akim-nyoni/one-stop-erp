@@ -34,6 +34,12 @@ public sealed class RestaurantPolicy : AuditableEntity, ICompanyScoped
     /// <summary>The service-charge income account the gratuity books to.</summary>
     public string ServiceChargeAccountCode { get; private set; } = string.Empty;
 
+    /// <summary>Gets or sets after how many minutes an open tab is flagged (0: never).</summary>
+    public int TabWarningMinutes { get; set; }
+
+    /// <summary>Gets or sets the tab total above which an open tab is flagged (0: never).</summary>
+    public decimal TabWarningAmount { get; set; }
+
     /// <summary>Updates the policy values.</summary>
     /// <param name="minParty">The party-size threshold.</param>
     /// <param name="percent">The gratuity percentage.</param>

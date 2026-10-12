@@ -58,6 +58,7 @@ internal sealed class RestaurantTableConfiguration : IEntityTypeConfiguration<Re
         b.HasKey(x => x.Id);
         b.Property(x => x.TableNumber).HasMaxLength(20);
         b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Shape).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.TableNumber }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => x.GroupId);
         b.HasIndex(x => x.SectionId);
@@ -129,6 +130,7 @@ internal sealed class RestaurantPolicyConfiguration : IEntityTypeConfiguration<R
 {
     public void Configure(EntityTypeBuilder<RestaurantPolicy> b)
     {
+        b.Property(x => x.TabWarningAmount).HasPrecision(19, 4);
         b.ToTable("policy", Schemas.Restaurant);
         b.HasKey(x => x.Id);
         b.Property(x => x.AutoGratuityPercent).HasPrecision(9, 4);
