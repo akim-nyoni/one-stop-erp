@@ -155,8 +155,8 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
         LeaveApplication application = new(me.CompanyId, me.Id, balance!.LeaveType, fromDate, toDate, days);
         _db.LeaveApplications.Add(application);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, me.CompanyId, WorkflowDocumentTypes.LeaveApplication, LeaveReference(application.Id), days, userId, ct)
-            .ConfigureAwait(false);
+        Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, me.CompanyId, WorkflowDocumentTypes.LeaveApplication, LeaveReference(application.Id), days, userId,
+            [("Department", me.Department), ("CostCentre", me.CostCentre), ("LeaveType", balance.LeaveType)], ct).ConfigureAwait(false);
         return governed.IsFailure ? Result<long>.Failure(governed.Error) : application.Id;
     }
 

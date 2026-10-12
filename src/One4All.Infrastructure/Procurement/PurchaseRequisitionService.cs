@@ -88,8 +88,14 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
 
             // The company's requisition workflow governs the approval from here.
             PurchaseRequisition req = await _db.Set<PurchaseRequisition>().Include(r => r.Lines).SingleAsync(r => r.Id == requisitionId, ct).ConfigureAwait(false);
-            Result<Application.Abstractions.Workflow.WorkflowStartResult> started = await _workflow.Value.StartAsync(companyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.PurchaseRequisition,
-                requisitionId.ToString(System.Globalization.CultureInfo.InvariantCulture), req.Lines.Sum(l => l.Quantity * l.UnitPrice), submittedByUserId, ct).ConfigureAwait(false);
+            List<long> itemIds = [.. req.Lines.Select(l => l.ItemId)];
+            string? category = (await _db.Items.Where(i => itemIds.Contains(i.Id)).Select(i => new { i.Id, i.Category }).ToListAsync(ct).ConfigureAwait(false))
+                .Join(req.Lines, i => i.Id, l => l.ItemId, (i, l) => (i.Category, Value: l.Quantity * l.UnitPrice)).Where(x => x.Category != null)
+                .GroupBy(x => x.Category).OrderByDescending(g => g.Sum(x => x.Value)).Select(g => g.Key).FirstOrDefault();
+            string? supplier = await _db.Suppliers.Where(s => s.Id == req.SupplierId).Select(s => s.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            Result<bool> started = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, companyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.PurchaseRequisition,
+                requisitionId.ToString(System.Globalization.CultureInfo.InvariantCulture), req.Lines.Sum(l => l.Quantity * l.UnitPrice), submittedByUserId,
+                [("Currency", req.Currency.Value), ("Supplier", supplier), ("Category", category)], ct).ConfigureAwait(false);
             return started.IsFailure ? Result.Failure(started.Error) : Result.Success();
         }, ct);
 

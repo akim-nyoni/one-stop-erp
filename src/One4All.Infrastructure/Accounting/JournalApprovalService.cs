@@ -46,8 +46,14 @@ public sealed class JournalApprovalService : IJournalApprovalService
                 return held;
             }
 
+            IReadOnlyDictionary<string, string> attributes = await Workflow.WorkflowGate.AttributesAsync(_db, preparedByUserId,
+            [
+                ("Currency", request.TransactionCurrency.Value), ("Department", request.Lines.Select(l => l.Department).FirstOrDefault(d => !string.IsNullOrWhiteSpace(d))),
+                ("CostCentre", request.Lines.Select(l => l.CostCentre).FirstOrDefault(c => !string.IsNullOrWhiteSpace(c))),
+                ("Project", request.Lines.Select(l => l.Project).FirstOrDefault(p => !string.IsNullOrWhiteSpace(p))),
+            ], ct).ConfigureAwait(false);
             Result<Application.Abstractions.Workflow.WorkflowStartResult> started = await _workflow.Value.StartAsync(request.CompanyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.Journal,
-                reference, held.Value.TotalBase, preparedByUserId, ct).ConfigureAwait(false);
+                reference, held.Value.TotalBase, preparedByUserId, attributes, ct).ConfigureAwait(false);
             return started.IsFailure ? started.Error : held;
         }, ct);
     }

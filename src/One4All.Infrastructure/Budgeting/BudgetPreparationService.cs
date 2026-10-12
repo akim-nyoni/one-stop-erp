@@ -132,7 +132,9 @@ public sealed class BudgetPreparationService : IBudgetPreparationService
             }
 
             decimal total = await _db.Set<BudgetLine>().Where(l => l.BudgetId == budgetId).SumAsync(l => l.Amount, ct).ConfigureAwait(false);
-            Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, companyId, WorkflowDocumentTypes.Budget, Reference(budgetId), total, userId, ct).ConfigureAwait(false);
+            string? department = await _db.Set<Budget>().Where(b => b.Id == budgetId).Select(b => b.Department).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, companyId, WorkflowDocumentTypes.Budget, Reference(budgetId), total, userId,
+                [("Department", department)], ct).ConfigureAwait(false);
             return governed.IsFailure ? Result.Failure(governed.Error) : Result.Success();
         }, ct);
 

@@ -58,7 +58,11 @@ public sealed class CreditNoteApprovalService : ICreditNoteApprovalService
             _db.Set<PendingCreditNote>().Add(held);
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, request.CompanyId, WorkflowDocumentTypes.CreditNote, number, request.NetAmount + request.TaxAmount,
-                submittedByUserId, ct).ConfigureAwait(false);
+                submittedByUserId,
+                [
+                    ("Currency", request.Currency.Value), ("Reason", request.ReasonCode),
+                    ("Customer", await _db.Customers.Where(c => c.Id == request.CustomerId).Select(c => c.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false)),
+                ], ct).ConfigureAwait(false);
             return governed.IsFailure ? governed.Error : Result<CreditNoteSubmission>.Success(new CreditNoteSubmission(false, null));
         }, ct);
 

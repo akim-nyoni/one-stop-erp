@@ -295,7 +295,8 @@ public sealed class PaymentRunService : IPaymentRunService
 
         // The company's payment-run workflow, when defined, governs the approval from here.
         Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, request.CompanyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.PaymentRun, batch.Number,
-            batch.Lines.Where(l => l.Included).Sum(l => l.Amount), proposedByUserId, ct).ConfigureAwait(false);
+            batch.Lines.Where(l => l.Included).Sum(l => l.Amount), proposedByUserId,
+            [("Currency", string.Join(",", batch.Lines.Where(l => l.Included).Select(l => l.Currency).Distinct().Order(StringComparer.Ordinal)))], ct).ConfigureAwait(false);
         return governed.IsFailure ? governed.Error : View(batch);
     }
 

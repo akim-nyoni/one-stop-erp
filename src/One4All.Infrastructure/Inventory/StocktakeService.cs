@@ -163,7 +163,8 @@ public sealed class StocktakeService : IStocktakeService
 
             decimal varianceValue = session.Lines.Where(l => l.IsCounted).Sum(l => Math.Abs(l.CountedQuantity!.Value - l.SystemQuantity) * l.AverageCost);
             Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, companyId, WorkflowDocumentTypes.Stocktake, reference, decimal.Round(varianceValue, 2),
-                postedByUserId ?? 0, ct).ConfigureAwait(false);
+                postedByUserId ?? 0, [("Warehouse", await _db.Warehouses.Where(w => w.Id == session.WarehouseId).Select(w => w.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false))], ct)
+                .ConfigureAwait(false);
             if (governed.IsFailure)
             {
                 return governed.Error;

@@ -141,8 +141,13 @@ public sealed class ProcurementService : IProcurementService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         // The company's purchase-order workflow, when defined, holds the order until it is approved.
+        long? job = order.Lines.Select(l => l.JobContractId).FirstOrDefault(j => j != null);
         Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, request.CompanyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.PurchaseOrder,
-            order.OrderNumber, order.Lines.Sum(l => l.OrderedQuantity * l.UnitPrice), request.RaisedByUserId, ct).ConfigureAwait(false);
+            order.OrderNumber, order.Lines.Sum(l => l.OrderedQuantity * l.UnitPrice), request.RaisedByUserId,
+            [
+                ("Currency", order.Currency.Value), ("Supplier", await _db.Suppliers.Where(s => s.Id == order.SupplierId).Select(s => s.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false)),
+                ("Project", job is long j ? await _db.JobContracts.Where(c => c.Id == j).Select(c => c.ContractNumber).FirstOrDefaultAsync(ct).ConfigureAwait(false) : null),
+            ], ct).ConfigureAwait(false);
         if (governed.IsFailure)
         {
             return governed.Error;
