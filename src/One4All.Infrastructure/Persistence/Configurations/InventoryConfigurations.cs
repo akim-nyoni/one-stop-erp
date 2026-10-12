@@ -51,6 +51,10 @@ internal sealed class ItemConfiguration : IEntityTypeConfiguration<Item>
 {
     public void Configure(EntityTypeBuilder<Item> b)
     {
+        b.Property(x => x.LongDescription).HasColumnType("text");
+        b.Property(x => x.LengthCm).HasPrecision(12, 3);
+        b.Property(x => x.WidthCm).HasPrecision(12, 3);
+        b.Property(x => x.HeightCm).HasPrecision(12, 3);
         b.Property(x => x.CatchWeightUnit).HasMaxLength(10);
         b.Property(x => x.NominalWeight).HasPrecision(19, 4);
         b.Property(x => x.WeightTolerancePercent).HasPrecision(7, 4);
@@ -369,5 +373,16 @@ internal sealed class HeldStockMovementConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.Quantity).HasPrecision(18, 4);
         b.Property(x => x.Reference).HasMaxLength(60);
         b.Property(x => x.JournalNumber).HasMaxLength(40);
+    }
+}
+
+internal sealed class ItemImageConfiguration : IEntityTypeConfiguration<ItemImage>
+{
+    public void Configure(EntityTypeBuilder<ItemImage> b)
+    {
+        b.ToTable("item_image", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.ContentType).HasMaxLength(50);
+        b.HasIndex(x => new { x.CompanyId, x.ItemId }).IsUnique();
     }
 }

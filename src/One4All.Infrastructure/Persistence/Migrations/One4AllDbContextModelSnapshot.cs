@@ -12603,6 +12603,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("forecast_window_days");
 
+                    b.Property<decimal?>("HeightCm")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)")
+                        .HasColumnName("height_cm");
+
                     b.Property<string>("HsCode")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -12623,6 +12628,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("LeadTimeDays")
                         .HasColumnType("integer")
                         .HasColumnName("lead_time_days");
+
+                    b.Property<decimal?>("LengthCm")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)")
+                        .HasColumnName("length_cm");
+
+                    b.Property<string>("LongDescription")
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("long_description");
 
                     b.Property<decimal?>("MaxQuantityPerSale")
                         .HasPrecision(19, 4)
@@ -12743,6 +12758,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(7, 4)
                         .HasColumnType("numeric(7,4)")
                         .HasColumnName("weight_tolerance_percent");
+
+                    b.Property<decimal?>("WidthCm")
+                        .HasPrecision(12, 3)
+                        .HasColumnType("numeric(12,3)")
+                        .HasColumnName("width_cm");
 
                     b.HasKey("Id")
                         .HasName("pk_item");
@@ -12870,6 +12890,48 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_item_category_company_id_code");
 
                     b.ToTable("item_category", "inv");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.ItemImage", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("content");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("content_type");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_item_image");
+
+                    b.HasIndex("CompanyId", "ItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_item_image_company_id_item_id");
+
+                    b.ToTable("item_image", "inv");
                 });
 
             modelBuilder.Entity("One4All.Core.Inventory.ItemSupplier", b =>
@@ -16411,6 +16473,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("last_reading_date");
 
+                    b.Property<string>("Location")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("location");
+
+                    b.Property<string>("MeterType")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("meter_type");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -16439,6 +16511,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)")
                         .HasColumnName("serial");
+
+                    b.Property<int?>("SizeMm")
+                        .HasColumnType("integer")
+                        .HasColumnName("size_mm");
 
                     b.Property<decimal>("UnitsCredit")
                         .HasPrecision(19, 4)
@@ -16745,6 +16821,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(60)")
                         .HasColumnName("land_use");
 
+                    b.Property<decimal?>("Latitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("latitude");
+
+                    b.Property<decimal?>("Longitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("longitude");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -16773,6 +16859,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("stand_number");
+
+                    b.Property<string>("Suburb")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("suburb");
 
                     b.Property<decimal>("Valuation")
                         .HasPrecision(19, 4)

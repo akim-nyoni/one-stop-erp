@@ -82,6 +82,25 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Stand location and meter details", ListTitle = "Meters",
+            Description = "A stand's suburb and GPS position (decimal degrees), and a meter's type, size (mm) and where it is on the stand. Blank fields stay as they are.",
+            Fields = [Pick("Step", "Step", ["Stand location", "Meter details"]), Opt("Stand", "Stand number"), Opt("Suburb", "Suburb"), OptNum("Latitude", "Latitude"), OptNum("Longitude", "Longitude"),
+                Opt("Meter", "Meter serial"), Opt("MeterType", "Meter type"), OptNum("Size", "Size (mm)"), Opt("Location", "Where the meter is")],
+            Run = async (c, i) =>
+            {
+                IPropertyRegisterService register = c.Get<IPropertyRegisterService>();
+                return i.Text("Step") == "Meter details"
+                    ? Check(await register.SetMeterDetailsAsync(c.CompanyId, i.Optional("Meter") ?? string.Empty, i.Optional("MeterType"), i.OptionalNumber("Size") is decimal size ? (int)size : null,
+                        i.Optional("Location")).ConfigureAwait(true), "Meter details saved.")
+                    : Check(await register.SetLocationAsync(c.CompanyId, i.Optional("Stand") ?? string.Empty, i.Optional("Suburb"), i.OptionalNumber("Latitude"), i.OptionalNumber("Longitude"))
+                        .ConfigureAwait(true), "Stand location saved.");
+            },
+            List = async c => Table(await c.Db.Set<Meter>().AsNoTracking().Where(m => m.CompanyId == c.CompanyId).OrderBy(m => m.Serial).Take(500).ToListAsync().ConfigureAwait(true),
+                ("Serial", m => m.Serial), ("Type", m => m.MeterType ?? string.Empty), ("Size (mm)", m => m.SizeMm?.ToString(CultureInfo.InvariantCulture) ?? string.Empty),
+                ("Where", m => m.Location ?? string.Empty), ("Installed", m => m.InstalledOn is DateOnly d ? D(d) : string.Empty)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Ratepayer statement", ListTitle = "Properties",
             Description = "The ratepayer's statement for a stand, as at a date, ready to print or hand over.",
             Fields = [Req("Stand", "Stand number"), Today("AsAt", "As at")],

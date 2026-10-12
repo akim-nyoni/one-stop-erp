@@ -355,6 +355,9 @@ internal sealed class PropertyConfiguration : IEntityTypeConfiguration<Property>
         b.Property(x => x.StandNumber).HasMaxLength(40);
         b.Property(x => x.Address).HasMaxLength(300);
         b.Property(x => x.CorrespondenceAddress).HasMaxLength(300);
+        b.Property(x => x.Suburb).HasMaxLength(60);
+        b.Property(x => x.Latitude).HasPrecision(9, 6);
+        b.Property(x => x.Longitude).HasPrecision(9, 6);
         b.Property(x => x.Ward).HasMaxLength(60);
         b.Property(x => x.Zone).HasMaxLength(60);
         b.Property(x => x.LandUse).HasMaxLength(60);
@@ -401,6 +404,8 @@ internal sealed class MeterConfiguration : IEntityTypeConfiguration<Meter>
         b.ToTable("meter", Schemas.Municipal);
         b.HasKey(x => x.Id);
         b.Property(x => x.Serial).HasMaxLength(60);
+        b.Property(x => x.MeterType).HasMaxLength(30);
+        b.Property(x => x.Location).HasMaxLength(200);
         b.Property(x => x.Multiplier).HasPrecision(19, 6);
         b.Property(x => x.LastReading).HasPrecision(19, 4);
         b.Property(x => x.LastActualReading).HasPrecision(19, 4);

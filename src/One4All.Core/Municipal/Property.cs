@@ -47,6 +47,15 @@ public sealed class Property : SoftDeletableEntity, ICompanyScoped
     /// <summary>The zone / suburb.</summary>
     public string? Zone { get; set; }
 
+    /// <summary>Gets or sets the suburb (when the zone is a planning zone).</summary>
+    public string? Suburb { get; set; }
+
+    /// <summary>Gets or sets the latitude of the stand (decimal degrees, WGS 84).</summary>
+    public decimal? Latitude { get; set; }
+
+    /// <summary>Gets or sets the longitude of the stand (decimal degrees, WGS 84).</summary>
+    public decimal? Longitude { get; set; }
+
     /// <summary>The size in square metres.</summary>
     public decimal SizeSquareMetres { get; set; }
 
@@ -181,6 +190,15 @@ public sealed class Meter : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>The number of dials (the register wraps to zero after 10^digits − 1); 0 when unknown.</summary>
     public int Digits { get; init; }
+
+    /// <summary>Gets or sets the meter type (e.g. water, electricity, bulk, prepaid).</summary>
+    public string? MeterType { get; set; }
+
+    /// <summary>Gets or sets the size (the pipe diameter in millimetres for water meters).</summary>
+    public int? SizeMm { get; set; }
+
+    /// <summary>Gets or sets where the meter is (e.g. "front boundary, left of gate").</summary>
+    public string? Location { get; set; }
 
     /// <summary>When it was installed.</summary>
     public DateOnly? InstalledOn { get; init; }

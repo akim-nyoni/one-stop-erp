@@ -130,6 +130,18 @@ public sealed class Item : SoftDeletableEntity, ICompanyScoped
     /// <summary>The volume of one unit in cubic metres, used to share landed costs by volume.</summary>
     public decimal? UnitVolumeM3 { get; set; }
 
+    /// <summary>Gets or sets the long (marketing / catalogue) description.</summary>
+    public string? LongDescription { get; set; }
+
+    /// <summary>Gets or sets the length of one unit in centimetres.</summary>
+    public decimal? LengthCm { get; set; }
+
+    /// <summary>Gets or sets the width of one unit in centimetres.</summary>
+    public decimal? WidthCm { get; set; }
+
+    /// <summary>Gets or sets the height of one unit in centimetres.</summary>
+    public decimal? HeightCm { get; set; }
+
     /// <summary>Gets or sets how the item's units are traced (batch or serial).</summary>
     public ItemTracking Tracking { get; set; }
 
@@ -212,4 +224,39 @@ public sealed class Warehouse : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Whether the warehouse is active.</summary>
     public bool IsActive { get; set; }
+}
+
+/// <summary>An item's picture (<c>inv.item_image</c>), kept apart from the item so item lists stay light.</summary>
+public sealed class ItemImage : Entity, ICompanyScoped
+{
+    private ItemImage()
+    {
+        Content = [];
+        ContentType = string.Empty;
+    }
+
+    /// <summary>Stores an item's picture.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="itemId">The item.</param>
+    /// <param name="content">The image bytes.</param>
+    /// <param name="contentType">The media type.</param>
+    public ItemImage(long companyId, long itemId, byte[] content, string contentType)
+    {
+        CompanyId = companyId;
+        ItemId = itemId;
+        Content = content;
+        ContentType = contentType;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>Gets the item.</summary>
+    public long ItemId { get; private set; }
+
+    /// <summary>Gets or sets the image bytes.</summary>
+    public byte[] Content { get; set; }
+
+    /// <summary>Gets or sets the media type.</summary>
+    public string ContentType { get; set; }
 }

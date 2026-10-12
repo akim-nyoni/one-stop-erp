@@ -374,6 +374,36 @@ public static partial class OperationCatalogue
         const string module = "Stock";
         yield return new Operation
         {
+            Module = module, Title = "Item picture, description and dimensions", ListTitle = "Items",
+            Description = "An item's long description, its length, width and height in centimetres (the volume follows) and weight, and its picture (a JPEG, PNG, GIF or WebP "
+                + "file of at most 1 MB; Remove picture drops it).",
+            Fields = [Pick("Step", "Step", ["Details", "Picture", "Remove picture"]), Req("Item", "Item code"), Opt("LongDescription", "Long description"), OptNum("Length", "Length (cm)"),
+                OptNum("Width", "Width (cm)"), OptNum("Height", "Height (cm)"), OptNum("Weight", "Weight (kg)"), Opt("File", "Picture file")],
+            Run = async (c, i) =>
+            {
+                IItemDetailsService details = c.Get<IItemDetailsService>();
+                switch (i.Text("Step"))
+                {
+                    case "Picture":
+                        string file = i.Optional("File") ?? throw new OperationException("Choose the picture file.");
+                        string type = System.IO.Path.GetExtension(file).ToLowerInvariant() switch { ".png" => "image/png", ".gif" => "image/gif", ".webp" => "image/webp", _ => "image/jpeg" };
+                        return Check(await details.SetImageAsync(c.CompanyId, i.Text("Item"), await System.IO.File.ReadAllBytesAsync(file).ConfigureAwait(true), type).ConfigureAwait(true), "Picture saved.");
+                    case "Remove picture":
+                        return Check(await details.SetImageAsync(c.CompanyId, i.Text("Item"), null, null).ConfigureAwait(true), "Picture removed.");
+                    default:
+                        return Check(await details.SetDetailsAsync(c.CompanyId, i.Text("Item"), new ItemDetails
+                        {
+                            LongDescription = i.Optional("LongDescription"), LengthCm = i.OptionalNumber("Length"), WidthCm = i.OptionalNumber("Width"), HeightCm = i.OptionalNumber("Height"),
+                            WeightKg = i.OptionalNumber("Weight"),
+                        }).ConfigureAwait(true), "Item details saved.");
+                }
+            },
+            List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Take(500).ToListAsync().ConfigureAwait(true),
+                ("Item", x => x.Code), ("Description", x => x.Description), ("L × W × H (cm)", x => x.LengthCm is null ? string.Empty : $"{x.LengthCm:0.#} × {x.WidthCm:0.#} × {x.HeightCm:0.#}"),
+                ("Weight (kg)", x => x.UnitWeightKg?.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Supplier- and customer-owned stock", ListTitle = "Goods held for others",
             Description = "Goods we hold that are not ours: a supplier's consignment stock (with the agreed price) or a customer's goods in our keeping. They stay out of our stock "
                 + "value. Return hands them back; Use (supplier-owned only) takes them into our stock at the agreed price and raises the supplier's invoice through the clearing account.",
