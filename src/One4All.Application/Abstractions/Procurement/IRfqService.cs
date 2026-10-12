@@ -32,6 +32,12 @@ public sealed record QuoteRequest(long SupplierId, DateOnly ReceivedOn, int Lead
 /// <param name="Score">Its total, lead time, points and rank.</param>
 public sealed record QuoteComparison(long SupplierId, string SupplierCode, IReadOnlyDictionary<long, decimal> UnitPrices, TenderScore Score);
 
+/// <summary>What sending a request for quotation to its suppliers did.</summary>
+/// <param name="BatchId">The email batch queued, or null when no supplier had an address.</param>
+/// <param name="Recipients">The addresses it was queued to.</param>
+/// <param name="NoEmail">The invited suppliers (codes) with nobody to email.</param>
+public sealed record RfqDespatch(long? BatchId, int Recipients, IReadOnlyList<string> NoEmail);
+
 /// <summary>The comparison matrix and adjudication record of a request for quotation.</summary>
 /// <param name="RfqNumber">The request.</param>
 /// <param name="Quotes">The quotes, best first.</param>
@@ -60,6 +66,23 @@ public interface IRfqService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success, or why it was refused.</returns>
     Task<Result> RecordQuoteAsync(long companyId, long rfqId, QuoteRequest quote, CancellationToken ct = default);
+
+    /// <summary>The printable request for quotation: the items and quantities wanted, the closing date and a column for the supplier's prices.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="rfqId">The request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The document text, or why there is none.</returns>
+    Task<Result<string>> RenderAsync(long companyId, long rfqId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Emails the request (as an attached document) to every invited supplier's order contacts (else the primary contact), reporting the
+    /// suppliers with nobody to email. Only an open request is sent.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="rfqId">The request.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What was queued, or why it was refused.</returns>
+    Task<Result<RfqDespatch>> SendAsync(long companyId, long rfqId, CancellationToken ct = default);
 
     /// <summary>The comparison matrix: every quote scored and ranked, and who has not quoted.</summary>
     /// <param name="companyId">The company.</param>

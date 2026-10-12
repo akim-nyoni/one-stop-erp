@@ -153,9 +153,9 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Requests for quotation", ListTitle = "RFQs",
-            Description = "Issue an RFQ to several suppliers (codes comma-separated) for items (ITEM:quantity; …), record each supplier's quote (ITEM@price; …, lead time), compare them "
-                + "(price and lead time weighted, ranked) and award the RFQ to a supplier, which raises the purchase order.",
-            Fields = [Pick("Step", "Step", ["Issue", "Quote", "Compare", "Award"]), Req("Rfq", "RFQ number"), Opt("Suppliers", "Supplier codes (issue) / supplier (quote, award)"),
+            Description = "Issue an RFQ to several suppliers (codes comma-separated) for items (ITEM:quantity; …), print it or email it to the suppliers' order contacts, record "
+                + "each supplier's quote (ITEM@price; …, lead time), compare them (price and lead time weighted, ranked) and award the RFQ to a supplier, which raises the purchase order.",
+            Fields = [Pick("Step", "Step", ["Issue", "Print", "Email", "Quote", "Compare", "Award"]), Req("Rfq", "RFQ number"), Opt("Suppliers", "Supplier codes (issue) / supplier (quote, award)"),
                 Opt("Lines", "Items: ITEM:quantity; … (issue) or ITEM@price; … (quote)"), Num("LeadTime", "Lead time (days, quote)", "0"), Opt("Terms", "Terms / award reason"), Num("Weight", "Price weight (compare)", "0.7"),
                 Today("Closes", "Closes on (issue)"), Today()],
             Run = async (c, i) =>
@@ -179,6 +179,12 @@ public static partial class OperationCatalogue
                         }
 
                         return Check(await rfqs.IssueAsync(c.CompanyId, new RfqRequest(i.Text("Rfq"), i.Date("Date"), i.Date("Closes"), suppliers, items)).ConfigureAwait(true), _ => "RFQ issued.");
+                    case "Print":
+                        return Check(await rfqs.RenderAsync(c.CompanyId, await RfqId().ConfigureAwait(true)).ConfigureAwait(true));
+                    case "Email":
+                        RfqDespatch sent = Check(await rfqs.SendAsync(c.CompanyId, await RfqId().ConfigureAwait(true)).ConfigureAwait(true));
+                        return (sent.BatchId is long batch ? $"Queued to {sent.Recipients} address(es) (batch {batch})." : "Nobody to email.")
+                            + (sent.NoEmail.Count == 0 ? string.Empty : $" No email address for: {string.Join(", ", sent.NoEmail)}.");
                     case "Quote":
                         Dictionary<long, decimal> prices = [];
                         foreach (string part in (i.Optional("Lines") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
