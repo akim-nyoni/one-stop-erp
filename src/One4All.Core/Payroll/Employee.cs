@@ -51,6 +51,9 @@ public enum PayMethod
 
     /// <summary>To a mobile-money wallet.</summary>
     MobileMoney = 3,
+
+    /// <summary>By cheque drawn on the company's bank account.</summary>
+    Cheque = 4,
 }
 
 /// <summary>An employee's gender, for statutory headcount returns.</summary>

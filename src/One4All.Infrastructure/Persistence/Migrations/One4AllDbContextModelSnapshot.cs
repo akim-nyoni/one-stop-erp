@@ -32716,6 +32716,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<long?>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");

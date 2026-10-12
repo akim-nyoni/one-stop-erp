@@ -231,10 +231,12 @@ public static partial class OperationCatalogue
         {
             Module = customers, Title = "Sales commissions", ListTitle = "Sales reps",
             Description = "A sales rep's commission statement for a period (by customer, on the rep's basis: invoiced, collected or gross margin), or the month-end accrual of "
-                + "every rep's commission earned. Save a rep sets up or changes one; Assign customer puts a customer with a rep.",
-            Fields = [Pick("Step", "Step", ["Statement", "Accrue", "Save rep", "Assign customer"]), Opt("Rep", "Sales rep code"), Today("From", "From"), Today("To", "To / month end"),
+                + "every rep's commission earned. Save a rep sets up or changes one; Assign customer puts a customer with a rep. Link employee makes a rep an employee; "
+                + "To payroll sends every linked rep's commission for From–To to the pay period's commission element (instead of accruing it).",
+            Fields = [Pick("Step", "Step", ["Statement", "Accrue", "Save rep", "Assign customer", "Link employee", "To payroll"]), Opt("Rep", "Sales rep code"), Today("From", "From"), Today("To", "To / month end"),
                 Opt("Expense", "Commission expense account (accrue)"), Opt("Payable", "Commission payable account (accrue)"), Opt("Name", "Rep name (save rep)"),
-                Pick("Basis", "Commission basis", Enum.GetNames<Core.Trading.CommissionBasis>()), Num("Rate", "Commission %", "0"), Opt("Customer", "Customer code (assign)")],
+                Pick("Basis", "Commission basis", Enum.GetNames<Core.Trading.CommissionBasis>()), Num("Rate", "Commission %", "0"), Opt("Customer", "Customer code (assign)"),
+                Opt("Employee", "Employee number (link)"), Opt("Period", "Pay period (to payroll)"), Opt("Element", "Commission element", "COMMISSION")],
             Run = async (c, i) =>
             {
                 Application.Abstractions.Trading.ICommissionService commissions = c.Get<Application.Abstractions.Trading.ICommissionService>();
@@ -268,6 +270,24 @@ public static partial class OperationCatalogue
                     (await c.Db.Customers.SingleAsync(x => x.Id == customerId).ConfigureAwait(true)).SalesRepId = repId;
                     await c.Db.SaveChangesAsync().ConfigureAwait(true);
                     return $"{i.Optional("Customer")} now earns {repCode} commission.";
+                }
+
+                if (i.Text("Step") == "Link employee")
+                {
+                    Core.Trading.SalesRep rep = await c.Db.Set<Core.Trading.SalesRep>().FirstOrDefaultAsync(r => r.CompanyId == c.CompanyId && r.Code == repCode).ConfigureAwait(true)
+                        ?? throw new OperationException($"Sales rep {repCode} not found.");
+                    string number = (i.Optional("Employee") ?? string.Empty).Trim().ToUpperInvariant();
+                    rep.EmployeeId = number.Length == 0 ? null
+                        : await FindAsync(c.Db.Employees, e => e.CompanyId == c.CompanyId && e.EmployeeNumber == number, e => e.Id, "employee", number).ConfigureAwait(true);
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return rep.EmployeeId is null ? $"{repCode} is no longer paid through payroll." : $"{repCode} is employee {number}; commission can go to payroll.";
+                }
+
+                if (i.Text("Step") == "To payroll")
+                {
+                    IReadOnlyList<Application.Abstractions.Trading.CommissionPayrollLine> sent = Check(await commissions.ToPayrollAsync(c.CompanyId, i.Date("From"), i.Date("To"),
+                        i.Optional("Period") ?? string.Empty, i.Optional("Element") ?? "COMMISSION").ConfigureAwait(true));
+                    return sent.Count == 0 ? "No commission to send." : string.Join(Environment.NewLine, sent.Select(l => $"{l.RepCode,-10} → {l.EmployeeNumber,-10} {M(l.Amount),12}"));
                 }
 
                 if (i.Text("Step") == "Statement")

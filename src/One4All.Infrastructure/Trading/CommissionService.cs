@@ -14,14 +14,64 @@ public sealed class CommissionService : ICommissionService
 {
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _engine;
+    private readonly Application.Abstractions.Payroll.IPayrollVariableService? _variables;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="engine">The posting engine.</param>
-    public CommissionService(One4AllDbContext db, IPostingEngine engine)
+    /// <param name="variables">The payroll variables commission is sent to (null: not paid through payroll).</param>
+    public CommissionService(One4AllDbContext db, IPostingEngine engine, Application.Abstractions.Payroll.IPayrollVariableService? variables = null)
     {
         _db = db;
         _engine = engine;
+        _variables = variables;
+    }
+
+    /// <inheritdoc />
+    public Task<Result<IReadOnlyList<CommissionPayrollLine>>> ToPayrollAsync(long companyId, DateOnly from, DateOnly to, string periodLabel, string elementCode, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ToPayrollCoreAsync(companyId, from, to, periodLabel, elementCode, ct), ct);
+
+    // One unit: every rep's variable is set, or none.
+    private async Task<Result<IReadOnlyList<CommissionPayrollLine>>> ToPayrollCoreAsync(long companyId, DateOnly from, DateOnly to, string periodLabel, string elementCode, CancellationToken ct)
+    {
+        if (_variables is null)
+        {
+            return Error.Rule("Commission.NoPayroll", "Payroll is not available here.");
+        }
+
+        if (to < from || string.IsNullOrWhiteSpace(periodLabel) || string.IsNullOrWhiteSpace(elementCode))
+        {
+            return Error.Validation("Commission.PayrollPeriod", "Sending commission to payroll needs the period it was earned in, the pay period and the commission element.");
+        }
+
+        var reps = await _db.Set<SalesRep>().AsNoTracking().Where(r => r.CompanyId == companyId && r.IsActive && r.EmployeeId != null)
+            .Select(r => new { r.Id, r.Code, EmployeeId = r.EmployeeId!.Value, Number = _db.Employees.Where(e => e.Id == r.EmployeeId).Select(e => e.EmployeeNumber).FirstOrDefault() })
+            .OrderBy(r => r.Code).ToListAsync(ct).ConfigureAwait(false);
+        List<CommissionPayrollLine> lines = [];
+        foreach (var rep in reps)
+        {
+            Result<CommissionStatement> statement = await StatementAsync(companyId, rep.Id, from, to, ct).ConfigureAwait(false);
+            if (statement.IsFailure)
+            {
+                return statement.Error;
+            }
+
+            decimal amount = decimal.Round(statement.Value.Total, 2, MidpointRounding.AwayFromZero);
+            if (amount <= 0m)
+            {
+                continue;
+            }
+
+            Result<long> set = await _variables.SetAsync(companyId, rep.EmployeeId, elementCode.Trim(), periodLabel.Trim(), null, amount, ct).ConfigureAwait(false);
+            if (set.IsFailure)
+            {
+                return set.Error;
+            }
+
+            lines.Add(new CommissionPayrollLine(rep.Code, rep.Number ?? string.Empty, amount));
+        }
+
+        return lines;
     }
 
     /// <inheritdoc />

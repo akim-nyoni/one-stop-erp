@@ -54,4 +54,18 @@ public interface ICommissionService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>What each rep earned and what was booked, or why it failed.</returns>
     Task<Result<IReadOnlyList<CommissionAccrualLine>>> AccrueAsync(long companyId, DateOnly monthEnd, string expenseAccountCode, string payableAccountCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sends each active rep's commission for a period to payroll (brief §4.15.2 commission from the sales agents): the rep's employee gets the
+    /// commission element's amount for the pay period, replacing what an earlier run sent. Reps who are not employees are left out. Paid
+    /// through payroll, commission is not accrued as well.
+    /// </summary>
+    /// <returns>What each rep's employee will be paid.</returns>
+    Task<Result<IReadOnlyList<CommissionPayrollLine>>> ToPayrollAsync(long companyId, DateOnly from, DateOnly to, string periodLabel, string elementCode, CancellationToken ct = default);
 }
+
+/// <summary>A rep's commission sent to payroll.</summary>
+/// <param name="RepCode">The rep.</param>
+/// <param name="EmployeeNumber">The rep's employee.</param>
+/// <param name="Amount">The commission.</param>
+public sealed record CommissionPayrollLine(string RepCode, string EmployeeNumber, decimal Amount);

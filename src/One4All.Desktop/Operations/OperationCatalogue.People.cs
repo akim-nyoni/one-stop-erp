@@ -398,10 +398,10 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Pay and close a payroll run", ListTitle = "Payroll runs",
-            Description = "After commit: Pay posts the run's net pay from the account for each pay method (bank transfers, cash, mobile money) and clears the net pay control; "
+            Description = "After commit: Pay posts the run's net pay from the account for each pay method (bank transfers, cash, mobile money, cheques) and clears the net pay control; "
                 + "Close closes the run once its net pay control is clear; Stage shows where a run stands.",
             Fields = [Pick("Step", "Step", ["Pay", "Close", "Stage"]), Req("Run", "Run document number"), Opt("Bank", "Bank account for transfers", "1100"), Opt("Cash", "Cash account"),
-                Opt("Mobile", "Mobile-money float account"), Today()],
+                Opt("Mobile", "Mobile-money float account"), Opt("Cheque", "Bank account cheques are drawn on"), Today()],
             Run = async (c, i) =>
             {
                 IPayrollSettlementService settlement = c.Get<IPayrollSettlementService>();
@@ -420,6 +420,7 @@ public static partial class OperationCatalogue
                         Use(Core.Payroll.PayMethod.BankTransfer, "Bank");
                         Use(Core.Payroll.PayMethod.Cash, "Cash");
                         Use(Core.Payroll.PayMethod.MobileMoney, "Mobile");
+                        Use(Core.Payroll.PayMethod.Cheque, "Cheque");
                         PayrollPayment paid = Check(await settlement.PayAsync(c.CompanyId, i.Text("Run"), i.Date("Date"), accounts).ConfigureAwait(true));
                         return $"Paid in journal {paid.JournalNumber}: " + string.Join("; ", paid.ByMethod.Select(m => $"{m.Method} {M(m.Amount)} from {m.FundingAccountCode}"));
                     case "Close":

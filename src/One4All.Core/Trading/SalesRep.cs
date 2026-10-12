@@ -61,6 +61,9 @@ public sealed class SalesRep : AuditableEntity, ICompanyScoped
 
     /// <summary>Whether the rep earns commission.</summary>
     public bool IsActive { get; set; }
+
+    /// <summary>Gets or sets the employee the rep is, when commission is paid through payroll.</summary>
+    public long? EmployeeId { get; set; }
 }
 
 /// <summary>

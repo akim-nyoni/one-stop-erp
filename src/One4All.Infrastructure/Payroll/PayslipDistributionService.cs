@@ -165,6 +165,7 @@ internal static class StoredPayslips
             PayMethod.BankTransfer when employee.BankAccountNumber is { Length: > 0 } account => $"Paid by bank transfer to {employee.BankName} …{(account.Length > 4 ? account[^4..] : account)}",
             PayMethod.MobileMoney when employee.MobileMoneyNumber is { Length: > 0 } wallet => $"Paid to mobile wallet …{(wallet.Length > 4 ? wallet[^4..] : wallet)}",
             PayMethod.Cash => "Paid in cash",
+            PayMethod.Cheque => "Paid by cheque",
             _ => null,
         };
 
