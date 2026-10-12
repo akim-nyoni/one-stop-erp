@@ -287,7 +287,12 @@ public interface IPayrollSetupService
     /// <summary>Creates a tax table (bands must start at nil and follow on from each other; only the last is open-ended).</summary>
     Task<Result<long>> CreateTaxTableAsync(long companyId, string code, DateOnly effectiveFrom, CurrencyCode? currency, IReadOnlyList<TaxBandInput> bands, CancellationToken ct = default);
 
-    /// <summary>Creates the standard pay elements the company does not have yet: BASIC, OVERTIME, HOUSING, TRANSPORT and PAYE (on the given tax table).</summary>
+    /// <summary>
+    /// Creates the standard pay elements the company does not have yet (brief §4.15.2): basic, overtime (1.5×, 2× and public holiday), the
+    /// allowances, commission, bonus and 13th cheque, backpay, leave pay and encashment, gratuity, severance and notice pay; and PAYE (on the
+    /// given tax table), pension, social security, medical aid, union dues, advances, garnishee orders, funeral and savings schemes, staff
+    /// purchases, housing rent and overpayment recovery.
+    /// </summary>
     /// <returns>The codes created.</returns>
     Task<Result<IReadOnlyList<string>>> SeedStandardElementsAsync(long companyId, string salaryExpenseAccount, string payeLiabilityAccount, string taxTableCode, CancellationToken ct = default);
 

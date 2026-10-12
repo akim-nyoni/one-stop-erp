@@ -416,13 +416,45 @@ public sealed class PayrollSetupService : IPayrollSetupService
     /// <inheritdoc />
     public async Task<Result<IReadOnlyList<string>>> SeedStandardElementsAsync(long companyId, string salaryExpenseAccount, string payeLiabilityAccount, string taxTableCode, CancellationToken ct = default)
     {
+        // The brief's standard elements (§4.15.2). Amounts and rates are set per employee (or entered as the period's variables for
+        // once-off pay such as bonus, backpay or gratuity); overtime is a rate per hour the employee's hourly rate × the multiplier is set on.
+        string pay = salaryExpenseAccount;
+        string owed = payeLiabilityAccount;
+        NewPayElement Earn(string code, string name, CalculationBasis basis, int sequence) => new(code, name, PayElementType.Earning, basis, sequence, pay) { Taxable = true };
+        NewPayElement Deduct(string code, string name, CalculationBasis basis, int sequence) => new(code, name, PayElementType.Deduction, basis, sequence, owed);
         NewPayElement[] standard =
         [
-            new("BASIC", "Basic salary", PayElementType.Earning, CalculationBasis.Formula, 1, salaryExpenseAccount) { Formula = "BASIC", Taxable = true },
-            new("OVERTIME", "Overtime", PayElementType.Earning, CalculationBasis.RatePerUnit, 2, salaryExpenseAccount) { Taxable = true },
-            new("HOUSING", "Housing allowance", PayElementType.Earning, CalculationBasis.FixedAmount, 3, salaryExpenseAccount) { Taxable = true },
-            new("TRANSPORT", "Transport allowance", PayElementType.Earning, CalculationBasis.FixedAmount, 4, salaryExpenseAccount) { Taxable = true },
-            new("PAYE", "PAYE", PayElementType.Deduction, CalculationBasis.TaxTable, 50, payeLiabilityAccount) { TaxTableCode = taxTableCode },
+            Earn("BASIC", "Basic salary", CalculationBasis.Formula, 1) with { Formula = "BASIC", Pensionable = true, SubjectToSocialSecurity = true, OvertimeBase = true, LeavePayBase = true },
+            Earn("OVERTIME", "Overtime", CalculationBasis.RatePerUnit, 2),
+            Earn("HOUSING", "Housing allowance", CalculationBasis.FixedAmount, 3),
+            Earn("TRANSPORT", "Transport allowance", CalculationBasis.FixedAmount, 4),
+            Deduct("PAYE", "PAYE", CalculationBasis.TaxTable, 50) with { TaxTableCode = taxTableCode },
+            Earn("OVERTIME2", "Overtime at double time", CalculationBasis.RatePerUnit, 5),
+            Earn("OVERTIMEPH", "Public-holiday overtime", CalculationBasis.RatePerUnit, 6),
+            Earn("ACTING", "Acting allowance", CalculationBasis.Formula, 7) with { Formula = "ACTINGALLOWANCE" },
+            Earn("RESPONSIBILITY", "Responsibility allowance", CalculationBasis.FixedAmount, 8),
+            Earn("SHIFT", "Shift and night allowance", CalculationBasis.FixedAmount, 9),
+            Earn("STANDBY", "Standby and call-out", CalculationBasis.RatePerUnit, 10),
+            Earn("COMMISSION", "Commission", CalculationBasis.FixedAmount, 11),
+            Earn("BONUS", "Bonus", CalculationBasis.FixedAmount, 12),
+            Earn("THIRTEENTH", "13th cheque", CalculationBasis.FixedAmount, 13),
+            Earn("BACKPAY", "Backpay", CalculationBasis.FixedAmount, 14),
+            Earn("LEAVEPAY", "Leave pay", CalculationBasis.FixedAmount, 15),
+            Earn("LEAVEENCASH", "Leave encashment", CalculationBasis.FixedAmount, 16),
+            Earn("GRATUITY", "Gratuity", CalculationBasis.FixedAmount, 17),
+            Earn("SEVERANCE", "Severance pay", CalculationBasis.FixedAmount, 18),
+            Earn("NOTICEPAY", "Notice pay", CalculationBasis.FixedAmount, 19),
+            Deduct("PENSION", "Pension fund", CalculationBasis.PercentOfBasic, 51),
+            Deduct("SOCIALSEC", "Social security", CalculationBasis.PercentOfBasic, 52),
+            Deduct("MEDICAL", "Medical aid", CalculationBasis.FixedAmount, 53),
+            Deduct("UNION", "Union dues", CalculationBasis.FixedAmount, 54),
+            Deduct("ADVANCE", "Salary advance recovery", CalculationBasis.FixedAmount, 55),
+            Deduct("GARNISHEE", "Garnishee and court orders", CalculationBasis.FixedAmount, 56),
+            Deduct("FUNERAL", "Funeral scheme", CalculationBasis.FixedAmount, 57),
+            Deduct("SAVINGS", "Savings scheme", CalculationBasis.FixedAmount, 58),
+            Deduct("STAFFPURCH", "Staff purchases", CalculationBasis.Formula, 59) with { Formula = "STAFFPURCHASES" },
+            Deduct("HOUSERENT", "Housing rent", CalculationBasis.Formula, 60) with { Formula = "HOUSINGRENT" },
+            Deduct("OVERPAYMENT", "Salary overpayment recovery", CalculationBasis.FixedAmount, 61),
         ];
         List<string> created = [];
         foreach (NewPayElement element in standard)
