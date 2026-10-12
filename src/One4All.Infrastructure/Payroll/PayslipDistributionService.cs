@@ -145,12 +145,37 @@ internal static class StoredPayslips
         List<PayslipLine> lines = [.. slips.SelectMany(p => p.Lines)];
         IReadOnlyList<PayslipItem> Items(PayElementType type) => [.. lines.Where(l => l.Type == type).GroupBy(l => l.ElementCode).Select(g => new PayslipItem(g.First().Description, g.Sum(l => l.Amount)))
             .Where(i => i.Amount != 0m)];
-        string company = await db.Companies.Where(c => c.Id == employee.CompanyId).Select(c => c.Name).FirstAsync(ct).ConfigureAwait(false);
+        var company = await db.Companies.Where(c => c.Id == employee.CompanyId).Select(c => new { c.Name, c.TaxYearStartMonth }).FirstAsync(ct).ConfigureAwait(false);
+        DateOnly payDate = slips.Max(p => p.PayDate);
+
+        // The tax elements (tax-table deductions), the tax year so far, leave and loans.
+        HashSet<string> taxCodes = [.. await db.PayElements.AsNoTracking().Where(e => e.CompanyId == employee.CompanyId && e.Basis == CalculationBasis.TaxTable).Select(e => e.Code).ToListAsync(ct)
+            .ConfigureAwait(false)];
+        DateOnly yearStart = PayPeriods.TaxYearStart(payDate, company.TaxYearStartMonth);
+        List<Payslip> year = await db.Payslips.AsNoTracking().Include(p => p.Lines)
+            .Where(p => p.CompanyId == employee.CompanyId && p.EmployeeId == employee.Id && p.PayDate >= yearStart && p.PayDate <= payDate).ToListAsync(ct).ConfigureAwait(false);
+        static decimal Taxable(IEnumerable<PayslipLine> ls) => ls.Where(l => l.Taxable && l.Type is PayElementType.Earning or PayElementType.Memo).Sum(l => l.Amount);
+        decimal Tax(IEnumerable<PayslipLine> ls) => ls.Where(l => taxCodes.Contains(l.ElementCode)).Sum(l => l.Amount);
+        List<(string, decimal)> leave = [.. (await db.Set<EmployeeLeaveBalance>().AsNoTracking().Where(b => b.EmployeeId == employee.Id).ToListAsync(ct).ConfigureAwait(false))
+            .OrderBy(b => b.LeaveType, StringComparer.Ordinal).Select(b => (b.LeaveType, b.BalanceDays))];
+        List<(string, decimal)> loans = [.. (await db.EmployeeLoans.AsNoTracking().Where(l => l.EmployeeId == employee.Id && l.Outstanding > 0m).ToListAsync(ct).ConfigureAwait(false))
+            .OrderBy(l => l.Reference, StringComparer.Ordinal).Select(l => (l.Reference, l.Outstanding))];
+        string? paidBy = employee.PaymentMethod switch
+        {
+            PayMethod.BankTransfer when employee.BankAccountNumber is { Length: > 0 } account => $"Paid by bank transfer to {employee.BankName} …{(account.Length > 4 ? account[^4..] : account)}",
+            PayMethod.MobileMoney when employee.MobileMoneyNumber is { Length: > 0 } wallet => $"Paid to mobile wallet …{(wallet.Length > 4 ? wallet[^4..] : wallet)}",
+            PayMethod.Cash => "Paid in cash",
+            _ => null,
+        };
+
         return PayslipFormatter.ToPlainText(new PayslipDocument
         {
-            CompanyName = company, EmployeeName = employee.FullName, EmployeeNumber = employee.EmployeeNumber, PeriodLabel = period, PayDate = slips.Min(p => p.PayDate),
+            CompanyName = company.Name, EmployeeName = employee.FullName, EmployeeNumber = employee.EmployeeNumber, PeriodLabel = period, PayDate = slips.Min(p => p.PayDate),
             Earnings = Items(PayElementType.Earning), Deductions = Items(PayElementType.Deduction), GrossEarnings = slips.Sum(p => p.GrossEarnings), TotalDeductions = slips.Sum(p => p.TotalDeductions),
-            NetPay = slips.Sum(p => p.NetPay),
+            NetPay = slips.Sum(p => p.NetPay), EmployerContributions = Items(PayElementType.EmployerContribution), MemoItems = Items(PayElementType.Memo), PaidBy = paidBy,
+            TaxablePay = Taxable(lines), TaxDeducted = Tax(lines),
+            YearToDate = (year.Sum(p => p.GrossEarnings), Taxable(year.SelectMany(p => p.Lines)), Tax(year.SelectMany(p => p.Lines)), year.Sum(p => p.NetPay)),
+            LeaveBalances = leave, LoanBalances = loans,
         });
     }
 }

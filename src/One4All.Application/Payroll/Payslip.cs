@@ -43,6 +43,30 @@ public sealed class PayslipDocument
 
     /// <summary>The net pay.</summary>
     public decimal NetPay { get; init; }
+
+    /// <summary>What the employer contributes on top (pension, medical aid, levies) — shown, not deducted.</summary>
+    public IReadOnlyList<PayslipItem> EmployerContributions { get; init; } = [];
+
+    /// <summary>Taxable benefits and other memo items — taxed, not paid.</summary>
+    public IReadOnlyList<PayslipItem> MemoItems { get; init; } = [];
+
+    /// <summary>How the net pay is paid (e.g. "Bank transfer to …4321"), or null.</summary>
+    public string? PaidBy { get; init; }
+
+    /// <summary>The period's taxable pay, or null when not shown.</summary>
+    public decimal? TaxablePay { get; init; }
+
+    /// <summary>The period's tax (the tax-table deductions), or null when not shown.</summary>
+    public decimal? TaxDeducted { get; init; }
+
+    /// <summary>The tax year to date: gross, taxable, tax and net (null when not shown).</summary>
+    public (decimal Gross, decimal Taxable, decimal Tax, decimal Net)? YearToDate { get; init; }
+
+    /// <summary>The leave balances (type, days).</summary>
+    public IReadOnlyList<(string LeaveType, decimal Days)> LeaveBalances { get; init; } = [];
+
+    /// <summary>The loan balances outstanding after this pay (reference, balance).</summary>
+    public IReadOnlyList<(string Reference, decimal Balance)> LoanBalances { get; init; } = [];
 }
 
 /// <summary>
@@ -94,7 +118,39 @@ public static class PayslipFormatter
         sb.AppendLine(TwoColumn("Gross earnings", Money(doc.GrossEarnings), width));
         sb.AppendLine(TwoColumn("Total deductions", Money(doc.TotalDeductions), width));
         sb.AppendLine(TwoColumn("NET PAY", Money(doc.NetPay), width));
+        if (doc.PaidBy is string paidBy)
+        {
+            sb.AppendLine(paidBy.Length > width ? paidBy[..width] : paidBy);
+        }
+
         sb.AppendLine(rule);
+
+        // The further sections (brief §4.15.7 payslip content), each only when there is something to show.
+        void Section(string title, IEnumerable<(string Label, string Value)> rows)
+        {
+            List<(string Label, string Value)> list = [.. rows];
+            if (list.Count == 0)
+            {
+                return;
+            }
+
+            sb.AppendLine(title);
+            foreach ((string label, string value) in list)
+            {
+                sb.AppendLine(TwoColumn(label, value, width));
+            }
+
+            sb.AppendLine(rule);
+        }
+
+        Section("EMPLOYER CONTRIBUTIONS", doc.EmployerContributions.Select(i => (i.Label, Money(i.Amount))));
+        Section("TAXABLE BENEFITS (NOT PAID)", doc.MemoItems.Select(i => (i.Label, Money(i.Amount))));
+        Section("TAX THIS PERIOD", doc.TaxablePay is decimal taxable ? [("Taxable pay", Money(taxable)), ("Tax deducted", Money(doc.TaxDeducted ?? 0m))] : []);
+        Section("TAX YEAR TO DATE", doc.YearToDate is { } ytd
+            ? [("Gross", Money(ytd.Gross)), ("Taxable", Money(ytd.Taxable)), ("Tax", Money(ytd.Tax)), ("Net", Money(ytd.Net))]
+            : []);
+        Section("LEAVE BALANCES (DAYS)", doc.LeaveBalances.Select(l => (l.LeaveType, l.Days.ToString("0.##", CultureInfo.InvariantCulture))));
+        Section("LOAN BALANCES", doc.LoanBalances.Select(l => (l.Reference, Money(l.Balance))));
 
         return sb.ToString();
     }
