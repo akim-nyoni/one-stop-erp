@@ -7524,6 +7524,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<DateOnly?>("CompletionDate")
+                        .HasColumnType("date")
+                        .HasColumnName("completion_date");
+
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("created_by_user_id");
@@ -7539,6 +7543,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("DeletedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
+
+                    b.Property<int?>("FundingSource")
+                        .HasColumnType("integer")
+                        .HasColumnName("funding_source");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
@@ -7567,6 +7575,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("SchemeType")
                         .HasColumnType("integer")
                         .HasColumnName("scheme_type");
+
+                    b.Property<DateOnly?>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
 
                     b.Property<int>("TargetBeneficiaries")
                         .HasColumnType("integer")
@@ -7635,6 +7647,31 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("frontage_metres");
 
+                    b.Property<bool>("HasElectricity")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_electricity");
+
+                    b.Property<bool>("HasRoad")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_road");
+
+                    b.Property<bool>("HasSewer")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_sewer");
+
+                    b.Property<bool>("HasStormWater")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_storm_water");
+
+                    b.Property<bool>("HasWater")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_water");
+
+                    b.Property<string>("IntendedUse")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("intended_use");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
@@ -7670,6 +7707,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("selling_price");
 
+                    b.Property<string>("ServicingPhase")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("servicing_phase");
+
                     b.Property<decimal>("SizeSquareMetres")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -7688,6 +7730,31 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int?>("StatusBeforeHold")
                         .HasColumnType("integer")
                         .HasColumnName("status_before_hold");
+
+                    b.Property<string>("StreetAddress")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("street_address");
+
+                    b.Property<string>("Suburb")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("suburb");
+
+                    b.Property<string>("Ward")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ward");
+
+                    b.Property<string>("Zone")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("zone");
+
+                    b.Property<string>("Zoning")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("zoning");
 
                     b.Property<decimal?>("ZoningWeight")
                         .HasPrecision(9, 4)
@@ -8560,9 +8627,24 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(300)")
                         .HasColumnName("description");
 
+                    b.Property<string>("Improvements")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("improvements");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<string>("LandUse")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("land_use");
+
+                    b.Property<string>("Locality")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("locality");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
@@ -8571,6 +8653,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("ModifiedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
+
+                    b.Property<int?>("Occupation")
+                        .HasColumnType("integer")
+                        .HasColumnName("occupation");
 
                     b.Property<string>("ParcelNumber")
                         .IsRequired()
@@ -8587,6 +8673,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");
+
+                    b.Property<int?>("Tenure")
+                        .HasColumnType("integer")
+                        .HasColumnName("tenure");
+
+                    b.Property<string>("Ward")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("ward");
 
                     b.HasKey("Id")
                         .HasName("pk_land_parcel");
@@ -10512,6 +10607,52 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_stand_pricing_rule_company_id_effective_from");
 
                     b.ToTable("stand_pricing_rule", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandRemark", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("RecordedBy")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("recorded_by");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stand_remark");
+
+                    b.HasIndex("StandId")
+                        .HasDatabaseName("ix_stand_remark_stand_id");
+
+                    b.ToTable("stand_remark", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.StandStatusChange", b =>
@@ -34404,6 +34545,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasForeignKey("StandId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_stand_pricing_rule_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandRemark", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stand_remark_stand_stand_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.StandStatusChange", b =>

@@ -57,6 +57,24 @@ public sealed class LandParcel : SoftDeletableEntity, ICompanyScoped
     /// <summary>The area in square metres.</summary>
     public decimal AreaSquareMetres { get; set; }
 
+    /// <summary>The locality.</summary>
+    public string? Locality { get; set; }
+
+    /// <summary>The ward.</summary>
+    public string? Ward { get; set; }
+
+    /// <summary>The current land use or zoning.</summary>
+    public string? LandUse { get; set; }
+
+    /// <summary>The tenure the council holds it under.</summary>
+    public ParcelTenure? Tenure { get; set; }
+
+    /// <summary>Existing improvements (buildings, fences, boreholes…).</summary>
+    public string? Improvements { get; set; }
+
+    /// <summary>Who is on the land now.</summary>
+    public ParcelOccupation? Occupation { get; set; }
+
     /// <summary>The total capitalised cost (acquisition + servicing) held in WIP.</summary>
     public decimal AcquisitionCost { get; private set; }
 
@@ -89,4 +107,42 @@ public sealed class LandParcel : SoftDeletableEntity, ICompanyScoped
     /// <summary>Records the mapped boundary.</summary>
     /// <param name="boundary">The boundary.</param>
     public void Map(MappedBoundary boundary) => Boundary = boundary;
+}
+
+/// <summary>The tenure a parcel is held under (brief §4.10.1).</summary>
+public enum ParcelTenure
+{
+    /// <summary>Freehold.</summary>
+    Freehold = 1,
+
+    /// <summary>State land.</summary>
+    StateLand = 2,
+
+    /// <summary>Leasehold.</summary>
+    Leasehold = 3,
+
+    /// <summary>Communal land.</summary>
+    Communal = 4,
+
+    /// <summary>Customary land.</summary>
+    Customary = 5,
+
+    /// <summary>Held in trust.</summary>
+    Trust = 6,
+}
+
+/// <summary>A parcel's current occupation (brief §4.10.1).</summary>
+public enum ParcelOccupation
+{
+    /// <summary>Vacant.</summary>
+    Vacant = 1,
+
+    /// <summary>Occupied.</summary>
+    Occupied = 2,
+
+    /// <summary>Informally settled.</summary>
+    InformallySettled = 3,
+
+    /// <summary>Under dispute.</summary>
+    UnderDispute = 4,
 }

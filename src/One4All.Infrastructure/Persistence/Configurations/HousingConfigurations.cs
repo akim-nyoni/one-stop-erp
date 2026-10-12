@@ -11,6 +11,12 @@ internal sealed class LandParcelConfiguration : IEntityTypeConfiguration<LandPar
         b.ToTable("land_parcel", Schemas.Housing);
         b.HasKey(x => x.Id);
         b.Property(x => x.ParcelNumber).HasMaxLength(40);
+        b.Property(x => x.Locality).HasMaxLength(120);
+        b.Property(x => x.Ward).HasMaxLength(40);
+        b.Property(x => x.LandUse).HasMaxLength(80);
+        b.Property(x => x.Improvements).HasMaxLength(500);
+        b.Property(x => x.Tenure).HasConversion<int?>();
+        b.Property(x => x.Occupation).HasConversion<int?>();
         b.Property(x => x.Description).HasMaxLength(300);
         b.Property(x => x.AreaSquareMetres).HasPrecision(19, 4);
         b.Property(x => x.Status).HasConversion<int>();
@@ -35,9 +41,23 @@ internal sealed class HousingSchemeConfiguration : IEntityTypeConfiguration<Hous
         b.Property(x => x.Code).HasMaxLength(30);
         b.Property(x => x.Name).HasMaxLength(120);
         b.Property(x => x.Ward).HasMaxLength(40);
+        b.Property(x => x.FundingSource).HasConversion<int?>();
         b.Property(x => x.SchemeType).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
+    }
+}
+
+internal sealed class StandRemarkConfiguration : IEntityTypeConfiguration<StandRemark>
+{
+    public void Configure(EntityTypeBuilder<StandRemark> b)
+    {
+        b.ToTable("stand_remark", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Text).HasColumnType("text");
+        b.Property(x => x.RecordedBy).HasMaxLength(120);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.StandId);
     }
 }
 
@@ -48,6 +68,13 @@ internal sealed class HousingStandConfiguration : IEntityTypeConfiguration<Housi
         b.ToTable("stand", Schemas.Housing);
         b.HasKey(x => x.Id);
         b.Property(x => x.StandNumber).HasMaxLength(40);
+        b.Property(x => x.StreetAddress).HasMaxLength(200);
+        b.Property(x => x.Ward).HasMaxLength(40);
+        b.Property(x => x.Suburb).HasMaxLength(80);
+        b.Property(x => x.Zone).HasMaxLength(40);
+        b.Property(x => x.IntendedUse).HasMaxLength(60);
+        b.Property(x => x.Zoning).HasMaxLength(60);
+        b.Property(x => x.ServicingPhase).HasMaxLength(40);
         b.Property(x => x.SizeSquareMetres).HasPrecision(19, 4);
         b.Property(x => x.Status).HasConversion<int>();
         b.HasMany(x => x.Ownership).WithOne().HasForeignKey(x => x.HousingStandId).OnDelete(DeleteBehavior.Cascade);

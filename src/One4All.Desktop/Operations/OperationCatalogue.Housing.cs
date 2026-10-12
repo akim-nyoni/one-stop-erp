@@ -731,6 +731,46 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Stand, parcel and scheme details", ListTitle = "Stand register",
+            Description = "Stand: address, ward / suburb / zone, intended use, zoning, servicing phase and the services available (water, sewer, road, electricity, storm water). "
+                + "Remark: adds a dated line to the stand's remarks history; Remarks lists it. Parcel: locality, ward, land use, tenure, improvements and occupation. "
+                + "Scheme: funding source and start / completion dates.",
+            Fields = [Pick("Step", "Step", ["Stand", "Remark", "Remarks", "Parcel", "Scheme"]), Opt("Code", "Stand / parcel / scheme number"), Opt("Address", "Street address"),
+                Opt("Ward", "Ward"), Opt("Suburb", "Suburb / locality"), Opt("Zone", "Zone"), Opt("Use", "Intended use / land use"), Opt("Zoning", "Zoning"), Opt("Phase", "Servicing phase"),
+                Tick("Water", "Water"), Tick("Sewer", "Sewer"), Tick("Road", "Road"), Tick("Power", "Electricity"), Tick("Storm", "Storm water"), Opt("Remark", "Remark / improvements"),
+                Pick("Tenure", "Parcel tenure", ["", .. Enum.GetNames<ParcelTenure>()]), Pick("Occupation", "Parcel occupation", ["", .. Enum.GetNames<ParcelOccupation>()]),
+                Pick("Funding", "Scheme funding", ["", .. Enum.GetNames<SchemeFunding>()]), Opt("Start", "Scheme start (yyyy-MM-dd)"), Opt("End", "Scheme completion (yyyy-MM-dd)")],
+            Run = async (c, i) =>
+            {
+                IHousingRegisterDetailsService details = c.Get<IHousingRegisterDetailsService>();
+                string code = i.Optional("Code") ?? string.Empty;
+                static DateOnly? Date(string? text) => text is null ? null : DateOnly.ParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                static T? Choice<T>(string text) where T : struct, Enum => text.Length == 0 ? null : Enum.Parse<T>(text);
+                switch (i.Text("Step"))
+                {
+                    case "Stand":
+                        return Check(await details.SetStandDetailsAsync(c.CompanyId, code, new StandDetails(i.Optional("Address"), i.Optional("Ward"), i.Optional("Suburb"), i.Optional("Zone"),
+                            i.Optional("Use"), i.Optional("Zoning"), i.Optional("Phase"), i.Flag("Water"), i.Flag("Sewer"), i.Flag("Road"), i.Flag("Power"), i.Flag("Storm"))).ConfigureAwait(true), "Stand details saved.");
+                    case "Remark":
+                        return Check(await details.AddStandRemarkAsync(c.CompanyId, code, i.Optional("Remark") ?? string.Empty, $"user {c.UserId}").ConfigureAwait(true), "Remark added.");
+                    case "Remarks":
+                        IReadOnlyList<(DateTimeOffset At, string RecordedBy, string Text)> remarks = await details.StandRemarksAsync(c.CompanyId, code).ConfigureAwait(true);
+                        return remarks.Count == 0 ? "No remarks." : string.Join(Environment.NewLine, remarks.Select(r => $"{r.At.ToLocalTime():yyyy-MM-dd HH:mm}  {r.RecordedBy}: {r.Text}"));
+                    case "Parcel":
+                        return Check(await details.SetParcelDetailsAsync(c.CompanyId, code, new ParcelDetails(i.Optional("Suburb"), i.Optional("Ward"), i.Optional("Use"),
+                            Choice<ParcelTenure>(i.Text("Tenure")), i.Optional("Remark"), Choice<ParcelOccupation>(i.Text("Occupation")))).ConfigureAwait(true), "Parcel details saved.");
+                    default:
+                        return Check(await details.SetSchemeDetailsAsync(c.CompanyId, code, new SchemeDetails(Choice<SchemeFunding>(i.Text("Funding")), Date(i.Optional("Start")), Date(i.Optional("End"))))
+                            .ConfigureAwait(true), "Scheme details saved.");
+                }
+            },
+            List = async c => Table(await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.StandNumber).Take(1000).ToListAsync().ConfigureAwait(true),
+                ("Stand", s => s.StandNumber), ("Address", s => s.StreetAddress), ("Ward", s => s.Ward), ("Suburb", s => s.Suburb), ("Use", s => s.IntendedUse), ("Zoning", s => s.Zoning),
+                ("Services", s => string.Join(" ", new[] { s.HasWater ? "W" : null, s.HasSewer ? "S" : null, s.HasRoad ? "R" : null, s.HasElectricity ? "E" : null, s.HasStormWater ? "D" : null }
+                    .OfType<string>())), ("Status", s => s.Status)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Instalment arrears and default notices", ListTitle = "Agreements in arrears",
             Description = "The arrears stages: a reminder from the first unpaid instalment, a letter of demand after 30 days, a notice of breach after 60 and a notice of cancellation "
                 + "after 90 (once the breach notice has stood 30 days) — each issued only after the previous one is served, with proof of service recorded. "

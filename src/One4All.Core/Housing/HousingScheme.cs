@@ -64,6 +64,15 @@ public sealed class HousingScheme : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>The ward the scheme lies in (for the ward housing pack, brief §14 H97).</summary>
     public string? Ward { get; set; }
+
+    /// <summary>How the scheme is funded (brief §4.10.2: own revenue, loan, grant, developer contribution), or null.</summary>
+    public SchemeFunding? FundingSource { get; set; }
+
+    /// <summary>When the scheme starts (or started).</summary>
+    public DateOnly? StartDate { get; set; }
+
+    /// <summary>When it is to be (or was) completed.</summary>
+    public DateOnly? CompletionDate { get; set; }
 }
 
 /// <summary>
@@ -265,4 +274,23 @@ public enum MaritalRegime
 
     /// <summary>Customary marriage.</summary>
     Customary = 3,
+}
+
+/// <summary>How a housing scheme is funded.</summary>
+public enum SchemeFunding
+{
+    /// <summary>The council's own revenue.</summary>
+    OwnRevenue = 1,
+
+    /// <summary>A loan.</summary>
+    Loan = 2,
+
+    /// <summary>A grant.</summary>
+    Grant = 3,
+
+    /// <summary>A developer's contribution.</summary>
+    DeveloperContribution = 4,
+
+    /// <summary>More than one source.</summary>
+    Mixed = 5,
 }

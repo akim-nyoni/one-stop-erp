@@ -281,6 +281,42 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
     /// <summary>The zoning weight, for apportioning servicing cost.</summary>
     public decimal? ZoningWeight { get; private set; }
 
+    /// <summary>The street address.</summary>
+    public string? StreetAddress { get; set; }
+
+    /// <summary>The ward.</summary>
+    public string? Ward { get; set; }
+
+    /// <summary>The suburb.</summary>
+    public string? Suburb { get; set; }
+
+    /// <summary>The zone.</summary>
+    public string? Zone { get; set; }
+
+    /// <summary>The intended use (residential, commercial, industrial, institutional…).</summary>
+    public string? IntendedUse { get; set; }
+
+    /// <summary>The zoning.</summary>
+    public string? Zoning { get; set; }
+
+    /// <summary>The servicing phase.</summary>
+    public string? ServicingPhase { get; set; }
+
+    /// <summary>Whether water is available to the stand.</summary>
+    public bool HasWater { get; set; }
+
+    /// <summary>Whether sewer is available.</summary>
+    public bool HasSewer { get; set; }
+
+    /// <summary>Whether a road reaches it.</summary>
+    public bool HasRoad { get; set; }
+
+    /// <summary>Whether electricity is available.</summary>
+    public bool HasElectricity { get; set; }
+
+    /// <summary>Whether storm-water drainage is available.</summary>
+    public bool HasStormWater { get; set; }
+
     /// <summary>Records the measures servicing cost is apportioned on.</summary>
     /// <param name="frontageMetres">The road frontage.</param>
     /// <param name="zoningWeight">The zoning weight.</param>
@@ -539,4 +575,45 @@ public sealed class OwnershipRecord : Entity
     /// <summary>Sets the computed hash (during construction / append).</summary>
     /// <param name="hash">The hash.</param>
     internal void SetHash(string hash) => Hash = hash;
+}
+
+/// <summary>A dated remark on a stand (<c>hse.stand_remark</c>, brief §4.10.2 "a free-form remarks history"): added, never edited.</summary>
+public sealed class StandRemark : Entity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private StandRemark()
+    {
+        Text = string.Empty;
+        RecordedBy = string.Empty;
+    }
+
+    /// <summary>Records a remark.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="standId">The stand.</param>
+    /// <param name="text">The remark.</param>
+    /// <param name="recordedBy">Who recorded it.</param>
+    /// <param name="at">When.</param>
+    public StandRemark(long companyId, long standId, string text, string recordedBy, DateTimeOffset at)
+    {
+        CompanyId = companyId;
+        StandId = standId;
+        Text = text;
+        RecordedBy = recordedBy;
+        At = at;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The stand.</summary>
+    public long StandId { get; private set; }
+
+    /// <summary>The remark.</summary>
+    public string Text { get; private set; }
+
+    /// <summary>Who recorded it.</summary>
+    public string RecordedBy { get; private set; }
+
+    /// <summary>When.</summary>
+    public DateTimeOffset At { get; private set; }
 }
