@@ -240,6 +240,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.TradingReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.ReceiptingReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.SqlReportDataProvider>();
+        services.AddScoped<Application.Abstractions.Reporting.IReportFieldDiscovery, Reporting.SqlReportDataProvider>();
         services.AddScoped<Application.Abstractions.Accounting.IReportingTreeService, Accounting.ReportingTreeService>();
         services.AddScoped<Application.Abstractions.Accounting.ITaxComplianceService, Accounting.TaxComplianceService>();
         services.AddScoped<Application.Abstractions.System.ILocalizationService, MasterData.LocalizationService>();

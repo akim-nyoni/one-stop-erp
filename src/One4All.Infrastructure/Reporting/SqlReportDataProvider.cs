@@ -13,7 +13,7 @@ namespace One4All.Infrastructure.Reporting;
 /// schemas or the catalogues; views and functions only from the <c>rpt</c> schema; run on its own connection in a read-only
 /// transaction with a statement timeout, report parameters bound by name, and at most <see cref="MaxRows"/> rows.
 /// </summary>
-public sealed partial class SqlReportDataProvider : IReportDataProvider
+public sealed partial class SqlReportDataProvider : IReportDataProvider, IReportFieldDiscovery
 {
     /// <summary>The most rows a query returns.</summary>
     public const int MaxRows = 50_000;
@@ -104,6 +104,54 @@ public sealed partial class SqlReportDataProvider : IReportDataProvider
             StringComparer.OrdinalIgnoreCase))];
         await transaction.RollbackAsync(ct).ConfigureAwait(false);
         return result;
+    }
+
+    /// <inheritdoc />
+    public async Task<Core.Common.Result<IReadOnlyList<ReportFieldInfo>>> DescribeAsync(long companyId, string command, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        if (!CanHandle(command ?? string.Empty))
+        {
+            return Core.Common.Error.Validation("Rpt.Source", "Fields can be discovered for SQL, view and function sources (sql:…, view:…, function:…).");
+        }
+
+        (string? sql, string? refusal) = Statement(command!, [.. parameters.Keys]);
+        if (sql is null)
+        {
+            return Core.Common.Error.Validation("Rpt.Source", refusal ?? "The source was refused.");
+        }
+
+        await using NpgsqlConnection connection = new(_connectionString);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
+        await using (NpgsqlCommand guard = new("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout = '15s'", connection, transaction))
+        {
+            await guard.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        // SELECT … LIMIT 0: the shape of the result, no rows read.
+        await using NpgsqlCommand describe = new($"SELECT * FROM ({sql}) AS report_rows LIMIT 0", connection, transaction);
+        describe.Parameters.AddWithValue("CompanyId", companyId);
+        foreach ((string name, object? value) in parameters.Where(p => Identifier().IsMatch(p.Key) && !p.Key.Equals("CompanyId", StringComparison.OrdinalIgnoreCase)))
+        {
+            describe.Parameters.AddWithValue(name, value switch
+            {
+                null => DBNull.Value,
+                DateOnly date => date.ToDateTime(TimeOnly.MinValue),
+                _ => value,
+            });
+        }
+
+        try
+        {
+            await using NpgsqlDataReader reader = await describe.ExecuteReaderAsync(System.Data.CommandBehavior.SchemaOnly, ct).ConfigureAwait(false);
+            IReadOnlyList<ReportFieldInfo> fields = [.. (await reader.GetColumnSchemaAsync(ct).ConfigureAwait(false)).Select(c => new ReportFieldInfo(c.ColumnName, c.DataTypeName))];
+            return Core.Common.Result<IReadOnlyList<ReportFieldInfo>>.Success(fields);
+        }
+        catch (PostgresException ex)
+        {
+            return Core.Common.Error.Validation("Rpt.Source", ex.MessageText);
+        }
     }
 
     [GeneratedRegex(@"^rpt\.[a-z_][a-z0-9_]*$", RegexOptions.IgnoreCase)]

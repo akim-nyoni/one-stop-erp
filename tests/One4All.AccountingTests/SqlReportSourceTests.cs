@@ -80,4 +80,22 @@ public sealed class SqlReportSourceTests
         ReportDefinition authored = new() { Code = "SQLX", Name = "SQL", DataSources = [new ReportDataSource { Kind = DataSourceKind.Sql, Command = "SELECT 1 WHERE @CompanyId > 0" }] };
         ReportCommands.For(authored).Should().Be("sql:SELECT 1 WHERE @CompanyId > 0");
     }
+
+    [SkippableFact]
+    public async Task Fields_are_discovered_without_reading_rows()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        IReportFieldDiscovery discovery = scope.ServiceProvider.GetRequiredService<IReportFieldDiscovery>();
+
+        var fields = (await discovery.DescribeAsync(companyId, "sql:SELECT account_code, name, budget_enabled FROM gl.account WHERE company_id = @CompanyId AND account_code >= @From",
+            new Dictionary<string, object?> { ["From"] = "1000" })).Value;
+        fields.Select(f => f.Name).Should().Equal("account_code", "name", "budget_enabled");
+        fields[2].TypeName.Should().Be("boolean");
+        (await discovery.DescribeAsync(companyId, "sql:SELECT * FROM sec.app_user", new Dictionary<string, object?>())).Error.Code.Should().Be("Rpt.Source");
+        (await discovery.DescribeAsync(companyId, "sql:SELECT nope FROM gl.account WHERE company_id = @CompanyId", new Dictionary<string, object?>())).Error.Message.Should().Contain("nope");
+    }
 }

@@ -379,6 +379,78 @@ public partial class BandedDesignerWindow : Window
         Render();
     }
 
+    // The report's data source: SQL (a SELECT filtered by @CompanyId), a reporting view or function, or a view built from columns and an order;
+    // "Discover fields" reads the columns without fetching rows (SELECT … LIMIT 0).
+    private async void DataSource_Click(object sender, RoutedEventArgs e)
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        ReportDataSource? current = _session.Definition.DataSources.FirstOrDefault();
+        ComboBox kind = new() { ItemsSource = new[] { DataSourceKind.Sql, DataSourceKind.View, DataSourceKind.Function, DataSourceKind.InMemory }, SelectedItem = current?.Kind ?? DataSourceKind.Sql };
+        TextBox command = new() { Text = current?.Command ?? string.Empty, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, Height = 120, FontFamily = new FontFamily("Consolas"),
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        TextBox view = new() { ToolTip = "rpt.<view> to build a query from" }, columns = new() { ToolTip = "Columns, comma-separated (blank: all)" }, order = new() { ToolTip = "Order by, e.g. posting_date DESC" };
+        TextBlock found = new() { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.DimGray, MinHeight = 40 };
+        List<string> discovered = [];
+        Button build = new() { Content = "Build query from view", Margin = new Thickness(0, 4, 0, 0) };
+        build.Click += (_, _) =>
+        {
+            (string? built, string? refusal) = ReportQueryBuilder.Build(view.Text.Trim(), [.. columns.Text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)], [],
+                [.. order.Text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)]);
+            if (built is null)
+            {
+                found.Text = refusal;
+                return;
+            }
+
+            kind.SelectedItem = DataSourceKind.Sql;
+            command.Text = built["sql:".Length..];
+        };
+        Button discover = new() { Content = "Discover fields", Margin = new Thickness(0, 4, 0, 0) };
+        discover.Click += async (_, _) =>
+        {
+            string text = kind.SelectedItem switch { DataSourceKind.View => "view:", DataSourceKind.Function => "function:", DataSourceKind.Sql => "sql:", _ => string.Empty } + command.Text.Trim();
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            Result<IReadOnlyList<ReportFieldInfo>> fields = await scope.ServiceProvider.GetRequiredService<IReportFieldDiscovery>().DescribeAsync(_companyId, text, _parameters).ConfigureAwait(true);
+            discovered = fields.IsSuccess ? [.. fields.Value.Select(f => f.Name)] : [];
+            found.Text = fields.IsSuccess ? string.Join(", ", fields.Value.Select(f => $"{f.Name} ({f.TypeName})")) : fields.Error.Message;
+        };
+
+        StackPanel panel = new() { Margin = new Thickness(12) };
+        foreach ((string label, UIElement editor) in new (string, UIElement)[]
+        {
+            ("Kind", kind), ("Query / view / function", command), ("Query builder: view", view), ("Columns", columns), ("Order by", order),
+        })
+        {
+            panel.Children.Add(new TextBlock { Text = label, Margin = new Thickness(0, 6, 0, 2) });
+            panel.Children.Add(editor);
+        }
+
+        panel.Children.Add(build);
+        panel.Children.Add(discover);
+        panel.Children.Add(found);
+        Window window = new() { Title = "Data source", Owner = this, Width = 560, SizeToContent = SizeToContent.Height, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false };
+        Button ok = new() { Content = "OK", Width = 80, IsDefault = true, Margin = new Thickness(0, 0, 6, 0) };
+        ok.Click += (_, _) => window.DialogResult = true;
+        panel.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0),
+            Children = { ok, new Button { Content = "Cancel", Width = 80, IsCancel = true } } });
+        window.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, MaxHeight = 720 };
+        if (window.ShowDialog() != true || string.IsNullOrWhiteSpace(command.Text))
+        {
+            return;
+        }
+
+        _session.Definition.DataSources.Clear();
+        _session.Definition.DataSources.Add(new ReportDataSource { Name = current?.Name ?? "Main", Kind = kind.SelectedItem is DataSourceKind k ? k : DataSourceKind.Sql, Command = command.Text.Trim() });
+        await LoadSampleAsync(_session.Definition).ConfigureAwait(true);
+        FieldList.ItemsSource = _sample.Count > 0 || discovered.Count == 0 ? _session.Fields(_sample.FirstOrDefault()) : discovered;
+        Render();
+        Status.Text = $"Data source set: {_sample.Count} sample row(s); save a version to keep it.";
+    }
+
     private void PageSetup_Click(object sender, RoutedEventArgs e)
     {
         if (_session is null || DesignerDialogs.AskPageSetup(this, _session.Definition.Page) is not PageSetup page)
