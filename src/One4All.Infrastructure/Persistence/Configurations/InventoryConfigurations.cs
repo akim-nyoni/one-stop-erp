@@ -387,3 +387,20 @@ internal sealed class ItemImageConfiguration : IEntityTypeConfiguration<ItemImag
         b.HasIndex(x => new { x.CompanyId, x.ItemId }).IsUnique();
     }
 }
+
+internal sealed class ConcreteTestConfiguration : IEntityTypeConfiguration<ConcreteTest>
+{
+    public void Configure(EntityTypeBuilder<ConcreteTest> b)
+    {
+        b.ToTable("concrete_test", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.RunNumber).HasMaxLength(40);
+        b.Property(x => x.SampleReference).HasMaxLength(40);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Result).HasPrecision(9, 2);
+        b.Property(x => x.Specified).HasPrecision(9, 2);
+        b.Property(x => x.Tolerance).HasPrecision(9, 2);
+        b.Property(x => x.TestedBy).HasMaxLength(120);
+        b.HasIndex(x => new { x.CompanyId, x.RunNumber });
+    }
+}

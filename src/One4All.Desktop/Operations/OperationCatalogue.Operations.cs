@@ -16,6 +16,33 @@ public static partial class OperationCatalogue
         const string module = "Weighbridge";
         yield return new Operation
         {
+            Module = module, Title = "Concrete slump and strength tests", ListTitle = "Failed tests (last 90 days)",
+            Description = "Records a slump test (mm, passes within the tolerance of the target) or a 7- or 28-day cube strength (MPa, passes at or above the specified strength) "
+                + "against a batch run; Show lists a run's tests.",
+            Fields = [Pick("Step", "Step", ["Record", "Show"]), Req("Run", "Batch run number"), Opt("Sample", "Sample / cube reference"),
+                Pick("Kind", "Test", Enum.GetNames<Core.Inventory.ConcreteTestKind>()), Num("Result", "Result (mm or MPa)", "0"), Num("Specified", "Target slump or specified strength", "0"),
+                Num("Tolerance", "Slump tolerance (mm)", "25"), Opt("By", "Tested by"), Today()],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.Inventory.IConcreteTestService tests = c.Get<Application.Abstractions.Inventory.IConcreteTestService>();
+                if (i.Text("Step") == "Show")
+                {
+                    IReadOnlyList<Core.Inventory.ConcreteTest> found = await tests.ForRunAsync(c.CompanyId, i.Text("Run")).ConfigureAwait(true);
+                    return found.Count == 0 ? "No tests on that run." : string.Join(Environment.NewLine, found.Select(t =>
+                        $"{D(t.TestedOn)} {t.SampleReference,-10} {t.Kind,-10} {Q(t.Result),8} vs {Q(t.Specified),8}  {(t.Passed ? "pass" : "FAIL")}"));
+                }
+
+                (long id, bool passed) = Check(await tests.RecordAsync(c.CompanyId, new Application.Abstractions.Inventory.ConcreteTestEntry(i.Text("Run"), i.Optional("Sample") ?? string.Empty,
+                    Enum.Parse<Core.Inventory.ConcreteTestKind>(i.Text("Kind")), i.Date("Date"), i.Number("Result"), i.Number("Specified"), i.Number("Tolerance")) { TestedBy = i.Optional("By") })
+                    .ConfigureAwait(true));
+                return passed ? $"Test {id} recorded: pass." : $"Test {id} recorded: FAILED — follow up with the plant and the customer.";
+            },
+            List = async c => Table(await c.Get<Application.Abstractions.Inventory.IConcreteTestService>().FailuresAsync(c.CompanyId, DateOnly.FromDateTime(DateTime.Today).AddDays(-90),
+                    DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true),
+                ("Date", t => D(t.TestedOn)), ("Run", t => t.RunNumber), ("Sample", t => t.SampleReference), ("Test", t => t.Kind), ("Result", t => Q(t.Result)), ("Specified", t => Q(t.Specified))),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "First weigh (open a ticket)", ListTitle = "Tickets still on the bridge",
             Description = "Outbound loads weigh empty first (leave the weight blank to use the vehicle's stored tare); inbound loads weigh loaded first. A keyed weight needs a reason and another person's authority.",
             Fields = [Pick("Direction", "Direction", "Outbound", "Inbound"), Req("Vehicle", "Vehicle registration"), Req("Item", "Product (item code)"), Num("Density", "m³ per tonne", "0.6"), Today(),

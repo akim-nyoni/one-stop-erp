@@ -85,5 +85,14 @@ public sealed class AssemblyTests
         string yield = await Render("INV99");
         yield.Should().Contain($"{result.RunNumber},2026-03-05,ACAKE Cake,10 → 9 (90.0%),AFLOUR Flour,4.95,6,4.95,6.00,1.05")
             .And.Contain("ASUGAR Sugar,0.9,1,3.60,4.00,0.4");
+
+        // Tests on the batch: a slump inside its tolerance passes, a weak 28-day cube fails and is listed for follow-up.
+        IConcreteTestService tests = scope.ServiceProvider.GetRequiredService<IConcreteTestService>();
+        (await tests.RecordAsync(companyId, new ConcreteTestEntry("NOPE", "S1", ConcreteTestKind.Slump, new DateOnly(2026, 3, 5), 80m, 75m, 25m))).Error.Code.Should().Be("Inv.BatchRunNotFound");
+        (await tests.RecordAsync(companyId, new ConcreteTestEntry(result.RunNumber, "S1", ConcreteTestKind.Slump, new DateOnly(2026, 3, 4), 80m, 75m, 25m))).Error.Code.Should().Be("Inv.ConcreteTestDate");
+        (await tests.RecordAsync(companyId, new ConcreteTestEntry(result.RunNumber, "S1", ConcreteTestKind.Slump, new DateOnly(2026, 3, 5), 80m, 75m, 25m))).Value.Passed.Should().BeTrue();
+        (await tests.RecordAsync(companyId, new ConcreteTestEntry(result.RunNumber, "C1", ConcreteTestKind.Cube28Day, new DateOnly(2026, 4, 2), 21m, 25m))).Value.Passed.Should().BeFalse();
+        (await tests.ForRunAsync(companyId, result.RunNumber)).Should().HaveCount(2);
+        (await tests.FailuresAsync(companyId, new DateOnly(2026, 3, 1), new DateOnly(2026, 4, 30))).Should().ContainSingle().Which.SampleReference.Should().Be("C1");
     }
 }

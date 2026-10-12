@@ -12393,6 +12393,92 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("bom_line", "inv");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.ConcreteTest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<bool>("Passed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("passed");
+
+                    b.Property<decimal>("Result")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("result");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("RunNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("run_number");
+
+                    b.Property<string>("SampleReference")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("sample_reference");
+
+                    b.Property<decimal>("Specified")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("specified");
+
+                    b.Property<string>("TestedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("tested_by");
+
+                    b.Property<DateOnly>("TestedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("tested_on");
+
+                    b.Property<decimal>("Tolerance")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("numeric(9,2)")
+                        .HasColumnName("tolerance");
+
+                    b.HasKey("Id")
+                        .HasName("pk_concrete_test");
+
+                    b.HasIndex("CompanyId", "RunNumber")
+                        .HasDatabaseName("ix_concrete_test_company_id_run_number");
+
+                    b.ToTable("concrete_test", "inv");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.HeldStock", b =>
                 {
                     b.Property<long>("Id")
