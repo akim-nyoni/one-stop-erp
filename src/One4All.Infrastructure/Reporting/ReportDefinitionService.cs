@@ -117,6 +117,62 @@ public sealed class ReportDefinitionService : IReportDefinitionService
         return record.Version;
     }
 
+    /// <inheritdoc />
+    public async Task<Result<int>> SaveUserVersionAsync(long companyId, long userId, string code, string name, string? module, string definitionJson, string? note, CancellationToken ct = default)
+    {
+        string key = (code ?? string.Empty).Trim();
+        if (key.Length == 0 || string.IsNullOrWhiteSpace(name))
+        {
+            return Error.Validation("Rpt.Definition", "A report needs a code and a name.");
+        }
+
+        string? problem = Validate(definitionJson);
+        if (problem is not null)
+        {
+            return Error.Validation("Rpt.Definition", problem);
+        }
+
+        ReportDefinitionRecord? record = await _db.ReportDefinitions
+            .FirstOrDefaultAsync(r => r.Scope == ReportScope.User && r.CompanyId == companyId && r.OwnerUserId == userId && r.Code == key, ct).ConfigureAwait(false);
+        string remark = string.IsNullOrWhiteSpace(note) ? "Saved" : note.Trim();
+        if (record is null)
+        {
+            record = new ReportDefinitionRecord(key, name.Trim(), definitionJson, ReportScope.User, companyId: companyId, ownerUserId: userId, module: string.IsNullOrWhiteSpace(module) ? null : module.Trim());
+            _db.ReportDefinitions.Add(record);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+        else
+        {
+            if (JsonDiff.Compare(record.DefinitionJson, definitionJson).Count == 0 && record.Name == name.Trim())
+            {
+                return Error.Rule("Rpt.NoChange", $"Nothing has changed since version {record.Version}.");
+            }
+
+            record.Name = name.Trim();
+            record.UpdateDefinition(definitionJson);
+        }
+
+        _db.Set<ReportDefinitionVersion>().Add(new ReportDefinitionVersion(record.Id, record.Version, definitionJson, userId, DateTimeOffset.UtcNow, remark));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return record.Version;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> RemoveUserVersionAsync(long companyId, long userId, string code, CancellationToken ct = default)
+    {
+        string key = (code ?? string.Empty).Trim();
+        ReportDefinitionRecord? record = await _db.ReportDefinitions
+            .FirstOrDefaultAsync(r => r.Scope == ReportScope.User && r.CompanyId == companyId && r.OwnerUserId == userId && r.Code == key, ct).ConfigureAwait(false);
+        if (record is null)
+        {
+            return Result.Failure(Error.NotFound("Rpt.NoUserVersion", $"You have no version of your own of {key}."));
+        }
+
+        _db.ReportDefinitions.Remove(record);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
     private async Task<int> CreateAsync(long companyId, string code, string name, string? module, string json, long? userId, string note, CancellationToken ct)
     {
         ReportDefinitionRecord record = new(code, name, json, ReportScope.Company, companyId: companyId, module: string.IsNullOrWhiteSpace(module) ? null : module.Trim());

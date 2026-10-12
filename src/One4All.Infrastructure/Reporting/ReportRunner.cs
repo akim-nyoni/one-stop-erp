@@ -30,6 +30,15 @@ public sealed class ReportRunner : IReportRunner
         _providers = providers;
     }
 
+    /// <summary>Creates the runner for a signed-in user, whose own report versions come first.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="providers">The data providers.</param>
+    /// <param name="currentUser">The signed-in user.</param>
+    public ReportRunner(One4AllDbContext db, IEnumerable<IReportDataProvider> providers, Application.Abstractions.Security.ICurrentUser currentUser)
+        : this(db, providers) => _userId = currentUser?.UserId;
+
+    private readonly long? _userId;
+
     /// <inheritdoc />
     public Task<Result<RenderedDocument>> RenderAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, ReportFormat format, CancellationToken ct = default)
         => RenderAsync(companyId, reportCode, parameters, format, new HashSet<Application.Security.SensitiveField>(), ct);
@@ -243,12 +252,14 @@ public sealed class ReportRunner : IReportRunner
     internal static async Task<ReportDefinition?> DefinitionAsync(One4AllDbContext db, long companyId, string code, CancellationToken ct)
         => await ResolveDefinitionAsync(db, companyId, code, ct).ConfigureAwait(false) ?? BuiltInDefinition(code);
 
-    private Task<ReportDefinition?> ResolveDefinitionAsync(long companyId, string code, CancellationToken ct) => ResolveDefinitionAsync(_db, companyId, code, ct);
+    private Task<ReportDefinition?> ResolveDefinitionAsync(long companyId, string code, CancellationToken ct) => ResolveDefinitionAsync(_db, companyId, code, ct, _userId);
 
-    private static async Task<ReportDefinition?> ResolveDefinitionAsync(One4AllDbContext db, long companyId, string code, CancellationToken ct)
+    // Resolution order (brief §13.2): the user's own version, then the company's, then the system's.
+    private static async Task<ReportDefinition?> ResolveDefinitionAsync(One4AllDbContext db, long companyId, string code, CancellationToken ct, long? userId = null)
     {
         ReportDefinitionRecord? record = await db.ReportDefinitions
-            .Where(r => r.Code == code && (r.Scope == ReportScope.System || (r.Scope == ReportScope.Company && r.CompanyId == companyId)))
+            .Where(r => r.Code == code && (r.Scope == ReportScope.System || (r.Scope == ReportScope.Company && r.CompanyId == companyId)
+                || (userId != null && r.Scope == ReportScope.User && r.CompanyId == companyId && r.OwnerUserId == userId)))
             .OrderByDescending(r => r.Scope)
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);

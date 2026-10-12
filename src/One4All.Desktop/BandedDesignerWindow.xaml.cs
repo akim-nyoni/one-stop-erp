@@ -655,9 +655,16 @@ public partial class BandedDesignerWindow : Window
 
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         ReportDefinition definition = _session.Definition;
-        Result<int> saved = await scope.ServiceProvider.GetRequiredService<IReportDefinitionService>().SaveAsync(_companyId, definition.Code, definition.Name, definition.Module,
-            ReportDefinitionSerializer.Serialize(definition), _services.GetService<DesktopSession>()?.UserId, string.IsNullOrWhiteSpace(NoteBox.Text) ? "Designer" : NoteBox.Text.Trim()).ConfigureAwait(true);
-        Status.Text = saved.IsSuccess ? $"Saved {definition.Code} as company version {saved.Value}; run it from the Report Viewer." : saved.Error.Message;
+        long? user = _services.GetService<DesktopSession>()?.UserId;
+        string note = string.IsNullOrWhiteSpace(NoteBox.Text) ? "Designer" : NoteBox.Text.Trim();
+        IReportDefinitionService definitions = scope.ServiceProvider.GetRequiredService<IReportDefinitionService>();
+        bool mine = MineBox.IsChecked == true && user is not null;
+        Result<int> saved = mine
+            ? await definitions.SaveUserVersionAsync(_companyId, user!.Value, definition.Code, definition.Name, definition.Module, ReportDefinitionSerializer.Serialize(definition), note).ConfigureAwait(true)
+            : await definitions.SaveAsync(_companyId, definition.Code, definition.Name, definition.Module, ReportDefinitionSerializer.Serialize(definition), user, note).ConfigureAwait(true);
+        Status.Text = saved.IsSuccess
+            ? $"Saved {definition.Code} as {(mine ? "your own" : "the company")} version {saved.Value}; run it from the Report Viewer."
+            : saved.Error.Message;
         if (saved.IsSuccess)
         {
             NoteBox.Clear();

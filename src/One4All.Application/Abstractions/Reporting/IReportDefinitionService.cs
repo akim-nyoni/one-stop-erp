@@ -62,4 +62,27 @@ public interface IReportDefinitionService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The new version number, or why it was refused.</returns>
     Task<Result<int>> RollbackAsync(long companyId, string code, int version, long? userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Saves a user's own version of a report (brief §13.2: resolution order user version → company version → system version): only that user runs it,
+    /// everyone else keeps the company's or the system's. Each save is kept in the version history.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="userId">The user.</param>
+    /// <param name="code">The report code.</param>
+    /// <param name="name">The display name.</param>
+    /// <param name="module">The module.</param>
+    /// <param name="definitionJson">The definition.</param>
+    /// <param name="note">Why it changed.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The version saved, or why it was refused.</returns>
+    Task<Result<int>> SaveUserVersionAsync(long companyId, long userId, string code, string name, string? module, string definitionJson, string? note, CancellationToken ct = default);
+
+    /// <summary>Removes a user's own version of a report; the user runs the company's (or the system's) again.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="userId">The user.</param>
+    /// <param name="code">The report code.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why it was refused.</returns>
+    Task<Result> RemoveUserVersionAsync(long companyId, long userId, string code, CancellationToken ct = default);
 }

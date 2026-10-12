@@ -85,6 +85,8 @@
                 <StackPanel DockPanel.Dock="Bottom" Margin="8">
                     <TextBlock Text="Version note" />
                     <TextBox x:Name="NoteBox" Margin="0,2,0,6" />
+                    <CheckBox x:Name="MineBox" Content="Save as my own version (only I run it)" Margin="0,0,0,6"
+                              ToolTip="Your own version comes before the company's; untick to save the company's version for everyone" />
                     <UniformGrid Columns="2">
                         <Button Content="Preview" Height="30" Margin="0,0,4,0" Click="Preview_Click" />
                         <Button Content="Save version" Height="30" FontWeight="SemiBold" Click="Save_Click" />

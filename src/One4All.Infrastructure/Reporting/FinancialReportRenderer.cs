@@ -120,11 +120,24 @@ public sealed class FinancialReportRenderer : IFinancialReportRenderer
         return new RenderedDocument(bytes, contentType, $"{baseName}.{ext}");
     }
 
+    /// <summary>Creates the renderer for a signed-in user, whose own report versions come first.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="reports">The ledger reports.</param>
+    /// <param name="tradingReports">The trading reports.</param>
+    /// <param name="currentUser">The signed-in user.</param>
+    public FinancialReportRenderer(One4AllDbContext db, IGeneralLedgerReports reports, Application.Abstractions.Trading.ITradingReports tradingReports,
+        Application.Abstractions.Security.ICurrentUser currentUser)
+        : this(db, reports, tradingReports) => _userId = currentUser?.UserId;
+
+    private readonly long? _userId;
+
     private async Task<ReportDefinition?> ResolveDefinitionAsync(long companyId, string code, CancellationToken ct)
     {
-        // Precedence: company customisation, then system. (User-level resolution needs the current user.)
+        // Precedence: the user's own version, the company's customisation, then the system's.
+        long? userId = _userId;
         ReportDefinitionRecord? record = await _db.ReportDefinitions
-            .Where(r => r.Code == code && (r.Scope == ReportScope.System || (r.Scope == ReportScope.Company && r.CompanyId == companyId)))
+            .Where(r => r.Code == code && (r.Scope == ReportScope.System || (r.Scope == ReportScope.Company && r.CompanyId == companyId)
+                || (userId != null && r.Scope == ReportScope.User && r.CompanyId == companyId && r.OwnerUserId == userId)))
             .OrderByDescending(r => r.Scope)
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);
