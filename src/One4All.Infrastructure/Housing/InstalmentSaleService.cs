@@ -84,6 +84,14 @@ public sealed class InstalmentSaleService : IInstalmentSaleService
             return number.Error;
         }
 
+        // The buyer's receivable goes to the tenure type's own control account, when one is set (brief §4.10.9).
+        Result onControl = await Trading.ReceivableControlService.ApplyTenureAsync(_db, request.CompanyId, buyer.Id,
+            Enum.IsDefined(request.Tenure) ? request.Tenure : InstalmentTenure.InstalmentSale, ct).ConfigureAwait(false);
+        if (onControl.IsFailure)
+        {
+            return onControl.Error;
+        }
+
         // Control passes on signature: the sale at the cash price and the full receivable (IFRS 15).
         Result<StandSaleResult> sold = await _housing.SellStandAsync(request.CompanyId, request.StandId, buyer.Id, buyer.Name, request.CashPrice, request.SignedOn,
             request.SalesAccountCode.Trim(), request.StandsAvailableAccountCode.Trim(), request.CostOfSalesAccountCode.Trim(), number.Value, ct).ConfigureAwait(false);

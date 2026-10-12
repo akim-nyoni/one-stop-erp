@@ -1485,3 +1485,15 @@ internal sealed class PlannedMaintenanceConfiguration : IEntityTypeConfiguration
         b.HasIndex(x => new { x.CompanyId, x.NextDue });
     }
 }
+
+internal sealed class TenureControlAccountConfiguration : IEntityTypeConfiguration<TenureControlAccount>
+{
+    public void Configure(EntityTypeBuilder<TenureControlAccount> b)
+    {
+        b.ToTable("tenure_control_account", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Tenure).HasConversion<int>();
+        b.Property(x => x.AccountCode).HasMaxLength(20);
+        b.HasIndex(x => new { x.CompanyId, x.Tenure }).IsUnique();
+    }
+}

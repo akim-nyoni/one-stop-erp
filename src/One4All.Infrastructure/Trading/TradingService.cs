@@ -108,7 +108,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return Error.Validation("Ar.RevenueLinesMismatch", "The revenue lines must each name an account and add up to the net amount.");
         }
 
-        Result<string> controlResult = await ControlCodeAsync(request.CompanyId, ControlAccountType.AccountsReceivable, ct).ConfigureAwait(false);
+        Result<string> controlResult = await ReceivableControlAsync(request.CompanyId, customer, ct).ConfigureAwait(false);
         if (controlResult.IsFailure)
         {
             return controlResult.Error;
@@ -555,7 +555,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return Error.NotFound("Ar.CustomerNotFound", $"Customer {request.CustomerId} not found.");
         }
 
-        Result<string> controlResult = await ControlCodeAsync(request.CompanyId, ControlAccountType.AccountsReceivable, ct).ConfigureAwait(false);
+        Result<string> controlResult = await ReceivableControlAsync(request.CompanyId, customer, ct).ConfigureAwait(false);
         if (controlResult.IsFailure)
         {
             return controlResult.Error;
@@ -594,7 +594,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return Error.NotFound("Ar.CustomerNotFound", $"Customer {request.CustomerId} not found.");
         }
 
-        Result<string> controlResult = await ControlCodeAsync(request.CompanyId, ControlAccountType.AccountsReceivable, ct).ConfigureAwait(false);
+        Result<string> controlResult = await ReceivableControlAsync(request.CompanyId, customer, ct).ConfigureAwait(false);
         if (controlResult.IsFailure)
         {
             return controlResult.Error;
@@ -927,7 +927,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return Error.NotFound("Ar.CustomerNotFound", $"Customer {customerId} not found.");
         }
 
-        Result<string> controlResult = await ControlCodeAsync(companyId, ControlAccountType.AccountsReceivable, ct).ConfigureAwait(false);
+        Result<string> controlResult = await ReceivableControlAsync(companyId, customer, ct).ConfigureAwait(false);
         if (controlResult.IsFailure)
         {
             return controlResult.Error;
@@ -1164,10 +1164,15 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             ? item.OutstandingBase
             : Round(transactionAmount * item.ExchangeRate);
 
+    // A customer's own receivables control (an instalment debtor's tenure control), else the company's main one.
+    private async Task<Result<string>> ReceivableControlAsync(long companyId, Customer customer, CancellationToken ct)
+        => customer.ReceivableControlAccountCode is string own ? own : await ControlCodeAsync(companyId, ControlAccountType.AccountsReceivable, ct).ConfigureAwait(false);
+
     private async Task<Result<string>> ControlCodeAsync(long companyId, ControlAccountType type, CancellationToken ct)
     {
         string? code = await _db.Accounts
             .Where(a => a.CompanyId == companyId && a.ControlAccountType == type)
+            .OrderBy(a => a.AccountCode)
             .Select(a => a.AccountCode)
             .FirstOrDefaultAsync(ct)
             .ConfigureAwait(false);

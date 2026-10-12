@@ -134,6 +134,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Housing.StandPriceWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Housing.OwnershipTransferWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Housing.IInstalmentSaleService, Housing.InstalmentSaleService>();
+        services.AddScoped<Application.Abstractions.Trading.IReceivableControlService, Trading.ReceivableControlService>();
         services.AddScoped<Application.Abstractions.Housing.IRentalHousingService, Housing.RentalHousingService>();
         services.AddScoped<Application.Abstractions.Housing.IRentalOccupancyService, Housing.RentalOccupancyService>();
         services.AddScoped<Application.Abstractions.Housing.IEvictionService, Housing.EvictionService>();

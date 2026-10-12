@@ -101,6 +101,12 @@ public sealed class Customer : SoftDeletableEntity, ICompanyScoped
     /// <summary>What happens when an invoice would take the balance over the credit limit (brief §4.5 "credit limit &amp; credit-limit check policy").</summary>
     public CreditLimitPolicy CreditLimitPolicy { get; set; }
 
+    /// <summary>
+    /// Gets or sets the receivables control account this customer's items post to, when not the company's main one (brief §4.10.9: instalment
+    /// debtors in a dedicated control per tenure type). Set before the customer has any items, and only for base-currency customers.
+    /// </summary>
+    public string? ReceivableControlAccountCode { get; set; }
+
     /// <summary>Whether the account is exempt from interest on arrears (government, charities, by council resolution).</summary>
     public bool InterestExempt { get; set; }
 

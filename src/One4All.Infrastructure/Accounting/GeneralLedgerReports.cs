@@ -515,7 +515,13 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
 
         // Sub-ledger totals as they stood at the date — not as they stand today. Later allocations, and stock
         // movements after the date, must not leak into a past reconciliation.
-        decimal arSub = await SubLedgerAsAtAsync(companyId, Core.Trading.TradingLedger.AccountsReceivable, asAtDate, ct).ConfigureAwait(false);
+        // Receivables split by control: each customer's own control, else the main (lowest-numbered) one.
+        string? mainAr = await Trading.ReceivableControlService.MainControlAsync(_db, companyId, ct).ConfigureAwait(false);
+        Dictionary<long, string> ownControl = await _db.Customers.Where(c => c.CompanyId == companyId && c.ReceivableControlAccountCode != null)
+            .ToDictionaryAsync(c => c.Id, c => c.ReceivableControlAccountCode!, ct).ConfigureAwait(false);
+        Dictionary<string, decimal> arByControl = (await Trading.OpenItemsAsAt.LoadAsync(_db, companyId, Core.Trading.TradingLedger.AccountsReceivable, asAtDate, ct).ConfigureAwait(false))
+            .GroupBy(i => ownControl.GetValueOrDefault(i.Item.TraderId) ?? mainAr ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Sum(i => i.Signed(Core.Trading.LedgerSign.Debit)), StringComparer.OrdinalIgnoreCase);
         decimal apSub = await SubLedgerAsAtAsync(companyId, Core.Trading.TradingLedger.AccountsPayable, asAtDate, ct).ConfigureAwait(false);
 
         decimal stockSub = await _db.Set<Core.Inventory.StockMovement>()
@@ -528,7 +534,7 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
             (decimal d, decimal cr) = movement.GetValueOrDefault(c.AccountCode, (0m, 0m));
             (decimal glNatural, decimal sub, string label) = c.ControlAccountType switch
             {
-                ControlAccountType.AccountsReceivable => (d - cr, arSub, "Accounts Receivable"),
+                ControlAccountType.AccountsReceivable => (d - cr, arByControl.GetValueOrDefault(c.AccountCode), "Accounts Receivable"),
                 ControlAccountType.AccountsPayable => (cr - d, apSub, "Accounts Payable"),
                 _ => (d - cr, stockSub, "Stock"),
             };

@@ -647,6 +647,24 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Receivables control per tenure type", ListTitle = "Tenure control accounts",
+            Description = "Instalment debtors post to a dedicated receivables control account per tenure type (instalment sale, rent-to-buy, lease with option): a buyer goes "
+                + "onto it when their agreement is signed. Customer control sets one customer's control directly (only before they have items). The control reconciliation "
+                + "matches each control to its own customers.",
+            Fields = [Pick("Step", "Step", ["Tenure control", "Customer control"]), Pick("Tenure", "Tenure type", Enum.GetNames<InstalmentTenure>()), Opt("Customer", "Customer code"),
+                Opt("Account", "Receivables control account (blank: main)")],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.Trading.IReceivableControlService controls = c.Get<Application.Abstractions.Trading.IReceivableControlService>();
+                return i.Text("Step") == "Customer control"
+                    ? Check(await controls.SetCustomerControlAsync(c.CompanyId, i.Optional("Customer") ?? string.Empty, i.Optional("Account")).ConfigureAwait(true), "Customer control set.")
+                    : Check(await controls.SetTenureControlAsync(c.CompanyId, Enum.Parse<InstalmentTenure>(i.Text("Tenure")), i.Optional("Account")).ConfigureAwait(true), "Tenure control set.");
+            },
+            List = async c => Table(await c.Get<Application.Abstractions.Trading.IReceivableControlService>().TenureControlsAsync(c.CompanyId).ConfigureAwait(true),
+                ("Tenure", t => t.Tenure), ("Control account", t => t.AccountCode)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Rental property accounting (IAS 40)", ListTitle = "Investment property and PPE register",
             Description = "Rental units are held to earn rentals: carry each as investment property (cost or fair value model) or PPE, never as stand stock. Designate brings the unit "
                 + "into its asset account at its carrying amount from the account it comes from; Revalue remeasures fair-value investment property, the change to the fair-value "

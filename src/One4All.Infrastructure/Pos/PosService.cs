@@ -207,8 +207,8 @@ public sealed class PosService : IPosService
                 return Error.Rule("Pos.CreditLimit", $"Customer {customer.Code} owes {owed:N2}; {onAccount:N2} more would pass the credit limit of {customer.CreditLimit:N2}.");
             }
 
-            receivablesControl = await _db.Accounts.Where(a => a.CompanyId == request.CompanyId && a.ControlAccountType == ControlAccountType.AccountsReceivable)
-                .Select(a => a.AccountCode).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            receivablesControl = customer.ReceivableControlAccountCode
+                ?? await Trading.ReceivableControlService.MainControlAsync(_db, request.CompanyId, ct).ConfigureAwait(false);
             if (receivablesControl is null)
             {
                 return Error.Rule("Trading.NoControlAccount", "No receivables control account is configured.");

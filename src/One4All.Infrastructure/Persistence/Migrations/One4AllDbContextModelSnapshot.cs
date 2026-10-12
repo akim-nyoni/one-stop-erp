@@ -11414,6 +11414,59 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.TenureControlAccount", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("account_code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Tenure")
+                        .HasColumnType("integer")
+                        .HasColumnName("tenure");
+
+                    b.HasKey("Id")
+                        .HasName("pk_tenure_control_account");
+
+                    b.HasIndex("CompanyId", "Tenure")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tenure_control_account_company_id_tenure");
+
+                    b.ToTable("tenure_control_account", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.TitleDeed", b =>
                 {
                     b.Property<long>("Id")
@@ -32219,6 +32272,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int?>("RateType")
                         .HasColumnType("integer")
                         .HasColumnName("rate_type");
+
+                    b.Property<string>("ReceivableControlAccountCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("receivable_control_account_code");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
