@@ -8189,6 +8189,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("deposit");
 
+                    b.Property<decimal>("EscalationPercent")
+                        .HasPrecision(7, 4)
+                        .HasColumnType("numeric(7,4)")
+                        .HasColumnName("escalation_percent");
+
                     b.Property<decimal>("FinancingDiscount")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")

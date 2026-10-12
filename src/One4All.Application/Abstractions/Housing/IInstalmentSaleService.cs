@@ -40,6 +40,9 @@ public sealed class InstalmentSaleRequest
     /// <summary>The tenure the instalments buy.</summary>
     public One4All.Core.Housing.InstalmentTenure Tenure { get; init; } = One4All.Core.Housing.InstalmentTenure.InstalmentSale;
 
+    /// <summary>The yearly step-up of the instalment (%), or 0 for level instalments.</summary>
+    public decimal EscalationPercent { get; init; }
+
     /// <summary>The stand sales revenue account.</summary>
     public string SalesAccountCode { get; init; } = string.Empty;
 

@@ -68,7 +68,13 @@ public sealed class InstalmentSaleService : IInstalmentSaleService
 
         // A plan with a financing component needs somewhere to defer its discount: refused before anything is sold.
         decimal? marketRate = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.HousingMarketRatePercent).FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        IReadOnlyList<PlannedInstalment> schedule = InstalmentPlan.Build(request.CashPrice - request.Deposit, request.AnnualRatePercent, request.TermMonths, request.Method, request.FirstDueDate);
+        if (request.EscalationPercent is < 0m or > 50m)
+        {
+            return Error.Validation("Hse.Escalation", "The yearly escalation is between 0 and 50%.");
+        }
+
+        IReadOnlyList<PlannedInstalment> schedule = InstalmentPlan.Build(request.CashPrice - request.Deposit, request.AnnualRatePercent, request.TermMonths, request.Method, request.FirstDueDate,
+            request.EscalationPercent);
         FinancingDiscount? financing = request.AnnualRatePercent < (marketRate ?? 0m)
             ? FinancingComponent.Measure(schedule, request.CashPrice - request.Deposit, marketRate, request.SignedOn, request.TermMonths)
             : null;
@@ -117,6 +123,7 @@ public sealed class InstalmentSaleService : IInstalmentSaleService
             request.Method, request.TermMonths, request.SignedOn, request.InterestAccountCode.Trim())
         {
             Tenure = Enum.IsDefined(request.Tenure) ? request.Tenure : InstalmentTenure.InstalmentSale,
+            EscalationPercent = request.EscalationPercent,
         };
         // A long plan below the market rate carries a financing component: the sale is its present value, the rest is interest earned over the term.
         foreach (PlannedInstalment line in schedule)

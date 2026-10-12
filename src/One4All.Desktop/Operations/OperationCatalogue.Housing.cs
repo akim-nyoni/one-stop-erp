@@ -406,7 +406,8 @@ public static partial class OperationCatalogue
                 + "by a date. Quote / settle early: the principal outstanding and the interest rebated when paid off now.",
             Fields = [Pick("Step", "Step", ["Sign", "Raise due", "Quote settlement", "Settle early", "Set market rate"]), Opt("Stand", "Stand number (sign)"), Opt("Buyer", "Buyer customer code (sign)"),
                 Opt("Agreement", "Agreement number (quote / settle)"), Num("Price", "Cash price", "0"), Num("Deposit", "Deposit", "0"), Num("Rate", "Annual interest %", "0"),
-                Pick("Method", "Interest", Enum.GetNames<InterestMethod>()), Pick("Tenure", "Tenure", Enum.GetNames<InstalmentTenure>()), Num("Term", "Term (months)", "12"), Today("Date", "Signed / as at"), Today("FirstDue", "First instalment due"),
+                Pick("Method", "Interest", Enum.GetNames<InterestMethod>()), Pick("Tenure", "Tenure", Enum.GetNames<InstalmentTenure>()), Num("Term", "Term (months)", "12"),
+                Num("Escalation", "Yearly instalment escalation %", "0"), Today("Date", "Signed / as at"), Today("FirstDue", "First instalment due"),
                 Opt("Sales", "Sales account"), Opt("Available", "Stands available (inventory) account"), Opt("Cost", "Cost of sales account"), Opt("Interest", "Interest income account"),
                 Opt("Bank", "Bank account (deposit)"), Opt("Deferred", "Deferred financing account (plans over a year below the market rate)"),
                 OptNum("Market", "Market credit rate % (set market rate; blank: no discounting)")],
@@ -432,7 +433,7 @@ public static partial class OperationCatalogue
                             SignedOn = i.Date("Date"), FirstDueDate = i.Date("FirstDue"), SalesAccountCode = i.Optional("Sales") ?? string.Empty,
                             StandsAvailableAccountCode = i.Optional("Available") ?? string.Empty, CostOfSalesAccountCode = i.Optional("Cost") ?? string.Empty,
                             InterestAccountCode = i.Optional("Interest") ?? string.Empty, BankAccountCode = i.Optional("Bank") ?? string.Empty,
-                            DeferredFinancingAccountCode = i.Optional("Deferred"), Tenure = Enum.Parse<InstalmentTenure>(i.Text("Tenure")),
+                            DeferredFinancingAccountCode = i.Optional("Deferred"), Tenure = Enum.Parse<InstalmentTenure>(i.Text("Tenure")), EscalationPercent = i.Number("Escalation"),
                         }).ConfigureAwait(true));
                         return $"Agreement {signed.AgreementNumber}:" + Environment.NewLine + string.Join(Environment.NewLine, signed.Schedule.Select(x =>
                             $"{x.Number,3}  {D(x.DueDate)}  {M(x.Amount),12}  interest {M(x.Interest),10}  principal {M(x.Principal),10}  balance {M(x.BalanceAfter),12}"));

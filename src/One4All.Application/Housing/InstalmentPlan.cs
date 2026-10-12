@@ -41,6 +41,72 @@ public static class InstalmentPlan
             : Even(principal, method == InterestMethod.Flat ? Round(principal * rate / 100m * months / 12m) : 0m, months, firstDueDate);
     }
 
+    /// <summary>
+    /// Builds an escalating schedule (brief §4.10.5 "escalation"): the instalment steps up by a percentage every twelve months, sized so the plan
+    /// still clears exactly — zero and flat plans spread the same total over the rising instalments; a reducing-balance plan charges interest
+    /// on the balance, which falls more slowly early on.
+    /// </summary>
+    /// <param name="principal">The amount financed.</param>
+    /// <param name="annualRatePercent">The annual interest rate.</param>
+    /// <param name="months">The term in months.</param>
+    /// <param name="method">How interest is charged.</param>
+    /// <param name="firstDueDate">The first instalment's due date.</param>
+    /// <param name="escalationPercent">The yearly step-up (0: level instalments).</param>
+    /// <returns>The instalments.</returns>
+    public static IReadOnlyList<PlannedInstalment> Build(decimal principal, decimal annualRatePercent, int months, InterestMethod method, DateOnly firstDueDate, decimal escalationPercent)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(escalationPercent);
+        if (escalationPercent == 0m)
+        {
+            return Build(principal, annualRatePercent, months, method, firstDueDate);
+        }
+
+        ArgumentOutOfRangeException.ThrowIfLessThan(months, 1);
+        ArgumentOutOfRangeException.ThrowIfNegative(principal);
+        ArgumentOutOfRangeException.ThrowIfNegative(annualRatePercent);
+        double step = 1 + (double)escalationPercent / 100;
+        double Factor(int n) => Math.Pow(step, (n - 1) / 12);
+        decimal rate = method == InterestMethod.Zero ? 0m : annualRatePercent;
+        List<PlannedInstalment> lines = [];
+        decimal balance = principal;
+        if (method == InterestMethod.ReducingBalance && rate > 0m)
+        {
+            // The first instalment that, rising each year, has a present value equal to the principal.
+            double r = (double)rate / 1200;
+            double weights = Enumerable.Range(1, months).Sum(n => Factor(n) / Math.Pow(1 + r, n));
+            double first = (double)principal / weights;
+            decimal monthly = rate / 1200m;
+            for (int n = 1; n <= months; n++)
+            {
+                decimal interest = Round(balance * monthly);
+                decimal payment = Round((decimal)(first * Factor(n)));
+                decimal p = n == months ? balance : payment - interest;
+                balance -= p;
+                lines.Add(new PlannedInstalment(n, firstDueDate.AddMonths(n - 1), p + interest, interest, p, balance));
+            }
+
+            return lines;
+        }
+
+        // Zero or flat: the same total, spread over rising instalments in proportion; principal and interest in the plan's ratio.
+        decimal totalInterest = method == InterestMethod.Flat ? Round(principal * rate / 100m * months / 12m) : 0m;
+        decimal total = principal + totalInterest;
+        double sum = Enumerable.Range(1, months).Sum(Factor);
+        decimal interestLeft = totalInterest;
+        for (int n = 1; n <= months; n++)
+        {
+            bool last = n == months;
+            decimal amount = Round(total * (decimal)(Factor(n) / sum));
+            decimal i = last ? interestLeft : total == 0m ? 0m : Round(amount * totalInterest / total);
+            decimal p = last ? balance : amount - i;
+            balance -= p;
+            interestLeft -= i;
+            lines.Add(new PlannedInstalment(n, firstDueDate.AddMonths(n - 1), p + i, i, p, balance));
+        }
+
+        return lines;
+    }
+
     /// <summary>The early-settlement quote as at a date: instalments due by then stand; later interest is rebated.</summary>
     /// <param name="schedule">The schedule.</param>
     /// <param name="asAtDate">The settlement date.</param>

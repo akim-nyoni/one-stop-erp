@@ -207,6 +207,7 @@ internal sealed class InstalmentAgreementConfiguration : IEntityTypeConfiguratio
         b.HasKey(x => x.Id);
         b.Property(x => x.Tenure).HasConversion<int>().HasDefaultValue(InstalmentTenure.InstalmentSale).HasSentinel((InstalmentTenure)0);
         b.Property(x => x.PenaltyRatePercent).HasPrecision(9, 4);
+        b.Property(x => x.EscalationPercent).HasPrecision(7, 4);
         b.Property(x => x.AgreementNumber).HasMaxLength(30);
         b.Property(x => x.CashPrice).HasPrecision(19, 4);
         b.Property(x => x.Deposit).HasPrecision(19, 4);

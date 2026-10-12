@@ -56,4 +56,24 @@ public class InstalmentPlanTests
         Action act = () => InstalmentPlan.Build(1000m, 10m, 0, InterestMethod.Flat, First);
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
+
+    [Theory]
+    [InlineData(InterestMethod.Zero, 0)]
+    [InlineData(InterestMethod.Flat, 10)]
+    [InlineData(InterestMethod.ReducingBalance, 12)]
+    public void Escalating_instalments_step_up_yearly_and_still_clear(InterestMethod method, double rate)
+    {
+        IReadOnlyList<PlannedInstalment> plan = InstalmentPlan.Build(24000m, (decimal)rate, 36, method, First, 10m);
+        plan.Should().HaveCount(36);
+        plan[^1].BalanceAfter.Should().Be(0m);
+        plan.Sum(i => i.Principal).Should().Be(24000m);
+        decimal year1 = plan[0].Amount, year2 = plan[12].Amount, year3 = plan[24].Amount;
+        (year2 / year1).Should().BeApproximately(1.10m, 0.002m);
+        (year3 / year2).Should().BeApproximately(1.10m, 0.002m);
+        plan[11].Amount.Should().Be(year1);
+    }
+
+    [Fact]
+    public void No_escalation_is_the_level_plan()
+        => InstalmentPlan.Build(12000m, 12m, 12, InterestMethod.ReducingBalance, First, 0m).Should().Equal(InstalmentPlan.Build(12000m, 12m, 12, InterestMethod.ReducingBalance, First));
 }

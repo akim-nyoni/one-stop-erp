@@ -146,6 +146,9 @@ public sealed class InstalmentAgreement : AuditableEntity, ICompanyScoped
     /// <summary>The annual penalty interest rate charged on arrears (%), or 0 for none (brief §4.10.5 "penalty interest on arrears").</summary>
     public decimal PenaltyRatePercent { get; set; }
 
+    /// <summary>Gets or sets the yearly step-up of the instalment (%), or 0 for level instalments.</summary>
+    public decimal EscalationPercent { get; set; }
+
     /// <summary>Where it stands.</summary>
     public InstalmentAgreementStatus Status { get; private set; }
 
