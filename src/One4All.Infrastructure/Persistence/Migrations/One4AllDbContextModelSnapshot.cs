@@ -16594,6 +16594,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<string>("CorrespondenceAddress")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("correspondence_address");
+
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("created_by_user_id");
@@ -16761,6 +16766,96 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("property_owner", "mun", t =>
                         {
                             t.HasCheckConstraint("ck_property_owner_share", "share_percent > 0 AND share_percent <= 100 AND (owned_to IS NULL OR owned_to >= owned_from)");
+                        });
+                });
+
+            modelBuilder.Entity("One4All.Core.Municipal.PropertyParty", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("address");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("CustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("email");
+
+                    b.Property<DateOnly>("From")
+                        .HasColumnType("date")
+                        .HasColumnName("from");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("phone");
+
+                    b.Property<long>("PropertyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("property_id");
+
+                    b.Property<bool>("ReceivesBills")
+                        .HasColumnType("boolean")
+                        .HasColumnName("receives_bills");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer")
+                        .HasColumnName("role");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<DateOnly?>("To")
+                        .HasColumnType("date")
+                        .HasColumnName("to");
+
+                    b.HasKey("Id")
+                        .HasName("pk_property_party");
+
+                    b.HasIndex("CompanyId", "PropertyId")
+                        .HasDatabaseName("ix_property_party_company_id_property_id");
+
+                    b.ToTable("property_party", "mun", t =>
+                        {
+                            t.HasCheckConstraint("ck_property_party_dates", "\"to\" IS NULL OR \"to\" >= \"from\"");
                         });
                 });
 

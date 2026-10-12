@@ -46,6 +46,13 @@ public static partial class OperationCatalogue
                 e.OpenOrders.ToList().ForEach(o => text.AppendLine(CultureInfo.InvariantCulture, $"Open order {o.OrderNumber}: {o.Kind} {o.ServiceType} raised {o.RaisedOn:yyyy-MM-dd}"));
                 e.Licences.ToList().ForEach(l => text.AppendLine(CultureInfo.InvariantCulture, $"Licence {l.LicenceNumber}: {l.Kind} {l.Status} to {l.ExpiresOn:yyyy-MM-dd}"));
                 text.AppendLine(e.ClearanceValidUntil is DateOnly until ? $"Clearance valid until {until:yyyy-MM-dd}" : "No valid clearance certificate");
+                if (e.CorrespondenceAddress is string postTo)
+                {
+                    text.AppendLine(CultureInfo.InvariantCulture, $"Correspondence to: {postTo}");
+                }
+
+                e.Parties.ToList().ForEach(p => text.AppendLine(CultureInfo.InvariantCulture,
+                    $"{p.Role}: {p.Name}{(p.Phone is null ? string.Empty : " " + p.Phone)} from {p.From:yyyy-MM-dd}{(p.ReceivesBills ? " (copied on bills)" : string.Empty)}"));
                 text.AppendLine("Recent transactions:");
                 e.RecentTransactions.ToList().ForEach(t => text.AppendLine(CultureInfo.InvariantCulture, $"  {t.Date:yyyy-MM-dd} {t.DocumentNumber,-14} {t.ItemType,-12} {M(t.Amount),14} outstanding {M(t.Outstanding)}"));
                 return text.ToString();
@@ -465,9 +472,13 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Property ownership",
             Description = "Registers a stand's owners and their shares (\"CUST1:50:R; CUST2:50\" — R marks the ratepayer), transfers it to buyers against a clearance certificate, "
-                + "and shows the owners now or the full history.",
-            Fields = [Pick("Step", "Step", ["Register", "Transfer", "Settle transfer", "Owners", "History"]), Req("Stand", "Stand number"), Opt("Owners", "Owners: CUSTOMER:share[:R]; …"), Opt("Clearance", "Clearance certificate (transfer)"),
-                Opt("Deeds", "Deeds reference"), Today()],
+                + "and shows the owners now or the full history. Also keeps the tenants, occupiers and managing agents (each optionally copied on the bills) and a correspondence "
+                + "address separate from the property's own.",
+            Fields = [Pick("Step", "Step", ["Register", "Transfer", "Settle transfer", "Owners", "History", "Add party", "End party", "Parties", "Correspondence address", "Bill goes to"]),
+                Req("Stand", "Stand number"), Opt("Owners", "Owners: CUSTOMER:share[:R]; …"), Opt("Clearance", "Clearance certificate (transfer)"),
+                Opt("Deeds", "Deeds reference"), Pick("Role", "Party is", Enum.GetNames<PropertyPartyRole>()), Opt("PartyName", "Party's name"), Opt("PartyAccount", "Party's own account (customer)"),
+                Opt("PartyPhone", "Party's phone"), Opt("PartyEmail", "Party's e-mail"), Opt("Address", "Address (party's, or the correspondence address)"), Tick("Copies", "Copy the party on bills"),
+                OptNum("Party", "Party id (end)"), Today()],
             Run = async (c, i) =>
             {
                 IOwnershipService ownership = c.Get<IOwnershipService>();
@@ -502,6 +513,24 @@ public static partial class OperationCatalogue
                             "Transferred.");
                     case "Owners":
                         return Show(await ownership.OwnersAsync(c.CompanyId, property, i.Date("Date")).ConfigureAwait(true));
+                    case "Add party":
+                        long partyId = Check(await ownership.AddPartyAsync(c.CompanyId, property, new NewPropertyParty(Enum.Parse<PropertyPartyRole>(i.Text("Role")), i.Optional("PartyName") ?? string.Empty,
+                            i.Date("Date"))
+                        {
+                            CustomerCode = i.Optional("PartyAccount"), Phone = i.Optional("PartyPhone"), Email = i.Optional("PartyEmail"), Address = i.Optional("Address"), ReceivesBills = i.Flag("Copies"),
+                        }).ConfigureAwait(true));
+                        return $"Recorded (party {partyId}).";
+                    case "End party":
+                        return Check(await ownership.EndPartyAsync(c.CompanyId, (long)(i.OptionalNumber("Party") ?? 0m), i.Date("Date")).ConfigureAwait(true), "Ended.");
+                    case "Parties":
+                        IReadOnlyList<PropertyPartyEntry> parties = await ownership.PartiesAsync(c.CompanyId, property, null).ConfigureAwait(true);
+                        return parties.Count == 0 ? "No tenants, occupiers or agents recorded." : string.Join(Environment.NewLine, parties.Select(p =>
+                            $"{p.Id,6} {p.Role,-14} {p.Name,-30} {p.From:yyyy-MM-dd} – {p.To?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "now"}{(p.ReceivesBills ? "  copied on bills" : string.Empty)}"));
+                    case "Correspondence address":
+                        return Check(await ownership.SetCorrespondenceAddressAsync(c.CompanyId, property, i.Optional("Address")).ConfigureAwait(true), "Correspondence address set.");
+                    case "Bill goes to":
+                        return string.Join(Environment.NewLine, Check(await ownership.BillRecipientsAsync(c.CompanyId, property, i.Date("Date")).ConfigureAwait(true))
+                            .Select(r => $"{r.Capacity,-15} {r.Name}  {r.Address ?? "(no address)"}  {r.Email}"));
                     default:
                         return Show(await ownership.HistoryAsync(c.CompanyId, property).ConfigureAwait(true));
                 }

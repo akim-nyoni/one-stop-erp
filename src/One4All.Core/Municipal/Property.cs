@@ -38,6 +38,9 @@ public sealed class Property : SoftDeletableEntity, ICompanyScoped
     /// <summary>The physical address.</summary>
     public string? Address { get; set; }
 
+    /// <summary>The correspondence address bills and letters go to, when it is not the property itself.</summary>
+    public string? CorrespondenceAddress { get; set; }
+
     /// <summary>The ward.</summary>
     public string Ward { get; set; } = string.Empty;
 

@@ -62,7 +62,14 @@ public sealed record EnquiryArrangement(decimal TotalAmount, decimal InstalmentA
 public sealed record PropertyEnquiry(
     string StandNumber, string Ward, decimal Valuation, string RatepayerCode, string RatepayerName, IReadOnlyList<OwnerEntry> Owners, IReadOnlyList<EnquiryService> Services,
     decimal Balance, decimal Overdue, IReadOnlyList<EnquiryTransaction> RecentTransactions, decimal? IndigentSubsidyPercent, EnquiryArrangement? Arrangement,
-    IReadOnlyList<EnquiryOrder> OpenOrders, IReadOnlyList<EnquiryLicence> Licences, DateOnly? ClearanceValidUntil);
+    IReadOnlyList<EnquiryOrder> OpenOrders, IReadOnlyList<EnquiryLicence> Licences, DateOnly? ClearanceValidUntil)
+{
+    /// <summary>Gets the current tenants, occupiers and managing agents.</summary>
+    public IReadOnlyList<PropertyPartyEntry> Parties { get; init; } = [];
+
+    /// <summary>Gets the correspondence address, when separate from the property.</summary>
+    public string? CorrespondenceAddress { get; init; }
+}
 
 /// <summary>
 /// The consumer enquiry desk (brief §4.9): one read-only view of a property — owners and ratepayer, services with their

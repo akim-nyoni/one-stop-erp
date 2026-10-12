@@ -18,6 +18,25 @@ public sealed record OwnerEntry(string CustomerCode, decimal SharePercent, bool 
 /// </summary>
 public interface IOwnershipService
 {
+    /// <summary>Records a tenant, occupier or managing agent of a property from a date.</summary>
+    /// <returns>The party's id.</returns>
+    Task<Result<long>> AddPartyAsync(long companyId, long propertyId, NewPropertyParty party, CancellationToken ct = default);
+
+    /// <summary>Ends a party's link with the property on its last day.</summary>
+    Task<Result> EndPartyAsync(long companyId, long partyId, DateOnly lastDay, CancellationToken ct = default);
+
+    /// <summary>The tenants, occupiers and managing agents on a date (or, with null, all of them ever).</summary>
+    Task<IReadOnlyList<PropertyPartyEntry>> PartiesAsync(long companyId, long propertyId, DateOnly? asAtDate, CancellationToken ct = default);
+
+    /// <summary>Sets (or, with blank, clears) the correspondence address that is separate from the property's own address.</summary>
+    Task<Result> SetCorrespondenceAddressAsync(long companyId, long propertyId, string? address, CancellationToken ct = default);
+
+    /// <summary>
+    /// Who a bill for the property goes to on a date: the ratepayer (at the correspondence address when there is one, else the property's
+    /// address), then each current party set to receive copies.
+    /// </summary>
+    Task<Result<IReadOnlyList<BillRecipient>>> BillRecipientsAsync(long companyId, long propertyId, DateOnly asAtDate, CancellationToken ct = default);
+
     /// <summary>Records a property's owners for the first time.</summary>
     /// <param name="companyId">The council.</param>
     /// <param name="propertyId">The property.</param>
@@ -80,3 +99,46 @@ public interface IOwnershipService
 /// <param name="SellerShare">The seller's share for the days they owned the property.</param>
 /// <param name="Settlement">Credited to the seller and charged to the buyer (negative: the other way round).</param>
 public sealed record TransferSettlementLine(string TariffCode, DateOnly PeriodStart, DateOnly PeriodEnd, decimal PeriodCharge, decimal BilledToSeller, decimal SellerShare, decimal Settlement);
+
+/// <summary>A tenant, occupier or managing agent to record.</summary>
+/// <param name="Role">The role.</param>
+/// <param name="Name">The name.</param>
+/// <param name="From">From when.</param>
+public sealed record NewPropertyParty(Core.Municipal.PropertyPartyRole Role, string Name, DateOnly From)
+{
+    /// <summary>The party's own account (customer code), if any.</summary>
+    public string? CustomerCode { get; init; }
+
+    /// <summary>The phone.</summary>
+    public string? Phone { get; init; }
+
+    /// <summary>The e-mail address.</summary>
+    public string? Email { get; init; }
+
+    /// <summary>The address for correspondence.</summary>
+    public string? Address { get; init; }
+
+    /// <summary>Whether copies of the bills go to the party.</summary>
+    public bool ReceivesBills { get; init; }
+}
+
+/// <summary>A tenant, occupier or managing agent of a property.</summary>
+/// <param name="Id">The party's id.</param>
+/// <param name="Role">The role.</param>
+/// <param name="Name">The name.</param>
+/// <param name="CustomerCode">The party's own account, if any.</param>
+/// <param name="Phone">The phone.</param>
+/// <param name="Email">The e-mail address.</param>
+/// <param name="Address">The address for correspondence.</param>
+/// <param name="ReceivesBills">Whether copies of the bills go to the party.</param>
+/// <param name="From">From when.</param>
+/// <param name="To">The last day, or null while current.</param>
+public sealed record PropertyPartyEntry(long Id, Core.Municipal.PropertyPartyRole Role, string Name, string? CustomerCode, string? Phone, string? Email, string? Address, bool ReceivesBills,
+    DateOnly From, DateOnly? To);
+
+/// <summary>Someone a property's bill goes to.</summary>
+/// <param name="Name">The name.</param>
+/// <param name="Address">The postal / correspondence address.</param>
+/// <param name="Email">The e-mail address.</param>
+/// <param name="Capacity">Ratepayer, tenant, occupier or managing agent.</param>
+public sealed record BillRecipient(string Name, string? Address, string? Email, string Capacity);

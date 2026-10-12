@@ -354,6 +354,7 @@ internal sealed class PropertyConfiguration : IEntityTypeConfiguration<Property>
         b.HasKey(x => x.Id);
         b.Property(x => x.StandNumber).HasMaxLength(40);
         b.Property(x => x.Address).HasMaxLength(300);
+        b.Property(x => x.CorrespondenceAddress).HasMaxLength(300);
         b.Property(x => x.Ward).HasMaxLength(60);
         b.Property(x => x.Zone).HasMaxLength(60);
         b.Property(x => x.LandUse).HasMaxLength(60);
@@ -485,5 +486,20 @@ internal sealed class BulkSupplyReadingConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.Volume).HasPrecision(19, 4);
         b.Property(x => x.Source).HasMaxLength(120);
         b.HasIndex(x => new { x.CompanyId, x.Zone, x.PeriodStart });
+    }
+}
+
+internal sealed class PropertyPartyConfiguration : IEntityTypeConfiguration<PropertyParty>
+{
+    public void Configure(EntityTypeBuilder<PropertyParty> b)
+    {
+        b.ToTable("property_party", Schemas.Municipal, t => t.HasCheckConstraint("ck_property_party_dates", "\"to\" IS NULL OR \"to\" >= \"from\""));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Role).HasConversion<int>();
+        b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.Phone).HasMaxLength(30);
+        b.Property(x => x.Email).HasMaxLength(200);
+        b.Property(x => x.Address).HasMaxLength(300);
+        b.HasIndex(x => new { x.CompanyId, x.PropertyId });
     }
 }

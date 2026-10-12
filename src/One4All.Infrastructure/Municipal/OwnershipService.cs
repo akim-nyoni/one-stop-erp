@@ -233,4 +233,109 @@ public sealed class OwnershipService : IOwnershipService
 
         property.RatepayerCustomerId = owners.Single(o => o.IsRatepayer).CustomerId;
     }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> AddPartyAsync(long companyId, long propertyId, NewPropertyParty party, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(party.Name))
+        {
+            return Error.Validation("Municipal.PartyName", "A tenant, occupier or agent needs a name.");
+        }
+
+        if (!await _db.Properties.AnyAsync(p => p.CompanyId == companyId && p.Id == propertyId, ct).ConfigureAwait(false))
+        {
+            return Error.NotFound("Municipal.PropertyNotFound", $"Property {propertyId} not found.");
+        }
+
+        long? customerId = null;
+        if (!string.IsNullOrWhiteSpace(party.CustomerCode))
+        {
+            string code = party.CustomerCode.Trim().ToUpperInvariant();
+            customerId = await _db.Customers.Where(c => c.CompanyId == companyId && c.Code == code).Select(c => (long?)c.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (customerId is null)
+            {
+                return Error.NotFound("Municipal.CustomerNotFound", $"Customer {code} not found.");
+            }
+        }
+
+        if (party.ReceivesBills && string.IsNullOrWhiteSpace(party.Address) && string.IsNullOrWhiteSpace(party.Email))
+        {
+            return Error.Validation("Municipal.PartyAddress", "A party sent copies of the bills needs an address or an e-mail address.");
+        }
+
+        static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        PropertyParty added = new(companyId, propertyId, party.Role, party.Name.Trim(), party.From)
+        {
+            CustomerId = customerId, Phone = Clean(party.Phone), Email = Clean(party.Email), Address = Clean(party.Address), ReceivesBills = party.ReceivesBills,
+        };
+        _db.Set<PropertyParty>().Add(added);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return added.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> EndPartyAsync(long companyId, long partyId, DateOnly lastDay, CancellationToken ct = default)
+    {
+        if (await _db.Set<PropertyParty>().FirstOrDefaultAsync(p => p.CompanyId == companyId && p.Id == partyId, ct).ConfigureAwait(false) is not PropertyParty party)
+        {
+            return Result.Failure(Error.NotFound("Municipal.PartyNotFound", $"Party {partyId} not found."));
+        }
+
+        if (party.To is not null || lastDay < party.From)
+        {
+            return Result.Failure(Error.Conflict("Municipal.PartyEnded", "The party has already ended, or the last day is before it started."));
+        }
+
+        party.End(lastDay);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PropertyPartyEntry>> PartiesAsync(long companyId, long propertyId, DateOnly? asAtDate, CancellationToken ct = default)
+    {
+        IQueryable<PropertyParty> parties = _db.Set<PropertyParty>().AsNoTracking().Where(p => p.CompanyId == companyId && p.PropertyId == propertyId);
+        if (asAtDate is DateOnly on)
+        {
+            parties = parties.Where(p => p.From <= on && (p.To == null || p.To >= on));
+        }
+
+        return await parties.OrderBy(p => p.Role).ThenBy(p => p.From)
+            .Select(p => new PropertyPartyEntry(p.Id, p.Role, p.Name, _db.Customers.Where(c => c.Id == p.CustomerId).Select(c => c.Code).FirstOrDefault(), p.Phone, p.Email, p.Address,
+                p.ReceivesBills, p.From, p.To))
+            .ToListAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetCorrespondenceAddressAsync(long companyId, long propertyId, string? address, CancellationToken ct = default)
+    {
+        if (await _db.Properties.FirstOrDefaultAsync(p => p.CompanyId == companyId && p.Id == propertyId, ct).ConfigureAwait(false) is not Property property)
+        {
+            return Result.Failure(Error.NotFound("Municipal.PropertyNotFound", $"Property {propertyId} not found."));
+        }
+
+        property.CorrespondenceAddress = string.IsNullOrWhiteSpace(address) ? null : address.Trim();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<BillRecipient>>> BillRecipientsAsync(long companyId, long propertyId, DateOnly asAtDate, CancellationToken ct = default)
+    {
+        if (await _db.Properties.AsNoTracking().FirstOrDefaultAsync(p => p.CompanyId == companyId && p.Id == propertyId, ct).ConfigureAwait(false) is not Property property)
+        {
+            return Error.NotFound("Municipal.PropertyNotFound", $"Property {propertyId} not found.");
+        }
+
+        var ratepayer = await _db.Customers.AsNoTracking().Where(c => c.Id == property.RatepayerCustomerId).Select(c => new { c.Name, c.Email }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        List<BillRecipient> recipients = [];
+        if (ratepayer is not null)
+        {
+            recipients.Add(new BillRecipient(ratepayer.Name, property.CorrespondenceAddress ?? property.Address, ratepayer.Email, "Ratepayer"));
+        }
+
+        recipients.AddRange((await PartiesAsync(companyId, propertyId, asAtDate, ct).ConfigureAwait(false)).Where(p => p.ReceivesBills)
+            .Select(p => new BillRecipient(p.Name, p.Address, p.Email, p.Role switch { PropertyPartyRole.ManagingAgent => "Managing agent", _ => p.Role.ToString() })));
+        return recipients;
+    }
 }

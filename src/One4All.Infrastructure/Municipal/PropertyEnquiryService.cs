@@ -84,7 +84,17 @@ public sealed class PropertyEnquiryService : IPropertyEnquiryService
             .OrderByDescending(c => c.ValidUntil)
             .Select(c => (DateOnly?)c.ValidUntil).FirstOrDefaultAsync(ct).ConfigureAwait(false);
 
+        List<PropertyPartyEntry> parties = await _db.Set<PropertyParty>().AsNoTracking()
+            .Where(p => p.CompanyId == companyId && p.PropertyId == propertyId && p.From <= asAtDate && (p.To == null || p.To >= asAtDate))
+            .OrderBy(p => p.Role).ThenBy(p => p.From)
+            .Select(p => new PropertyPartyEntry(p.Id, p.Role, p.Name, _db.Customers.Where(c => c.Id == p.CustomerId).Select(c => c.Code).FirstOrDefault(), p.Phone, p.Email, p.Address,
+                p.ReceivesBills, p.From, p.To))
+            .ToListAsync(ct).ConfigureAwait(false);
+
         return new PropertyEnquiry(property.StandNumber, property.Ward, valuation, ratepayer.Code, ratepayer.Name, owners, services,
-            balance, Math.Max(0m, pastDue - credits), recent, subsidy, arrangement, orders, licences, clearance);
+            balance, Math.Max(0m, pastDue - credits), recent, subsidy, arrangement, orders, licences, clearance)
+        {
+            Parties = parties, CorrespondenceAddress = property.CorrespondenceAddress,
+        };
     }
 }
