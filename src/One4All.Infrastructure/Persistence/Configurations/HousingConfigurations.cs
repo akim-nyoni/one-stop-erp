@@ -154,6 +154,24 @@ internal sealed class StandAllocationConfiguration : IEntityTypeConfiguration<St
     }
 }
 
+internal sealed class InstalmentNoticeConfiguration : IEntityTypeConfiguration<InstalmentNotice>
+{
+    public void Configure(EntityTypeBuilder<InstalmentNotice> b)
+    {
+        b.ToTable("instalment_notice", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.NoticeNumber).HasMaxLength(40);
+        b.Property(x => x.Text).HasColumnType("text");
+        b.Property(x => x.Stage).HasConversion<int>();
+        b.Property(x => x.Arrears).HasPrecision(19, 4);
+        b.Property(x => x.ServiceMethod).HasMaxLength(60);
+        b.Property(x => x.ServedBy).HasMaxLength(120);
+        b.HasOne<InstalmentAgreement>().WithMany().HasForeignKey(x => x.AgreementId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.NoticeNumber }).IsUnique();
+        b.HasIndex(x => new { x.AgreementId, x.Stage });
+    }
+}
+
 internal sealed class InstalmentAgreementConfiguration : IEntityTypeConfiguration<InstalmentAgreement>
 {
     public void Configure(EntityTypeBuilder<InstalmentAgreement> b)
@@ -161,6 +179,7 @@ internal sealed class InstalmentAgreementConfiguration : IEntityTypeConfiguratio
         b.ToTable("instalment_agreement", Schemas.Housing, t => t.HasCheckConstraint("ck_instalment_agreement_terms", "cash_price > 0 AND deposit >= 0 AND deposit < cash_price AND term_months >= 1 AND annual_rate_percent >= 0"));
         b.HasKey(x => x.Id);
         b.Property(x => x.Tenure).HasConversion<int>().HasDefaultValue(InstalmentTenure.InstalmentSale).HasSentinel((InstalmentTenure)0);
+        b.Property(x => x.PenaltyRatePercent).HasPrecision(9, 4);
         b.Property(x => x.AgreementNumber).HasMaxLength(30);
         b.Property(x => x.CashPrice).HasPrecision(19, 4);
         b.Property(x => x.Deposit).HasPrecision(19, 4);

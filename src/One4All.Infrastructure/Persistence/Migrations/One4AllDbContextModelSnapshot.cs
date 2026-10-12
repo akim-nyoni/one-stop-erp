@@ -7866,6 +7866,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<decimal>("PenaltyRatePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("penalty_rate_percent");
+
                     b.Property<long>("RowVersion")
                         .HasColumnType("bigint")
                         .HasColumnName("row_version");
@@ -7912,6 +7917,83 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_instalment_agreement_terms", "cash_price > 0 AND deposit >= 0 AND deposit < cash_price AND term_months >= 1 AND annual_rate_percent >= 0");
                         });
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.InstalmentNotice", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AgreementId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("agreement_id");
+
+                    b.Property<decimal>("Arrears")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("arrears");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<int>("DaysOverdue")
+                        .HasColumnType("integer")
+                        .HasColumnName("days_overdue");
+
+                    b.Property<DateOnly>("IssuedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("issued_on");
+
+                    b.Property<string>("NoticeNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("notice_number");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("ServedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("served_by");
+
+                    b.Property<DateOnly?>("ServedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("served_on");
+
+                    b.Property<string>("ServiceMethod")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("service_method");
+
+                    b.Property<int>("Stage")
+                        .HasColumnType("integer")
+                        .HasColumnName("stage");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("text");
+
+                    b.HasKey("Id")
+                        .HasName("pk_instalment_notice");
+
+                    b.HasIndex("AgreementId", "Stage")
+                        .HasDatabaseName("ix_instalment_notice_agreement_id_stage");
+
+                    b.HasIndex("CompanyId", "NoticeNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_instalment_notice_company_id_notice_number");
+
+                    b.ToTable("instalment_notice", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.InstalmentScheduleLine", b =>
@@ -33901,6 +33983,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_instalment_agreement_stand_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.InstalmentNotice", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.InstalmentAgreement", null)
+                        .WithMany()
+                        .HasForeignKey("AgreementId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_instalment_notice_instalment_agreement_agreement_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.InstalmentScheduleLine", b =>

@@ -731,6 +731,36 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Instalment arrears and default notices", ListTitle = "Agreements in arrears",
+            Description = "The arrears stages: a reminder from the first unpaid instalment, a letter of demand after 30 days, a notice of breach after 60 and a notice of cancellation "
+                + "after 90 (once the breach notice has stood 30 days) — each issued only after the previous one is served, with proof of service recorded. "
+                + "Penalty: sets an agreement's annual penalty rate on arrears; Charge penalties invoices a month's penalty interest on each agreement's arrears once.",
+            Fields = [Pick("Step", "Step", ["Issue next notice", "Record service", "Penalty rate", "Charge penalties"]), Opt("Agreement", "Agreement number"), Opt("Notice", "Notice number (service)"),
+                Opt("Method", "Served by (hand, registered post, email)"), Opt("ServedBy", "Who served it"), OptNum("Rate", "Penalty rate % a year"), Today()],
+            Run = async (c, i) =>
+            {
+                IInstalmentDefaultService defaults = c.Get<IInstalmentDefaultService>();
+                switch (i.Text("Step"))
+                {
+                    case "Issue next notice":
+                        (string number, string text) = Check(await defaults.IssueNextAsync(c.CompanyId, i.Optional("Agreement") ?? string.Empty, i.Date("Date")).ConfigureAwait(true));
+                        return $"Notice {number} issued:{Environment.NewLine}{Environment.NewLine}{text}";
+                    case "Record service":
+                        return Check(await defaults.RecordServiceAsync(c.CompanyId, i.Optional("Notice") ?? string.Empty, i.Date("Date"), i.Optional("Method") ?? string.Empty,
+                            i.Optional("ServedBy") ?? string.Empty).ConfigureAwait(true), "Service recorded.");
+                    case "Penalty rate":
+                        return Check(await defaults.SetPenaltyRateAsync(c.CompanyId, i.Optional("Agreement") ?? string.Empty, i.OptionalNumber("Rate") ?? 0m).ConfigureAwait(true), "Penalty rate saved.");
+                    default:
+                        PenaltyRun run = Check(await defaults.ChargePenaltyInterestAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true));
+                        return $"{run.Agreements} agreement(s) charged {M(run.Total)} penalty interest.";
+                }
+            },
+            List = async c => Table(await c.Get<IInstalmentDefaultService>().ReviewAsync(c.CompanyId, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true),
+                ("Agreement", d => d.AgreementNumber), ("Buyer", d => d.Buyer), ("Arrears", d => M(d.Arrears)), ("Days", d => d.DaysOverdue), ("Last notice", d => d.LastStage?.ToString() ?? "-"),
+                ("Next", d => d.NextStage?.ToString() ?? d.Why ?? "-")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Housing cooperatives", ListTitle = "Cooperatives",
             Description = "Registers a cooperative, adds and removes members, allocates stands to it (\"S1,S2\") and sub-allocates each to a member; Stands lists what it holds and to whom. "
                 + "Account: links its receivables account (customer code). Charge: invoices it. Contribution: a member's payment receipted on its account. Statement: its account for the "

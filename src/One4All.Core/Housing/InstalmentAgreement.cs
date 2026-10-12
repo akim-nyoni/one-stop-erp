@@ -143,6 +143,9 @@ public sealed class InstalmentAgreement : AuditableEntity, ICompanyScoped
     /// <summary>The tenure the instalments buy (brief §4.10.5): an instalment sale, rent-to-buy or a lease with an option to purchase.</summary>
     public InstalmentTenure Tenure { get; set; } = InstalmentTenure.InstalmentSale;
 
+    /// <summary>The annual penalty interest rate charged on arrears (%), or 0 for none (brief §4.10.5 "penalty interest on arrears").</summary>
+    public decimal PenaltyRatePercent { get; set; }
+
     /// <summary>Where it stands.</summary>
     public InstalmentAgreementStatus Status { get; private set; }
 
@@ -250,4 +253,96 @@ public sealed class InstalmentScheduleLine : Entity
 
     /// <summary>Marks its financing discount earned.</summary>
     public void EarnFinancing() => FinancingEarned = true;
+}
+
+/// <summary>The stages of default on an instalment agreement (brief §4.10.5 "arrears stages → reminder → demand letter → notice of breach → notice of cancellation").</summary>
+public enum DefaultStage
+{
+    /// <summary>A friendly reminder.</summary>
+    Reminder = 1,
+
+    /// <summary>A letter of demand.</summary>
+    Demand = 2,
+
+    /// <summary>A notice of breach.</summary>
+    Breach = 3,
+
+    /// <summary>A notice of cancellation (the cancellation itself follows, with its refund computation).</summary>
+    Cancellation = 4,
+}
+
+/// <summary>A dated default notice on an instalment agreement, with proof of service (<c>hse.instalment_notice</c>).</summary>
+public sealed class InstalmentNotice : Entity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private InstalmentNotice()
+    {
+        NoticeNumber = string.Empty;
+        Text = string.Empty;
+    }
+
+    /// <summary>Issues a notice.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="agreementId">The agreement.</param>
+    /// <param name="noticeNumber">The notice number.</param>
+    /// <param name="stage">The stage.</param>
+    /// <param name="issuedOn">When it was issued.</param>
+    /// <param name="arrears">The arrears it demands.</param>
+    /// <param name="daysOverdue">How long the oldest unpaid instalment had been due.</param>
+    /// <param name="text">The notice as issued.</param>
+    public InstalmentNotice(long companyId, long agreementId, string noticeNumber, DefaultStage stage, DateOnly issuedOn, decimal arrears, int daysOverdue, string text)
+    {
+        CompanyId = companyId;
+        AgreementId = agreementId;
+        NoticeNumber = noticeNumber;
+        Stage = stage;
+        IssuedOn = issuedOn;
+        Arrears = arrears;
+        DaysOverdue = daysOverdue;
+        Text = text;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The agreement.</summary>
+    public long AgreementId { get; private set; }
+
+    /// <summary>The notice number.</summary>
+    public string NoticeNumber { get; private set; }
+
+    /// <summary>The stage.</summary>
+    public DefaultStage Stage { get; private set; }
+
+    /// <summary>When it was issued.</summary>
+    public DateOnly IssuedOn { get; private set; }
+
+    /// <summary>The arrears it demands.</summary>
+    public decimal Arrears { get; private set; }
+
+    /// <summary>How long the oldest unpaid instalment had been due.</summary>
+    public int DaysOverdue { get; private set; }
+
+    /// <summary>The notice as issued.</summary>
+    public string Text { get; private set; }
+
+    /// <summary>When it was served, once it has been.</summary>
+    public DateOnly? ServedOn { get; private set; }
+
+    /// <summary>How it was served (hand, registered post, email…).</summary>
+    public string? ServiceMethod { get; private set; }
+
+    /// <summary>Who served it.</summary>
+    public string? ServedBy { get; private set; }
+
+    /// <summary>Records proof of service.</summary>
+    /// <param name="servedOn">When.</param>
+    /// <param name="method">How.</param>
+    /// <param name="servedBy">Who.</param>
+    public void Serve(DateOnly servedOn, string method, string servedBy)
+    {
+        ServedOn = servedOn;
+        ServiceMethod = method;
+        ServedBy = servedBy;
+    }
 }
