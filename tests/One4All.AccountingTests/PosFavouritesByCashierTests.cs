@@ -49,5 +49,12 @@ public sealed class PosFavouritesByCashierTests
         IReadOnlyList<FavouriteTile> someoneElse = await catalogue.FavouriteTilesAsync(companyId, bar.Id, 123);
         someoneElse.Select(f => (f.Tile.Code, f.Colour)).Should().Equal(("PFC-COLA", (string?)null), ("PFC-CHIPS", "#AA3300"));
         (await catalogue.FavouritesAsync(companyId, bar.Id)).Select(t => t.Code).Should().Contain(["PFC-COLA", "PFC-CHIPS"]).And.NotContain("PFC-LAGER");
+
+        // Dragged into a new order, the page becomes the cashier's own arrangement.
+        IReadOnlyList<FavouriteTile> before = await catalogue.FavouriteTilesAsync(companyId, bar.Id, cashier);
+        List<long> reversed = [.. before.Where(f => f.Page == 1).Select(f => f.Tile.ItemId).Reverse()];
+        (await catalogue.ArrangeFavouritesAsync(companyId, bar.Id, cashier, 1, reversed)).IsSuccess.Should().BeTrue();
+        (await catalogue.FavouriteTilesAsync(companyId, bar.Id, cashier)).Where(f => f.Page == 1).Select(f => f.Tile.ItemId).Should().Equal(reversed);
+        (await catalogue.ArrangeFavouritesAsync(companyId, bar.Id, cashier, 1, [reversed[0], reversed[0]])).Error.Code.Should().Be("Pos.FavouriteOrder");
     }
 }

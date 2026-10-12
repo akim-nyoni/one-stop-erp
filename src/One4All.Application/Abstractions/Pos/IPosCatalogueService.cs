@@ -106,6 +106,12 @@ public interface IPosCatalogueService
     /// <returns>Success, or why it was refused.</returns>
     Task<Result> SetFavouriteAsync(long companyId, long? terminalId, long? userId, string itemCode, int sortOrder, int page, string? colour, bool remove, CancellationToken ct = default);
 
+    /// <summary>
+    /// Saves a cashier's own arrangement of a favourites page at a till (dragged into order): the cashier gets their own pin for each item, in that
+    /// order, keeping the colour the item showed in.
+    /// </summary>
+    Task<Result> ArrangeFavouritesAsync(long companyId, long? terminalId, long userId, int page, IReadOnlyList<long> itemIds, CancellationToken ct = default);
+
     /// <summary>The favourites a cashier sees at a till: their own first, then the till's, then every till's — each item once — with colour and page.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="terminalId">The till.</param>

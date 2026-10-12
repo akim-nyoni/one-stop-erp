@@ -206,7 +206,8 @@
                                 <DataTemplate DataType="{x:Type vm:PosProductVm}">
                                     <Button Style="{StaticResource ProductButton}" Background="{Binding TileBrush}"
                                             Command="{Binding DataContext.AddProductCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                            CommandParameter="{Binding}">
+                                            CommandParameter="{Binding}" AllowDrop="True"
+                                            PreviewMouseLeftButtonDown="Tile_PreviewMouseLeftButtonDown" PreviewMouseMove="Tile_PreviewMouseMove" Drop="Tile_Drop">
                                         <StackPanel>
                                             <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" />
                                             <TextBlock Text="{Binding PriceText}" Foreground="#7FE0A0" FontSize="14" HorizontalAlignment="Center" Margin="0,4,0,0" />

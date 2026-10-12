@@ -191,6 +191,43 @@ public sealed class PosCatalogueService : IPosCatalogueService
         return [.. pins.Where(f => tiles.ContainsKey(f.ItemId)).Select(f => new FavouriteTile(tiles[f.ItemId], f.Colour, f.Page))];
     }
 
+    /// <inheritdoc />
+    public async Task<Result> ArrangeFavouritesAsync(long companyId, long? terminalId, long userId, int page, IReadOnlyList<long> itemIds, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(itemIds);
+        if (page < 1 || itemIds.Count == 0 || itemIds.Distinct().Count() != itemIds.Count)
+        {
+            return Result.Failure(Error.Validation("Pos.FavouriteOrder", "Arrange a page by listing each of its items once."));
+        }
+
+        List<long> ids = [.. itemIds];
+        List<PosFavourite> pins = await _db.PosFavourites
+            .Where(f => f.CompanyId == companyId && ids.Contains(f.ItemId) && (f.TerminalId == null || f.TerminalId == terminalId) && (f.UserId == null || f.UserId == userId))
+            .ToListAsync(ct).ConfigureAwait(false);
+        for (int i = 0; i < ids.Count; i++)
+        {
+            List<PosFavourite> forItem = [.. pins.Where(p => p.ItemId == ids[i])];
+            PosFavourite? own = forItem.Find(p => p.UserId == userId && p.TerminalId == terminalId);
+            PosFavourite? nearest = forItem.OrderBy(p => p.UserId is null ? 1 : 0).ThenBy(p => p.TerminalId is null ? 1 : 0).FirstOrDefault();
+            if (nearest is null)
+            {
+                return Result.Failure(Error.NotFound("Pos.NotFavourite", $"Item {ids[i]} is not a favourite here."));
+            }
+
+            if (own is null)
+            {
+                _db.PosFavourites.Add(new PosFavourite(companyId, terminalId, ids[i], i + 1) { UserId = userId, Page = page, Colour = nearest.Colour });
+            }
+            else
+            {
+                (own.SortOrder, own.Page) = (i + 1, page);
+            }
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
     private async Task<Result> SaveFavouriteAsync(long companyId, long? terminalId, long? userId, long itemId, int sortOrder, int page, string? colour, bool remove, CancellationToken ct)
     {
         PosFavourite? existing = await _db.PosFavourites.FirstOrDefaultAsync(f => f.CompanyId == companyId && f.TerminalId == terminalId && f.UserId == userId && f.ItemId == itemId, ct)

@@ -105,4 +105,31 @@ public partial class PosTerminalWindow : Window
             await File.WriteAllTextAsync(dialog.FileName, _viewModel.LastReceiptText).ConfigureAwait(false);
         }
     }
+
+    // Dragging a favourite tile onto another rearranges the page (on the favourites tabs only).
+    private Point _dragStart;
+
+    private void Tile_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e) => _dragStart = e.GetPosition(this);
+
+    private void Tile_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (e.LeftButton != System.Windows.Input.MouseButtonState.Pressed || sender is not FrameworkElement { DataContext: PosProductVm tile } source)
+        {
+            return;
+        }
+
+        Vector moved = e.GetPosition(this) - _dragStart;
+        if (Math.Abs(moved.X) > SystemParameters.MinimumHorizontalDragDistance * 3 || Math.Abs(moved.Y) > SystemParameters.MinimumVerticalDragDistance * 3)
+        {
+            DragDrop.DoDragDrop(source, tile, DragDropEffects.Move);
+        }
+    }
+
+    private async void Tile_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(typeof(PosProductVm)) is PosProductVm moving && sender is FrameworkElement { DataContext: PosProductVm onto } && !ReferenceEquals(moving, onto))
+        {
+            await _viewModel.MoveFavouriteAsync(moving, onto).ConfigureAwait(true);
+        }
+    }
 }

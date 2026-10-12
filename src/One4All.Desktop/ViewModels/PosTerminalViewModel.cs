@@ -879,6 +879,40 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     // Typing in the scan box narrows the tiles as you type (code, name, barcode or PLU); Enter still adds the exact match.
     partial void OnScanEntryChanged(string value) => ApplyCategoryFilter();
 
+    /// <summary>Moves a favourite tile to where another one is (dragged onto it) and saves the cashier's arrangement of the page.</summary>
+    /// <param name="moving">The tile dragged.</param>
+    /// <param name="onto">The tile it was dropped on.</param>
+    /// <returns>A task.</returns>
+    public async Task MoveFavouriteAsync(PosProductVm moving, PosProductVm onto)
+    {
+        if (SelectedCategory is not string tab || !tab.StartsWith(FavouritesTab, StringComparison.Ordinal) || _cashierUserId == 0 || !_online)
+        {
+            return;
+        }
+
+        int page = _favourites.FirstOrDefault(f => f.Tile.ItemId == moving.ItemId)?.Page ?? 1;
+        IReadOnlyList<long> order = FavouriteOrder.Move([.. Products.Select(p => p.ItemId)], moving.ItemId, onto.ItemId);
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            IPosCatalogueService catalogue = scope.ServiceProvider.GetRequiredService<IPosCatalogueService>();
+            Result saved = await catalogue.ArrangeFavouritesAsync(_companyId, _terminalId == 0 ? null : _terminalId, _cashierUserId, page, order).ConfigureAwait(true);
+            if (saved.IsFailure)
+            {
+                StatusMessage = saved.Error.Message;
+                return;
+            }
+
+            _favourites = [.. await catalogue.FavouriteTilesAsync(_companyId, _terminalId == 0 ? null : _terminalId, _cashierUserId).ConfigureAwait(true)];
+            ApplyCategoryFilter();
+            StatusMessage = $"{moving.Name} moved.";
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            StatusMessage = "Offline: favourites can be rearranged when the connection returns.";
+        }
+    }
+
     private void ApplyCategoryFilter()
     {
         Products.Clear();
