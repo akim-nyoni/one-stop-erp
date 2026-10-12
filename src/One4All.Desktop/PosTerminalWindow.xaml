@@ -436,6 +436,10 @@
                                 <Button Content="Receipt" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#2C3E50" Click="PrintReceipt_Click" />
                                 <Button Content="Hand over" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#6C3483" Command="{Binding HandOverCommand}"
                                         ToolTip="Count the drawer; the next cashier enters their name and PIN in the supervisor boxes" />
+                                <Button Content="Void Sale" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#922B21" Command="{Binding VoidSaleCommand}"
+                                        ToolTip="Type the sale number from the receipt in the scan box; a supervisor authorises" />
+                                <Button Content="Refund Sale" Style="{StaticResource PadButton}" Height="44" FontSize="14" Background="#A04000" Command="{Binding RefundSaleCommand}"
+                                        ToolTip="Type the sale number from the receipt in the scan box; refunded in cash with a supervisor's authority" />
                             </UniformGrid>
                         </StackPanel>
                     </Grid>

@@ -1980,6 +1980,77 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
     }
 
+    /// <summary>Voids a completed sale (its number typed in the scan box) with a supervisor's authority: the sale and its stock are reversed.</summary>
+    [RelayCommand]
+    private async Task VoidSaleAsync()
+    {
+        if (await CompletedSaleAsync().ConfigureAwait(true) is not Sale sale || await SupervisorAsync("Pos.Void", OperationFlags.VoidReverse).ConfigureAwait(true) is not long)
+        {
+            return;
+        }
+
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            Result<string> voided = await scope.ServiceProvider.GetRequiredService<IPosService>()
+                .VoidSaleAsync(_companyId, sale.Id, DateOnly.FromDateTime(DateTime.Today), $"Voided at till {_terminalId}", TaxAccountCode.Length > 0 ? TaxAccountCode : null).ConfigureAwait(true);
+            StatusMessage = voided.IsSuccess ? $"Sale {sale.SaleNumber} voided (journal {voided.Value})." : voided.Error.Message;
+            ScanEntry = string.Empty;
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            StatusMessage = "Offline: a sale can be voided when the connection returns.";
+        }
+    }
+
+    /// <summary>Refunds a completed sale in full (its number typed in the scan box) in cash, with a supervisor's authority.</summary>
+    [RelayCommand]
+    private async Task RefundSaleAsync()
+    {
+        if (await CompletedSaleAsync().ConfigureAwait(true) is not Sale sale || await SupervisorAsync("Pos.Refund", OperationFlags.AuthoriseLevel1).ConfigureAwait(true) is not long supervisor)
+        {
+            return;
+        }
+
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            Result<PosRefundResult> refunded = await scope.ServiceProvider.GetRequiredService<IPosEventService>().RefundAsync(new PosRefundRequest
+            {
+                CompanyId = _companyId, SaleId = sale.Id, TerminalId = _terminalId, CashierUserId = _cashierUserId, AuthorisedByUserId = supervisor, Date = DateOnly.FromDateTime(DateTime.Today),
+                RefundAccountCode = CashAccountCode, TaxAccountCode = TaxAccountCode.Length > 0 ? TaxAccountCode : null, Reason = "Refund at the till",
+                Lines = [.. sale.Lines.Select(l => new PosRefundLine(l.Id, l.Quantity))],
+            }).ConfigureAwait(true);
+            StatusMessage = refunded.IsSuccess ? $"Sale {sale.SaleNumber} refunded: {refunded.Value.Gross:N2} paid out in cash." : refunded.Error.Message;
+            ScanEntry = string.Empty;
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            StatusMessage = "Offline: refunds need the connection.";
+        }
+    }
+
+    // The completed sale whose number is in the scan box.
+    private async Task<Sale?> CompletedSaleAsync()
+    {
+        string number = (ScanEntry ?? string.Empty).Trim();
+        if (number.Length == 0 || !_online)
+        {
+            StatusMessage = "Type (or scan) the sale number from the receipt in the scan box first.";
+            return null;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        Sale? sale = await scope.ServiceProvider.GetRequiredService<One4AllDbContext>().Set<Sale>().AsNoTracking().Include(s => s.Lines)
+            .FirstOrDefaultAsync(s => s.CompanyId == _companyId && s.SaleNumber == number).ConfigureAwait(true);
+        if (sale is null)
+        {
+            StatusMessage = $"No sale {number}.";
+        }
+
+        return sale;
+    }
+
     /// <summary>Abandons the current ticket.</summary>
     [RelayCommand]
     private void NewSale()
