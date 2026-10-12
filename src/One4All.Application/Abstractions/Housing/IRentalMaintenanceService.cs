@@ -31,6 +31,14 @@ public sealed class RepairCompletion
     public string? RechargeAccountCode { get; init; }
 }
 
+/// <summary>A planned maintenance task that is due.</summary>
+/// <param name="Id">The task.</param>
+/// <param name="UnitCode">The unit.</param>
+/// <param name="Description">The work.</param>
+/// <param name="Due">When it is due.</param>
+/// <param name="EveryMonths">How often it recurs.</param>
+public sealed record PlannedTaskDue(long Id, string UnitCode, string Description, DateOnly Due, int EveryMonths);
+
 /// <summary>A unit's maintenance history.</summary>
 /// <param name="UnitCode">The unit.</param>
 /// <param name="RepairsOpen">Repairs reported and not yet done.</param>
@@ -88,4 +96,18 @@ public interface IRentalMaintenanceService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The history, or why there is none.</returns>
     Task<Result<UnitMaintenanceHistory>> HistoryAsync(long companyId, string unitCode, CancellationToken ct = default);
+
+    /// <summary>Records why a void unit is empty and its refurbishment work order (a job contract number), if any (brief §4.10.7 voids management).</summary>
+    Task<Result> SetVoidDetailsAsync(long companyId, string unitCode, string? reason, string? refurbishmentJobNumber, CancellationToken ct = default);
+
+    /// <summary>Puts a task into the planned maintenance programme for a unit, due first on a date and every so many months after (0: once).</summary>
+    /// <returns>The task's id.</returns>
+    Task<Result<long>> PlanAsync(long companyId, string unitCode, string description, DateOnly firstDue, int everyMonths, CancellationToken ct = default);
+
+    /// <summary>The planned tasks due on or before a date.</summary>
+    Task<IReadOnlyList<PlannedTaskDue>> DueAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
+
+    /// <summary>Marks a planned task done: raises the repair that carries its cost and moves the task to its next due date.</summary>
+    /// <returns>The repair number raised.</returns>
+    Task<Result<string>> MarkDoneAsync(long companyId, long taskId, DateOnly doneOn, CancellationToken ct = default);
 }

@@ -250,6 +250,8 @@ internal sealed class RentalUnitConfiguration : IEntityTypeConfiguration<RentalU
         b.Property(x => x.MonthlyRent).HasPrecision(19, 4);
         b.Property(x => x.RentAccountCode).HasMaxLength(20);
         b.Property(x => x.Suburb).HasMaxLength(80);
+        b.Property(x => x.VoidReason).HasMaxLength(120);
+        b.Property(x => x.RefurbishmentJobNumber).HasMaxLength(40);
         b.Ignore(x => x.IsLet);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
     }
@@ -1467,5 +1469,16 @@ internal sealed class DuplicateCaseConfiguration : IEntityTypeConfiguration<Dupl
         b.Property(x => x.DecisionReason).HasMaxLength(500);
         b.Property(x => x.Status).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}
+
+internal sealed class PlannedMaintenanceConfiguration : IEntityTypeConfiguration<PlannedMaintenance>
+{
+    public void Configure(EntityTypeBuilder<PlannedMaintenance> b)
+    {
+        b.ToTable("planned_maintenance", Schemas.Housing, t => t.HasCheckConstraint("ck_planned_maintenance_every", "every_months >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.NextDue });
     }
 }

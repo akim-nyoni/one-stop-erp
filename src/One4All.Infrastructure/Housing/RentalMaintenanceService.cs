@@ -34,6 +34,83 @@ public sealed class RentalMaintenanceService : IRentalMaintenanceService
     }
 
     /// <inheritdoc />
+    public async Task<Result> SetVoidDetailsAsync(long companyId, string unitCode, string? reason, string? refurbishmentJobNumber, CancellationToken ct = default)
+    {
+        string code = (unitCode ?? string.Empty).Trim().ToUpperInvariant();
+        RentalUnit? unit = await _db.Set<RentalUnit>().FirstOrDefaultAsync(u => u.CompanyId == companyId && u.Code == code, ct).ConfigureAwait(false);
+        if (unit is null)
+        {
+            return Result.Failure(Error.NotFound("Hse.UnitNotFound", $"Unit {code} not found."));
+        }
+
+        if (unit.IsLet)
+        {
+            return Result.Failure(Error.Rule("Hse.UnitLet", $"Unit {unit.Code} is let, not void."));
+        }
+
+        string? job = string.IsNullOrWhiteSpace(refurbishmentJobNumber) ? null : refurbishmentJobNumber.Trim().ToUpperInvariant();
+        if (job is not null && !await _db.JobContracts.AnyAsync(j => j.CompanyId == companyId && j.ContractNumber == job, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.NotFound("Hse.JobNotFound", $"No job {job} to carry the refurbishment."));
+        }
+
+        unit.VoidReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        unit.RefurbishmentJobNumber = job;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> PlanAsync(long companyId, string unitCode, string description, DateOnly firstDue, int everyMonths, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(description) || everyMonths is < 0 or > 120)
+        {
+            return Error.Validation("Hse.Planned", "A planned task needs a description and recurs every 0 (once) to 120 months.");
+        }
+
+        Result<RentalUnit> unit = await FindUnitAsync(companyId, unitCode, ct).ConfigureAwait(false);
+        if (unit.IsFailure)
+        {
+            return unit.Error;
+        }
+
+        PlannedMaintenance task = new(companyId, unit.Value.Id, description.Trim(), firstDue, everyMonths);
+        _db.Set<PlannedMaintenance>().Add(task);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return task.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PlannedTaskDue>> DueAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+        => await (from t in _db.Set<PlannedMaintenance>().AsNoTracking()
+                  join u in _db.Set<RentalUnit>().AsNoTracking() on t.UnitId equals u.Id
+                  where t.CompanyId == companyId && t.IsActive && t.NextDue <= asAtDate
+                  orderby t.NextDue, u.Code
+                  select new PlannedTaskDue(t.Id, u.Code, t.Description, t.NextDue, t.EveryMonths)).ToListAsync(ct).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public Task<Result<string>> MarkDoneAsync(long companyId, long taskId, DateOnly doneOn, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            PlannedMaintenance? task = await _db.Set<PlannedMaintenance>().FirstOrDefaultAsync(t => t.CompanyId == companyId && t.Id == taskId && t.IsActive, ct).ConfigureAwait(false);
+            if (task is null)
+            {
+                return Error.NotFound("Hse.PlannedNotFound", $"Planned task {taskId} is not in the programme.");
+            }
+
+            string unitCode = await _db.Set<RentalUnit>().Where(u => u.Id == task.UnitId).Select(u => u.Code).FirstAsync(ct).ConfigureAwait(false);
+            Result<string> repair = await ReportRepairAsync(companyId, unitCode, doneOn, $"Planned: {task.Description}", ct).ConfigureAwait(false);
+            if (repair.IsFailure)
+            {
+                return repair.Error;
+            }
+
+            task.Done(doneOn);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return repair;
+        }, ct);
+
+    /// <inheritdoc />
     public async Task<Result<string>> ReportRepairAsync(long companyId, string unitCode, DateOnly reportedOn, string description, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(description))

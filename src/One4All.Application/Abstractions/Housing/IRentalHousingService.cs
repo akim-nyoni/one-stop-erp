@@ -49,7 +49,14 @@ public sealed record RentReviewResult(int UnitsReviewed, int TenanciesReviewed);
 /// <param name="VacantSince">The first empty day.</param>
 /// <param name="DaysVoid">Days void to the date.</param>
 /// <param name="RentLost">Rent lost to the date.</param>
-public sealed record VoidUnit(string UnitCode, DateOnly VacantSince, int DaysVoid, decimal RentLost);
+public sealed record VoidUnit(string UnitCode, DateOnly VacantSince, int DaysVoid, decimal RentLost)
+{
+    /// <summary>Gets why it is empty.</summary>
+    public string? Reason { get; init; }
+
+    /// <summary>Gets the refurbishment work order (job) number.</summary>
+    public string? RefurbishmentJob { get; init; }
+}
 
 /// <summary>
 /// Council rental housing (brief §4.10.7): the unit register; tenancies with the deposit held as a liability; the

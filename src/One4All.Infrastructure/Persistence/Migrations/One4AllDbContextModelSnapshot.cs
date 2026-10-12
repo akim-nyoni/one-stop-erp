@@ -9396,6 +9396,77 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("ownership_record", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.PlannedMaintenance", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("EveryMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("every_months");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<DateOnly?>("LastDone")
+                        .HasColumnType("date")
+                        .HasColumnName("last_done");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<DateOnly>("NextDue")
+                        .HasColumnType("date")
+                        .HasColumnName("next_due");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("UnitId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("unit_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_planned_maintenance");
+
+                    b.HasIndex("CompanyId", "NextDue")
+                        .HasDatabaseName("ix_planned_maintenance_company_id_next_due");
+
+                    b.ToTable("planned_maintenance", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_planned_maintenance_every", "every_months >= 0");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.RegistrationDateChange", b =>
                 {
                     b.Property<long>("Id")
@@ -9593,6 +9664,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("monthly_rent");
 
+                    b.Property<string>("RefurbishmentJobNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("refurbishment_job_number");
+
+                    b.Property<DateOnly?>("ReletOn")
+                        .HasColumnType("date")
+                        .HasColumnName("relet_on");
+
                     b.Property<string>("RentAccountCode")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -9619,6 +9699,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("VacantSince")
                         .HasColumnType("date")
                         .HasColumnName("vacant_since");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("void_reason");
 
                     b.HasKey("Id")
                         .HasName("pk_rental_unit");

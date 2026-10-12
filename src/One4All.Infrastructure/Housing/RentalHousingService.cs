@@ -105,7 +105,7 @@ public sealed class RentalHousingService : IRentalHousingService
 
         _db.Set<Tenancy>().Add(new Tenancy(request.CompanyId, number.Value, unit.Id, tenant.Id, request.StartDate, unit.MonthlyRent, request.Deposit,
             string.IsNullOrWhiteSpace(request.DepositAccountCode) ? string.Empty : request.DepositAccountCode.Trim()));
-        unit.Let();
+        unit.Let(request.StartDate);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return number.Value;
     }
@@ -366,9 +366,12 @@ public sealed class RentalHousingService : IRentalHousingService
     {
         var units = await _db.Set<RentalUnit>().AsNoTracking()
             .Where(u => u.CompanyId == companyId && u.VacantSince != null && u.VacantSince <= asAtDate)
-            .Select(u => new { u.Code, VacantSince = u.VacantSince!.Value, u.MonthlyRent }).ToListAsync(ct).ConfigureAwait(false);
+            .Select(u => new { u.Code, VacantSince = u.VacantSince!.Value, u.MonthlyRent, u.VoidReason, u.RefurbishmentJobNumber }).ToListAsync(ct).ConfigureAwait(false);
         return [.. units
-            .Select(u => new VoidUnit(u.Code, u.VacantSince, RentalArithmetic.DaysVoid(u.VacantSince, asAtDate), RentalArithmetic.RentLost(u.MonthlyRent, RentalArithmetic.DaysVoid(u.VacantSince, asAtDate))))
+            .Select(u => new VoidUnit(u.Code, u.VacantSince, RentalArithmetic.DaysVoid(u.VacantSince, asAtDate), RentalArithmetic.RentLost(u.MonthlyRent, RentalArithmetic.DaysVoid(u.VacantSince, asAtDate)))
+            {
+                Reason = u.VoidReason, RefurbishmentJob = u.RefurbishmentJobNumber,
+            })
             .OrderByDescending(v => v.DaysVoid).ThenBy(v => v.UnitCode, StringComparer.Ordinal)];
     }
 

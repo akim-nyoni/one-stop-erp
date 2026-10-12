@@ -149,8 +149,31 @@ public sealed class RentalUnit : AuditableEntity, ICompanyScoped
     /// <summary>Whether it is let.</summary>
     public bool IsLet => VacantSince is null;
 
+    /// <summary>Gets or sets why the unit stands empty (e.g. "refurbishment", "awaiting allocation", "structural").</summary>
+    public string? VoidReason { get; set; }
+
+    /// <summary>Gets or sets the job (contract) number of the refurbishment work order while it is void.</summary>
+    public string? RefurbishmentJobNumber { get; set; }
+
+    /// <summary>Gets the last day it was re-let (the start of the latest tenancy after a void).</summary>
+    public DateOnly? ReletOn { get; private set; }
+
     /// <summary>Lets it.</summary>
     public void Let() => VacantSince = null;
+
+    /// <summary>Lets it from a date, closing the void.</summary>
+    /// <param name="date">The tenancy's first day.</param>
+    public void Let(DateOnly date)
+    {
+        if (VacantSince is not null)
+        {
+            ReletOn = date;
+        }
+
+        VacantSince = null;
+        VoidReason = null;
+        RefurbishmentJobNumber = null;
+    }
 
     /// <summary>Marks it vacant from a date.</summary>
     /// <param name="date">The first empty day.</param>

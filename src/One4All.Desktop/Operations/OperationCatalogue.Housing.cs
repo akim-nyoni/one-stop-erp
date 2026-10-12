@@ -649,8 +649,12 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Rental maintenance", ListTitle = "Rental units",
             Description = "Report a repair on a unit; complete it with its cost (recharged to the tenant when they caused it); record an inspection with its condition grade (1–5) and "
-                + "whether it needs follow-up, and close the follow-up; History summarises a unit's repairs and condition.",
-            Fields = [Pick("Step", "Step", ["Report repair", "Complete repair", "Inspection", "Close follow-up", "History"]), Opt("Unit", "Unit code"), Opt("Repair", "Repair number (complete)"),
+                + "whether it needs follow-up, and close the follow-up; History summarises a unit's repairs and condition. Void details record why a void unit is empty and its "
+                + "refurbishment job. The planned maintenance programme: plan a task (due on the date, then every so many months), list what is due, and mark one done — "
+                + "which raises the repair that carries its cost.",
+            Fields = [Pick("Step", "Step", ["Report repair", "Complete repair", "Inspection", "Close follow-up", "History", "Void details", "Plan task", "Planned due", "Planned done"]),
+                Opt("Unit", "Unit code"), Opt("Repair", "Repair number (complete)"), Opt("Reason", "Void reason"), Opt("Job", "Refurbishment job (contract) number"),
+                Num("Every", "Planned: every (months, 0 = once)", "12"), OptNum("Task", "Planned task id"),
                 Opt("Description", "Description / findings"), Num("Cost", "Cost", "0"), Opt("Expense", "Repairs expense account"), Opt("PaidFrom", "Paid from account"), Tick("TenantCaused", "Tenant caused it"),
                 Opt("Recharge", "Recharge income account"), Opt("Inspector", "Inspector"), Num("Grade", "Condition grade (1–5)", "3"), Tick("FollowUp", "Needs follow-up"),
                 OptNum("Inspection", "Inspection id (close)"), Today()],
@@ -674,6 +678,15 @@ public static partial class OperationCatalogue
                             i.Flag("FollowUp")).ConfigureAwait(true), id => $"Inspection {id} recorded.");
                     case "Close follow-up":
                         return Check(await maintenance.CloseFollowUpAsync(c.CompanyId, (long)(i.OptionalNumber("Inspection") ?? 0m), i.Date("Date")).ConfigureAwait(true), "Follow-up closed.");
+                    case "Void details":
+                        return Check(await maintenance.SetVoidDetailsAsync(c.CompanyId, unit, i.Optional("Reason"), i.Optional("Job")).ConfigureAwait(true), "Void details saved.");
+                    case "Plan task":
+                        return $"Planned task {Check(await maintenance.PlanAsync(c.CompanyId, unit, i.Optional("Description") ?? string.Empty, i.Date("Date"), i.Whole("Every")).ConfigureAwait(true))} added.";
+                    case "Planned due":
+                        IReadOnlyList<PlannedTaskDue> due = await maintenance.DueAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true);
+                        return due.Count == 0 ? "Nothing planned is due." : string.Join(Environment.NewLine, due.Select(t => $"{t.Id,6} {D(t.Due)} {t.UnitCode,-10} {t.Description}"));
+                    case "Planned done":
+                        return $"Done; repair {Check(await maintenance.MarkDoneAsync(c.CompanyId, (long)(i.OptionalNumber("Task") ?? 0m), i.Date("Date")).ConfigureAwait(true))} raised for its cost.";
                     default:
                         UnitMaintenanceHistory history = Check(await maintenance.HistoryAsync(c.CompanyId, unit).ConfigureAwait(true));
                         return $"{history.UnitCode}: {history.RepairsOpen} repair(s) open, repairs cost {M(history.RepairCost)}, recharged {M(history.Recharged)}, "

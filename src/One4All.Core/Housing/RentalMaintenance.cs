@@ -157,3 +157,68 @@ public sealed class UnitInspection : AuditableEntity, ICompanyScoped
     /// <param name="date">When.</param>
     public void CloseFollowUp(DateOnly date) => FollowUpDoneOn = date;
 }
+
+/// <summary>
+/// A planned maintenance task on a rental unit (<c>hse.planned_maintenance</c>; brief §4.10.7 planned maintenance programme): due every so many
+/// months; marking it done raises the repair that carries its cost and moves it to the next due date.
+/// </summary>
+public sealed class PlannedMaintenance : AuditableEntity, ICompanyScoped
+{
+    private PlannedMaintenance() => Description = string.Empty;
+
+    /// <summary>Plans a task.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="unitId">The unit.</param>
+    /// <param name="description">The work (e.g. "Service geyser", "Repaint exterior").</param>
+    /// <param name="nextDue">When it is first due.</param>
+    /// <param name="everyMonths">How often it recurs (0: once).</param>
+    public PlannedMaintenance(long companyId, long unitId, string description, DateOnly nextDue, int everyMonths)
+    {
+        CompanyId = companyId;
+        UnitId = unitId;
+        Description = description;
+        NextDue = nextDue;
+        EveryMonths = everyMonths;
+        IsActive = true;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>Gets the unit.</summary>
+    public long UnitId { get; private set; }
+
+    /// <summary>Gets the work.</summary>
+    public string Description { get; private set; }
+
+    /// <summary>Gets when it is next due.</summary>
+    public DateOnly NextDue { get; private set; }
+
+    /// <summary>Gets how often it recurs in months (0: once).</summary>
+    public int EveryMonths { get; private set; }
+
+    /// <summary>Gets when it was last done.</summary>
+    public DateOnly? LastDone { get; private set; }
+
+    /// <summary>Gets whether it is still in the programme.</summary>
+    public bool IsActive { get; private set; }
+
+    /// <summary>Records it done and moves it on (a one-off task leaves the programme).</summary>
+    /// <param name="date">When it was done.</param>
+    public void Done(DateOnly date)
+    {
+        LastDone = date;
+        if (EveryMonths > 0)
+        {
+            NextDue = NextDue.AddMonths(EveryMonths);
+            while (NextDue <= date)
+            {
+                NextDue = NextDue.AddMonths(EveryMonths);
+            }
+        }
+        else
+        {
+            IsActive = false;
+        }
+    }
+}
