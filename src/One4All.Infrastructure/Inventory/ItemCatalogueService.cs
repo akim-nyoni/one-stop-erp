@@ -126,8 +126,16 @@ public sealed class ItemCatalogueService : IItemCatalogueService
         matches.AddRange((await _db.ItemUnits.Where(u => u.CompanyId == companyId && u.Barcode == text).Select(u => u.ItemId).ToListAsync(ct).ConfigureAwait(false)).Select(id => (id, "pack barcode")));
         matches.AddRange((await _db.ItemAliases.Where(a => a.CompanyId == companyId && a.Kind == ItemAliasKind.Synonym && EF.Functions.ILike(a.Alias, like)).Select(a => a.ItemId)
             .ToListAsync(ct).ConfigureAwait(false)).Select(id => (id, "synonym")));
-        matches.AddRange((await _db.Items.Where(i => i.CompanyId == companyId && (EF.Functions.ILike(i.Description, like) || EF.Functions.ILike(i.Code, like) || (i.Brand != null && EF.Functions.ILike(i.Brand, like))))
-            .Select(i => i.Id).Take(take * 2).ToListAsync(ct).ConfigureAwait(false)).Select(id => (id, "description")));
+
+        // Every word typed must appear in the code, description or brand ("sugar 2kg" finds "Sugar white 2kg"), each word served by the trigram indexes.
+        IQueryable<Item> described = _db.Items.Where(i => i.CompanyId == companyId);
+        foreach (string word in text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            string part = $"%{word.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal)}%";
+            described = described.Where(i => EF.Functions.ILike(i.Description, part) || EF.Functions.ILike(i.Code, part) || (i.Brand != null && EF.Functions.ILike(i.Brand, part)));
+        }
+
+        matches.AddRange((await described.Select(i => i.Id).Take(take * 2).ToListAsync(ct).ConfigureAwait(false)).Select(id => (id, "description")));
 
         List<(long Id, string Matched)> ranked = [.. matches.GroupBy(m => m.Id).Select(g => g.First()).Take(take)];
         List<long> ids = [.. ranked.Select(r => r.Id)];
