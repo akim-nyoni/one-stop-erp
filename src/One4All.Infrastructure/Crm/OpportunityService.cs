@@ -102,4 +102,37 @@ public sealed class OpportunityService : IOpportunityService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return order.Value.SalesOrderId;
     }
+
+    /// <inheritdoc />
+    public async Task<Result> MoveAsync(long companyId, long opportunityId, OpportunityStage stage, decimal? probabilityPercent, DateOnly? expectedCloseOn, string? lostReason, DateOnly on,
+        CancellationToken ct = default)
+    {
+        if (await _db.Set<Opportunity>().FirstOrDefaultAsync(o => o.CompanyId == companyId && o.Id == opportunityId, ct).ConfigureAwait(false) is not Opportunity opportunity)
+        {
+            return Result.Failure(Error.NotFound("Crm.OpportunityNotFound", $"Opportunity {opportunityId} not found."));
+        }
+
+        if (opportunity.IsClosed)
+        {
+            return Result.Failure(Error.Rule("Crm.OpportunityClosed", $"{opportunity.Name} was {opportunity.Stage} on {opportunity.ClosedOn:yyyy-MM-dd}."));
+        }
+
+        if (probabilityPercent is < 0m or > 100m || (stage == OpportunityStage.Lost && string.IsNullOrWhiteSpace(lostReason)))
+        {
+            return Result.Failure(Error.Validation("Crm.OpportunityMove", "A probability is 0–100%, and a lost opportunity needs the reason."));
+        }
+
+        if (stage is OpportunityStage.Won or OpportunityStage.Lost)
+        {
+            opportunity.Close(stage == OpportunityStage.Won, on, lostReason?.Trim());
+        }
+        else
+        {
+            opportunity.MoveTo(stage, probabilityPercent);
+        }
+
+        opportunity.ExpectedCloseOn = expectedCloseOn ?? opportunity.ExpectedCloseOn;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
 }

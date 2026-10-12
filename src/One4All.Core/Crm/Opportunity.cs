@@ -78,6 +78,29 @@ public sealed class Opportunity : SoftDeletableEntity, ICompanyScoped
     /// <summary>The win probability (%).</summary>
     public decimal ProbabilityPercent { get; private set; }
 
+    /// <summary>Gets or sets when the opportunity is expected to close.</summary>
+    public DateOnly? ExpectedCloseOn { get; set; }
+
+    /// <summary>Gets when it was won or lost.</summary>
+    public DateOnly? ClosedOn { get; private set; }
+
+    /// <summary>Gets why it was lost.</summary>
+    public string? LostReason { get; private set; }
+
+    /// <summary>Gets a value indicating whether it is won or lost.</summary>
+    public bool IsClosed => Stage is OpportunityStage.Won or OpportunityStage.Lost;
+
+    /// <summary>Closes the opportunity as won or lost on a date.</summary>
+    /// <param name="won">Won or lost.</param>
+    /// <param name="on">When.</param>
+    /// <param name="lostReason">Why it was lost.</param>
+    public void Close(bool won, DateOnly on, string? lostReason)
+    {
+        MoveTo(won ? OpportunityStage.Won : OpportunityStage.Lost);
+        ClosedOn = on;
+        LostReason = won ? null : lostReason;
+    }
+
     /// <summary>Whether the opportunity is still open (not won or lost).</summary>
     public bool IsOpen => Stage is not (OpportunityStage.Won or OpportunityStage.Lost);
 

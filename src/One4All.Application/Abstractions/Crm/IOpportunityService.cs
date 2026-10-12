@@ -48,6 +48,13 @@ public interface IOpportunityService
     Task<Result<PipelineForecast>> PipelineForecastAsync(long companyId, CancellationToken ct = default);
 
     /// <summary>
+    /// Moves an open opportunity along the pipeline (with its probability, or the stage's default) and its expected close date; won and lost close it
+    /// (lost needs the reason) and a closed opportunity stays closed.
+    /// </summary>
+    Task<Result> MoveAsync(long companyId, long opportunityId, OpportunityStage stage, decimal? probabilityPercent, DateOnly? expectedCloseOn, string? lostReason, DateOnly on,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Converts a won (or to-be-won) opportunity into a sales order for its linked customer: creates the order
     /// through the sales-order service with the supplied lines and marks the opportunity Won. Refuses a lost
     /// opportunity, one with no linked customer, or an empty line list.

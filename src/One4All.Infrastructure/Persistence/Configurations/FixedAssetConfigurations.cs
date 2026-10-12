@@ -73,6 +73,8 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
     {
         b.ToTable("opportunity", Schemas.Crm);
         b.HasKey(x => x.Id);
+        b.Property(x => x.LostReason).HasMaxLength(300);
+        b.Ignore(x => x.IsClosed);
         b.Property(x => x.Name).HasMaxLength(200);
         b.Property(x => x.ContactName).HasMaxLength(200);
         b.Property(x => x.Stage).HasConversion<int>();

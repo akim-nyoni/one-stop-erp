@@ -17,6 +17,55 @@ public static partial class OperationCatalogue
         const string module = "CRM";
         yield return new Operation
         {
+            Module = module, Title = "Opportunity pipeline", ListTitle = "Open opportunities",
+            Description = "Move an opportunity through the pipeline (lead, qualified, proposal, negotiation) with its probability and expected close date, or close it as won "
+                + "or lost (with the reason); Forecast shows the weighted pipeline by stage; Timeline lists everything done on it; Convert raises the sales order from it "
+                + "(lines ITEM:qty[:price]; …).",
+            Fields = [Pick("Step", "Step", ["Move", "Forecast", "Timeline", "Convert to order"]), OptNum("Opportunity", "Opportunity id"), Pick("Stage", "Stage", Enum.GetNames<OpportunityStage>()),
+                OptNum("Probability", "Probability % (blank: the stage's)"), Opt("ExpectedClose", "Expected close (yyyy-MM-dd)"), Opt("Reason", "Why lost"), Opt("Order", "Sales order number"),
+                Opt("Lines", "Lines ITEM:qty[:price]; …"), Today()],
+            Run = async (c, i) =>
+            {
+                IOpportunityService pipeline = c.Get<IOpportunityService>();
+                long opportunity = (long)(i.OptionalNumber("Opportunity") ?? 0m);
+                switch (i.Text("Step"))
+                {
+                    case "Forecast":
+                        PipelineForecast forecast = Check(await pipeline.PipelineForecastAsync(c.CompanyId).ConfigureAwait(true));
+                        return string.Join(Environment.NewLine, forecast.Stages.Select(s => $"{s.Stage,-12} {s.Count,4}  {M(s.EstimatedValue),14}  weighted {M(s.WeightedValue),14}"))
+                            + Environment.NewLine + $"Total {M(forecast.TotalEstimated)}, weighted forecast {M(forecast.TotalWeighted)}.";
+                    case "Timeline":
+                        IReadOnlyList<CrmActivity> done = await c.Get<ICrmService>().TimelineAsync(c.CompanyId, null, opportunity, null).ConfigureAwait(true);
+                        return done.Count == 0 ? "Nothing logged yet." : string.Join(Environment.NewLine, done.Select(a => $"{(a.DoneOnUtc ?? a.DueOnUtc):yyyy-MM-dd HH:mm} {a.Type,-10} {a.Subject} {(a.DoneOnUtc is null ? string.Empty : "(done)")}"));
+                    case "Convert to order":
+                        List<Application.Abstractions.SalesOrders.SalesOrderLineRequest> lines = [];
+                        foreach (string part in (i.Optional("Lines") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                            Core.Inventory.Item item = await c.Db.Items.FirstOrDefaultAsync(x => x.CompanyId == c.CompanyId && x.Code == bits[0].ToUpper()).ConfigureAwait(true)
+                                ?? throw new OperationException($"Item {bits[0]} not found.");
+                            decimal quantity = bits.Length > 1 && decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal q) ? q
+                                : throw new OperationException($"Write each line as ITEM:qty[:price] (\"{part}\").");
+                            decimal? price = bits.Length > 2 && decimal.TryParse(bits[2], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal pr) ? pr : null;
+                            lines.Add(new(item.Id, item.Description, quantity, price, item.TaxCode, item.RevenueAccountCode ?? string.Empty));
+                        }
+
+                        CurrencyCode currency = await c.Db.Companies.Where(x => x.Id == c.CompanyId).Select(x => x.BaseCurrency).FirstAsync().ConfigureAwait(true);
+                        long order = Check(await pipeline.ConvertToSalesOrderAsync(c.CompanyId, opportunity, i.Optional("Order") ?? string.Empty, i.Date("Date"), currency, lines).ConfigureAwait(true));
+                        return $"Sales order raised (id {order}).";
+                    default:
+                        DateOnly? expected = i.Optional("ExpectedClose") is string text ? DateOnly.ParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null;
+                        return Check(await pipeline.MoveAsync(c.CompanyId, opportunity, Enum.Parse<OpportunityStage>(i.Text("Stage")), i.OptionalNumber("Probability"), expected, i.Optional("Reason"),
+                            i.Date("Date")).ConfigureAwait(true), $"Opportunity now {i.Text("Stage")}.");
+                }
+            },
+            List = async c => Table(await c.Db.Set<Opportunity>().AsNoTracking().Where(o => o.CompanyId == c.CompanyId && o.Stage != OpportunityStage.Won && o.Stage != OpportunityStage.Lost)
+                    .OrderBy(o => o.ExpectedCloseOn).ThenBy(o => o.Id).Take(300).ToListAsync().ConfigureAwait(true),
+                ("Id", o => o.Id), ("Opportunity", o => o.Name), ("Stage", o => o.Stage), ("Value", o => M(o.EstimatedValue)), ("Probability", o => $"{o.ProbabilityPercent:0}%"),
+                ("Expected close", o => o.ExpectedCloseOn is DateOnly d ? D(d) : "-")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Capture a lead", ListTitle = "Leads",
             Description = "A prospective customer with an e-mail or phone and where they came from; an earlier lead with the same e-mail or phone is flagged.",
             Fields = [Req("Name", "Name"), Opt("Organisation", "Organisation"), Opt("Email", "E-mail"), Opt("Phone", "Phone"), Req("Source", "Source", "web")],
