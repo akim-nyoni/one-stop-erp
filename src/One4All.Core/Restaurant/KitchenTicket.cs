@@ -63,6 +63,20 @@ public sealed class KitchenTicket : AuditableEntity, ICompanyScoped
     /// <summary>Gets or sets the preparation station the ticket goes to (null: the kitchen).</summary>
     public string? Station { get; set; }
 
+    /// <summary>Gets how many times the ticket has been printed at its station (more than once: reprints).</summary>
+    public int PrintCount { get; private set; }
+
+    /// <summary>Gets when it was last printed.</summary>
+    public DateTimeOffset? LastPrintedOnUtc { get; private set; }
+
+    /// <summary>Records a print at the station.</summary>
+    /// <param name="at">When.</param>
+    public void MarkPrinted(DateTimeOffset at)
+    {
+        PrintCount++;
+        LastPrintedOnUtc = at;
+    }
+
     /// <summary>The status.</summary>
     public KitchenTicketStatus Status { get; private set; }
 

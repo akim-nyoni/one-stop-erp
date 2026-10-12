@@ -424,6 +424,7 @@ public static class DependencyInjection
 
         // Restaurant / Hospitality (optional module).
         services.AddScoped<Application.Abstractions.Restaurant.IRestaurantService, Restaurant.RestaurantService>();
+        services.AddScoped<Application.Abstractions.Restaurant.IKitchenPrintService, Restaurant.KitchenPrintService>();
 
         // Cashiering & Receipting.
         services.AddScoped<Application.Abstractions.Receipting.IPayerAccountProvider, Receipting.ArPayerAccountProvider>();

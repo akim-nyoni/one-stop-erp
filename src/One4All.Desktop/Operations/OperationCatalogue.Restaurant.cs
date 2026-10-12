@@ -9,9 +9,38 @@ namespace One4All.Desktop.Operations;
 /// <content>Restaurant: the menu and its recipes, the floor (tables, sections, combined tables), orders and the kitchen, billing (split, seats, tenders, vouchers, house accounts), reservations, the waitlist, tips and wastage.</content>
 public static partial class OperationCatalogue
 {
+    // Prints a fired order's tickets at their stations and says where each went.
+    private static async Task<string> KitchenPrintsAsync(OperationContext c, string ticketNumber)
+    {
+        One4All.Core.Common.Result<IReadOnlyList<KitchenPrintOutcome>> printed = await c.Get<IKitchenPrintService>().PrintAsync(c.CompanyId, ticketNumber).ConfigureAwait(true);
+        return printed.IsFailure ? string.Empty : Environment.NewLine + string.Join(Environment.NewLine, printed.Value.Select(o =>
+            $"{o.TicketNumber} → {o.Station}: " + (o.Printer is null ? "kitchen display only" : o.Error is null ? $"printed on {o.Printer}" : $"NOT printed on {o.Printer} ({o.Error})")));
+    }
+
     private static IEnumerable<Operation> Restaurant()
     {
         const string module = "Restaurant";
+        yield return new Operation
+        {
+            Module = "Restaurant", Title = "Kitchen station printers", ListTitle = "Station printers",
+            Description = "Which printer each preparation station's tickets print on (KITCHEN for dishes with no station): a Windows printer by name, or a network printer by host "
+                + "and port. A station with no printer works from its kitchen display. Reprint sends a ticket (and its per-station tickets) again, marked REPRINT.",
+            Fields = [Pick("Step", "Step", ["Set", "Remove", "Reprint"]), Opt("Station", "Station"), Opt("Printer", "Windows printer name"), Opt("Host", "Network printer host"),
+                Num("Port", "Port", "9100"), Num("Copies", "Copies", "1"), Opt("Ticket", "Ticket number (reprint)")],
+            Run = async (c, i) =>
+            {
+                IKitchenPrintService kitchen = c.Get<IKitchenPrintService>();
+                StationPrinterSetting setting = new(i.Optional("Station") ?? string.Empty, i.Optional("Printer"), i.Optional("Host"), (int)i.Number("Port"), (int)i.Number("Copies"));
+                return i.Text("Step") switch
+                {
+                    "Remove" => Check(await kitchen.SetStationPrinterAsync(c.CompanyId, setting, remove: true).ConfigureAwait(true), "Station printer removed."),
+                    "Reprint" => "Reprinted." + await KitchenPrintsAsync(c, i.Optional("Ticket") ?? string.Empty).ConfigureAwait(true),
+                    _ => Check(await kitchen.SetStationPrinterAsync(c.CompanyId, setting).ConfigureAwait(true), "Station printer set."),
+                };
+            },
+            List = async c => Table(await c.Get<IKitchenPrintService>().StationPrintersAsync(c.CompanyId).ConfigureAwait(true),
+                ("Station", p => p.Station), ("Printer", p => p.PrinterName ?? $"{p.Host}:{p.Port}"), ("Copies", p => p.Copies)),
+        };
         yield return new Operation
         {
             Module = module, Title = "Menu items", ListTitle = "Menu",
@@ -180,10 +209,11 @@ public static partial class OperationCatalogue
                     case "Change waiter":
                         return Check(await restaurant.ReassignWaiterAsync(c.CompanyId, order, await UserOrMe().ConfigureAwait(true)).ConfigureAwait(true), "Waiter changed.");
                     case "Fire order":
-                        return Check(await restaurant.FireOrderAsync(c.CompanyId, order, i.Optional("Ticket") ?? string.Empty, i.Date("Date")).ConfigureAwait(true), _ => "Sent to the kitchen.");
+                        _ = Check(await restaurant.FireOrderAsync(c.CompanyId, order, i.Optional("Ticket") ?? string.Empty, i.Date("Date")).ConfigureAwait(true));
+                        return "Sent to the kitchen." + await KitchenPrintsAsync(c, i.Optional("Ticket") ?? string.Empty).ConfigureAwait(true);
                     case "Fire course":
-                        return Check(await restaurant.FireCourseAsync(c.CompanyId, order, Enum.Parse<MenuCourse>(i.Text("Course")), i.Optional("Ticket") ?? string.Empty, i.Date("Date")).ConfigureAwait(true),
-                            _ => $"{i.Text("Course")} sent to the kitchen.");
+                        _ = Check(await restaurant.FireCourseAsync(c.CompanyId, order, Enum.Parse<MenuCourse>(i.Text("Course")), i.Optional("Ticket") ?? string.Empty, i.Date("Date")).ConfigureAwait(true));
+                        return $"{i.Text("Course")} sent to the kitchen." + await KitchenPrintsAsync(c, i.Optional("Ticket") ?? string.Empty).ConfigureAwait(true);
                     case "Assign driver":
                         return Check(await restaurant.AssignDeliveryDriverAsync(c.CompanyId, order, await UserOrMe().ConfigureAwait(true)).ConfigureAwait(true), "Driver assigned.");
                     case "Delivery status":

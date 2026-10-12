@@ -295,3 +295,16 @@ internal sealed class KitchenTicketLineConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.Quantity).HasPrecision(19, 4);
     }
 }
+
+internal sealed class KitchenStationPrinterConfiguration : IEntityTypeConfiguration<KitchenStationPrinter>
+{
+    public void Configure(EntityTypeBuilder<KitchenStationPrinter> b)
+    {
+        b.ToTable("station_printer", Schemas.Restaurant);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Station).HasMaxLength(30);
+        b.Property(x => x.PrinterName).HasMaxLength(200);
+        b.Property(x => x.Host).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.Station }).IsUnique();
+    }
+}
