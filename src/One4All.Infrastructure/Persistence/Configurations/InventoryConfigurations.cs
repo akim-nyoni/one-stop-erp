@@ -343,3 +343,31 @@ internal sealed class ItemCategoryConfiguration : IEntityTypeConfiguration<Core.
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
     }
 }
+
+internal sealed class HeldStockConfiguration : IEntityTypeConfiguration<HeldStock>
+{
+    public void Configure(EntityTypeBuilder<HeldStock> b)
+    {
+        b.ToTable("held_stock", Schemas.Inventory, t => t.HasCheckConstraint("ck_held_stock_quantity", "quantity >= 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Owner).HasConversion<int>();
+        b.Property(x => x.Quantity).HasPrecision(18, 4);
+        b.Property(x => x.UnitPrice).HasPrecision(18, 4);
+        b.HasIndex(x => new { x.CompanyId, x.Owner, x.OwnerId, x.ItemId, x.WarehouseId }).IsUnique();
+        b.HasMany(x => x.Movements).WithOne().HasForeignKey(x => x.HeldStockId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Movements).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class HeldStockMovementConfiguration : IEntityTypeConfiguration<HeldStockMovement>
+{
+    public void Configure(EntityTypeBuilder<HeldStockMovement> b)
+    {
+        b.ToTable("held_stock_movement", Schemas.Inventory);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Quantity).HasPrecision(18, 4);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+    }
+}

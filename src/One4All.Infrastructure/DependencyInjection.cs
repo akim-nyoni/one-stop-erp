@@ -315,6 +315,7 @@ public static class DependencyInjection
 
         // Inventory + Procurement.
         services.AddScoped<Application.Abstractions.Inventory.IInventoryService, Inventory.InventoryService>();
+        services.AddScoped<Application.Abstractions.Inventory.IHeldStockService, Inventory.HeldStockService>();
         services.AddScoped<Application.Abstractions.Inventory.ILotTrackingService, Inventory.LotTrackingService>();
         services.AddScoped<Application.Abstractions.Inventory.IStockTransferService, Inventory.StockTransferService>();
         services.AddScoped<Application.Abstractions.Inventory.IAssemblyService, Inventory.AssemblyService>();

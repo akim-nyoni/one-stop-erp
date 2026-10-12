@@ -12393,6 +12393,127 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("bom_line", "inv");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.HeldStock", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("ItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("item_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<int>("Owner")
+                        .HasColumnType("integer")
+                        .HasColumnName("owner");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("owner_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_price");
+
+                    b.Property<long>("WarehouseId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_held_stock");
+
+                    b.HasIndex("CompanyId", "Owner", "OwnerId", "ItemId", "WarehouseId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_held_stock_company_id_owner_owner_id_item_id_warehouse_id");
+
+                    b.ToTable("held_stock", "inv", t =>
+                        {
+                            t.HasCheckConstraint("ck_held_stock_quantity", "quantity >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.HeldStockMovement", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long>("HeldStockId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("held_stock_id");
+
+                    b.Property<string>("JournalNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("quantity");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_held_stock_movement");
+
+                    b.HasIndex("HeldStockId")
+                        .HasDatabaseName("ix_held_stock_movement_held_stock_id");
+
+                    b.ToTable("held_stock_movement", "inv");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.Item", b =>
                 {
                     b.Property<long>("Id")
@@ -35151,6 +35272,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_bom_line_bills_of_materials_bill_of_materials_id");
                 });
 
+            modelBuilder.Entity("One4All.Core.Inventory.HeldStockMovement", b =>
+                {
+                    b.HasOne("One4All.Core.Inventory.HeldStock", null)
+                        .WithMany("Movements")
+                        .HasForeignKey("HeldStockId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_held_stock_movement_held_stock_held_stock_id");
+                });
+
             modelBuilder.Entity("One4All.Core.Inventory.PriceListLine", b =>
                 {
                     b.HasOne("One4All.Core.Inventory.PriceList", null)
@@ -36196,6 +36327,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("One4All.Core.Inventory.BillOfMaterials", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("One4All.Core.Inventory.HeldStock", b =>
+                {
+                    b.Navigation("Movements");
                 });
 
             modelBuilder.Entity("One4All.Core.Inventory.PriceList", b =>

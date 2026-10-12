@@ -374,6 +374,36 @@ public static partial class OperationCatalogue
         const string module = "Stock";
         yield return new Operation
         {
+            Module = module, Title = "Supplier- and customer-owned stock", ListTitle = "Goods held for others",
+            Description = "Goods we hold that are not ours: a supplier's consignment stock (with the agreed price) or a customer's goods in our keeping. They stay out of our stock "
+                + "value. Return hands them back; Use (supplier-owned only) takes them into our stock at the agreed price and raises the supplier's invoice through the clearing account.",
+            Fields = [Pick("Step", "Step", ["Take in", "Return", "Use"]), Pick("Owner", "Owner is a", Enum.GetNames<HeldStockOwner>()), Opt("OwnerCode", "Supplier or customer code"),
+                Opt("Item", "Item code"), Opt("Warehouse", "Location code"), Num("Quantity", "Quantity", "1"), OptNum("Price", "Agreed price (supplier-owned)"), OptNum("Held", "Holding id"),
+                Opt("Reference", "Reference"), Opt("Clearing", "Consignment clearing account (use)"), Today()],
+            Run = async (c, i) =>
+            {
+                IHeldStockService held = c.Get<IHeldStockService>();
+                long holding = (long)(i.OptionalNumber("Held") ?? 0m);
+                switch (i.Text("Step"))
+                {
+                    case "Return":
+                        return Check(await held.ReturnAsync(c.CompanyId, holding, i.Number("Quantity"), i.Date("Date"), i.Optional("Reference")).ConfigureAwait(true), "Handed back.");
+                    case "Use":
+                        string journal = Check(await held.UseAsync(c.CompanyId, holding, i.Number("Quantity"), i.Date("Date"), i.Optional("Reference") ?? string.Empty, i.Optional("Clearing") ?? string.Empty)
+                            .ConfigureAwait(true));
+                        return $"Taken into stock and invoiced by the supplier ({journal}).";
+                    default:
+                        long id = Check(await held.TakeInAsync(c.CompanyId, new HeldStockIn(Enum.Parse<HeldStockOwner>(i.Text("Owner")), i.Optional("OwnerCode") ?? string.Empty, i.Optional("Item") ?? string.Empty,
+                            i.Optional("Warehouse") ?? string.Empty, i.Number("Quantity"), i.Date("Date"), i.Optional("Reference")) { UnitPrice = i.OptionalNumber("Price") }).ConfigureAwait(true));
+                        return $"Taken in (holding {id}).";
+                }
+            },
+            List = async c => Table(await c.Get<IHeldStockService>().HoldingsAsync(c.CompanyId, null).ConfigureAwait(true),
+                ("Holding", r => r.Id), ("Owner", r => r.Owner), ("Code", r => r.OwnerCode), ("Name", r => r.OwnerName), ("Item", r => r.ItemCode), ("Location", r => r.WarehouseCode),
+                ("Quantity", r => r.Quantity), ("Agreed price", r => r.Owner == HeldStockOwner.Supplier ? r.UnitPrice.ToString("0.00##", System.Globalization.CultureInfo.InvariantCulture) : string.Empty)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Price a list from cost", ListTitle = "Price lists",
             Description = "Items with no price on the list are priced from cost (average, else standard): a markup on cost or a margin on price, rounded to a price point. Basis None turns it off.",
             Fields = [Req("List", "Price list code"), Pick("Basis", "Basis", Enum.GetNames<CostPlusBasis>()), Num("Percent", "Markup or margin %", "0"), Num("RoundTo", "Price point", "0.05"),
