@@ -425,19 +425,38 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = suppliers, Title = "Supplier bank details", ListTitle = "Changes awaiting approval",
-            Description = "A change to a supplier's bank details is requested by one user and approved (or rejected) by another; until then the supplier is held out of payment runs.",
-            Fields = [Pick("Step", "Step", ["Request change", "Approve", "Reject"]), Opt("Supplier", "Supplier code (request)"), Opt("AccountName", "Account name"), Opt("AccountNumber", "Account number"),
-                Opt("Bank", "Bank"), OptNum("Change", "Change id (approve / reject)"), Opt("Reason", "Reason (reject)")],
+            Description = "A change to a supplier's bank details (or mobile-money wallet) is requested by one user and approved (or rejected) by another; until then the supplier is held "
+                + "out of payment runs. Payment priority (1 paid first … 9 last) decides who is paid first when a run's funds are short.",
+            Fields = [Pick("Step", "Step", ["Request change", "Approve", "Reject", "Payment priority"]), Opt("Supplier", "Supplier code (request)"), Opt("AccountName", "Account name"),
+                Opt("AccountNumber", "Account number"), Opt("Bank", "Bank"), Opt("Wallet", "Mobile-money wallet"), OptNum("Change", "Change id (approve / reject)"), Opt("Reason", "Reason (reject)"),
+                Num("Priority", "Payment priority (1–9)", "5")],
             Run = async (c, i) =>
             {
                 Application.Abstractions.Trading.ISupplierBankDetailsService bank = c.Get<Application.Abstractions.Trading.ISupplierBankDetailsService>();
                 long change = (long)(i.OptionalNumber("Change") ?? 0m);
+                async Task<string> SetPriorityAsync()
+                {
+                    int priority = (int)i.Number("Priority");
+                    if (priority is < 1 or > 9)
+                    {
+                        throw new OperationException("Payment priority is 1 (paid first) to 9 (paid last).");
+                    }
+
+                    long supplierId = await SupplierAsync(c, i.Optional("Supplier") ?? string.Empty).ConfigureAwait(true);
+                    Core.Trading.Supplier supplier = await c.Db.Suppliers.SingleAsync(s => s.Id == supplierId).ConfigureAwait(true);
+                    supplier.PaymentPriority = priority;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"{supplier.Code} is now paid at priority {priority}.";
+                }
+
                 return i.Text("Step") switch
                 {
                     "Request change" => Check(await bank.RequestChangeAsync(c.CompanyId, await SupplierAsync(c, i.Optional("Supplier") ?? string.Empty).ConfigureAwait(true),
-                        new Application.Abstractions.Trading.SupplierBankDetails(i.Optional("AccountName"), i.Optional("AccountNumber"), i.Optional("Bank")), c.UserId).ConfigureAwait(true),
+                        new Application.Abstractions.Trading.SupplierBankDetails(i.Optional("AccountName"), i.Optional("AccountNumber"), i.Optional("Bank")) { MobileMoneyNumber = i.Optional("Wallet") },
+                        c.UserId).ConfigureAwait(true),
                         id => $"Change {id} awaits another user's approval; the supplier is held out of payment runs meanwhile."),
                     "Approve" => Check(await bank.ApproveAsync(c.CompanyId, change, c.UserId).ConfigureAwait(true), "Bank details changed."),
+                    "Payment priority" => await SetPriorityAsync().ConfigureAwait(true),
                     _ => Check(await bank.RejectAsync(c.CompanyId, change, c.UserId, i.Optional("Reason") ?? string.Empty).ConfigureAwait(true), "Change rejected."),
                 };
             },

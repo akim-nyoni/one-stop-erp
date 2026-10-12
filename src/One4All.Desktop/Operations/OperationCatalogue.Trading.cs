@@ -216,11 +216,12 @@ public static partial class OperationCatalogue
         {
             Module = "Suppliers", Title = "Payment run approval", ListTitle = "Saved payment runs",
             Description = "Saves a proposed payment run for review: everyone due (held suppliers left out with the reason); lines can be left out or part-paid (oldest invoices "
-                + "first); someone other than the proposer approves it, which pays exactly what it holds. Require approval stops direct payment runs for the company.",
+                + "first); someone other than the proposer approves it, which pays exactly what it holds. Require approval stops direct payment runs for the company. With funds "
+                + "available (and a currency), the proposal pays suppliers by payment priority (1 first) until the funds run out. Mobile money writes a payout file to each wallet.",
             Fields = [Pick("Step", "Step", ["Save proposal", "Set line", "Approve", "Cancel", "Show", "Require approval", "Allow direct runs"]), Opt("Run", "Run number"),
                 Today("Date", "Payment date"), Today("Due", "Pay invoices due on or before"), Req("Bank", "Bank account", "1100"), Opt("Currency", "Currency (blank: all)"),
                 Opt("Wht", "Withholding tax code"), Opt("Layout", "Bank file layout"), Pick("Method", "Pay by", Enum.GetNames<PaymentRunMethod>()), Opt("Cheque", "First cheque number (cheques)"),
-                Opt("Supplier", "Supplier code (set line)"), Tick("Include", "Pay this supplier", true), OptNum("Amount", "Amount (blank: all due)")],
+                Opt("Supplier", "Supplier code (set line)"), Tick("Include", "Pay this supplier", true), OptNum("Amount", "Amount (blank: all due)"), OptNum("Funds", "Funds available (save proposal)")],
             Run = async (c, i) =>
             {
                 IPaymentRunService runs = c.Get<IPaymentRunService>();
@@ -241,7 +242,7 @@ public static partial class OperationCatalogue
                         {
                             CompanyId = c.CompanyId, PaymentDate = i.Date("Date"), DueOnOrBefore = i.Date("Due"), BankAccountCode = i.Text("Bank"), Currency = i.Optional("Currency"),
                             WithholdingTaxCode = i.Optional("Wht"), EftLayoutCode = i.Optional("Layout"), Method = Enum.Parse<PaymentRunMethod>(i.Text("Method")),
-                            FirstChequeNumber = i.Optional("Cheque"),
+                            FirstChequeNumber = i.Optional("Cheque"), FundsAvailable = i.OptionalNumber("Funds"),
                         }, c.UserId).ConfigureAwait(true)));
                     case "Set line":
                         return Show(Check(await runs.SetLineAsync(c.CompanyId, run, i.Text("Supplier"), i.Optional("Currency") ?? string.Empty, i.Flag("Include"), i.OptionalNumber("Amount"))

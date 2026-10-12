@@ -73,6 +73,11 @@ public sealed class PaymentRunService : IPaymentRunService
         }
 
         Core.Banking.BankFileLayout? layout = null;
+        if (request.Method == Core.Trading.PaymentRunMethod.MobileMoney && !string.IsNullOrWhiteSpace(request.EftLayoutCode))
+        {
+            return Error.Validation("Ap.MobileLayout", "A mobile-money run makes its own payout file; leave the bank file layout blank.");
+        }
+
         if (!string.IsNullOrWhiteSpace(request.EftLayoutCode))
         {
             layout = await _db.BankFileLayouts.AsNoTracking().FirstOrDefaultAsync(l => l.CompanyId == request.CompanyId && l.Code == request.EftLayoutCode.Trim().ToUpper(), ct).ConfigureAwait(false);
@@ -84,6 +89,15 @@ public sealed class PaymentRunService : IPaymentRunService
 
         (List<OpenItem> dueInvoices, List<OpenItem> credits, Dictionary<long, Supplier> suppliers) = await SelectAsync(request, ct).ConfigureAwait(false);
         HashSet<long> bankChanging = await BankChangingAsync(request.CompanyId, ct).ConfigureAwait(false);
+
+        // A mobile-money run pays wallets: every supplier it would pay needs one.
+        if (request.Method == Core.Trading.PaymentRunMethod.MobileMoney
+            && dueInvoices.Select(i => i.TraderId).Distinct().Where(id => suppliers.TryGetValue(id, out Supplier? s) && !s.OnHold && !bankChanging.Contains(id)
+                && (approved is null || approved.Any(a => a.Key.SupplierId == id && a.Value > 0m)))
+                .Select(id => suppliers[id]).FirstOrDefault(s => string.IsNullOrWhiteSpace(s.MobileMoneyNumber)) is Supplier walletless)
+        {
+            return Error.Validation("Ap.NoWallet", $"Supplier {walletless.Code} has no mobile-money wallet; pay it another way or request its wallet as a bank-detail change.");
+        }
 
         // Continue the day's numbering if an earlier run already used it.
         string prefix = $"PMT-{request.PaymentDate:yyyyMMdd}-";
@@ -219,7 +233,8 @@ public sealed class PaymentRunService : IPaymentRunService
             }
         }
 
-        byte[] eft = request.Method != Core.Trading.PaymentRunMethod.Eft ? []
+        byte[] eft = request.Method == Core.Trading.PaymentRunMethod.MobileMoney ? BuildMobileMoneyFile(request, [.. lines.Where(l => l.Amount > 0m)], suppliers)
+            : request.Method != Core.Trading.PaymentRunMethod.Eft ? []
             : layout is null ? BuildEftFile(request, [.. lines.Where(l => l.Amount > 0m)], suppliers) : LayoutEftFile(request, layout, [.. lines.Where(l => l.Amount > 0m)], suppliers);
         return new PaymentRunResult(lines, totalBase, eft, chequeNumbers);
     }
@@ -246,7 +261,30 @@ public sealed class PaymentRunService : IPaymentRunService
             decimal apply = held ? 0m : Math.Min(available, due);
             decimal toPay = held ? 0m : due - apply;
             decimal withholding = toPay > 0m ? await WithholdingOnAsync(request, supplier, toPay, ct).ConfigureAwait(false) : 0m;
-            lines.Add(new PaymentProposalLine(supplier.Id, supplier.Code, supplier.Name, group.Key.Currency, group.Count(), due, available, apply, toPay, held, withholding, bankChanging.Contains(supplier.Id)));
+            lines.Add(new PaymentProposalLine(supplier.Id, supplier.Code, supplier.Name, group.Key.Currency, group.Count(), due, available, apply, toPay, held, withholding, bankChanging.Contains(supplier.Id))
+            {
+                Priority = supplier.PaymentPriority,
+            });
+        }
+
+        // Short of funds: pay by priority, then supplier code, until the funds run out; the rest waits for a later run.
+        if (request.FundsAvailable is decimal funds)
+        {
+            if (funds < 0m || string.IsNullOrWhiteSpace(request.Currency))
+            {
+                return Error.Validation("Ap.FundsAvailable", "Funds available are a non-negative amount in the run's currency (give the currency).");
+            }
+
+            decimal left = funds;
+            List<PaymentProposalLine> capped = [];
+            foreach (PaymentProposalLine line in lines.OrderBy(l => l.Priority).ThenBy(l => l.SupplierCode, StringComparer.Ordinal))
+            {
+                decimal pay = Math.Min(line.ToPay, left);
+                left -= pay;
+                capped.Add(line with { ToPay = pay, Deferred = line.ToPay - pay });
+            }
+
+            lines = capped;
         }
 
         return new PaymentRunProposal(request.PaymentDate, [.. lines.OrderBy(l => l.SupplierCode, StringComparer.Ordinal).ThenBy(l => l.Currency, StringComparer.Ordinal)]);
@@ -493,6 +531,21 @@ public sealed class PaymentRunService : IPaymentRunService
         Application.Banking.BankFileHeader header = new(request.PaymentDate, request.BankAccountCode, rows.Select(r => r.Currency).FirstOrDefault() ?? string.Empty, rows.Count, rows.Sum(r => r.Amount),
             Application.Banking.BankFileFormatter.HashTotal(rows.Select(r => r.Account)));
         return Encoding.UTF8.GetBytes(Application.Banking.BankFileFormatter.Render(layout.HeaderTemplate, layout.DetailTemplate, layout.TrailerTemplate, header, rows, layout.LineEnding));
+    }
+
+    // The bulk mobile-money payout file: a header with the count and total, then one line per wallet.
+    private static byte[] BuildMobileMoneyFile(PaymentRunRequest request, List<PaymentRunLine> lines, IReadOnlyDictionary<long, Supplier> suppliers)
+    {
+        StringBuilder sb = new();
+        sb.AppendLine($"HDR-MM|{request.PaymentDate:yyyyMMdd}|{lines.Count}|{lines.Sum(l => l.NetPaid).ToString("0.00", CultureInfo.InvariantCulture)}");
+        foreach (PaymentRunLine line in lines)
+        {
+            Supplier supplier = suppliers[line.SupplierId];
+            sb.AppendLine(string.Join('|', "MM", line.PaymentNumber, supplier.Code, supplier.Name, supplier.MobileMoneyNumber ?? string.Empty, line.Currency,
+                line.NetPaid.ToString("0.00", CultureInfo.InvariantCulture)));
+        }
+
+        return Encoding.UTF8.GetBytes(sb.ToString());
     }
 
     private static byte[] BuildEftFile(PaymentRunRequest request, List<PaymentRunLine> lines, IReadOnlyDictionary<long, Supplier> suppliers)

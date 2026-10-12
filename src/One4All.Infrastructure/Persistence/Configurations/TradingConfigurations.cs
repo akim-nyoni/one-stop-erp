@@ -49,6 +49,7 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         b.Property(x => x.BankAccountName).HasMaxLength(120);
         b.Property(x => x.BankAccountNumber).HasMaxLength(40);
         b.Property(x => x.BankName).HasMaxLength(120);
+        b.Property(x => x.MobileMoneyNumber).HasMaxLength(30);
         b.Property(x => x.BlacklistReason).HasMaxLength(300);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
@@ -175,6 +176,7 @@ internal sealed class SupplierBankChangeConfiguration : IEntityTypeConfiguration
         b.Property(x => x.AccountName).HasMaxLength(120);
         b.Property(x => x.AccountNumber).HasMaxLength(40);
         b.Property(x => x.BankName).HasMaxLength(120);
+        b.Property(x => x.MobileMoneyNumber).HasMaxLength(30);
         b.Property(x => x.Status).HasConversion<int>();
         b.Property(x => x.RejectionReason).HasMaxLength(256);
         b.HasIndex(x => x.SupplierId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_supplier_bank_change_one_pending");

@@ -60,6 +60,9 @@ public sealed class SupplierBankChange : AuditableEntity, ICompanyScoped
     /// <summary>The new bank and branch.</summary>
     public string? BankName { get; private set; }
 
+    /// <summary>Gets the new mobile-money wallet (null: unchanged; empty: removed).</summary>
+    public string? MobileMoneyNumber { get; init; }
+
     /// <summary>Who asked for the change.</summary>
     public long RequestedByUserId { get; private set; }
 

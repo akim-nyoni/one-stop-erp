@@ -37,6 +37,12 @@ public sealed class PaymentRunRequest
 
     /// <summary>Only invoices in this currency (all when blank).</summary>
     public string? Currency { get; init; }
+
+    /// <summary>
+    /// The funds available for the run, in its currency (null: no limit). A proposal then pays suppliers by priority (1 first), then
+    /// supplier code, until the funds run out; the rest is deferred to a later run.
+    /// </summary>
+    public decimal? FundsAvailable { get; init; }
 }
 
 /// <summary>One supplier's line in a payment run.</summary>
@@ -73,7 +79,14 @@ public sealed record PaymentRunResult(IReadOnlyList<PaymentRunLine> Lines, decim
 /// <param name="ToPay">What the run would pay (0 for a supplier on hold).</param>
 /// <param name="OnHold">True when the supplier is on hold and would be skipped.</param>
 /// <param name="Withholding">Withholding tax that would be deducted (the supplier has no valid tax clearance).</param>
-public readonly record struct PaymentProposalLine(long SupplierId, string SupplierCode, string SupplierName, string Currency, int InvoicesDue, decimal AmountDue, decimal CreditsAvailable, decimal CreditsToApply, decimal ToPay, bool OnHold, decimal Withholding = 0m, bool BankChangePending = false);
+public readonly record struct PaymentProposalLine(long SupplierId, string SupplierCode, string SupplierName, string Currency, int InvoicesDue, decimal AmountDue, decimal CreditsAvailable, decimal CreditsToApply, decimal ToPay, bool OnHold, decimal Withholding = 0m, bool BankChangePending = false)
+{
+    /// <summary>Gets the supplier's payment priority (1 first … 9 last).</summary>
+    public int Priority { get; init; } = 5;
+
+    /// <summary>Gets what the funds available left unpaid this time.</summary>
+    public decimal Deferred { get; init; }
+}
 
 /// <summary>A payment run proposal: what <see cref="IPaymentRunService.RunAsync"/> would do with the same request.</summary>
 /// <param name="PaymentDate">The payment date.</param>

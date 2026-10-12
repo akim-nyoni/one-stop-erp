@@ -32938,6 +32938,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<string>("MobileMoneyNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("mobile_money_number");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -32960,6 +32965,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(9, 4)
                         .HasColumnType("numeric(9,4)")
                         .HasColumnName("over_receipt_tolerance_percent");
+
+                    b.Property<int>("PaymentPriority")
+                        .HasColumnType("integer")
+                        .HasColumnName("payment_priority");
 
                     b.Property<int>("PaymentTermsDays")
                         .HasColumnType("integer")
@@ -33030,6 +33039,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
+
+                    b.Property<string>("MobileMoneyNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("mobile_money_number");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")

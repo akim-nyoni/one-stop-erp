@@ -6,7 +6,11 @@ namespace One4All.Application.Abstractions.Trading;
 /// <param name="AccountName">The account name.</param>
 /// <param name="AccountNumber">The account number.</param>
 /// <param name="BankName">The bank and branch.</param>
-public sealed record SupplierBankDetails(string? AccountName, string? AccountNumber, string? BankName);
+public sealed record SupplierBankDetails(string? AccountName, string? AccountNumber, string? BankName)
+{
+    /// <summary>The new mobile-money wallet (null: unchanged; blank: removed).</summary>
+    public string? MobileMoneyNumber { get; init; }
+}
 
 /// <summary>A bank-detail change waiting for a second user.</summary>
 /// <param name="ChangeId">The change.</param>

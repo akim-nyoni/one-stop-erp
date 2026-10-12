@@ -19,9 +19,10 @@ public sealed class SupplierBankDetailsService : ISupplierBankDetailsService
     public async Task<Result<long>> RequestChangeAsync(long companyId, long supplierId, SupplierBankDetails details, long requestedByUserId, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(details);
-        if (string.IsNullOrWhiteSpace(details.AccountNumber))
+        bool walletOnly = string.IsNullOrWhiteSpace(details.AccountNumber);
+        if (walletOnly && details.MobileMoneyNumber is null)
         {
-            return Error.Validation("Ap.BankDetailsIncomplete", "New bank details need an account number.");
+            return Error.Validation("Ap.BankDetailsIncomplete", "New bank details need an account number (or a mobile-money wallet).");
         }
 
         Supplier? supplier = await _db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId && s.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -35,7 +36,10 @@ public sealed class SupplierBankDetailsService : ISupplierBankDetailsService
             return Error.Conflict("Ap.BankChangePending", $"Supplier {supplier.Code} already has a bank-detail change awaiting approval.");
         }
 
-        SupplierBankChange change = new(companyId, supplierId, Clean(details.AccountName), details.AccountNumber.Trim(), Clean(details.BankName), requestedByUserId);
+        // A wallet-only change keeps the bank account as it is.
+        SupplierBankChange change = walletOnly
+            ? new(companyId, supplierId, supplier.BankAccountName, supplier.BankAccountNumber, supplier.BankName, requestedByUserId) { MobileMoneyNumber = details.MobileMoneyNumber!.Trim() }
+            : new(companyId, supplierId, Clean(details.AccountName), details.AccountNumber!.Trim(), Clean(details.BankName), requestedByUserId) { MobileMoneyNumber = details.MobileMoneyNumber?.Trim() };
         _db.Set<SupplierBankChange>().Add(change);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return change.Id;

@@ -14,6 +14,7 @@ public sealed class Supplier : SoftDeletableEntity, ICompanyScoped
     private string? _bankAccountName;
     private string? _bankAccountNumber;
     private string? _bankName;
+    private string? _mobileMoneyNumber;
 
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private Supplier()
@@ -76,6 +77,12 @@ public sealed class Supplier : SoftDeletableEntity, ICompanyScoped
     /// <summary>Bank name/branch; set at creation, then changed only by an approved bank-detail change.</summary>
     public string? BankName { get => _bankName; init => _bankName = value; }
 
+    /// <summary>Mobile-money wallet paid by mobile-money payment runs; set at creation, then changed only by an approved bank-detail change.</summary>
+    public string? MobileMoneyNumber { get => _mobileMoneyNumber; init => _mobileMoneyNumber = value; }
+
+    /// <summary>Gets or sets the payment priority, 1 (paid first) to 9 (paid last): when funds are short, a payment run pays in this order.</summary>
+    public int PaymentPriority { get; set; } = 5;
+
     /// <summary>Applies an approved bank-detail change.</summary>
     /// <param name="change">The change; it must be this supplier's and approved.</param>
     /// <exception cref="InvalidOperationException">Thrown for a change that is not this supplier's or not approved.</exception>
@@ -90,6 +97,10 @@ public sealed class Supplier : SoftDeletableEntity, ICompanyScoped
         _bankAccountName = change.AccountName;
         _bankAccountNumber = change.AccountNumber;
         _bankName = change.BankName;
+        if (change.MobileMoneyNumber is not null)
+        {
+            _mobileMoneyNumber = change.MobileMoneyNumber.Length == 0 ? null : change.MobileMoneyNumber;
+        }
     }
 
     /// <summary>Whether the supplier is active.</summary>

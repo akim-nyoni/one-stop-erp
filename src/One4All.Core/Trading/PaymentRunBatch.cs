@@ -187,4 +187,7 @@ public enum PaymentRunMethod
 
     /// <summary>Paid in cash: no file, no cheques.</summary>
     Cash = 2,
+
+    /// <summary>A bulk mobile-money payout file, one line per supplier's wallet.</summary>
+    MobileMoney = 3,
 }
