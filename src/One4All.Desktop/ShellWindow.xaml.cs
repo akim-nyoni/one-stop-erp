@@ -86,6 +86,38 @@ public partial class ShellWindow : Window
         editor.Show();
     }
 
+    // The update channel: the vendor-signed release, downloaded and checked (SHA-256) before the installer runs; the app closes so it can be replaced.
+    private async void CheckForUpdates_Click(object sender, RoutedEventArgs e)
+    {
+        Application.Abstractions.System.IUpdateService updates = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Application.Abstractions.System.IUpdateService>(_services);
+        Application.Abstractions.System.UpdateCheck check = await updates.CheckAsync().ConfigureAwait(true);
+        if (check.Manifest is null || check.Status == One4All.Licensing.Core.UpdateStatus.UpToDate)
+        {
+            MessageBox.Show(this, check.Problem ?? $"One4All {check.CurrentVersion} is the latest version.", "Updates", MessageBoxButton.OK,
+                check.Problem is null ? MessageBoxImage.Information : MessageBoxImage.Warning);
+            return;
+        }
+
+        string question = $"One4All {check.Manifest.Version} is available (this is {check.CurrentVersion})"
+            + (check.Status == One4All.Licensing.Core.UpdateStatus.Required ? " and this version must be updated." : ".")
+            + (string.IsNullOrWhiteSpace(check.Manifest.Notes) ? string.Empty : $"{Environment.NewLine}{Environment.NewLine}{check.Manifest.Notes}")
+            + $"{Environment.NewLine}{Environment.NewLine}Download and install it now? One4All closes while it installs.";
+        if (MessageBox.Show(this, question, "Updates", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        Core.Common.Result<string> installer = await updates.DownloadAsync(check.Manifest).ConfigureAwait(true);
+        if (installer.IsFailure)
+        {
+            MessageBox.Show(this, installer.Error.Message, "Updates", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        global::System.Diagnostics.Process.Start(new global::System.Diagnostics.ProcessStartInfo(installer.Value) { UseShellExecute = true });
+        global::System.Windows.Application.Current.Shutdown();
+    }
+
     private void OpenTeller_Click(object sender, RoutedEventArgs e)
     {
         ShellViewModel vm = (ShellViewModel)DataContext;

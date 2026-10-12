@@ -125,7 +125,9 @@
                 <MenuItem Header="{loc:T 'Data Health…'}" Click="OpenDataHealth_Click" />
                 <MenuItem Header="{loc:T 'Scheduled Jobs…'}" Click="OpenScheduledJobs_Click" />
             </MenuItem>
-            <MenuItem Header="{loc:T '_Help'}" />
+            <MenuItem Header="{loc:T '_Help'}">
+                <MenuItem Header="{loc:T 'Check for Updates…'}" Click="CheckForUpdates_Click" />
+            </MenuItem>
         </Menu>
 
         <!-- Toolbar -->

@@ -430,6 +430,8 @@ public static class DependencyInjection
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();
+        Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton(services, new Application.Abstractions.System.UpdateOptions());
+        services.AddSingleton<Application.Abstractions.System.IUpdateService, SystemServices.UpdateService>();
         services.AddSingleton<IMachineIdProvider, WmiMachineIdProvider>();
         services.AddSingleton<ILicenceService, LicenceService>();
         services.AddScoped<ILicenceUsageService, LicenceUsageService>();

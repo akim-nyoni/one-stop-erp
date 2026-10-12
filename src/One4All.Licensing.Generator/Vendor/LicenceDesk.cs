@@ -424,6 +424,36 @@ public sealed class LicenceDesk
         return new QRCoder.PngByteQRCode(data).GetGraphic(4);
     }
 
+    /// <summary>
+    /// Publishes a release on the update channel: the installer's SHA-256 with its version and location, signed with the vendor key (and logged).
+    /// </summary>
+    /// <param name="version">The version released.</param>
+    /// <param name="installerPath">The installer file (hashed).</param>
+    /// <param name="installerLocation">Where installations download it from (https URL or share path).</param>
+    /// <param name="minimumVersion">The oldest version still allowed to run, or null.</param>
+    /// <param name="notes">Release notes.</param>
+    /// <returns>The signed manifest token to place on the channel.</returns>
+    public string PublishUpdate(string version, string installerPath, string installerLocation, string? minimumVersion, string? notes)
+    {
+        if (!System.Version.TryParse(version, out _))
+        {
+            throw new ArgumentException($"'{version}' is not a version.", nameof(version));
+        }
+
+        string sha;
+        using (FileStream file = File.OpenRead(installerPath))
+        {
+            sha = Convert.ToHexString(SHA256.HashData(file));
+        }
+
+        string token = UpdateManifestCodec.Sign(new UpdateManifest
+        {
+            KeyId = _keyId, Version = version, InstallerLocation = installerLocation, Sha256 = sha, MinimumVersion = minimumVersion, Notes = notes, PublishedAt = _now(),
+        }, _privateKeyBase64);
+        Log("Update", null, null, $"Version {version} ({sha[..12]}…) at {installerLocation}");
+        return token;
+    }
+
     /// <summary>The licence certificate as a PDF: customer, licence, modules with their end dates, the activation string and the verification QR code.</summary>
     /// <param name="licenceId">The licence.</param>
     /// <returns>The PDF bytes.</returns>

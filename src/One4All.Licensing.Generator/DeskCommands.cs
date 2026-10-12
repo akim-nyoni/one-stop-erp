@@ -8,7 +8,7 @@ namespace One4All.Licensing.Generator;
 internal static class DeskCommands
 {
     /// <summary>The desk command names.</summary>
-    public static readonly string[] Names = ["customer", "customers", "grant", "renew", "change", "reissue", "revoke", "crl", "expiring", "history", "bulk", "certificate", "log", "request"];
+    public static readonly string[] Names = ["customer", "customers", "grant", "renew", "change", "reissue", "revoke", "crl", "expiring", "history", "bulk", "certificate", "log", "request", "update"];
 
     /// <summary>Runs a desk command.</summary>
     /// <param name="command">The command.</param>
@@ -93,6 +93,11 @@ internal static class DeskCommands
                 }
 
                 return rows.Any(r => r.Error is not null) ? 4 : 0;
+            case "update":
+                string manifestPath = a.GetValueOrDefault("out", "update.manifest");
+                File.WriteAllText(manifestPath, desk.PublishUpdate(Need(a, "version"), Need(a, "file"), Need(a, "url"), a.GetValueOrDefault("minimum"), a.GetValueOrDefault("notes")));
+                Console.WriteLine($"Signed update manifest written to {manifestPath}; place it on the update channel.");
+                return 0;
             case "certificate":
                 string path = a.GetValueOrDefault("out", "certificate.pdf");
                 if (path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))

@@ -50,6 +50,9 @@ public partial class App : System.Windows.Application
             }
 
             ServiceCollection services = new();
+            Application.Abstractions.System.UpdateOptions updates = new();
+            config.GetSection("Updates").Bind(updates);
+            services.AddSingleton(updates);
             services.AddOne4AllInfrastructure(connectionString, licensing);
             services.AddSingleton(PosDevices());
             services.AddTransient<ViewModels.LoginViewModel>();
