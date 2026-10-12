@@ -30,6 +30,12 @@ public sealed record AuditQuery
     public int Take { get; init; } = 500;
 
     /// <summary>
+    /// Only entries older than this one (keyset paging: pass the last id of the previous page to get the next, newest first), or null for the newest.
+    /// The database seeks to it through the primary key, so a page deep in a long log costs the same as the first.
+    /// </summary>
+    public long? BeforeId { get; init; }
+
+    /// <summary>
     /// The user asking: payroll changes are left out unless they hold Payroll › Payroll Audit Trail (brief §4.15.10 walled garden). Null for
     /// the system (everything).
     /// </summary>

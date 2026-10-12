@@ -2258,12 +2258,23 @@ api.MapGet("/api/gl/journals/{journalNumber}", async (long companyId, string jou
 .RequireAuthorization()
 .WithName("JournalDetail");
 
-api.MapGet("/api/audit", async (long companyId, DateOnly? from, DateOnly? to, string? entityType, string? entityId, string? userName, One4All.Core.Audit.AuditAction? action, int? take, ClaimsPrincipal user,
-    IAuditService audit, CancellationToken ct) =>
-    Results.Ok(await audit.QueryAsync(new AuditQuery
+api.MapGet("/api/audit", async (long companyId, DateOnly? from, DateOnly? to, string? entityType, string? entityId, string? userName, One4All.Core.Audit.AuditAction? action, int? take,
+    long? beforeId, ClaimsPrincipal user, HttpContext http, IAuditService audit, CancellationToken ct) =>
+{
+    IReadOnlyList<AuditEntryView> page = await audit.QueryAsync(new AuditQuery
     {
-        CompanyId = companyId, From = from, To = to, EntityType = entityType, EntityId = entityId, UserName = userName, Action = action, Take = take ?? 500, RequestingUserId = SignedInUser(user) ?? -1,
-    }, ct).ConfigureAwait(false)))
+        CompanyId = companyId, From = from, To = to, EntityType = entityType, EntityId = entityId, UserName = userName, Action = action, Take = take ?? 500, BeforeId = beforeId,
+        RequestingUserId = SignedInUser(user) ?? -1,
+    }, ct).ConfigureAwait(false);
+
+    // Keyset paging in the database: the next page is ?beforeId= the last id of this one.
+    if (page.Count > 0)
+    {
+        http.Response.Headers["X-Next-Before-Id"] = page[^1].Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    return Results.Ok(page);
+})
 .RequireAuthorization()
 .WithName("AuditTrail");
 

@@ -76,6 +76,11 @@ public sealed class AuditService : IAuditService
             }
         }
 
+        if (query.BeforeId is long before)
+        {
+            q = q.Where(c => c.Id < before);
+        }
+
         int take = Math.Clamp(query.Take, 1, MaxTake);
         List<ChangeLogEntry> entries = await q.OrderByDescending(c => c.Id).Take(take).ToListAsync(ct).ConfigureAwait(false);
 
