@@ -61,6 +61,66 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Grievances and property issued", ListTitle = "Open grievances and property out",
+            Description = "Lodge a grievance and follow it (investigating, resolved or withdrawn with the outcome); issue company property to an employee and record its return — "
+                + "anything still out is listed on the leaver's clearance. Medical records are kept under Medical records (restricted).",
+            Fields = [Pick("Step", "Step", ["Lodge grievance", "Move grievance", "Issue property", "Return property"]), Opt("Number", "Employee number"), Opt("Subject", "Subject / item"),
+                Opt("Details", "Details"), Opt("Against", "Against (grievance)"), Pick("Status", "Grievance is now", ["Investigating", "Resolved", "Withdrawn"]), Opt("Outcome", "Outcome / return condition"),
+                Opt("Serial", "Serial or asset number"), Num("Value", "Value", "0"), OptNum("Id", "Grievance or issue id"), Today()],
+            Run = async (c, i) =>
+            {
+                IHrCasesService cases = c.Get<IHrCasesService>();
+                long id = (long)(i.OptionalNumber("Id") ?? 0m);
+                return i.Text("Step") switch
+                {
+                    "Move grievance" => Check(await cases.MoveGrievanceAsync(c.CompanyId, id, Enum.Parse<GrievanceStatus>(i.Text("Status")), i.Date("Date"), i.Optional("Outcome")).ConfigureAwait(true),
+                        $"Grievance {id} is now {i.Text("Status").ToLowerInvariant()}."),
+                    "Issue property" => $"Issued (id {Check(await cases.IssueAssetAsync(c.CompanyId, i.Optional("Number") ?? string.Empty, i.Optional("Subject") ?? string.Empty, i.Optional("Serial"),
+                        i.Number("Value"), i.Date("Date")).ConfigureAwait(true))}).",
+                    "Return property" => Check(await cases.ReturnAssetAsync(c.CompanyId, id, i.Date("Date"), i.Optional("Outcome")).ConfigureAwait(true), "Returned."),
+                    _ => $"Grievance lodged (id {Check(await cases.LodgeGrievanceAsync(c.CompanyId, i.Optional("Number") ?? string.Empty, i.Date("Date"), i.Optional("Subject") ?? string.Empty,
+                        i.Optional("Details") ?? string.Empty, i.Optional("Against")).ConfigureAwait(true))}).",
+                };
+            },
+            List = async c =>
+            {
+                var grievances = await (from g in c.Db.Set<EmployeeGrievance>().AsNoTracking()
+                                        join e in c.Db.Employees.AsNoTracking() on g.EmployeeId equals e.Id
+                                        where g.CompanyId == c.CompanyId && (g.Status == GrievanceStatus.Open || g.Status == GrievanceStatus.Investigating)
+                                        select new { Kind = "Grievance", g.Id, e.EmployeeNumber, What = g.Subject, Since = g.LodgedOn, State = g.Status.ToString() }).ToListAsync().ConfigureAwait(true);
+                var issued = await (from a in c.Db.Set<EmployeeAssetIssue>().AsNoTracking()
+                                    join e in c.Db.Employees.AsNoTracking() on a.EmployeeId equals e.Id
+                                    where a.CompanyId == c.CompanyId && a.ReturnedOn == null
+                                    select new { Kind = "Property", a.Id, e.EmployeeNumber, What = a.Description, Since = a.IssuedOn, State = "Out" }).ToListAsync().ConfigureAwait(true);
+                return Table([.. grievances.Concat(issued).OrderBy(x => x.Since)], ("Kind", x => x.Kind), ("Id", x => x.Id), ("Employee", x => x.EmployeeNumber), ("What", x => x.What),
+                    ("Since", x => D(x.Since)), ("State", x => x.State));
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Medical records (restricted)",
+            Description = "An employee's medical records — fitness assessments, illness, injury, disability — seen and kept only by users with the Hr.Medical permission; "
+                + "notes are encrypted at rest.",
+            Fields = [Pick("Step", "Step", ["Show", "Record"]), Req("Number", "Employee number"), Pick("Kind", "Record is", Enum.GetNames<MedicalRecordKind>()), Opt("Note", "Note"),
+                Pick("Fit", "Fit for work", ["Not assessed", "Fit", "Not fit"]), Opt("Review", "Review on (yyyy-MM-dd)"), Today()],
+            Run = async (c, i) =>
+            {
+                IHrCasesService cases = c.Get<IHrCasesService>();
+                if (i.Text("Step") == "Record")
+                {
+                    bool? fit = i.Text("Fit") switch { "Fit" => true, "Not fit" => false, _ => null };
+                    DateOnly? review = i.Optional("Review") is string r ? DateOnly.ParseExact(r, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null;
+                    return $"Recorded (id {Check(await cases.RecordMedicalAsync(c.CompanyId, i.Text("Number"), i.Date("Date"), Enum.Parse<MedicalRecordKind>(i.Text("Kind")), i.Optional("Note") ?? string.Empty,
+                        fit, review, c.UserId).ConfigureAwait(true))}).";
+                }
+
+                IReadOnlyList<EmployeeMedicalRecord> records = Check(await cases.MedicalRecordsAsync(c.CompanyId, i.Text("Number"), c.UserId).ConfigureAwait(true));
+                return records.Count == 0 ? "No medical records." : string.Join(Environment.NewLine, records.Select(m =>
+                    $"{D(m.Date)} {m.Kind,-10} {(m.FitForWork is bool f ? (f ? "fit" : "NOT fit") : string.Empty),-8} {m.Note}{(m.ReviewOn is DateOnly rv ? $" (review {D(rv)})" : string.Empty)}"));
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Employee contacts, photo and dependants", ListTitle = "Beneficiaries and medical-aid dependants",
             Description = "The rest of the employee master: addresses, phone, job title, notice period and workers' compensation class (blank stays, a space clears); "
                 + "the photograph (a JPEG, PNG or BMP file; blank removes it); and beneficiaries (with their share, all shares at most 100%) and medical-aid dependants.",

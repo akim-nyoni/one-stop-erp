@@ -112,6 +112,13 @@ public sealed class TerminationService : ITerminationService
         termination.AddClearance("Final pay posted" + (journal is null ? " (nothing due)" : $" ({journal})"), cleared: true);
         termination.AddClearance(statement.UnrecoveredLoans > 0m ? $"Loans still owed: {statement.UnrecoveredLoans:N2} — arrange repayment" : "Staff loans settled", statement.UnrecoveredLoans == 0m);
         termination.AddClearance("Company property returned (keys, ID card, equipment, uniform)", cleared: false);
+        foreach (EmployeeAssetIssue issued in await _db.Set<EmployeeAssetIssue>().AsNoTracking().Where(a => a.EmployeeId == employee.Id && a.ReturnedOn == null)
+            .OrderBy(a => a.IssuedOn).ToListAsync(ct).ConfigureAwait(false))
+        {
+            termination.AddClearance($"Return {issued.Description}{(issued.SerialNumber is null ? string.Empty : $" ({issued.SerialNumber})")}"
+                + (issued.Value > 0m ? $", worth {issued.Value:N2}" : string.Empty), cleared: false);
+        }
+
         termination.AddClearance("System access withdrawn", cleared: employee.UserId is null);
         if (employee.HousingTenancyId is not null)
         {

@@ -124,6 +124,47 @@ internal sealed class EmployeeLoanConfiguration : IEntityTypeConfiguration<Emplo
     }
 }
 
+internal sealed class EmployeeGrievanceConfiguration : IEntityTypeConfiguration<EmployeeGrievance>
+{
+    public void Configure(EntityTypeBuilder<EmployeeGrievance> b)
+    {
+        b.ToTable("grievance", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Subject).HasMaxLength(200);
+        b.Property(x => x.Details).HasColumnType("text");
+        b.Property(x => x.Against).HasMaxLength(200);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.Outcome).HasColumnType("text");
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}
+
+internal sealed class EmployeeAssetIssueConfiguration : IEntityTypeConfiguration<EmployeeAssetIssue>
+{
+    public void Configure(EntityTypeBuilder<EmployeeAssetIssue> b)
+    {
+        b.ToTable("asset_issue", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.Property(x => x.SerialNumber).HasMaxLength(60);
+        b.Property(x => x.Value).HasPrecision(18, 2);
+        b.Property(x => x.ReturnCondition).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId });
+    }
+}
+
+internal sealed class EmployeeMedicalRecordConfiguration : IEntityTypeConfiguration<EmployeeMedicalRecord>
+{
+    public void Configure(EntityTypeBuilder<EmployeeMedicalRecord> b)
+    {
+        b.ToTable("medical_record", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Note).HasColumnType("text").Encrypted();
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId });
+    }
+}
+
 internal sealed class EmployeeDependantConfiguration : IEntityTypeConfiguration<EmployeeDependant>
 {
     public void Configure(EntityTypeBuilder<EmployeeDependant> b)
