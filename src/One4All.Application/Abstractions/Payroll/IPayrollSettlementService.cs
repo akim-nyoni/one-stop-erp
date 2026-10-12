@@ -7,7 +7,11 @@ namespace One4All.Application.Abstractions.Payroll;
 /// <param name="DocumentNumber">The run.</param>
 /// <param name="JournalNumber">The payment journal.</param>
 /// <param name="ByMethod">The net pay by method, and the account it was paid from.</param>
-public sealed record PayrollPayment(string DocumentNumber, string JournalNumber, IReadOnlyList<(PayMethod Method, string FundingAccountCode, decimal Amount)> ByMethod);
+public sealed record PayrollPayment(string DocumentNumber, string JournalNumber, IReadOnlyList<(PayMethod Method, string FundingAccountCode, decimal Amount)> ByMethod)
+{
+    /// <summary>Gets the net pay paid in other currencies: from which account, the amount in that currency and its base value.</summary>
+    public IReadOnlyList<(Core.Accounting.CurrencyCode Currency, string FundingAccountCode, decimal Amount, decimal BaseAmount)> ByCurrency { get; init; } = [];
+}
 
 /// <summary>Where a run stands after commit.</summary>
 /// <param name="DocumentNumber">The run.</param>
@@ -31,7 +35,12 @@ public interface IPayrollSettlementService
     /// <param name="fundingAccounts">The account each pay method is paid from (bank transfers from the bank, cash from the cash account, wallets from the mobile-money float).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The payment, or why it was refused.</returns>
-    Task<Result<PayrollPayment>> PayAsync(long companyId, string documentNumber, DateOnly paidOn, IReadOnlyDictionary<PayMethod, string> fundingAccounts, CancellationToken ct = default);
+    /// <remarks>
+    /// Earnings paid in another currency (an element's paid-in currency) are paid from that currency's account in the currency, converted at the
+    /// pay date's daily rate; the rest of each employee's net pay goes by their pay method in the base currency.
+    /// </remarks>
+    Task<Result<PayrollPayment>> PayAsync(long companyId, string documentNumber, DateOnly paidOn, IReadOnlyDictionary<PayMethod, string> fundingAccounts,
+        IReadOnlyDictionary<Core.Accounting.CurrencyCode, string>? currencyAccounts = null, CancellationToken ct = default);
 
     /// <summary>Closes a paid run once its net pay control has cleared.</summary>
     /// <param name="companyId">The company.</param>

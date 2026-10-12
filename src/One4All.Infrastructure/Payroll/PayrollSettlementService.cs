@@ -25,7 +25,8 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
     }
 
     /// <inheritdoc />
-    public Task<Result<PayrollPayment>> PayAsync(long companyId, string documentNumber, DateOnly paidOn, IReadOnlyDictionary<PayMethod, string> fundingAccounts, CancellationToken ct = default)
+    public Task<Result<PayrollPayment>> PayAsync(long companyId, string documentNumber, DateOnly paidOn, IReadOnlyDictionary<PayMethod, string> fundingAccounts,
+        IReadOnlyDictionary<CurrencyCode, string>? currencyAccounts = null, CancellationToken ct = default)
         => _db.AtomicAsync(async () =>
         {
             ArgumentNullException.ThrowIfNull(fundingAccounts);
@@ -51,13 +52,51 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
                 return Error.Rule("Payroll.NoNetPayAccount", $"Run {run.DocumentNumber} does not record its net pay control account; pay it by journal.");
             }
 
-            // Each employee's net pay by how they are paid.
-            var slips = await (from p in _db.Set<Payslip>()
+            // Each employee's net pay: the earnings paid in another currency go out in it; the rest by how they are paid.
+            var slips = await (from p in _db.Set<Payslip>().Include(p => p.Lines)
                                join e in _db.Set<Employee>() on p.EmployeeId equals e.Id
                                where p.CompanyId == companyId && p.RunReference == run.DocumentNumber
-                               select new { p.NetPay, e.PaymentMethod }).ToListAsync(ct).ConfigureAwait(false);
+                               select new { Slip = p, e.PaymentMethod }).ToListAsync(ct).ConfigureAwait(false);
+            Dictionary<string, CurrencyCode> paidIn = await _db.PayElements.Where(e => e.CompanyId == companyId && e.PaidInCurrency != null)
+                .ToDictionaryAsync(e => e.Code, e => e.PaidInCurrency!.Value, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
+            CurrencyCode currency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+
+            Dictionary<CurrencyCode, decimal> foreignBase = [];
+            List<(PayMethod Method, decimal Net)> baseNet = [];
+            foreach (var s in slips.Where(s => s.Slip.NetPay > 0m))
+            {
+                decimal inForeign = 0m;
+                foreach (IGrouping<CurrencyCode, PayslipLine> lines in s.Slip.Lines.Where(l => l.Type == PayElementType.Earning && paidIn.TryGetValue(l.ElementCode, out CurrencyCode c) && c != currency)
+                    .GroupBy(l => paidIn[l.ElementCode]))
+                {
+                    // Never more than the employee's net: deductions come off the base-currency part first, then the foreign part.
+                    decimal portion = Math.Min(lines.Sum(l => l.Amount), s.Slip.NetPay - inForeign);
+                    foreignBase[lines.Key] = foreignBase.GetValueOrDefault(lines.Key) + portion;
+                    inForeign += portion;
+                }
+
+                baseNet.Add((s.PaymentMethod, s.Slip.NetPay - inForeign));
+            }
+
+            List<(CurrencyCode Currency, string Account, decimal Amount, decimal BaseAmount, decimal Rate)> byCurrency = [];
+            foreach ((CurrencyCode foreign, decimal baseAmount) in foreignBase.Where(f => f.Value > 0m).OrderBy(f => f.Key.Value, StringComparer.Ordinal))
+            {
+                if (currencyAccounts is null || !currencyAccounts.TryGetValue(foreign, out string? account) || string.IsNullOrWhiteSpace(account))
+                {
+                    return Error.Validation("Payroll.CurrencyAccount", $"Say which {foreign} account pays the net pay earned in {foreign} ({baseAmount:N2} in base).");
+                }
+
+                decimal? rate = await Accounting.ExchangeRateResolver.FindAsync(_db, foreign, currency, ExchangeRateType.Daily, paidOn, ct).ConfigureAwait(false);
+                if (rate is not > 0m)
+                {
+                    return Error.Rule("Payroll.NoRate", $"There is no {foreign} rate on {paidOn:yyyy-MM-dd} to pay the {foreign} net pay at.");
+                }
+
+                byCurrency.Add((foreign, account.Trim().ToUpperInvariant(), decimal.Round(baseAmount / rate.Value, 2, MidpointRounding.AwayFromZero), baseAmount, rate.Value));
+            }
+
             List<(PayMethod Method, string Account, decimal Amount)> byMethod = [];
-            foreach (IGrouping<PayMethod, decimal> method in slips.Where(s => s.NetPay > 0m).GroupBy(s => s.PaymentMethod, s => s.NetPay).OrderBy(g => g.Key))
+            foreach (IGrouping<PayMethod, decimal> method in baseNet.Where(s => s.Net > 0m).GroupBy(s => s.Method, s => s.Net).OrderBy(g => g.Key))
             {
                 if (!fundingAccounts.TryGetValue(method.Key, out string? account) || string.IsNullOrWhiteSpace(account))
                 {
@@ -67,13 +106,12 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
                 byMethod.Add((method.Key, account.Trim().ToUpperInvariant(), method.Sum()));
             }
 
-            decimal total = byMethod.Sum(m => m.Amount);
+            decimal total = byMethod.Sum(m => m.Amount) + byCurrency.Sum(c => c.BaseAmount);
             if (total <= 0m)
             {
                 return Error.Rule("Payroll.NothingToPay", $"Run {run.DocumentNumber} has no net pay to pay.");
             }
 
-            CurrencyCode currency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
             Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
             {
                 CompanyId = companyId, SourceModule = "GL", PostingDate = paidOn, TransactionCurrency = currency, DocumentType = "PAYROLLPAY", DocumentNumber = $"{run.DocumentNumber}-PAY",
@@ -82,6 +120,11 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
                 [
                     new JournalLineRequest { AccountCode = run.NetPayAccountCode, Side = JournalSide.Debit, TransactionAmount = total },
                     .. byMethod.GroupBy(m => m.Account).Select(g => new JournalLineRequest { AccountCode = g.Key, Side = JournalSide.Credit, TransactionAmount = g.Sum(m => m.Amount) }),
+                    .. byCurrency.Select(c => new JournalLineRequest
+                    {
+                        AccountCode = c.Account, Side = JournalSide.Credit, TransactionAmount = c.Amount, Currency = c.Currency, ExchangeRate = c.Rate, BaseAmount = c.BaseAmount,
+                        Narrative = $"Net pay in {c.Currency}",
+                    }),
                 ],
             }, ct).ConfigureAwait(false);
             if (posted.IsFailure)
@@ -91,7 +134,10 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
 
             run.MarkPaid(paidOn, posted.Value.JournalNumber);
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-            return Result<PayrollPayment>.Success(new PayrollPayment(run.DocumentNumber, posted.Value.JournalNumber, [.. byMethod]));
+            return Result<PayrollPayment>.Success(new PayrollPayment(run.DocumentNumber, posted.Value.JournalNumber, [.. byMethod])
+            {
+                ByCurrency = [.. byCurrency.Select(c => (c.Currency, c.Account, c.Amount, c.BaseAmount))],
+            });
         }, ct);
 
     /// <inheritdoc />

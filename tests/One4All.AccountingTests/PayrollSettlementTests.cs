@@ -55,4 +55,36 @@ public sealed class PayrollSettlementTests
         (await settlement.CloseAsync(companyId, "PS-M03", new DateOnly(2026, 3, 27))).Error.Code.Should().Be("Payroll.RunClosed");
         (await db.Set<PayrollRunRecord>().AsNoTracking().SingleAsync(r => r.CompanyId == companyId && r.DocumentNumber == "PS-M03")).PaymentJournalNumber.Should().Be(paid.JournalNumber);
     }
+
+    [SkippableFact]
+    public async Task Earnings_paid_in_another_currency_are_paid_from_its_account()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        db.Accounts.Add(new Core.Accounting.LedgerAccount(companyId, "1120", "Bank EUR", Core.Accounting.AccountType.Asset));
+        PayElement basic = new(companyId, "BASIC", "Basic Salary", PayElementType.Earning, CalculationBasis.Formula, 1, "6100") { Formula = "BASIC" };
+        PayElement euro = new(companyId, "EURALLOW", "Allowance paid in EUR", PayElementType.Earning, CalculationBasis.FixedAmount, 2, "6100") { FixedAmount = 220m, PaidInCurrency = Scenario.Eur };
+        db.PayElements.AddRange(basic, euro);
+        await db.SaveChangesAsync();
+        Employee cy = new(companyId, "MC-1", "Cy Expat", 1000m, new DateOnly(2025, 1, 1)) { PaymentMethod = PayMethod.BankTransfer, BankAccountNumber = "222" };
+        cy.AssignPayElement(basic.Id);
+        cy.AssignPayElement(euro.Id);
+        db.Employees.Add(cy);
+        await db.SaveChangesAsync();
+        (await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-03", new DateOnly(2026, 3, 25), "2420", "MC-M03")).IsSuccess.Should().BeTrue();
+
+        IPayrollSettlementService settlement = scope.ServiceProvider.GetRequiredService<IPayrollSettlementService>();
+        Dictionary<PayMethod, string> bank = new() { [PayMethod.BankTransfer] = "1100" };
+        (await settlement.PayAsync(companyId, "MC-M03", new DateOnly(2026, 3, 25), bank)).Error.Code.Should().Be("Payroll.CurrencyAccount");
+
+        // 220 base of EUR earnings at 1.10 = EUR 200 from the EUR account; the other 1,000 by bank transfer.
+        PayrollPayment paid = (await settlement.PayAsync(companyId, "MC-M03", new DateOnly(2026, 3, 25), bank,
+            new Dictionary<Core.Accounting.CurrencyCode, string> { [Scenario.Eur] = "1120" })).Value;
+        paid.ByMethod.Should().Equal((PayMethod.BankTransfer, "1100", 1000m));
+        paid.ByCurrency.Should().Equal((Scenario.Eur, "1120", 200m, 220m));
+        (await settlement.StageAsync(companyId, "MC-M03")).Value.NetPayOutstanding.Should().Be(0m);
+    }
 }
