@@ -346,6 +346,47 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Pay and close a payroll run", ListTitle = "Payroll runs",
+            Description = "After commit: Pay posts the run's net pay from the account for each pay method (bank transfers, cash, mobile money) and clears the net pay control; "
+                + "Close closes the run once its net pay control is clear; Stage shows where a run stands.",
+            Fields = [Pick("Step", "Step", ["Pay", "Close", "Stage"]), Req("Run", "Run document number"), Opt("Bank", "Bank account for transfers", "1100"), Opt("Cash", "Cash account"),
+                Opt("Mobile", "Mobile-money float account"), Today()],
+            Run = async (c, i) =>
+            {
+                IPayrollSettlementService settlement = c.Get<IPayrollSettlementService>();
+                switch (i.Text("Step"))
+                {
+                    case "Pay":
+                        Dictionary<Core.Payroll.PayMethod, string> accounts = [];
+                        void Use(Core.Payroll.PayMethod method, string field)
+                        {
+                            if (i.Optional(field) is string account)
+                            {
+                                accounts[method] = account;
+                            }
+                        }
+
+                        Use(Core.Payroll.PayMethod.BankTransfer, "Bank");
+                        Use(Core.Payroll.PayMethod.Cash, "Cash");
+                        Use(Core.Payroll.PayMethod.MobileMoney, "Mobile");
+                        PayrollPayment paid = Check(await settlement.PayAsync(c.CompanyId, i.Text("Run"), i.Date("Date"), accounts).ConfigureAwait(true));
+                        return $"Paid in journal {paid.JournalNumber}: " + string.Join("; ", paid.ByMethod.Select(m => $"{m.Method} {M(m.Amount)} from {m.FundingAccountCode}"));
+                    case "Close":
+                        PayrollRunStage closed = Check(await settlement.CloseAsync(c.CompanyId, i.Text("Run"), i.Date("Date")).ConfigureAwait(true));
+                        return $"Run {closed.DocumentNumber} closed on {D(closed.ClosedOn!.Value)}.";
+                    default:
+                        PayrollRunStage stage = Check(await settlement.StageAsync(c.CompanyId, i.Text("Run")).ConfigureAwait(true));
+                        return $"Run {stage.DocumentNumber}: net {M(stage.Net)}; paid {(stage.PaidOn is DateOnly p ? D(p) : "not yet")}; closed {(stage.ClosedOn is DateOnly cl ? D(cl) : "not yet")}; "
+                            + $"{M(stage.NetPayOutstanding)} still on the net pay control.";
+                }
+            },
+            List = async c => Table(await c.Db.Set<Core.Payroll.PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.PayDate).Take(200)
+                    .ToListAsync().ConfigureAwait(true),
+                ("Run", r => r.DocumentNumber), ("Period", r => r.PeriodLabel), ("Group", r => r.PayGroup), ("Kind", r => r.Kind), ("Net", r => M(r.Net)),
+                ("Paid", r => r.PaidOn is DateOnly p ? D(p) : "-"), ("Closed", r => r.ClosedOn is DateOnly cl ? D(cl) : "-"), ("Reversed", r => r.IsReversed ? "yes" : "")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Import time-clock punches", ListTitle = "Leave balances",
             Description = "Reads the clock's export (badge,date time per line; CSV or Excel): each employee's first punch in and last punch out make the day, late against the "
                 + "rostered shift, with the hours beyond the shift as overtime awaiting approval. Days already recorded are left alone.",

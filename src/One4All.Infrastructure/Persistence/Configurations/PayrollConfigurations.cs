@@ -210,6 +210,8 @@ internal sealed class PayrollRunRecordConfiguration : IEntityTypeConfiguration<P
     {
         b.ToTable("payroll_run", Schemas.HumanResources);
         b.HasKey(x => x.Id);
+        b.Property(x => x.NetPayAccountCode).HasMaxLength(20);
+        b.Property(x => x.PaymentJournalNumber).HasMaxLength(40);
         b.Property(x => x.PeriodLabel).HasMaxLength(20);
         b.Property(x => x.JournalNumber).HasMaxLength(40);
         b.Property(x => x.Gross).HasPrecision(19, 4);

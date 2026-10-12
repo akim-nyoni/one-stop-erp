@@ -349,6 +349,31 @@ public sealed class PayrollRunRecord : AuditableEntity, ICompanyScoped
     /// <summary>Gets a value indicating whether the run has been reversed.</summary>
     public bool IsReversed => ReversedOn is not null;
 
+    /// <summary>The net pay control account the run credited (cleared by the payment).</summary>
+    public string? NetPayAccountCode { get; set; }
+
+    /// <summary>When the net pay was paid out (the Pay stage), if it has been.</summary>
+    public DateOnly? PaidOn { get; private set; }
+
+    /// <summary>The payment journal.</summary>
+    public string? PaymentJournalNumber { get; private set; }
+
+    /// <summary>When the run was closed (net pay control cleared), if it has been.</summary>
+    public DateOnly? ClosedOn { get; private set; }
+
+    /// <summary>Records the Pay stage.</summary>
+    /// <param name="date">When it was paid.</param>
+    /// <param name="journalNumber">The payment journal.</param>
+    public void MarkPaid(DateOnly date, string journalNumber)
+    {
+        PaidOn = date;
+        PaymentJournalNumber = journalNumber;
+    }
+
+    /// <summary>Records the Close stage.</summary>
+    /// <param name="date">When it was closed.</param>
+    public void Close(DateOnly date) => ClosedOn = date;
+
     /// <summary>Marks the run reversed by an approved reversal run.</summary>
     /// <param name="date">The reversal date.</param>
     /// <param name="reversalDocument">The reversal run's document number.</param>

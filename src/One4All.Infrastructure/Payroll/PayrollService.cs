@@ -365,7 +365,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         }
 
         _db.Set<PayrollRunRecord>().Add(new PayrollRunRecord(company.Id, periodLabel, payDate, slips.Count, totalGross, totalDeductions, totalNet, posted.Value.JournalNumber, kind, documentNumber, reason,
-            payGroup));
+            payGroup) { NetPayAccountCode = netPayAccountCode.Trim().ToUpperInvariant() });
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new PayrollRunResult(slips.Count, totalGross, totalDeductions, totalNet, posted.Value.JournalNumber);
     }
