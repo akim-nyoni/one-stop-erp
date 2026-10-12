@@ -1425,3 +1425,47 @@ internal sealed class StandSwapConfiguration : IEntityTypeConfiguration<StandSwa
         b.Property(x => x.Reason).HasMaxLength(300);
     }
 }
+
+internal sealed class ApplicantDocumentConfiguration : IEntityTypeConfiguration<ApplicantDocument>
+{
+    public void Configure(EntityTypeBuilder<ApplicantDocument> b)
+    {
+        b.ToTable("applicant_document", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Type).HasConversion<int>();
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.Property(x => x.VerifiedBy).HasMaxLength(120);
+        b.Ignore(x => x.IsVerified);
+        b.HasOne<HousingApplicant>().WithMany().HasForeignKey(x => x.ApplicantId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => x.ApplicantId);
+    }
+}
+
+internal sealed class DeceasedPersonConfiguration : IEntityTypeConfiguration<DeceasedPerson>
+{
+    public void Configure(EntityTypeBuilder<DeceasedPerson> b)
+    {
+        b.ToTable("deceased_person", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.IdNumber).HasMaxLength(40);
+        b.Property(x => x.FullName).HasMaxLength(200);
+        b.HasIndex(x => new { x.CompanyId, x.IdNumber }).IsUnique();
+    }
+}
+
+internal sealed class DuplicateCaseConfiguration : IEntityTypeConfiguration<DuplicateCase>
+{
+    public void Configure(EntityTypeBuilder<DuplicateCase> b)
+    {
+        b.ToTable("duplicate_case", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.FirstSource).HasMaxLength(40);
+        b.Property(x => x.SecondSource).HasMaxLength(40);
+        b.Property(x => x.FirstReference).HasMaxLength(60);
+        b.Property(x => x.SecondReference).HasMaxLength(60);
+        b.Property(x => x.Reason).HasMaxLength(200);
+        b.Property(x => x.DecisionReason).HasMaxLength(500);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.Status });
+    }
+}

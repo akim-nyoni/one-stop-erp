@@ -5860,6 +5860,59 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.ApplicantDocument", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("ApplicantId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("applicant_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("description");
+
+                    b.Property<DateOnly>("LodgedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("lodged_on");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
+                        .HasColumnName("type");
+
+                    b.Property<string>("VerifiedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("verified_by");
+
+                    b.Property<DateOnly?>("VerifiedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("verified_on");
+
+                    b.HasKey("Id")
+                        .HasName("pk_applicant_document");
+
+                    b.HasIndex("ApplicantId")
+                        .HasDatabaseName("ix_applicant_document_applicant_id");
+
+                    b.ToTable("applicant_document", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.ApplicantFee", b =>
                 {
                     b.Property<long>("Id")
@@ -6459,6 +6512,49 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("covenant_step", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.DeceasedPerson", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly>("DiedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("died_on");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("full_name");
+
+                    b.Property<string>("IdNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("id_number");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_deceased_person");
+
+                    b.HasIndex("CompanyId", "IdNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_deceased_person_company_id_id_number");
+
+                    b.ToTable("deceased_person", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.DeliveryMilestone", b =>
                 {
                     b.Property<long>("Id")
@@ -6848,6 +6944,83 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_due_diligence_check_land_acquisition_id_item");
 
                     b.ToTable("due_diligence_check", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.DuplicateCase", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long?>("DecidedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("decided_by_user_id");
+
+                    b.Property<DateOnly?>("DecidedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("decided_on");
+
+                    b.Property<string>("DecisionReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("decision_reason");
+
+                    b.Property<string>("FirstReference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("first_reference");
+
+                    b.Property<string>("FirstSource")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("first_source");
+
+                    b.Property<DateOnly>("OpenedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("opened_on");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("reason");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("SecondReference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("second_reference");
+
+                    b.Property<string>("SecondSource")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("second_source");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_duplicate_case");
+
+                    b.HasIndex("CompanyId", "Status")
+                        .HasDatabaseName("ix_duplicate_case_company_id_status");
+
+                    b.ToTable("duplicate_case", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.EnumeratedHousehold", b =>
@@ -7287,11 +7460,20 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("dependants");
 
+                    b.Property<string>("Employer")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("employer");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("full_name");
+
+                    b.Property<int>("Gender")
+                        .HasColumnType("integer")
+                        .HasColumnName("gender");
 
                     b.Property<bool>("HasDisability")
                         .HasColumnType("boolean")
@@ -7335,6 +7517,21 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("monthly_income");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("PhysicalAddress")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("physical_address");
+
+                    b.Property<string>("PostalAddress")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("postal_address");
 
                     b.Property<DateOnly>("RegistrationDate")
                         .HasColumnType("date")
@@ -33870,6 +34067,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasForeignKey("SchemeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_allocation_quota_housing_schemes_scheme_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.ApplicantDocument", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.HousingApplicant", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_applicant_document_housing_applicants_applicant_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.ApplicantFee", b =>

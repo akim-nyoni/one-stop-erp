@@ -391,6 +391,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Payroll.IPayrollSettlementService, Payroll.PayrollSettlementService>();
         services.AddScoped<Application.Abstractions.Housing.IInstalmentDefaultService, Housing.InstalmentDefaultService>();
         services.AddScoped<Application.Abstractions.Housing.IHousingRegisterDetailsService, Housing.HousingRegisterDetailsService>();
+        services.AddScoped<Application.Abstractions.Housing.IApplicantIntakeService, Housing.ApplicantIntakeService>();
         services.AddScoped<Application.Abstractions.Payroll.IPayrollVariableService, Payroll.PayrollService>();
         services.AddScoped<Application.Abstractions.Payroll.IPayrollRemittanceService, Payroll.PayrollService>();
         services.AddScoped<Application.Abstractions.Banking.IBankFileService, Banking.BankFileService>();

@@ -731,6 +731,48 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Applicant intake and duplicate queue", ListTitle = "Duplicate queue",
+            Description = "Contact: an applicant's gender, addresses, phone and employer. Lodge / Verify: supporting documents (ID copy, proof of residence, payslip, affidavit) "
+                + "verified one by one with the officer's name — the applicant is verified once all are. Death: adds to the deceased register. Scan: finds suspected duplicates "
+                + "(same ID, similar name with the same birth date, same phone) and applicants on the deceased register and queues them. Merge (keeps the earlier registration), "
+                + "Reject (removes the second) or Clear a case, with a reason.",
+            Fields = [Pick("Step", "Step", ["Contact", "Lodge document", "Verify document", "Death", "Scan", "Merge", "Reject", "Clear"]), Opt("Applicant", "Waiting-list number"),
+                Pick("Gender", "Gender", Enum.GetNames<Core.Payroll.Gender>()), Opt("Physical", "Physical address"), Opt("Postal", "Postal address"), Opt("Phone", "Phone"), Opt("Employer", "Employer"),
+                Pick("DocType", "Document", Enum.GetNames<ApplicantDocumentType>()), Opt("Description", "Description / name (death)"), OptNum("Id", "Document / case id"),
+                Opt("Officer", "Verifying officer"), Opt("IdNumber", "National ID (death)"), Opt("Reason", "Reason (decision)"), Today()],
+            Run = async (c, i) =>
+            {
+                IApplicantIntakeService intake = c.Get<IApplicantIntakeService>();
+                string applicant = i.Optional("Applicant") ?? string.Empty;
+                long id = (long)(i.OptionalNumber("Id") ?? 0m);
+                switch (i.Text("Step"))
+                {
+                    case "Contact":
+                        return Check(await intake.SetContactAsync(c.CompanyId, applicant, new ApplicantContact(Enum.Parse<Core.Payroll.Gender>(i.Text("Gender")), i.Optional("Physical"),
+                            i.Optional("Postal"), i.Optional("Phone"), i.Optional("Employer"))).ConfigureAwait(true), "Details saved.");
+                    case "Lodge document":
+                        return Check(await intake.LodgeDocumentAsync(c.CompanyId, applicant, Enum.Parse<ApplicantDocumentType>(i.Text("DocType")), i.Optional("Description") ?? string.Empty,
+                            i.Date("Date")).ConfigureAwait(true), doc => $"Document {doc} lodged.");
+                    case "Verify document":
+                        bool all = Check(await intake.VerifyDocumentAsync(c.CompanyId, id, i.Optional("Officer") ?? string.Empty, i.Date("Date")).ConfigureAwait(true));
+                        return all ? "Verified — every document is, so the applicant is verified." : "Verified; other documents still await verification.";
+                    case "Death":
+                        return Check(await intake.RecordDeathAsync(c.CompanyId, i.Optional("IdNumber") ?? string.Empty, i.Optional("Description") ?? string.Empty, i.Date("Date")).ConfigureAwait(true),
+                            "Added to the deceased register.");
+                    case "Scan":
+                        DuplicateScan scan = await intake.ScanAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true);
+                        return $"{scan.Opened} new case(s) queued ({scan.Deceased} applicant(s) on the deceased register).";
+                    default:
+                        DuplicateCaseStatus decision = i.Text("Step") switch { "Merge" => DuplicateCaseStatus.Merged, "Reject" => DuplicateCaseStatus.Rejected, _ => DuplicateCaseStatus.Cleared };
+                        return Check(await intake.DecideAsync(c.CompanyId, id, decision, i.Optional("Reason") ?? string.Empty, c.UserId, i.Date("Date")).ConfigureAwait(true), $"Case {id} {decision.ToString().ToLowerInvariant()}.");
+                }
+            },
+            List = async c => Table(await c.Get<IApplicantIntakeService>().QueueAsync(c.CompanyId).ConfigureAwait(true),
+                ("Case", x => x.Id), ("Status", x => x.Status), ("First", x => $"{x.FirstSource} {x.FirstReference}"), ("Second", x => $"{x.SecondSource} {x.SecondReference}"),
+                ("Reason", x => x.Reason), ("Decision", x => x.DecisionReason ?? "")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Stand, parcel and scheme details", ListTitle = "Stand register",
             Description = "Stand: address, ward / suburb / zone, intended use, zoning, servicing phase and the services available (water, sewer, road, electricity, storm water). "
                 + "Remark: adds a dated line to the stand's remarks history; Remarks lists it. Parcel: locality, ward, land use, tenure, improvements and occupation. "

@@ -9,7 +9,7 @@ namespace One4All.Application.Housing;
 /// <param name="Name">The name as captured.</param>
 /// <param name="IdNumber">The national ID number as captured, if any.</param>
 /// <param name="DateOfBirth">The date of birth, if captured.</param>
-public sealed record PersonRecord(string Source, string Reference, string Name, string? IdNumber, DateOnly? DateOfBirth);
+public sealed record PersonRecord(string Source, string Reference, string Name, string? IdNumber, DateOnly? DateOfBirth, string? Phone = null);
 
 /// <summary>Two records that look like the same person, or one person under two identities.</summary>
 /// <param name="First">One record.</param>
@@ -59,7 +59,8 @@ public static class DuplicateApplicants
 
         foreach (IEnumerable<int> bucket in Buckets(people, p => p.IdNumber is null ? null : NormaliseId(p.IdNumber))
                      .Concat(Buckets(people, p => p.DateOfBirth?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)))
-                     .Concat(Buckets(people, p => NameKey(p.Name))))
+                     .Concat(Buckets(people, p => NameKey(p.Name)))
+                     .Concat(Buckets(people, p => PhoneKey(p.Phone))))
         {
             int[] members = [.. bucket];
             for (int x = 0; x < members.Length; x++)
@@ -92,6 +93,11 @@ public static class DuplicateApplicants
         {
             return a.Source == WaitingList && b.Source == WaitingList ? "Same ID registered twice on the waiting list"
                 : namesClose ? null : "Same ID number under different names";
+        }
+
+        if (PhoneKey(a.Phone) is { } phone && phone == PhoneKey(b.Phone) && idA != idB)
+        {
+            return "Same phone number under different ID numbers";
         }
 
         if (!namesClose)
@@ -158,4 +164,11 @@ public static class DuplicateApplicants
     private static IEnumerable<IEnumerable<int>> Buckets(IReadOnlyList<PersonRecord> people, Func<PersonRecord, string?> key)
         => Enumerable.Range(0, people.Count).Select(i => (Index: i, Key: key(people[i]))).Where(x => !string.IsNullOrEmpty(x.Key))
             .GroupBy(x => x.Key, StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Select(x => x.Index));
+
+    // A phone number's last nine digits (so +263 77 123 4567 and 077 123 4567 match), or null when too short to mean anything.
+    private static string? PhoneKey(string? phone)
+    {
+        string digits = new([.. (phone ?? string.Empty).Where(char.IsDigit)]);
+        return digits.Length < 7 ? null : digits.Length > 9 ? digits[^9..] : digits;
+    }
 }

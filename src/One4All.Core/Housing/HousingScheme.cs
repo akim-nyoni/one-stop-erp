@@ -178,6 +178,21 @@ public sealed class HousingApplicant : SoftDeletableEntity, ICompanyScoped
     /// <summary>Marks the applicant verified.</summary>
     public void Verify() => IsVerified = true;
 
+    /// <summary>The applicant's gender.</summary>
+    public Payroll.Gender Gender { get; set; }
+
+    /// <summary>The physical address.</summary>
+    public string? PhysicalAddress { get; set; }
+
+    /// <summary>The postal address.</summary>
+    public string? PostalAddress { get; set; }
+
+    /// <summary>The contact phone number (duplicates are also matched on it).</summary>
+    public string? Phone { get; set; }
+
+    /// <summary>The employer.</summary>
+    public string? Employer { get; set; }
+
     /// <summary>Records the facts the qualification rules and the priority score use.</summary>
     /// <param name="category">The waiting-list category.</param>
     /// <param name="dateOfBirth">The date of birth.</param>
@@ -293,4 +308,209 @@ public enum SchemeFunding
 
     /// <summary>More than one source.</summary>
     Mixed = 5,
+}
+
+/// <summary>A supporting document on an application (brief §4.10.3 intake: ID copy, proof of residence, payslip, affidavit).</summary>
+public enum ApplicantDocumentType
+{
+    /// <summary>A copy of the national ID.</summary>
+    IdCopy = 1,
+
+    /// <summary>Proof of residence.</summary>
+    ProofOfResidence = 2,
+
+    /// <summary>A payslip or proof of income.</summary>
+    Payslip = 3,
+
+    /// <summary>An affidavit.</summary>
+    Affidavit = 4,
+
+    /// <summary>Anything else.</summary>
+    Other = 5,
+}
+
+/// <summary>A supporting document an applicant lodged, flagged verified or not with the verifying officer's name (<c>hse.applicant_document</c>).</summary>
+public sealed class ApplicantDocument : Entity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private ApplicantDocument() => Description = string.Empty;
+
+    /// <summary>Records a lodged document.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="applicantId">The applicant.</param>
+    /// <param name="type">The kind of document.</param>
+    /// <param name="description">What it is.</param>
+    /// <param name="lodgedOn">When it was lodged.</param>
+    public ApplicantDocument(long companyId, long applicantId, ApplicantDocumentType type, string description, DateOnly lodgedOn)
+    {
+        CompanyId = companyId;
+        ApplicantId = applicantId;
+        Type = type;
+        Description = description;
+        LodgedOn = lodgedOn;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The applicant.</summary>
+    public long ApplicantId { get; private set; }
+
+    /// <summary>The kind of document.</summary>
+    public ApplicantDocumentType Type { get; private set; }
+
+    /// <summary>What it is.</summary>
+    public string Description { get; private set; }
+
+    /// <summary>When it was lodged.</summary>
+    public DateOnly LodgedOn { get; private set; }
+
+    /// <summary>Who verified it, once verified.</summary>
+    public string? VerifiedBy { get; private set; }
+
+    /// <summary>When it was verified.</summary>
+    public DateOnly? VerifiedOn { get; private set; }
+
+    /// <summary>Gets a value indicating whether it has been verified.</summary>
+    public bool IsVerified => VerifiedOn is not null;
+
+    /// <summary>Records the verification.</summary>
+    /// <param name="officer">The verifying officer.</param>
+    /// <param name="on">When.</param>
+    public void Verify(string officer, DateOnly on)
+    {
+        VerifiedBy = officer;
+        VerifiedOn = on;
+    }
+}
+
+/// <summary>A person on the deceased register (from civil registration), checked against applicants (<c>hse.deceased_person</c>).</summary>
+public sealed class DeceasedPerson : Entity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private DeceasedPerson()
+    {
+        IdNumber = string.Empty;
+        FullName = string.Empty;
+    }
+
+    /// <summary>Records a death.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="idNumber">The national ID.</param>
+    /// <param name="fullName">The name.</param>
+    /// <param name="diedOn">The date of death.</param>
+    public DeceasedPerson(long companyId, string idNumber, string fullName, DateOnly diedOn)
+    {
+        CompanyId = companyId;
+        IdNumber = idNumber;
+        FullName = fullName;
+        DiedOn = diedOn;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>The national ID.</summary>
+    public string IdNumber { get; private set; }
+
+    /// <summary>The name.</summary>
+    public string FullName { get; private set; }
+
+    /// <summary>The date of death.</summary>
+    public DateOnly DiedOn { get; private set; }
+}
+
+/// <summary>Where a duplicate case stands.</summary>
+public enum DuplicateCaseStatus
+{
+    /// <summary>Awaiting an officer.</summary>
+    Open = 0,
+
+    /// <summary>Merged: the later registration removed, the earlier kept.</summary>
+    Merged = 1,
+
+    /// <summary>Rejected: the suspect registration removed.</summary>
+    Rejected = 2,
+
+    /// <summary>Not a duplicate.</summary>
+    Cleared = 3,
+}
+
+/// <summary>A suspected duplicate in the officer's queue (<c>hse.duplicate_case</c>, brief §4.10.3 "a dedicated duplicate applicants queue … merge or reject with reasons").</summary>
+public sealed class DuplicateCase : Entity, ICompanyScoped
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private DuplicateCase()
+    {
+        FirstReference = string.Empty;
+        SecondReference = string.Empty;
+        FirstSource = string.Empty;
+        SecondSource = string.Empty;
+        Reason = string.Empty;
+    }
+
+    /// <summary>Opens a case.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="firstSource">Where the first record is.</param>
+    /// <param name="firstReference">The first record.</param>
+    /// <param name="secondSource">Where the second record is.</param>
+    /// <param name="secondReference">The second record.</param>
+    /// <param name="reason">Why they look like one person.</param>
+    /// <param name="openedOn">When.</param>
+    public DuplicateCase(long companyId, string firstSource, string firstReference, string secondSource, string secondReference, string reason, DateOnly openedOn)
+    {
+        CompanyId = companyId;
+        FirstSource = firstSource;
+        FirstReference = firstReference;
+        SecondSource = secondSource;
+        SecondReference = secondReference;
+        Reason = reason;
+        OpenedOn = openedOn;
+    }
+
+    /// <inheritdoc />
+    public long CompanyId { get; private set; }
+
+    /// <summary>Where the first record is.</summary>
+    public string FirstSource { get; private set; }
+
+    /// <summary>The first record.</summary>
+    public string FirstReference { get; private set; }
+
+    /// <summary>Where the second record is.</summary>
+    public string SecondSource { get; private set; }
+
+    /// <summary>The second record.</summary>
+    public string SecondReference { get; private set; }
+
+    /// <summary>Why they look like one person.</summary>
+    public string Reason { get; private set; }
+
+    /// <summary>When the case was opened.</summary>
+    public DateOnly OpenedOn { get; private set; }
+
+    /// <summary>Where it stands.</summary>
+    public DuplicateCaseStatus Status { get; private set; }
+
+    /// <summary>The officer's reason for the decision.</summary>
+    public string? DecisionReason { get; private set; }
+
+    /// <summary>Who decided.</summary>
+    public long? DecidedByUserId { get; private set; }
+
+    /// <summary>When.</summary>
+    public DateOnly? DecidedOn { get; private set; }
+
+    /// <summary>Records the decision.</summary>
+    /// <param name="status">Merged, rejected or cleared.</param>
+    /// <param name="reason">Why.</param>
+    /// <param name="userId">Who.</param>
+    /// <param name="on">When.</param>
+    public void Decide(DuplicateCaseStatus status, string reason, long userId, DateOnly on)
+    {
+        Status = status;
+        DecisionReason = reason;
+        DecidedByUserId = userId;
+        DecidedOn = on;
+    }
 }
