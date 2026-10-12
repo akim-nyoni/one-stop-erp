@@ -257,3 +257,16 @@ internal sealed class VirementBandConfiguration : IEntityTypeConfiguration<Virem
         b.HasIndex(x => x.CompanyId);
     }
 }
+
+internal sealed class CapitalCarryForwardConfiguration : IEntityTypeConfiguration<CapitalCarryForward>
+{
+    public void Configure(EntityTypeBuilder<CapitalCarryForward> b)
+    {
+        b.ToTable("capital_carry_forward", Schemas.Budget, t => t.HasCheckConstraint("ck_capital_carry_forward_amount", "amount > 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.AccountCode).HasMaxLength(20);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Reference).HasMaxLength(60);
+        b.HasIndex(x => new { x.CompanyId, x.FromFiscalYearId, x.AccountCode });
+    }
+}

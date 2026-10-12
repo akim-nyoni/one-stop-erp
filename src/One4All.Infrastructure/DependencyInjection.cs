@@ -139,6 +139,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Housing.IEvictionService, Housing.EvictionService>();
         services.AddScoped<Application.Abstractions.Housing.IRepossessionService, Housing.RepossessionService>();
         services.AddScoped<Application.Abstractions.Housing.IRentalMaintenanceService, Housing.RentalMaintenanceService>();
+        services.AddScoped<Application.Abstractions.Housing.IRentalPropertyAccountingService, Housing.RentalPropertyAccountingService>();
         services.AddScoped<Application.Abstractions.Housing.IHousingEclService, Housing.HousingEclService>();
         services.AddScoped<Application.Abstractions.Housing.IWaitingListControlService, Housing.WaitingListControlService>();
         services.AddScoped<Application.Abstractions.Housing.IAllocationAppealService, Housing.AllocationAppealService>();
@@ -425,6 +426,7 @@ public static class DependencyInjection
 
         // Budgeting, Planning & Commitment Control.
         services.AddScoped<Application.Abstractions.Budgeting.IBudgetingService, Budgeting.BudgetingService>();
+        services.AddScoped<Application.Abstractions.Budgeting.ICapitalCarryForwardService, Budgeting.CapitalCarryForwardService>();
 
         // Restaurant / Hospitality (optional module).
         services.AddScoped<Application.Abstractions.Restaurant.IRestaurantService, Restaurant.RestaurantService>();

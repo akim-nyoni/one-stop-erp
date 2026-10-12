@@ -251,6 +251,9 @@ internal sealed class RentalUnitConfiguration : IEntityTypeConfiguration<RentalU
         b.Property(x => x.RentAccountCode).HasMaxLength(20);
         b.Property(x => x.Suburb).HasMaxLength(80);
         b.Property(x => x.VoidReason).HasMaxLength(120);
+        b.Property(x => x.Treatment).HasConversion<int>();
+        b.Property(x => x.AssetAccountCode).HasMaxLength(20);
+        b.Property(x => x.CarryingAmount).HasPrecision(19, 4);
         b.Property(x => x.RefurbishmentJobNumber).HasMaxLength(40);
         b.Ignore(x => x.IsLet);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();

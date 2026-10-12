@@ -149,6 +149,40 @@ public sealed class RentalUnit : AuditableEntity, ICompanyScoped
     /// <summary>Whether it is let.</summary>
     public bool IsLet => VacantSince is null;
 
+    /// <summary>Gets how the unit is accounted for (brief §4.10.9: held to earn rentals — investment property or PPE, never stock).</summary>
+    public RentalPropertyTreatment Treatment { get; private set; }
+
+    /// <summary>Gets the asset account the unit is carried in.</summary>
+    public string? AssetAccountCode { get; private set; }
+
+    /// <summary>Gets the unit's carrying amount.</summary>
+    public decimal CarryingAmount { get; private set; }
+
+    /// <summary>Gets when it was last valued (designated or revalued).</summary>
+    public DateOnly? LastValuedOn { get; private set; }
+
+    /// <summary>Designates how the unit is accounted for, at its opening carrying amount.</summary>
+    /// <param name="treatment">Investment property (cost or fair value) or PPE.</param>
+    /// <param name="assetAccountCode">The asset account.</param>
+    /// <param name="carryingAmount">The opening carrying amount.</param>
+    /// <param name="on">When.</param>
+    public void Designate(RentalPropertyTreatment treatment, string assetAccountCode, decimal carryingAmount, DateOnly on)
+    {
+        Treatment = treatment;
+        AssetAccountCode = assetAccountCode;
+        CarryingAmount = carryingAmount;
+        LastValuedOn = on;
+    }
+
+    /// <summary>Records a fair-value remeasurement.</summary>
+    /// <param name="fairValue">The new fair value.</param>
+    /// <param name="on">When.</param>
+    public void Remeasure(decimal fairValue, DateOnly on)
+    {
+        CarryingAmount = fairValue;
+        LastValuedOn = on;
+    }
+
     /// <summary>Gets or sets why the unit stands empty (e.g. "refurbishment", "awaiting allocation", "structural").</summary>
     public string? VoidReason { get; set; }
 
@@ -477,4 +511,20 @@ public sealed class LodgerPermit : AuditableEntity, ICompanyScoped
         RevokedOn = lastDay;
         RevokedReason = reason;
     }
+}
+
+/// <summary>How a rental unit is accounted for.</summary>
+public enum RentalPropertyTreatment
+{
+    /// <summary>Not yet carried in the ledger.</summary>
+    NotDesignated = 0,
+
+    /// <summary>Investment property under the cost model (IAS 40.56).</summary>
+    InvestmentPropertyCost = 1,
+
+    /// <summary>Investment property under the fair value model: remeasured, the change in profit or loss (IAS 40.35).</summary>
+    InvestmentPropertyFairValue = 2,
+
+    /// <summary>Property, plant and equipment (IAS 16), when policy holds rentals as PPE.</summary>
+    PropertyPlantEquipment = 3,
 }

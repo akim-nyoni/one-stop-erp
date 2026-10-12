@@ -239,9 +239,10 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
     /// <param name="virementId">The approved virement adding the line, if any.</param>
     /// <exception cref="InvalidOperationException">Thrown when adding an ordinary line to a sealed budget: changes go in a new version or a virement.</exception>
     /// <param name="rephaseId">The approved re-phasing adding the line, if any.</param>
-    public BudgetLine AddLine(string accountCode, int period, decimal amount, string? costCentre = null, long? virementId = null, long? rephaseId = null)
+    /// <param name="carryForwardId">The approved capital carry-forward adding the line, if any.</param>
+    public BudgetLine AddLine(string accountCode, int period, decimal amount, string? costCentre = null, long? virementId = null, long? rephaseId = null, long? carryForwardId = null)
     {
-        if (IsSealed && virementId is null && rephaseId is null)
+        if (IsSealed && virementId is null && rephaseId is null && carryForwardId is null)
         {
             throw new InvalidOperationException("An approved budget cannot be edited; create a new version or a virement.");
         }
@@ -251,7 +252,7 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
             throw new InvalidOperationException($"Budget {Label} v{VersionNumber} is {Status}; nothing about it can change.");
         }
 
-        BudgetLine line = new(accountCode, period, amount, costCentre, virementId) { RephaseId = rephaseId };
+        BudgetLine line = new(accountCode, period, amount, costCentre, virementId) { RephaseId = rephaseId, CarryForwardId = carryForwardId };
         _lines.Add(line);
         return line;
     }
@@ -280,7 +281,7 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
     {
         StringBuilder canonical = new();
         canonical.Append(CultureInfo.InvariantCulture, $"{CompanyId}|{FiscalYearId}|{(int)Type}|{Department}|{VersionNumber}\n");
-        foreach (BudgetLine line in _lines.Where(l => l.VirementId is null && l.RephaseId is null)
+        foreach (BudgetLine line in _lines.Where(l => l.VirementId is null && l.RephaseId is null && l.CarryForwardId is null)
                      .OrderBy(l => l.AccountCode, StringComparer.Ordinal).ThenBy(l => l.CostCentre, StringComparer.Ordinal).ThenBy(l => l.Period).ThenBy(l => l.Amount))
         {
             canonical.Append(CultureInfo.InvariantCulture, $"{line.AccountCode}|{line.CostCentre}|{line.Period}|{line.Amount:0.0000}\n");
@@ -399,6 +400,9 @@ public sealed class BudgetLine : Entity
 
     /// <summary>Gets the approved re-phasing that added this line (a timing move, never a change of value).</summary>
     public long? RephaseId { get; init; }
+
+    /// <summary>Gets the approved capital carry-forward that added this line, if any.</summary>
+    public long? CarryForwardId { get; init; }
 
     /// <summary>Gets the project the line budgets for.</summary>
     public string? Project { get; private set; }

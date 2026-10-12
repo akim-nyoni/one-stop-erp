@@ -647,6 +647,27 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Rental property accounting (IAS 40)", ListTitle = "Investment property and PPE register",
+            Description = "Rental units are held to earn rentals: carry each as investment property (cost or fair value model) or PPE, never as stand stock. Designate brings the unit "
+                + "into its asset account at its carrying amount from the account it comes from; Revalue remeasures fair-value investment property, the change to the fair-value "
+                + "gain or loss account.",
+            Fields = [Pick("Step", "Step", ["Designate", "Revalue"]), Req("Unit", "Unit code"), Pick("Treatment", "Carried as", Enum.GetNames<RentalPropertyTreatment>()),
+                Opt("Asset", "Asset account"), Num("Amount", "Carrying amount / fair value", "0"), Opt("Contra", "From account (designate)"), Opt("GainLoss", "Fair-value gain/loss account (revalue)"), Today()],
+            Run = async (c, i) =>
+            {
+                IRentalPropertyAccountingService accounting = c.Get<IRentalPropertyAccountingService>();
+                string journal = i.Text("Step") == "Revalue"
+                    ? Check(await accounting.RevalueAsync(c.CompanyId, i.Text("Unit"), i.Number("Amount"), i.Date("Date"), i.Optional("GainLoss") ?? string.Empty).ConfigureAwait(true))
+                    : Check(await accounting.DesignateAsync(c.CompanyId, i.Text("Unit"), Enum.Parse<RentalPropertyTreatment>(i.Text("Treatment")), i.Optional("Asset") ?? string.Empty, i.Number("Amount"),
+                        i.Optional("Contra") ?? string.Empty, i.Date("Date")).ConfigureAwait(true));
+                return journal.Length == 0 ? "Saved (nothing to post)." : $"Posted in journal {journal}.";
+            },
+            List = async c => Table(await c.Get<IRentalPropertyAccountingService>().RegisterAsync(c.CompanyId).ConfigureAwait(true),
+                ("Unit", r => r.UnitCode), ("Carried as", r => r.Treatment), ("Account", r => r.AssetAccountCode), ("Carrying amount", r => M(r.CarryingAmount)),
+                ("Valued", r => r.LastValuedOn is DateOnly d ? D(d) : "-")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Rental maintenance", ListTitle = "Rental units",
             Description = "Report a repair on a unit; complete it with its cost (recharged to the tenant when they caused it); record an inspection with its condition grade (1–5) and "
                 + "whether it needs follow-up, and close the follow-up; History summarises a unit's repairs and condition. Void details record why a void unit is empty and its "

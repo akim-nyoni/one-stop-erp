@@ -3147,6 +3147,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("budget_id");
 
+                    b.Property<long?>("CarryForwardId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("carry_forward_id");
+
                     b.Property<string>("CostCentre")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -3540,6 +3544,84 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("budget_virement", "bud", t =>
                         {
                             t.HasCheckConstraint("ck_budget_virement_reviewer_not_requester", "status <> 1 OR reviewed_by_user_id <> requested_by_user_id");
+                        });
+                });
+
+            modelBuilder.Entity("One4All.Core.Budgeting.CapitalCarryForward", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("account_code");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<long>("ApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<DateOnly>("ApprovedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("approved_on");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long>("FromFiscalYearId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("from_fiscal_year_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("reference");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("ToBudgetId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("to_budget_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_capital_carry_forward");
+
+                    b.HasIndex("CompanyId", "FromFiscalYearId", "AccountCode")
+                        .HasDatabaseName("ix_capital_carry_forward_company_id_from_fiscal_year_id_accoun");
+
+                    b.ToTable("capital_carry_forward", "bud", t =>
+                        {
+                            t.HasCheckConstraint("ck_capital_carry_forward_amount", "amount > 0");
                         });
                 });
 
@@ -9623,6 +9705,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("AssetAccountCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("asset_account_code");
+
+                    b.Property<decimal>("CarryingAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("carrying_amount");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -9646,6 +9738,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("description");
+
+                    b.Property<DateOnly?>("LastValuedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("last_valued_on");
 
                     b.Property<int?>("MaxOccupants")
                         .HasColumnType("integer")
@@ -9691,6 +9787,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("character varying(80)")
                         .HasColumnName("suburb");
+
+                    b.Property<int>("Treatment")
+                        .HasColumnType("integer")
+                        .HasColumnName("treatment");
 
                     b.Property<int>("UnitType")
                         .HasColumnType("integer")
