@@ -91,8 +91,26 @@ public sealed class PromoCampaign : AuditableEntity, ICompanyScoped
     /// <summary>Whether the campaign is running.</summary>
     public bool IsActive { get; set; }
 
+    /// <summary>Gets or sets the customer types the codes are for, comma-separated (null: every customer).</summary>
+    public string? CustomerTypes { get; set; }
+
+    /// <summary>Gets or sets the item categories the discount applies to, comma-separated (null: the whole spend).</summary>
+    public string? ItemCategories { get; set; }
+
     /// <summary>The campaign's codes.</summary>
     public IReadOnlyList<PromoCode> Codes => _codes.AsReadOnly();
+
+    /// <summary>Whether a customer of a type may use the codes.</summary>
+    /// <param name="customerType">The customer's type (null: an unnamed or untyped customer).</param>
+    /// <returns>True when eligible.</returns>
+    public bool IsFor(string? customerType) => CustomerTypes is null || (customerType is not null && List(CustomerTypes).Contains(customerType.Trim(), StringComparer.OrdinalIgnoreCase));
+
+    /// <summary>Whether the discount applies to items of a category.</summary>
+    /// <param name="category">The item category.</param>
+    /// <returns>True when covered.</returns>
+    public bool Covers(string? category) => ItemCategories is null || (category is not null && List(ItemCategories).Contains(category.Trim(), StringComparer.OrdinalIgnoreCase));
+
+    private static string[] List(string value) => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     /// <summary>Adds a code.</summary>
     /// <param name="code">The code.</param>

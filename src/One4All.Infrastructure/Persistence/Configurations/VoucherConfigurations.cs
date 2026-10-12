@@ -82,6 +82,8 @@ internal sealed class PromoCampaignConfiguration : IEntityTypeConfiguration<Prom
         b.Property(x => x.DiscountType).HasConversion<int>();
         b.Property(x => x.DiscountValue).HasPrecision(19, 4);
         b.Property(x => x.MinimumSpend).HasPrecision(19, 4);
+        b.Property(x => x.CustomerTypes).HasMaxLength(200);
+        b.Property(x => x.ItemCategories).HasMaxLength(200);
         b.HasMany(x => x.Codes).WithOne().HasForeignKey(x => x.PromoCampaignId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Codes).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();

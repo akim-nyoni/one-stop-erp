@@ -94,27 +94,45 @@ public static partial class OperationCatalogue
         {
             Module = pos, Title = "Promotional codes", ListTitle = "Promo campaigns",
             Description = "A campaign of discount codes (a % or an amount off, a minimum spend, uses per code, a cap on redemptions, a validity window); quote or redeem a code against "
-                + "a spend; and analyse a campaign (codes used, redemptions, spend and discount given).",
+                + "a spend; and analyse a campaign (codes used, redemptions, spend and discount given). A campaign may be limited to customer types and to item categories "
+                + "(the minimum spend and discount then count only those lines: give the basket as CATEGORY:amount; …).",
             Fields = [Pick("Step", "Step", ["Create campaign", "Quote", "Redeem", "Analyse"]), Opt("Campaign", "Campaign code"), Opt("Name", "Name (create)"),
                 Pick("DiscountType", "Discount", Enum.GetNames<PromoDiscountType>()), Num("Discount", "Discount value", "0"), Today("From", "Valid from"), Today("To", "Valid to"),
                 Num("MinSpend", "Minimum spend", "0"), Num("Uses", "Uses per code", "1"), OptNum("Max", "Most redemptions (blank: no cap)"), Opt("Codes", "Codes: A1, A2, … (create) / the code (quote, redeem)"),
-                Num("Spend", "Spend (quote, redeem)", "0"), Opt("Reference", "Sale reference (redeem)"), Today()],
+                Num("Spend", "Spend (quote, redeem)", "0"), Opt("Reference", "Sale reference (redeem)"), Today(),
+                Opt("CustomerTypes", "Customer types (create: who may use it, comma-separated; quote/redeem: the customer's type)"),
+                Opt("Categories", "Item categories (create: what it discounts, comma-separated; quote/redeem: the basket CATEGORY:amount; …)")],
             Run = async (c, i) =>
             {
                 IPromoService promos = c.Get<IPromoService>();
                 string campaign = i.Optional("Campaign") ?? string.Empty, codes = i.Optional("Codes") ?? string.Empty;
+                PromoEligibility Eligibility()
+                {
+                    List<PromoBasketLine> basket = [];
+                    foreach (string part in (i.Optional("Categories") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                        basket.Add(bits.Length == 2 && decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal amount)
+                            ? new PromoBasketLine(bits[0], amount)
+                            : throw new OperationException($"Write the basket as CATEGORY:amount; … (\"{part}\")."));
+                    }
+
+                    return new PromoEligibility(i.Optional("CustomerTypes"), basket);
+                }
+
                 switch (i.Text("Step"))
                 {
                     case "Create campaign":
                         IReadOnlyList<string> list = codes.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                         return Check(await promos.CreateCampaignAsync(c.CompanyId, new PromoCampaignRequest(campaign, i.Optional("Name") ?? campaign, Enum.Parse<PromoDiscountType>(i.Text("DiscountType")),
-                            i.Number("Discount"), i.Date("From"), i.Date("To"), i.Number("MinSpend"), i.Whole("Uses"), i.OptionalNumber("Max") is decimal max ? (int)max : null, list)).ConfigureAwait(true),
+                            i.Number("Discount"), i.Date("From"), i.Date("To"), i.Number("MinSpend"), i.Whole("Uses"), i.OptionalNumber("Max") is decimal max ? (int)max : null, list,
+                            i.Optional("CustomerTypes"), i.Optional("Categories"))).ConfigureAwait(true),
                             _ => $"Campaign {campaign} created with {list.Count} code(s).");
                     case "Quote":
-                        PromoQuote quote = Check(await promos.QuoteAsync(c.CompanyId, codes.Trim(), i.Date("Date"), i.Number("Spend")).ConfigureAwait(true));
+                        PromoQuote quote = Check(await promos.QuoteAsync(c.CompanyId, codes.Trim(), i.Date("Date"), i.Number("Spend"), Eligibility()).ConfigureAwait(true));
                         return $"{quote.Code} ({quote.CampaignCode}) takes {M(quote.Discount)} off.";
                     case "Redeem":
-                        PromoQuote redeemed = Check(await promos.RedeemAsync(c.CompanyId, codes.Trim(), i.Date("Date"), i.Number("Spend"), i.Optional("Reference") ?? string.Empty).ConfigureAwait(true));
+                        PromoQuote redeemed = Check(await promos.RedeemAsync(c.CompanyId, codes.Trim(), i.Date("Date"), i.Number("Spend"), i.Optional("Reference") ?? string.Empty, Eligibility()).ConfigureAwait(true));
                         return $"{redeemed.Code} redeemed: {M(redeemed.Discount)} off.";
                     default:
                         long id = await FindAsync(c.Db.Set<PromoCampaign>(), p => p.CompanyId == c.CompanyId && p.Code.ToUpper() == campaign.ToUpper(), p => p.Id, "campaign", campaign).ConfigureAwait(true);

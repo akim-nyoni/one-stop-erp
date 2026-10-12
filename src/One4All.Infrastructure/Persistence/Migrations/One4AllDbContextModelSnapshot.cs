@@ -34414,6 +34414,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<string>("CustomerTypes")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("customer_types");
+
                     b.Property<int>("DiscountType")
                         .HasColumnType("integer")
                         .HasColumnName("discount_type");
@@ -34426,6 +34431,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
+
+                    b.Property<string>("ItemCategories")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("item_categories");
 
                     b.Property<int?>("MaxRedemptions")
                         .HasColumnType("integer")

@@ -34,7 +34,11 @@ public sealed class PromoService : IPromoService
         }
 
         PromoCampaign campaign = new(companyId, request.Code, request.Name, request.DiscountType, request.DiscountValue, request.ValidFrom, request.ValidTo,
-            request.MinimumSpend, request.UsesPerCode, request.MaxRedemptions);
+            request.MinimumSpend, request.UsesPerCode, request.MaxRedemptions)
+        {
+            CustomerTypes = string.IsNullOrWhiteSpace(request.CustomerTypes) ? null : request.CustomerTypes.Trim(),
+            ItemCategories = string.IsNullOrWhiteSpace(request.ItemCategories) ? null : request.ItemCategories.Trim(),
+        };
         foreach (string code in codes)
         {
             campaign.AddCode(code);
@@ -46,7 +50,7 @@ public sealed class PromoService : IPromoService
     }
 
     /// <inheritdoc />
-    public async Task<Result<PromoQuote>> QuoteAsync(long companyId, string code, DateOnly date, decimal spend, CancellationToken ct = default)
+    public async Task<Result<PromoQuote>> QuoteAsync(long companyId, string code, DateOnly date, decimal spend, PromoEligibility? eligibility = null, CancellationToken ct = default)
     {
         Result<(PromoCampaign Campaign, PromoCode Code)> found = await FindAsync(companyId, code, tracked: false, ct).ConfigureAwait(false);
         if (found.IsFailure)
@@ -54,15 +58,15 @@ public sealed class PromoService : IPromoService
             return found.Error;
         }
 
-        return Check(found.Value.Campaign, found.Value.Code, date, spend);
+        return Check(found.Value.Campaign, found.Value.Code, date, spend, eligibility);
     }
 
     /// <inheritdoc />
-    public Task<Result<PromoQuote>> RedeemAsync(long companyId, string code, DateOnly date, decimal spend, string reference, CancellationToken ct = default)
-        => _db.AtomicAsync(() => RedeemCoreAsync(companyId, code, date, spend, reference, ct), ct);
+    public Task<Result<PromoQuote>> RedeemAsync(long companyId, string code, DateOnly date, decimal spend, string reference, PromoEligibility? eligibility = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RedeemCoreAsync(companyId, code, date, spend, reference, eligibility, ct), ct);
 
     // One unit, with the campaign locked so concurrent redemptions cannot overrun its caps.
-    private async Task<Result<PromoQuote>> RedeemCoreAsync(long companyId, string code, DateOnly date, decimal spend, string reference, CancellationToken ct)
+    private async Task<Result<PromoQuote>> RedeemCoreAsync(long companyId, string code, DateOnly date, decimal spend, string reference, PromoEligibility? eligibility, CancellationToken ct)
     {
         string normalised = code.Trim().ToUpperInvariant();
         long? campaignId = await _db.Set<PromoCampaign>().Where(c => c.CompanyId == companyId && c.Codes.Any(p => p.Code == normalised))
@@ -79,7 +83,7 @@ public sealed class PromoService : IPromoService
         }
 
         (PromoCampaign campaign, PromoCode promo) = found.Value;
-        Result<PromoQuote> quote = Check(campaign, promo, date, spend);
+        Result<PromoQuote> quote = Check(campaign, promo, date, spend, eligibility);
         if (quote.IsFailure)
         {
             return quote.Error;
@@ -107,8 +111,28 @@ public sealed class PromoService : IPromoService
         return new PromoAnalysis(campaign.Code, campaign.Codes.Count, campaign.Codes.Count(c => c.TimesUsed > 0), totals?.Count ?? 0, totals?.Spend ?? 0m, totals?.Discount ?? 0m);
     }
 
-    private static Result<PromoQuote> Check(PromoCampaign campaign, PromoCode code, DateOnly date, decimal spend)
+    private static Result<PromoQuote> Check(PromoCampaign campaign, PromoCode code, DateOnly date, decimal spend, PromoEligibility? eligibility)
     {
+        if (!campaign.IsFor(eligibility?.CustomerType))
+        {
+            return Error.Rule("Promo.CustomerNotEligible", $"Code {code.Code} is only for {campaign.CustomerTypes} customers.");
+        }
+
+        if (campaign.ItemCategories is not null)
+        {
+            // Limited to categories: the spend that counts (for the minimum and the discount) is the covered lines only.
+            if (eligibility is null || eligibility.Lines.Count == 0)
+            {
+                return Error.Validation("Promo.BasketNeeded", $"Code {code.Code} applies to {campaign.ItemCategories} only; give the basket lines.");
+            }
+
+            spend = eligibility.Lines.Where(l => campaign.Covers(l.Category)).Sum(l => l.Amount);
+            if (spend <= 0m)
+            {
+                return Error.Rule("Promo.NoEligibleItems", $"Code {code.Code} applies to {campaign.ItemCategories} only, and the basket has none.");
+            }
+        }
+
         if (!campaign.IsActive)
         {
             return Error.Rule("Promo.Inactive", $"Campaign {campaign.Code} is not running.");

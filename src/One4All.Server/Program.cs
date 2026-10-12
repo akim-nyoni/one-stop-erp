@@ -885,13 +885,13 @@ api.MapPost("/api/vouchers/promo-campaigns", async (long companyId, One4All.Appl
 .RequireAuthorization()
 .WithName("CreatePromoCampaign");
 
-api.MapGet("/api/vouchers/promo-codes/{code}/quote", async (string code, long companyId, DateOnly date, decimal spend, One4All.Application.Abstractions.Vouchers.IPromoService promos, CancellationToken ct) =>
-    ValueResponse(await promos.QuoteAsync(companyId, code, date, spend, ct).ConfigureAwait(false)))
+api.MapGet("/api/vouchers/promo-codes/{code}/quote", async (string code, long companyId, DateOnly date, decimal spend, string? customerType, One4All.Application.Abstractions.Vouchers.IPromoService promos, CancellationToken ct) =>
+    ValueResponse(await promos.QuoteAsync(companyId, code, date, spend, new One4All.Application.Abstractions.Vouchers.PromoEligibility(customerType, []), ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("QuotePromoCode");
 
-api.MapPost("/api/vouchers/promo-codes/{code}/redeem", async (string code, long companyId, DateOnly date, decimal spend, string reference, One4All.Application.Abstractions.Vouchers.IPromoService promos, CancellationToken ct) =>
-    ValueResponse(await promos.RedeemAsync(companyId, code, date, spend, reference, ct).ConfigureAwait(false)))
+api.MapPost("/api/vouchers/promo-codes/{code}/redeem", async (string code, long companyId, DateOnly date, decimal spend, string reference, string? customerType, One4All.Application.Abstractions.Vouchers.IPromoService promos, CancellationToken ct) =>
+    ValueResponse(await promos.RedeemAsync(companyId, code, date, spend, reference, new One4All.Application.Abstractions.Vouchers.PromoEligibility(customerType, []), ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("RedeemPromoCode");
 
