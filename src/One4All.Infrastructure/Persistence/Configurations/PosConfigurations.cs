@@ -12,6 +12,7 @@ internal sealed class PosTerminalConfiguration : IEntityTypeConfiguration<PosTer
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).HasMaxLength(20);
         b.Property(x => x.Name).HasMaxLength(120);
+        b.Property(x => x.Profile).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }

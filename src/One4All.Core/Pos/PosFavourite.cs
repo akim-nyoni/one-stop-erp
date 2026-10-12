@@ -33,4 +33,13 @@ public sealed class PosFavourite : Entity, ICompanyScoped
 
     /// <summary>Gets or sets where it sits among the favourites.</summary>
     public int SortOrder { get; set; }
+
+    /// <summary>Gets or sets the cashier it is pinned for (null: whoever uses the till).</summary>
+    public long? UserId { get; set; }
+
+    /// <summary>Gets or sets the tile colour (#RRGGBB or a colour name), or null for the default.</summary>
+    public string? Colour { get; set; }
+
+    /// <summary>Gets or sets the favourites page it sits on (1 first).</summary>
+    public int Page { get; set; } = 1;
 }

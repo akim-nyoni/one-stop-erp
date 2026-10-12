@@ -90,6 +90,30 @@ public interface IPosCatalogueService
     /// <returns>Success or why not.</returns>
     Task<Result> SetFavouriteAsync(long companyId, long? terminalId, string itemCode, int sortOrder, bool remove, CancellationToken ct = default);
 
+    /// <summary>
+    /// Pins (or unpins) a favourite for a cashier and / or a till, on a page, in a colour (brief §4.1 "favourites / hot-key grid per terminal and per cashier:
+    /// colour-coded … pages of tiles").
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="terminalId">The till (null: every till).</param>
+    /// <param name="userId">The cashier (null: whoever uses the till).</param>
+    /// <param name="itemCode">The item.</param>
+    /// <param name="sortOrder">Its position on the page.</param>
+    /// <param name="page">The page (1 first).</param>
+    /// <param name="colour">The tile colour, or null.</param>
+    /// <param name="remove">Unpin it instead.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why it was refused.</returns>
+    Task<Result> SetFavouriteAsync(long companyId, long? terminalId, long? userId, string itemCode, int sortOrder, int page, string? colour, bool remove, CancellationToken ct = default);
+
+    /// <summary>The favourites a cashier sees at a till: their own first, then the till's, then every till's — each item once — with colour and page.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="terminalId">The till.</param>
+    /// <param name="userId">The cashier.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The favourite tiles in page and position order.</returns>
+    Task<IReadOnlyList<FavouriteTile>> FavouriteTilesAsync(long companyId, long? terminalId, long? userId, CancellationToken ct = default);
+
     /// <summary>The categories under a category (null: the top level), for drilling down.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="parentCode">The parent category.</param>
@@ -116,3 +140,9 @@ public interface IPosCatalogueService
 /// <param name="SoldWithinDays">Only items sold at the tills in the last so many days, or null.</param>
 public sealed record PosFinderFilter(string? Category = null, string? Brand = null, string? SupplierCode = null, decimal? MinPrice = null, decimal? MaxPrice = null,
     bool InStockOnly = false, bool PromotionOnly = false, int? SoldWithinDays = null);
+
+/// <summary>A favourite on the till: the tile, its colour and page.</summary>
+/// <param name="Tile">The priced tile.</param>
+/// <param name="Colour">The tile colour, or null.</param>
+/// <param name="Page">The page (1 first).</param>
+public sealed record FavouriteTile(PosTile Tile, string? Colour, int Page);

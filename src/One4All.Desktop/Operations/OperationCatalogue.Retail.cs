@@ -54,8 +54,11 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Till favourites", ListTitle = "Favourites",
-            Description = "Items pinned to the till's ★ Favourites tab — for one terminal, or every till when no terminal is given (the till's own come first).",
-            Fields = [Req("Item", "Item code"), Opt("Terminal", "Terminal code (blank: every till)"), Num("Order", "Position", "10"), Tick("Remove", "Remove it")],
+            Description = "Items pinned to the till's ★ Favourites tabs — for one terminal or every till, and optionally for one cashier (their own come first, then the till's, "
+                + "then every till's), on a page (★ Favourites, ★ Favourites 2…) in a colour (#RRGGBB or a name). Profile: what kind of counter the terminal is.",
+            Fields = [Pick("Step", "Step", ["Favourite", "Profile"]), Opt("Item", "Item code"), Opt("Terminal", "Terminal code (blank: every till)"), Opt("Cashier", "Cashier user name (blank: anyone)"),
+                Num("Order", "Position", "10"), Num("Page", "Page", "1"), Opt("Colour", "Tile colour"), Tick("Remove", "Remove it"),
+                Pick("Profile", "Terminal profile", Enum.GetNames<Core.Pos.TerminalProfile>())],
             Run = async (c, i) =>
             {
                 long? terminal = null;
@@ -65,8 +68,24 @@ public static partial class OperationCatalogue
                     terminal = await FindAsync(c.Db.PosTerminals, t => t.CompanyId == c.CompanyId && t.Code == key, t => t.Id, "terminal", code).ConfigureAwait(true);
                 }
 
-                return Check(await c.Get<IPosCatalogueService>().SetFavouriteAsync(c.CompanyId, terminal, i.Text("Item"), i.Whole("Order"), i.Flag("Remove")).ConfigureAwait(true),
-                    i.Flag("Remove") ? "Favourite removed." : "Favourite saved.");
+                if (i.Text("Step") == "Profile")
+                {
+                    Core.Pos.PosTerminal till = await c.Db.PosTerminals.FirstOrDefaultAsync(t => t.Id == terminal).ConfigureAwait(true)
+                        ?? throw new OperationException("Name the terminal whose profile to set.");
+                    till.Profile = Enum.Parse<Core.Pos.TerminalProfile>(i.Text("Profile"));
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Terminal {till.Code} is a {till.Profile} till.";
+                }
+
+                long? cashier = null;
+                if (i.Optional("Cashier") is string name)
+                {
+                    string user = name.ToUpperInvariant();
+                    cashier = await FindAsync(c.Db.Users, u => u.NormalizedUsername == user, u => u.Id, "user", name).ConfigureAwait(true);
+                }
+
+                return Check(await c.Get<IPosCatalogueService>().SetFavouriteAsync(c.CompanyId, terminal, cashier, i.Optional("Item") ?? string.Empty, i.Whole("Order"), i.Whole("Page"),
+                    i.Optional("Colour"), i.Flag("Remove")).ConfigureAwait(true), i.Flag("Remove") ? "Favourite removed." : "Favourite saved.");
             },
             List = async c => Table(await (from f in c.Db.PosFavourites.AsNoTracking()
                                            join it in c.Db.Items.AsNoTracking() on f.ItemId equals it.Id

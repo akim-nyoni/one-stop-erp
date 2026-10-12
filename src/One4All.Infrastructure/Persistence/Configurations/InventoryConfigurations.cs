@@ -315,7 +315,9 @@ internal sealed class PosFavouriteConfiguration : IEntityTypeConfiguration<Core.
     {
         b.ToTable("favourite", Schemas.PointOfSale);
         b.HasKey(x => x.Id);
-        b.HasIndex(x => new { x.CompanyId, x.TerminalId, x.ItemId }).IsUnique().AreNullsDistinct(false);
+        b.Property(x => x.Colour).HasMaxLength(30);
+        b.Property(x => x.Page).HasDefaultValue(1).HasSentinel(0);
+        b.HasIndex(x => new { x.CompanyId, x.TerminalId, x.UserId, x.ItemId }).IsUnique().AreNullsDistinct(false);
     }
 }
 

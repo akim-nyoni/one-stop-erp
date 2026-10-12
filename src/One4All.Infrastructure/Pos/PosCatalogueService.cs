@@ -128,7 +128,7 @@ public sealed class PosCatalogueService : IPosCatalogueService
     public async Task<IReadOnlyList<PosTile>> FavouritesAsync(long companyId, long? terminalId, CancellationToken ct = default)
     {
         // The till's own favourites first, then the ones for every till; an item pinned twice shows once.
-        List<long> ids = [.. (await _db.PosFavourites.AsNoTracking().Where(f => f.CompanyId == companyId && (f.TerminalId == null || f.TerminalId == terminalId))
+        List<long> ids = [.. (await _db.PosFavourites.AsNoTracking().Where(f => f.CompanyId == companyId && f.UserId == null && (f.TerminalId == null || f.TerminalId == terminalId))
                 .ToListAsync(ct).ConfigureAwait(false))
             .OrderBy(f => f.TerminalId is null ? 1 : 0).ThenBy(f => f.SortOrder).Select(f => f.ItemId).Distinct()];
         Dictionary<long, Item> found = await Sellable(companyId).Where(i => ids.Contains(i.Id)).ToDictionaryAsync(i => i.Id, ct).ConfigureAwait(false);
@@ -150,7 +150,51 @@ public sealed class PosCatalogueService : IPosCatalogueService
             return Result.Failure(Error.NotFound("Pos.TerminalNotFound", $"Terminal {terminal} not found."));
         }
 
-        PosFavourite? existing = await _db.PosFavourites.FirstOrDefaultAsync(f => f.CompanyId == companyId && f.TerminalId == terminalId && f.ItemId == itemId, ct).ConfigureAwait(false);
+        return await SaveFavouriteAsync(companyId, terminalId, null, itemId.Value, sortOrder, 1, null, remove, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetFavouriteAsync(long companyId, long? terminalId, long? userId, string itemCode, int sortOrder, int page, string? colour, bool remove,
+        CancellationToken ct = default)
+    {
+        string code = (itemCode ?? string.Empty).Trim().ToUpperInvariant();
+        long? itemId = await _db.Items.Where(i => i.CompanyId == companyId && i.Code == code).Select(i => (long?)i.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (itemId is null)
+        {
+            return Result.Failure(Error.NotFound("Pos.ItemNotFound", $"Item {code} not found."));
+        }
+
+        if (page < 1)
+        {
+            return Result.Failure(Error.Validation("Pos.FavouritePage", "Favourite pages start at 1."));
+        }
+
+        if (terminalId is long terminal && !await _db.PosTerminals.AnyAsync(t => t.Id == terminal && t.CompanyId == companyId, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.NotFound("Pos.TerminalNotFound", $"Terminal {terminal} not found."));
+        }
+
+        return await SaveFavouriteAsync(companyId, terminalId, userId, itemId.Value, sortOrder, page, string.IsNullOrWhiteSpace(colour) ? null : colour.Trim(), remove, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<FavouriteTile>> FavouriteTilesAsync(long companyId, long? terminalId, long? userId, CancellationToken ct = default)
+    {
+        // The cashier's own first, then the till's, then every till's; an item pinned twice shows once, as the nearest pin has it.
+        List<PosFavourite> pins = [.. (await _db.PosFavourites.AsNoTracking()
+                .Where(f => f.CompanyId == companyId && (f.TerminalId == null || f.TerminalId == terminalId) && (f.UserId == null || f.UserId == userId)).ToListAsync(ct).ConfigureAwait(false))
+            .OrderBy(f => f.UserId is null ? 1 : 0).ThenBy(f => f.TerminalId is null ? 1 : 0).DistinctBy(f => f.ItemId)
+            .OrderBy(f => f.Page).ThenBy(f => f.UserId is null ? 1 : 0).ThenBy(f => f.SortOrder)];
+        List<long> ids = [.. pins.Select(f => f.ItemId)];
+        Dictionary<long, Item> found = await Sellable(companyId).Where(i => ids.Contains(i.Id)).ToDictionaryAsync(i => i.Id, ct).ConfigureAwait(false);
+        Dictionary<long, PosTile> tiles = (await PriceAsync(companyId, [.. ids.Where(found.ContainsKey).Select(id => found[id])], ct).ConfigureAwait(false)).ToDictionary(t => t.ItemId);
+        return [.. pins.Where(f => tiles.ContainsKey(f.ItemId)).Select(f => new FavouriteTile(tiles[f.ItemId], f.Colour, f.Page))];
+    }
+
+    private async Task<Result> SaveFavouriteAsync(long companyId, long? terminalId, long? userId, long itemId, int sortOrder, int page, string? colour, bool remove, CancellationToken ct)
+    {
+        PosFavourite? existing = await _db.PosFavourites.FirstOrDefaultAsync(f => f.CompanyId == companyId && f.TerminalId == terminalId && f.UserId == userId && f.ItemId == itemId, ct)
+            .ConfigureAwait(false);
         if (remove)
         {
             if (existing is not null)
@@ -160,11 +204,13 @@ public sealed class PosCatalogueService : IPosCatalogueService
         }
         else if (existing is null)
         {
-            _db.PosFavourites.Add(new PosFavourite(companyId, terminalId, itemId.Value, sortOrder));
+            _db.PosFavourites.Add(new PosFavourite(companyId, terminalId, itemId, sortOrder) { UserId = userId, Page = page, Colour = colour });
         }
         else
         {
             existing.SortOrder = sortOrder;
+            existing.Page = page;
+            existing.Colour = colour;
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

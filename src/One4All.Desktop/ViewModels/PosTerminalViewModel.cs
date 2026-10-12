@@ -38,6 +38,12 @@ public sealed class PosProductVm
     /// <summary>The category (for filtering).</summary>
     public required string Category { get; init; }
 
+    /// <summary>The tile colour (a favourite's own, else the default).</summary>
+    public System.Windows.Media.Brush TileBrush { get; init; } = DefaultTileBrush;
+
+    /// <summary>The default tile colour.</summary>
+    public static System.Windows.Media.Brush DefaultTileBrush { get; } = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x2C, 0x3E, 0x50));
+
     /// <summary>The tax-exclusive unit price.</summary>
     public required decimal Price { get; init; }
 
@@ -481,7 +487,14 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     private const string FavouritesTab = "★ Favourites";
 
     // The till's favourites in order, each category's parent (to show sub-categories with their parent), and whether the server can be asked.
-    private List<long> _favourites = [];
+    private List<FavouriteTile> _favourites = [];
+    private TerminalProfile _profile;
+
+    /// <summary>The till's profile as shown in the header.</summary>
+    public string ProfileText => _profile == TerminalProfile.General ? string.Empty : _profile.ToString();
+
+    /// <summary>Whether the till weighs goods (not at a bar or restaurant till).</summary>
+    public bool IsScaleVisible => _profile is not (TerminalProfile.Bar or TerminalProfile.Restaurant);
     private Dictionary<string, string?> _categoryParents = new(StringComparer.OrdinalIgnoreCase);
     private bool _online;
     private CancellationTokenSource? _searching;
@@ -567,7 +580,11 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     // Tiles come from the item master (not the restaurant menu), so a tapped sale issues stock and posts its cost like a scanned one.
     private async Task LoadProductsAsync(IPosCatalogueService catalogue, One4AllDbContext db, CancellationToken ct)
     {
-        _favourites = [.. (await catalogue.FavouritesAsync(_companyId, _terminalId == 0 ? null : _terminalId, ct).ConfigureAwait(true)).Select(t => t.ItemId)];
+        _favourites = [.. await catalogue.FavouriteTilesAsync(_companyId, _terminalId == 0 ? null : _terminalId, _cashierUserId == 0 ? null : _cashierUserId, ct).ConfigureAwait(true)];
+        long terminal = _terminalId;
+        _profile = await db.PosTerminals.AsNoTracking().Where(t => t.Id == terminal).Select(t => t.Profile).FirstOrDefaultAsync(ct).ConfigureAwait(true);
+        OnPropertyChanged(nameof(ProfileText));
+        OnPropertyChanged(nameof(IsScaleVisible));
         _categoryParents = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (ItemCategory category in await db.ItemCategories.AsNoTracking().Where(c => c.CompanyId == _companyId).ToListAsync(ct).ConfigureAwait(true))
         {
@@ -590,9 +607,10 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
         Categories.Clear();
         Categories.Add("All");
-        if (_favourites.Count > 0)
+        // One favourites tab per page (a bar or restaurant till opens on its favourites).
+        foreach (int page in _favourites.Select(f => f.Page).Distinct().Order())
         {
-            Categories.Add(FavouritesTab);
+            Categories.Add(FavouritesPage(page));
         }
 
         foreach (string category in _allProducts.Select(p => p.Category).Distinct().OrderBy(c => c))
@@ -602,6 +620,31 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
         SelectedCategory = "All";
         ApplyCategoryFilter();
+    }
+
+    private static string FavouritesPage(int page) => page <= 1 ? FavouritesTab : $"{FavouritesTab} {page}";
+
+    // A favourite's tile in its own colour (an unreadable colour keeps the default).
+    private static PosProductVm Coloured(PosProductVm product, string? colour)
+    {
+        if (string.IsNullOrWhiteSpace(colour))
+        {
+            return product;
+        }
+
+        try
+        {
+            return new PosProductVm
+            {
+                ItemId = product.ItemId, Tile = product.Tile, Name = product.Name, Category = product.Category, Price = product.Price, RevenueAccountCode = product.RevenueAccountCode,
+                TaxCode = product.TaxCode, TaxRate = product.TaxRate,
+                TileBrush = (System.Windows.Media.Brush?)new System.Windows.Media.BrushConverter().ConvertFromString(colour) ?? PosProductVm.DefaultTileBrush,
+            };
+        }
+        catch (FormatException)
+        {
+            return product;
+        }
     }
 
     private PosProductVm Product(PosTile tile) => new()
@@ -816,7 +859,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         IEnumerable<PosProductVm> chosen = SelectedCategory switch
         {
             "All" => _allProducts,
-            FavouritesTab => _favourites.Select(id => _allProducts.FirstOrDefault(p => p.ItemId == id)).OfType<PosProductVm>(),
+            string tab when tab.StartsWith(FavouritesTab, StringComparison.Ordinal) => _favourites.Where(f => FavouritesPage(f.Page) == tab)
+                .Select(f => _allProducts.FirstOrDefault(p => p.ItemId == f.Tile.ItemId) is PosProductVm p ? Coloured(p, f.Colour) : null).OfType<PosProductVm>(),
             _ => _allProducts.Where(p => InCategory(p, SelectedCategory)),
         };
         foreach (PosProductVm product in chosen.Where(p => p.Tile?.Matches(ScanEntry) ?? true))

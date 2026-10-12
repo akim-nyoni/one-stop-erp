@@ -92,6 +92,31 @@ public sealed class PosTerminal : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Whether the till is cashed up blind (brief §4.1): the cashier declares the count before seeing what was expected.</summary>
     public bool BlindCashUp { get; set; }
+
+    /// <summary>The terminal's profile — what kind of counter it is, which shapes the till's layout (brief §4.1 "configurable layout per terminal profile").</summary>
+    public TerminalProfile Profile { get; set; }
+}
+
+/// <summary>What kind of counter a terminal is.</summary>
+public enum TerminalProfile
+{
+    /// <summary>A general till.</summary>
+    General = 0,
+
+    /// <summary>A supermarket checkout (scale and scanner first).</summary>
+    Supermarket = 1,
+
+    /// <summary>A bar (favourites and tabs first; no scale).</summary>
+    Bar = 2,
+
+    /// <summary>A butchery or deli counter (the scale first).</summary>
+    Butchery = 3,
+
+    /// <summary>A weighbridge kiosk.</summary>
+    WeighbridgeKiosk = 4,
+
+    /// <summary>A restaurant till (favourites and tabs first; no scale).</summary>
+    Restaurant = 5,
 }
 
 /// <summary>

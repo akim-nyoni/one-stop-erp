@@ -68,6 +68,7 @@
         <!-- Header -->
         <DockPanel Grid.Row="0" Margin="4,0,4,10">
             <TextBlock Text="One4All &#8226; Point of Sale" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource Ink}" DockPanel.Dock="Left" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding ProfileText}" FontSize="15" Foreground="{DynamicResource Muted}" DockPanel.Dock="Left" VerticalAlignment="Center" Margin="12,0,0,0" />
             <Button Content="Close" Style="{StaticResource PadButton}" Width="110" Background="#7F8C8D" Click="Close_Click" DockPanel.Dock="Right" />
             <ToggleButton x:Name="ContrastToggle" Content="High contrast" Width="150" Height="56" Margin="4" FontSize="16" FontWeight="SemiBold" DockPanel.Dock="Right"
                           Checked="Contrast_Changed" Unchecked="Contrast_Changed" ToolTip="Black background, white and yellow text, outlined buttons (accessibility)" />
@@ -89,7 +90,16 @@
             <Border Grid.Column="0" Background="{DynamicResource Panel}" CornerRadius="8" Padding="10" Margin="0,0,10,0">
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                        <Button Content="Weigh" Style="{StaticResource PadButton}" Height="36" Width="90" FontSize="14" Background="#6C3483" Command="{Binding WeighCommand}" DockPanel.Dock="Right" />
+                        <Button Content="Weigh" Height="36" Width="90" FontSize="14" Background="#6C3483" Command="{Binding WeighCommand}" DockPanel.Dock="Right"
+                                >
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource PadButton}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsScaleVisible}" Value="False"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
                         <Button Content="Add" Style="{StaticResource PadButton}" Height="36" Width="70" FontSize="14" Background="#1E8449" Command="{Binding ScanCommand}" DockPanel.Dock="Right" />
                         <TextBox x:Name="ScanBox" Text="{Binding ScanEntry, UpdateSourceTrigger=PropertyChanged}" FontSize="18" Padding="6,4" Margin="0,0,6,0"
                                  ToolTip="Scan a barcode or type a PLU / item code and press Enter (type a quantity on the pad first for more than one)">
@@ -194,7 +204,7 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type vm:PosProductVm}">
-                                    <Button Style="{StaticResource ProductButton}"
+                                    <Button Style="{StaticResource ProductButton}" Background="{Binding TileBrush}"
                                             Command="{Binding DataContext.AddProductCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                             CommandParameter="{Binding}">
                                         <StackPanel>

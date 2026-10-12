@@ -21693,6 +21693,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("Colour")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("colour");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -21700,6 +21705,12 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("ItemId")
                         .HasColumnType("bigint")
                         .HasColumnName("item_id");
+
+                    b.Property<int>("Page")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("page");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
@@ -21715,14 +21726,18 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("terminal_id");
 
+                    b.Property<long?>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
                     b.HasKey("Id")
                         .HasName("pk_favourite");
 
-                    b.HasIndex("CompanyId", "TerminalId", "ItemId")
+                    b.HasIndex("CompanyId", "TerminalId", "UserId", "ItemId")
                         .IsUnique()
-                        .HasDatabaseName("ix_favourite_company_id_terminal_id_item_id");
+                        .HasDatabaseName("ix_favourite_company_id_terminal_id_user_id_item_id");
 
-                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("CompanyId", "TerminalId", "ItemId"), false);
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("CompanyId", "TerminalId", "UserId", "ItemId"), false);
 
                     b.ToTable("favourite", "pos");
                 });
@@ -21791,6 +21806,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)")
                         .HasColumnName("name");
+
+                    b.Property<int>("Profile")
+                        .HasColumnType("integer")
+                        .HasColumnName("profile");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
