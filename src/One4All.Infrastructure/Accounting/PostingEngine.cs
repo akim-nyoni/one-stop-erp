@@ -76,6 +76,11 @@ public sealed class PostingEngine : IPostingEngine
         }
 
         CurrencyCode baseCurrency = company.BaseCurrency;
+        if ((request.TransactionCurrency != baseCurrency || request.Lines.Any(l => l.Currency is CurrencyCode lineCurrency && lineCurrency != baseCurrency))
+            && Licensing.LicenceFeatureGate.Check(_licence, One4All.Licensing.Core.LicenceFeatures.MultiCurrency, "Posting in a foreign currency") is { IsFailure: true } foreign)
+        {
+            return foreign.Error;
+        }
 
         // Back-dating: a person posting further back than the company allows needs the back-date permission (brief §5.1).
         if (company.BackDateAllowanceDays is int allowance && (request.PostedByUserId ?? request.SubmittedByUserId) is long actor)

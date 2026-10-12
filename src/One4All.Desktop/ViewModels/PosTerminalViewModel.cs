@@ -1880,6 +1880,12 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             // A gift card's balance cannot be checked or charged offline, so a voucher sale is not queued.
             StatusMessage = "Offline: gift cards cannot be taken without the connection. Clear the voucher tender and take another payment.";
         }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex)
+            && Infrastructure.Licensing.LicenceFeatureGate.Check(_services.GetService<Application.Abstractions.Licensing.ILicenceService>(), One4All.Licensing.Core.LicenceFeatures.OfflinePos,
+                "Selling offline") is { IsFailure: true } unlicensed)
+        {
+            StatusMessage = $"Offline, and {unlicensed.Error.Message}";
+        }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
         {
             // The central database is unreachable — capture the sale locally and sync on reconnect.

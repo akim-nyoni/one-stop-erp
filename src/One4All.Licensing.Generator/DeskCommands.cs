@@ -48,6 +48,7 @@ internal static class DeskCommands
                     CustomerId = Need(a, "customer"), Edition = Enum.Parse<LicenceEdition>(a.GetValueOrDefault("edition", "Standard"), true),
                     LicenceType = Enum.Parse<LicenceType>(a.GetValueOrDefault("type", "Subscription"), true), Term = a.GetValueOrDefault("term", "1y"),
                     Modules = a.TryGetValue("modules", out string? modules) ? modules.Split(' ', ',', StringSplitOptions.RemoveEmptyEntries) : null,
+                    Features = a.TryGetValue("features", out string? features) ? features.Split(' ', ',', StringSplitOptions.RemoveEmptyEntries) : null,
                     ModuleTerms = a.TryGetValue("module-terms", out string? terms)
                         ? terms.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(t => t.Split('=')).ToDictionary(p => p[0].Trim().ToUpperInvariant(), p => p[1].Trim())
                         : new Dictionary<string, string>(),

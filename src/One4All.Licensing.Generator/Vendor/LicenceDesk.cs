@@ -112,6 +112,9 @@ public sealed class IssueRequest
     /// <summary>Gets or sets the modules (null: the edition's template).</summary>
     public IReadOnlyList<string>? Modules { get; set; }
 
+    /// <summary>Gets or sets the feature flags (null: the edition's).</summary>
+    public IReadOnlyList<string>? Features { get; set; }
+
     /// <summary>Gets or sets per-module terms that differ from the licence's (module code → term).</summary>
     public IReadOnlyDictionary<string, string> ModuleTerms { get; set; } = new Dictionary<string, string>();
 
@@ -573,6 +576,8 @@ public sealed class LicenceDesk
         {
             payload.Limits[key] = value;
         }
+
+        payload.Features = [.. (request.Features ?? LicenceFeatures.ForEdition(request.Edition)).Select(f => f.Trim().ToUpperInvariant()).Where(f => f.Length > 0).Distinct()];
 
         foreach (string code in (request.Modules ?? EditionTemplates.ModulesFor(request.Edition)).Select(m => m.Trim().ToUpperInvariant()).Distinct())
         {

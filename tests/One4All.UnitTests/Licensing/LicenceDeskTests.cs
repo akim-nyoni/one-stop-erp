@@ -138,4 +138,15 @@ public sealed class LicenceDeskTests : IDisposable
     {
         public DateTimeOffset UtcNow => now;
     }
+
+    [Fact]
+    public void Licences_carry_the_edition_features_unless_given()
+    {
+        LicenceDesk desk = new(_folder, _keys.PrivateKeyBase64, "desk-k", () => Now);
+        desk.SaveCustomer("cust-f", "Feature Co", "ops@feature.test", ["Main"]);
+        IssuedLicence standard = desk.Issue(new IssueRequest { CustomerId = "cust-f", Edition = LicenceEdition.Standard });
+        Validate(standard.Token).Payload!.Features.Should().BeEquivalentTo(LicenceFeatures.ForEdition(LicenceEdition.Standard));
+        IssuedLicence chosen = desk.Issue(new IssueRequest { CustomerId = "cust-f", Edition = LicenceEdition.Standard, Features = ["api_access"] });
+        Validate(chosen.Token).Payload!.Features.Should().Equal("API_ACCESS");
+    }
 }

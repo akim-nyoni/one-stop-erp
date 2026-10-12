@@ -13,12 +13,24 @@ public sealed class ApiClientService : IApiClientService
 {
     private readonly One4AllDbContext _db;
     private readonly IClock _clock;
+    private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="clock">The clock.</param>
     public ApiClientService(One4AllDbContext db, IClock clock)
+        : this(db, clock, null)
     {
+    }
+
+    /// <summary>Creates the service under the installed licence.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="clock">The clock.</param>
+    /// <param name="licence">The licence (API keys need its API_ACCESS feature).</param>
+    [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
+    public ApiClientService(One4AllDbContext db, IClock clock, Application.Abstractions.Licensing.ILicenceService? licence)
+    {
+        _licence = licence;
         _db = db;
         _clock = clock;
     }
@@ -84,6 +96,11 @@ public sealed class ApiClientService : IApiClientService
     /// <inheritdoc />
     public async Task<Result<ApiClientIdentity>> AuthenticateAsync(string apiKey, CancellationToken ct = default)
     {
+        if (Licensing.LicenceFeatureGate.Check(_licence, LicenceFeatures.ApiAccess, "API access") is { IsFailure: true } unlicensed)
+        {
+            return unlicensed.Error;
+        }
+
         Error refused = Error.Forbidden("Api.KeyInvalid", "The API key is not valid.");
         string key = (apiKey ?? string.Empty).Trim();
         int dot = key.IndexOf('.', StringComparison.Ordinal);

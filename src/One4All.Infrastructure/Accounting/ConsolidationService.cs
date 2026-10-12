@@ -19,7 +19,21 @@ public sealed class ConsolidationService : IConsolidationService
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
-    public ConsolidationService(One4AllDbContext db) => _db = db;
+    public ConsolidationService(One4AllDbContext db) : this(db, null)
+    {
+    }
+
+    /// <summary>Creates the service under the installed licence.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="licence">The licence (consolidation needs its CONSOLIDATION feature).</param>
+    [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
+    public ConsolidationService(One4AllDbContext db, Application.Abstractions.Licensing.ILicenceService? licence)
+    {
+        _db = db;
+        _licence = licence;
+    }
+
+    private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
 
     /// <inheritdoc />
     public Task<Result<ConsolidatedTrialBalance>> ConsolidatedTrialBalanceAsync(IReadOnlyList<long> companyIds, DateOnly asAtDate, CancellationToken ct = default) =>
@@ -28,6 +42,11 @@ public sealed class ConsolidationService : IConsolidationService
     /// <inheritdoc />
     public async Task<Result<ConsolidatedTrialBalance>> ConsolidatedTrialBalanceAsync(IReadOnlyList<long> companyIds, DateOnly asAtDate, IReadOnlyCollection<string> intercompanyAccountCodes, CancellationToken ct = default)
     {
+        if (Licensing.LicenceFeatureGate.Check(_licence, One4All.Licensing.Core.LicenceFeatures.Consolidation, "Consolidation") is { IsFailure: true } unlicensed)
+        {
+            return unlicensed.Error;
+        }
+
         using IDisposable unscoped = _db.WithoutCompanyScope(); // a group reads every member company's books
         if (companyIds is null || companyIds.Count == 0)
         {
@@ -102,6 +121,11 @@ public sealed class ConsolidationService : IConsolidationService
     /// <inheritdoc />
     public async Task<Result<TranslatedTrialBalance>> TranslatedTrialBalanceAsync(IReadOnlyList<long> companyIds, CurrencyCode presentationCurrency, DateOnly asAtDate, IReadOnlyCollection<string>? intercompanyAccountCodes = null, CancellationToken ct = default)
     {
+        if (Licensing.LicenceFeatureGate.Check(_licence, One4All.Licensing.Core.LicenceFeatures.Consolidation, "Consolidation") is { IsFailure: true } unlicensed)
+        {
+            return unlicensed.Error;
+        }
+
         using IDisposable unscoped = _db.WithoutCompanyScope(); // a group reads every member company's books
         if (companyIds is null || companyIds.Count == 0)
         {

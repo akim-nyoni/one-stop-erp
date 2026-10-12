@@ -15,7 +15,21 @@ public sealed class HyperinflationService : IHyperinflationService
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
-    public HyperinflationService(One4AllDbContext db) => _db = db;
+    public HyperinflationService(One4AllDbContext db) : this(db, null)
+    {
+    }
+
+    /// <summary>Creates the service under the installed licence.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="licence">The licence (restatement needs its HYPERINFLATION feature).</param>
+    [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
+    public HyperinflationService(One4AllDbContext db, Application.Abstractions.Licensing.ILicenceService? licence)
+    {
+        _db = db;
+        _licence = licence;
+    }
+
+    private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
 
     /// <inheritdoc />
     public async Task<Result> SetIndexAsync(long companyId, string indexCode, DateOnly month, decimal value, CancellationToken ct = default)
@@ -44,6 +58,11 @@ public sealed class HyperinflationService : IHyperinflationService
     /// <inheritdoc />
     public async Task<Result<RestatedTrialBalance>> RestatedTrialBalanceAsync(long companyId, DateOnly asAtDate, string indexCode = "CPI", CancellationToken ct = default)
     {
+        if (Licensing.LicenceFeatureGate.Check(_licence, One4All.Licensing.Core.LicenceFeatures.Hyperinflation, "IAS 29 restatement") is { IsFailure: true } unlicensed)
+        {
+            return unlicensed.Error;
+        }
+
         string code = indexCode.Trim().ToUpperInvariant();
         FiscalYear? year = await _db.FiscalYears.AsNoTracking()
             .FirstOrDefaultAsync(y => y.CompanyId == companyId && y.StartDate <= asAtDate && y.EndDate >= asAtDate, ct).ConfigureAwait(false);
