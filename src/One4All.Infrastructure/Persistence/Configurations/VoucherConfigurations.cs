@@ -35,6 +35,9 @@ internal sealed class AccountingVoucherLineConfiguration : IEntityTypeConfigurat
         b.Property(x => x.Debit).HasPrecision(19, 4);
         b.Property(x => x.Credit).HasPrecision(19, 4);
         b.Property(x => x.Narrative).HasMaxLength(200);
+        b.Property(x => x.CostCentre).HasMaxLength(20);
+        b.Property(x => x.Department).HasMaxLength(30);
+        b.Property(x => x.Project).HasMaxLength(20);
     }
 }
 

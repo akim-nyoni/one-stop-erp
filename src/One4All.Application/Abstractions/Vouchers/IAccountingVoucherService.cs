@@ -7,7 +7,10 @@ namespace One4All.Application.Abstractions.Vouchers;
 /// <param name="AccountCode">The account.</param>
 /// <param name="Amount">The amount; for a journal voucher, positive for a debit and negative for a credit.</param>
 /// <param name="Narrative">The line description.</param>
-public sealed record VoucherLineRequest(string AccountCode, decimal Amount, string? Narrative = null);
+/// <param name="CostCentre">The cost centre the line posts to.</param>
+/// <param name="Department">The department the line posts to.</param>
+/// <param name="Project">The project the line posts to.</param>
+public sealed record VoucherLineRequest(string AccountCode, decimal Amount, string? Narrative = null, string? CostCentre = null, string? Department = null, string? Project = null);
 
 /// <summary>A voucher to prepare.</summary>
 /// <param name="Type">The kind.</param>

@@ -113,7 +113,8 @@ public sealed class AccountingVoucher : AuditableEntity, ICompanyScoped
     /// <param name="debit">The debit, or zero.</param>
     /// <param name="credit">The credit, or zero.</param>
     /// <param name="narrative">The line description.</param>
-    public void AddLine(string accountCode, decimal debit, decimal credit, string? narrative) => _lines.Add(new AccountingVoucherLine(accountCode, debit, credit, narrative));
+    public void AddLine(string accountCode, decimal debit, decimal credit, string? narrative, string? costCentre = null, string? department = null, string? project = null) =>
+        _lines.Add(new AccountingVoucherLine(accountCode, debit, credit, narrative) { CostCentre = costCentre, Department = department, Project = project });
 
     /// <summary>Records the approval and the posting it made.</summary>
     /// <param name="userId">The approver.</param>
@@ -177,4 +178,13 @@ public sealed class AccountingVoucherLine : Entity
 
     /// <summary>The line description.</summary>
     public string? Narrative { get; private set; }
+
+    /// <summary>The cost centre the line posts to.</summary>
+    public string? CostCentre { get; internal init; }
+
+    /// <summary>The department the line posts to.</summary>
+    public string? Department { get; internal init; }
+
+    /// <summary>The project the line posts to.</summary>
+    public string? Project { get; internal init; }
 }

@@ -70,7 +70,7 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
                 AccountingVoucherType.Journal => (Math.Max(line.Amount, 0m), Math.Max(-line.Amount, 0m)),
                 _ => (line.Amount, 0m),
             };
-            voucher.AddLine(line.AccountCode.Trim(), debit, credit, line.Narrative);
+            voucher.AddLine(line.AccountCode.Trim(), debit, credit, line.Narrative, Dimension(line.CostCentre), Dimension(line.Department), Dimension(line.Project));
         }
 
         _db.Set<AccountingVoucher>().Add(voucher);
@@ -145,6 +145,7 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
         List<JournalLineRequest> lines = [.. voucher.Lines.Select(l => new JournalLineRequest
         {
             AccountCode = l.AccountCode, Side = l.Debit > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = l.Debit > 0m ? l.Debit : l.Credit, Narrative = l.Narrative,
+            CostCentre = l.CostCentre, Department = l.Department, Project = l.Project,
         })];
         decimal total = voucher.Lines.Sum(l => l.Debit + l.Credit);
         if (voucher.Type is AccountingVoucherType.Payment or AccountingVoucherType.PettyCash)
@@ -219,6 +220,8 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
         };
         return AccountingVoucherFormatter.ToPlainText(document);
     }
+
+    private static string? Dimension(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
 
     private static string Sequence(AccountingVoucherType type) => type switch
     {

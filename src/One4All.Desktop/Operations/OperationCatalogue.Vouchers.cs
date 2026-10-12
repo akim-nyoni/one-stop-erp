@@ -19,7 +19,7 @@ public static partial class OperationCatalogue
                 + "checked by a second, approved and posted by another (or through the approvals inbox when an AccountingVoucher workflow is defined), cancelled while a draft, "
                 + "and printed with prepared / checked / approved signature blocks. Supporting documents attach under Attachments (target AccountingVoucher, key the voucher number).",
             Fields = [Pick("Step", "Step", ["Prepare", "Check", "Approve", "Cancel", "Print"]), Pick("Type", "Type (prepare)", Enum.GetNames<AccountingVoucherType>()), Opt("Number", "Voucher number"),
-                Opt("Party", "Paid to / received from / about (prepare)"), Opt("Cash", "Cash or bank account (not a journal)"), Opt("Lines", "Lines: ACCOUNT:amount[:narrative]; …"),
+                Opt("Party", "Paid to / received from / about (prepare)"), Opt("Cash", "Cash or bank account (not a journal)"), Opt("Lines", "Lines: ACCOUNT:amount[:narrative[:cost centre[:department[:project]]]]; …"),
                 Opt("Narrative", "Narrative"), Today()],
             Run = async (c, i) =>
             {
@@ -29,10 +29,11 @@ public static partial class OperationCatalogue
                     List<VoucherLineRequest> lines = [];
                     foreach (string part in (i.Optional("Lines") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                     {
-                        string[] bits = part.Split(':', 3, StringSplitOptions.TrimEntries);
+                        string[] bits = part.Split(':', 6, StringSplitOptions.TrimEntries);
+                        string? Bit(int n) => bits.Length > n && bits[n].Length > 0 ? bits[n] : null;
                         lines.Add(bits.Length >= 2 && decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal amount)
-                            ? new VoucherLineRequest(bits[0], amount, bits.Length == 3 ? bits[2] : null)
-                            : throw new OperationException($"Write each line as ACCOUNT:amount[:narrative] (\"{part}\")."));
+                            ? new VoucherLineRequest(bits[0], amount, Bit(2), Bit(3), Bit(4), Bit(5))
+                            : throw new OperationException($"Write each line as ACCOUNT:amount[:narrative[:cost centre[:department[:project]]]] (\"{part}\")."));
                     }
 
                     PreparedVoucher prepared = Check(await vouchers.PrepareAsync(c.CompanyId, new VoucherRequest(Enum.Parse<AccountingVoucherType>(i.Text("Type")), i.Date("Date"), i.Optional("Party") ?? string.Empty,

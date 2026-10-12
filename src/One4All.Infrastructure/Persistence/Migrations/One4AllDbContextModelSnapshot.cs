@@ -34119,6 +34119,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("accounting_voucher_id");
 
+                    b.Property<string>("CostCentre")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cost_centre");
+
                     b.Property<decimal>("Credit")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -34129,10 +34134,20 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("debit");
 
+                    b.Property<string>("Department")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("department");
+
                     b.Property<string>("Narrative")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("narrative");
+
+                    b.Property<string>("Project")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("project");
 
                     b.Property<long>("RowVersion")
                         .HasColumnType("bigint")
