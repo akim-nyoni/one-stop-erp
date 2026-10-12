@@ -262,6 +262,61 @@ public sealed class UserAdminService : IUserAdminService
         return names;
     }
 
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<RoleDifference>>> CompareRolesAsync(long firstRoleId, long secondRoleId, CancellationToken ct = default)
+    {
+        List<Role> roles = await _db.Roles.AsNoTracking().Include(r => r.Permissions).Where(r => r.Id == firstRoleId || r.Id == secondRoleId).ToListAsync(ct).ConfigureAwait(false);
+        if (roles.Find(r => r.Id == firstRoleId) is not Role first || roles.Find(r => r.Id == secondRoleId) is not Role second)
+        {
+            return Error.NotFound("Security.RoleNotFound", "Both roles must exist to compare them.");
+        }
+
+        static Dictionary<string, OperationFlags> Grants(Role role) => role.Permissions.ToDictionary(p => p.PermissionCode, p => p.Operations, StringComparer.OrdinalIgnoreCase);
+        return Result<IReadOnlyList<RoleDifference>>.Success(RoleComparison.Compare(Grants(first), Grants(second)));
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<int>> BulkGrantAsync(IReadOnlyList<long> roleIds, string codePattern, OperationFlags operations, BulkGrantMode mode, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(roleIds);
+        List<Role> roles = await _db.Roles.Include(r => r.Permissions).Where(r => roleIds.Contains(r.Id)).ToListAsync(ct).ConfigureAwait(false);
+        if (roles.Count == 0 || roles.Count != roleIds.Distinct().Count())
+        {
+            return Error.NotFound("Security.RoleNotFound", "Every role in a bulk change must exist.");
+        }
+
+        if (roles.Find(r => r.IsSystemRole) is Role system)
+        {
+            return Error.Rule("Security.SystemRole", $"{system.Name} is a system role; copy it to a role of your own to change it.");
+        }
+
+        IReadOnlyList<string> codes = RoleComparison.Matching(codePattern, PermissionCatalogue.All.Select(p => p.Code).Concat(roles.SelectMany(r => r.Permissions.Select(p => p.PermissionCode))));
+        if (codes.Count == 0 || (operations == OperationFlags.None && mode != BulkGrantMode.Set))
+        {
+            return Error.Validation("Security.BulkGrant", "A bulk change needs a permission code or pattern that matches, and the operations to change.");
+        }
+
+        int changed = 0;
+        foreach (Role role in roles)
+        {
+            foreach (string code in codes)
+            {
+                OperationFlags current = role.Permissions.FirstOrDefault(p => string.Equals(p.PermissionCode, code, StringComparison.OrdinalIgnoreCase))?.Operations ?? OperationFlags.None;
+                OperationFlags next = RoleComparison.Apply(current, operations, mode);
+                if (next != current)
+                {
+                    role.Grant(code, next);
+                    changed++;
+                }
+            }
+
+            await RecordAsync(Core.Audit.AuditAction.Update, "Role", role.Id, $"Bulk {mode} {operations} on {codePattern.Trim()}", ct).ConfigureAwait(false);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return changed;
+    }
+
     // A permission or account change in the change log, by whoever is signed in.
     private async Task RecordAsync(Core.Audit.AuditAction action, string entityType, long entityId, string what, CancellationToken ct)
     {

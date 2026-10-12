@@ -534,6 +534,46 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Compare roles or change many at once", ListTitle = "Roles",
+            Description = "Compare shows where two roles differ, permission by permission. Bulk change adds, removes or sets operations (View, Create, Edit, Delete, Print, Export, Post, "
+                + "Approve, VoidReverse — comma separated) on a permission code or a pattern such as Payroll.* across several roles (comma separated) at once. System roles are left alone.",
+            Fields = [Pick("Step", "Step", ["Compare", "Bulk change"]), Req("Roles", "Role(s) (compare: two)"), Opt("Pattern", "Permission code or pattern (bulk)"),
+                Opt("Operations", "Operations (bulk)"), Pick("Mode", "Bulk change", Enum.GetNames<BulkGrantMode>())],
+            Run = async (c, i) =>
+            {
+                List<long> roles = [];
+                foreach (string name in i.Text("Roles").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    roles.Add(await RoleAsync(c, name).ConfigureAwait(true));
+                }
+
+                if (i.Text("Step") == "Compare")
+                {
+                    if (roles.Count != 2)
+                    {
+                        throw new OperationException("Name exactly two roles to compare.");
+                    }
+
+                    IReadOnlyList<RoleDifference> differences = Check(await c.Get<IUserAdminService>().CompareRolesAsync(roles[0], roles[1]).ConfigureAwait(true));
+                    return differences.Count == 0 ? "The two roles grant exactly the same." : string.Join(Environment.NewLine, differences.Select(d =>
+                        $"{d.Code,-32} only first: {d.OnlyFirst,-24} only second: {d.OnlySecond,-24} both: {d.Both}"));
+                }
+
+                OperationFlags operations = OperationFlags.None;
+                foreach (string op in (i.Optional("Operations") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    operations |= Enum.TryParse(op, true, out OperationFlags flag) ? flag : throw new OperationException($"'{op}' is not an operation.");
+                }
+
+                int changed = Check(await c.Get<IUserAdminService>().BulkGrantAsync(roles, i.Optional("Pattern") ?? string.Empty, operations, Enum.Parse<BulkGrantMode>(i.Text("Mode")))
+                    .ConfigureAwait(true));
+                return $"{changed} grant(s) changed.";
+            },
+            List = async c => Table(await c.Db.Roles.AsNoTracking().Include(r => r.Permissions).OrderBy(r => r.Name).ToListAsync().ConfigureAwait(true),
+                ("Role", r => r.Name), ("System", r => r.IsSystemRole ? "yes" : string.Empty), ("Permissions", r => r.Permissions.Count)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Assign a role", ListTitle = "Users and their roles",
             Description = "Gives a user a role, limited by scopes such as Company:ACME;Branch:HO,NORTH (blank: unrestricted). Warns of segregation-of-duties conflicts.",
             Fields = [Req("Username", "Login name"), Req("Role", "Role name"), Opt("Scopes", "Scopes (Dimension:values;...)"), Tick("Remove", "Remove the role instead")],

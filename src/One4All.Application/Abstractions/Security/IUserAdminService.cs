@@ -86,4 +86,14 @@ public interface IUserAdminService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or why not.</returns>
     Task<Result> SetManagerAsync(long userId, long? managerUserId, CancellationToken ct = default);
+
+    /// <summary>The permissions on which two roles differ.</summary>
+    Task<Result<IReadOnlyList<Core.Security.RoleDifference>>> CompareRolesAsync(long firstRoleId, long secondRoleId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Adds, removes or sets operations on every permission a pattern covers (an exact code, or a prefix such as <c>Payroll.*</c>), across the
+    /// given roles at once. System roles are refused.
+    /// </summary>
+    /// <returns>How many grants changed.</returns>
+    Task<Result<int>> BulkGrantAsync(IReadOnlyList<long> roleIds, string codePattern, Core.Security.OperationFlags operations, Core.Security.BulkGrantMode mode, CancellationToken ct = default);
 }
