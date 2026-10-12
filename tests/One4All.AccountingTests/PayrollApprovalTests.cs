@@ -42,8 +42,8 @@ public sealed class PayrollApprovalTests
         PayElement basic = new(companyId, "BASIC", "Basic Salary", PayElementType.Earning, CalculationBasis.Formula, 1, "6100") { Formula = "BASIC", Taxable = true };
         db.PayElements.Add(basic);
         await db.SaveChangesAsync();
-        Employee ann = new(companyId, "PA-1", "Ann First", 1000m, new DateOnly(2025, 1, 1));
-        Employee ben = new(companyId, "PA-2", "Ben Second", 2000m, new DateOnly(2025, 1, 1));
+        Employee ann = new(companyId, "PA-1", "Ann First", 1000m, new DateOnly(2025, 1, 1)) { NationalIdNumber = $"PA1-{companyId}", TaxNumber = "T1", BankAccountNumber = $"PA1{companyId}" };
+        Employee ben = new(companyId, "PA-2", "Ben Second", 2000m, new DateOnly(2025, 1, 1)) { NationalIdNumber = $"PA2-{companyId}", TaxNumber = "T2", BankAccountNumber = $"PA2{companyId}" };
         ann.AssignPayElement(basic.Id);
         ben.AssignPayElement(basic.Id);
         db.Employees.AddRange(ann, ben);

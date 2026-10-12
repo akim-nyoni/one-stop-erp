@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Payroll;
+using One4All.Application.Payroll;
 using One4All.Core.Common;
 using One4All.Core.Payroll;
 using One4All.Infrastructure.Persistence;
@@ -179,7 +180,58 @@ public sealed partial class PayrollService : IPayrollApprovalService
             issues.Add($"{numbers.GetValueOrDefault(suspended.EmployeeId)}: {suspended.ElementCode} suspended {N(suspended.Attempted - suspended.Deducted)} by net-pay protection");
         }
 
+        issues.AddRange(await RecordExceptionsAsync(run, ids, payGroup, payDate, ct).ConfigureAwait(false));
         return issues;
+    }
+
+    // The record checks (bank, IDs, tax number, status, contract, grade scale, leave, bank changes, missing from the previous run): PayrollRunChecks.
+    private async Task<IReadOnlyList<string>> RecordExceptionsAsync(PreparedRun run, List<long> ids, string payGroup, DateOnly payDate, CancellationToken ct)
+    {
+        long companyId = run.Company.Id;
+        List<Employee> employees = await _db.Set<Employee>().AsNoTracking().Where(e => ids.Contains(e.Id)).ToListAsync(ct).ConfigureAwait(false);
+
+        // The previous regular run of the group: who was paid, and when (bank changes after it are flagged).
+        DateOnly? lastRun = await _db.Set<Payslip>().Where(p => p.CompanyId == companyId && p.PayGroup == payGroup && p.RunKind == PayRunKind.Regular && p.PayDate < payDate)
+            .MaxAsync(p => (DateOnly?)p.PayDate, ct).ConfigureAwait(false);
+        List<string> previous = lastRun is DateOnly last
+            ? await (from p in _db.Set<Payslip>()
+                     join e in _db.Set<Employee>() on p.EmployeeId equals e.Id
+                     where p.CompanyId == companyId && p.PayGroup == payGroup && p.RunKind == PayRunKind.Regular && p.PayDate == last
+                     select e.EmployeeNumber).Distinct().ToListAsync(ct).ConfigureAwait(false)
+            : [];
+
+        List<SalaryScale> scales = await _db.Set<SalaryScale>().AsNoTracking().Where(s => s.CompanyId == companyId && s.EffectiveFrom <= payDate).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<string, (decimal Min, decimal Max)> grades = scales.GroupBy(s => s.Grade, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key,
+            g =>
+            {
+                List<decimal> notches = [.. g.GroupBy(s => s.Notch).Select(n => n.OrderByDescending(s => s.EffectiveFrom).First().MonthlyAmount)];
+                return (notches.Min(), notches.Max());
+            }, StringComparer.OrdinalIgnoreCase);
+        ILookup<long, (string, decimal)> negativeLeave = (await _db.Set<EmployeeLeaveBalance>().AsNoTracking().Where(b => ids.Contains(b.EmployeeId)).ToListAsync(ct).ConfigureAwait(false))
+            .Where(b => b.BalanceDays < 0m).ToLookup(b => b.EmployeeId, b => (b.LeaveType, b.BalanceDays));
+
+        Dictionary<long, DateTimeOffset> bankChanged = [];
+        if (lastRun is DateOnly since)
+        {
+            DateTimeOffset after = new(since.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
+            List<string> keys = [.. ids.Select(i => i.ToString(CultureInfo.InvariantCulture))];
+            string[] bankFields = [nameof(Employee.BankAccountNumber), nameof(Employee.BankName), nameof(Employee.BankBranch), nameof(Employee.MobileMoneyNumber), nameof(Employee.PaymentMethod)];
+            foreach (var change in await _db.ChangeLog.AsNoTracking().Where(c => c.CompanyId == companyId && c.EntityType == "Employee" && c.OccurredOnUtc > after
+                         && c.EntityId != null && keys.Contains(c.EntityId)).Select(c => new { c.EntityId, c.OccurredOnUtc, c.ChangedFields }).ToListAsync(ct).ConfigureAwait(false))
+            {
+                if (change.ChangedFields.Any(f => bankFields.Contains(f)) && long.TryParse(change.EntityId, out long employee)
+                    && (!bankChanged.TryGetValue(employee, out DateTimeOffset seen) || change.OccurredOnUtc > seen))
+                {
+                    bankChanged[employee] = change.OccurredOnUtc;
+                }
+            }
+        }
+
+        List<RunEmployee> facts = [.. employees.Select(e => new RunEmployee(e.EmployeeNumber, e.NationalIdNumber, e.TaxNumber, e.PaymentMethod, e.BankAccountNumber, e.MobileMoneyNumber,
+            e.Status, e.TerminationDate, e.ContractEndDate, e.BasicSalary, e.Grade,
+            e.Grade is string g && grades.TryGetValue(g, out var range) ? range.Min : null, e.Grade is string g2 && grades.TryGetValue(g2, out var range2) ? range2.Max : null,
+            [.. negativeLeave[e.Id]], bankChanged.TryGetValue(e.Id, out DateTimeOffset when) ? when : null))];
+        return PayrollRunChecks.Exceptions(facts, previous, payDate);
     }
 
     // §4.15.10: nobody calculates, approves, commits or reverses a run that pays them — the employee number of the conflict, or null.
