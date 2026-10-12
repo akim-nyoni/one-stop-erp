@@ -15,6 +15,82 @@ public static partial class OperationCatalogue
         const string module = "Receipting";
         yield return new Operation
         {
+            Module = module, Title = "Cash office drawer", ListTitle = "Payments awaiting clearance",
+            Description = "During a session: a pickup moves surplus cash from the drawer to the safe; a petty cash payout pays an expense from the drawer; a supervisor verifies "
+                + "another cashier's closed session; a receipt is reprinted (marked as a copy, counted); a cheque or transfer awaiting clearance is confirmed into the bank.",
+            Fields = [Pick("Step", "Step", ["Pickup", "Petty cash payout", "Verify session", "Reprint receipt", "Confirm cleared tender"]), Num("Amount", "Amount", "0"),
+                Opt("Cash", "Cash (drawer) account", "1000"), Opt("Safe", "Safe account (pickup)"), Opt("Expense", "Expense account (petty cash)"), Opt("Bank", "Bank account (cleared tender)"),
+                Opt("Reason", "Reason"), OptNum("Session", "Session id (verify)"), Opt("Receipt", "Receipt number (reprint)"), OptNum("Pending", "Pending tender id (confirm)"), Today()],
+            Run = async (c, i) =>
+            {
+                IReceiptingService receipting = c.Get<IReceiptingService>();
+                string reason = i.Optional("Reason") ?? string.Empty;
+                switch (i.Text("Step"))
+                {
+                    case "Pickup":
+                        return $"Picked up ({Check(await receipting.PickupAsync(c.CompanyId, await MySessionAsync(c).ConfigureAwait(true), i.Number("Amount"), i.Date("Date"), i.Optional("Cash") ?? "1000",
+                            i.Optional("Safe") ?? throw new OperationException("Give the safe account."), reason).ConfigureAwait(true))}).";
+                    case "Petty cash payout":
+                        return $"Paid out ({Check(await receipting.PettyCashPayoutAsync(c.CompanyId, await MySessionAsync(c).ConfigureAwait(true), i.Number("Amount"), i.Date("Date"), i.Optional("Cash") ?? "1000",
+                            i.Optional("Expense") ?? throw new OperationException("Give the expense account."), reason).ConfigureAwait(true))}).";
+                    case "Verify session":
+                        return Check(await receipting.VerifySessionAsync(c.CompanyId, (long)(i.OptionalNumber("Session") ?? 0m), c.UserId).ConfigureAwait(true), "Session verified.");
+                    case "Reprint receipt":
+                        string number = i.Optional("Receipt") ?? throw new OperationException("Give the receipt number.");
+                        long receipt = await c.Db.Receipts.AsNoTracking().Where(r => r.CompanyId == c.CompanyId && r.ReceiptNumber == number).Select(r => (long?)r.Id).FirstOrDefaultAsync().ConfigureAwait(true)
+                            ?? throw new OperationException($"No receipt {number}.");
+                        return $"Copy {Check(await receipting.ReprintReceiptAsync(c.CompanyId, receipt, i.Date("Date"), c.UserId).ConfigureAwait(true))} of {number}.";
+                    default:
+                        return $"Cleared into the bank ({Check(await receipting.ConfirmPendingTenderAsync(c.CompanyId, (long)(i.OptionalNumber("Pending") ?? 0m), i.Date("Date"),
+                            i.Optional("Bank") ?? throw new OperationException("Give the bank account.")).ConfigureAwait(true))}).";
+                }
+            },
+            List = async c => Table(await c.Db.PendingTenders.AsNoTracking().Where(p => p.CompanyId == c.CompanyId && p.ConfirmedOn == null).OrderBy(p => p.Date).Take(300).ToListAsync().ConfigureAwait(true),
+                ("Id", p => p.Id), ("Receipt", p => p.ReceiptNumber), ("Tender", p => p.TenderType), ("Reference", p => p.Reference ?? string.Empty), ("Amount", p => M(p.Amount)),
+                ("Date", p => p.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Arrangements, dishonours and refunds", ListTitle = "Payment arrangements",
+            Description = "A payment arrangement on a debtor's account (total and monthly instalment from a start date); a dishonoured cheque or reversed transfer, with an "
+                + "optional penalty charged; money held in suspense allocated to an account; and a credit balance refunded to the debtor (approved by the user doing it).",
+            Fields = [Pick("Step", "Step", ["Arrangement", "Dishonour", "Allocate from suspense", "Refund credit"]), Opt("Payer", "Customer code or stand number"), Num("Amount", "Amount / total", "0"),
+                Num("Instalment", "Monthly instalment (arrangement)", "0"), Opt("Receipt", "Receipt number (dishonour)"), Num("Penalty", "Penalty (dishonour)", "0"), Opt("PenaltyAccount", "Penalty income account"),
+                Opt("Suspense", "Suspense account"), Pick("Strategy", "Allocate to", Enum.GetNames<ReceiptAllocationStrategy>()), Opt("Bank", "Bank account (refund)"), Opt("Reason", "Reason"), Today()],
+            Run = async (c, i) =>
+            {
+                IReceiptingService receipting = c.Get<IReceiptingService>();
+                string reason = i.Optional("Reason") ?? string.Empty;
+                switch (i.Text("Step"))
+                {
+                    case "Dishonour":
+                        string number = i.Optional("Receipt") ?? throw new OperationException("Give the receipt number.");
+                        long receipt = await c.Db.Receipts.AsNoTracking().Where(r => r.CompanyId == c.CompanyId && r.ReceiptNumber == number).Select(r => (long?)r.Id).FirstOrDefaultAsync().ConfigureAwait(true)
+                            ?? throw new OperationException($"No receipt {number}.");
+                        decimal penalty = i.Number("Penalty");
+                        return Check(await receipting.RecordDishonourAsync(c.CompanyId, receipt, i.Date("Date"), penalty, penalty > 0m ? i.Optional("PenaltyAccount") : null,
+                            penalty > 0m ? $"{number}-DH" : null, c.UserId, reason).ConfigureAwait(true), $"Receipt {number} dishonoured" + (penalty > 0m ? $"; penalty {M(penalty)} charged." : "."));
+                    case "Allocate from suspense":
+                        ReceiptResult moved = Check(await receipting.AllocateFromSuspenseAsync(c.CompanyId, await PayerAsync(c, i.Optional("Payer") ?? string.Empty).ConfigureAwait(true), i.Number("Amount"),
+                            i.Date("Date"), i.Optional("Suspense") ?? throw new OperationException("Give the suspense account."), Enum.Parse<ReceiptAllocationStrategy>(i.Text("Strategy")), reason)
+                            .ConfigureAwait(true));
+                        return $"Receipt {moved.ReceiptNumber}: {M(moved.AllocatedToDebt)} to the account, {M(moved.CreditOnAccount)} credit on account.";
+                    case "Refund credit":
+                        RefundResult refunded = Check(await receipting.RefundCreditAsync(c.CompanyId, await PayerAsync(c, i.Optional("Payer") ?? string.Empty).ConfigureAwait(true), i.Number("Amount"),
+                            i.Date("Date"), i.Optional("Bank") ?? throw new OperationException("Give the bank account."), c.UserId, reason).ConfigureAwait(true));
+                        return $"Refunded {M(refunded.Amount)} (journal {refunded.JournalNumber}).";
+                    default:
+                        long arrangement = Check(await receipting.CaptureArrangementAsync(c.CompanyId, await PayerAsync(c, i.Optional("Payer") ?? string.Empty).ConfigureAwait(true), i.Number("Amount"),
+                            i.Number("Instalment"), i.Date("Date")).ConfigureAwait(true));
+                        return $"Arrangement {arrangement} captured.";
+                }
+            },
+            List = async c => Table(await c.Db.PaymentArrangements.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Take(300).ToListAsync().ConfigureAwait(true),
+                ("Id", a => a.Id), ("Customer", a => a.CustomerId), ("Total", a => M(a.TotalAmount)), ("Instalment", a => M(a.InstalmentAmount)),
+                ("From", a => a.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Status", a => a.Status)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Open or close my session", ListTitle = "Cashier sessions",
             Description = "Open a session at a station with the float, or close yours by declaring the cash counted (shortages and overs are posted).",
             Fields = [Pick("Step", "Step", ["Open", "Close"]), Opt("Station", "Station code (open)"), Opt("Currency", "Currency", "USD"), OptNum("Amount", "Float (open) / cash counted (close)"),
