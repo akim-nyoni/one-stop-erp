@@ -33077,6 +33077,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(8)")
                         .HasColumnName("cash_account_code");
 
+                    b.Property<long?>("CheckedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("checked_by_user_id");
+
+                    b.Property<DateTimeOffset?>("CheckedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("checked_on_utc");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");

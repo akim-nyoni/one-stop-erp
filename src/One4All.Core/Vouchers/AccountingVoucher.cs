@@ -127,6 +127,21 @@ public sealed class AccountingVoucher : AuditableEntity, ICompanyScoped
 
     /// <summary>Cancels a draft.</summary>
     public void Cancel() => Status = AccountingVoucherStatus.Cancelled;
+
+    /// <summary>Gets who checked the voucher (the middle signature: prepared, checked, approved), if anyone has.</summary>
+    public long? CheckedByUserId { get; private set; }
+
+    /// <summary>Gets when it was checked.</summary>
+    public DateTimeOffset? CheckedOnUtc { get; private set; }
+
+    /// <summary>Records the check.</summary>
+    /// <param name="userId">The checker.</param>
+    /// <param name="at">When.</param>
+    public void MarkChecked(long userId, DateTimeOffset at)
+    {
+        CheckedByUserId = userId;
+        CheckedOnUtc = at;
+    }
 }
 
 /// <summary>A line of an accounting voucher (<c>vou.accounting_voucher_line</c>).</summary>

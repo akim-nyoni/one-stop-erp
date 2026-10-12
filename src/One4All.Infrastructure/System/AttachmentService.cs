@@ -110,6 +110,8 @@ public sealed class AttachmentService : IAttachmentService
             AttachmentTarget.Journal => await _db.Journals.AnyAsync(j => j.CompanyId == companyId && (j.JournalNumber == attachment.TargetKey || j.DocumentNumber == attachment.TargetKey)
                 && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed), ct).ConfigureAwait(false),
             AttachmentTarget.LedgerDocument => true,
+            AttachmentTarget.AccountingVoucher => await _db.Set<Core.Vouchers.AccountingVoucher>().AnyAsync(v => v.CompanyId == companyId && v.Number.ToUpper() == attachment.TargetKey.ToUpper()
+                && v.Status == Core.Vouchers.AccountingVoucherStatus.Posted, ct).ConfigureAwait(false),
             _ => false,
         };
         if (posted)
@@ -135,6 +137,7 @@ public sealed class AttachmentService : IAttachmentService
         AttachmentTarget.Student => _db.Students.AnyAsync(s => s.CompanyId == companyId && s.AdmissionNumber.ToUpper() == key, ct),
         AttachmentTarget.Contract => _db.JobContracts.AnyAsync(c => c.CompanyId == companyId && c.ContractNumber.ToUpper() == key, ct),
         AttachmentTarget.WorkflowDocument => _db.WorkflowInstances.AnyAsync(i => i.CompanyId == companyId && (i.DocumentType + "/" + i.DocumentReference).ToUpper() == key, ct),
+        AttachmentTarget.AccountingVoucher => _db.Set<Core.Vouchers.AccountingVoucher>().AnyAsync(v => v.CompanyId == companyId && v.Number.ToUpper() == key, ct),
         _ => Task.FromResult(false),
     };
 }

@@ -16,8 +16,9 @@ public static partial class OperationCatalogue
         {
             Module = ledger, Title = "Accounting vouchers", ListTitle = "Vouchers",
             Description = "Payment, receipt, journal and petty cash vouchers: prepared by one user (lines ACCOUNT:amount; … — for a journal, debits positive and credits negative), "
-                + "approved and posted by another, cancelled while a draft, and printed with signature blocks.",
-            Fields = [Pick("Step", "Step", ["Prepare", "Approve", "Cancel", "Print"]), Pick("Type", "Type (prepare)", Enum.GetNames<AccountingVoucherType>()), Opt("Number", "Voucher number"),
+                + "checked by a second, approved and posted by another (or through the approvals inbox when an AccountingVoucher workflow is defined), cancelled while a draft, "
+                + "and printed with prepared / checked / approved signature blocks. Supporting documents attach under Attachments (target AccountingVoucher, key the voucher number).",
+            Fields = [Pick("Step", "Step", ["Prepare", "Check", "Approve", "Cancel", "Print"]), Pick("Type", "Type (prepare)", Enum.GetNames<AccountingVoucherType>()), Opt("Number", "Voucher number"),
                 Opt("Party", "Paid to / received from / about (prepare)"), Opt("Cash", "Cash or bank account (not a journal)"), Opt("Lines", "Lines: ACCOUNT:amount[:narrative]; …"),
                 Opt("Narrative", "Narrative"), Today()],
             Run = async (c, i) =>
@@ -43,13 +44,15 @@ public static partial class OperationCatalogue
                 long id = await FindAsync(c.Db.Set<AccountingVoucher>(), v => v.CompanyId == c.CompanyId && v.Number.ToUpper() == number.ToUpper(), v => v.Id, "voucher", number).ConfigureAwait(true);
                 return i.Text("Step") switch
                 {
+                    "Check" => Check(await vouchers.CheckAsync(c.CompanyId, id, c.UserId).ConfigureAwait(true), $"Voucher {number} checked."),
                     "Approve" => Check(await vouchers.ApproveAsync(c.CompanyId, id, c.UserId).ConfigureAwait(true), j => $"Voucher {number} approved and posted ({j})."),
                     "Cancel" => Check(await vouchers.CancelAsync(c.CompanyId, id).ConfigureAwait(true), $"Voucher {number} cancelled."),
                     _ => Check(await vouchers.RenderAsync(c.CompanyId, id).ConfigureAwait(true)),
                 };
             },
             List = async c => Table(await c.Db.Set<AccountingVoucher>().AsNoTracking().Where(v => v.CompanyId == c.CompanyId).OrderByDescending(v => v.Id).Take(200).ToListAsync().ConfigureAwait(true),
-                ("Voucher", v => v.Number), ("Type", v => v.Type), ("Date", v => D(v.Date)), ("Party", v => v.Party), ("Status", v => v.Status), ("Journal", v => v.JournalNumber ?? string.Empty)),
+                ("Voucher", v => v.Number), ("Type", v => v.Type), ("Date", v => D(v.Date)), ("Party", v => v.Party), ("Status", v => v.Status),
+                ("Checked", v => v.CheckedByUserId is null ? string.Empty : "yes"), ("Journal", v => v.JournalNumber ?? string.Empty)),
         };
         yield return new Operation
         {

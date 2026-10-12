@@ -68,4 +68,7 @@ public static class WorkflowDocumentTypes
 
     /// <summary>A submitted stand ownership transfer (reference: the application number).</summary>
     public const string OwnershipTransfer = "OwnershipTransfer";
+
+    /// <summary>A prepared accounting voucher (reference: the voucher number); approval posts it.</summary>
+    public const string AccountingVoucher = "AccountingVoucher";
 }

@@ -37,6 +37,9 @@ public enum AttachmentTarget
 
     /// <summary>A document in an approval workflow, keyed <c>{DocumentType}/{Reference}</c> — shown to its approvers.</summary>
     WorkflowDocument = 11,
+
+    /// <summary>An accounting voucher (payment, receipt, journal or petty cash), keyed by its number.</summary>
+    AccountingVoucher = 12,
 }
 
 /// <summary>

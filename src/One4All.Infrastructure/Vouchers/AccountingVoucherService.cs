@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Numbering;
 using One4All.Application.Abstractions.Vouchers;
+using One4All.Application.Abstractions.Workflow;
 using One4All.Application.Vouchers;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
@@ -18,16 +19,19 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _engine;
     private readonly INumberSequenceService _numbers;
+    private readonly Lazy<IWorkflowService>? _workflow;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="engine">The posting engine.</param>
     /// <param name="numbers">The number sequences.</param>
-    public AccountingVoucherService(One4AllDbContext db, IPostingEngine engine, INumberSequenceService numbers)
+    /// <param name="workflow">The approval workflow (null: approvals are direct only).</param>
+    public AccountingVoucherService(One4AllDbContext db, IPostingEngine engine, INumberSequenceService numbers, Lazy<IWorkflowService>? workflow = null)
     {
         _db = db;
         _engine = engine;
         _numbers = numbers;
+        _workflow = workflow;
     }
 
     /// <inheritdoc />
@@ -71,15 +75,50 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
 
         _db.Set<AccountingVoucher>().Add(voucher);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new PreparedVoucher(voucher.Id, voucher.Number, request.Lines.Sum(l => Math.Abs(l.Amount)) / (cashVoucher ? 1m : 2m));
+        decimal total = request.Lines.Sum(l => Math.Abs(l.Amount)) / (cashVoucher ? 1m : 2m);
+
+        // When the company routes vouchers through an approval workflow, it starts now; approving it in the inbox posts the voucher.
+        Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, companyId, WorkflowDocumentTypes.AccountingVoucher, voucher.Number, total,
+            request.PreparedByUserId, [("Type", request.Type.ToString()), ("Party", voucher.Party), ("CashAccount", voucher.CashAccountCode)], ct).ConfigureAwait(false);
+        if (governed.IsFailure)
+        {
+            return governed.Error;
+        }
+
+        return new PreparedVoucher(voucher.Id, voucher.Number, total);
     }
 
     /// <inheritdoc />
     public Task<Result<string>> ApproveAsync(long companyId, long voucherId, long approverUserId, CancellationToken ct = default)
-        => _db.AtomicAsync(() => ApproveCoreAsync(companyId, voucherId, approverUserId, ct), ct);
+        => _db.AtomicAsync(() => ApproveCoreAsync(companyId, voucherId, approverUserId, fromWorkflow: false, ct), ct);
 
-    // One unit: the posting and the approval are kept together.
-    private async Task<Result<string>> ApproveCoreAsync(long companyId, long voucherId, long approverUserId, CancellationToken ct)
+    /// <inheritdoc />
+    public async Task<Result> CheckAsync(long companyId, long voucherId, long checkerUserId, CancellationToken ct = default)
+    {
+        Result<AccountingVoucher> found = await LoadDraftAsync(companyId, voucherId, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return Result.Failure(found.Error);
+        }
+
+        AccountingVoucher voucher = found.Value;
+        if (checkerUserId == voucher.PreparedByUserId)
+        {
+            return Result.Failure(Error.Rule("Vou.SelfCheck", $"Voucher {voucher.Number} must be checked by someone other than the person who prepared it."));
+        }
+
+        if (voucher.CheckedByUserId is not null)
+        {
+            return Result.Failure(Error.Conflict("Vou.AlreadyChecked", $"Voucher {voucher.Number} has already been checked."));
+        }
+
+        voucher.MarkChecked(checkerUserId, DateTimeOffset.UtcNow);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    // One unit: the posting and the approval are kept together. From the workflow, the inbox decision is the approval.
+    internal async Task<Result<string>> ApproveCoreAsync(long companyId, long voucherId, long approverUserId, bool fromWorkflow, CancellationToken ct)
     {
         Result<AccountingVoucher> found = await LoadDraftAsync(companyId, voucherId, ct).ConfigureAwait(false);
         if (found.IsFailure)
@@ -88,9 +127,19 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
         }
 
         AccountingVoucher voucher = found.Value;
+        if (!fromWorkflow && await Workflow.WorkflowGate.InProgressAsync(_db, companyId, WorkflowDocumentTypes.AccountingVoucher, voucher.Number, ct).ConfigureAwait(false))
+        {
+            return Workflow.WorkflowGate.Governed(WorkflowDocumentTypes.AccountingVoucher, voucher.Number);
+        }
+
         if (approverUserId == voucher.PreparedByUserId)
         {
             return Error.Rule("Vou.SelfApproval", $"Voucher {voucher.Number} must be approved by someone other than the person who prepared it.");
+        }
+
+        if (approverUserId == voucher.CheckedByUserId)
+        {
+            return Error.Rule("Vou.CheckerApproval", $"Voucher {voucher.Number} was checked by this user; someone else approves it.");
         }
 
         List<JournalLineRequest> lines = [.. voucher.Lines.Select(l => new JournalLineRequest
@@ -162,7 +211,12 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
             [.. voucher.Lines.Select(l => new VoucherDocumentLine(l.AccountCode, names.GetValueOrDefault(l.AccountCode, string.Empty), l.Narrative, l.Debit, l.Credit))],
             $"User {voucher.PreparedByUserId.ToString(CultureInfo.InvariantCulture)}",
             voucher.ApprovedByUserId is long approver ? $"User {approver.ToString(CultureInfo.InvariantCulture)}" : null,
-            voucher.JournalNumber);
+            voucher.JournalNumber)
+        {
+            CheckedBy = voucher.CheckedByUserId is long checker ? $"User {checker.ToString(CultureInfo.InvariantCulture)}" : null,
+            Attachments = await _db.Set<Attachment>().AsNoTracking()
+                .CountAsync(a => a.CompanyId == companyId && a.Target == AttachmentTarget.AccountingVoucher && a.TargetKey == voucher.Number && a.RemovedOnUtc == null, ct).ConfigureAwait(false),
+        };
         return AccountingVoucherFormatter.ToPlainText(document);
     }
 
@@ -173,6 +227,20 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
         AccountingVoucherType.Journal => "JV",
         _ => "PCV",
     };
+
+    /// <summary>Cancels a voucher turned down in its approval workflow.</summary>
+    internal async Task<Result> CancelFromWorkflowAsync(long companyId, long voucherId, CancellationToken ct)
+    {
+        Result<AccountingVoucher> found = await LoadDraftAsync(companyId, voucherId, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return Result.Success();
+        }
+
+        found.Value.Cancel();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
 
     private async Task<Result<AccountingVoucher>> LoadDraftAsync(long companyId, long voucherId, CancellationToken ct)
     {
@@ -189,5 +257,40 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
         }
 
         return voucher;
+    }
+}
+
+/// <summary>Posts a voucher approved in its workflow, or cancels one rejected or returned there.</summary>
+internal sealed class AccountingVoucherWorkflowHandler : IWorkflowDocumentHandler
+{
+    private readonly One4AllDbContext _db;
+    private readonly IPostingEngine _engine;
+    private readonly INumberSequenceService _numbers;
+
+    public AccountingVoucherWorkflowHandler(One4AllDbContext db, IPostingEngine engine, INumberSequenceService numbers)
+    {
+        _db = db;
+        _engine = engine;
+        _numbers = numbers;
+    }
+
+    public string DocumentType => WorkflowDocumentTypes.AccountingVoucher;
+
+    public async Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+    {
+        long? id = await _db.Set<AccountingVoucher>().Where(v => v.CompanyId == companyId && v.Number == documentReference).Select(v => (long?)v.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (id is not long voucherId)
+        {
+            return Result.Failure(Error.NotFound("Vou.VoucherNotFound", $"Voucher {documentReference} not found."));
+        }
+
+        AccountingVoucherService vouchers = new(_db, _engine, _numbers);
+        if (outcome != Core.Workflow.WorkflowStatus.Approved)
+        {
+            return await vouchers.CancelFromWorkflowAsync(companyId, voucherId, ct).ConfigureAwait(false);
+        }
+
+        Result<string> posted = await vouchers.ApproveCoreAsync(companyId, voucherId, decidedByUserId, fromWorkflow: true, ct).ConfigureAwait(false);
+        return posted.IsSuccess ? Result.Success() : Result.Failure(posted.Error);
     }
 }

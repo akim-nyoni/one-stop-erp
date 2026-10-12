@@ -46,6 +46,12 @@ public interface IAccountingVoucherService
     /// <returns>The journal number, or why it was refused.</returns>
     Task<Result<string>> ApproveAsync(long companyId, long voucherId, long approverUserId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Checks a draft voucher — the "checked by" signature between preparer and approver. The checker is neither the preparer nor (later)
+    /// the approver.
+    /// </summary>
+    Task<Result> CheckAsync(long companyId, long voucherId, long checkerUserId, CancellationToken ct = default);
+
     /// <summary>Cancels a draft voucher; its number stays used.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="voucherId">The voucher.</param>

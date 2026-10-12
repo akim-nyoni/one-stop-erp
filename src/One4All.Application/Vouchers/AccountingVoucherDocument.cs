@@ -25,7 +25,14 @@ public sealed record VoucherDocumentLine(string AccountCode, string AccountName,
 /// <param name="ApprovedBy">Who approved it, once approved.</param>
 /// <param name="JournalNumber">The posting, once approved.</param>
 public sealed record AccountingVoucherDocument(string CompanyName, AccountingVoucherType Type, string Number, DateOnly Date, string Party, string? Narrative, string Currency,
-    IReadOnlyList<VoucherDocumentLine> Lines, string PreparedBy, string? ApprovedBy, string? JournalNumber);
+    IReadOnlyList<VoucherDocumentLine> Lines, string PreparedBy, string? ApprovedBy, string? JournalNumber)
+{
+    /// <summary>Gets who checked it, if anyone has.</summary>
+    public string? CheckedBy { get; init; }
+
+    /// <summary>Gets how many supporting documents are attached.</summary>
+    public int Attachments { get; init; }
+}
 
 /// <summary>
 /// Prints an accounting voucher in fixed-width text: the voucher title for its type, number and date, the party, each
@@ -81,7 +88,13 @@ public static class AccountingVoucherFormatter
         sb.AppendLine(rule);
         sb.AppendLine(document.JournalNumber is null ? "Status: awaiting approval - not posted" : $"Posted: journal {document.JournalNumber}");
         sb.AppendLine();
+        if (document.Attachments > 0)
+        {
+            sb.AppendLine(document.Attachments == 1 ? "Supporting documents: 1 attached" : $"Supporting documents: {document.Attachments} attached");
+        }
+
         sb.AppendLine(Pair($"Prepared by: {document.PreparedBy}", "Signature: ____________", width));
+        sb.AppendLine(Pair($"Checked by: {document.CheckedBy ?? "____________"}", "Signature: ____________", width));
         sb.AppendLine(Pair($"Approved by: {document.ApprovedBy ?? "____________"}", "Signature: ____________", width));
         if (document.Type is AccountingVoucherType.Payment or AccountingVoucherType.PettyCash)
         {
