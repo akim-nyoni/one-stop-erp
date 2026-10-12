@@ -444,6 +444,10 @@ public static class DependencyInjection
 
         // Licensing.
         services.AddSingleton(licensingOptions ?? new LicensingOptions());
+        services.AddSingleton<global::One4All.Licensing.Core.IOnlineActivationClient>(sp =>
+            sp.GetRequiredService<LicensingOptions>().ActivationUrl is { Length: > 0 } activation && Uri.TryCreate(activation.TrimEnd('/') + "/", UriKind.Absolute, out Uri? service)
+                ? new global::One4All.Licensing.Core.HttpOnlineActivationClient(new HttpClient { BaseAddress = service, Timeout = TimeSpan.FromSeconds(30) })
+                : new global::One4All.Licensing.Core.OfflineOnlyActivationClient());
         services.AddSingleton<ITrustedLicenceKeys, TrustedLicenceKeys>();
         Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton(services, new Application.Abstractions.System.UpdateOptions());
         services.AddSingleton<Application.Abstractions.System.IUpdateService, SystemServices.UpdateService>();

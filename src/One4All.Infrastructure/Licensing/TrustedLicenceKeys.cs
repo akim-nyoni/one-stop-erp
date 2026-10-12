@@ -25,6 +25,9 @@ public sealed class LicensingOptions
 
     /// <summary>Gets or sets where the file copy of the clock mark lives (default: the common application data folder).</summary>
     public string? ClockMarkPath { get; set; }
+
+    /// <summary>Gets or sets the vendor's online activation service (https); blank: activation is offline only.</summary>
+    public string? ActivationUrl { get; set; }
 }
 
 /// <summary>Reads the trusted licence public keys from <see cref="LicensingOptions"/>.</summary>

@@ -15,7 +15,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Licence", ListTitle = "Licensed modules",
             Description = "Shows the licence; installs a new licence or the vendor's revocation list (paste the text or give the file path); or gives this machine's activation request code to send to the vendor.",
-            Fields = [Pick("Action", "Action", ["Show status", "Install licence", "Install revocation list", "Activation request code"]), Opt("Token", "Licence / list text or file path"),
+            Fields = [Pick("Action", "Action", ["Show status", "Install licence", "Install revocation list", "Activation request code", "Activate online", "Renew online"]), Opt("Token", "Licence / list text or file path"),
                 Opt("Customer", "Customer reference (request code)")],
             Run = async (c, i) =>
             {
@@ -29,6 +29,26 @@ public static partial class OperationCatalogue
                     case "Install revocation list":
                         int revoked = Check(await licence.InstallRevocationListAsync(text ?? throw new OperationException("Paste the revocation list or give its file.")).ConfigureAwait(true));
                         return $"Revocation list installed ({revoked} licence(s) revoked). This licence: {licence.Current.Status}.";
+                    case "Activate online":
+                    case "Renew online":
+                        IOnlineActivationClient online = c.Get<IOnlineActivationClient>();
+                        OnlineActivationRequest request = new(new LicenceRequestCode(licence.MachineFingerprint, i.Optional("Customer"), Environment.MachineName, DateTimeOffset.UtcNow).Encode(),
+                            text, licence.Current.Payload?.LicenceId);
+                        OnlineActivationResponse answer = i.Text("Action") == "Renew online"
+                            ? await online.RenewAsync(request).ConfigureAwait(true)
+                            : await online.ActivateAsync(request).ConfigureAwait(true);
+                        if (!answer.Granted || answer.LicenceToken is null)
+                        {
+                            return answer.Message ?? "Not granted.";
+                        }
+
+                        if (answer.RevocationListToken is string list)
+                        {
+                            _ = await licence.InstallRevocationListAsync(list).ConfigureAwait(true);
+                        }
+
+                        LicenseValidationResult activated = await licence.InstallAsync(answer.LicenceToken).ConfigureAwait(true);
+                        return $"{activated.Status}: {activated.Message}" + (answer.Message is null ? string.Empty : $" ({answer.Message})");
                     case "Activation request code":
                         string code = new LicenceRequestCode(licence.MachineFingerprint, i.Optional("Customer"), Environment.MachineName, DateTimeOffset.UtcNow).Encode();
                         System.Windows.Clipboard.SetText(code);
