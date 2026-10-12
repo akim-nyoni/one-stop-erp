@@ -61,6 +61,26 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "HR expiry alerts", ListTitle = "Expiring within 60 days",
+            Description = "What lapses for active employees — work permits, contract ends, probation, filed documents and training certificates — within the days given; "
+                + "Notify sends HR (users whose roles cover employee records) one notification listing them. The scheduled task hr.expiry-alerts does this daily for 30 days ahead.",
+            Fields = [Pick("Step", "Step", ["List", "Notify HR"]), Num("Days", "Within (days)", "60"), Today()],
+            Run = async (c, i) =>
+            {
+                IHrAlertService alerts = c.Get<IHrAlertService>();
+                if (i.Text("Step") == "Notify HR")
+                {
+                    return $"{Check(await alerts.NotifyAsync(c.CompanyId, i.Date("Date"), i.Whole("Days")).ConfigureAwait(true))} HR user(s) notified.";
+                }
+
+                IReadOnlyList<HrExpiry> due = await alerts.ExpiringAsync(c.CompanyId, i.Date("Date"), i.Whole("Days")).ConfigureAwait(true);
+                return due.Count == 0 ? "Nothing expires in that time." : string.Join(Environment.NewLine, due.Select(d => $"{D(d.ExpiresOn)} {d.EmployeeNumber,-10} {d.EmployeeName,-28} {d.What}"));
+            },
+            List = async c => Table(await c.Get<IHrAlertService>().ExpiringAsync(c.CompanyId, DateOnly.FromDateTime(DateTime.Today), 60).ConfigureAwait(true),
+                ("Expires", d => D(d.ExpiresOn)), ("Days", d => d.DaysLeft), ("Employee", d => d.EmployeeNumber), ("Name", d => d.EmployeeName), ("What", d => d.What)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Grievances and property issued", ListTitle = "Open grievances and property out",
             Description = "Lodge a grievance and follow it (investigating, resolved or withdrawn with the outcome); issue company property to an employee and record its return — "
                 + "anything still out is listed on the leaver's clearance. Medical records are kept under Medical records (restricted).",
