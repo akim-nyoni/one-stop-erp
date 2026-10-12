@@ -13,6 +13,41 @@ public static partial class OperationCatalogue
     private static IEnumerable<Operation> Budgeting()
     {
         const string module = "Budgeting";
+        yield return new Operation
+        {
+            Module = module, Title = "Carry unspent capital forward", ListTitle = "Capital budgets",
+            Description = "Year-end: Propose lists each capital vote's approved budget, what was spent and what may still be carried; Approve carries the given amounts (VOTE:amount; …) "
+                + "into a later year's capital budget under the approval reference — a separate act, recorded for audit.",
+            Fields = [Pick("Step", "Step", ["Propose", "Approve"]), Req("Year", "From fiscal year (code)"), Opt("Budget", "Into capital budget (label, approve)"),
+                Opt("Amounts", "VOTE:amount; … (approve)"), Opt("Reference", "Approval reference"), Today("AsAt", "As at")],
+            Run = async (c, i) =>
+            {
+                ICapitalCarryForwardService carry = c.Get<ICapitalCarryForwardService>();
+                long year = await FindAsync(c.Db.FiscalYears, y => y.CompanyId == c.CompanyId && y.Code == i.Text("Year"), y => y.Id, "fiscal year", i.Text("Year")).ConfigureAwait(true);
+                if (i.Text("Step") == "Propose")
+                {
+                    IReadOnlyList<CapitalUnspent> votes = Check(await carry.ProposeAsync(c.CompanyId, year, i.Date("AsAt")).ConfigureAwait(true));
+                    return votes.Count == 0 ? "No approved capital budget for that year." : string.Join(Environment.NewLine, votes.Select(v =>
+                        $"{v.AccountCode,-10} budget {M(v.Budget),14}  spent {M(v.Spent),14}  carried {M(v.AlreadyCarried),12}  may carry {M(v.Carryable),14}"));
+                }
+
+                string label = i.Optional("Budget") ?? throw new OperationException("Name the capital budget to carry into.");
+                long target = await FindAsync(c.Db.Set<Budget>(), b => b.CompanyId == c.CompanyId && b.Label == label && b.Type == BudgetType.Capital, b => b.Id, "capital budget", label).ConfigureAwait(true);
+                List<CarryForwardAmount> amounts = [];
+                foreach (string part in (i.Optional("Amounts") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                    amounts.Add(bits.Length == 2 && decimal.TryParse(bits[1], System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal amount)
+                        ? new CarryForwardAmount(bits[0], amount) : throw new OperationException($"Write each as VOTE:amount (\"{part}\")."));
+                }
+
+                decimal total = Check(await carry.ApproveAsync(c.CompanyId, year, target, amounts, i.Optional("Reference") ?? string.Empty, c.UserId, i.Date("AsAt")).ConfigureAwait(true));
+                return $"{M(total)} of unspent capital carried into {label}.";
+            },
+            List = async c => Table(await c.Db.Set<Budget>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId && b.Type == BudgetType.Capital).OrderByDescending(b => b.Id).Take(100)
+                    .ToListAsync().ConfigureAwait(true),
+                ("Budget", b => b.Label), ("Version", b => b.VersionNumber), ("Status", b => b.Status)),
+        };
         string[] steps = ["Submit", "Start review", "Return", "Recommend", "Approve", "Accept proposals"];
         yield return new Operation
         {
