@@ -18373,6 +18373,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_salary_held");
 
+                    b.Property<string>("JobTitle")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("job_title");
+
                     b.Property<DateOnly?>("LastIncrementOn")
                         .HasColumnType("date")
                         .HasColumnName("last_increment_on");
@@ -18425,6 +18430,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("notch");
 
+                    b.Property<int?>("NoticePeriodDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("notice_period_days");
+
                     b.Property<int>("PayFrequency")
                         .HasColumnType("integer")
                         .HasColumnName("pay_frequency");
@@ -18437,6 +18446,30 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("PaymentMethod")
                         .HasColumnType("integer")
                         .HasColumnName("payment_method");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("phone");
+
+                    b.Property<byte[]>("Photo")
+                        .HasColumnType("bytea")
+                        .HasColumnName("photo");
+
+                    b.Property<string>("PhotoContentType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("photo_content_type");
+
+                    b.Property<string>("PhysicalAddress")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("physical_address");
+
+                    b.Property<string>("PostalAddress")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("postal_address");
 
                     b.Property<DateOnly?>("ProbationEndDate")
                         .HasColumnType("date")
@@ -18493,6 +18526,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly?>("WorkPermitExpiry")
                         .HasColumnType("date")
                         .HasColumnName("work_permit_expiry");
+
+                    b.Property<string>("WorkersCompensationClass")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("workers_compensation_class");
 
                     b.HasKey("Id")
                         .HasName("pk_employee");
@@ -18630,6 +18668,73 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_employee_benefit_company_id_employee_id");
 
                     b.ToTable("employee_benefit", "pay");
+                });
+
+            modelBuilder.Entity("One4All.Core.Payroll.EmployeeDependant", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateOnly?>("DateOfBirth")
+                        .HasColumnType("date")
+                        .HasColumnName("date_of_birth");
+
+                    b.Property<long>("EmployeeId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("employee_id");
+
+                    b.Property<string>("IdNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("id_number");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("MedicalAidNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("medical_aid_number");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Relationship")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("relationship");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<decimal?>("SharePercent")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("share_percent");
+
+                    b.HasKey("Id")
+                        .HasName("pk_employee_dependant");
+
+                    b.HasIndex("CompanyId", "EmployeeId")
+                        .HasDatabaseName("ix_employee_dependant_company_id_employee_id");
+
+                    b.ToTable("employee_dependant", "hr");
                 });
 
             modelBuilder.Entity("One4All.Core.Payroll.EmployeeDocument", b =>

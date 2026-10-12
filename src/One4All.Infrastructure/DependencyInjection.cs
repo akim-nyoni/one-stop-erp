@@ -410,6 +410,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Inventory.IItemCatalogueService, Inventory.ItemCatalogueService>();
         services.AddScoped<Application.Abstractions.Inventory.IBinService, Inventory.BinService>();
         services.AddScoped<Application.Abstractions.Payroll.IHrRecordsService, Payroll.HrRecordsService>();
+        services.AddScoped<Application.Abstractions.Payroll.IEmployeeProfileService, Payroll.EmployeeProfileService>();
         services.AddScoped<Application.Abstractions.Payroll.IAttendanceService, Payroll.AttendanceService>();
         services.AddScoped<Application.Abstractions.Payroll.IEmployeeLoanService, Payroll.EmployeeLoanService>();
         services.AddScoped<Application.Abstractions.Payroll.IEstablishmentService, Payroll.EstablishmentService>();

@@ -61,6 +61,56 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Employee contacts, photo and dependants", ListTitle = "Beneficiaries and medical-aid dependants",
+            Description = "The rest of the employee master: addresses, phone, job title, notice period and workers' compensation class (blank stays, a space clears); "
+                + "the photograph (a JPEG, PNG or BMP file; blank removes it); and beneficiaries (with their share, all shares at most 100%) and medical-aid dependants.",
+            Fields = [Pick("Step", "Step", ["Details", "Photo", "Add dependant", "Remove dependant"]), Opt("Number", "Employee number"), Opt("Physical", "Physical address"),
+                Opt("Postal", "Postal address"), Opt("Phone", "Phone"), Opt("JobTitle", "Job title / position"), OptNum("Notice", "Notice period (days)"), Opt("Wcif", "Workers' compensation class"),
+                Opt("PhotoFile", "Photograph file"), Pick("Kind", "Dependant is", Enum.GetNames<DependantKind>()), Opt("DependantName", "Dependant's name"), Opt("Relationship", "Relationship"),
+                Opt("Born", "Born (yyyy-MM-dd)"), Opt("IdNumber", "ID number"), OptNum("Share", "Beneficiary share %"), Opt("MedicalAid", "Medical-aid number"), OptNum("Dependant", "Dependant id")],
+            Run = async (c, i) =>
+            {
+                IEmployeeProfileService profile = c.Get<IEmployeeProfileService>();
+                string number = i.Optional("Number") ?? string.Empty;
+                switch (i.Text("Step"))
+                {
+                    case "Photo":
+                        if (i.Optional("PhotoFile") is not string file)
+                        {
+                            _ = Check(await profile.SetPhotoAsync(c.CompanyId, number, null, null).ConfigureAwait(true), string.Empty);
+                            return "Photograph removed.";
+                        }
+
+                        string type = System.IO.Path.GetExtension(file).ToLowerInvariant() switch { ".png" => "image/png", ".bmp" => "image/bmp", _ => "image/jpeg" };
+                        _ = Check(await profile.SetPhotoAsync(c.CompanyId, number, await System.IO.File.ReadAllBytesAsync(file).ConfigureAwait(true), type).ConfigureAwait(true), string.Empty);
+                        return "Photograph saved.";
+                    case "Add dependant":
+                        long id = Check(await profile.AddDependantAsync(c.CompanyId, number, new NewDependant(Enum.Parse<DependantKind>(i.Text("Kind")), i.Optional("DependantName") ?? string.Empty,
+                            i.Optional("Relationship") ?? string.Empty)
+                        {
+                            DateOfBirth = i.Optional("Born") is string born ? DateOnly.ParseExact(born, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null, IdNumber = i.Optional("IdNumber"),
+                            SharePercent = i.OptionalNumber("Share"), MedicalAidNumber = i.Optional("MedicalAid"),
+                        }).ConfigureAwait(true));
+                        return $"Added (id {id}).";
+                    case "Remove dependant":
+                        _ = Check(await profile.RemoveDependantAsync(c.CompanyId, (long)(i.OptionalNumber("Dependant") ?? 0m)).ConfigureAwait(true), string.Empty);
+                        return "Removed.";
+                    default:
+                        _ = Check(await profile.SetDetailsAsync(c.CompanyId, number, new EmployeeProfileUpdate
+                        {
+                            PhysicalAddress = i.Optional("Physical"), PostalAddress = i.Optional("Postal"), Phone = i.Optional("Phone"), JobTitle = i.Optional("JobTitle"),
+                            NoticePeriodDays = i.OptionalNumber("Notice") is decimal notice ? (int)notice : null, WorkersCompensationClass = i.Optional("Wcif"),
+                        }).ConfigureAwait(true), string.Empty);
+                        return $"Employee {number.ToUpperInvariant()} updated.";
+                }
+            },
+            List = async c => Table(await c.Db.EmployeeDependants.AsNoTracking().Where(d => d.CompanyId == c.CompanyId)
+                    .Join(c.Db.Employees, d => d.EmployeeId, e => e.Id, (d, e) => new { d, e.EmployeeNumber }).OrderBy(x => x.EmployeeNumber).ThenBy(x => x.d.Kind).Take(500).ToListAsync().ConfigureAwait(true),
+                ("Id", x => x.d.Id), ("Employee", x => x.EmployeeNumber), ("Name", x => x.d.Name), ("Is", x => x.d.Kind), ("Relationship", x => x.d.Relationship),
+                ("Share %", x => x.d.SharePercent?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty), ("Medical aid", x => x.d.MedicalAidNumber ?? string.Empty)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Employee record", ListTitle = "Employees",
             Description = "Engage an employee, or update one (blank fields stay as they are). Bank details are set at engagement; later changes go through 'Bank detail change' "
                 + "and a second person's approval.",
@@ -106,7 +156,8 @@ public static partial class OperationCatalogue
             },
             List = async c => Table(await c.Db.Employees.AsNoTracking().Where(e => e.CompanyId == c.CompanyId).OrderBy(e => e.EmployeeNumber).Take(500).ToListAsync().ConfigureAwait(true),
                 ("Number", e => e.EmployeeNumber), ("Name", e => e.FullName), ("Department", e => e.Department ?? string.Empty), ("Grade", e => e.Grade ?? string.Empty),
-                ("Type", e => e.EmploymentType), ("Status", e => e.Status), ("Engaged", e => D(e.EngagementDate))),
+                ("Type", e => e.EmploymentType), ("Job title", e => e.JobTitle ?? string.Empty), ("Phone", e => e.Phone ?? string.Empty), ("Status", e => e.Status),
+                ("Engaged", e => D(e.EngagementDate))),
         };
         yield return new Operation
         {

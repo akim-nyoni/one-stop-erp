@@ -26,6 +26,18 @@ public enum EmploymentType
 
     /// <summary>Casual / day labour.</summary>
     Casual = 2,
+
+    /// <summary>A fixed-term appointment (ends on the contract end date).</summary>
+    FixedTerm = 3,
+
+    /// <summary>Seasonal work (ends with the season).</summary>
+    Seasonal = 4,
+
+    /// <summary>An intern or attachment student.</summary>
+    Intern = 5,
+
+    /// <summary>A consultant engaged for a period.</summary>
+    Consultant = 6,
 }
 
 /// <summary>How an employee's net pay is paid (brief §14 PR11–PR13).</summary>
@@ -226,6 +238,36 @@ public sealed class Employee : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Gets or sets the e-mail address payslips are sent to.</summary>
     public string? Email { get; set; }
+
+    /// <summary>Gets or sets the residential (physical) address.</summary>
+    public string? PhysicalAddress { get; set; }
+
+    /// <summary>Gets or sets the postal address.</summary>
+    public string? PostalAddress { get; set; }
+
+    /// <summary>Gets or sets the employee's own phone number.</summary>
+    public string? Phone { get; set; }
+
+    /// <summary>Gets or sets the job title / position held.</summary>
+    public string? JobTitle { get; set; }
+
+    /// <summary>Gets or sets the notice period, in days, either side must give.</summary>
+    public int? NoticePeriodDays { get; set; }
+
+    /// <summary>Gets or sets the workers' compensation (accident insurance) class the post is rated in.</summary>
+    public string? WorkersCompensationClass { get; set; }
+
+    /// <summary>Gets or sets the photograph (an image file's bytes), or null.</summary>
+    public byte[]? Photo { get; set; }
+
+    /// <summary>Gets or sets the photograph's media type (e.g. image/jpeg).</summary>
+    public string? PhotoContentType { get; set; }
+
+    /// <summary>Whether this kind of employment ends on a contract end date.</summary>
+    /// <param name="type">The employment type.</param>
+    /// <returns>True for contract, fixed-term, seasonal, intern and consultant engagements.</returns>
+    public static bool HasEndDate(EmploymentType type) => type is EmploymentType.Contract or EmploymentType.FixedTerm or EmploymentType.Seasonal or EmploymentType.Intern
+        or EmploymentType.Consultant;
 
     /// <summary>When employment ended.</summary>
     public DateOnly? TerminationDate { get; private set; }

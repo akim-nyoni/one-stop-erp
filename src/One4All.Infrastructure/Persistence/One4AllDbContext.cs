@@ -587,6 +587,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Employee leave balances.</summary>
     public DbSet<Core.Payroll.EmployeeLeaveBalance> EmployeeLeaveBalances => Set<Core.Payroll.EmployeeLeaveBalance>();
 
+    /// <summary>Employees' beneficiaries and medical-aid dependants.</summary>
+    public DbSet<Core.Payroll.EmployeeDependant> EmployeeDependants => Set<Core.Payroll.EmployeeDependant>();
+
     /// <summary>Employee expense claims.</summary>
     public DbSet<Core.Expenses.ExpenseClaim> ExpenseClaims => Set<Core.Expenses.ExpenseClaim>();
 

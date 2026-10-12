@@ -33,9 +33,9 @@ public sealed class PayrollSetupService : IPayrollSetupService
             return Error.Validation("Payroll.SalaryNegative", "The basic salary cannot be negative.");
         }
 
-        if (employee.EmploymentType == EmploymentType.Contract && employee.ContractEndDate is null)
+        if (Employee.HasEndDate(employee.EmploymentType) && employee.ContractEndDate is null)
         {
-            return Error.Validation("Payroll.ContractEnd", "A contract employee needs the contract's end date.");
+            return Error.Validation("Payroll.ContractEnd", $"A {employee.EmploymentType} employee needs the contract's end date.");
         }
 
         if (DimensionProblem(employee.Department, employee.CostCentre) is Error dimension)
@@ -132,9 +132,9 @@ public sealed class PayrollSetupService : IPayrollSetupService
         employee.Nationality = update.Nationality is null ? employee.Nationality : Clean(update.Nationality);
         employee.SocialSecurityNumber = update.SocialSecurityNumber is null ? employee.SocialSecurityNumber : Clean(update.SocialSecurityNumber);
         employee.UnionMembership = update.UnionMembership is null ? employee.UnionMembership : Clean(update.UnionMembership);
-        if (employee.EmploymentType == EmploymentType.Contract && employee.ContractEndDate is null)
+        if (Employee.HasEndDate(employee.EmploymentType) && employee.ContractEndDate is null)
         {
-            return Result.Failure(Error.Validation("Payroll.ContractEnd", "A contract employee needs the contract's end date."));
+            return Result.Failure(Error.Validation("Payroll.ContractEnd", $"A {employee.EmploymentType} employee needs the contract's end date."));
         }
 
         // A move to another department or grade needs a vacant approved post there.

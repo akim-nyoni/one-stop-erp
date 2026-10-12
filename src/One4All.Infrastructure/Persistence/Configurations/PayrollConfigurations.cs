@@ -15,6 +15,12 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         b.HasIndex(x => x.HousingTenancyId);
         b.Property(x => x.PayGroup).HasMaxLength(20);
         b.Property(x => x.EmploymentType).HasConversion<int>();
+        b.Property(x => x.PhysicalAddress).HasMaxLength(300);
+        b.Property(x => x.PostalAddress).HasMaxLength(300);
+        b.Property(x => x.Phone).HasMaxLength(30);
+        b.Property(x => x.JobTitle).HasMaxLength(100);
+        b.Property(x => x.WorkersCompensationClass).HasMaxLength(20);
+        b.Property(x => x.PhotoContentType).HasMaxLength(50);
         b.Property(x => x.FullName).HasMaxLength(200);
         b.Property(x => x.Department).HasMaxLength(30);
         b.Property(x => x.CostCentre).HasMaxLength(30);
@@ -115,6 +121,22 @@ internal sealed class EmployeeLoanConfiguration : IEntityTypeConfiguration<Emplo
         b.Property(x => x.LoanReceivableAccountCode).HasMaxLength(8);
         b.Property(x => x.Status).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.Status });
+    }
+}
+
+internal sealed class EmployeeDependantConfiguration : IEntityTypeConfiguration<EmployeeDependant>
+{
+    public void Configure(EntityTypeBuilder<EmployeeDependant> b)
+    {
+        b.ToTable("employee_dependant", Schemas.HumanResources);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.Relationship).HasMaxLength(50);
+        b.Property(x => x.IdNumber).HasMaxLength(30);
+        b.Property(x => x.MedicalAidNumber).HasMaxLength(30);
+        b.Property(x => x.SharePercent).HasPrecision(5, 2);
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId });
     }
 }
 
