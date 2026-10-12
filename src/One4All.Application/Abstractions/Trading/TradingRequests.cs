@@ -14,8 +14,17 @@ public readonly record struct TradingPostingResult(long OpenItemId, string Journ
 }
 
 /// <summary>A request to post a sales invoice (AR).</summary>
-public sealed class SalesInvoiceRequest
+public sealed class SalesInvoiceRequest : ITradingAnalysis
 {
+    /// <summary>Gets the cost centre the revenue or expense posts to.</summary>
+    public string? CostCentre { get; init; }
+
+    /// <summary>Gets the department the revenue or expense posts to.</summary>
+    public string? Department { get; init; }
+
+    /// <summary>Gets the project the revenue or expense posts to.</summary>
+    public string? Project { get; init; }
+
     /// <summary>The company.</summary>
     public long CompanyId { get; init; }
 
@@ -74,7 +83,7 @@ public sealed class SalesInvoiceRequest
 /// <summary>One revenue account's share of a sales invoice's net amount.</summary>
 /// <param name="AccountCode">The revenue account (credited).</param>
 /// <param name="NetAmount">Its net amount.</param>
-public readonly record struct RevenueLine(string AccountCode, decimal NetAmount);
+public readonly record struct RevenueLine(string AccountCode, decimal NetAmount, string? CostCentre = null, string? Department = null);
 
 /// <summary>A request to post a receipt against a customer (AR).</summary>
 public sealed class ReceiptRequest
@@ -111,8 +120,17 @@ public sealed class ReceiptRequest
 }
 
 /// <summary>A request to post a supplier invoice (AP).</summary>
-public sealed class PurchaseInvoiceRequest
+public sealed class PurchaseInvoiceRequest : ITradingAnalysis
 {
+    /// <summary>Gets the cost centre the revenue or expense posts to.</summary>
+    public string? CostCentre { get; init; }
+
+    /// <summary>Gets the department the revenue or expense posts to.</summary>
+    public string? Department { get; init; }
+
+    /// <summary>Gets the project the revenue or expense posts to.</summary>
+    public string? Project { get; init; }
+
     /// <summary>The company.</summary>
     public long CompanyId { get; init; }
 
@@ -137,6 +155,9 @@ public sealed class PurchaseInvoiceRequest
     /// <summary>The expense/stock account code (debited).</summary>
     public string ExpenseAccountCode { get; init; } = string.Empty;
 
+    /// <summary>Gets the expense lines when the invoice spreads over several accounts (they add up to the net; each may carry its own cost centre and department).</summary>
+    public IReadOnlyList<RevenueLine> ExpenseLines { get; init; } = [];
+
     /// <summary>The input-tax account code (debited), when there is recoverable tax.</summary>
     public string? TaxAccountCode { get; init; }
 
@@ -160,8 +181,17 @@ public sealed class PurchaseInvoiceRequest
 }
 
 /// <summary>A request to post a credit note to a customer (AR) — reduces the debtor balance.</summary>
-public sealed class SalesCreditNoteRequest
+public sealed class SalesCreditNoteRequest : ITradingAnalysis
 {
+    /// <summary>Gets the cost centre the revenue or expense posts to.</summary>
+    public string? CostCentre { get; init; }
+
+    /// <summary>Gets the department the revenue or expense posts to.</summary>
+    public string? Department { get; init; }
+
+    /// <summary>Gets the project the revenue or expense posts to.</summary>
+    public string? Project { get; init; }
+
     /// <summary>Gets why the credit was given (RETURN, PRICE, DAMAGED…), for the credit notes analysis.</summary>
     public string? ReasonCode { get; init; }
 
@@ -203,8 +233,17 @@ public sealed class SalesCreditNoteRequest
 }
 
 /// <summary>A request to post a credit note from a supplier (AP) — reduces the creditor balance.</summary>
-public sealed class PurchaseCreditNoteRequest
+public sealed class PurchaseCreditNoteRequest : ITradingAnalysis
 {
+    /// <summary>Gets the cost centre the revenue or expense posts to.</summary>
+    public string? CostCentre { get; init; }
+
+    /// <summary>Gets the department the revenue or expense posts to.</summary>
+    public string? Department { get; init; }
+
+    /// <summary>Gets the project the revenue or expense posts to.</summary>
+    public string? Project { get; init; }
+
     /// <summary>The company.</summary>
     public long CompanyId { get; init; }
 
@@ -281,4 +320,20 @@ public sealed class PaymentRequest
     /// the net and the tax is owed on the code's output (WHT payable) account. Ignored for a cleared supplier.
     /// </summary>
     public string? WithholdingTaxCode { get; init; }
+}
+
+/// <summary>
+/// The analysis a trading document's revenue or expense lines post with (brief §3.1, §4.4): cost centre, department and project, so departmental
+/// budgets and the departmental P&amp;L see invoices and credit notes, not only manual journals.
+/// </summary>
+public interface ITradingAnalysis
+{
+    /// <summary>Gets the cost centre.</summary>
+    string? CostCentre { get; }
+
+    /// <summary>Gets the department.</summary>
+    string? Department { get; }
+
+    /// <summary>Gets the project.</summary>
+    string? Project { get; }
 }

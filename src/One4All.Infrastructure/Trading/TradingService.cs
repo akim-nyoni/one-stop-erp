@@ -169,7 +169,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         List<JournalLineRequest> lines = [Line(controlResult.Value, JournalSide.Debit, gross, rate, baseGross)];
         if (request.RevenueLines.Count == 0)
         {
-            lines.Add(Line(request.SalesAccountCode, JournalSide.Credit, request.NetAmount, rate, baseNet));
+            lines.Add(Analysed(Line(request.SalesAccountCode, JournalSide.Credit, request.NetAmount, rate, baseNet), request));
         }
         else
         {
@@ -180,7 +180,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
                 RevenueLine revenue = request.RevenueLines[i];
                 decimal baseShare = i == request.RevenueLines.Count - 1 ? baseLeft : Round(revenue.NetAmount * rate);
                 baseLeft -= baseShare;
-                lines.Add(Line(revenue.AccountCode, JournalSide.Credit, revenue.NetAmount, rate, baseShare));
+                lines.Add(Analysed(Line(revenue.AccountCode, JournalSide.Credit, revenue.NetAmount, rate, baseShare), request, revenue));
             }
         }
 
@@ -615,7 +615,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         // Reverse of an invoice: Dr revenue, Dr output tax, Cr AR control.
         List<JournalLineRequest> lines =
         [
-            Line(request.SalesAccountCode, JournalSide.Debit, request.NetAmount, rate, baseNet),
+            Analysed(Line(request.SalesAccountCode, JournalSide.Debit, request.NetAmount, rate, baseNet), request),
             Line(controlResult.Value, JournalSide.Credit, gross, rate, baseGross),
         ];
         if (request.TaxAmount != 0m && request.TaxAccountCode is not null)
@@ -671,7 +671,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         List<JournalLineRequest> lines =
         [
             Line(controlResult.Value, JournalSide.Debit, gross, rate, baseGross),
-            Line(request.ExpenseAccountCode, JournalSide.Credit, request.NetAmount, rate, baseNet),
+            Analysed(Line(request.ExpenseAccountCode, JournalSide.Credit, request.NetAmount, rate, baseNet), request),
         ];
         if (request.TaxAmount != 0m && request.TaxAccountCode is not null)
         {
@@ -701,6 +701,12 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         if (string.IsNullOrWhiteSpace(request.DocumentNumber))
         {
             return Error.Validation("Ap.InvoiceNumberRequired", "A supplier invoice needs the supplier's invoice number.");
+        }
+
+        if (request.ExpenseLines.Count > 0
+            && (request.ExpenseLines.Sum(l => l.NetAmount) != request.NetAmount || request.ExpenseLines.Any(l => string.IsNullOrWhiteSpace(l.AccountCode))))
+        {
+            return Error.Validation("Ap.ExpenseLinesMismatch", "The expense lines must each name an account and add up to the net amount.");
         }
 
         List<string> existing = await _db.OpenItems
@@ -755,11 +761,23 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         decimal baseTax = Round(request.TaxAmount * rate);
         decimal baseGross = baseNet + baseTax;
 
-        List<JournalLineRequest> lines =
-        [
-            Line(request.ExpenseAccountCode, JournalSide.Debit, request.NetAmount, rate, baseNet),
-            Line(controlResult.Value, JournalSide.Credit, gross, rate, baseGross),
-        ];
+        List<JournalLineRequest> lines = [Line(controlResult.Value, JournalSide.Credit, gross, rate, baseGross)];
+        if (request.ExpenseLines.Count == 0)
+        {
+            lines.Insert(0, Analysed(Line(request.ExpenseAccountCode, JournalSide.Debit, request.NetAmount, rate, baseNet), request));
+        }
+        else
+        {
+            // Several expense accounts (each with its own analysis): the last absorbs base rounding so the debits equal the base net.
+            decimal baseLeft = baseNet;
+            for (int i = 0; i < request.ExpenseLines.Count; i++)
+            {
+                RevenueLine expense = request.ExpenseLines[i];
+                decimal baseShare = i == request.ExpenseLines.Count - 1 ? baseLeft : Round(expense.NetAmount * rate);
+                baseLeft -= baseShare;
+                lines.Insert(i, Analysed(Line(expense.AccountCode, JournalSide.Debit, expense.NetAmount, rate, baseShare), request, expense));
+            }
+        }
         if (request.TaxAmount != 0m && request.TaxAccountCode is not null)
         {
             lines.Add(Line(request.TaxAccountCode, JournalSide.Debit, request.TaxAmount, rate, baseTax, request.TaxCode));
@@ -1233,6 +1251,16 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
     private static JournalLineRequest Line(string account, JournalSide side, decimal txn, decimal rate, decimal baseAmount, string? taxCode = null) =>
         new() { AccountCode = account, Side = side, TransactionAmount = txn, ExchangeRate = rate, BaseAmount = baseAmount, TaxCode = taxCode };
+
+    // A revenue or expense line with the document's analysis (a line's own cost centre and department win over the document's).
+    private static JournalLineRequest Analysed(JournalLineRequest line, ITradingAnalysis document, RevenueLine? own = null) => new()
+    {
+        AccountCode = line.AccountCode, Side = line.Side, TransactionAmount = line.TransactionAmount, ExchangeRate = line.ExchangeRate, BaseAmount = line.BaseAmount, TaxCode = line.TaxCode,
+        Narrative = line.Narrative, CostCentre = Clean(own?.CostCentre) ?? Clean(document.CostCentre), Department = Clean(own?.Department) ?? Clean(document.Department),
+        Project = Clean(document.Project),
+    };
+
+    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
 
     private static decimal Round(decimal value) => decimal.Round(value, Scale, MidpointRounding.ToEven);
 }

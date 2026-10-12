@@ -108,7 +108,8 @@ public static partial class OperationCatalogue
             Description = "Posts a sales invoice or credit note to a customer's account (the customer's currency unless another is given; tax at the tax code's account).",
             Fields = [Pick("Document", "Document", ["Invoice", "Credit note"]), Req("Customer", "Customer code"), Req("Number", "Document number"), Today("Date", "Date"), Num("Net", "Net amount"),
                 Num("Tax", "Tax amount", "0"), Req("Account", "Sales account"), Opt("TaxAccount", "Tax account"), Opt("TaxCode", "Tax code"), Opt("Currency", "Currency (blank: the customer's)"),
-                Opt("Reason", "Reason code (credit note)"), Opt("Narrative", "Narrative"), Opt("Override", "Supervisor allowing it over the credit limit (user name)")],
+                Opt("Reason", "Reason code (credit note)"), Opt("Narrative", "Narrative"), Opt("Override", "Supervisor allowing it over the credit limit (user name)"),
+                Opt("CostCentre", "Cost centre"), Opt("Department", "Department"), Opt("Project", "Project")],
             Run = async (c, i) =>
             {
                 long customer = await CustomerAsync(c, i.Text("Customer")).ConfigureAwait(true);
@@ -121,12 +122,14 @@ public static partial class OperationCatalogue
                     {
                         CompanyId = c.CompanyId, CustomerId = customer, DocumentNumber = i.Text("Number"), DocumentDate = i.Date("Date"), Currency = currency, NetAmount = i.Number("Net"),
                         TaxAmount = i.Number("Tax"), SalesAccountCode = i.Text("Account"), TaxAccountCode = i.Optional("TaxAccount"), ReasonCode = i.Optional("Reason"), Narrative = i.Optional("Narrative"),
+                        CostCentre = i.Optional("CostCentre"), Department = i.Optional("Department"), Project = i.Optional("Project"),
                     }, c.UserId).ConfigureAwait(true));
                     return credit.Posted ? $"Credit note {i.Text("Number")} posted (journal {credit.JournalNumber})." : $"Credit note {i.Text("Number")} is awaiting approval.";
                 }
 
                 TradingPostingResult posted = Check(await c.Get<ISalesLedgerService>().PostInvoiceAsync(new SalesInvoiceRequest
                 {
+                    CostCentre = i.Optional("CostCentre"), Department = i.Optional("Department"), Project = i.Optional("Project"),
                     CompanyId = c.CompanyId, CustomerId = customer, DocumentNumber = i.Text("Number"), DocumentDate = i.Date("Date"), Currency = currency, NetAmount = i.Number("Net"),
                     TaxAmount = i.Number("Tax"), SalesAccountCode = i.Text("Account"), TaxAccountCode = i.Optional("TaxAccount"), TaxCode = i.Optional("TaxCode"), Narrative = i.Optional("Narrative"),
                     EnteredByUserId = c.UserId, CreditLimitOverrideByUserId = await OptionalUserAsync(c, i.Optional("Override")).ConfigureAwait(true),
@@ -168,24 +171,36 @@ public static partial class OperationCatalogue
             Module = "Suppliers", Title = "Supplier invoice or credit note", ListTitle = "Open supplier items",
             Description = "Posts a supplier's invoice or credit note that has no purchase order (services, utilities); invoices for ordered goods go through Purchasing → Match a supplier invoice.",
             Fields = [Pick("Document", "Document", ["Invoice", "Credit note"]), Req("Supplier", "Supplier code"), Req("Number", "Supplier's document number"), Today("Date", "Date"), Num("Net", "Net amount"),
-                Num("Tax", "Tax amount", "0"), Req("Account", "Expense account"), Opt("TaxAccount", "Tax account"), Opt("TaxCode", "Tax code"), Opt("Currency", "Currency (blank: the supplier's)"),
-                Opt("Narrative", "Narrative")],
+                Num("Tax", "Tax amount", "0"), Opt("Account", "Expense account"), Opt("TaxAccount", "Tax account"), Opt("TaxCode", "Tax code"), Opt("Currency", "Currency (blank: the supplier's)"),
+                Opt("Narrative", "Narrative"), Opt("CostCentre", "Cost centre"), Opt("Department", "Department"), Opt("Project", "Project"),
+                Opt("Lines", "Expense lines ACCOUNT:amount[:cost centre[:department]]; … (invoice)")],
             Run = async (c, i) =>
             {
                 long supplier = await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true);
                 CurrencyCode currency = i.Optional("Currency") is string code ? CurrencyCode.Parse(code)
                     : await c.Db.Suppliers.AsNoTracking().Where(x => x.Id == supplier).Select(x => x.Currency).SingleAsync().ConfigureAwait(true);
                 IPurchaseLedgerService purchases = c.Get<IPurchaseLedgerService>();
+                List<RevenueLine> expenseLines = [];
+                foreach (string part in (i.Optional("Lines") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                    expenseLines.Add(bits.Length >= 2 && decimal.TryParse(bits[1], System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal amount)
+                        ? new RevenueLine(bits[0], amount, bits.Length > 2 ? bits[2] : null, bits.Length > 3 ? bits[3] : null)
+                        : throw new OperationException($"Write each line as ACCOUNT:amount[:cost centre[:department]] (\"{part}\")."));
+                }
+
                 TradingPostingResult posted = Check(i.Text("Document") == "Invoice"
                     ? await purchases.PostInvoiceAsync(new PurchaseInvoiceRequest
                     {
                         CompanyId = c.CompanyId, SupplierId = supplier, DocumentNumber = i.Text("Number"), DocumentDate = i.Date("Date"), Currency = currency, NetAmount = i.Number("Net"),
-                        TaxAmount = i.Number("Tax"), ExpenseAccountCode = i.Text("Account"), TaxAccountCode = i.Optional("TaxAccount"), TaxCode = i.Optional("TaxCode"), Narrative = i.Optional("Narrative"),
+                        TaxAmount = i.Number("Tax"), ExpenseAccountCode = i.Optional("Account") ?? string.Empty, TaxAccountCode = i.Optional("TaxAccount"), TaxCode = i.Optional("TaxCode"),
+                        Narrative = i.Optional("Narrative"), CostCentre = i.Optional("CostCentre"), Department = i.Optional("Department"), Project = i.Optional("Project"), ExpenseLines = expenseLines,
                     }).ConfigureAwait(true)
                     : await purchases.PostCreditNoteAsync(new PurchaseCreditNoteRequest
                     {
                         CompanyId = c.CompanyId, SupplierId = supplier, DocumentNumber = i.Text("Number"), DocumentDate = i.Date("Date"), Currency = currency, NetAmount = i.Number("Net"),
-                        TaxAmount = i.Number("Tax"), ExpenseAccountCode = i.Text("Account"), TaxAccountCode = i.Optional("TaxAccount"), Narrative = i.Optional("Narrative"),
+                        TaxAmount = i.Number("Tax"), ExpenseAccountCode = i.Optional("Account") ?? string.Empty, TaxAccountCode = i.Optional("TaxAccount"), Narrative = i.Optional("Narrative"),
+                        CostCentre = i.Optional("CostCentre"), Department = i.Optional("Department"), Project = i.Optional("Project"),
                     }).ConfigureAwait(true));
                 return $"{i.Text("Document")} {i.Text("Number")} posted: {M(posted.BaseAmount)} base (journal {posted.JournalNumber})"
                     + (posted.WithheldBase == 0m ? "." : $"; {M(posted.WithheldBase)} withholding tax held back.");
