@@ -192,4 +192,20 @@ public sealed class RenderModel
 
     /// <summary>The report footer band, if any (rendered once at the end).</summary>
     public RenderBand? ReportFooter { get; set; }
+
+    /// <summary>Whether this is the head of a longer report (the first pages shown while the rest are laid out).</summary>
+    public bool IsHead { get; init; }
+
+    /// <summary>
+    /// The first bands of the report, to show at once while the rest are laid out (brief §13 performance: "renders first page &lt; 5 s, streams thereafter"):
+    /// the headers and up to the given number of body bands, without the report footer (its totals belong to the whole report). The whole report when it is short.
+    /// </summary>
+    /// <param name="maxBodyBands">How many body bands to keep.</param>
+    /// <returns>The head, or this model when it is no longer than that.</returns>
+    public RenderModel Head(int maxBodyBands)
+        => Body.Count <= maxBodyBands ? this : new RenderModel
+        {
+            ReportName = ReportName, RightToLeft = RightToLeft, Page = Page, ReportHeader = ReportHeader, PageHeader = PageHeader, PageFooter = PageFooter,
+            Body = [.. Body.Take(Math.Max(0, maxBodyBands))], IsHead = true,
+        };
 }

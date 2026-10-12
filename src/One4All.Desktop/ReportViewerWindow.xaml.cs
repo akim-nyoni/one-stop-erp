@@ -59,9 +59,32 @@ public partial class ReportViewerWindow : Window
             return;
         }
 
-        (FixedDocument document, _pages) = FixedReportDocument.Build(layout, Drill);
-        Viewer.Document = document;
+        // A long report shows its first pages at once and the rest when they are laid out, so the viewer answers straight away.
+        RenderModel head = layout.Head(PreviewHeadBands);
+        (FixedDocument first, _pages) = FixedReportDocument.Build(head, Drill);
+        Viewer.Document = first;
+        if (!head.IsHead)
+        {
+            return;
+        }
+
+        string status = _viewModel.StatusMessage;
+        _viewModel.StatusMessage = $"Showing the first pages; laying out the rest of {layout.Body.Count:N0} rows…";
+        _ = Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, () =>
+        {
+            if (!ReferenceEquals(_viewModel.Layout, layout))
+            {
+                return; // a newer run took over
+            }
+
+            (FixedDocument whole, _pages) = FixedReportDocument.Build(layout, Drill);
+            Viewer.Document = whole;
+            _viewModel.StatusMessage = status;
+        });
     }
+
+    // How many body rows the first view shows before the whole report is laid out.
+    private const int PreviewHeadBands = 300;
 
     private async void Drill(string target, string key)
     {

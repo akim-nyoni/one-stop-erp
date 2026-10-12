@@ -268,10 +268,11 @@ public sealed partial class ReportViewerViewModel : ObservableObject
         }
 
         IsBusy = true;
-        StatusMessage = "Running…";
+        StatusMessage = "Running… (Cancel stops it)";
+        CancellationTokenSource running = _running = new CancellationTokenSource();
         try
         {
-            Result<RenderedDocument> result = await RenderAsync(ReportFormat.Layout, ReportRunPurpose.View).ConfigureAwait(true);
+            Result<RenderedDocument> result = await RenderAsync(ReportFormat.Layout, ReportRunPurpose.View, running.Token).ConfigureAwait(true);
             if (result.IsFailure)
             {
                 StatusMessage = result.Error.Message;
@@ -282,11 +283,23 @@ public sealed partial class ReportViewerViewModel : ObservableObject
             Layout = One4All.Reporting.Engine.ReportLayout.Deserialize(result.Value.Content);
             StatusMessage = $"Rendered {SelectedReport.Code} at {DateTime.Now:HH:mm:ss}. Blue values open their source.";
         }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "Run cancelled.";
+        }
         finally
         {
             IsBusy = false;
+            _running = null;
+            running.Dispose();
         }
     }
+
+    private CancellationTokenSource? _running;
+
+    /// <summary>Stops a report that is still running.</summary>
+    [RelayCommand]
+    private void CancelRun() => _running?.Cancel();
 
     /// <summary>Gets the laid-out report on screen (null before a run or after a failure).</summary>
     [ObservableProperty]
@@ -329,7 +342,7 @@ public sealed partial class ReportViewerViewModel : ObservableObject
 
     // Every preview and export goes through the audited runner as the signed-in user, so it is permission-checked and in
     // the report run log (brief §13.3).
-    private async Task<Result<RenderedDocument>> RenderAsync(ReportFormat format, ReportRunPurpose purpose)
+    private async Task<Result<RenderedDocument>> RenderAsync(ReportFormat format, ReportRunPurpose purpose, CancellationToken ct = default)
     {
         ReportListItem report = SelectedReport!;
         Dictionary<string, object?> parameters = BuildParameters();
@@ -337,7 +350,7 @@ public sealed partial class ReportViewerViewModel : ObservableObject
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         IAuditedReportRunner runner = scope.ServiceProvider.GetRequiredService<IAuditedReportRunner>();
         long? userId = _services.GetService<DesktopSession>()?.UserId;
-        Result<AuditedReport> run = await runner.RunAsync(_companyId, report.Code, parameters, format, purpose, userId).ConfigureAwait(true);
+        Result<AuditedReport> run = await runner.RunAsync(_companyId, report.Code, parameters, format, purpose, userId, ct).ConfigureAwait(true);
         return run.IsSuccess ? run.Value.Document : run.Error;
     }
 
