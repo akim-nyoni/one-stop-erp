@@ -217,6 +217,12 @@ public static class PayrollReports
              new Column("Accrual", "Accrual", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("PR66", "Segregation of Duties Violations — Payroll", "Payroll", "Users who processed a payroll run in the period after changing employee pay or payment details, and anyone who processed a run that paid themselves.",
             "PyrlSod", [new Column("User", "User", 100), new Column("Violation", "Violation", 200), new Column("Detail", "Detail", 260), new Column("Run", "Run", 100), new Column("When", "When", 110)], Period);
+        yield return Listing("PR74", "Payslip (designable)", "Payroll", "Every payslip line in the period — employee, section, element and amount with the slip's gross, deductions and net — "
+            + "as the data source for a company's own payslip layout in the report designer (one employee, or all).",
+            "PyrlPayslipLines", [new Column("Employee", "Employee", 150), new Column("Number", "No.", 60), new Column("Department", "Dept", 60), new Column("Period", "Period", 60),
+             new Column("PayDate", "Pay date", 70), new Column("Section", "Section", 80), new Column("Element", "Element", 70), new Column("Description", "Description", 150),
+             new Column("Amount", "Amount", 85, true), new Column("Gross", "Gross", 85), new Column("Deductions", "Deductions", 85), new Column("Net", "Net", 85)],
+            [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("EmployeeNumber", ParameterType.String)]);
         yield return Listing("PR69", "Payslip Reprint Log", "Payroll", "Payslips printed more than once: each print after the first with when and by whom.",
             "PyrlReprints", [new Column("Employee", "Employee", 160), new Column("Period", "Period", 70), new Column("Print", "Print no.", 55), new Column("When", "When", 115), new Column("User", "By", 100)], Period);
     }

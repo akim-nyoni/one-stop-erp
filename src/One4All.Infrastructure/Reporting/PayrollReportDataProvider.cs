@@ -39,6 +39,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLJOURNAL" => await JournalAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLVARIANCE" => await VarianceAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLTRACE" => await TraceAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLPAYSLIPLINES" => await PayslipLinesAsync(companyId, fromDate, toDate, Text(parameters, "EmployeeNumber"), ct).ConfigureAwait(false),
             "PYRLDENOMINATIONS" => await DenominationsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLNETCONTROL" => await NetControlAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLEARNINGS" => await EarningsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -108,6 +109,28 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLTAXTABLE" => await TaxTableAsync(companyId, asAt, ct).ConfigureAwait(false),
             _ => [],
         };
+    }
+
+    // Every payslip line with its slip's totals — the data a designed payslip layout groups by employee.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PayslipLinesAsync(long companyId, DateOnly fromDate, DateOnly toDate, string? employeeNumber, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        string? only = string.IsNullOrWhiteSpace(employeeNumber) ? null : employeeNumber.Trim().ToUpperInvariant();
+        static string Section(PayElementType type) => type switch
+        {
+            PayElementType.Earning => "Earnings",
+            PayElementType.Deduction => "Deductions",
+            PayElementType.EmployerContribution => "Employer contributions",
+            PayElementType.Memo => "Taxable benefits",
+            _ => type.ToString(),
+        };
+        return [.. (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false))
+            .Where(p => only is null || (employees.TryGetValue(p.EmployeeId, out Employee? e) && e.EmployeeNumber == only))
+            .OrderBy(p => employees.GetValueOrDefault(p.EmployeeId)?.EmployeeNumber, StringComparer.Ordinal).ThenBy(p => p.PayDate)
+            .SelectMany(p => p.Lines.Where(l => l.Type != PayElementType.Provision).OrderBy(l => l.Type).ThenBy(l => l.Id).Select(l => Row(
+                ("Employee", employees.GetValueOrDefault(p.EmployeeId)?.FullName ?? "?"), ("Number", employees.GetValueOrDefault(p.EmployeeId)?.EmployeeNumber ?? "?"),
+                ("Department", employees.GetValueOrDefault(p.EmployeeId)?.Department ?? string.Empty), ("Period", p.PeriodLabel), ("PayDate", Date(p.PayDate)), ("Section", Section(l.Type)),
+                ("Element", l.ElementCode), ("Description", l.Description), ("Amount", l.Amount), ("Gross", p.GrossEarnings), ("Deductions", p.TotalDeductions), ("Net", p.NetPay))))];
     }
 
     private Task<List<Payslip>> PayslipsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)

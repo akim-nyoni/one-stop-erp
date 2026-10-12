@@ -54,6 +54,15 @@ public sealed class PayrollSettlementTests
         (closed.PaidOn, closed.ClosedOn, closed.NetPayOutstanding).Should().Be(((DateOnly?)new DateOnly(2026, 3, 25), (DateOnly?)new DateOnly(2026, 3, 26), 0m));
         (await settlement.CloseAsync(companyId, "PS-M03", new DateOnly(2026, 3, 27))).Error.Code.Should().Be("Payroll.RunClosed");
         (await db.Set<PayrollRunRecord>().AsNoTracking().SingleAsync(r => r.CompanyId == companyId && r.DocumentNumber == "PS-M03")).PaymentJournalNumber.Should().Be(paid.JournalNumber);
+
+        // The designable payslip: one employee's lines with the slip's totals, ready for a company's own layout.
+        await scope.ServiceProvider.GetRequiredService<One4All.Infrastructure.Persistence.Seeding.ReportCatalogueSeeder>().SeedAsync();
+        var payslip = await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Reporting.IReportRunner>().RenderAsync(companyId, "PR74",
+            new Dictionary<string, object?> { ["FromDate"] = new DateOnly(2026, 3, 1), ["ToDate"] = new DateOnly(2026, 3, 31), ["EmployeeNumber"] = "ps-1" },
+            One4All.Application.Abstractions.Reporting.ReportFormat.Csv);
+        payslip.IsSuccess.Should().BeTrue(payslip.IsFailure ? payslip.Error.Message : null);
+        string csv = System.Text.Encoding.UTF8.GetString(payslip.Value.Content);
+        csv.Should().Contain("Ann Bank,PS-1").And.Contain("Earnings,BASIC").And.NotContain("Ben Cash");
     }
 
     [SkippableFact]
