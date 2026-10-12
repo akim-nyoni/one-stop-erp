@@ -9,6 +9,7 @@ internal sealed class CompanyConfiguration : IEntityTypeConfiguration<Company>
     public void Configure(EntityTypeBuilder<Company> b)
     {
         b.Property(x => x.PosChangeCurrency).HasMaxLength(3);
+        b.Property(x => x.TaxYearStartMonth).HasDefaultValue(1).HasSentinel(0);
         b.ToTable("company", Schemas.System);
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).HasMaxLength(20);

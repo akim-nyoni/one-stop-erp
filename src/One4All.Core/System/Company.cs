@@ -78,6 +78,9 @@ public sealed class Company : SoftDeletableEntity
     /// </summary>
     public bool PayrollApprovalRequired { get; set; }
 
+    /// <summary>Gets or sets the month the tax year starts in (1 = January; e.g. 3 for a March–February tax year); year-to-date pay and cumulative tax follow it.</summary>
+    public int TaxYearStartMonth { get; set; } = 1;
+
     /// <summary>Gets or sets the deemed (official) annual interest rate a cheap or interest-free staff loan's benefit is taxed at (null: no loan benefit).</summary>
     public decimal? DeemedLoanInterestRatePercent { get; set; }
 

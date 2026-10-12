@@ -75,8 +75,9 @@ public sealed partial class PayrollService
                 .Where(i => customers.Contains(i.Item.TraderId)).GroupBy(i => i.Item.TraderId).ToDictionary(g => g.Key, g => g.Sum(i => i.Signed(LedgerSign.Debit)));
         }
 
-        // The tax year so far (January to the period before this pay date): taxable pay and the tax each tax-table element deducted.
-        DateOnly yearStart = new(asAt.Year, 1, 1);
+        // The tax year so far (from the company's tax-year start to the period before this pay date): taxable pay and the tax each tax-table element deducted.
+        int taxYearStartMonth = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.TaxYearStartMonth).FirstAsync(ct).ConfigureAwait(false);
+        DateOnly yearStart = PayPeriods.TaxYearStart(asAt, taxYearStartMonth);
         List<string> taxCodes = [.. elements.Values.Where(e => e.Basis == CalculationBasis.TaxTable).Select(e => e.Code)];
         var ytd = await _db.Set<Payslip>().Where(p => p.CompanyId == companyId && ids.Contains(p.EmployeeId) && p.PayDate >= yearStart && p.PayDate < asAt)
             .SelectMany(p => p.Lines.Where(l => ((l.Type == PayElementType.Earning || l.Type == PayElementType.Memo) && l.Taxable) || taxCodes.Contains(l.ElementCode))
@@ -123,7 +124,7 @@ public sealed partial class PayrollService
             .ToListAsync(ct).ConfigureAwait(false);
         List<SalaryScale> salaryScales = acting.Count == 0 ? [] : await _db.SalaryScales.AsNoTracking().Where(s => s.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
 
-        var openings = await _db.Set<PayrollYtdOpening>().AsNoTracking().Where(o => ids.Contains(o.EmployeeId) && o.TaxYear == asAt.Year)
+        var openings = await _db.Set<PayrollYtdOpening>().AsNoTracking().Where(o => ids.Contains(o.EmployeeId) && o.TaxYear == PayPeriods.TaxYear(asAt, taxYearStartMonth))
             .Select(o => new { o.EmployeeId, o.Code, o.Amount }).ToListAsync(ct).ConfigureAwait(false);
 
         Dictionary<long, Dictionary<string, object?>> result = [];
@@ -133,7 +134,7 @@ public sealed partial class PayrollService
             {
                 [YtdTaxableVariable] = ytd.Where(l => l.EmployeeId == e.Id && l.Type is PayElementType.Earning or PayElementType.Memo).Sum(l => l.Amount)
                     + openings.Where(o => o.EmployeeId == e.Id && o.Code == PayrollYtdOpening.TaxableCode).Sum(o => o.Amount),
-                [TaxPeriodVariable] = (decimal)PayPeriods.Number(e.PayFrequency, asAt),
+                [TaxPeriodVariable] = (decimal)PayPeriods.Number(e.PayFrequency, asAt, taxYearStartMonth),
                 [TaxTablesKey] = tables,
                 [TaxCreditsKey] = credits.Where(c => (c.AppliesToAll || given.Any(g => g.EmployeeId == e.Id && g.TaxCreditId == c.Id)) && TaxCredits.Eligible(c.MinimumAge, e.DateOfBirth, asAt))
                     .Select(c => new TaxCreditRule(c.Code, c.Basis, c.Amount, c.Percent, c.ElementCode)).ToList(),

@@ -776,6 +776,27 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Set the tax year", ListTitle = "Deductions and their suspension priority",
+            Description = "The month the tax year starts in (1 = January; 3 for a March–February year). Year-to-date taxable pay, cumulative tax and the YTD openings follow it.",
+            Fields = [Num("Month", "First month of the tax year (1–12)", "1")],
+            Run = async (c, i) =>
+            {
+                int month = i.Whole("Month");
+                if (month is < 1 or > 12)
+                {
+                    throw new OperationException("The month is 1 to 12.");
+                }
+
+                Company company = await c.Db.Companies.FirstAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                company.TaxYearStartMonth = month;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"The tax year starts on 1 {new DateOnly(2000, month, 1):MMMM}.";
+            },
+            List = async c => Table(await c.Db.PayElements.AsNoTracking().Where(e => e.CompanyId == c.CompanyId && e.Type == PayElementType.Deduction).OrderBy(e => e.Sequence).ToListAsync().ConfigureAwait(true),
+                ("Deduction", e => e.Code), ("Name", e => e.Name)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set net-pay protection", ListTitle = "Deductions and their suspension priority",
             Description = "The minimum take-home (an amount and / or % of gross) and, optionally, one deduction's suspension priority (0 = never suspended; highest is suspended first).",
             Fields = [OptNum("Amount", "Minimum take-home amount"), OptNum("Percent", "Minimum take-home % of gross"), Opt("Element", "Deduction code"), OptNum("Priority", "Its suspension priority")],

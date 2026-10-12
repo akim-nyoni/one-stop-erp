@@ -63,12 +63,41 @@ public static class PayPeriods
     /// <param name="frequency">The frequency.</param>
     /// <param name="payDate">The pay date.</param>
     /// <returns>The period number, from 1.</returns>
-    public static int Number(PayFrequency frequency, DateOnly payDate) => frequency switch
+    public static int Number(PayFrequency frequency, DateOnly payDate) => Number(frequency, payDate, 1);
+
+    /// <summary>The pay period's number within a tax year that starts in the given month (1 = January; brief §4.15.3 "tax-year straddling a fiscal year").</summary>
+    /// <param name="frequency">The frequency.</param>
+    /// <param name="payDate">The pay date.</param>
+    /// <param name="taxYearStartMonth">The tax year's first month.</param>
+    /// <returns>The period number from 1.</returns>
+    public static int Number(PayFrequency frequency, DateOnly payDate, int taxYearStartMonth)
     {
-        PayFrequency.Weekly => Math.Min(52, ((payDate.DayOfYear - 1) / 7) + 1),
-        PayFrequency.Fortnightly => Math.Min(26, ((payDate.DayOfYear - 1) / 14) + 1),
-        _ => payDate.Month,
-    };
+        int days = payDate.DayNumber - TaxYearStart(payDate, taxYearStartMonth).DayNumber;
+        return frequency switch
+        {
+            PayFrequency.Weekly => Math.Min(52, (days / 7) + 1),
+            PayFrequency.Fortnightly => Math.Min(26, (days / 14) + 1),
+            _ => (((payDate.Month - Month(taxYearStartMonth)) % 12) + 12) % 12 + 1,
+        };
+    }
+
+    /// <summary>The first day of the tax year a date falls in.</summary>
+    /// <param name="date">The date.</param>
+    /// <param name="taxYearStartMonth">The tax year's first month (1–12).</param>
+    /// <returns>The first day.</returns>
+    public static DateOnly TaxYearStart(DateOnly date, int taxYearStartMonth)
+    {
+        int month = Month(taxYearStartMonth);
+        return new DateOnly(date.Month >= month ? date.Year : date.Year - 1, month, 1);
+    }
+
+    /// <summary>The tax year a date falls in, named by the calendar year it starts in (March 2026 – February 2027 is 2026; a January year is its own year).</summary>
+    /// <param name="date">The date.</param>
+    /// <param name="taxYearStartMonth">The tax year's first month (1–12).</param>
+    /// <returns>The tax year.</returns>
+    public static int TaxYear(DateOnly date, int taxYearStartMonth) => TaxYearStart(date, taxYearStartMonth).Year;
+
+    private static int Month(int taxYearStartMonth) => taxYearStartMonth is >= 1 and <= 12 ? taxYearStartMonth : 1;
 
     /// <summary>The days of the period someone was employed (from engagement, to termination), and the days in the period.</summary>
     /// <param name="frequency">The frequency.</param>
