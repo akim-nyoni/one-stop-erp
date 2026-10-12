@@ -73,7 +73,8 @@ public static class StatementFormatter
     /// <param name="width">The character width (default 64).</param>
     /// <returns>The formatted statement.</returns>
     /// <param name="address">The trader's correspondence address lines.</param>
-    public static string ToPlainText(TraderStatement statement, string companyName, DateOnly asAt, int width = DefaultWidth, IReadOnlyList<string>? address = null)
+    /// <param name="remittanceSlip">Whether to end with a tear-off remittance slip for the customer to return with the payment.</param>
+    public static string ToPlainText(TraderStatement statement, string companyName, DateOnly asAt, int width = DefaultWidth, IReadOnlyList<string>? address = null, bool remittanceSlip = false)
     {
         if (width < 40)
         {
@@ -112,9 +113,27 @@ public static class StatementFormatter
         sb.AppendLine(TwoColumn("61-90 days", Money(ageing.Days61To90), width));
         sb.AppendLine(TwoColumn("Over 90 days", Money(ageing.Over90), width));
         sb.AppendLine(rule);
+        if (remittanceSlip)
+        {
+            // The tear-off slip (brief §4.5 statements with remittance slip): what the customer sends back with the payment.
+            sb.AppendLine();
+            sb.AppendLine(Fit("- - - cut here - - - " + new string('-', width), width));
+            AppendCentered(sb, "REMITTANCE SLIP", width);
+            sb.AppendLine(Fit($"Return with your payment to {companyName}", width));
+            sb.AppendLine(TwoColumn($"Account: {statement.TraderCode}", $"Statement: {asAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}", width));
+            sb.AppendLine(Fit(statement.TraderName, width));
+            sb.AppendLine(TwoColumn($"Balance due ({statement.Currency})", Money(statement.Balance), width));
+            sb.AppendLine(TwoColumn("Overdue now", Money(ageing.Total - ageing.Current), width));
+            sb.AppendLine(TwoColumn("Amount paid", "______________", width));
+            sb.AppendLine(TwoColumn("Date paid", "______________", width));
+            sb.AppendLine(Fit($"Quote reference {statement.TraderCode} on your payment.", width));
+            sb.AppendLine(rule);
+        }
 
         return sb.ToString();
     }
+
+    private static string Fit(string text, int width) => text.Length > width ? text[..width] : text;
 
     private static string Abbrev(Core.Trading.OpenItemType type) => type switch
     {

@@ -116,11 +116,21 @@ public sealed class Student : SoftDeletableEntity, ICompanyScoped
     /// <summary>Grants a bursary/scholarship to the student.</summary>
     /// <param name="type">The bursary type.</param>
     /// <param name="value">The percentage or value.</param>
-    public void GrantBursary(BursaryType type, decimal value)
+    /// <param name="validUntil">The last day it applies (null: until withdrawn).</param>
+    public void GrantBursary(BursaryType type, decimal value, DateOnly? validUntil = null)
     {
         BursaryType = type;
         BursaryValue = value;
+        BursaryValidUntil = validUntil;
     }
+
+    /// <summary>Gets the last day the bursary applies, or null when it runs until withdrawn.</summary>
+    public DateOnly? BursaryValidUntil { get; private set; }
+
+    /// <summary>Whether the bursary applies on a date (it has one and it has not expired).</summary>
+    /// <param name="date">The date.</param>
+    /// <returns>True when in force.</returns>
+    public bool BursaryInForce(DateOnly date) => BursaryType != BursaryType.None && (BursaryValidUntil is null || BursaryValidUntil >= date);
 
     /// <summary>Withdraws the student from enrolment.</summary>
     public void Withdraw() => IsEnrolled = false;
@@ -142,10 +152,11 @@ public sealed class Student : SoftDeletableEntity, ICompanyScoped
     /// <summary>The bursary, then the sibling percentage on what is left.</summary>
     /// <param name="compulsoryTotal">The compulsory fees.</param>
     /// <param name="siblingPercent">The sibling discount percentage.</param>
+    /// <param name="on">The billing date (an expired bursary gives nothing); null ignores expiry.</param>
     /// <returns>The bursary and the sibling discount.</returns>
-    public (decimal Bursary, decimal Sibling) ComputeDiscounts(decimal compulsoryTotal, decimal siblingPercent)
+    public (decimal Bursary, decimal Sibling) ComputeDiscounts(decimal compulsoryTotal, decimal siblingPercent, DateOnly? on = null)
     {
-        decimal bursary = ComputeDiscount(compulsoryTotal);
+        decimal bursary = on is DateOnly date && !BursaryInForce(date) ? 0m : ComputeDiscount(compulsoryTotal);
         decimal sibling = decimal.Round((compulsoryTotal - bursary) * siblingPercent / 100m, 2, MidpointRounding.AwayFromZero);
         return (bursary, sibling);
     }

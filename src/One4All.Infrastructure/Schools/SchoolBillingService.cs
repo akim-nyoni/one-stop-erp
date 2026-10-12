@@ -217,7 +217,7 @@ public sealed class SchoolBillingService : ISchoolBillingService
             staffPercent = company.StaffChildDiscountPercent;
         }
 
-        (decimal bursary, decimal familyDiscount) = student.ComputeDiscounts(gross, Math.Max(siblingPercent, staffPercent));
+        (decimal bursary, decimal familyDiscount) = student.ComputeDiscounts(gross, Math.Max(siblingPercent, staffPercent), date);
         bool staffWins = staffPercent > siblingPercent;
         decimal sibling = staffWins ? 0m : familyDiscount, staffDiscount = staffWins ? familyDiscount : 0m;
         decimal discount = bursary + familyDiscount;

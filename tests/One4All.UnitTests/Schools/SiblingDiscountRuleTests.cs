@@ -23,4 +23,14 @@ public sealed class SiblingDiscountRuleTests
         child.GrantBursary(BursaryType.Percentage, 50m);
         child.ComputeDiscounts(1_000m, 10m).Should().Be((500m, 50m));
     }
+
+    [Fact]
+    public void An_expired_bursary_gives_nothing()
+    {
+        One4All.Core.Schools.Student child = new(1, "EXP-1", "Expiring Bursary", "G1", 9);
+        child.GrantBursary(One4All.Core.Schools.BursaryType.Percentage, 50m, new DateOnly(2026, 6, 30));
+        child.ComputeDiscounts(1_000m, 10m, new DateOnly(2026, 6, 30)).Should().Be((500m, 50m));
+        child.ComputeDiscounts(1_000m, 10m, new DateOnly(2026, 7, 1)).Should().Be((0m, 100m));
+        child.BursaryInForce(new DateOnly(2026, 7, 1)).Should().BeFalse();
+    }
 }

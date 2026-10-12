@@ -46,6 +46,7 @@ public sealed class StatementService : IStatementService
     private async Task<Result<string>> RenderAsync(long companyId, TraderStatement statement, DateOnly asAt, int width, TradingLedger ledger, long traderId, CancellationToken ct)
     {
         string companyName = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? string.Empty;
-        return StatementFormatter.ToPlainText(statement, companyName, asAt, width, await TraderDirectory.CorrespondenceAsync(_db, companyId, ledger, traderId, ct).ConfigureAwait(false));
+        return StatementFormatter.ToPlainText(statement, companyName, asAt, width, await TraderDirectory.CorrespondenceAsync(_db, companyId, ledger, traderId, ct).ConfigureAwait(false),
+            remittanceSlip: ledger == TradingLedger.AccountsReceivable);
     }
 }

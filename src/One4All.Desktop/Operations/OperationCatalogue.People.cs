@@ -1166,9 +1166,11 @@ public static partial class OperationCatalogue
         {
             Module = "Sales & Schools", Title = "Bursaries", ListTitle = "Bursary requests",
             Description = "Request a bursary (percentage or value off compulsory fees) — it reduces fees only once approved by someone else with the bursary approval right, "
-                + "or through the approval workflow when one is defined for bursaries. Decide approves or rejects a pending request by its reference.",
-            Fields = [Pick("Step", "Step", ["Request", "Approve", "Reject"]), Opt("Student", "Admission number (request)"), Pick("Type", "Type", ["Percentage", "Value"]),
-                OptNum("Value", "Percentage or value (request)"), Opt("Reason", "Reason / decision note"), Opt("Reference", "Reference (decide)"), Today()],
+                + "or through the approval workflow when one is defined for bursaries. Decide approves or rejects a pending request by its reference. A bursary may expire: fees billed "
+                + "after its last day get no bursary. Expiring lists bursaries ending within the given days, for renewal.",
+            Fields = [Pick("Step", "Step", ["Request", "Approve", "Reject", "Expiring"]), Opt("Student", "Admission number (request)"), Pick("Type", "Type", ["Percentage", "Value"]),
+                OptNum("Value", "Percentage or value (request)"), Opt("Reason", "Reason / decision note"), Opt("Reference", "Reference (decide)"), Opt("ValidUntil", "Last day it applies (yyyy-MM-dd)"),
+                Num("Within", "Expiring within (days)", "60"), Today()],
             Run = async (c, i) =>
             {
                 ISchoolBursaryService bursaries = c.Get<ISchoolBursaryService>();
@@ -1176,9 +1178,17 @@ public static partial class OperationCatalogue
                 {
                     long student = await FindAsync(c.Db.Students, s => s.CompanyId == c.CompanyId && s.AdmissionNumber == (i.Optional("Student") ?? string.Empty).ToUpper(), s => s.Id, "student",
                         i.Optional("Student") ?? string.Empty).ConfigureAwait(true);
+                    DateOnly? validUntil = i.Optional("ValidUntil") is string last ? DateOnly.ParseExact(last, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null;
                     BursaryRequestResult asked = Check(await bursaries.RequestAsync(c.CompanyId, student, Enum.Parse<Core.Schools.BursaryType>(i.Text("Type")), i.OptionalNumber("Value") ?? 0m,
-                        i.Optional("Reason") ?? string.Empty, c.UserId, i.Date("Date")).ConfigureAwait(true));
+                        i.Optional("Reason") ?? string.Empty, c.UserId, i.Date("Date"), validUntil).ConfigureAwait(true));
                     return asked.InWorkflow ? $"{asked.Reference} is in its approval workflow." : $"{asked.Reference} awaits approval.";
+                }
+
+                if (i.Text("Step") == "Expiring")
+                {
+                    IReadOnlyList<ExpiringBursary> expiring = await bursaries.ExpiringAsync(c.CompanyId, i.Date("Date"), (int)i.Number("Within")).ConfigureAwait(true);
+                    return expiring.Count == 0 ? "No bursaries expire in that time." : string.Join(Environment.NewLine, expiring.Select(b =>
+                        $"{D(b.ValidUntil)}  {b.AdmissionNumber,-12} {b.StudentName,-30} {b.Type} {Q(b.Value)}"));
                 }
 
                 return Check(await bursaries.DecideAsync(c.CompanyId, i.Text("Reference"), i.Text("Step") == "Approve", c.UserId, i.Date("Date"), i.Optional("Reason")).ConfigureAwait(true),

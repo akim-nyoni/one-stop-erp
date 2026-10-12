@@ -59,4 +59,13 @@ public sealed class StatementFormatterTests
         string[] clamped = StatementFormatter.ToPlainText(Sample(), "Test Trading Co", AsAt, 10).Split('\n', StringSplitOptions.RemoveEmptyEntries);
         clamped.Should().OnlyContain(l => l.TrimEnd('\r').Length <= 40);
     }
+
+    [Fact]
+    public void A_customer_statement_can_end_with_a_remittance_slip()
+    {
+        StatementFormatter.ToPlainText(Sample(), "Test Trading Co", AsAt).Should().NotContain("REMITTANCE SLIP");
+        string text = StatementFormatter.ToPlainText(Sample(), "Test Trading Co", AsAt, 48, remittanceSlip: true);
+        text.Should().Contain("cut here").And.Contain("REMITTANCE SLIP").And.Contain("Amount paid").And.Contain("Quote reference");
+        text.Split('\n', StringSplitOptions.RemoveEmptyEntries).Should().OnlyContain(l => l.TrimEnd('\r').Length <= 48);
+    }
 }

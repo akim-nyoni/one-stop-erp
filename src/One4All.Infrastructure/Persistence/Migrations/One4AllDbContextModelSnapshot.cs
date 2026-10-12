@@ -28279,6 +28279,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("type");
 
+                    b.Property<DateOnly?>("ValidUntil")
+                        .HasColumnType("date")
+                        .HasColumnName("valid_until");
+
                     b.Property<decimal>("Value")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -28689,6 +28693,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("BursaryType")
                         .HasColumnType("integer")
                         .HasColumnName("bursary_type");
+
+                    b.Property<DateOnly?>("BursaryValidUntil")
+                        .HasColumnType("date")
+                        .HasColumnName("bursary_valid_until");
 
                     b.Property<decimal>("BursaryValue")
                         .HasPrecision(19, 4)

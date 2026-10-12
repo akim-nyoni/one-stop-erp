@@ -64,6 +64,9 @@ public sealed class BursaryAward : AuditableEntity, ICompanyScoped
     /// <summary>When.</summary>
     public DateOnly RequestedOn { get; private set; }
 
+    /// <summary>Gets or sets the last day the bursary applies (null: until withdrawn).</summary>
+    public DateOnly? ValidUntil { get; set; }
+
     /// <summary>Where it stands.</summary>
     public BursaryAwardStatus Status { get; private set; }
 

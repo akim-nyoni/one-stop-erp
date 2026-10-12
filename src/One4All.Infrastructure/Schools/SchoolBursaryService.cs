@@ -30,12 +30,18 @@ public sealed class SchoolBursaryService : ISchoolBursaryService
     }
 
     /// <inheritdoc />
-    public Task<Result<BursaryRequestResult>> RequestAsync(long companyId, long studentId, BursaryType type, decimal value, string reason, long userId, DateOnly date, CancellationToken ct = default)
+    public Task<Result<BursaryRequestResult>> RequestAsync(long companyId, long studentId, BursaryType type, decimal value, string reason, long userId, DateOnly date, DateOnly? validUntil = null,
+        CancellationToken ct = default)
         => _db.AtomicAsync(async () =>
         {
             if (type == BursaryType.None || value <= 0m || (type == BursaryType.Percentage && value > 100m) || string.IsNullOrWhiteSpace(reason))
             {
                 return Error.Validation("School.BursaryInvalid", "A bursary needs a percentage (up to 100) or a positive value, and a reason.");
+            }
+
+            if (validUntil < date)
+            {
+                return Error.Validation("School.BursaryExpiry", "A bursary cannot expire before it is requested.");
             }
 
             Student? student = await _db.Students.FirstOrDefaultAsync(s => s.Id == studentId && s.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -51,7 +57,7 @@ public sealed class SchoolBursaryService : ISchoolBursaryService
 
             int count = await _db.Set<BursaryAward>().CountAsync(a => a.StudentId == studentId, ct).ConfigureAwait(false);
             string reference = $"BUR-{student.AdmissionNumber}-{count + 1}";
-            _db.Set<BursaryAward>().Add(new BursaryAward(companyId, studentId, reference, type, value, reason.Trim(), userId, date));
+            _db.Set<BursaryAward>().Add(new BursaryAward(companyId, studentId, reference, type, value, reason.Trim(), userId, date) { ValidUntil = validUntil });
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, companyId, WorkflowDocumentTypes.Bursary, reference, value, userId, ct).ConfigureAwait(false);
             return governed.IsFailure ? governed.Error : Result<BursaryRequestResult>.Success(new BursaryRequestResult(reference, governed.Value));
@@ -93,11 +99,21 @@ public sealed class SchoolBursaryService : ISchoolBursaryService
         if (approve)
         {
             Student student = await _db.Students.FirstAsync(s => s.Id == award.StudentId, ct).ConfigureAwait(false);
-            student.GrantBursary(award.Type, award.Value);
+            student.GrantBursary(award.Type, award.Value, award.ValidUntil);
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<ExpiringBursary>> ExpiringAsync(long companyId, DateOnly asAt, int withinDays, CancellationToken ct = default)
+    {
+        DateOnly until = asAt.AddDays(Math.Max(0, withinDays));
+        List<Student> students = await _db.Students.AsNoTracking()
+            .Where(s => s.CompanyId == companyId && s.IsEnrolled && s.BursaryType != BursaryType.None && s.BursaryValidUntil != null && s.BursaryValidUntil >= asAt && s.BursaryValidUntil <= until)
+            .OrderBy(s => s.BursaryValidUntil).ThenBy(s => s.AdmissionNumber).ToListAsync(ct).ConfigureAwait(false);
+        return [.. students.Select(s => new ExpiringBursary(s.AdmissionNumber, s.ShownName(false), s.BursaryType, s.BursaryValue, s.BursaryValidUntil!.Value))];
     }
 
     /// <inheritdoc />

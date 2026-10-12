@@ -15,7 +15,12 @@ public sealed record BursaryRequestResult(string Reference, bool InWorkflow);
 public interface ISchoolBursaryService
 {
     /// <summary>Asks for a bursary; it waits for approval (or goes into the approval workflow when one is defined).</summary>
-    Task<Result<BursaryRequestResult>> RequestAsync(long companyId, long studentId, BursaryType type, decimal value, string reason, long userId, DateOnly date, CancellationToken ct = default);
+    /// <remarks>A bursary may be given an expiry (the last day it applies); fees billed after it get no bursary.</remarks>
+    Task<Result<BursaryRequestResult>> RequestAsync(long companyId, long studentId, BursaryType type, decimal value, string reason, long userId, DateOnly date, DateOnly? validUntil = null,
+        CancellationToken ct = default);
+
+    /// <summary>The students whose bursaries expire within the given days of a date (for renewal), soonest first.</summary>
+    Task<IReadOnlyList<ExpiringBursary>> ExpiringAsync(long companyId, DateOnly asAt, int withinDays, CancellationToken ct = default);
 
     /// <summary>Approves or rejects a pending bursary: never by its requester, and only with the bursary approval right; approval applies it to the student.</summary>
     Task<Result> DecideAsync(long companyId, string reference, bool approve, long userId, DateOnly date, string? note, CancellationToken ct = default);
@@ -29,3 +34,11 @@ public interface ISchoolBursaryService
     /// <summary>Sets or lifts do-not-disclose on a student.</summary>
     Task<Result> SetDisclosureAsync(long companyId, long studentId, bool doNotDisclose, string? note, CancellationToken ct = default);
 }
+
+/// <summary>A bursary coming up for renewal.</summary>
+/// <param name="AdmissionNumber">The student.</param>
+/// <param name="StudentName">The student's name (withheld for restricted records).</param>
+/// <param name="Type">Percentage or value.</param>
+/// <param name="Value">The percentage or value.</param>
+/// <param name="ValidUntil">The last day it applies.</param>
+public sealed record ExpiringBursary(string AdmissionNumber, string StudentName, BursaryType Type, decimal Value, DateOnly ValidUntil);
