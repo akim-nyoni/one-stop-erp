@@ -4,6 +4,30 @@ using One4All.Application.Abstractions.Trading;
 
 namespace One4All.Application.Trading;
 
+/// <summary>A movement on a balance-forward statement.</summary>
+/// <param name="Date">The document date.</param>
+/// <param name="DocumentType">The kind of document.</param>
+/// <param name="DocumentNumber">The document number.</param>
+/// <param name="Amount">The amount (positive increases what the customer owes, or what we owe the supplier).</param>
+/// <param name="Balance">The running balance after it.</param>
+public sealed record BalanceForwardLine(DateOnly Date, Core.Trading.OpenItemType DocumentType, string DocumentNumber, decimal Amount, decimal Balance);
+
+/// <summary>
+/// A balance-forward statement (brief §4.5): the balance brought forward at the start of the period, the period's documents with a running
+/// balance, and the balance carried forward; the ageing still comes from the open items.
+/// </summary>
+/// <param name="TraderCode">The trader code.</param>
+/// <param name="TraderName">The trader name.</param>
+/// <param name="Currency">The statement currency.</param>
+/// <param name="From">The first day of the period.</param>
+/// <param name="To">The last day of the period.</param>
+/// <param name="Opening">The balance brought forward.</param>
+/// <param name="Lines">The period's movements.</param>
+/// <param name="Closing">The balance carried forward.</param>
+/// <param name="Ageing">The ageing of what is outstanding at the period end.</param>
+public sealed record BalanceForwardStatement(string TraderCode, string TraderName, string Currency, DateOnly From, DateOnly To, decimal Opening, IReadOnlyList<BalanceForwardLine> Lines,
+    decimal Closing, StatementAgeing Ageing);
+
 /// <summary>The outstanding balance of a statement split by days past due as at a date.</summary>
 /// <param name="Current">Not yet due.</param>
 /// <param name="Days1To30">1–30 days past due.</param>
@@ -105,8 +129,55 @@ public static class StatementFormatter
         sb.AppendLine(rule);
         sb.AppendLine(TwoColumn($"BALANCE DUE ({statement.Currency})", Money(statement.Balance), width));
         sb.AppendLine(rule);
+        AppendFooter(sb, statement.TraderCode, statement.TraderName, statement.Currency, statement.Balance, StatementAgeing.Of(statement, asAt), companyName, asAt, width, remittanceSlip);
+        return sb.ToString();
+    }
 
-        StatementAgeing ageing = StatementAgeing.Of(statement, asAt);
+    /// <summary>Renders a balance-forward statement: brought forward, the period's documents with a running balance, carried forward and the ageing.</summary>
+    /// <param name="statement">The statement data.</param>
+    /// <param name="companyName">The issuing company's name (heading).</param>
+    /// <param name="width">The character width (default 64).</param>
+    /// <param name="address">The trader's correspondence address lines.</param>
+    /// <param name="remittanceSlip">Whether to end with a tear-off remittance slip.</param>
+    /// <returns>The formatted statement.</returns>
+    public static string ToBalanceForwardText(BalanceForwardStatement statement, string companyName, int width = DefaultWidth, IReadOnlyList<string>? address = null, bool remittanceSlip = false)
+    {
+        width = Math.Max(width, 40);
+        StringBuilder sb = new();
+        string rule = new('-', width);
+
+        AppendCentered(sb, companyName, width);
+        AppendCentered(sb, "STATEMENT OF ACCOUNT", width);
+        sb.AppendLine(rule);
+        sb.AppendLine(TwoColumn($"To: {statement.TraderName} ({statement.TraderCode})", string.Empty, width));
+        foreach (string addressLine in address ?? [])
+        {
+            sb.AppendLine(TwoColumn("    " + addressLine, string.Empty, width));
+        }
+
+        sb.AppendLine(TwoColumn($"Period: {Iso(statement.From)} to {Iso(statement.To)}", $"Currency: {statement.Currency}", width));
+        sb.AppendLine(rule);
+        sb.AppendLine(ThreeColumn("Date       Document", "Amount", "Balance", width));
+        sb.AppendLine(ThreeColumn($"{Iso(statement.From)} Balance brought forward", string.Empty, Money(statement.Opening), width));
+        foreach (BalanceForwardLine line in statement.Lines)
+        {
+            sb.AppendLine(ThreeColumn($"{Iso(line.Date)} {Abbrev(line.DocumentType)} {line.DocumentNumber}", Money(line.Amount), Money(line.Balance), width));
+        }
+
+        sb.AppendLine(rule);
+        sb.AppendLine(TwoColumn($"BALANCE CARRIED FORWARD ({statement.Currency})", Money(statement.Closing), width));
+        sb.AppendLine(rule);
+        AppendFooter(sb, statement.TraderCode, statement.TraderName, statement.Currency, statement.Closing, statement.Ageing, companyName, statement.To, width, remittanceSlip);
+        return sb.ToString();
+    }
+
+    private static string Iso(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    // The ageing and (for customers) the tear-off remittance slip, shared by both statement styles.
+    private static void AppendFooter(StringBuilder sb, string traderCode, string traderName, string currency, decimal balance, StatementAgeing ageing, string companyName, DateOnly asAt, int width,
+        bool remittanceSlip)
+    {
+        string rule = new('-', width);
         sb.AppendLine(TwoColumn("Current", Money(ageing.Current), width));
         sb.AppendLine(TwoColumn("1-30 days", Money(ageing.Days1To30), width));
         sb.AppendLine(TwoColumn("31-60 days", Money(ageing.Days31To60), width));
@@ -120,17 +191,15 @@ public static class StatementFormatter
             sb.AppendLine(Fit("- - - cut here - - - " + new string('-', width), width));
             AppendCentered(sb, "REMITTANCE SLIP", width);
             sb.AppendLine(Fit($"Return with your payment to {companyName}", width));
-            sb.AppendLine(TwoColumn($"Account: {statement.TraderCode}", $"Statement: {asAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}", width));
-            sb.AppendLine(Fit(statement.TraderName, width));
-            sb.AppendLine(TwoColumn($"Balance due ({statement.Currency})", Money(statement.Balance), width));
+            sb.AppendLine(TwoColumn($"Account: {traderCode}", $"Statement: {Iso(asAt)}", width));
+            sb.AppendLine(Fit(traderName, width));
+            sb.AppendLine(TwoColumn($"Balance due ({currency})", Money(balance), width));
             sb.AppendLine(TwoColumn("Overdue now", Money(ageing.Total - ageing.Current), width));
             sb.AppendLine(TwoColumn("Amount paid", "______________", width));
             sb.AppendLine(TwoColumn("Date paid", "______________", width));
-            sb.AppendLine(Fit($"Quote reference {statement.TraderCode} on your payment.", width));
+            sb.AppendLine(Fit($"Quote reference {traderCode} on your payment.", width));
             sb.AppendLine(rule);
         }
-
-        return sb.ToString();
     }
 
     private static string Fit(string text, int width) => text.Length > width ? text[..width] : text;

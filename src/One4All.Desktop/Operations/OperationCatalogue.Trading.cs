@@ -160,10 +160,28 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = "Customers", Title = "Customer statement", ListTitle = "Open customer items", Description = "The customer's statement as at a date, ready to print or send.",
-            Fields = [Req("Customer", "Customer code"), Today("AsAt", "As at")],
-            Run = async (c, i) => Check(await c.Get<IStatementService>().RenderCustomerStatementTextAsync(c.CompanyId, await CustomerAsync(c, i.Text("Customer")).ConfigureAwait(true), i.Date("AsAt"), 72)
-                .ConfigureAwait(true)),
+            Module = "Customers", Title = "Customer statement", ListTitle = "Open customer items",
+            Description = "The customer's statement as at a date, ready to print or send: open-item, or balance-forward (brought forward, the period's documents with a running "
+                + "balance, carried forward) for customers set to that style or when a period start is given. Style sets the customer's statement style.",
+            Fields = [Req("Customer", "Customer code"), Today("AsAt", "As at"), Opt("From", "Balance-forward period from (yyyy-MM-dd; blank: the customer's style)"),
+                Pick("Style", "Set the customer's style", ["(leave)", .. Enum.GetNames<Core.Trading.StatementType>()])],
+            Run = async (c, i) =>
+            {
+                long customerId = await CustomerAsync(c, i.Text("Customer")).ConfigureAwait(true);
+                if (i.Text("Style") != "(leave)")
+                {
+                    Core.Trading.Customer customer = await c.Db.Customers.FirstAsync(x => x.Id == customerId).ConfigureAwait(true);
+                    customer.StatementType = Enum.Parse<Core.Trading.StatementType>(i.Text("Style"));
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                }
+
+                IStatementService statements = c.Get<IStatementService>();
+                return i.Optional("From") is string from
+                    ? Check(await statements.RenderCustomerBalanceForwardTextAsync(c.CompanyId, customerId,
+                        DateOnly.TryParse(from, System.Globalization.CultureInfo.InvariantCulture, out DateOnly start) ? start : throw new OperationException("Write the period start as yyyy-MM-dd."),
+                        i.Date("AsAt"), 72).ConfigureAwait(true))
+                    : Check(await statements.RenderCustomerStatementTextAsync(c.CompanyId, customerId, i.Date("AsAt"), 72).ConfigureAwait(true));
+            },
             List = c => OpenItemsAsync(c, TradingLedger.AccountsReceivable),
         };
         yield return new Operation
