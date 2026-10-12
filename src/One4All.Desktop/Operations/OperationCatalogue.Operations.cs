@@ -296,6 +296,31 @@ public static partial class OperationCatalogue
         const string module = "Contracts";
         yield return new Operation
         {
+            Module = module, Title = "Open a job contract", ListTitle = "Job contracts",
+            Description = "A contract (job) for a customer: its value, budgeted cost, retention % on certificates and the revenue account. The WBS, BOQ, variations, certificates and "
+                + "subcontracts all hang off it. Capture a cost books a manual cost to one of its heads (purchases, stock, labour, plant, subcontract, overhead).",
+            Fields = [Pick("Step", "Step", ["Open", "Capture a cost"]), Req("Contract", "Contract number"), Opt("Name", "Name"), Opt("Customer", "Customer code"), Num("Value", "Contract value", "0"),
+                Num("Budget", "Budgeted cost", "0"), Num("Retention", "Retention %", "0"), Opt("Revenue", "Revenue account"), Opt("Head", "Cost head (capture)"),
+                Pick("Source", "Cost from", Enum.GetNames<JobCostSource>()), Num("Amount", "Cost amount", "0"), Opt("Reference", "Reference"), Today()],
+            Run = async (c, i) =>
+            {
+                IJobCostingService jobs = c.Get<IJobCostingService>();
+                if (i.Text("Step") == "Capture a cost")
+                {
+                    long contract = await ContractAsync(c, i.Text("Contract")).ConfigureAwait(true);
+                    return Check(await jobs.CaptureCostAsync(c.CompanyId, contract, i.Optional("Head") ?? string.Empty, Enum.Parse<JobCostSource>(i.Text("Source")), i.Number("Amount"), i.Date("Date"),
+                        i.Optional("Reference")).ConfigureAwait(true), "Cost captured.");
+                }
+
+                long id = Check(await jobs.CreateContractAsync(c.CompanyId, i.Text("Contract"), i.Optional("Name") ?? i.Text("Contract"), await CustomerAsync(c, i.Optional("Customer") ?? string.Empty)
+                    .ConfigureAwait(true), i.Number("Value"), i.Number("Budget"), i.Number("Retention"), i.Optional("Revenue") ?? string.Empty).ConfigureAwait(true));
+                return $"Contract {i.Text("Contract").ToUpperInvariant()} opened (id {id}).";
+            },
+            List = async c => Table(await c.Db.JobContracts.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.ContractNumber).Take(500).ToListAsync().ConfigureAwait(true),
+                ("Contract", x => x.ContractNumber), ("Name", x => x.Name), ("Value", x => M(x.ContractValue)), ("Budget", x => M(x.BudgetCost)), ("Status", x => x.Status)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Job cost position and overhead rates", ListTitle = "Overhead rates",
             Description = "A job's actual cost (purchases, goods received for it, stock issues, labour, plant, subcontractors, overheads), what is still on order for it, and the "
                 + "forecast. Overhead rates add a percentage on a kind of direct cost (e.g. 35% on labour) as it is captured; 0% removes a rate.",
