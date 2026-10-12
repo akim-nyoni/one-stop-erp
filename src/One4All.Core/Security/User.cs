@@ -105,6 +105,20 @@ public sealed class User : SoftDeletableEntity
     /// <param name="pinHash">The Argon2id hash of the PIN.</param>
     public void SetPinHash(string? pinHash) => PinHash = pinHash;
 
+    /// <summary>Gets the hash of the cashier card the user signs in to the till with, if any.</summary>
+    public string? CardHash { get; private set; }
+
+    /// <summary>Gets the enrolment the fingerprint reader matches this user to, if any.</summary>
+    public string? BiometricId { get; private set; }
+
+    /// <summary>Sets (or clears) the cashier card hash.</summary>
+    /// <param name="cardHash">The hash.</param>
+    public void SetCardHash(string? cardHash) => CardHash = cardHash;
+
+    /// <summary>Sets (or clears) the fingerprint enrolment.</summary>
+    /// <param name="biometricId">The reader's enrolment id.</param>
+    public void SetBiometricId(string? biometricId) => BiometricId = biometricId;
+
     /// <summary>Marks the account as (or not as) the built-in system administrator.</summary>
     /// <param name="value">True to grant system-administrator status.</param>
     public void SetSystemAdministrator(bool value) => IsSystemAdministrator = value;

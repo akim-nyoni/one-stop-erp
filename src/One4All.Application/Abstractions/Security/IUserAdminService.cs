@@ -32,6 +32,12 @@ public interface IUserAdminService
     /// <returns>Success or why not.</returns>
     Task<Result> SetActiveAsync(long userId, bool active, CancellationToken ct = default);
 
+    /// <summary>Gives a user a cashier card for till login (what the swipe or scan reads; blank removes it). A card belongs to one user.</summary>
+    Task<Result> SetCashierCardAsync(long userId, string? cardRead, CancellationToken ct = default);
+
+    /// <summary>Links a user to their fingerprint reader enrolment (blank removes it). An enrolment belongs to one user.</summary>
+    Task<Result> SetBiometricIdAsync(long userId, string? biometricId, CancellationToken ct = default);
+
     /// <summary>Creates a role, optionally copying another role's grants.</summary>
     /// <param name="name">The role name (unique).</param>
     /// <param name="description">The description.</param>

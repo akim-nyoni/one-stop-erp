@@ -317,6 +317,55 @@ public sealed class UserAdminService : IUserAdminService
         return changed;
     }
 
+    /// <inheritdoc />
+    public async Task<Result> SetCashierCardAsync(long userId, string? cardRead, CancellationToken ct = default)
+    {
+        if (await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false) is not User user)
+        {
+            return Result.Failure(Error.NotFound("Security.UserNotFound", $"User {userId} not found."));
+        }
+
+        string? hash = null;
+        if (!string.IsNullOrWhiteSpace(cardRead))
+        {
+            hash = CashierCards.Hash(cardRead);
+            if (hash.Length == 0)
+            {
+                return Result.Failure(Error.Validation("Security.CardUnreadable", "No card number could be read from that."));
+            }
+
+            if (await _db.Users.AnyAsync(u => u.Id != userId && u.CardHash == hash, ct).ConfigureAwait(false))
+            {
+                return Result.Failure(Error.Conflict("Security.CardInUse", "That card already belongs to another user."));
+            }
+        }
+
+        user.SetCardHash(hash);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await RecordAsync(Core.Audit.AuditAction.Update, "User", userId, hash is null ? "Cashier card removed" : "Cashier card issued", ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetBiometricIdAsync(long userId, string? biometricId, CancellationToken ct = default)
+    {
+        if (await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false) is not User user)
+        {
+            return Result.Failure(Error.NotFound("Security.UserNotFound", $"User {userId} not found."));
+        }
+
+        string? id = string.IsNullOrWhiteSpace(biometricId) ? null : biometricId.Trim();
+        if (id is not null && await _db.Users.AnyAsync(u => u.Id != userId && u.BiometricId == id, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.Conflict("Security.BiometricInUse", "That fingerprint enrolment already belongs to another user."));
+        }
+
+        user.SetBiometricId(id);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        await RecordAsync(Core.Audit.AuditAction.Update, "User", userId, id is null ? "Fingerprint enrolment removed" : "Fingerprint enrolled", ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
     // A permission or account change in the change log, by whoever is signed in.
     private async Task RecordAsync(Core.Audit.AuditAction action, string entityType, long entityId, string what, CancellationToken ct)
     {

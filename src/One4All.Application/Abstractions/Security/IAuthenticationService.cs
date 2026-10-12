@@ -170,6 +170,12 @@ public interface IAuthenticationService
     /// <returns>The authentication result.</returns>
     Task<AuthenticationResult> AuthenticateByPinAsync(string username, string pin, string? terminal = null, CancellationToken ct = default);
 
+    /// <summary>Authenticates a cashier by the card they swiped or scanned (the till's card login).</summary>
+    Task<AuthenticationResult> AuthenticateByCardAsync(string cardRead, string? terminal = null, CancellationToken ct = default);
+
+    /// <summary>Authenticates a cashier by the enrolment the fingerprint reader matched.</summary>
+    Task<AuthenticationResult> AuthenticateByBiometricAsync(string biometricId, string? terminal = null, CancellationToken ct = default);
+
     /// <summary>Changes a user's password (rotating the security stamp).</summary>
     /// <param name="userId">The user id.</param>
     /// <param name="currentPassword">The current password.</param>

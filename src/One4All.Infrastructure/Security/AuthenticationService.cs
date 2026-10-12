@@ -85,15 +85,34 @@ public sealed class AuthenticationService : IAuthenticationService
     public Task<AuthenticationResult> AuthenticateByPinAsync(string username, string pin, string? terminal = null, CancellationToken ct = default) =>
         AuthenticateCoreAsync(username, pin, usePin: true, terminal, ct);
 
+    /// <inheritdoc />
+    public async Task<AuthenticationResult> AuthenticateByCardAsync(string cardRead, string? terminal = null, CancellationToken ct = default)
+    {
+        string hash = Application.Security.CashierCards.Hash(cardRead);
+        string? username = hash.Length == 0 ? null : await _db.Users.Where(u => u.CardHash == hash).Select(u => u.Username).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return await AuthenticateCoreAsync(username ?? "(unknown card)", string.Empty, usePin: true, terminal, ct, verifiedBy: username is null ? "Card?" : "Card").ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<AuthenticationResult> AuthenticateByBiometricAsync(string biometricId, string? terminal = null, CancellationToken ct = default)
+    {
+        string id = (biometricId ?? string.Empty).Trim();
+        string? username = id.Length == 0 ? null : await _db.Users.Where(u => u.BiometricId == id).Select(u => u.Username).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return await AuthenticateCoreAsync(username ?? "(unknown fingerprint)", string.Empty, usePin: true, terminal, ct, verifiedBy: username is null ? "Fingerprint?" : "Fingerprint")
+            .ConfigureAwait(false);
+    }
+
     // Every attempt is logged (SYS236 / SYS249); a success opens a session.
-    private async Task<AuthenticationResult> AuthenticateCoreAsync(string username, string secret, bool usePin, string? terminal, CancellationToken ct, string? oneTimeCode = null)
+    // A card or fingerprint already identified the user (verifiedBy names how; a trailing '?' means nobody matched).
+    private async Task<AuthenticationResult> AuthenticateCoreAsync(string username, string secret, bool usePin, string? terminal, CancellationToken ct, string? oneTimeCode = null,
+        string? verifiedBy = null)
     {
         string normalized = username.Trim().ToUpperInvariant();
         User? user = await _db.Users
             .FirstOrDefaultAsync(u => u.NormalizedUsername == normalized, ct)
             .ConfigureAwait(false);
         DateTimeOffset now = _clock.UtcNow;
-        string method = usePin ? "PIN" : "Password";
+        string method = verifiedBy?.TrimEnd('?') ?? (usePin ? "PIN" : "Password");
         async Task<AuthenticationResult> LogAsync(AuthenticationResult result, string? sessionId = null)
         {
             _db.LoginEvents.Add(new LoginEvent(user?.Id, username.Trim(), now, terminal, method, result.Outcome.ToString(), sessionId) { SourceAddress = _currentUser?.ClientAddress });
@@ -129,7 +148,7 @@ public sealed class AuthenticationService : IAuthenticationService
         }
 
         string? storedHash = usePin ? user.PinHash : user.PasswordHash;
-        bool ok = storedHash is not null && _hasher.Verify(storedHash, secret);
+        bool ok = verifiedBy is not null ? !verifiedBy.EndsWith('?') : storedHash is not null && _hasher.Verify(storedHash, secret);
 
         if (!ok)
         {

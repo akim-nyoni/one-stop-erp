@@ -146,17 +146,14 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             return;
         }
 
-        if (!CashCounts.TryParse(CountedCash, _currency.Value, out IReadOnlyList<CashCount> counts) || string.IsNullOrWhiteSpace(SupervisorName) || string.IsNullOrEmpty(SupervisorPin))
+        if (!CashCounts.TryParse(CountedCash, _currency.Value, out IReadOnlyList<CashCount> counts))
         {
-            StatusMessage = "Type the count (120, or 120; ZAR 500), and the next cashier their name and PIN.";
+            StatusMessage = "Type the count (120, or 120; ZAR 500), and the next cashier their name and PIN (or swipe their card).";
             return;
         }
 
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
-        AuthenticationResult incoming = await scope.ServiceProvider.GetRequiredService<IAuthenticationService>()
-            .AuthenticateByPinAsync(SupervisorName.Trim(), SupervisorPin, $"POS-{_terminalId}").ConfigureAwait(true);
-        SupervisorPin = string.Empty;
-        SupervisorPinCleared?.Invoke();
+        AuthenticationResult incoming = await IdentifyPersonAsync(scope).ConfigureAwait(true);
         if (!incoming.Succeeded)
         {
             StatusMessage = incoming.Message;
@@ -183,6 +180,35 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         TillSessionId = handed.Value.IncomingSessionId;
         CountedCash = string.Empty;
         StatusMessage = $"{outgoing} handed over: expected {r.ExpectedCash:N2}, counted {r.CountedCash:N2}. {CashierName} now has the till (session {TillSessionId}).";
+    }
+
+    // Who is at the till: a name and PIN; a card swiped or scanned into the name box (no PIN); or, with nothing typed, the fingerprint reader.
+    private async Task<AuthenticationResult> IdentifyPersonAsync(AsyncServiceScope scope)
+    {
+        IAuthenticationService auth = scope.ServiceProvider.GetRequiredService<IAuthenticationService>();
+        string terminal = $"POS-{_terminalId}";
+        string name = SupervisorName?.Trim() ?? string.Empty;
+        string pin = SupervisorPin ?? string.Empty;
+        SupervisorPin = string.Empty;
+        SupervisorPinCleared?.Invoke();
+        if (name.Length > 0 && pin.Length > 0)
+        {
+            return await auth.AuthenticateByPinAsync(name, pin, terminal).ConfigureAwait(true);
+        }
+
+        if (name.Length > 0)
+        {
+            SupervisorName = string.Empty;
+            return await auth.AuthenticateByCardAsync(name, terminal).ConfigureAwait(true);
+        }
+
+        if (scope.ServiceProvider.GetRequiredService<IDeviceProvider>().FingerprintReader is IFingerprintReader reader
+            && await reader.IdentifyAsync().ConfigureAwait(true) is string enrolment)
+        {
+            return await auth.AuthenticateByBiometricAsync(enrolment, terminal).ConfigureAwait(true);
+        }
+
+        return AuthenticationResult.Failure(AuthenticationOutcome.InvalidCredentials, "Enter a name and PIN, swipe a card, or use the fingerprint reader.");
     }
 
     /// <summary>The GL account cash (and change) posts to.</summary>
@@ -1539,17 +1565,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     // A supervisor's user name and PIN, checked now: they must hold the permission and not be the cashier.
     private async Task<long?> SupervisorAsync(string permission, OperationFlags needed)
     {
-        if (string.IsNullOrWhiteSpace(SupervisorName) || string.IsNullOrEmpty(SupervisorPin))
-        {
-            StatusMessage = "A supervisor must enter their name and PIN.";
-            return null;
-        }
-
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
-        AuthenticationResult supervisor = await scope.ServiceProvider.GetRequiredService<IAuthenticationService>()
-            .AuthenticateByPinAsync(SupervisorName.Trim(), SupervisorPin, $"POS-{_terminalId}").ConfigureAwait(true);
-        SupervisorPin = string.Empty;
-        SupervisorPinCleared?.Invoke();
+        AuthenticationResult supervisor = await IdentifyPersonAsync(scope).ConfigureAwait(true);
         if (!supervisor.Succeeded || supervisor.UserId == _cashierUserId || !supervisor.Permissions.Has(permission, needed))
         {
             StatusMessage = !supervisor.Succeeded ? supervisor.Message ?? "Supervisor not recognised."

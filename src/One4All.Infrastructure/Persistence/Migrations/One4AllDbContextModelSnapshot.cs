@@ -30107,6 +30107,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("BiometricId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("biometric_id");
+
+                    b.Property<string>("CardHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("card_hash");
+
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("created_by_user_id");
@@ -30223,6 +30233,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_user");
+
+                    b.HasIndex("BiometricId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_biometric_id")
+                        .HasFilter("biometric_id IS NOT NULL");
+
+                    b.HasIndex("CardHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_card_hash")
+                        .HasFilter("card_hash IS NOT NULL");
 
                     b.HasIndex("NormalizedUsername")
                         .IsUnique()

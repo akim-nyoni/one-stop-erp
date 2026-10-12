@@ -119,6 +119,10 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.Property(x => x.Email).HasMaxLength(256);
         b.Property(x => x.PasswordHash).HasMaxLength(512);
         b.Property(x => x.PinHash).HasMaxLength(512);
+        b.Property(x => x.CardHash).HasMaxLength(64);
+        b.HasIndex(x => x.CardHash).IsUnique().HasFilter("card_hash IS NOT NULL");
+        b.Property(x => x.BiometricId).HasMaxLength(100);
+        b.HasIndex(x => x.BiometricId).IsUnique().HasFilter("biometric_id IS NOT NULL");
         b.Property(x => x.TwoFactorSecret).HasMaxLength(64);
         b.Property(x => x.SecurityStamp).HasMaxLength(64);
 

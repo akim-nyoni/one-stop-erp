@@ -534,6 +534,22 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Cashier card and fingerprint", ListTitle = "Users and their roles",
+            Description = "Issues a user the cashier card they swipe or scan to sign in at the till and to authorise (swipe it into the card box; only its hash is kept), or links "
+                + "them to their fingerprint reader enrolment. Blank removes either.",
+            Fields = [Req("Username", "Login name"), Pick("What", "Set", ["Card", "Fingerprint"]), Opt("Value", "Card swipe / enrolment id")],
+            Run = async (c, i) =>
+            {
+                long user = await UserAsync(c, i.Text("Username")).ConfigureAwait(true);
+                IUserAdminService admin = c.Get<IUserAdminService>();
+                return i.Text("What") == "Fingerprint"
+                    ? Check(await admin.SetBiometricIdAsync(user, i.Optional("Value")).ConfigureAwait(true), i.Optional("Value") is null ? "Fingerprint enrolment removed." : "Fingerprint linked.")
+                    : Check(await admin.SetCashierCardAsync(user, i.Optional("Value")).ConfigureAwait(true), i.Optional("Value") is null ? "Card removed." : "Card issued.");
+            },
+            List = UsersAsync,
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Compare roles or change many at once", ListTitle = "Roles",
             Description = "Compare shows where two roles differ, permission by permission. Bulk change adds, removes or sets operations (View, Create, Edit, Delete, Print, Export, Post, "
                 + "Approve, VoidReverse — comma separated) on a permission code or a pattern such as Payroll.* across several roles (comma separated) at once. System roles are left alone.",

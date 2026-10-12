@@ -94,4 +94,15 @@ public interface IDeviceProvider
 
     /// <summary>Gets the embedded price / weight barcode templates.</summary>
     IReadOnlyList<EmbeddedBarcodeRule> BarcodeRules { get; }
+
+    /// <summary>Gets the fingerprint reader, when the terminal has one (the hook a vendor's reader SDK plugs into).</summary>
+    IFingerprintReader? FingerprintReader => null;
+}
+
+/// <summary>A fingerprint reader that matches a finger on the device and answers with the enrolment it matched.</summary>
+public interface IFingerprintReader
+{
+    /// <summary>Waits for a finger and returns the matched enrolment id, or null when nobody matched.</summary>
+    /// <returns>The enrolment id.</returns>
+    Task<string?> IdentifyAsync(CancellationToken ct = default);
 }
