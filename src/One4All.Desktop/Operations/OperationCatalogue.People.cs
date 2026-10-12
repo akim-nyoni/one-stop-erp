@@ -370,12 +370,13 @@ public static partial class OperationCatalogue
             Description = "Per leave type: yearly days (service bands \"5:24;10:30\" raise them after so many completed years), earned monthly or granted at the leave-year start, "
                 + "joiners pro rata, and a carry-over cap applied as the leave year turns (the excess is forfeited). A balance ceiling stops accrual; carried days can lapse so many months "
                 + "into the year; leave can be taken in advance down to so many days; sick tiers \"11:50;21:0\" pay so much from the nth sick day of the year. "
-                + "Run month accrues for a month (the scheduled task does the month just ended); Apply sick pay sets the period's deductions.",
-            Fields = [Pick("Step", "Step", ["Save policy", "Run month", "Apply sick pay"]), Req("Type", "Leave type", "ANNUAL"), OptNum("Days", "Days a year"), Tick("Monthly", "Earned monthly", true),
+                + "Run month accrues for a month (the scheduled task does the month just ended); Apply sick pay sets the period's deductions. Advance leave pay pays the "
+                + "leave starting in the month ahead into the pay period (LEAVEPAY) and recovers it in the recovery period (LEAVEADV).",
+            Fields = [Pick("Step", "Step", ["Save policy", "Run month", "Apply sick pay", "Advance leave pay"]), Req("Type", "Leave type", "ANNUAL"), OptNum("Days", "Days a year"), Tick("Monthly", "Earned monthly", true),
                 Num("Start", "Leave year starts (month)", "1"), OptNum("Cap", "Carry-over cap (days, blank: none)"), Tick("ProRata", "Joiners pro rata", true), Opt("Bands", "Service bands (years:days;...)"),
                 OptNum("Ceiling", "Balance ceiling (days, blank: none)"), OptNum("Lapse", "Carried days lapse after (months, blank: never)"), Num("Advance", "May go negative by (days)", "0"),
                 Opt("Tiers", "Sick tiers (from day:pay %;...)"), Today("Month", "Month to run"), Opt("Period", "Pay period (sick pay)"), Opt("Element", "Deduction element (sick pay)"),
-                Num("WorkDays", "Working days a month (sick pay)", "21.67")],
+                Num("WorkDays", "Working days a month (sick pay)", "21.67"), Opt("Recovery", "Recovery period (advance)")],
             Run = async (c, i) =>
             {
                 ILeavePolicyService policies = c.Get<ILeavePolicyService>();
@@ -383,6 +384,14 @@ public static partial class OperationCatalogue
                 {
                     LeaveAccrualRun run = Check(await policies.RunMonthAsync(c.CompanyId, i.Date("Month")).ConfigureAwait(true));
                     return $"{run.Period}: {run.Accrued} balance(s) earned {Q(run.DaysAccrued)} day(s); {Q(run.DaysForfeited)} forfeited; {run.AlreadyRun} already run.";
+                }
+
+                if (i.Text("Step") == "Advance leave pay")
+                {
+                    DateOnly month = i.Date("Month"), from = new(month.Year, month.Month, 1);
+                    IReadOnlyList<LeaveAdvanceLine> advanced = Check(await policies.AdvanceLeavePayAsync(c.CompanyId, i.Text("Type"), from, from.AddMonths(1).AddDays(-1), i.Optional("Period") ?? string.Empty,
+                        i.Optional("Recovery") ?? string.Empty, i.Optional("Element") ?? "LEAVEPAY", "LEAVEADV", i.Number("WorkDays")).ConfigureAwait(true));
+                    return $"{advanced.Count} employee(s) going on leave; {Q(advanced.Sum(a => a.LeaveDays))} day(s), {M(advanced.Sum(a => a.Amount))} paid in advance.";
                 }
 
                 if (i.Text("Step") == "Apply sick pay")

@@ -54,7 +54,7 @@ public sealed class PayrollSetupTests
 
         // The standard elements, once.
         IReadOnlyList<string> seeded = (await setup.SeedStandardElementsAsync(companyId, "6100", "2400", "PAYE")).Value;
-        seeded.Should().HaveCount(31).And.StartWith(["BASIC", "OVERTIME", "HOUSING", "TRANSPORT", "PAYE"]).And.Contain(["OVERTIME2", "OVERTIMEPH", "GRATUITY", "GARNISHEE", "STAFFPURCH", "HOUSERENT"]);
+        seeded.Should().HaveCount(32).And.StartWith(["BASIC", "OVERTIME", "HOUSING", "TRANSPORT", "PAYE"]).And.Contain(["OVERTIME2", "OVERTIMEPH", "GRATUITY", "GARNISHEE", "STAFFPURCH", "HOUSERENT"]);
         (await setup.SeedStandardElementsAsync(companyId, "6100", "2400", "PAYE")).Value.Should().BeEmpty();
         (await setup.CreatePayElementAsync(companyId, new NewPayElement("BAD", "Bad", PayElementType.Earning, CalculationBasis.Formula, 9, "6100"))).Error.Code.Should().Be("Payroll.FormulaRequired");
         (await setup.UpdatePayElementAsync(companyId, "HOUSING", 0m, null, null, null)).IsSuccess.Should().BeTrue();

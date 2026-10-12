@@ -455,6 +455,7 @@ public sealed class PayrollSetupService : IPayrollSetupService
             Deduct("STAFFPURCH", "Staff purchases", CalculationBasis.Formula, 59) with { Formula = "STAFFPURCHASES" },
             Deduct("HOUSERENT", "Housing rent", CalculationBasis.Formula, 60) with { Formula = "HOUSINGRENT" },
             Deduct("OVERPAYMENT", "Salary overpayment recovery", CalculationBasis.FixedAmount, 61),
+            Deduct("LEAVEADV", "Leave pay advance recovery", CalculationBasis.FixedAmount, 62),
         ];
         List<string> created = [];
         foreach (NewPayElement element in standard)

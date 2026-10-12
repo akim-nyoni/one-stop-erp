@@ -72,5 +72,20 @@ public sealed class LeaveRulesTests
         (sick.SickDays, sick.UnpaidDays, sick.Deduction).Should().Be((8m, 4.5m, 450m));
         (await db.PayrollVariables.AsNoTracking().Where(v => v.EmployeeId == clerk.Id && v.ElementCode == "SICKDED" && v.PeriodLabel == "2026-10").Select(v => v.Amount).SingleAsync())
             .Should().Be(450m);
+
+        // Leave pay in advance: 5 annual days from 2 November at 2,170 ÷ 21.7 = 500, paid in October and recovered in November.
+        db.PayElements.AddRange(
+            new PayElement(companyId, "LEAVEPAY", "Leave pay", PayElementType.Earning, CalculationBasis.FixedAmount, 15, "6100"),
+            new PayElement(companyId, "LEAVEADV", "Leave pay advance recovery", PayElementType.Deduction, CalculationBasis.FixedAmount, 62, "6100"));
+        await db.SaveChangesAsync();
+        (await attendance.TakeLeaveAsync(companyId, clerk.Id, "ANNUAL", new DateOnly(2027, 5, 3), new DateOnly(2027, 5, 7), 5m)).IsSuccess.Should().BeTrue();
+        (await policies.AdvanceLeavePayAsync(companyId, "ANNUAL", new DateOnly(2027, 5, 1), new DateOnly(2027, 5, 31), "2027-04", "2027-04", "LEAVEPAY", "LEAVEADV", 21.7m))
+            .Error.Code.Should().Be("Pay.LeaveAdvance");
+        LeaveAdvanceLine advance = (await policies.AdvanceLeavePayAsync(companyId, "ANNUAL", new DateOnly(2027, 5, 1), new DateOnly(2027, 5, 31), "2027-04", "2027-05", "LEAVEPAY", "LEAVEADV", 21.7m))
+            .Value.Should().ContainSingle().Subject;
+        (advance.LeaveDays, advance.Amount).Should().Be((5m, 500m));
+        List<PayrollVariable> advanceVariables = await db.PayrollVariables.AsNoTracking().Where(v => v.EmployeeId == clerk.Id && (v.ElementCode == "LEAVEPAY" || v.ElementCode == "LEAVEADV"))
+            .OrderBy(v => v.PeriodLabel).ToListAsync();
+        advanceVariables.Select(v => (v.ElementCode, v.PeriodLabel, v.Amount)).Should().Equal(("LEAVEPAY", "2027-04", (decimal?)500m), ("LEAVEADV", "2027-05", (decimal?)500m));
     }
 }

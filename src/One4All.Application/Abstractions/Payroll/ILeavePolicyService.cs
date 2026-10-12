@@ -22,6 +22,12 @@ public sealed record LeavePolicyRequest(long CompanyId, string LeaveType, decima
 /// <param name="Deduction">The pay deduction (unpaid days × basic ÷ working days).</param>
 public sealed record SickPayLine(long EmployeeId, decimal SickDays, decimal UnpaidDays, decimal Deduction);
 
+/// <summary>Leave pay paid ahead of an employee's leave, and its recovery.</summary>
+/// <param name="EmployeeId">The employee.</param>
+/// <param name="LeaveDays">The leave days starting in the window.</param>
+/// <param name="Amount">The leave pay paid now and recovered in the recovery period.</param>
+public sealed record LeaveAdvanceLine(long EmployeeId, decimal LeaveDays, decimal Amount);
+
 /// <summary>A month's leave policy run.</summary>
 /// <param name="Period">The month (yyyyMM).</param>
 /// <param name="Accrued">Balances accrued or granted.</param>
@@ -58,4 +64,12 @@ public interface ILeavePolicyService
     /// <returns>The employees with sick days in the period.</returns>
     Task<Result<IReadOnlyList<SickPayLine>>> ApplySickPayAsync(long companyId, string leaveType, string periodLabel, DateOnly fromDate, DateOnly toDate, string deductionElementCode,
         decimal workingDaysPerMonth, CancellationToken ct = default);
+
+    /// <summary>
+    /// Pays leave pay in advance (brief §4.15.4): for leave of a type starting between two dates, the leave days' pay (basic ÷ working days a month,
+    /// per day) goes into this pay period as the advance element and comes back in the recovery period as the recovery deduction, when the
+    /// leave days are paid in the ordinary way. Rerunning replaces the earlier figures.
+    /// </summary>
+    Task<Result<IReadOnlyList<LeaveAdvanceLine>>> AdvanceLeavePayAsync(long companyId, string leaveType, DateOnly fromDate, DateOnly toDate, string periodLabel, string recoveryPeriodLabel,
+        string advanceElementCode, string recoveryElementCode, decimal workingDaysPerMonth, CancellationToken ct = default);
 }

@@ -186,6 +186,48 @@ public sealed class LeavePolicyService : ILeavePolicyService
             return Result<IReadOnlyList<SickPayLine>>.Success(lines);
         }, ct);
 
+    /// <inheritdoc />
+    public Task<Result<IReadOnlyList<LeaveAdvanceLine>>> AdvanceLeavePayAsync(long companyId, string leaveType, DateOnly fromDate, DateOnly toDate, string periodLabel, string recoveryPeriodLabel,
+        string advanceElementCode, string recoveryElementCode, decimal workingDaysPerMonth, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            string type = (leaveType ?? string.Empty).Trim().ToUpperInvariant();
+            if (workingDaysPerMonth <= 0m || toDate < fromDate || string.IsNullOrWhiteSpace(periodLabel) || string.IsNullOrWhiteSpace(recoveryPeriodLabel)
+                || string.Equals(periodLabel.Trim(), recoveryPeriodLabel.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                return Error.Validation("Pay.LeaveAdvance", "Leave pay in advance needs the leave window, a pay period and a later recovery period, and working days a month.");
+            }
+
+            var taken = await _db.LeaveRecords.AsNoTracking()
+                .Where(l => l.CompanyId == companyId && l.Kind == LeaveRecordKind.Taken && l.LeaveType.ToUpper() == type && l.FromDate >= fromDate && l.FromDate <= toDate)
+                .GroupBy(l => l.EmployeeId).Select(g => new { EmployeeId = g.Key, Days = g.Sum(l => l.Days) }).ToListAsync(ct).ConfigureAwait(false);
+            List<long> ids = [.. taken.Select(t => t.EmployeeId)];
+            Dictionary<long, decimal> basic = await _db.Employees.Where(e => ids.Contains(e.Id)).ToDictionaryAsync(e => e.Id, e => e.BasicSalary, ct).ConfigureAwait(false);
+
+            List<LeaveAdvanceLine> lines = [];
+            foreach (var leave in taken.OrderBy(t => t.EmployeeId))
+            {
+                decimal amount = Math.Round(leave.Days * basic.GetValueOrDefault(leave.EmployeeId) / workingDaysPerMonth, 2, MidpointRounding.AwayFromZero);
+                if (amount <= 0m)
+                {
+                    continue;
+                }
+
+                foreach ((string element, string period) in new[] { (advanceElementCode, periodLabel), (recoveryElementCode, recoveryPeriodLabel) })
+                {
+                    Result<long> set = await _variables.SetAsync(companyId, leave.EmployeeId, element, period, null, amount, ct).ConfigureAwait(false);
+                    if (set.IsFailure)
+                    {
+                        return set.Error;
+                    }
+                }
+
+                lines.Add(new LeaveAdvanceLine(leave.EmployeeId, leave.Days, amount));
+            }
+
+            return Result<IReadOnlyList<LeaveAdvanceLine>>.Success(lines);
+        }, ct);
+
     // The unpaid share of the sick days from position 'from' to 'to' in the leave year (day n spans n-1..n); days before the first tier are on full pay.
     private static decimal UnpaidDays(IReadOnlyList<LeaveSickTier> tiers, decimal from, decimal to)
     {
