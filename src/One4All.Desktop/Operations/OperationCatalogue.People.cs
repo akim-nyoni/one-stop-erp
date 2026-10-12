@@ -1219,6 +1219,68 @@ public static partial class OperationCatalogue
     {
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Fee structures and term billing", ListTitle = "Fee structures",
+            Description = "A fee structure per grade and term with its items (compulsory ones billed to every student in the grade, optional ones only to those taking them); "
+                + "Bill term invoices every enrolled student of the grade under the prefix (a rerun skips those already billed); Bill student invoices one.",
+            Fields = [Pick("Step", "Step", ["Save structure", "Add item", "Bill term", "Bill student"]), Req("Structure", "Fee structure code"), Opt("Name", "Name / item description"),
+                Opt("Grade", "Grade"), Opt("Term", "Term (e.g. 2026-T1)"), Opt("Revenue", "Revenue account"), Num("Amount", "Item amount", "0"), Tick("Compulsory", "Compulsory item", true),
+                Opt("Prefix", "Invoice prefix (bill term) / number (bill student)"), Opt("Student", "Admission number (bill student)"), Today()],
+            Run = async (c, i) =>
+            {
+                ISchoolSetupService setup = c.Get<ISchoolSetupService>();
+                ISchoolBillingService billing = c.Get<ISchoolBillingService>();
+                async Task<long> StructureAsync() => await FindAsync(c.Db.FeeStructures, f => f.CompanyId == c.CompanyId && f.Code == i.Text("Structure").ToUpper(), f => f.Id, "fee structure",
+                    i.Text("Structure")).ConfigureAwait(true);
+                switch (i.Text("Step"))
+                {
+                    case "Add item":
+                        return $"Item {Check(await setup.AddFeeItemAsync(c.CompanyId, i.Text("Structure"), i.Optional("Name") ?? string.Empty, i.Number("Amount"), i.Flag("Compulsory"), i.Optional("Revenue"))
+                            .ConfigureAwait(true))} added.";
+                    case "Bill term":
+                        TermBillResult term = Check(await billing.BillTermAsync(c.CompanyId, await StructureAsync().ConfigureAwait(true), i.Optional("Prefix") ?? string.Empty, i.Date("Date")).ConfigureAwait(true));
+                        return $"{term.Bills.Count} student(s) billed {M(term.TotalNetBilled)}; {term.AlreadyBilled} already billed.";
+                    case "Bill student":
+                        long student = await FindAsync(c.Db.Students, s => s.CompanyId == c.CompanyId && s.AdmissionNumber == (i.Optional("Student") ?? string.Empty).ToUpper(), s => s.Id, "student",
+                            i.Optional("Student") ?? string.Empty).ConfigureAwait(true);
+                        StudentBillResult bill = Check(await billing.BillStudentAsync(c.CompanyId, student, await StructureAsync().ConfigureAwait(true), i.Optional("Prefix") ?? string.Empty, i.Date("Date"))
+                            .ConfigureAwait(true));
+                        return $"Billed {M(bill.NetFees)} (gross {M(bill.GrossFees)}, discounts {M(bill.Discount + bill.SiblingDiscount)}).";
+                    default:
+                        return $"Fee structure saved (id {Check(await setup.SaveFeeStructureAsync(c.CompanyId, i.Text("Structure"), i.Optional("Name") ?? i.Text("Structure"), i.Optional("Grade") ?? string.Empty,
+                            i.Optional("Term") ?? string.Empty, i.Optional("Revenue") ?? string.Empty).ConfigureAwait(true))}).";
+                }
+            },
+            List = async c => Table(await c.Db.FeeStructures.AsNoTracking().Include(f => f.Items).Where(f => f.CompanyId == c.CompanyId).OrderBy(f => f.Code).ToListAsync().ConfigureAwait(true),
+                ("Structure", f => f.Code), ("Name", f => f.Name), ("Grade", f => f.Grade), ("Term", f => f.Term), ("Compulsory", f => M(f.CompulsoryTotal)), ("Items", f => f.Items.Count)),
+        };
+        yield return new Operation
+        {
+            Module = "Sales & Schools", Title = "Students, hostels and routes", ListTitle = "Students",
+            Description = "Admit a student under their guardian's account (the customer billed); set up a hostel or transport route with its capacity and fee per term; place a "
+                + "student in a hostel and on a route (blank takes them out) within capacity.",
+            Fields = [Pick("Step", "Step", ["Admit", "Hostel", "Route", "Place"]), Opt("Student", "Admission number"), Opt("Name", "Name"), Opt("Grade", "Grade"), Opt("Guardian", "Guardian (customer code)"),
+                Opt("Code", "Hostel / route code"), Num("Capacity", "Capacity", "0"), Num("Fee", "Fee per term", "0"), Opt("Revenue", "Revenue account"), Opt("HostelCode", "Hostel (place)"),
+                Opt("RouteCode", "Route (place)"), Today()],
+            Run = async (c, i) =>
+            {
+                ISchoolSetupService setup = c.Get<ISchoolSetupService>();
+                return i.Text("Step") switch
+                {
+                    "Hostel" => $"Hostel saved (id {Check(await setup.SaveHostelAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Optional("Name") ?? string.Empty, i.Whole("Capacity"), i.Number("Fee"),
+                        i.Optional("Revenue") ?? string.Empty).ConfigureAwait(true))}).",
+                    "Route" => $"Route saved (id {Check(await setup.SaveRouteAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Optional("Name") ?? string.Empty, i.Whole("Capacity"), i.Number("Fee"),
+                        i.Optional("Revenue") ?? string.Empty).ConfigureAwait(true))}).",
+                    "Place" => Check(await setup.PlaceStudentAsync(c.CompanyId, i.Optional("Student") ?? string.Empty, i.Optional("HostelCode"), i.Optional("RouteCode")).ConfigureAwait(true), "Student placed."),
+                    _ => $"Student admitted (id {Check(await setup.AdmitStudentAsync(c.CompanyId, i.Optional("Student") ?? string.Empty, i.Optional("Name") ?? string.Empty, i.Optional("Grade") ?? string.Empty,
+                        i.Optional("Guardian") ?? string.Empty, i.Date("Date")).ConfigureAwait(true))}).",
+                };
+            },
+            List = async c => Table(await c.Db.Students.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.AdmissionNumber).Take(500).ToListAsync().ConfigureAwait(true),
+                ("Admission", s => s.AdmissionNumber), ("Name", s => s.ShownName(false)), ("Grade", s => s.Grade), ("Boarder", s => s.IsBoarder ? "yes" : string.Empty),
+                ("Enrolled", s => s.IsEnrolled ? "yes" : "left")),
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Term dates, optional fees and leavers", ListTitle = "Optional fee items",
             Description = "Term dates (with pro rata, a joiner pays from the admission date and a leaver is credited the unused part of the term invoice); a student taking or "
                 + "dropping an optional item (lunches, clubs, trips — billed with the term, not discounted); a student's admission date; withdrawing a student.",
