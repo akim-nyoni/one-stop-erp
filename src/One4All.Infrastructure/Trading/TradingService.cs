@@ -126,8 +126,9 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         decimal baseTax = Round(request.TaxAmount * rate);
         decimal baseGross = baseNet + baseTax;
 
-        // Credit-limit control: refuse when this invoice would take the customer's outstanding balance over the limit.
-        if (customer.CreditLimit > 0m)
+        // Credit-limit control under the customer's policy: block (refuse unless a supervisor overrides), warn (post, flagged and logged) or ignore.
+        bool overLimit = false;
+        if (customer.CreditLimit > 0m && customer.CreditLimitPolicy != CreditLimitPolicy.Ignore)
         {
             // Lock the customer for the rest of the transaction so concurrent invoices queue here: each then sees the
             // others' committed items, and two cannot both squeeze under the limit.
@@ -136,7 +137,13 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             decimal debits = await ar.Where(i => i.Sign == LedgerSign.Debit).SumAsync(i => (decimal?)i.OutstandingBase, ct).ConfigureAwait(false) ?? 0m;
             decimal credits = await ar.Where(i => i.Sign == LedgerSign.Credit).SumAsync(i => (decimal?)i.OutstandingBase, ct).ConfigureAwait(false) ?? 0m;
             decimal outstanding = debits - credits;
-            if (outstanding + baseGross > customer.CreditLimit)
+            if (outstanding + baseGross > customer.CreditLimit && customer.CreditLimitPolicy == CreditLimitPolicy.Warn)
+            {
+                overLimit = true;
+                _db.Set<CreditLimitOverride>().Add(new CreditLimitOverride(request.CompanyId, customer.Id, request.DocumentNumber, customer.CreditLimit, outstanding + baseGross, 0,
+                    request.EnteredByUserId, DateTimeOffset.UtcNow));
+            }
+            else if (outstanding + baseGross > customer.CreditLimit)
             {
                 // Only a supervisor who may override credit limits (not whoever raised the invoice) lets it through, and the override is kept.
                 if (request.CreditLimitOverrideByUserId is not long overrider)
@@ -194,7 +201,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
-        return opened;
+        return opened.IsSuccess && overLimit ? opened.Value with { OverCreditLimit = true } : opened;
     }
 
     /// <inheritdoc />

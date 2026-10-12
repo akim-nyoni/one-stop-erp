@@ -30581,6 +30581,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("entered_by_user_id");
 
+                    b.Property<bool>("IsWarning")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_warning");
+
                     b.Property<long>("RowVersion")
                         .HasColumnType("bigint")
                         .HasColumnName("row_version");
@@ -30713,6 +30717,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("credit_limit");
+
+                    b.Property<int>("CreditLimitPolicy")
+                        .HasColumnType("integer")
+                        .HasColumnName("credit_limit_policy");
 
                     b.Property<string>("Currency")
                         .IsRequired()

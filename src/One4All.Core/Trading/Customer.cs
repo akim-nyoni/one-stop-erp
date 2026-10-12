@@ -98,6 +98,9 @@ public sealed class Customer : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the account is on hold (blocks new sales on credit).</summary>
     public bool OnHold { get; set; }
 
+    /// <summary>What happens when an invoice would take the balance over the credit limit (brief §4.5 "credit limit &amp; credit-limit check policy").</summary>
+    public CreditLimitPolicy CreditLimitPolicy { get; set; }
+
     /// <summary>Whether the account is exempt from interest on arrears (government, charities, by council resolution).</summary>
     public bool InterestExempt { get; set; }
 
@@ -147,4 +150,17 @@ public sealed class Customer : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>The exchange-rate type this customer's foreign documents convert at (e.g. a contract or bank rate); null: the daily rate. Falls back to the daily rate when none is found.</summary>
     public One4All.Core.System.ExchangeRateType? RateType { get; set; }
+}
+
+/// <summary>What an invoice over a customer's credit limit does.</summary>
+public enum CreditLimitPolicy
+{
+    /// <summary>Refused unless a supervisor who may override credit limits lets it through.</summary>
+    Block = 0,
+
+    /// <summary>Posted, flagged and logged as over the limit.</summary>
+    Warn = 1,
+
+    /// <summary>Not checked (the limit is for information only).</summary>
+    Ignore = 2,
 }

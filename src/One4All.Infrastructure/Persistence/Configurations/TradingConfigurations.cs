@@ -9,6 +9,7 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
     public void Configure(EntityTypeBuilder<Customer> b)
     {
         b.Property(x => x.DeliveryZone).HasMaxLength(20);
+        b.Property(x => x.CreditLimitPolicy).HasConversion<int>();
         b.Property(x => x.CustomerType).HasMaxLength(30);
         b.Property(x => x.DunningGroupCode).HasMaxLength(20);
         b.ToTable("customer", Schemas.AccountsReceivable);

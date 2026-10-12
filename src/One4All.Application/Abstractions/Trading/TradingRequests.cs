@@ -7,7 +7,11 @@ namespace One4All.Application.Abstractions.Trading;
 /// <param name="JournalNumber">The GL journal number.</param>
 /// <param name="BaseAmount">The gross amount in base currency.</param>
 /// <param name="WithheldBase">Withholding tax deducted from a supplier payment (base currency; 0 when none).</param>
-public readonly record struct TradingPostingResult(long OpenItemId, string JournalNumber, decimal BaseAmount, decimal WithheldBase = 0m);
+public readonly record struct TradingPostingResult(long OpenItemId, string JournalNumber, decimal BaseAmount, decimal WithheldBase = 0m)
+{
+    /// <summary>Gets a value indicating whether the invoice took the customer over the credit limit under a warn policy.</summary>
+    public bool OverCreditLimit { get; init; }
+}
 
 /// <summary>A request to post a sales invoice (AR).</summary>
 public sealed class SalesInvoiceRequest

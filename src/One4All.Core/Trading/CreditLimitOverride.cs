@@ -10,6 +10,7 @@ public sealed class CreditLimitOverride : Entity, ICompanyScoped
     /// <summary>Records the override.</summary>
     public CreditLimitOverride(long companyId, long customerId, string documentNumber, decimal creditLimit, decimal balanceAfter, long authorisedByUserId, long? enteredByUserId, DateTimeOffset at)
     {
+        IsWarning = authorisedByUserId == 0;
         CompanyId = companyId;
         CustomerId = customerId;
         DocumentNumber = documentNumber;
@@ -43,4 +44,7 @@ public sealed class CreditLimitOverride : Entity, ICompanyScoped
 
     /// <summary>When.</summary>
     public DateTimeOffset At { get; private set; }
+
+    /// <summary>Whether the invoice went through on a warn policy rather than a supervisor's override.</summary>
+    public bool IsWarning { get; private set; }
 }

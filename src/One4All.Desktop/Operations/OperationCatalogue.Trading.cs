@@ -358,8 +358,10 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = credit, Title = "Credit limits", ListTitle = "Increases awaiting approval",
-            Description = "Lowers a customer's credit limit at once; an increase is requested with the reason and approved (or rejected) by another user.",
-            Fields = [Pick("Step", "Step", ["Lower", "Request increase", "Approve", "Reject"]), Opt("Customer", "Customer code"), Num("Limit", "New limit", "0"), Opt("Reason", "Reason"), OptNum("Request", "Request id")],
+            Description = "Lowers a customer's credit limit at once; an increase is requested with the reason and approved (or rejected) by another user. Policy: what an invoice over "
+                + "the limit does — Block (refused unless a supervisor overrides), Warn (posted, flagged and logged) or Ignore.",
+            Fields = [Pick("Step", "Step", ["Lower", "Request increase", "Approve", "Reject", "Policy"]), Opt("Customer", "Customer code"), Num("Limit", "New limit", "0"), Opt("Reason", "Reason"),
+                OptNum("Request", "Request id"), Pick("Policy", "Credit-limit policy", Enum.GetNames<Core.Trading.CreditLimitPolicy>())],
             Run = async (c, i) =>
             {
                 ICreditLimitService limits = c.Get<ICreditLimitService>();
@@ -373,6 +375,12 @@ public static partial class OperationCatalogue
                             .ConfigureAwait(true), id => $"Request {id} awaits another user's approval.");
                     case "Approve":
                         return Check(await limits.ApproveAsync(c.CompanyId, request, c.UserId).ConfigureAwait(true), "Limit raised.");
+                    case "Policy":
+                        long customerId = await CustomerAsync(c, i.Optional("Customer") ?? string.Empty).ConfigureAwait(true);
+                        Core.Trading.Customer customer = await c.Db.Customers.FirstAsync(x => x.Id == customerId).ConfigureAwait(true);
+                        customer.CreditLimitPolicy = Enum.Parse<Core.Trading.CreditLimitPolicy>(i.Text("Policy"));
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return $"{customer.Code}: invoices over the limit now {customer.CreditLimitPolicy switch { Core.Trading.CreditLimitPolicy.Warn => "post with a warning", Core.Trading.CreditLimitPolicy.Ignore => "are not checked", _ => "are refused unless overridden" }}.";
                     default:
                         return Check(await limits.RejectAsync(c.CompanyId, request, c.UserId, i.Optional("Reason") ?? string.Empty).ConfigureAwait(true), "Request rejected.");
                 }
