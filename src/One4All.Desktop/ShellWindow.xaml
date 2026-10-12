@@ -85,6 +85,10 @@
                     <Separator />
                     <MenuItem Header="{loc:T 'Document Printer…'}" Tag="Documents" Click="OpenOperations_Click" />
                 </MenuItem>
+                <Separator />
+                <MenuItem Header="{loc:T 'Larger Text'}" InputGestureText="Ctrl++" Click="LargerText_Click" />
+                <MenuItem Header="{loc:T 'Smaller Text'}" InputGestureText="Ctrl+−" Click="SmallerText_Click" />
+                <MenuItem Header="{loc:T 'Normal Text Size'}" InputGestureText="Ctrl+0" Click="NormalText_Click" />
             </MenuItem>
             <MenuItem x:Name="MaintenanceMenu" Header="{loc:T '_Maintenance'}">
                 <MenuItem Header="{loc:T 'Roles &amp; Permissions…'}" Click="OpenPermissionEditor_Click" />

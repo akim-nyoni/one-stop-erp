@@ -87,6 +87,12 @@ public partial class ShellWindow : Window
     }
 
     // The update channel: the vendor-signed release, downloaded and checked (SHA-256) before the installer runs; the app closes so it can be replaced.
+    private void LargerText_Click(object sender, RoutedEventArgs e) => UiScaling.Set(Application.Localization.UiScale.Larger(UiScaling.Current));
+
+    private void SmallerText_Click(object sender, RoutedEventArgs e) => UiScaling.Set(Application.Localization.UiScale.Smaller(UiScaling.Current));
+
+    private void NormalText_Click(object sender, RoutedEventArgs e) => UiScaling.Set(1.0);
+
     private async void CheckForUpdates_Click(object sender, RoutedEventArgs e)
     {
         Application.Abstractions.System.IUpdateService updates = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<Application.Abstractions.System.IUpdateService>(_services);
