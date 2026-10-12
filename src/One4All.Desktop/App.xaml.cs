@@ -96,6 +96,7 @@ public partial class App : System.Windows.Application
         }
 
         Services.GetRequiredService<DesktopSession>().SignIn(result);
+        await DesktopRowScope.LoadAsync(Services, result.UserId).ConfigureAwait(true);
         ILicenceService licence = Services.GetRequiredService<ILicenceService>();
         await Localization.UiText.LoadAsync(Services).ConfigureAwait(true);
         ShellWindow shell = new(new ShellViewModel(result, licence, Services.GetService<One4All.Application.Modules.IModuleRegistry>()), Services);

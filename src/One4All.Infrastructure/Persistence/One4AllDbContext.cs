@@ -25,8 +25,21 @@ public class One4AllDbContext : DbContext
     /// <summary>Creates the context with the given options.</summary>
     /// <param name="options">EF Core options, typically configured to use Npgsql.</param>
     public One4AllDbContext(DbContextOptions<One4AllDbContext> options)
+        : this(options, null)
+    {
+    }
+
+    /// <summary>Creates a context limited to the signed-in user's row scope, when the host holds one.</summary>
+    /// <param name="options">The options.</param>
+    /// <param name="rowScope">The host's row scope (null: none).</param>
+    [Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructor]
+    public One4AllDbContext(DbContextOptions<One4AllDbContext> options, RowScopeHolder? rowScope)
         : base(options)
     {
+        if (rowScope?.Scope is Application.Security.RowScope scope)
+        {
+            ApplyRowScope(scope);
+        }
     }
 
     /// <summary>The name of the query filter hiding soft-deleted rows.</summary>
