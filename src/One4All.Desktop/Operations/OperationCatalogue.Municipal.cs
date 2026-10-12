@@ -55,6 +55,26 @@ public static partial class OperationCatalogue
                     $"{p.Role}: {p.Name}{(p.Phone is null ? string.Empty : " " + p.Phone)} from {p.From:yyyy-MM-dd}{(p.ReceivesBills ? " (copied on bills)" : string.Empty)}"));
                 text.AppendLine("Recent transactions:");
                 e.RecentTransactions.ToList().ForEach(t => text.AppendLine(CultureInfo.InvariantCulture, $"  {t.Date:yyyy-MM-dd} {t.DocumentNumber,-14} {t.ItemType,-12} {M(t.Amount),14} outstanding {M(t.Outstanding)}"));
+                if (e.Readings.Count > 0)
+                {
+                    text.AppendLine("Readings:");
+                    e.Readings.ToList().ForEach(r => text.AppendLine(CultureInfo.InvariantCulture,
+                        $"  {r.Date:yyyy-MM-dd} {r.MeterSerial,-14} {r.Reading,12:0.###} used {r.Consumption,10:0.###} {r.Kind}{(r.Accepted ? string.Empty : " (not accepted)")}"));
+                }
+
+                if (e.Tickets.Count > 0)
+                {
+                    text.AppendLine("Complaints and tickets:");
+                    e.Tickets.ToList().ForEach(t => text.AppendLine(CultureInfo.InvariantCulture, $"  {t.ReportedAt:yyyy-MM-dd} {t.Reference,-12} {t.Category,-20} {t.Status,-10} {t.Description}"));
+                }
+
+                if (e.Correspondence.Count > 0)
+                {
+                    text.AppendLine("Correspondence:");
+                    e.Correspondence.ToList().ForEach(m => text.AppendLine(CultureInfo.InvariantCulture,
+                        $"  {m.At:yyyy-MM-dd} {(m.Outgoing ? "to  " : "from")} {m.Party,-24} {m.Channel,-8} {m.Subject} [{m.Status}]"));
+                }
+
                 return text.ToString();
             },
             List = async c => Table(await c.Db.Properties.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.StandNumber).Take(500).ToListAsync().ConfigureAwait(true),

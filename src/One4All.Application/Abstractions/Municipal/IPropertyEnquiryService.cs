@@ -69,7 +69,42 @@ public sealed record PropertyEnquiry(
 
     /// <summary>Gets the correspondence address, when separate from the property.</summary>
     public string? CorrespondenceAddress { get; init; }
+
+    /// <summary>Gets the complaints and service tickets logged against the property, newest first.</summary>
+    public IReadOnlyList<EnquiryTicket> Tickets { get; init; } = [];
+
+    /// <summary>Gets the meters' reading history, newest first.</summary>
+    public IReadOnlyList<EnquiryReading> Readings { get; init; } = [];
+
+    /// <summary>Gets the messages sent to and received from the ratepayer and the property's parties, newest first.</summary>
+    public IReadOnlyList<EnquiryMessage> Correspondence { get; init; } = [];
 }
+
+/// <summary>A complaint or service ticket on the enquiry desk.</summary>
+/// <param name="Reference">The ticket reference.</param>
+/// <param name="Category">Its category.</param>
+/// <param name="Status">Where it stands.</param>
+/// <param name="ReportedAt">When it was reported.</param>
+/// <param name="Description">What was reported.</param>
+public sealed record EnquiryTicket(string Reference, string Category, Core.Municipal.TicketStatus Status, DateTimeOffset ReportedAt, string Description);
+
+/// <summary>A meter reading on the enquiry desk.</summary>
+/// <param name="MeterSerial">The meter.</param>
+/// <param name="Date">The reading date.</param>
+/// <param name="Reading">The register reading.</param>
+/// <param name="Consumption">The consumption since the previous reading.</param>
+/// <param name="Kind">Actual or estimated.</param>
+/// <param name="Accepted">Whether it passed validation.</param>
+public sealed record EnquiryReading(string MeterSerial, DateOnly Date, decimal Reading, decimal Consumption, Core.Municipal.MeterReadingKind Kind, bool Accepted);
+
+/// <summary>A message to or from the ratepayer or a party of the property.</summary>
+/// <param name="At">When it was sent or received.</param>
+/// <param name="Outgoing">Whether we sent it.</param>
+/// <param name="Channel">E-mail, SMS, WhatsApp …</param>
+/// <param name="Party">The address it went to or came from.</param>
+/// <param name="Subject">The subject, or the start of the text.</param>
+/// <param name="Status">Its delivery status (outgoing) or Received.</param>
+public sealed record EnquiryMessage(DateTimeOffset At, bool Outgoing, string Channel, string Party, string Subject, string Status);
 
 /// <summary>
 /// The consumer enquiry desk (brief §4.9): one read-only view of a property — owners and ratepayer, services with their

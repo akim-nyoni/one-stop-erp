@@ -91,10 +91,50 @@ public sealed class PropertyEnquiryService : IPropertyEnquiryService
                 p.ReceivesBills, p.From, p.To))
             .ToListAsync(ct).ConfigureAwait(false);
 
+        // Complaints and service tickets on the property.
+        List<EnquiryTicket> tickets = await _db.Set<ServiceTicket>().AsNoTracking().Where(t => t.CompanyId == companyId && t.PropertyId == propertyId)
+            .OrderByDescending(t => t.ReportedAt).Take(20)
+            .Select(t => new EnquiryTicket(t.Reference, _db.Set<TicketCategory>().Where(c => c.Id == t.CategoryId).Select(c => c.Name).FirstOrDefault() ?? string.Empty, t.Status, t.ReportedAt, t.Description))
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        // The meters' readings, the latest twelve per meter.
+        List<EnquiryReading> readings = [];
+        foreach ((long meterId, Meter meter) in meters)
+        {
+            readings.AddRange(await _db.Set<MeterReading>().AsNoTracking().Where(r => r.MeterId == meterId && r.ReadingDate <= asAtDate).OrderByDescending(r => r.ReadingDate).ThenByDescending(r => r.Id).Take(12)
+                .Select(r => new EnquiryReading(meter.Serial, r.ReadingDate, r.Reading, r.Consumption, r.Kind, r.Accepted)).ToListAsync(ct).ConfigureAwait(false));
+        }
+
+        // Correspondence: what went to, or came from, the ratepayer's and the parties' addresses.
+        HashSet<string> addresses = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string? address in new[] { ratepayer.Email, ratepayer.MobileNumber }.Concat(parties.SelectMany(p => new[] { p.Email, p.Phone })))
+        {
+            if (!string.IsNullOrWhiteSpace(address))
+            {
+                addresses.Add(address.Trim());
+            }
+        }
+
+        List<string> addressList = [.. addresses];
+        List<EnquiryMessage> correspondence = [];
+        if (addressList.Count > 0)
+        {
+            correspondence.AddRange(await _db.Set<Core.Communications.OutboundMessage>().AsNoTracking().Where(m => m.CompanyId == companyId && addressList.Contains(m.Recipient))
+                .OrderByDescending(m => m.QueuedAt).Take(20)
+                .Select(m => new EnquiryMessage(m.SentAt ?? m.QueuedAt, true, m.Channel.ToString(), m.Recipient, m.Subject, m.Status.ToString())).ToListAsync(ct).ConfigureAwait(false));
+        }
+
+        correspondence.AddRange(await _db.Set<Core.Communications.InboundMessage>().AsNoTracking()
+            .Where(m => m.CompanyId == companyId && (m.CustomerId == ratepayer.Id || addressList.Contains(m.From)))
+            .OrderByDescending(m => m.ReceivedAt).Take(20)
+            .Select(m => new EnquiryMessage(m.ReceivedAt, false, m.Channel.ToString(), m.From, m.Body.Length > 60 ? m.Body.Substring(0, 60) : m.Body, "Received")).ToListAsync(ct).ConfigureAwait(false));
+
         return new PropertyEnquiry(property.StandNumber, property.Ward, valuation, ratepayer.Code, ratepayer.Name, owners, services,
             balance, Math.Max(0m, pastDue - credits), recent, subsidy, arrangement, orders, licences, clearance)
         {
-            Parties = parties, CorrespondenceAddress = property.CorrespondenceAddress,
+            Parties = parties, CorrespondenceAddress = property.CorrespondenceAddress, Tickets = tickets,
+            Readings = [.. readings.OrderByDescending(r => r.Date).ThenBy(r => r.MeterSerial, StringComparer.Ordinal)],
+            Correspondence = [.. correspondence.OrderByDescending(m => m.At).Take(20)],
         };
     }
 }

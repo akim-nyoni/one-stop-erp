@@ -37,7 +37,7 @@ public sealed class PropertyEnquiryTests
         Tariff water = new(companyId, "WAT-ENQ", "Water", ServiceType.Water, TariffType.PerUnit, new DateOnly(2026, 1, 1), "4000") { PerUnitRate = 1m };
         Tariff refuse = new(companyId, "REF-ENQ", "Refuse", ServiceType.Refuse, TariffType.Flat, new DateOnly(2026, 1, 1), "4000") { FixedCharge = 20m };
         db.Tariffs.AddRange(water, refuse);
-        Customer owner = new(companyId, "EQ-OWN", "Enquiry Owner", Scenario.Usd) { PaymentTermsDays = 30 };
+        Customer owner = new(companyId, "EQ-OWN", "Enquiry Owner", Scenario.Usd) { PaymentTermsDays = 30, Email = $"eq{companyId}@example.com" };
         db.Customers.Add(owner);
         await db.SaveChangesAsync();
 
@@ -70,7 +70,23 @@ public sealed class PropertyEnquiryTests
             CompanyId = companyId, Kind = CouncilLicenceKind.Hawker, HolderCustomerId = owner.Id, Description = "Fruit stall", IssuedOn = new DateOnly(2026, 1, 1), CycleMonths = 12, Fee = 0m,
         })).Value.LicenceNumber;
 
+        TicketCategory leak = new(companyId, $"LEAK-{companyId}", "Water leak", ServiceType.Water, 4m, 48m);
+        db.Set<TicketCategory>().Add(leak);
+        await db.SaveChangesAsync();
+        DateTimeOffset reported = new(2026, 3, 20, 9, 0, 0, TimeSpan.Zero);
+        db.Set<ServiceTicket>().Add(new ServiceTicket(companyId, $"TK-{companyId}", leak.Id, stand.Id, TicketPriority.High, "Enquiry Owner", "0771", "Burst pipe at the gate", reported,
+            reported.AddHours(4), reported.AddHours(48)));
+        db.Set<One4All.Core.Communications.OutboundMessage>().Add(new One4All.Core.Communications.OutboundMessage(companyId, null, One4All.Core.Communications.MessageChannel.Email,
+            owner.Email!, "Your March statement", "Attached.", new DateTimeOffset(2026, 3, 26, 8, 0, 0, TimeSpan.Zero)));
+        db.Set<One4All.Core.Communications.InboundMessage>().Add(new One4All.Core.Communications.InboundMessage(companyId, One4All.Core.Communications.MessageChannel.Email, owner.Email!,
+            "Enquiry Owner", "Please read my meter again", new DateTimeOffset(2026, 3, 27, 8, 0, 0, TimeSpan.Zero), $"in-{companyId}"));
+        await db.SaveChangesAsync();
+
         PropertyEnquiry view = (await scope.ServiceProvider.GetRequiredService<IPropertyEnquiryService>().EnquireAsync(companyId, stand.Id, new DateOnly(2026, 4, 1), 2)).Value;
+        view.Tickets.Should().ContainSingle().Which.Should().Match<EnquiryTicket>(t => t.Category == "Water leak" && t.Description == "Burst pipe at the gate");
+        view.Readings.Should().NotBeEmpty();
+        view.Readings[0].Should().Match<EnquiryReading>(r => r.MeterSerial == serial && r.Date == new DateOnly(2026, 3, 1) && r.Reading == 120m);
+        view.Correspondence.Select(m => (m.Outgoing, m.Subject)).Should().Equal((false, "Please read my meter again"), (true, "Your March statement"));
         view.Should().Match<PropertyEnquiry>(v => v.StandNumber == "E1" && v.Ward == "Ward 12" && v.Valuation == 80_000m && v.RatepayerCode == "EQ-OWN" && v.RatepayerName == "Enquiry Owner");
         view.Owners.Select(o => o.CustomerCode).Should().Equal("EQ-OWN");
         view.Services.Should().Equal(
