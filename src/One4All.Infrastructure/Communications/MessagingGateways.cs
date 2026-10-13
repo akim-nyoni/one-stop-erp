@@ -74,24 +74,50 @@ public sealed class MessagingOptions
 public sealed class SmtpEmailGateway : IMessageGateway
 {
     private readonly SmtpOptions _options;
+    private readonly ICompanyMessagingService? _companies;
+    private readonly HttpClient? _http;
 
     /// <summary>Creates the gateway.</summary>
     /// <param name="options">The messaging settings.</param>
-    public SmtpEmailGateway(MessagingOptions options) => _options = options.Smtp;
+    /// <param name="companies">Each company's own email settings (its SMTP server or Microsoft Graph), over the server's.</param>
+    /// <param name="http">The HTTP client Microsoft Graph is called with.</param>
+    public SmtpEmailGateway(MessagingOptions options, ICompanyMessagingService? companies = null, HttpClient? http = null)
+    {
+        _options = options.Smtp;
+        _companies = companies;
+        _http = http;
+    }
 
     /// <inheritdoc />
     public MessageChannel Channel => MessageChannel.Email;
 
     /// <inheritdoc />
-    public Task<GatewayResult> SendAsync(long companyId, string recipient, string subject, string body, CancellationToken ct = default) => SendCoreAsync(recipient, subject, body, null, ct);
+    public Task<GatewayResult> SendAsync(long companyId, string recipient, string subject, string body, CancellationToken ct = default) => SendCoreAsync(companyId, recipient, subject, body, null, ct);
 
     /// <inheritdoc />
     public Task<GatewayResult> SendAsync(long companyId, string recipient, string subject, string body, MessageAttachment attachment, CancellationToken ct = default)
-        => SendCoreAsync(recipient, subject, body, attachment, ct);
+        => SendCoreAsync(companyId, recipient, subject, body, attachment, ct);
 
-    private async Task<GatewayResult> SendCoreAsync(string recipient, string subject, string body, MessageAttachment? attachment, CancellationToken ct)
+    private async Task<GatewayResult> SendCoreAsync(long companyId, string recipient, string subject, string body, MessageAttachment? attachment, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(_options.Host) || string.IsNullOrWhiteSpace(_options.From))
+        // The company's own delivery, when it has one, over the server's.
+        Core.Communications.CompanyMessagingSettings? own = _companies is null ? null : await _companies.ForGatewayAsync(companyId, ct).ConfigureAwait(false);
+        if (own?.EmailProvider == Core.Communications.EmailProvider.MicrosoftGraph)
+        {
+            return _http is null ? new GatewayResult(false, "Microsoft Graph needs an HTTP client on this host.")
+                : !MailAddress.TryCreate(recipient?.Trim(), out _) ? new GatewayResult(false, $"\"{recipient}\" is not an email address.")
+                : await GraphMailSender.SendAsync(_http, own, recipient!, subject, body, attachment, ct).ConfigureAwait(false);
+        }
+
+        SmtpOptions options = own?.EmailProvider == Core.Communications.EmailProvider.Smtp
+            ? new SmtpOptions { Host = own.SmtpHost, Port = own.SmtpPort, UseTls = own.SmtpUseTls, Username = own.SmtpUsername, Password = own.SmtpPassword, From = own.FromAddress ?? string.Empty, FromName = own.FromName }
+            : _options;
+        return await SendSmtpAsync(options, recipient, subject, body, attachment, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<GatewayResult> SendSmtpAsync(SmtpOptions options, string recipient, string subject, string body, MessageAttachment? attachment, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(options.Host) || string.IsNullOrWhiteSpace(options.From))
         {
             return new GatewayResult(false, "Email is not configured (Messaging:Smtp).");
         }
@@ -101,7 +127,7 @@ public sealed class SmtpEmailGateway : IMessageGateway
             return new GatewayResult(false, $"\"{recipient}\" is not an email address.");
         }
 
-        using MailMessage message = new(new MailAddress(_options.From, _options.FromName), to) { Subject = subject, Body = body, BodyEncoding = Encoding.UTF8, SubjectEncoding = Encoding.UTF8 };
+        using MailMessage message = new(new MailAddress(options.From, options.FromName), to) { Subject = subject, Body = body, BodyEncoding = Encoding.UTF8, SubjectEncoding = Encoding.UTF8 };
         string id = $"<{Guid.NewGuid():N}@one4all>";
         message.Headers.Add("Message-ID", id);
         using MemoryStream? content = attachment is null ? null : new MemoryStream(attachment.Content);
@@ -110,10 +136,10 @@ public sealed class SmtpEmailGateway : IMessageGateway
             message.Attachments.Add(new Attachment(content!, attachment.Name, attachment.ContentType));
         }
 
-        using SmtpClient client = new(_options.Host, _options.Port) { EnableSsl = _options.UseTls, DeliveryMethod = SmtpDeliveryMethod.Network };
-        if (!string.IsNullOrWhiteSpace(_options.Username))
+        using SmtpClient client = new(options.Host, options.Port) { EnableSsl = options.UseTls, DeliveryMethod = SmtpDeliveryMethod.Network };
+        if (!string.IsNullOrWhiteSpace(options.Username))
         {
-            client.Credentials = new NetworkCredential(_options.Username, _options.Password);
+            client.Credentials = new NetworkCredential(options.Username, options.Password);
         }
 
         try
@@ -133,14 +159,17 @@ public sealed class HttpSmsGateway : IMessageGateway
 {
     private readonly HttpClient _http;
     private readonly SmsOptions _options;
+    private readonly ICompanyMessagingService? _companies;
 
     /// <summary>Creates the gateway.</summary>
     /// <param name="http">The HTTP client.</param>
     /// <param name="options">The messaging settings.</param>
-    public HttpSmsGateway(HttpClient http, MessagingOptions options)
+    /// <param name="companies">Each company's own SMS provider, over the server's.</param>
+    public HttpSmsGateway(HttpClient http, MessagingOptions options, ICompanyMessagingService? companies = null)
     {
         _http = http;
         _options = options.Sms;
+        _companies = companies;
     }
 
     /// <inheritdoc />
@@ -149,7 +178,15 @@ public sealed class HttpSmsGateway : IMessageGateway
     /// <inheritdoc />
     public async Task<GatewayResult> SendAsync(long companyId, string recipient, string subject, string body, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(_options.Url))
+        Core.Communications.CompanyMessagingSettings? own = _companies is null ? null : await _companies.ForGatewayAsync(companyId, ct).ConfigureAwait(false);
+        SmsOptions sms = own?.SmsUrl is string url
+            ? new SmsOptions
+            {
+                Url = url, BodyTemplate = own.SmsBodyTemplate ?? _options.BodyTemplate, ContentType = own.SmsContentType ?? "application/json", AuthHeader = own.SmsAuthHeader,
+                AuthValue = own.SmsAuthValue, From = own.SmsFrom,
+            }
+            : _options;
+        if (string.IsNullOrWhiteSpace(sms.Url))
         {
             return new GatewayResult(false, "SMS is not configured (Messaging:Sms).");
         }
@@ -159,13 +196,13 @@ public sealed class HttpSmsGateway : IMessageGateway
             return new GatewayResult(false, $"\"{recipient}\" is not a phone number.");
         }
 
-        using HttpRequestMessage request = new(HttpMethod.Post, _options.Url)
+        using HttpRequestMessage request = new(HttpMethod.Post, sms.Url)
         {
-            Content = new StringContent(SmsRequest.Fill(_options.BodyTemplate, _options.ContentType, number, body, _options.From), Encoding.UTF8, _options.ContentType),
+            Content = new StringContent(SmsRequest.Fill(sms.BodyTemplate, sms.ContentType, number, body, sms.From), Encoding.UTF8, sms.ContentType),
         };
-        if (!string.IsNullOrWhiteSpace(_options.AuthHeader))
+        if (!string.IsNullOrWhiteSpace(sms.AuthHeader))
         {
-            request.Headers.TryAddWithoutValidation(_options.AuthHeader, _options.AuthValue);
+            request.Headers.TryAddWithoutValidation(sms.AuthHeader, sms.AuthValue);
         }
 
         try

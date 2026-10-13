@@ -5,6 +5,7 @@ using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Backup;
 using One4All.Application.Abstractions.Integration;
 using One4All.Application.Abstractions.MasterData;
+using One4All.Application.Abstractions.Communications;
 using One4All.Application.Abstractions.Onboarding;
 using One4All.Application.Abstractions.Security;
 using One4All.Application.MasterData;
@@ -146,6 +147,36 @@ public static partial class OperationCatalogue
         };
         string[] imports = ["Accounts", "Warehouses", "Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "PayrollYtd",
             "Properties", "Meters", "Students", "Stands", "RentalUnits", "Budget"];
+        yield return new Operation
+        {
+            Module = module, Title = "Company email and SMS settings", ListTitle = "Import templates",
+            Description = "The company's own email delivery (its SMTP server, or Microsoft 365 through Microsoft Graph with an app registration allowed Mail.Send) and its SMS "
+                + "provider, used instead of the server's settings. Passwords, client secrets and API keys are stored encrypted and never shown; leave them blank to keep the stored "
+                + "ones. Show: what is set.",
+            Fields = [Pick("Step", "Step", ["Show", "Email", "SMS"]), Pick("Provider", "Email provider", Enum.GetNames<Core.Communications.EmailProvider>()),
+                Opt("From", "Sender address / Graph mailbox"), Opt("FromName", "Sender name"), Opt("Host", "SMTP host"), Num("Port", "SMTP port", "587"), Tick("Tls", "SMTP uses TLS", true),
+                Opt("User", "SMTP login"), Opt("Password", "SMTP password (blank: keep)"), Opt("Tenant", "Graph tenant id"), Opt("Client", "Graph client id"),
+                Opt("Secret", "Graph client secret (blank: keep)"), Opt("SmsUrl", "SMS endpoint (blank: the server's)"), Opt("SmsTemplate", "SMS body template with {to} {body} {from}"),
+                Opt("SmsHeader", "SMS auth header"), Opt("SmsKey", "SMS auth value (blank: keep)"), Opt("SmsFrom", "SMS sender id")],
+            Run = async (c, i) =>
+            {
+                ICompanyMessagingService messaging = c.Get<ICompanyMessagingService>();
+                switch (i.Text("Step"))
+                {
+                    case "Email":
+                        _ = Check(await messaging.SaveEmailAsync(c.CompanyId, new CompanyEmailSettings(Enum.Parse<Core.Communications.EmailProvider>(i.Text("Provider")), i.Optional("From"),
+                            i.Optional("FromName"), i.Optional("Host"), i.Whole("Port"), i.Flag("Tls"), i.Optional("User"), i.Optional("Password"), i.Optional("Tenant"), i.Optional("Client"),
+                            i.Optional("Secret"))).ConfigureAwait(true), string.Empty);
+                        break;
+                    case "SMS":
+                        _ = Check(await messaging.SaveSmsAsync(c.CompanyId, new CompanySmsSettings(i.Optional("SmsUrl"), i.Optional("SmsTemplate"), null, i.Optional("SmsHeader"),
+                            i.Optional("SmsKey"), i.Optional("SmsFrom"))).ConfigureAwait(true), string.Empty);
+                        break;
+                }
+
+                return await messaging.DescribeAsync(c.CompanyId).ConfigureAwait(true);
+            },
+        };
         yield return new Operation
         {
             Module = module, Title = "Import templates and master data export", ListTitle = "Import templates",

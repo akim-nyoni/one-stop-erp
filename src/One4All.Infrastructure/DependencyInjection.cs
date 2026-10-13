@@ -179,6 +179,7 @@ public static class DependencyInjection
         // Email (SMTP) and SMS (HTTP provider); unconfigured channels refuse sends, so despatch retries and reports them.
         services.AddSingleton(messagingOptions ?? new Communications.MessagingOptions());
         services.AddSingleton(new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(30) });
+        services.AddScoped<Application.Abstractions.Communications.ICompanyMessagingService, Communications.CompanyMessagingService>();
         services.AddScoped<Application.Abstractions.Communications.IMessageGateway, Communications.SmtpEmailGateway>();
         services.AddScoped<Application.Abstractions.Communications.IMessageGateway, Communications.HttpSmsGateway>();
         services.AddScoped<Application.Abstractions.Communications.IMessageGateway, Communications.WhatsAppCloudGateway>();

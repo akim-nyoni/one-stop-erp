@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using One4All.Core.System;
+using One4All.Infrastructure.Security;
 
 namespace One4All.Infrastructure.Persistence.Configurations;
 
@@ -214,5 +215,30 @@ internal sealed class WorkstationPrinterConfiguration : IEntityTypeConfiguration
         b.Property(x => x.PrinterName).HasMaxLength(200);
         b.Property(x => x.Tray).HasMaxLength(40);
         b.HasIndex(x => new { x.CompanyId, x.Workstation, x.Purpose }).IsUnique();
+    }
+}
+
+internal sealed class CompanyMessagingSettingsConfiguration : IEntityTypeConfiguration<Core.Communications.CompanyMessagingSettings>
+{
+    public void Configure(EntityTypeBuilder<Core.Communications.CompanyMessagingSettings> b)
+    {
+        b.ToTable("company_messaging", Schemas.System);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => x.CompanyId).IsUnique();
+        b.Property(x => x.EmailProvider).HasConversion<int>();
+        b.Property(x => x.SmtpHost).HasMaxLength(200);
+        b.Property(x => x.SmtpUsername).HasMaxLength(200);
+        b.Property(x => x.SmtpPassword).Encrypted();
+        b.Property(x => x.FromAddress).HasMaxLength(200);
+        b.Property(x => x.FromName).HasMaxLength(120);
+        b.Property(x => x.GraphTenantId).HasMaxLength(100);
+        b.Property(x => x.GraphClientId).HasMaxLength(100);
+        b.Property(x => x.GraphClientSecret).Encrypted();
+        b.Property(x => x.SmsUrl).HasMaxLength(400);
+        b.Property(x => x.SmsBodyTemplate).HasMaxLength(1000);
+        b.Property(x => x.SmsContentType).HasMaxLength(100);
+        b.Property(x => x.SmsAuthHeader).HasMaxLength(100);
+        b.Property(x => x.SmsAuthValue).Encrypted();
+        b.Property(x => x.SmsFrom).HasMaxLength(40);
     }
 }

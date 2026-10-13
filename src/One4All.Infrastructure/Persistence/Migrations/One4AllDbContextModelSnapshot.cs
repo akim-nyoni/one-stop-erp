@@ -3788,6 +3788,134 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("virement_band", "bud");
                 });
 
+            modelBuilder.Entity("One4All.Core.Communications.CompanyMessagingSettings", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<int>("EmailProvider")
+                        .HasColumnType("integer")
+                        .HasColumnName("email_provider");
+
+                    b.Property<string>("FromAddress")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("from_address");
+
+                    b.Property<string>("FromName")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("from_name");
+
+                    b.Property<string>("GraphClientId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("graph_client_id");
+
+                    b.Property<string>("GraphClientSecret")
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("graph_client_secret")
+                        .HasAnnotation("One4All:Encrypted", true);
+
+                    b.Property<string>("GraphTenantId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("graph_tenant_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("SmsAuthHeader")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("sms_auth_header");
+
+                    b.Property<string>("SmsAuthValue")
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("sms_auth_value")
+                        .HasAnnotation("One4All:Encrypted", true);
+
+                    b.Property<string>("SmsBodyTemplate")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("sms_body_template");
+
+                    b.Property<string>("SmsContentType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("sms_content_type");
+
+                    b.Property<string>("SmsFrom")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("sms_from");
+
+                    b.Property<string>("SmsUrl")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("sms_url");
+
+                    b.Property<string>("SmtpHost")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("smtp_host");
+
+                    b.Property<string>("SmtpPassword")
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("smtp_password")
+                        .HasAnnotation("One4All:Encrypted", true);
+
+                    b.Property<int>("SmtpPort")
+                        .HasColumnType("integer")
+                        .HasColumnName("smtp_port");
+
+                    b.Property<bool>("SmtpUseTls")
+                        .HasColumnType("boolean")
+                        .HasColumnName("smtp_use_tls");
+
+                    b.Property<string>("SmtpUsername")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("smtp_username");
+
+                    b.HasKey("Id")
+                        .HasName("pk_company_messaging");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_company_messaging_company_id");
+
+                    b.ToTable("company_messaging", "sys");
+                });
+
             modelBuilder.Entity("One4All.Core.Communications.DespatchBatch", b =>
                 {
                     b.Property<long>("Id")
