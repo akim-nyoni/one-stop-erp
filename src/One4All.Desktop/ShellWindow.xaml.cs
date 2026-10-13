@@ -245,6 +245,12 @@ public partial class ShellWindow : Window
         check.Show();
     }
 
+    private void OpenFloorPlan_Click(object sender, RoutedEventArgs e)
+    {
+        FloorPlanWindow floor = new(_services) { Owner = this };
+        floor.Show();
+    }
+
     private void OpenFaultDesk_Click(object sender, RoutedEventArgs e)
     {
         FaultDeskWindow desk = new(_services) { Owner = this };

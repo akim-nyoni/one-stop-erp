@@ -100,6 +100,7 @@
                 <MenuItem Header="{loc:T 'My Approvals…'}" Click="OpenApprovals_Click" />
                 <MenuItem Header="{loc:T 'My Notifications…'}" Click="OpenNotifications_Click" />
                 <MenuItem Header="{loc:T 'Fault Desk…'}" Click="OpenFaultDesk_Click" />
+                <MenuItem Header="{loc:T 'Restaurant Floor…'}" Click="OpenFloorPlan_Click" />
                 <MenuItem Header="{loc:T 'Journals Awaiting Approval…'}" Click="OpenJournalApprovals_Click" />
                 <MenuItem Header="{loc:T 'Stock Replenishment…'}" Click="OpenReplenishment_Click" />
                 <MenuItem Header="{loc:T 'Supplier Payment Run…'}" Click="OpenPaymentRun_Click" />
