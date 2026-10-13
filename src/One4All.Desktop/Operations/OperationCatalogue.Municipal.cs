@@ -102,13 +102,22 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Ratepayer statement", ListTitle = "Properties",
-            Description = "The ratepayer's statement for a stand, as at a date, ready to print or hand over.",
-            Fields = [Req("Stand", "Stand number"), Today("AsAt", "As at")],
+            Description = "The ratepayer's statement for a stand, as at a date, ready to print or hand over, with a consumption graph for each of the stand's meters "
+                + "over the months chosen.",
+            Fields = [Req("Stand", "Stand number"), Today("AsAt", "As at"), Num("Months", "Months of consumption graph (0: none)", "12")],
             Run = async (c, i) =>
             {
                 long propertyId = await PropertyAsync(c, i.Text("Stand")).ConfigureAwait(true);
                 long ratepayer = await c.Db.Properties.AsNoTracking().Where(p => p.Id == propertyId).Select(p => p.RatepayerCustomerId).SingleAsync().ConfigureAwait(true);
-                return Check(await c.Get<IStatementService>().RenderCustomerStatementTextAsync(c.CompanyId, ratepayer, i.Date("AsAt"), 72).ConfigureAwait(true));
+                string statement = Check(await c.Get<IStatementService>().RenderCustomerStatementTextAsync(c.CompanyId, ratepayer, i.Date("AsAt"), 72).ConfigureAwait(true));
+                if (i.Whole("Months") <= 0)
+                {
+                    return statement;
+                }
+
+                IReadOnlyList<Application.Municipal.MeterConsumption> meters = Check(await c.Get<IPropertyRegisterService>()
+                    .ConsumptionAsync(c.CompanyId, i.Text("Stand"), i.Date("AsAt"), i.Whole("Months")).ConfigureAwait(true));
+                return statement + string.Concat(meters.Select(m => Environment.NewLine + Application.Municipal.ConsumptionGraph.Render(m, 72)));
             },
             List = async c => Table(await c.Db.Properties.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.StandNumber).Take(500).ToListAsync().ConfigureAwait(true),
                 ("Stand", p => p.StandNumber), ("Ward", p => p.Ward), ("Ratepayer", p => p.RatepayerCustomerId)),

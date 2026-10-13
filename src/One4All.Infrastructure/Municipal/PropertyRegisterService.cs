@@ -73,4 +73,44 @@ public sealed class PropertyRegisterService : IPropertyRegisterService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<Application.Municipal.MeterConsumption>>> ConsumptionAsync(long companyId, string standNumber, DateOnly asAt, int months = 12, CancellationToken ct = default)
+    {
+        string stand = (standNumber ?? string.Empty).Trim().ToUpperInvariant();
+        Property? property = await _db.Properties.AsNoTracking().Include(p => p.Services)
+            .FirstOrDefaultAsync(p => p.CompanyId == companyId && p.StandNumber.ToUpper() == stand, ct).ConfigureAwait(false);
+        if (property is null)
+        {
+            return Error.NotFound("Mun.PropertyNotFound", $"No stand {stand}.");
+        }
+
+        months = Math.Clamp(months, 1, 36);
+        DateOnly last = new(asAt.Year, asAt.Month, 1);
+        DateOnly first = last.AddMonths(1 - months);
+        DateOnly end = last.AddMonths(1);
+        List<(long MeterId, string Service)> meters = [.. property.Services.Where(s => s.MeterId is not null).Select(s => (s.MeterId!.Value, s.ServiceType.ToString())).Distinct()];
+        List<long> ids = [.. meters.Select(m => m.MeterId)];
+        Dictionary<long, string> serials = await _db.Set<Meter>().AsNoTracking().IgnoreQueryFilters([One4AllDbContext.SoftDeleteFilter])
+            .Where(m => ids.Contains(m.Id)).ToDictionaryAsync(m => m.Id, m => m.Serial, ct).ConfigureAwait(false);
+        var readings = await _db.MeterReadings.AsNoTracking()
+            .Where(r => r.CompanyId == companyId && ids.Contains(r.MeterId) && r.Accepted && r.ReadingDate >= first && r.ReadingDate < end)
+            .Select(r => new { r.MeterId, r.ReadingDate, r.Consumption }).ToListAsync(ct).ConfigureAwait(false);
+
+        List<Application.Municipal.MeterConsumption> result = [];
+        foreach ((long meterId, string service) in meters)
+        {
+            List<Application.Municipal.MonthlyConsumption> series = [];
+            for (DateOnly month = first; month < end; month = month.AddMonths(1))
+            {
+                DateOnly next = month.AddMonths(1);
+                series.Add(new Application.Municipal.MonthlyConsumption(month,
+                    readings.Where(r => r.MeterId == meterId && r.ReadingDate >= month && r.ReadingDate < next).Sum(r => r.Consumption)));
+            }
+
+            result.Add(new Application.Municipal.MeterConsumption(serials.GetValueOrDefault(meterId, meterId.ToString(System.Globalization.CultureInfo.InvariantCulture)), service, series));
+        }
+
+        return result;
+    }
 }
