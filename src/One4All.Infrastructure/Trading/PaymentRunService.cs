@@ -78,7 +78,8 @@ public sealed class PaymentRunService : IPaymentRunService
             return Error.Validation("Ap.MobileLayout", "A mobile-money run makes its own payout file; leave the bank file layout blank.");
         }
 
-        if (!string.IsNullOrWhiteSpace(request.EftLayoutCode))
+        bool pain001 = string.Equals(request.EftLayoutCode?.Trim(), Application.Banking.Pain001.LayoutCode, StringComparison.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(request.EftLayoutCode) && !pain001)
         {
             layout = await _db.BankFileLayouts.AsNoTracking().FirstOrDefaultAsync(l => l.CompanyId == request.CompanyId && l.Code == request.EftLayoutCode.Trim().ToUpper(), ct).ConfigureAwait(false);
             if (layout is null)
@@ -235,6 +236,7 @@ public sealed class PaymentRunService : IPaymentRunService
 
         byte[] eft = request.Method == Core.Trading.PaymentRunMethod.MobileMoney ? BuildMobileMoneyFile(request, [.. lines.Where(l => l.Amount > 0m)], suppliers)
             : request.Method != Core.Trading.PaymentRunMethod.Eft ? []
+            : pain001 ? await Pain001FileAsync(request, [.. lines.Where(l => l.Amount > 0m)], suppliers, ct).ConfigureAwait(false)
             : layout is null ? BuildEftFile(request, [.. lines.Where(l => l.Amount > 0m)], suppliers) : LayoutEftFile(request, layout, [.. lines.Where(l => l.Amount > 0m)], suppliers);
         return new PaymentRunResult(lines, totalBase, eft, chequeNumbers);
     }
@@ -531,6 +533,19 @@ public sealed class PaymentRunService : IPaymentRunService
         Application.Banking.BankFileHeader header = new(request.PaymentDate, request.BankAccountCode, rows.Select(r => r.Currency).FirstOrDefault() ?? string.Empty, rows.Count, rows.Sum(r => r.Amount),
             Application.Banking.BankFileFormatter.HashTotal(rows.Select(r => r.Account)));
         return Encoding.UTF8.GetBytes(Application.Banking.BankFileFormatter.Render(layout.HeaderTemplate, layout.DetailTemplate, layout.TrailerTemplate, header, rows, layout.LineEnding));
+    }
+
+    // An ISO 20022 pain.001 credit transfer file: the company pays from the bank account kept on the run's ledger account.
+    private async Task<byte[]> Pain001FileAsync(PaymentRunRequest request, List<PaymentRunLine> lines, IReadOnlyDictionary<long, Supplier> suppliers, CancellationToken ct)
+    {
+        string company = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.Name).FirstAsync(ct).ConfigureAwait(false);
+        string debtorAccount = await _db.BankAccounts.AsNoTracking().Where(b => b.CompanyId == request.CompanyId && b.GlAccountCode == request.BankAccountCode && b.AccountNumber != null)
+            .Select(b => b.AccountNumber!).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? request.BankAccountCode;
+        List<Application.Banking.Pain001Payment> payments = [.. lines.Select(l => new Application.Banking.Pain001Payment(l.PaymentNumber,
+            new Application.Banking.Pain001Party(suppliers[l.SupplierId].BankAccountName ?? suppliers[l.SupplierId].Name, suppliers[l.SupplierId].BankAccountNumber ?? string.Empty),
+            l.Currency.ToString(), l.NetPaid, $"Payment {l.PaymentNumber} to {suppliers[l.SupplierId].Code}"))];
+        string messageId = $"{request.BankAccountCode}-{request.PaymentDate:yyyyMMdd}-{lines.Select(l => l.PaymentNumber).FirstOrDefault()}";
+        return Encoding.UTF8.GetBytes(Application.Banking.Pain001.Write(messageId, DateTimeOffset.UtcNow, request.PaymentDate, new Application.Banking.Pain001Party(company, debtorAccount), payments));
     }
 
     // The bulk mobile-money payout file: a header with the count and total, then one line per wallet.
