@@ -89,6 +89,9 @@ public sealed class Customer : SoftDeletableEntity, ICompanyScoped
     /// <summary>Settlement (early-payment) discount percentage.</summary>
     public decimal SettlementDiscountPercent { get; set; }
 
+    /// <summary>Days from the invoice date within which the settlement discount may be taken (0: up to the due date).</summary>
+    public int SettlementDiscountDays { get; set; }
+
     /// <summary>How ageing is measured.</summary>
     public AgeingBasis AgeingBasis { get; set; }
 

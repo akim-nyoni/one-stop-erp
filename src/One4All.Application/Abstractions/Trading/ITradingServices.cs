@@ -117,9 +117,22 @@ public interface ISalesLedgerService
     /// <param name="bankAccountCode">The bank/cash account the receipt is banked to (debited).</param>
     /// <param name="discountAccountCode">The discounts-allowed account (debited with the discount).</param>
     /// <param name="documentNumber">The receipt document number.</param>
+    /// <param name="taxAccountCode">The output tax account: when given, the tax share of the discount (in the invoice's tax-to-gross proportion) comes off output tax.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The posting result of the cash receipt.</returns>
-    Task<Result<TradingPostingResult>> SettleWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountAccountCode, string documentNumber, CancellationToken ct = default);
+    Task<Result<TradingPostingResult>> SettleWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountAccountCode, string documentNumber,
+        string? taxAccountCode = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// The settlement discount a customer may take on an invoice paid on a date: the customer's settlement percentage of the outstanding amount when
+    /// paid within the customer's settlement days of the invoice date (or by the due date when no days are set), else nothing.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="invoiceOpenItemId">The AR invoice.</param>
+    /// <param name="paidOn">The payment date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The discount (zero outside the window), or why there is none.</returns>
+    Task<Result<decimal>> SuggestSettlementDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly paidOn, CancellationToken ct = default);
 }
 
 /// <summary>The Purchase Ledger (AP) posting service (brief §4.6).</summary>
@@ -172,9 +185,11 @@ public interface IPurchaseLedgerService
     /// <param name="bankAccountCode">The bank/cash account the payment is drawn from (credited).</param>
     /// <param name="discountReceivedAccountCode">The discounts-received income account (credited with the discount).</param>
     /// <param name="documentNumber">The payment document number.</param>
+    /// <param name="taxAccountCode">The input tax account: when given, the tax share of the discount (in the invoice's tax-to-gross proportion) comes off input tax.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The posting result of the cash payment.</returns>
-    Task<Result<TradingPostingResult>> PayWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode, string documentNumber, CancellationToken ct = default);
+    Task<Result<TradingPostingResult>> PayWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode,
+        string documentNumber, string? taxAccountCode = null, CancellationToken ct = default);
 }
 
 /// <summary>Matches credit items against debit items and realises FX (brief §4.5 allocation/matching).</summary>

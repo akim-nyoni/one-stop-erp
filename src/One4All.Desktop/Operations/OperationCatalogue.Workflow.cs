@@ -15,7 +15,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Request a master-data change", ListTitle = "Master-data changes",
             Description = "Changes a tariff's rates or a customer's, supplier's or item's field — held for the \"MasterDataChange\" workflow when one is defined, applied at once otherwise. "
-                + "Tariff: FixedCharge, PerUnitRate, RatePerValuationCents, RatePerSquareMetre, MinimumCharge, IsActive. Customer: Name, PaymentTermsDays, SettlementDiscountPercent, OnHold, "
+                + "Tariff: FixedCharge, PerUnitRate, RatePerValuationCents, RatePerSquareMetre, MinimumCharge, IsActive. Customer: Name, PaymentTermsDays, SettlementDiscountPercent, SettlementDiscountDays, OnHold, "
                 + "InterestExempt, TaxRegistration, Email, IsActive. Supplier: Name, PaymentTermsDays, OnHold, TaxRegistration, TaxClearanceExpiry, IsActive. Item: Description, TaxCode, "
                 + "StandardCost, CostOfSalesAccountCode, RevenueAccountCode, IsActive.",
             Fields = [Pick("Target", "Record", Enum.GetNames<Core.System.MasterDataTarget>()), Req("Key", "Code"), Req("Field", "Field"), Opt("Value", "New value (blank clears)")],

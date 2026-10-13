@@ -464,11 +464,69 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public Task<Result<TradingPostingResult>> SettleWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountAccountCode, string documentNumber, CancellationToken ct = default)
-        => _db.AtomicAsync(() => SettleWithDiscountCoreAsync(companyId, invoiceOpenItemId, date, cashAmount, discountAmount, bankAccountCode, discountAccountCode, documentNumber, ct), ct);
+    public Task<Result<TradingPostingResult>> SettleWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountAccountCode, string documentNumber,
+        string? taxAccountCode = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => SettleWithDiscountCoreAsync(companyId, invoiceOpenItemId, date, cashAmount, discountAmount, bankAccountCode, discountAccountCode, documentNumber, taxAccountCode, ct), ct);
+
+    /// <inheritdoc />
+    public async Task<Result<decimal>> SuggestSettlementDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly paidOn, CancellationToken ct = default)
+    {
+        OpenItem? invoice = await _db.OpenItems.AsNoTracking()
+            .FirstOrDefaultAsync(i => i.Id == invoiceOpenItemId && i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable, ct).ConfigureAwait(false);
+        if (invoice is null)
+        {
+            return Error.NotFound("Ar.OpenItemNotFound", $"AR open item {invoiceOpenItemId} not found.");
+        }
+
+        var terms = await _db.Customers.AsNoTracking().Where(c => c.Id == invoice.TraderId).Select(c => new { c.SettlementDiscountPercent, c.SettlementDiscountDays })
+            .FirstAsync(ct).ConfigureAwait(false);
+        DateOnly lastDay = terms.SettlementDiscountDays > 0 ? invoice.DocumentDate.AddDays(terms.SettlementDiscountDays) : invoice.DueDate;
+        return invoice.Sign != LedgerSign.Debit || invoice.OutstandingTransaction <= 0m || terms.SettlementDiscountPercent <= 0m || paidOn > lastDay
+            ? 0m
+            : Round(invoice.OutstandingTransaction * terms.SettlementDiscountPercent / 100m);
+    }
+
+    // The tax share of a settlement discount (brief §4.5/§4.6): the discount reduces the consideration, so the invoice's tax-to-gross share of it
+    // comes back off output tax (a customer's discount) or input tax (a supplier's), moved from the discount account to the tax account.
+    private async Task<Result<string?>> DiscountTaxAsync(OpenItem invoice, DateOnly date, decimal discount, string discountAccountCode, string? taxAccountCode, string documentNumber, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(taxAccountCode) || invoice.JournalEntryId is not long journalId || invoice.OriginalTransaction == 0m)
+        {
+            return Result<string?>.Success(null);
+        }
+
+        bool sales = invoice.Ledger == TradingLedger.AccountsReceivable;
+        var taxLines = await _db.Set<JournalLine>().AsNoTracking().Where(l => l.JournalEntryId == journalId && l.AccountCode == taxAccountCode)
+            .Select(l => new { Amount = sales ? l.TransactionCredit - l.TransactionDebit : l.TransactionDebit - l.TransactionCredit, l.TaxCode }).ToListAsync(ct).ConfigureAwait(false);
+        decimal tax = taxLines.Sum(l => l.Amount);
+        decimal share = Round(discount * tax / invoice.OriginalTransaction);
+        if (share <= 0m)
+        {
+            return Result<string?>.Success(null);
+        }
+
+        string? taxCode = taxLines.Select(l => l.TaxCode).FirstOrDefault(c => !string.IsNullOrEmpty(c));
+        decimal baseShare = Round(share * invoice.ExchangeRate);
+        Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
+        {
+            CompanyId = invoice.CompanyId,
+            SourceModule = sales ? "AR" : "AP",
+            PostingDate = date,
+            TransactionCurrency = invoice.Currency,
+            EnforceManualJournalRules = false,
+            DocumentType = "SettlementDiscountTax",
+            DocumentNumber = $"{documentNumber}-TAX",
+            Narrative = $"Tax on settlement discount for {invoice.DocumentNumber}",
+            Lines = sales
+                ? [Line(taxAccountCode, JournalSide.Debit, share, invoice.ExchangeRate, baseShare, taxCode), Line(discountAccountCode, JournalSide.Credit, share, invoice.ExchangeRate, baseShare)]
+                : [Line(discountAccountCode, JournalSide.Debit, share, invoice.ExchangeRate, baseShare), Line(taxAccountCode, JournalSide.Credit, share, invoice.ExchangeRate, baseShare, taxCode)],
+        }, ct).ConfigureAwait(false);
+        return posting.IsFailure ? posting.Error : posting.Value.JournalNumber;
+    }
 
     // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
-    private async Task<Result<TradingPostingResult>> SettleWithDiscountCoreAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountAccountCode, string documentNumber, CancellationToken ct)
+    private async Task<Result<TradingPostingResult>> SettleWithDiscountCoreAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountAccountCode, string documentNumber,
+        string? taxAccountCode, CancellationToken ct)
     {
         if (cashAmount <= 0m || discountAmount <= 0m)
         {
@@ -527,7 +585,8 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return allocDiscount.Error;
         }
 
-        return cash.Value;
+        Result<string?> discountTax = await DiscountTaxAsync(invoice, date, discountAmount, discountAccountCode, taxAccountCode, documentNumber, ct).ConfigureAwait(false);
+        return discountTax.IsFailure ? discountTax.Error : cash.Value;
     }
 
     /// <inheritdoc />
@@ -866,11 +925,13 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public Task<Result<TradingPostingResult>> PayWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode, string documentNumber, CancellationToken ct = default)
-        => _db.AtomicAsync(() => PayWithDiscountCoreAsync(companyId, invoiceOpenItemId, date, cashAmount, discountAmount, bankAccountCode, discountReceivedAccountCode, documentNumber, ct), ct);
+    public Task<Result<TradingPostingResult>> PayWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode,
+        string documentNumber, string? taxAccountCode = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PayWithDiscountCoreAsync(companyId, invoiceOpenItemId, date, cashAmount, discountAmount, bankAccountCode, discountReceivedAccountCode, documentNumber, taxAccountCode, ct), ct);
 
     // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
-    private async Task<Result<TradingPostingResult>> PayWithDiscountCoreAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode, string documentNumber, CancellationToken ct)
+    private async Task<Result<TradingPostingResult>> PayWithDiscountCoreAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode,
+        string documentNumber, string? taxAccountCode, CancellationToken ct)
     {
         if (cashAmount <= 0m || discountAmount <= 0m)
         {
@@ -929,7 +990,8 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return allocDiscount.Error;
         }
 
-        return cash.Value;
+        Result<string?> discountTax = await DiscountTaxAsync(invoice, date, discountAmount, discountReceivedAccountCode, taxAccountCode, documentNumber, ct).ConfigureAwait(false);
+        return discountTax.IsFailure ? discountTax.Error : cash.Value;
     }
 
     /// <inheritdoc />

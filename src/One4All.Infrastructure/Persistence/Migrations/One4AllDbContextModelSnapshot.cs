@@ -32311,6 +32311,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("sales_rep_id");
 
+                    b.Property<int>("SettlementDiscountDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("settlement_discount_days");
+
                     b.Property<decimal>("SettlementDiscountPercent")
                         .HasPrecision(9, 4)
                         .HasColumnType("numeric(9,4)")

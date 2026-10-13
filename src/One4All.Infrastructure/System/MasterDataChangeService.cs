@@ -21,7 +21,7 @@ public sealed class MasterDataChangeService : IMasterDataChangeService
     private static readonly Dictionary<MasterDataTarget, string[]> Allowed = new()
     {
         [MasterDataTarget.Tariff] = ["FixedCharge", "PerUnitRate", "RatePerValuationCents", "RatePerSquareMetre", "MinimumCharge", "IsActive"],
-        [MasterDataTarget.Customer] = ["Name", "PaymentTermsDays", "SettlementDiscountPercent", "OnHold", "InterestExempt", "TaxRegistration", "Email", "IsActive"],
+        [MasterDataTarget.Customer] = ["Name", "PaymentTermsDays", "SettlementDiscountPercent", "SettlementDiscountDays", "OnHold", "InterestExempt", "TaxRegistration", "Email", "IsActive"],
         [MasterDataTarget.Supplier] = ["Name", "PaymentTermsDays", "OnHold", "TaxRegistration", "TaxClearanceExpiry", "IsActive"],
         [MasterDataTarget.Item] = ["Description", "TaxCode", "StandardCost", "CostOfSalesAccountCode", "RevenueAccountCode", "IsActive"],
     };

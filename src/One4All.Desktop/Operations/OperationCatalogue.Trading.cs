@@ -186,6 +186,42 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Customers", Title = "Settlement discount", ListTitle = "Open customer items",
+            Description = "An invoice paid early with a settlement discount: Suggest gives the customer's discount on the outstanding amount when paid within the customer's settlement "
+                + "days (else by the due date); Settle (a customer invoice) or Pay (a supplier invoice) posts the cash and the discount and settles the invoice. With a tax account, "
+                + "the invoice's tax share of the discount comes back off output (or input) tax.",
+            Fields = [Pick("Step", "Step", ["Suggest", "Settle", "Pay"]), Req("Invoice", "Invoice number"), Num("Cash", "Cash received / paid", "0"), Num("Discount", "Discount", "0"),
+                Opt("Bank", "Bank account"), Opt("DiscountAccount", "Discount allowed / received account"), Opt("TaxAccount", "Tax account (adjusts the tax on the discount)"),
+                Opt("Number", "Receipt / payment number"), Today()],
+            Run = async (c, i) =>
+            {
+                TradingLedger ledger = i.Text("Step") == "Pay" ? TradingLedger.AccountsPayable : TradingLedger.AccountsReceivable;
+                string number = i.Text("Invoice");
+                long invoice = await FindAsync(c.Db.OpenItems, x => x.CompanyId == c.CompanyId && x.Ledger == ledger && x.DocumentNumber.ToUpper() == number.ToUpper() && x.Sign == (ledger == TradingLedger.AccountsReceivable ? LedgerSign.Debit : LedgerSign.Credit),
+                    x => x.Id, "invoice", number).ConfigureAwait(true);
+                string Need(string field) => i.Optional(field) ?? throw new OperationException($"Give the {field switch { "DiscountAccount" => "discount account", "Number" => "document number", _ => "bank account" }}.");
+                TradingPostingResult posted;
+                switch (i.Text("Step"))
+                {
+                    case "Suggest":
+                        decimal suggested = Check(await c.Get<ISalesLedgerService>().SuggestSettlementDiscountAsync(c.CompanyId, invoice, i.Date("Date")).ConfigureAwait(true));
+                        return suggested > 0m ? $"Settlement discount on {number} if paid on {i.Date("Date"):yyyy-MM-dd}: {M(suggested)}." : $"No settlement discount on {number} on {i.Date("Date"):yyyy-MM-dd}.";
+                    case "Settle":
+                        posted = Check(await c.Get<ISalesLedgerService>().SettleWithDiscountAsync(c.CompanyId, invoice, i.Date("Date"), i.Number("Cash"), i.Number("Discount"), Need("Bank"), Need("DiscountAccount"),
+                            Need("Number"), i.Optional("TaxAccount")).ConfigureAwait(true));
+                        break;
+                    default:
+                        posted = Check(await c.Get<IPurchaseLedgerService>().PayWithDiscountAsync(c.CompanyId, invoice, i.Date("Date"), i.Number("Cash"), i.Number("Discount"), Need("Bank"), Need("DiscountAccount"),
+                            Need("Number"), i.Optional("TaxAccount")).ConfigureAwait(true));
+                        break;
+                }
+
+                return $"{number} settled: cash {M(i.Number("Cash"))} and discount {M(i.Number("Discount"))} (journal {posted.JournalNumber}).";
+            },
+            List = c => OpenItemsAsync(c, TradingLedger.AccountsReceivable),
+        };
+        yield return new Operation
+        {
             Module = "Suppliers", Title = "Supplier invoice or credit note", ListTitle = "Open supplier items",
             Description = "Posts a supplier's invoice or credit note that has no purchase order (services, utilities); invoices for ordered goods go through Purchasing → Match a supplier invoice.",
             Fields = [Pick("Document", "Document", ["Invoice", "Credit note"]), Req("Supplier", "Supplier code"), Req("Number", "Supplier's document number"), Today("Date", "Date"), Num("Net", "Net amount"),
