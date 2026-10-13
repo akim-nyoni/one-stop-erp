@@ -67,6 +67,9 @@ public sealed record BillingPostOptions
 
     /// <summary>Told after every chunk.</summary>
     public IProgress<BillingRunProgress>? Progress { get; init; }
+
+    /// <summary>Bills posted at once, each in its own unit of work (1: one after another); a large run posts several at a time to finish in its window.</summary>
+    public int Parallelism { get; init; } = 1;
 }
 
 /// <summary>A line of a billing run.</summary>

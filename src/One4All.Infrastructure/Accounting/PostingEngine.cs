@@ -720,6 +720,14 @@ public sealed class PostingEngine : IPostingEngine
 
     private async Task<string> AllocateJournalNumberAsync(long companyId, int year, CancellationToken ct)
     {
+        // Inside a unit of work the company's journal counter is locked until it commits, so postings made at the same moment (a billing run
+        // posting several bills at once, two cashiers) queue for the next number instead of colliding and retrying.
+        if (_db.Database.CurrentTransaction is not null)
+        {
+            await _db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT 1 FROM sys.number_sequence WHERE company_id = {companyId} AND branch_id IS NULL AND document_type = {JournalDocumentType} FOR UPDATE", ct).ConfigureAwait(false);
+        }
+
         ForgetIfUnchanged(_db.NumberSequences.Local.FirstOrDefault(s => s.CompanyId == companyId && s.BranchId == null && s.DocumentType == JournalDocumentType));
         NumberSequence? sequence = await _db.NumberSequences
             .FirstOrDefaultAsync(s => s.CompanyId == companyId && s.BranchId == null && s.DocumentType == JournalDocumentType, ct)

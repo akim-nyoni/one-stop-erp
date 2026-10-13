@@ -3,10 +3,13 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Inventory;
+using One4All.Application.Abstractions.Municipal;
 using One4All.Application.Abstractions.Payroll;
 using One4All.Application.Abstractions.Reporting;
 using One4All.Core.Inventory;
+using One4All.Core.Municipal;
 using One4All.Core.Payroll;
+using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
 using One4All.Infrastructure.Persistence.Seeding;
 using One4All.Reporting;
@@ -18,7 +21,8 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// The performance pack (brief §15 non-functional targets): item lookup under 100 ms on 100,000 SKUs, a 100,000-row report rendered within 5 s, and a
-/// payroll of 1,000 employees calculated in under 60 s.
+/// payroll of 1,000 employees calculated in under 60 s, and a billing run of 50,000 municipal accounts proposed and posted within 15 minutes
+/// (ONE4ALL_PERF_BILLING sets a smaller count to try it).
 /// Heavy, so it runs only when ONE4ALL_PERF=1; it cleans up the items it creates.
 /// </summary>
 [Collection(AccountingCollection.Name)]
@@ -160,5 +164,53 @@ public sealed class PerformanceTests
         run.IsSuccess.Should().BeTrue(run.IsFailure ? run.Error.Message : null);
         _output.WriteLine($"Payroll of 1,000 employees calculated and posted in {watch.Elapsed.TotalSeconds:0.0} s.");
         watch.Elapsed.TotalSeconds.Should().BeLessThan(60, "the brief's target: 1,000 employees in under a minute");
+    }
+
+    [SkippableFact]
+    public async Task A_billing_run_of_50000_accounts_posts_within_15_minutes()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        Skip.IfNot(Enabled, "Set ONE4ALL_PERF=1 to run the performance pack.");
+        int accounts = int.TryParse(Environment.GetEnvironmentVariable("ONE4ALL_PERF_BILLING"), out int n) && n > 0 ? n : 50_000;
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        Tariff refuse = new(companyId, "REF-PERF", "Refuse Removal", ServiceType.Refuse, TariffType.Flat, new DateOnly(2026, 1, 1), "4000") { FixedCharge = 20m };
+        db.Tariffs.Add(refuse);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.AutoDetectChangesEnabled = false;
+        for (int start = 0; start < accounts; start += 2_000)
+        {
+            List<Customer> owners = [.. Enumerable.Range(start, Math.Min(2_000, accounts - start)).Select(i => new Customer(companyId, $"BP{i:000000}", $"Ratepayer {i}", Scenario.Usd))];
+            db.Customers.AddRange(owners);
+            await db.SaveChangesAsync();
+            foreach (Customer owner in owners)
+            {
+                Property stand = new(companyId, "S" + owner.Code, "Ward P", owner.Id);
+                stand.AddService(ServiceType.Refuse, refuse.Id, new DateOnly(2026, 1, 1));
+                db.Properties.Add(stand);
+            }
+
+            await db.SaveChangesAsync();
+            db.ChangeTracker.Clear();
+        }
+
+        db.ChangeTracker.AutoDetectChangesEnabled = true;
+        IBillingRunService runs = scope.ServiceProvider.GetRequiredService<IBillingRunService>();
+        Stopwatch watch = Stopwatch.StartNew();
+        var proposed = await runs.ProposeAsync(new BillingRunProposal
+        {
+            CompanyId = companyId, ServiceType = ServiceType.Refuse, BillDate = new DateOnly(2026, 5, 31), Ward = "Ward P", InvoicePrefix = "BP", UserId = 81,
+        });
+        proposed.IsSuccess.Should().BeTrue(proposed.IsFailure ? proposed.Error.Message : null);
+        double proposing = watch.Elapsed.TotalSeconds;
+        var posted = await runs.ApproveAsync(companyId, proposed.Value.RunNumber, 82, new BillingPostOptions { ChunkSize = 1_000, Parallelism = 6 });
+        watch.Stop();
+        posted.IsSuccess.Should().BeTrue(posted.IsFailure ? posted.Error.Message : null);
+        string? why = (await runs.LinesAsync(companyId, proposed.Value.RunNumber, exceptionsOnly: true)).Value.Select(l => l.Message).FirstOrDefault();
+        posted.Value.Posted.Should().Be(accounts, why);
+        _output.WriteLine($"Billing run of {accounts:N0} accounts: proposed in {proposing:0.0} s, posted in {watch.Elapsed.TotalSeconds - proposing:0.0} s.");
+        watch.Elapsed.TotalMinutes.Should().BeLessThan(15d * accounts / 50_000, "the brief's target: 50,000 accounts in under 15 minutes (pro rata for a smaller try)");
     }
 }

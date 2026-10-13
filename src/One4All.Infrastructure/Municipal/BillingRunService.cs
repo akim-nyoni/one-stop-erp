@@ -17,6 +17,7 @@ public sealed class BillingRunService : IBillingRunService
     private readonly Lazy<Application.Abstractions.Workflow.IWorkflowService>? _workflow;
     private readonly INumberSequenceService _numbers;
     private readonly ISalesLedgerService _ar;
+    private readonly Microsoft.Extensions.DependencyInjection.IServiceScopeFactory? _scopes;
     private readonly Application.Abstractions.Communications.IStatementDespatchService? _despatch;
 
     /// <inheritdoc />
@@ -45,9 +46,12 @@ public sealed class BillingRunService : IBillingRunService
     /// <param name="numbers">The number sequences.</param>
     /// <param name="ar">The receivables ledger.</param>
     /// <param name="webhooks">Publishes generated bills.</param>
+    /// <param name="scopes">Creates the units of work bills post in when a run posts several at a time.</param>
     public BillingRunService(One4AllDbContext db, INumberSequenceService numbers, ISalesLedgerService ar, Application.Abstractions.Integration.IWebhookService? webhooks = null,
-        Lazy<Application.Abstractions.Workflow.IWorkflowService>? workflow = null, Application.Abstractions.Communications.IStatementDespatchService? despatch = null)
+        Lazy<Application.Abstractions.Workflow.IWorkflowService>? workflow = null, Application.Abstractions.Communications.IStatementDespatchService? despatch = null,
+        Microsoft.Extensions.DependencyInjection.IServiceScopeFactory? scopes = null)
     {
+        _scopes = scopes;
         _despatch = despatch;
         _workflow = workflow;
         _webhooks = webhooks;
@@ -271,11 +275,12 @@ public sealed class BillingRunService : IBillingRunService
             : await PostChunksAsync(companyId, found.Value.Id, options, ct).ConfigureAwait(false);
     }
 
-    // Posts the run's remaining bills chunk by chunk, each bill on its own: a failure is recorded on its line and the rest carry on; the
-    // change tracker is cleared after each chunk so memory stays flat however large the run.
+    // Posts the run's remaining bills chunk by chunk, each bill on its own: a failure is recorded on its line and the rest carry on. Each bill
+    // posts into an empty change tracker (cleared after it), so the time per bill stays flat however large the run (brief §15: 50,000 accounts).
     private async Task<Result<BillingRunSummary>> PostChunksAsync(long companyId, long runId, BillingPostOptions options, CancellationToken ct)
     {
         int chunkSize = Math.Clamp(options.ChunkSize, 1, 5_000);
+        _db.ChangeTracker.Clear(); // the run and lines loaded to approve it would otherwise shadow what the bills' own units of work record
         var header = await _db.Set<BillingRun>().AsNoTracking().Where(r => r.Id == runId).Select(r => new { r.RunNumber, r.BillDate }).SingleAsync(ct).ConfigureAwait(false);
         int total = await _db.Set<BillingRunLine>().CountAsync(l => l.BillingRunId == runId && l.Included, ct).ConfigureAwait(false);
         int handled = 0;
@@ -283,7 +288,7 @@ public sealed class BillingRunService : IBillingRunService
         {
             ct.ThrowIfCancellationRequested();
             int take = options.MaxBills is int limit ? Math.Min(chunkSize, limit - handled) : chunkSize;
-            List<BillingRunLine> chunk = await _db.Set<BillingRunLine>()
+            List<BillingRunLine> chunk = await _db.Set<BillingRunLine>().AsNoTracking()
                 .Where(l => l.BillingRunId == runId && l.Included && !l.IsPosted && (l.Exceptions & BillingExceptions.Failed) == 0)
                 .OrderBy(l => l.PropertyId).Take(take).ToListAsync(ct).ConfigureAwait(false);
             if (chunk.Count == 0)
@@ -292,14 +297,32 @@ public sealed class BillingRunService : IBillingRunService
             }
 
             // A bill already on the account (posted before an interruption) is marked, not posted again.
-            Dictionary<string, long> existing = await _db.OpenItems.Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsReceivable
+            Dictionary<string, long> existing = await _db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsReceivable
                     && chunk.Select(l => l.InvoiceNumber).Contains(i.DocumentNumber))
                 .ToDictionaryAsync(i => i.DocumentNumber, i => i.Id, StringComparer.Ordinal, ct).ConfigureAwait(false);
+            if (options.Parallelism > 1 && _scopes is not null)
+            {
+                // Several bills at once, each with its own context and ledger service (the ledger serialises what must be serial itself).
+                await Parallel.ForEachAsync(chunk, new ParallelOptions { MaxDegreeOfParallelism = Math.Min(options.Parallelism, 16), CancellationToken = ct }, async (line, token) =>
+                {
+                    await using Microsoft.Extensions.DependencyInjection.AsyncServiceScope scope = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.CreateAsyncScope(_scopes);
+                    One4AllDbContext db = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<One4AllDbContext>(scope.ServiceProvider);
+                    ISalesLedgerService ar = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<ISalesLedgerService>(scope.ServiceProvider);
+                    await PostLineAsync(db, ar, companyId, header.BillDate, line, existing, token).ConfigureAwait(false);
+                }).ConfigureAwait(false);
+                handled += chunk.Count;
+                await ReportAsync(runId, total, options, ct).ConfigureAwait(false);
+                continue;
+            }
+
             foreach (BillingRunLine line in chunk)
             {
                 if (existing.TryGetValue(line.InvoiceNumber, out long already))
                 {
+                    _db.Attach(line);
                     line.MarkPosted(already);
+                    await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+                    _db.ChangeTracker.Clear();
                     continue;
                 }
 
@@ -314,6 +337,9 @@ public sealed class BillingRunService : IBillingRunService
                     posted = Error.Failure("Mun.PostFailed", ex.InnerException?.Message ?? ex.Message);
                 }
 
+                // Whatever the posting left tracked goes, then only the line is recorded.
+                _db.ChangeTracker.Clear();
+                _db.Attach(line);
                 if (posted.IsSuccess)
                 {
                     line.MarkPosted(posted.Value.OpenItemId);
@@ -322,16 +348,13 @@ public sealed class BillingRunService : IBillingRunService
                 {
                     line.MarkFailed(posted.Error.Message);
                 }
+
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+                _db.ChangeTracker.Clear();
             }
 
-            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             handled += chunk.Count;
-            _db.ChangeTracker.Clear();
-            if (options.Progress is not null)
-            {
-                (int done, int failed) = await CountsAsync(runId, ct).ConfigureAwait(false);
-                options.Progress.Report(new BillingRunProgress(done, failed, total));
-            }
+            await ReportAsync(runId, total, options, ct).ConfigureAwait(false);
         }
 
         BillingRun run = await _db.Set<BillingRun>().Include(r => r.Lines).SingleAsync(r => r.Id == runId, ct).ConfigureAwait(false);
@@ -351,6 +374,51 @@ public sealed class BillingRunService : IBillingRunService
         }
 
         return Summary(run);
+    }
+
+    private async Task ReportAsync(long runId, int total, BillingPostOptions options, CancellationToken ct)
+    {
+        if (options.Progress is not null)
+        {
+            (int done, int failed) = await CountsAsync(runId, ct).ConfigureAwait(false);
+            options.Progress.Report(new BillingRunProgress(done, failed, total));
+        }
+    }
+
+    // One bill in its own context: posted (or recognised as already on the account), and its line marked.
+    private static async Task PostLineAsync(One4AllDbContext db, ISalesLedgerService ar, long companyId, DateOnly billDate, BillingRunLine line, IReadOnlyDictionary<string, long> existing,
+        CancellationToken ct)
+    {
+        Result<TradingPostingResult>? posted = null;
+        if (!existing.TryGetValue(line.InvoiceNumber, out long already))
+        {
+            try
+            {
+                posted = await MunicipalCharges.PostAsync(db, ar, companyId, line.RatepayerCustomerId, line.InvoiceNumber, billDate, line.Charge, 0m, line.RevenueAccountCode, null, line.Narrative, ct)
+                    .ConfigureAwait(false);
+            }
+            catch (DbUpdateException ex)
+            {
+                posted = Error.Failure("Mun.PostFailed", ex.InnerException?.Message ?? ex.Message);
+            }
+        }
+
+        db.ChangeTracker.Clear();
+        db.Attach(line);
+        if (posted is null)
+        {
+            line.MarkPosted(already);
+        }
+        else if (posted.IsSuccess)
+        {
+            line.MarkPosted(posted.Value.OpenItemId);
+        }
+        else
+        {
+            line.MarkFailed(posted.Error.Message);
+        }
+
+        await db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
     private async Task<(int Posted, int Failed)> CountsAsync(long runId, CancellationToken ct)
