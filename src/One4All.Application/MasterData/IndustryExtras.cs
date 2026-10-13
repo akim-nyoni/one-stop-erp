@@ -3,7 +3,8 @@ namespace One4All.Application.MasterData;
 /// <summary>A POS terminal a vertical starts with.</summary>
 /// <param name="Code">The terminal code.</param>
 /// <param name="Name">Its name.</param>
-public sealed record TerminalSeed(string Code, string Name);
+/// <param name="Profile">The kind of counter it is.</param>
+public sealed record TerminalSeed(string Code, string Name, Core.Pos.TerminalProfile Profile = Core.Pos.TerminalProfile.General);
 
 /// <summary>
 /// What else a vertical seeds beyond its ledger (brief §12 Industry Setup Wizard): item categories, a POS terminal profile at head office,
@@ -50,6 +51,13 @@ public static class IndustryExtras
             [new TerminalSeed("BAR01", "Bar till"), new TerminalSeed("REST01", "Restaurant till")],
             ["POS-SUM", "POS103", "POS105", "POS107", "INV79", "INV-VAL"],
             [("RC35", "Receipt80"), ("RES-KOT", "Receipt80")]),
+        [Vertical.Butchery] = new([("CARC", "Carcasses"), ("CUTS", "Cuts"), ("PROC", "Processed & deli"), ("SPICE", "Spices & casings")],
+            [new TerminalSeed("SCALE01", "Butchery counter", Core.Pos.TerminalProfile.Butchery)],
+            ["POS-SUM", "POS103", "POS105", "INV79", "INV-VAL", "INV99"],
+            [("RC35", "Receipt80")]),
+        [Vertical.BulkMaterials] = new([("AGG", "Aggregates & sand"), ("CEM", "Cement & admixtures"), ("RMX", "Ready-mix concrete")],
+            [new TerminalSeed("WB01", "Weighbridge kiosk", Core.Pos.TerminalProfile.WeighbridgeKiosk)],
+            ["WB198", "WB199", "WB200", "WB201", "WB203", "WB204", "WB205", "INV-VAL"]),
     };
 
     /// <summary>The extras for a vertical.</summary>

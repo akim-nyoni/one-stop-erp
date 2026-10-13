@@ -1,0 +1,14 @@
+code,name,type,control,category,budget
+1415,Inventory - Carcasses,Asset,,Inventory,
+1416,Inventory - Cuts & Processed Meat,Asset,,Inventory,
+1417,Inventory - Spices & Casings,Asset,,Inventory,
+4600,Meat Sales,Income,,Revenue,
+4601,Processed Meat Sales,Income,,Revenue,
+4602,Biltong & Deli Sales,Income,,Revenue,
+4603,Hides & By-product Sales,Income,,Other Income,
+5600,Cost of Meat Sold,Expense,,Cost of Sales,
+5601,Carcass Yield Loss,Expense,,Cost of Sales,yes
+5602,Trim & Bone Wastage,Expense,,Cost of Sales,yes
+5603,Spices & Casings Used,Expense,,Cost of Sales,yes
+6470,Cold Room Power,Expense,,Administration,yes
+6471,Abattoir & Inspection Fees,Expense,,Administration,yes

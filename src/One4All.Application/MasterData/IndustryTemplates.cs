@@ -26,6 +26,12 @@ public enum Vertical
 
     /// <summary>Hospitality: bars, restaurants and lodges — food, beverage and liquor sales and costs, tabs, tips and functions.</summary>
     Hospitality = 6,
+
+    /// <summary>Butchery: carcasses broken into cuts at the counter scale — meat and deli sales, yield loss and wastage, cold-room costs.</summary>
+    Butchery = 7,
+
+    /// <summary>Bulk materials and concrete: sand, aggregates and ready-mix sold over the weighbridge, with haulage and stockpile variances.</summary>
+    BulkMaterials = 8,
 }
 
 /// <summary>How much of a permission a starter role gets.</summary>
@@ -192,6 +198,40 @@ public static class IndustryTemplates
             [
                 new("LAGER", "Lager 340ml", ItemType.Stock, "Liquor", "4502", "5502"), new("COLA", "Cola 330ml", ItemType.Stock, "Beverages", "4501", "5501"),
                 new("BURGER", "Beef burger and chips", ItemType.Stock, "Food", "4500", "5500"),
+            ]),
+        [Vertical.Butchery] = new(Vertical.Butchery,
+            [
+                new("1415", "Inventory - Carcasses", AccountType.Asset), new("4600", "Meat Sales", AccountType.Income), new("4601", "Processed Meat Sales", AccountType.Income),
+                new("5600", "Cost of Meat Sold", AccountType.Expense), new("5601", "Carcass Yield Loss", AccountType.Expense), new("5602", "Trim & Bone Wastage", AccountType.Expense),
+            ],
+            [],
+            [("COLDROOM", "Cold Room"), ("COUNTER", "Butchery Counter")],
+            [
+                new("Butcher", [("Pos.Sale", GrantLevel.Use), ("Pos.TillSession", GrantLevel.Use), ("Inventory.Item", GrantLevel.Read)]),
+                new("Butchery Manager", [("Pos", GrantLevel.Full), ("Inventory", GrantLevel.Full), ("Procurement", GrantLevel.Use)]),
+            ],
+            [("CATERER", "Demo Caterer")], [("ABATTOIR", "Demo Abattoir")],
+            [
+                new("BEEF-CARC", "Beef carcass (kg)", ItemType.Stock, "Carcasses", "4600", "5600"), new("BEEF-MINCE", "Beef mince (kg)", ItemType.Stock, "Cuts", "4600", "5600"),
+                new("T-BONE", "T-bone steak (kg)", ItemType.Stock, "Cuts", "4600", "5600"), new("BOEREWORS", "Boerewors (kg)", ItemType.Stock, "Processed", "4601", "5600"),
+            ]),
+        [Vertical.BulkMaterials] = new(Vertical.BulkMaterials,
+            [
+                new("1418", "Inventory - Aggregates & Sand", AccountType.Asset), new("1419", "Inventory - Cement & Admixtures", AccountType.Asset),
+                new("4700", "Aggregate & Sand Sales", AccountType.Income), new("4701", "Ready-mix Concrete Sales", AccountType.Income), new("4702", "Haulage Income", AccountType.Income),
+                new("5700", "Cost of Aggregates Sold", AccountType.Expense), new("5701", "Cost of Concrete Sold", AccountType.Expense), new("5702", "Haulage Costs", AccountType.Expense),
+                new("5703", "Stockpile Variances", AccountType.Expense),
+            ],
+            [],
+            [("QUARRY", "Quarry Stockpiles"), ("PLANT", "Batching Plant")],
+            [
+                new("Weighbridge Clerk", [("Inventory.Weighbridge", GrantLevel.Use), ("Sales.Receipt", GrantLevel.Use)]),
+                new("Plant Manager", [("Inventory", GrantLevel.Full), ("JobCosting", GrantLevel.Use), ("Procurement", GrantLevel.Use)]),
+            ],
+            [("BUILDER", "Demo Builder")], [("CEMCO", "Demo Cement Supplier")],
+            [
+                new("RIVERSAND", "River sand (tonne)", ItemType.Stock, "Aggregates", "4700", "5700"), new("STONE19", "19mm stone (tonne)", ItemType.Stock, "Aggregates", "4700", "5700"),
+                new("RMX25", "Ready-mix 25MPa (m3)", ItemType.Stock, "Concrete", "4701", "5701"),
             ]),
     };
 

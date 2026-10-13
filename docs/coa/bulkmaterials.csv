@@ -1,0 +1,15 @@
+code,name,type,control,category,budget
+1418,Inventory - Aggregates & Sand,Asset,,Inventory,
+1419,Inventory - Cement & Admixtures,Asset,,Inventory,
+1421,Inventory - Ready-mix in Process,Asset,,Inventory,
+4700,Aggregate & Sand Sales,Income,,Revenue,
+4701,Ready-mix Concrete Sales,Income,,Revenue,
+4702,Haulage Income,Income,,Revenue,
+4703,Weighbridge Fees,Income,,Revenue,
+5700,Cost of Aggregates Sold,Expense,,Cost of Sales,
+5701,Cost of Concrete Sold,Expense,,Cost of Sales,
+5702,Haulage Costs,Expense,,Cost of Sales,yes
+5703,Stockpile Variances,Expense,,Cost of Sales,yes
+5704,Rejected Concrete,Expense,,Cost of Sales,yes
+6480,Plant & Truck Fuel,Expense,,Administration,yes
+6481,Plant Repairs,Expense,,Administration,yes

@@ -125,7 +125,7 @@ public sealed class IndustrySetupService : IIndustrySetupService
         {
             if (headOffice is long branch && !await _db.Set<Core.Pos.PosTerminal>().AnyAsync(t => t.CompanyId == companyId && t.Code == seed.Code, ct).ConfigureAwait(false))
             {
-                _db.Set<Core.Pos.PosTerminal>().Add(new Core.Pos.PosTerminal(companyId, branch, seed.Code, seed.Name));
+                _db.Set<Core.Pos.PosTerminal>().Add(new Core.Pos.PosTerminal(companyId, branch, seed.Code, seed.Name) { Profile = seed.Profile });
                 terminals++;
             }
         }
