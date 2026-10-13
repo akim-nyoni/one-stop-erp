@@ -88,17 +88,29 @@ public sealed class LeaveService : ILeaveService
         return _db.AtomicAsync(async () =>
         {
             if (string.IsNullOrWhiteSpace(request.ExpenseAccountCode) || string.IsNullOrWhiteSpace(request.ProvisionAccountCode) || string.IsNullOrWhiteSpace(request.DocumentNumber)
-                || (request.Kind == PayrollProvisionKind.Gratuity ? request.DaysPerYear <= 0m || request.WorkingDaysPerMonth <= 0m : request.MonthsOfPay <= 0m))
+                || request.Kind switch
+                {
+                    PayrollProvisionKind.Gratuity => request.DaysPerYear <= 0m || request.WorkingDaysPerMonth <= 0m,
+                    PayrollProvisionKind.LongService => request.LongServiceAwards.Count == 0 || request.LongServiceAwards.Any(a => a.Years <= 0 || a.MonthsOfPay <= 0m),
+                    _ => request.MonthsOfPay <= 0m,
+                }
+                || request.DiscountRatePercent < 0m || request.RetirementAge is < 40 or > 80)
             {
-                return Error.Validation("Pay.Provision", "A provision needs its accounts, a document number and a positive rate (months' pay for a bonus, days per year for gratuity).");
+                return Error.Validation("Pay.Provision", "A provision needs its accounts, a document number and a positive rate (months' pay for a bonus, days per year for gratuity, "
+                    + "milestones for long service) and a sensible discount rate and retirement age.");
             }
 
-            // Target = what the active employees have earned to the date.
+            // Target = what the active employees have earned to the date (gratuity at present value when a discount rate is given).
             var staff = await _db.Employees.AsNoTracking().Where(e => e.CompanyId == request.CompanyId && e.Status == EmployeeStatus.Active)
-                .Select(e => new { e.BasicSalary, e.EngagementDate }).ToListAsync(ct).ConfigureAwait(false);
-            decimal target = staff.Sum(e => request.Kind == PayrollProvisionKind.Bonus
-                ? Application.Payroll.PayrollProvisions.BonusEarned(e.BasicSalary, e.EngagementDate, request.YearStart, request.Date, request.MonthsOfPay)
-                : Application.Payroll.PayrollProvisions.GratuityEarned(e.BasicSalary, e.EngagementDate, request.Date, request.DaysPerYear, request.WorkingDaysPerMonth));
+                .Select(e => new { e.BasicSalary, e.EngagementDate, e.DateOfBirth }).ToListAsync(ct).ConfigureAwait(false);
+            decimal target = staff.Sum(e => request.Kind switch
+            {
+                PayrollProvisionKind.Bonus => Application.Payroll.PayrollProvisions.BonusEarned(e.BasicSalary, e.EngagementDate, request.YearStart, request.Date, request.MonthsOfPay),
+                PayrollProvisionKind.Gratuity => Application.Payroll.PayrollProvisions.PresentValue(
+                    Application.Payroll.PayrollProvisions.GratuityEarned(e.BasicSalary, e.EngagementDate, request.Date, request.DaysPerYear, request.WorkingDaysPerMonth),
+                    e.DateOfBirth, request.Date, request.RetirementAge, request.DiscountRatePercent, request.SalaryGrowthPercent),
+                _ => Application.Payroll.PayrollProvisions.LongServiceEarned(e.BasicSalary, e.EngagementDate, request.Date, request.LongServiceAwards),
+            });
             string provision = request.ProvisionAccountCode.Trim(), expense = request.ExpenseAccountCode.Trim();
             decimal provided = await (
                 from l in _db.Set<JournalLine>()
@@ -116,7 +128,8 @@ public sealed class LeaveService : ILeaveService
             Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
             {
                 CompanyId = request.CompanyId, SourceModule = "GL", PostingDate = request.Date, TransactionCurrency = company.BaseCurrency,
-                DocumentType = request.Kind == PayrollProvisionKind.Bonus ? "PAY-BONUS-PROV" : "PAY-GRAT-PROV", DocumentNumber = request.DocumentNumber.Trim(),
+                DocumentType = request.Kind switch { PayrollProvisionKind.Bonus => "PAY-BONUS-PROV", PayrollProvisionKind.Gratuity => "PAY-GRAT-PROV", _ => "PAY-LSA-PROV" },
+                DocumentNumber = request.DocumentNumber.Trim(),
                 Narrative = $"{request.Kind} provision true-up to {target:0.00}",
                 Lines =
                 [

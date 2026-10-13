@@ -584,16 +584,21 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Bonus and gratuity provisions", ListTitle = "Leave balances",
-            Description = "Trues up the 13th-cheque bonus provision (earned through the bonus year) or the gratuity provision (days' pay per year of service) to what active "
+            Description = "Trues up the 13th-cheque bonus provision (earned through the bonus year), the gratuity provision (days' pay per year of service, discounted to "
+                + "retirement when a discount rate is given) or the long-service award provision (milestones YEARS:months' pay; …, earned towards the next) to what active "
                 + "employees have earned to the date, posting the movement between the expense and the provision.",
             Fields = [Pick("Kind", "Provision", Enum.GetNames<PayrollProvisionKind>()), Today(), Today("YearStart", "Bonus year starts"), Num("Months", "Months' pay a year (bonus)", "1"),
                 Num("DaysPerYear", "Days' pay per year of service (gratuity)", "15"), Num("WorkingDays", "Working days a month (gratuity)", "26"), Req("Expense", "Expense account"),
-                Req("Provision", "Provision account"), Req("Document", "Document number")],
+                Req("Provision", "Provision account"), Req("Document", "Document number"), Opt("Awards", "Long-service milestones YEARS:months' pay; … (e.g. 10:1; 20:2)"),
+                Num("Discount", "Discount rate % (gratuity; 0: none)", "0"), Num("Growth", "Salary growth % (gratuity)", "0"), Num("Retire", "Retirement age (gratuity)", "65")],
             Run = async (c, i) => $"Provision now {M(Check(await c.Get<ILeaveService>().RaisePayrollProvisionAsync(new PayrollProvisionRequest
             {
                 CompanyId = c.CompanyId, Kind = Enum.Parse<PayrollProvisionKind>(i.Text("Kind")), Date = i.Date("Date"), YearStart = i.Date("YearStart"), MonthsOfPay = i.Number("Months"),
                 DaysPerYear = i.Number("DaysPerYear"), WorkingDaysPerMonth = i.Number("WorkingDays"), ExpenseAccountCode = i.Text("Expense"), ProvisionAccountCode = i.Text("Provision"),
-                DocumentNumber = i.Text("Document"),
+                DocumentNumber = i.Text("Document"), DiscountRatePercent = i.Number("Discount"), SalaryGrowthPercent = i.Number("Growth"), RetirementAge = i.Whole("Retire"),
+                LongServiceAwards = [.. (i.Optional("Awards") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(a => a.Split(':', StringSplitOptions.TrimEntries))
+                    .Select(a => a.Length == 2 && int.TryParse(a[0], out int years) && decimal.TryParse(a[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal months)
+                        ? (years, months) : throw new OperationException("Write each milestone as YEARS:months' pay."))],
             }).ConfigureAwait(true)))}.",
             List = LeaveBalancesAsync,
         };

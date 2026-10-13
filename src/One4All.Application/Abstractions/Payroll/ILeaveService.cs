@@ -57,6 +57,9 @@ public enum PayrollProvisionKind
 
     /// <summary>Gratuity, earned for each year of service.</summary>
     Gratuity = 1,
+
+    /// <summary>Long-service awards, earned towards each service milestone.</summary>
+    LongService = 2,
 }
 
 /// <summary>Trues up a bonus or gratuity provision to what active employees have earned (brief §4.15).</summary>
@@ -82,6 +85,18 @@ public sealed class PayrollProvisionRequest
 
     /// <summary>Gets the working days a month's pay covers (gratuity's daily rate).</summary>
     public decimal WorkingDaysPerMonth { get; init; } = 26m;
+
+    /// <summary>Gets the long-service milestones: years of service and the months' pay awarded at each (long service).</summary>
+    public IReadOnlyList<(int Years, decimal MonthsOfPay)> LongServiceAwards { get; init; } = [];
+
+    /// <summary>Gets the annual discount rate the gratuity provision is discounted at to retirement (0: not discounted).</summary>
+    public decimal DiscountRatePercent { get; init; }
+
+    /// <summary>Gets the annual salary growth assumed when discounting.</summary>
+    public decimal SalaryGrowthPercent { get; init; }
+
+    /// <summary>Gets the normal retirement age the benefit is discounted from.</summary>
+    public int RetirementAge { get; init; } = 65;
 
     /// <summary>Gets the expense account.</summary>
     public string ExpenseAccountCode { get; init; } = string.Empty;
