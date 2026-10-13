@@ -1,10 +1,12 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Inventory;
+using One4All.Application.Abstractions.Payroll;
 using One4All.Application.Abstractions.Reporting;
 using One4All.Core.Inventory;
+using One4All.Core.Payroll;
 using One4All.Infrastructure.Persistence;
 using One4All.Infrastructure.Persistence.Seeding;
 using One4All.Reporting;
@@ -15,7 +17,8 @@ using Xunit.Abstractions;
 namespace One4All.AccountingTests;
 
 /// <summary>
-/// The performance pack (brief §15 non-functional targets): item lookup under 100 ms on 100,000 SKUs and a 100,000-row report rendered within 5 s.
+/// The performance pack (brief §15 non-functional targets): item lookup under 100 ms on 100,000 SKUs, a 100,000-row report rendered within 5 s, and a
+/// payroll of 1,000 employees calculated in under 60 s.
 /// Heavy, so it runs only when ONE4ALL_PERF=1; it cleans up the items it creates.
 /// </summary>
 [Collection(AccountingCollection.Name)]
@@ -125,5 +128,37 @@ public sealed class PerformanceTests
         _output.WriteLine($"100,000-row report rendered to PDF ({rendered.Value.Content.Length / 1024:N0} KB) in {watch.Elapsed.TotalSeconds:0.00} s.");
         (fetch + layout).Should().BeLessThan(5, "the brief's target: the first page within 5 s (rows fetched and every page laid out)");
         watch.Elapsed.TotalSeconds.Should().BeLessThan(30, "the whole 100,000-row PDF (some 2,000 pages) is written within half a minute");
+    }
+
+    [SkippableFact]
+    public async Task A_payroll_of_1000_employees_is_calculated_within_a_minute()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        Skip.IfNot(Enabled, "Set ONE4ALL_PERF=1 to run the performance pack.");
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        PayElement basic = new(companyId, "BASIC", "Basic Salary", PayElementType.Earning, CalculationBasis.Formula, 1, "6100") { Formula = "BASIC", Taxable = true };
+        PayElement housing = new(companyId, "HOUSING", "Housing", PayElementType.Earning, CalculationBasis.PercentOfBasic, 2, "6100") { Rate = 10m, Taxable = true };
+        PayElement paye = new(companyId, "PAYE", "PAYE", PayElementType.Deduction, CalculationBasis.Formula, 3, "2400") { Formula = "TAXABLE * 20 / 100" };
+        db.PayElements.AddRange(basic, housing, paye);
+        await db.SaveChangesAsync();
+        for (int i = 0; i < 1_000; i++)
+        {
+            Employee employee = new(companyId, $"PERF{companyId % 10000}-{i:0000}", $"Employee {i}", 800m + (i % 50) * 20m, new DateOnly(2024, 1, 1));
+            employee.AssignPayElement(basic.Id);
+            employee.AssignPayElement(housing.Id);
+            employee.AssignPayElement(paye.Id);
+            db.Employees.Add(employee);
+        }
+
+        await db.SaveChangesAsync();
+        Stopwatch watch = Stopwatch.StartNew();
+        var run = await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-03", new DateOnly(2026, 3, 25), "2420", $"PERF-{companyId}");
+        watch.Stop();
+        run.IsSuccess.Should().BeTrue(run.IsFailure ? run.Error.Message : null);
+        _output.WriteLine($"Payroll of 1,000 employees calculated and posted in {watch.Elapsed.TotalSeconds:0.0} s.");
+        watch.Elapsed.TotalSeconds.Should().BeLessThan(60, "the brief's target: 1,000 employees in under a minute");
     }
 }
