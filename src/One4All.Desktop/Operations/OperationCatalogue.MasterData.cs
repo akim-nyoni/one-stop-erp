@@ -148,6 +148,25 @@ public static partial class OperationCatalogue
             "Properties", "Meters", "Students", "Stands", "RentalUnits", "Budget"];
         yield return new Operation
         {
+            Module = module, Title = "Import templates and master data export", ListTitle = "Import templates",
+            Description = "Template: saves the CSV template for an import (its header row and an example row) to fill in. Export: saves a register (accounts, warehouses, customers, "
+                + "suppliers, items, employees) in its import layout, to correct in a spreadsheet or load into another company.",
+            Fields = [Pick("Action", "Action", ["Template", "Export"]), Pick("Kind", "What", imports.Concat(["Employees"]).Distinct().ToArray()), Req("File", "Save to (.csv path)")],
+            Run = async (c, i) =>
+            {
+                string kind = i.Text("Kind");
+                string csv = i.Text("Action") == "Template"
+                    ? Application.Onboarding.ImportTemplates.For(kind) ?? throw new OperationException($"No template for {kind}.")
+                    : Check(await c.Get<IMasterDataExportService>().ExportAsync(c.CompanyId, kind).ConfigureAwait(true));
+                await System.IO.File.WriteAllTextAsync(i.Text("File"), csv, new System.Text.UTF8Encoding(false)).ConfigureAwait(true);
+                int lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length - 1;
+                return i.Text("Action") == "Template" ? $"{kind} template saved to {i.Text("File")}." : $"{lines} {kind.ToLowerInvariant()} exported to {i.Text("File")}.";
+            },
+            List = c => Task.FromResult(Table(Application.Onboarding.ImportTemplates.Kinds.Select(k => (Kind: k, Header: Application.Onboarding.ImportTemplates.For(k)!.Split('\r')[0])).ToList(),
+                ("Import", t => t.Kind), ("Columns", t => t.Header))),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Import master data or opening balances", ListTitle = "Opening balance reconciliation",
             Description = "Loads a CSV template (header row; dates yyyy-MM-dd). Untick Commit to preview: nothing is written while any row has an error. "
                 + "Accounts: code,name,type[,category,manual,budget]. Warehouses: code,name. "

@@ -202,6 +202,7 @@ public static class DependencyInjection
         services.AddScoped<IDataHealthService, Accounting.DataHealthService>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDefinitionService, Reporting.ReportDefinitionService>();
         services.AddScoped<Application.Abstractions.Reporting.IReportSubscriptionService, Reporting.ReportSubscriptionService>();
+        services.AddScoped<Application.Abstractions.Onboarding.IMasterDataExportService, Onboarding.MasterDataExportService>();
         services.AddSingleton<Application.Abstractions.Reporting.IReportPrinter, Reporting.ShellReportPrinter>();
         services.AddScoped<Application.Abstractions.Reporting.IAuditedReportRunner, Reporting.AuditedReportRunner>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Reporting.ReportSubscriptionsTask>();
