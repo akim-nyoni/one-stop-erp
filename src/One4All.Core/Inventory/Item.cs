@@ -158,7 +158,10 @@ public sealed class Item : SoftDeletableEntity, ICompanyScoped
     public bool IsActive { get; set; }
 
     /// <summary>Whether the item is quantity-tracked stock.</summary>
-    public bool IsStockTracked => ItemType is ItemType.Stock or ItemType.Weighed;
+    public bool IsStockTracked => ItemType is ItemType.Stock or ItemType.Weighed or ItemType.Fuel;
+
+    /// <summary>Gets or sets the deposit item charged with every unit of this item (a bottle or crate deposit).</summary>
+    public long? DepositItemId { get; set; }
 
     /// <summary>Gets or sets the price look-up code keyed at the till for unlabelled goods (fruit, bakery).</summary>
     public string? Plu { get; set; }

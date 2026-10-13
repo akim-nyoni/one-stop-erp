@@ -130,6 +130,19 @@ public sealed class PosService : IPosService
             return allowed.Error;
         }
 
+        // Deposits are liabilities, not revenue (brief §4.4): a deposit line carries no tax and posts to a liability account.
+        HashSet<long> deposits = [.. await _db.Items.AsNoTracking().Where(i => soldIds.Contains(i.Id) && i.ItemType == ItemType.Deposit).Select(i => i.Id).ToListAsync(ct).ConfigureAwait(false)];
+        if (deposits.Count > 0)
+        {
+            List<string> depositAccounts = [.. request.Lines.Where(l => deposits.Contains(l.ItemId)).Select(l => l.RevenueAccountCode).Distinct()];
+            int liabilities = await _db.Accounts.CountAsync(a => a.CompanyId == request.CompanyId && depositAccounts.Contains(a.AccountCode) && a.Type == Core.Accounting.AccountType.Liability, ct)
+                .ConfigureAwait(false);
+            if (request.Lines.Any(l => deposits.Contains(l.ItemId) && l.TaxAmount != 0m) || liabilities != depositAccounts.Count)
+            {
+                return Error.Validation("Pos.DepositLine", "A deposit is charged without tax and held on a liability account, not taken as revenue.");
+            }
+        }
+
         foreach (PosSaleLineRequest line in request.Lines)
         {
             if (line.PromotionDiscount < 0m || (line.PromotionDiscount > 0m && string.IsNullOrWhiteSpace(line.DiscountAccountCode)))

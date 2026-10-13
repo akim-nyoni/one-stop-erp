@@ -13063,6 +13063,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
 
+                    b.Property<long?>("DepositItemId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deposit_item_id");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(300)

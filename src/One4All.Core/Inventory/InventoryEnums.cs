@@ -17,6 +17,15 @@ public enum ItemType
 
     /// <summary>A weighed / catch-weight item.</summary>
     Weighed = 5,
+
+    /// <summary>Fuel: stock held and sold by the litre (to three decimals), costed like stock.</summary>
+    Fuel = 6,
+
+    /// <summary>
+    /// A refundable deposit (bottle, crate, gas cylinder): charged with the item that carries it and posted to a liability, never revenue
+    /// (brief §4.4 "deposits are liabilities"); no tax and no stock.
+    /// </summary>
+    Deposit = 7,
 }
 
 /// <summary>The inventory costing method (brief §3.6, IAS 2).</summary>

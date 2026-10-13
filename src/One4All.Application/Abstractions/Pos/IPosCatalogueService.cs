@@ -12,7 +12,8 @@ namespace One4All.Application.Abstractions.Pos;
 /// <param name="TaxCode">Its tax code, if taxed.</param>
 /// <param name="Barcode">Its barcode, for searching.</param>
 /// <param name="Plu">Its PLU, for searching.</param>
-public sealed record PosTile(long ItemId, string Code, string Name, string Category, decimal UnitPrice, string RevenueAccountCode, string? TaxCode, string? Barcode, string? Plu)
+public sealed record PosTile(long ItemId, string Code, string Name, string Category, decimal UnitPrice, string RevenueAccountCode, string? TaxCode, string? Barcode, string? Plu,
+    long? DepositItemId = null)
 {
     /// <summary>Whether the tile matches what the cashier has typed: every word found in its code, name, barcode or PLU (any case).</summary>
     /// <param name="text">The search text.</param>

@@ -315,7 +315,7 @@ public sealed class PosCatalogueService : IPosCatalogueService
             if (price is decimal unitPrice)
             {
                 tiles.Add(new PosTile(item.Id, item.Code, item.ShortDescription ?? item.Description, string.IsNullOrWhiteSpace(item.Category) ? "General" : item.Category!, unitPrice,
-                    item.RevenueAccountCode!, item.TaxCode, item.Barcode, item.Plu));
+                    item.RevenueAccountCode!, item.TaxCode, item.Barcode, item.Plu, item.DepositItemId));
             }
         }
 

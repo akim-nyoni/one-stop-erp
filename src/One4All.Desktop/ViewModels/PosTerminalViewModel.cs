@@ -1037,6 +1037,15 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [ObservableProperty]
     private long _tillSessionId;
 
+    // A bottle or crate deposit rides with the item that carries it: the deposit item's own price, untaxed, on its liability account.
+    private void AddDepositFor(long? depositItemId, decimal quantity)
+    {
+        if (depositItemId is long id && _tiles.FirstOrDefault(t => t.ItemId == id) is PosTile deposit)
+        {
+            _ticket.AddLine(deposit.ItemId, deposit.Name, deposit.UnitPrice, 0m, deposit.RevenueAccountCode, null, quantity);
+        }
+    }
+
     /// <summary>Adds a product to the ticket.</summary>
     /// <param name="product">The product tapped.</param>
     [RelayCommand]
@@ -1048,6 +1057,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         _ticket.AddLine(product.ItemId, product.Name, product.Price, product.TaxRate, product.RevenueAccountCode, product.TaxCode);
+        AddDepositFor(product.Tile?.DepositItemId, 1m);
         ScanEntry = string.Empty;
         RebuildCart();
     }
@@ -1299,6 +1309,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         PosTicketLine line = _ticket.AddLine(item.Id, item.Description, unitPrice, rate, item.RevenueAccountCode, item.TaxCode, quantity);
+        AddDepositFor(item.DepositItemId, quantity);
         TenderEntry = string.Empty;
         RebuildCart();
         StatusMessage = $"{item.Description} × {quantity:0.###}";
@@ -1325,6 +1336,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         PosTicketLine line = _ticket.AddLine(tile.ItemId, tile.Name, unitPrice, rate, tile.RevenueAccountCode, tile.TaxCode, quantity);
+        AddDepositFor(tile.DepositItemId, quantity);
         TenderEntry = string.Empty;
         RebuildCart();
         StatusMessage = $"{tile.Name} × {quantity:0.###} (offline price)";
