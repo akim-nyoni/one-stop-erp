@@ -159,7 +159,7 @@ public static class Charts
 /// <summary>The data command a report's provider is chosen by.</summary>
 public static class ReportCommands
 {
-    /// <summary>The command for a definition: SQL, view and function sources are prefixed (sql:, view:, function:); in-memory ones are their name.</summary>
+    /// <summary>The command for a definition: SQL, view, function and web API sources are prefixed (sql:, view:, function:, api:); in-memory ones are their name.</summary>
     /// <param name="definition">The definition.</param>
     /// <returns>The command.</returns>
     public static string For(ReportDefinition definition)
@@ -171,6 +171,7 @@ public static class ReportCommands
             DataSourceKind.Sql => "sql:" + source.Command,
             DataSourceKind.View => "view:" + source.Command,
             DataSourceKind.Function => "function:" + source.Command,
+            DataSourceKind.Api => "api:" + source.Command,
             _ => source.Command,
         };
     }

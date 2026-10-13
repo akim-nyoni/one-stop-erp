@@ -38,6 +38,11 @@ builder.Configuration.GetSection(One4All.Infrastructure.Backup.BackupOptions.Sec
 One4All.Infrastructure.Security.FieldEncryptionOptions fieldEncryption = new();
 builder.Configuration.GetSection(One4All.Infrastructure.Security.FieldEncryptionOptions.SectionName).Bind(fieldEncryption);
 builder.Services.AddOne4AllInfrastructure(connectionString, licensing, messaging, backup, fieldEncryption);
+
+// Report API data sources (brief §13.1): the web APIs reports may read, from Reporting:Apis (name -> base URL and auth header).
+One4All.Infrastructure.Reporting.ReportApiOptions reportApis = new();
+builder.Configuration.GetSection("Reporting:Apis").Bind(reportApis.Endpoints);
+builder.Services.AddSingleton(reportApis);
 builder.Services.AddHostedService<One4All.Server.LicenceHost>();
 builder.Services.AddHostedService<One4All.Server.WebhookHost>();
 

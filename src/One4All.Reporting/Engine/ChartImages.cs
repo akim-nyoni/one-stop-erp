@@ -35,11 +35,12 @@ public static class ChartImages
         }
 
         bool round = element.ChartType is ChartType.Pie or ChartType.Donut;
-        List<string> legend = round ? categories : series.Count > 1 ? series : [];
+        bool combo = element.ChartType == ChartType.ColumnLine && !string.IsNullOrWhiteSpace(element.ChartLineField);
+        List<string> legend = combo ? [element.AggregateField ?? element.FieldName ?? "Value", element.ChartLineField!] : round ? categories : series.Count > 1 ? series : [];
         double legendWidth = legend.Count > 0 ? Math.Min(element.Width * 0.3, 110) : 0;
         double axisHeight = round ? 0 : Math.Min(14, element.Height * 0.15);
         double plotWidth = Math.Max(10, element.Width - legendWidth), plotHeight = Math.Max(10, element.Height - axisHeight);
-        string[] colours = [.. Enumerable.Range(0, Math.Max(categories.Count, series.Count)).Select(i => i == 0 ? element.ChartColor : Palette[i % Palette.Count])];
+        string[] colours = [.. Enumerable.Range(0, Math.Max(2, Math.Max(categories.Count, series.Count))).Select(i => i == 0 ? element.ChartColor : Palette[i % Palette.Count])];
 
         Canvas canvas = new((int)Math.Round(plotWidth * Scale), (int)Math.Round(plotHeight * Scale));
         switch (element.ChartType)
@@ -51,6 +52,27 @@ public static class ChartImages
             case ChartType.Line:
             case ChartType.Area:
                 DrawLines(canvas, values, categories.Count, series.Count, colours, element.ChartType == ChartType.Area);
+                break;
+            case ChartType.ColumnLine when combo:
+                // The columns, then the line field summed by the same categories on its own scale over them.
+                decimal[,] columns = new decimal[categories.Count, 1];
+                for (int c = 0; c < categories.Count; c++)
+                {
+                    columns[c, 0] = Total(values, c, series.Count);
+                }
+
+                DrawColumns(canvas, columns, categories.Count, 1, colours, stacked: false);
+                ReportElement line = new() { AggregateField = element.ChartLineField, ChartCategoryField = element.ChartCategoryField };
+                (List<string> lineCategories, _, decimal[,] lineValues) = Summarise(line, scope);
+                decimal[,] aligned = new decimal[categories.Count, 1];
+                for (int c = 0; c < categories.Count; c++)
+                {
+                    int at = lineCategories.IndexOf(categories[c]);
+                    aligned[c, 0] = at < 0 ? 0m : lineValues[at, 0];
+                }
+
+                colours[1] = Palette[2];
+                DrawLines(canvas, aligned, categories.Count, 1, [Palette[2]], area: false);
                 break;
             default:
                 DrawColumns(canvas, values, categories.Count, series.Count, colours, element.ChartType == ChartType.StackedColumn);

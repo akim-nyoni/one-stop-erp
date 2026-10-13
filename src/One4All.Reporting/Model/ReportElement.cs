@@ -68,6 +68,9 @@ public sealed class ReportElement
     /// <summary>Gets or sets a chart's series field: one bar / line / stack segment per value (blank: one series).</summary>
     public string? ChartSeriesField { get; set; }
 
+    /// <summary>Gets or sets the field a combination chart draws as a line over the columns (on its own scale).</summary>
+    public string? ChartLineField { get; set; }
+
     /// <summary>The expression for a <see cref="ElementKind.Expression"/> element.</summary>
     public string? Expression { get; set; }
 

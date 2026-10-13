@@ -201,6 +201,12 @@ public sealed class ReportEngine
                 continue;
             }
 
+            if (element.Kind is ElementKind.Table or ElementKind.CrossTab)
+            {
+                rendered.Cells.AddRange(element.Kind == ElementKind.Table ? ReportGrids.Table(element, scope) : ReportGrids.CrossTab(element, scope));
+                continue;
+            }
+
             if (element.Kind == ElementKind.SubReport)
             {
                 PlaceSubReport(rendered, element, input, row);

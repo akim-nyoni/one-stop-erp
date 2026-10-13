@@ -104,6 +104,18 @@ public enum ElementKind
 
     /// <summary>Another report run inside this one, its parameters linked from the parent row.</summary>
     SubReport = 12,
+
+    /// <summary>
+    /// A table of the rows in scope inside the element's box: columns from <see cref="ReportElement.Text"/> as "Field[:Header[:width%]]; …", a
+    /// header row, and as many rows as fit (the rest counted in a last line).
+    /// </summary>
+    Table = 13,
+
+    /// <summary>
+    /// A cross-tab of the rows in scope inside the element's box: rows by <see cref="ReportElement.ChartCategoryField"/>, columns by
+    /// <see cref="ReportElement.ChartSeriesField"/>, cells summing <see cref="ReportElement.AggregateField"/>, with row and column totals.
+    /// </summary>
+    CrossTab = 14,
 }
 
 /// <summary>Horizontal text alignment.</summary>
@@ -165,6 +177,12 @@ public enum DataSourceKind
 
     /// <summary>An in-memory dataset supplied by the caller (e.g. a report DTO).</summary>
     InMemory = 3,
+
+    /// <summary>
+    /// A JSON web API: the command is a configured endpoint's name and path ("WEATHER/daily?from={FromDate}"), so a report can only call the
+    /// endpoints the administrator has configured.
+    /// </summary>
+    Api = 4,
 }
 
 /// <summary>Aggregate functions (brief §13.1).</summary>
@@ -262,4 +280,7 @@ public enum ChartType
 
     /// <summary>A pie with a hole.</summary>
     Donut = 6,
+
+    /// <summary>A combination: columns of the value field with a line of <see cref="ReportElement.ChartLineField"/> on its own scale.</summary>
+    ColumnLine = 7,
 }
