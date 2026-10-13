@@ -68,6 +68,21 @@ internal sealed class QuotationLineConfiguration : IEntityTypeConfiguration<Quot
     }
 }
 
+internal sealed class DeliveryVehicleConfiguration : IEntityTypeConfiguration<DeliveryVehicle>
+{
+    public void Configure(EntityTypeBuilder<DeliveryVehicle> b)
+    {
+        b.ToTable("delivery_vehicle", Schemas.SalesOrders);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Registration).HasMaxLength(20);
+        b.Property(x => x.Description).HasMaxLength(120);
+        b.Property(x => x.CapacityKg).HasPrecision(19, 4);
+        b.Property(x => x.CapacityM3).HasPrecision(19, 4);
+        b.Property(x => x.DefaultDriver).HasMaxLength(120);
+        b.HasIndex(x => new { x.CompanyId, x.Registration }).IsUnique();
+    }
+}
+
 internal sealed class SalesDeliveryConfiguration : IEntityTypeConfiguration<SalesDelivery>
 {
     public void Configure(EntityTypeBuilder<SalesDelivery> b)

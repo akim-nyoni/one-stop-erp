@@ -52,6 +52,9 @@ public sealed class SalesDelivery : AuditableEntity, ICompanyScoped
     /// <summary>Gets or sets the driver.</summary>
     public string? Driver { get; set; }
 
+    /// <summary>Gets or sets the drop's place in the vehicle's run that day (1 first; null: not sequenced).</summary>
+    public int? StopSequence { get; set; }
+
     /// <summary>Gets when it was delivered (proof of delivery).</summary>
     public DateOnly? DeliveredOn { get; private set; }
 

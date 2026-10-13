@@ -1627,6 +1627,35 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Delivery vehicles and loads", ListTitle = "Delivery vehicles",
+            Description = "Register a vehicle (capacity in kg, optional m³ and drops a day, usual driver); put a delivery on a vehicle's run for a day at a stop (refused when it would "
+                + "overload the vehicle by weight or exceed its drops); or show a vehicle's load for a day in run order.",
+            Fields = [Pick("Step", "Step", "Assign", "Load", "Register vehicle"), Req("Vehicle", "Vehicle registration"), Opt("Delivery", "Delivery reference (assign)"), Today("Date", "Day"),
+                Opt("Route", "Route"), Opt("Driver", "Driver"), OptNum("Stop", "Stop number (assign; blank: last)"), Opt("Description", "Description (register)"),
+                OptNum("CapacityKg", "Capacity kg (register)"), OptNum("CapacityM3", "Capacity m³ (register)"), OptNum("MaxStops", "Most drops a day (register)")],
+            Run = async (c, i) =>
+            {
+                IDeliveryPlanningService planning = c.Get<IDeliveryPlanningService>();
+                if (i.Text("Step") == "Register vehicle")
+                {
+                    return Check(await planning.SaveVehicleAsync(c.CompanyId, new DeliveryVehicleRequest(i.Text("Vehicle"), i.Optional("Description") ?? i.Text("Vehicle"),
+                        i.OptionalNumber("CapacityKg") ?? 0m, i.OptionalNumber("CapacityM3"), i.OptionalNumber("MaxStops") is decimal stops ? (int)stops : null, i.Optional("Driver"))).ConfigureAwait(true),
+                        _ => $"Vehicle {i.Text("Vehicle").ToUpperInvariant()} saved.");
+                }
+
+                VehicleLoad load = Check(i.Text("Step") == "Assign"
+                    ? await planning.AssignAsync(c.CompanyId, new DeliveryAssignment(i.Optional("Delivery") ?? string.Empty, i.Text("Vehicle"), i.Date("Date"), i.Optional("Route"), i.Optional("Driver"),
+                        i.OptionalNumber("Stop") is decimal stop ? (int)stop : null)).ConfigureAwait(true)
+                    : await planning.LoadAsync(c.CompanyId, i.Text("Vehicle"), i.Date("Date")).ConfigureAwait(true));
+                return $"{load.Vehicle} on {load.Date:yyyy-MM-dd}: {Q(load.WeightKg)} of {Q(load.CapacityKg)} kg ({load.Utilisation:0.#}%)" + Environment.NewLine
+                    + string.Join(Environment.NewLine, load.Stops.Select(s => $"  {s.Stop}. {s.DeliveryReference} {s.Route ?? string.Empty} {Q(s.WeightKg)} kg"));
+            },
+            List = async c => Table(await c.Db.Set<Core.SalesOrders.DeliveryVehicle>().AsNoTracking().Where(v => v.CompanyId == c.CompanyId).OrderBy(v => v.Registration).ToListAsync().ConfigureAwait(true),
+                ("Vehicle", v => v.Registration), ("Description", v => v.Description), ("Capacity kg", v => Q(v.CapacityKg)), ("Drops", v => v.MaxStops?.ToString(CultureInfo.InvariantCulture) ?? "-"),
+                ("Driver", v => v.DefaultDriver ?? "-")),
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Charge for a delivery", Description = "Works out a delivery's charge from the customer's zone; tick 'Invoice' to bill it to the customer (once per delivery).",
             Fields = [Req("Delivery", "Delivery reference"), Tick("Invoice", "Invoice it"), Opt("Number", "Invoice number"), Today(), Req("Revenue", "Delivery income account", "4000"), Opt("TaxCode", "Tax code"),
                 Opt("TaxAccount", "Output tax account")],

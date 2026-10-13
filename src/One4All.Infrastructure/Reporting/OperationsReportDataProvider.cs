@@ -448,7 +448,8 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         Dictionary<long, (string Number, long CustomerId)> orders = await _db.SalesOrders.AsNoTracking().Where(o => o.CompanyId == companyId).ToDictionaryAsync(o => o.Id, o => (o.OrderNumber, o.CustomerId), ct).ConfigureAwait(false);
         Dictionary<long, string> customers = await GuardiansAsync(companyId, ct).ConfigureAwait(false);
         Dictionary<long, (string Code, decimal? Weight)> items = await _db.Items.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => (i.Code, i.UnitWeightKg), ct).ConfigureAwait(false);
-        return [.. planned.OrderBy(d => d.PlannedFor).ThenBy(d => d.Vehicle ?? "~", StringComparer.Ordinal).ThenBy(d => d.Route ?? string.Empty, StringComparer.Ordinal).ThenBy(d => d.Reference, StringComparer.Ordinal)
+        return [.. planned.OrderBy(d => d.PlannedFor).ThenBy(d => d.Vehicle ?? "~", StringComparer.Ordinal).ThenBy(d => d.StopSequence ?? int.MaxValue)
+            .ThenBy(d => d.Route ?? string.Empty, StringComparer.Ordinal).ThenBy(d => d.Reference, StringComparer.Ordinal)
             .Select(d => Row(("Date", Date(d.PlannedFor!.Value)), ("Vehicle", d.Vehicle ?? "Unassigned"), ("Route", d.Route ?? "—"), ("Driver", d.Driver ?? "—"), ("Delivery", d.Reference),
                 ("Order", orders.GetValueOrDefault(d.SalesOrderId).Number ?? "?"), ("Customer", customers.GetValueOrDefault(orders.GetValueOrDefault(d.SalesOrderId).CustomerId, "?")),
                 ("Items", string.Join(", ", d.Lines.Select(l => $"{Qty(l.Quantity)} × {items.GetValueOrDefault(l.ItemId).Code ?? "?"}"))),

@@ -28107,6 +28107,68 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("customer_contract_line", "sop");
                 });
 
+            modelBuilder.Entity("One4All.Core.SalesOrders.DeliveryVehicle", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<decimal>("CapacityKg")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("capacity_kg");
+
+                    b.Property<decimal?>("CapacityM3")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("capacity_m3");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("DefaultDriver")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("default_driver");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<int?>("MaxStops")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_stops");
+
+                    b.Property<string>("Registration")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("registration");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_delivery_vehicle");
+
+                    b.HasIndex("CompanyId", "Registration")
+                        .IsUnique()
+                        .HasDatabaseName("ix_delivery_vehicle_company_id_registration");
+
+                    b.ToTable("delivery_vehicle", "sop");
+                });
+
             modelBuilder.Entity("One4All.Core.SalesOrders.DeliveryZoneRate", b =>
                 {
                     b.Property<long>("Id")
@@ -28501,6 +28563,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("SalesOrderId")
                         .HasColumnType("bigint")
                         .HasColumnName("sales_order_id");
+
+                    b.Property<int?>("StopSequence")
+                        .HasColumnType("integer")
+                        .HasColumnName("stop_sequence");
 
                     b.Property<string>("Vehicle")
                         .HasMaxLength(20)
