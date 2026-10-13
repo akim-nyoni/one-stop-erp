@@ -41,6 +41,15 @@ public partial class PosTerminalWindow : Window
 
     private void SupervisorPin_Changed(object sender, RoutedEventArgs e) => _viewModel.SupervisorPin = SupervisorPinBox.Password;
 
+    // The terminal's function keys run their till actions (F9 stays bound to the next tender currency).
+    private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key is >= System.Windows.Input.Key.F1 and <= System.Windows.Input.Key.F12 && e.Key != System.Windows.Input.Key.F9 && _viewModel.RunFunctionKey(e.Key.ToString()))
+        {
+            e.Handled = true;
+        }
+    }
+
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
     // The high-contrast palette (brief §15 accessibility): black, white and yellow, every button outlined.

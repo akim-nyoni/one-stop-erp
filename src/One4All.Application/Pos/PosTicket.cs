@@ -37,7 +37,8 @@ public sealed record PosSaleContext(
     string? PrescriptionReference = null,
     string? DiscountAccountCode = null,
     long? CustomerId = null,
-    PosChangeQuote? Change = null);
+    PosChangeQuote? Change = null,
+    string? TipsAccountCode = null);
 
 /// <summary>Change given in another currency, rounded to what can be handed over (brief §4.1).</summary>
 /// <param name="Currency">The change currency.</param>
@@ -216,11 +217,31 @@ public sealed class PosTicket
     /// <summary>The amount tendered so far.</summary>
     public decimal Tendered => decimal.Round(_tenders.Sum(t => t.BaseAmount), 4, MidpointRounding.ToEven);
 
+    /// <summary>The tip the customer adds (paid with the tenders, owed to staff).</summary>
+    public decimal Tip { get; private set; }
+
+    /// <summary>What the customer pays: the gross total plus any tip.</summary>
+    public decimal AmountDue => GrossTotal + Tip;
+
     /// <summary>The outstanding balance (never negative).</summary>
-    public decimal BalanceDue => Math.Max(0m, decimal.Round(GrossTotal - Tendered, 4, MidpointRounding.ToEven));
+    public decimal BalanceDue => Math.Max(0m, decimal.Round(AmountDue - Tendered, 4, MidpointRounding.ToEven));
 
     /// <summary>The change owed to the customer (never negative).</summary>
-    public decimal ChangeDue => Math.Max(0m, decimal.Round(Tendered - GrossTotal, 4, MidpointRounding.ToEven));
+    public decimal ChangeDue => Math.Max(0m, decimal.Round(Tendered - AmountDue, 4, MidpointRounding.ToEven));
+
+    /// <summary>Sets the tip (zero removes it).</summary>
+    /// <param name="amount">The tip.</param>
+    /// <returns>Success, or why not.</returns>
+    public Result SetTip(decimal amount)
+    {
+        if (amount < 0m)
+        {
+            return Result.Failure(Error.Validation("Pos.Tip", "A tip cannot be negative."));
+        }
+
+        Tip = PosMoney.Round(amount);
+        return Result.Success();
+    }
 
     /// <summary>The balance still due expressed in another currency (rounded up to the cent, so it covers the balance).</summary>
     /// <param name="rate">Units of the ticket's currency one unit of the other buys.</param>
@@ -250,7 +271,7 @@ public sealed class PosTicket
     }
 
     /// <summary>True once the ticket has lines and is fully paid.</summary>
-    public bool IsFullyTendered => _lines.Count > 0 && Tendered >= GrossTotal;
+    public bool IsFullyTendered => _lines.Count > 0 && Tendered >= AmountDue;
 
     /// <summary>True when the ticket has neither lines nor tenders.</summary>
     public bool IsEmpty => _lines.Count == 0 && _tenders.Count == 0;
@@ -456,6 +477,7 @@ public sealed class PosTicket
     {
         _lines.Clear();
         _tenders.Clear();
+        Tip = 0m;
     }
 
     /// <summary>
@@ -476,6 +498,11 @@ public sealed class PosTicket
         if (basket.IsFailure)
         {
             return basket;
+        }
+
+        if (Tip > 0m && string.IsNullOrWhiteSpace(context.TipsAccountCode))
+        {
+            return Error.Validation("Pos.TipsAccount", "No tips account is configured for the tip.");
         }
 
         List<PosTenderRequest> tenders = [];
@@ -528,6 +555,7 @@ public sealed class PosTicket
             CompanyId = sale.CompanyId, TerminalId = sale.TerminalId, TillSessionId = sale.TillSessionId, CashierUserId = sale.CashierUserId, SaleNumber = sale.SaleNumber,
             SaleDate = sale.SaleDate, WarehouseId = sale.WarehouseId, TaxAccountCode = sale.TaxAccountCode, AgeVerified = sale.AgeVerified,
             PrescriptionReference = sale.PrescriptionReference, CustomerId = sale.CustomerId, Lines = sale.Lines, Tenders = tenders,
+            Tip = Tip, TipsAccountCode = Tip > 0m ? context.TipsAccountCode!.Trim() : null,
         };
     }
 

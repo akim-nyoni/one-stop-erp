@@ -55,7 +55,9 @@ public sealed record PosSaleEnvelope(
     IReadOnlyList<PosTenderEnvelope> Tenders,
     bool AgeVerified = false,
     string? PrescriptionReference = null,
-    string? OfflineSessionKey = null)
+    string? OfflineSessionKey = null,
+    decimal Tip = 0m,
+    string? TipsAccountCode = null)
 {
     /// <summary>The operation kind used to route this envelope to its replay handler.</summary>
     public const string Kind = "PosSale";
@@ -74,6 +76,8 @@ public sealed record PosSaleEnvelope(
         TaxAccountCode = TaxAccountCode,
         AgeVerified = AgeVerified,
         PrescriptionReference = PrescriptionReference,
+        Tip = Tip,
+        TipsAccountCode = TipsAccountCode,
         Lines = Lines
             .Select(l => new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode))
             .ToList(),

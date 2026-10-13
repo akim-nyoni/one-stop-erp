@@ -13,6 +13,7 @@ internal sealed class PosTerminalConfiguration : IEntityTypeConfiguration<PosTer
         b.Property(x => x.Code).HasMaxLength(20);
         b.Property(x => x.Name).HasMaxLength(120);
         b.Property(x => x.Profile).HasConversion<int>();
+        b.Property(x => x.FunctionKeys).HasMaxLength(400);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }
@@ -38,6 +39,7 @@ internal sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
     {
         b.ToTable("sale", Schemas.PointOfSale);
         b.Property(x => x.FiscalStatus).HasConversion<int>();
+        b.Property(x => x.Tip).HasPrecision(19, 4);
         b.Property(x => x.FiscalCode).HasMaxLength(60);
         b.Property(x => x.FiscalVerification).HasMaxLength(500);
         b.Property(x => x.FiscalError).HasMaxLength(300);

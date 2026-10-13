@@ -55,10 +55,11 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Till favourites", ListTitle = "Favourites",
             Description = "Items pinned to the till's ★ Favourites tabs — for one terminal or every till, and optionally for one cashier (their own come first, then the till's, "
-                + "then every till's), on a page (★ Favourites, ★ Favourites 2…) in a colour (#RRGGBB or a name). Profile: what kind of counter the terminal is.",
-            Fields = [Pick("Step", "Step", ["Favourite", "Profile"]), Opt("Item", "Item code"), Opt("Terminal", "Terminal code (blank: every till)"), Opt("Cashier", "Cashier user name (blank: anyone)"),
+                + "then every till's), on a page (★ Favourites, ★ Favourites 2…) in a colour (#RRGGBB or a name). Profile: what kind of counter the terminal is. "
+                + "Function keys: the terminal's F1–F12 (F2=TenderCash; F3=TenderCard; …) over its profile's defaults.",
+            Fields = [Pick("Step", "Step", ["Favourite", "Profile", "Function keys"]), Opt("Item", "Item code"), Opt("Terminal", "Terminal code (blank: every till)"), Opt("Cashier", "Cashier user name (blank: anyone)"),
                 Num("Order", "Position", "10"), Num("Page", "Page", "1"), Opt("Colour", "Tile colour"), Tick("Remove", "Remove it"),
-                Pick("Profile", "Terminal profile", Enum.GetNames<Core.Pos.TerminalProfile>())],
+                Pick("Profile", "Terminal profile", Enum.GetNames<Core.Pos.TerminalProfile>()), Opt("Keys", "Function keys F2=TenderCash; … (blank: the profile's)")],
             Run = async (c, i) =>
             {
                 long? terminal = null;
@@ -75,6 +76,16 @@ public static partial class OperationCatalogue
                     till.Profile = Enum.Parse<Core.Pos.TerminalProfile>(i.Text("Profile"));
                     await c.Db.SaveChangesAsync().ConfigureAwait(true);
                     return $"Terminal {till.Code} is a {till.Profile} till.";
+                }
+
+                if (i.Text("Step") == "Function keys")
+                {
+                    Core.Pos.PosTerminal till = await c.Db.PosTerminals.FirstOrDefaultAsync(t => t.Id == terminal).ConfigureAwait(true)
+                        ?? throw new OperationException("Name the terminal whose function keys to set.");
+                    IReadOnlyDictionary<string, string> own = Check(Application.Pos.TillFunctionKeys.Parse(i.Optional("Keys")));
+                    till.FunctionKeys = own.Count == 0 ? null : string.Join("; ", own.Select(k => $"{k.Key}={k.Value}"));
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Terminal {till.Code}: {Application.Pos.TillFunctionKeys.Describe(Application.Pos.TillFunctionKeys.For(till.Profile, till.FunctionKeys))}";
                 }
 
                 long? cashier = null;

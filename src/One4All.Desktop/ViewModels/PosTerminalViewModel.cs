@@ -235,6 +235,26 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [ObservableProperty]
     private string _giftCardAccountCode = string.Empty;
 
+    /// <summary>The tips-payable account a tip added at the till is credited to.</summary>
+    [ObservableProperty]
+    private string _tipsAccountCode = string.Empty;
+
+    /// <summary>Adds the amount typed in the scan box to the ticket as the customer's tip (0 removes it); the tenders then cover it.</summary>
+    [RelayCommand]
+    private void AddTip()
+    {
+        if (!decimal.TryParse((ScanEntry ?? string.Empty).Trim(), NumberStyles.Number, CultureInfo.InvariantCulture, out decimal tip))
+        {
+            StatusMessage = "Type the tip amount in the scan box first.";
+            return;
+        }
+
+        Result set = _ticket.SetTip(tip);
+        StatusMessage = set.IsSuccess ? (tip > 0m ? $"Tip {tip:N2} added." : "Tip removed.") : set.Error.Message;
+        ScanEntry = string.Empty;
+        RefreshTotals();
+    }
+
     /// <summary>The gift card number for a voucher tender (typed or scanned).</summary>
     [ObservableProperty]
     private string _voucherNumber = string.Empty;
@@ -438,6 +458,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         DiscountAccountCode = Account("Discount", DiscountAccountCode);
         MobileMoneyAccountCode = Account("MobileMoney", MobileMoneyAccountCode);
         GiftCardAccountCode = Account("GiftCard", GiftCardAccountCode);
+        TipsAccountCode = Account("Tips", TipsAccountCode);
         TenderCurrencies.Clear();
         foreach (OfflineTenderCurrency currency in snapshot.TenderCurrencies)
         {
@@ -521,6 +542,30 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
     /// <summary>Whether the till weighs goods (not at a bar or restaurant till).</summary>
     public bool IsScaleVisible => _profile is not (TerminalProfile.Bar or TerminalProfile.Restaurant);
+
+    private IReadOnlyDictionary<string, string> _functionKeys = TillFunctionKeys.Defaults(TerminalProfile.General);
+
+    /// <summary>Gets the function keys for the help line.</summary>
+    public string FunctionKeysText => TillFunctionKeys.Describe(_functionKeys);
+
+    /// <summary>Runs the till action mapped to a function key.</summary>
+    /// <param name="key">The key ("F2").</param>
+    /// <returns>True when the key is mapped (and its action was run if it could be).</returns>
+    public bool RunFunctionKey(string key)
+    {
+        if (!_functionKeys.TryGetValue(key, out string? action)
+            || GetType().GetProperty(action + "Command")?.GetValue(this) is not System.Windows.Input.ICommand command)
+        {
+            return false;
+        }
+
+        if (command.CanExecute(null))
+        {
+            command.Execute(null);
+        }
+
+        return true;
+    }
     private Dictionary<string, string?> _categoryParents = new(StringComparer.OrdinalIgnoreCase);
     private bool _online;
     private CancellationTokenSource? _searching;
@@ -556,7 +601,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             Accounts = new Dictionary<string, string>
             {
                 ["Cash"] = CashAccountCode, ["Card"] = CardAccountCode, ["Tax"] = TaxAccountCode, ["OverShort"] = OverShortAccountCode, ["Discount"] = DiscountAccountCode,
-                ["MobileMoney"] = MobileMoneyAccountCode, ["GiftCard"] = GiftCardAccountCode,
+                ["MobileMoney"] = MobileMoneyAccountCode, ["GiftCard"] = GiftCardAccountCode, ["Tips"] = TipsAccountCode,
             },
             TenderCurrencies = [.. TenderCurrencies.Select(t => new OfflineTenderCurrency(t.Code.Value, t.Rate))],
             Customers = _customers.Count > 0 ? _customers : _snapshot?.Customers ?? [],
@@ -608,8 +653,11 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     {
         _favourites = [.. await catalogue.FavouriteTilesAsync(_companyId, _terminalId == 0 ? null : _terminalId, _cashierUserId == 0 ? null : _cashierUserId, ct).ConfigureAwait(true)];
         long terminal = _terminalId;
-        _profile = await db.PosTerminals.AsNoTracking().Where(t => t.Id == terminal).Select(t => t.Profile).FirstOrDefaultAsync(ct).ConfigureAwait(true);
+        var till = await db.PosTerminals.AsNoTracking().Where(t => t.Id == terminal).Select(t => new { t.Profile, t.FunctionKeys }).FirstOrDefaultAsync(ct).ConfigureAwait(true);
+        _profile = till?.Profile ?? TerminalProfile.General;
+        _functionKeys = TillFunctionKeys.For(_profile, till?.FunctionKeys);
         OnPropertyChanged(nameof(ProfileText));
+        OnPropertyChanged(nameof(FunctionKeysText));
         OnPropertyChanged(nameof(IsScaleVisible));
         _categoryParents = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (ItemCategory category in await db.ItemCategories.AsNoTracking().Where(c => c.CompanyId == _companyId).ToListAsync(ct).ConfigureAwait(true))
@@ -1813,7 +1861,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             TenderAccounts: tenderAccounts,
             AgeVerified: AgeVerified,
             PrescriptionReference: string.IsNullOrWhiteSpace(PrescriptionReference) ? null : PrescriptionReference.Trim(),
-            DiscountAccountCode: NullIfBlank(DiscountAccountCode));
+            DiscountAccountCode: NullIfBlank(DiscountAccountCode),
+            TipsAccountCode: NullIfBlank(TipsAccountCode));
     }
 
     // The change in the configured change currency (null: give it in base, or none is owed).
@@ -1909,7 +1958,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             request.SaleNumber, request.SaleDate, request.WarehouseId, _currency.Value, request.TaxAccountCode,
             request.Lines.Select(l => new PosSaleLineEnvelope(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode)).ToList(),
             request.Tenders.Select(t => new PosTenderEnvelope(t.TenderType, t.Currency.Value, t.Amount, t.AccountCode, t.IsChange)).ToList(),
-            request.AgeVerified, request.PrescriptionReference, request.TillSessionId == 0 ? _offlineSessionKey : null);
+            request.AgeVerified, request.PrescriptionReference, request.TillSessionId == 0 ? _offlineSessionKey : null, request.Tip, request.TipsAccountCode);
 
         LocalOfflineEntry entry = new(Guid.NewGuid(), request.CompanyId, PosSaleEnvelope.Kind, JsonSerializer.Serialize(envelope), DateTimeOffset.UtcNow);
         await LocalQueue.EnqueueAsync(entry).ConfigureAwait(true);

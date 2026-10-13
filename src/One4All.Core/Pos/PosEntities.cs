@@ -95,6 +95,9 @@ public sealed class PosTerminal : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>The terminal's profile — what kind of counter it is, which shapes the till's layout (brief §4.1 "configurable layout per terminal profile").</summary>
     public TerminalProfile Profile { get; set; }
+
+    /// <summary>Gets or sets the terminal's own function keys ("F2=TenderCash; F3=TenderCard"), over its profile's defaults.</summary>
+    public string? FunctionKeys { get; set; }
 }
 
 /// <summary>What kind of counter a terminal is.</summary>

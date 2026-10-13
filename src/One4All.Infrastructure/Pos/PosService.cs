@@ -283,7 +283,19 @@ public sealed class PosService : IPosService
             return Error.Rule("Pos.VoucherOverpays", "Vouchers cannot pay more than the sale; no change is given from a voucher.");
         }
 
-        decimal difference = sale.NetTenderedBase - sale.TotalGross;
+        // A tip rides on the tenders and is owed to staff: credited to the tips account, outside the sale's revenue and tax.
+        if (request.Tip < 0m || (request.Tip > 0m && string.IsNullOrWhiteSpace(request.TipsAccountCode)))
+        {
+            return Error.Validation("Pos.Tip", "A tip must be positive and needs the tips-payable account.");
+        }
+
+        if (request.Tip > 0m)
+        {
+            journalLines.Add(new JournalLineRequest { AccountCode = request.TipsAccountCode!.Trim(), Side = JournalSide.Credit, TransactionAmount = request.Tip, Narrative = "Tip" });
+            sale.RecordTip(request.Tip);
+        }
+
+        decimal difference = sale.NetTenderedBase - sale.TotalGross - request.Tip;
         if (Math.Abs(difference) > 0.0001m)
         {
             // Cash rounding: a cash sale may be tendered up to half the smallest cash unit away from the exact total — in base, or in the change
@@ -306,7 +318,7 @@ public sealed class PosService : IPosService
                 && Math.Abs(difference) <= tolerance + 0.0001m && sale.Tenders.Any(t => t.TenderType == TenderType.Cash);
             if (!rounds)
             {
-                return Error.Rule("Pos.Unbalanced", $"Tenders {sale.NetTenderedBase:0.00} do not equal the sale total {sale.TotalGross:0.00}.");
+                return Error.Rule("Pos.Unbalanced", $"Tenders {sale.NetTenderedBase:0.00} do not equal the sale total {sale.TotalGross + request.Tip:0.00}.");
             }
 
             journalLines.Add(new JournalLineRequest
@@ -630,7 +642,7 @@ public sealed class PosService : IPosService
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
-        return new TillRead(sales.Count, gross, tenderTotals, zNumber);
+        return new TillRead(sales.Count, gross, tenderTotals, zNumber) { Tips = sales.Sum(s => s.Tip) };
     }
 
     /// <inheritdoc />

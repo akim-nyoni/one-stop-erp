@@ -110,6 +110,13 @@ public sealed class Sale : AuditableEntity, ICompanyScoped
     /// <param name="amount">Tendered less the exact total.</param>
     public void RecordCashRounding(decimal amount) => CashRounding = amount;
 
+    /// <summary>Gets the tip the customer added at the till (paid with the tenders, owed to staff; not revenue).</summary>
+    public decimal Tip { get; private set; }
+
+    /// <summary>Records the tip.</summary>
+    /// <param name="amount">The tip.</param>
+    public void RecordTip(decimal amount) => Tip = amount;
+
     /// <summary>Where the sale stands with the fiscal device (brief §3.5).</summary>
     public FiscalStatus FiscalStatus { get; private set; }
 

@@ -67,8 +67,14 @@ public sealed class CompleteSaleRequest
     /// <summary>Gets the prescription the sale's prescription-only items are sold against.</summary>
     public string? PrescriptionReference { get; init; }
 
-    /// <summary>The tenders (including any change as IsChange).</summary>
+    /// <summary>The tenders (including any change as IsChange); they cover the sale and any tip.</summary>
     public IReadOnlyList<PosTenderRequest> Tenders { get; init; } = [];
+
+    /// <summary>Gets the tip the customer adds (base currency): paid with the tenders, credited to the tips account, not revenue.</summary>
+    public decimal Tip { get; init; }
+
+    /// <summary>Gets the tips-payable account a tip is credited to.</summary>
+    public string? TipsAccountCode { get; init; }
 }
 
 /// <summary>The result of completing a sale.</summary>
@@ -104,7 +110,11 @@ public sealed class SplitBillRequest
 /// <param name="TotalGross">Gross sales.</param>
 /// <param name="TenderTotals">Gross per tender type.</param>
 /// <param name="ZReadNumber">The Z number (only on a Z-read/close).</param>
-public sealed record TillRead(int SaleCount, decimal TotalGross, IReadOnlyDictionary<TenderType, decimal> TenderTotals, int? ZReadNumber);
+public sealed record TillRead(int SaleCount, decimal TotalGross, IReadOnlyDictionary<TenderType, decimal> TenderTotals, int? ZReadNumber)
+{
+    /// <summary>Gets the tips taken with the shift's sales (in the tender totals, owed to staff).</summary>
+    public decimal Tips { get; init; }
+}
 
 /// <summary>A request to close a till with a cash-up (declared cash count).</summary>
 public sealed class CashUpRequest

@@ -22768,6 +22768,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
 
+                    b.Property<string>("FunctionKeys")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("function_keys");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -23098,6 +23103,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("TillSessionId")
                         .HasColumnType("bigint")
                         .HasColumnName("till_session_id");
+
+                    b.Property<decimal>("Tip")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("tip");
 
                     b.HasKey("Id")
                         .HasName("pk_sale");
