@@ -18,6 +18,9 @@ public sealed class BillingRunService : IBillingRunService
     private readonly INumberSequenceService _numbers;
     private readonly ISalesLedgerService _ar;
     private readonly Microsoft.Extensions.DependencyInjection.IServiceScopeFactory? _scopes;
+
+    // Bills posted in one transaction (each with its own savepoint).
+    private const int TransactionBatch = 50;
     private readonly Application.Abstractions.Communications.IStatementDespatchService? _despatch;
 
     /// <inheritdoc />
@@ -315,42 +318,57 @@ public sealed class BillingRunService : IBillingRunService
                 continue;
             }
 
-            foreach (BillingRunLine line in chunk)
+            // Bills post in batches of one transaction each (a savepoint per bill, so a failed bill is rolled back alone): the journal counter's
+            // lock, the audit chain's head and the commit are paid once a batch rather than once a bill, and the batch is small enough that
+            // other postings in the company wait only briefly for the counter.
+            foreach (BillingRunLine[] batch in chunk.Chunk(TransactionBatch))
             {
-                if (existing.TryGetValue(line.InvoiceNumber, out long already))
+                await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+                foreach (BillingRunLine line in batch)
                 {
+                    Result<TradingPostingResult>? posted = null;
+                    if (!existing.ContainsKey(line.InvoiceNumber))
+                    {
+                        await transaction.CreateSavepointAsync("bill", ct).ConfigureAwait(false);
+                        try
+                        {
+                            posted = await MunicipalCharges.PostAsync(_db, _ar, companyId, line.RatepayerCustomerId, line.InvoiceNumber, header.BillDate,
+                                line.Charge, 0m, line.RevenueAccountCode, null, line.Narrative, ct).ConfigureAwait(false);
+                        }
+                        catch (DbUpdateException ex)
+                        {
+                            posted = Error.Failure("Mun.PostFailed", ex.InnerException?.Message ?? ex.Message);
+                        }
+
+                        if (posted.IsFailure)
+                        {
+                            // Undo whatever the failed bill wrote; the chain head and counters it advanced are read afresh.
+                            await transaction.RollbackToSavepointAsync("bill", ct).ConfigureAwait(false);
+                            _db.ChainHeads = null;
+                        }
+                    }
+
+                    // Whatever the posting left tracked goes, then only the line is recorded.
+                    _db.ChangeTracker.Clear();
                     _db.Attach(line);
-                    line.MarkPosted(already);
+                    if (posted is null)
+                    {
+                        line.MarkPosted(existing[line.InvoiceNumber]);
+                    }
+                    else if (posted.IsSuccess)
+                    {
+                        line.MarkPosted(posted.Value.OpenItemId);
+                    }
+                    else
+                    {
+                        line.MarkFailed(posted.Error.Message);
+                    }
+
                     await _db.SaveChangesAsync(ct).ConfigureAwait(false);
                     _db.ChangeTracker.Clear();
-                    continue;
                 }
 
-                Result<TradingPostingResult> posted;
-                try
-                {
-                    posted = await MunicipalCharges.PostAsync(_db, _ar, companyId, line.RatepayerCustomerId, line.InvoiceNumber, header.BillDate,
-                        line.Charge, 0m, line.RevenueAccountCode, null, line.Narrative, ct).ConfigureAwait(false);
-                }
-                catch (DbUpdateException ex)
-                {
-                    posted = Error.Failure("Mun.PostFailed", ex.InnerException?.Message ?? ex.Message);
-                }
-
-                // Whatever the posting left tracked goes, then only the line is recorded.
-                _db.ChangeTracker.Clear();
-                _db.Attach(line);
-                if (posted.IsSuccess)
-                {
-                    line.MarkPosted(posted.Value.OpenItemId);
-                }
-                else
-                {
-                    line.MarkFailed(posted.Error.Message);
-                }
-
-                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-                _db.ChangeTracker.Clear();
+                await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
 
             handled += chunk.Count;

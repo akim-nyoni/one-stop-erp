@@ -205,7 +205,7 @@ public sealed class PerformanceTests
         });
         proposed.IsSuccess.Should().BeTrue(proposed.IsFailure ? proposed.Error.Message : null);
         double proposing = watch.Elapsed.TotalSeconds;
-        var posted = await runs.ApproveAsync(companyId, proposed.Value.RunNumber, 82, new BillingPostOptions { ChunkSize = 1_000, Parallelism = 6 });
+        var posted = await runs.ApproveAsync(companyId, proposed.Value.RunNumber, 82, new BillingPostOptions { ChunkSize = 1_000 });
         watch.Stop();
         posted.IsSuccess.Should().BeTrue(posted.IsFailure ? posted.Error.Message : null);
         string? why = (await runs.LinesAsync(companyId, proposed.Value.RunNumber, exceptionsOnly: true)).Value.Select(l => l.Message).FirstOrDefault();
