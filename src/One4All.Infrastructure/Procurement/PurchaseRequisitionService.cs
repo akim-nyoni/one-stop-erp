@@ -38,7 +38,8 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
     private readonly Application.Abstractions.Security.IPermissionService? _permissions;
 
     /// <inheritdoc />
-    public async Task<Result<long>> CreateAsync(long companyId, long supplierId, string requisitionNumber, DateOnly requestedDate, CurrencyCode currency, IReadOnlyList<PurchaseRequisitionLineRequest> lines, CancellationToken ct = default)
+    public async Task<Result<long>> CreateAsync(long companyId, long supplierId, string requisitionNumber, DateOnly requestedDate, CurrencyCode currency, IReadOnlyList<PurchaseRequisitionLineRequest> lines,
+        RequisitionDetails? details = null, CancellationToken ct = default)
     {
         if (lines is null || lines.Count == 0)
         {
@@ -61,7 +62,16 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
             return Error.NotFound("Pop.SupplierNotFound", $"Supplier {supplierId} not found.");
         }
 
-        PurchaseRequisition req = new(companyId, supplierId, requisitionNumber, requestedDate, currency);
+        if (details?.RequiredBy is DateOnly needed && needed < requestedDate)
+        {
+            return Error.Validation("Pop.ReqRequiredBy", "The required-by date cannot be before the requisition date.");
+        }
+
+        PurchaseRequisition req = new(companyId, supplierId, requisitionNumber, requestedDate, currency)
+        {
+            RequiredBy = details?.RequiredBy, Justification = string.IsNullOrWhiteSpace(details?.Justification) ? null : details.Justification.Trim(),
+            Department = Dimension(details?.Department), CostCentre = Dimension(details?.CostCentre), Project = Dimension(details?.Project),
+        };
         foreach (PurchaseRequisitionLineRequest line in lines)
         {
             req.AddLine(line.ItemId, line.Description, line.Quantity, line.UnitPrice).ExpenseAccountCode = string.IsNullOrWhiteSpace(line.ExpenseAccountCode) ? null : line.ExpenseAccountCode.Trim().ToUpperInvariant();
@@ -151,7 +161,9 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
         }, ct);
 
     private static List<Application.Abstractions.Budgeting.BudgetDemand> Demands(PurchaseRequisition req)
-        => [.. req.Lines.Where(l => !string.IsNullOrWhiteSpace(l.ExpenseAccountCode)).Select(l => new Application.Abstractions.Budgeting.BudgetDemand(l.ExpenseAccountCode!, null, l.Quantity * l.UnitPrice))];
+        => [.. req.Lines.Where(l => !string.IsNullOrWhiteSpace(l.ExpenseAccountCode)).Select(l => new Application.Abstractions.Budgeting.BudgetDemand(l.ExpenseAccountCode!, req.Department, l.Quantity * l.UnitPrice))];
+
+    private static string? Dimension(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
 
     // The budget check for a requisition: Block refuses; RequireApproval at approval needs an approver who may override budget blocks.
     private async Task<Result<Core.Budgeting.BudgetAction>> GateAsync(long companyId, long requisitionId, long? approverUserId, CancellationToken ct)
@@ -224,6 +236,10 @@ public sealed class PurchaseRequisitionService : IPurchaseRequisitionService
             SupplierId = req.SupplierId,
             OrderNumber = orderNumber,
             OrderDate = orderDate,
+            RequiredBy = req.RequiredBy,
+            Department = req.Department,
+            CostCentre = req.CostCentre,
+            Project = req.Project,
             Currency = req.Currency,
             Lines = req.Lines
                 .Select(l => new PurchaseOrderLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.ExpenseAccountCode))

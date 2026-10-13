@@ -23984,6 +23984,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<string>("CostCentre")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cost_centre");
+
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("created_by_user_id");
@@ -23997,6 +24002,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
                         .HasColumnName("currency");
+
+                    b.Property<string>("Department")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("department");
 
                     b.Property<long?>("FrameworkAgreementId")
                         .HasColumnType("bigint")
@@ -24023,6 +24033,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("order_number");
+
+                    b.Property<string>("Project")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("project");
 
                     b.Property<DateOnly?>("RequiredBy")
                         .HasColumnType("date")
@@ -24266,6 +24281,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<string>("CostCentre")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("cost_centre");
+
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("created_by_user_id");
@@ -24280,6 +24300,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(3)")
                         .HasColumnName("currency");
 
+                    b.Property<string>("Department")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("department");
+
+                    b.Property<string>("Justification")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("justification");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -24288,6 +24318,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<string>("Project")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("project");
+
                     b.Property<long?>("PurchaseOrderId")
                         .HasColumnType("bigint")
                         .HasColumnName("purchase_order_id");
@@ -24295,6 +24330,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("RequestedDate")
                         .HasColumnType("date")
                         .HasColumnName("requested_date");
+
+                    b.Property<DateOnly?>("RequiredBy")
+                        .HasColumnType("date")
+                        .HasColumnName("required_by");
 
                     b.Property<string>("RequisitionNumber")
                         .IsRequired()

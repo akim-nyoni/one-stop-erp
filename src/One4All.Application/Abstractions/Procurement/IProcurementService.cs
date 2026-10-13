@@ -28,6 +28,15 @@ public sealed class CreatePurchaseOrderRequest
     /// <summary>When the goods are required, if a date is set; used to judge on-time delivery.</summary>
     public DateOnly? RequiredBy { get; init; }
 
+    /// <summary>Gets the department the order is for: its budget is checked, and price differences post to it.</summary>
+    public string? Department { get; init; }
+
+    /// <summary>Gets the cost centre the order is for.</summary>
+    public string? CostCentre { get; init; }
+
+    /// <summary>Gets the project the order is for.</summary>
+    public string? Project { get; init; }
+
     /// <summary>Gets who approved an overrun needing approval (they must be able to override budget blocks).</summary>
     public long? BudgetApprovedByUserId { get; init; }
 

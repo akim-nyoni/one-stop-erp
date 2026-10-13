@@ -152,6 +152,9 @@ internal sealed class PurchaseOrderConfiguration : IEntityTypeConfiguration<Purc
     {
         b.ToTable("purchase_order", Schemas.Purchasing);
         b.HasKey(x => x.Id);
+        b.Property(x => x.Department).HasMaxLength(30);
+        b.Property(x => x.CostCentre).HasMaxLength(20);
+        b.Property(x => x.Project).HasMaxLength(20);
         b.Property(x => x.OrderNumber).HasMaxLength(40);
         b.Property(x => x.Currency).HasMaxLength(3);
         b.Property(x => x.Status).HasConversion<int>();
@@ -207,6 +210,10 @@ internal sealed class PurchaseRequisitionConfiguration : IEntityTypeConfiguratio
     {
         b.ToTable("requisition", Schemas.Purchasing);
         b.Property(x => x.BudgetOutcome).HasConversion<int>();
+        b.Property(x => x.Justification).HasMaxLength(500);
+        b.Property(x => x.Department).HasMaxLength(30);
+        b.Property(x => x.CostCentre).HasMaxLength(20);
+        b.Property(x => x.Project).HasMaxLength(20);
         b.HasKey(x => x.Id);
         b.Property(x => x.RequisitionNumber).HasMaxLength(40);
         b.Property(x => x.Currency).HasMaxLength(3);

@@ -68,6 +68,15 @@ public sealed class PurchaseOrder : AuditableEntity, ICompanyScoped
     /// <summary>When the goods are required; deliveries after it count as late on the supplier scorecard.</summary>
     public DateOnly? RequiredBy { get; set; }
 
+    /// <summary>Gets or sets the department the spend is for (its budget is checked).</summary>
+    public string? Department { get; set; }
+
+    /// <summary>Gets or sets the cost centre the spend is for.</summary>
+    public string? CostCentre { get; set; }
+
+    /// <summary>Gets or sets the project the spend is for.</summary>
+    public string? Project { get; set; }
+
     /// <summary>Gets or sets the framework agreement the order is called off against.</summary>
     public long? FrameworkAgreementId { get; set; }
 

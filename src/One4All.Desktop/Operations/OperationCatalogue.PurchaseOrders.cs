@@ -20,7 +20,9 @@ public static partial class OperationCatalogue
             Module = module, Title = "Purchase requisition", ListTitle = "Requisitions",
             Description = "Raise a requisition (budget-checked), submit it, approve or reject it (someone else approves), and convert an approved one into a purchase order. " + LinesHelp,
             Fields = [Pick("Step", "Step", ["Create", "Submit", "Approve", "Reject", "Convert to order"]), Opt("Number", "Requisition number"), Opt("Supplier", "Supplier code (create)"),
-                Opt("Currency", "Currency", "USD"), Opt("Lines", "Lines (create)"), Opt("Order", "New order number (convert)"), Today("Date", "Date")],
+                Opt("Currency", "Currency", "USD"), Opt("Lines", "Lines (create)"), Opt("Order", "New order number (convert)"), Today("Date", "Date"),
+                Opt("Account", "Expense account the lines are budget-checked against (create)"), Opt("RequiredBy", "Required by yyyy-MM-dd (create)"), Opt("Justification", "Justification (create)"),
+                Opt("Department", "Department (create)"), Opt("CostCentre", "Cost centre (create)"), Opt("Project", "Project (create)")],
             Run = async (c, i) =>
             {
                 IPurchaseRequisitionService requisitions = c.Get<IPurchaseRequisitionService>();
@@ -30,11 +32,15 @@ public static partial class OperationCatalogue
                     List<PurchaseRequisitionLineRequest> lines = [];
                     foreach ((long item, string description, decimal quantity, decimal price) in await OrderLinesAsync(c, i.Text("Lines")).ConfigureAwait(true))
                     {
-                        lines.Add(new PurchaseRequisitionLineRequest(item, description, quantity, price));
+                        lines.Add(new PurchaseRequisitionLineRequest(item, description, quantity, price, i.Optional("Account")));
                     }
 
+                    DateOnly? requiredBy = i.Optional("RequiredBy") is string needed
+                        ? DateOnly.TryParse(needed, CultureInfo.InvariantCulture, out DateOnly by) ? by : throw new OperationException("Write the required-by date as yyyy-MM-dd.")
+                        : null;
                     long id = Check(await requisitions.CreateAsync(c.CompanyId, await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true), number, i.Date("Date"),
-                        CurrencyCode.Parse(i.Optional("Currency") ?? "USD"), lines).ConfigureAwait(true));
+                        CurrencyCode.Parse(i.Optional("Currency") ?? "USD"), lines,
+                        new RequisitionDetails(requiredBy, i.Optional("Justification"), i.Optional("Department"), i.Optional("CostCentre"), i.Optional("Project"))).ConfigureAwait(true));
                     return $"Requisition {number} created (id {id}); submit it for approval.";
                 }
 

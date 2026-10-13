@@ -101,7 +101,7 @@ public sealed class ProcurementService : IProcurementService
 
         // The budget gate at order raising (brief §4.18.5); budgeted lines commit their spend under the order number.
         List<One4All.Application.Abstractions.Budgeting.BudgetDemand> demands = [.. request.Lines.Where(l => !string.IsNullOrWhiteSpace(l.ExpenseAccountCode))
-            .Select(l => new One4All.Application.Abstractions.Budgeting.BudgetDemand(l.ExpenseAccountCode!, null, l.Quantity * l.UnitPrice))];
+            .Select(l => new One4All.Application.Abstractions.Budgeting.BudgetDemand(l.ExpenseAccountCode!, Dimension(request.Department), l.Quantity * l.UnitPrice))];
         if (_budget is not null && demands.Count > 0)
         {
             Result<One4All.Application.Abstractions.Budgeting.BudgetGateResult> check = await _budget.CheckAsync(request.CompanyId, request.OrderDate, demands, ct).ConfigureAwait(false);
@@ -128,7 +128,11 @@ public sealed class ProcurementService : IProcurementService
             }
         }
 
-        PurchaseOrder order = new(request.CompanyId, request.SupplierId, orderNumber, request.OrderDate, request.Currency) { RequiredBy = request.RequiredBy, FrameworkAgreementId = request.FrameworkAgreementId };
+        PurchaseOrder order = new(request.CompanyId, request.SupplierId, orderNumber, request.OrderDate, request.Currency)
+        {
+            RequiredBy = request.RequiredBy, FrameworkAgreementId = request.FrameworkAgreementId,
+            Department = Dimension(request.Department), CostCentre = Dimension(request.CostCentre), Project = Dimension(request.Project),
+        };
         foreach (PurchaseOrderLineRequest line in request.Lines)
         {
             PurchaseOrderLine added = order.AddLine(line.ItemId, line.Description, line.Quantity, line.UnitPrice);
@@ -330,6 +334,8 @@ public sealed class ProcurementService : IProcurementService
         return new GrnResult(grn.Id, accrued);
     }
 
+    private static string? Dimension(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+
     /// <inheritdoc />
     public Task<Result<MatchInvoiceResult>> MatchInvoiceAsync(MatchInvoiceRequest request, CancellationToken ct = default)
         => _db.AtomicAsync(() => MatchInvoiceCoreAsync(request, ct), ct);
@@ -419,7 +425,7 @@ public sealed class ProcurementService : IProcurementService
 
         // The budget gate at invoice posting: only spend beyond what the order committed is checked again.
         List<One4All.Application.Abstractions.Budgeting.BudgetDemand> excess = [.. spent.Where(s => s.Invoiced > s.Committed)
-            .Select(s => new One4All.Application.Abstractions.Budgeting.BudgetDemand(s.Account, null, s.Invoiced - s.Committed))];
+            .Select(s => new One4All.Application.Abstractions.Budgeting.BudgetDemand(s.Account, order.Department, s.Invoiced - s.Committed))];
         if (_budget is not null && excess.Count > 0)
         {
             Result<One4All.Application.Abstractions.Budgeting.BudgetGateResult> check = await _budget.CheckAsync(request.CompanyId, request.Date, excess, ct).ConfigureAwait(false);
@@ -447,6 +453,7 @@ public sealed class ProcurementService : IProcurementService
             matchLines.Add(new JournalLineRequest
             {
                 AccountCode = request.PriceVarianceAccountCode!.Trim(), Side = variance > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(variance),
+                CostCentre = order.CostCentre, Department = order.Department, Project = order.Project,
             });
         }
 
@@ -455,7 +462,7 @@ public sealed class ProcurementService : IProcurementService
             matchLines.Add(new JournalLineRequest
             {
                 AccountCode = line.ExpenseAccountCode!, Side = difference > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(difference),
-                Narrative = $"Price difference to job ({line.Description})",
+                Narrative = $"Price difference to job ({line.Description})", CostCentre = order.CostCentre, Department = order.Department, Project = order.Project,
             });
         }
 

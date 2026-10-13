@@ -80,6 +80,22 @@ public sealed class PurchaseRequisition : AuditableEntity, ICompanyScoped
     /// <summary>Gets or sets the budget check's outcome at the last gate (warn / approval needed show to the approver).</summary>
     public Budgeting.BudgetAction BudgetOutcome { get; set; }
 
+    /// <summary>Gets or sets when the goods or services are needed (carried to the purchase order).</summary>
+    public DateOnly? RequiredBy { get; set; }
+
+    /// <summary>Gets or sets why they are needed, for the approver.</summary>
+    public string? Justification { get; set; }
+
+    /// <summary>Gets or sets the department the spend is for (its budget is checked).</summary>
+    public string? Department { get; set; }
+
+    /// <summary>Gets or sets the cost centre the spend is for.</summary>
+    public string? CostCentre { get; set; }
+
+    /// <summary>Gets or sets the project the spend is for.</summary>
+    public string? Project { get; set; }
+
+
     /// <summary>The estimated total (sum of line values).</summary>
     public decimal Total => _lines.Sum(l => l.Quantity * l.UnitPrice);
 

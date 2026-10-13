@@ -11,6 +11,14 @@ namespace One4All.Application.Abstractions.Procurement;
 /// <param name="ExpenseAccountCode">The expense account it is budgeted against, if any.</param>
 public readonly record struct PurchaseRequisitionLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice, string? ExpenseAccountCode = null);
 
+/// <summary>What a requisition is for, beyond its lines: when it is needed, why, and the analysis its budget is checked against.</summary>
+/// <param name="RequiredBy">When the goods or services are needed.</param>
+/// <param name="Justification">Why they are needed.</param>
+/// <param name="Department">The department (its budget is checked).</param>
+/// <param name="CostCentre">The cost centre.</param>
+/// <param name="Project">The project.</param>
+public sealed record RequisitionDetails(DateOnly? RequiredBy = null, string? Justification = null, string? Department = null, string? CostCentre = null, string? Project = null);
+
 /// <summary>
 /// Manages purchase requisitions (internal buy requests): capture, submit, approve/reject, and conversion into
 /// a purchase order. Requisitions touch no ledger; an approved one converts into a PO via
@@ -25,9 +33,11 @@ public interface IPurchaseRequisitionService
     /// <param name="requestedDate">The date requested.</param>
     /// <param name="currency">The currency.</param>
     /// <param name="lines">The requisition lines (at least one, each with a positive quantity).</param>
+    /// <param name="details">When it is needed, why, and its department, cost centre and project.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The created requisition id.</returns>
-    Task<Result<long>> CreateAsync(long companyId, long supplierId, string requisitionNumber, DateOnly requestedDate, CurrencyCode currency, IReadOnlyList<PurchaseRequisitionLineRequest> lines, CancellationToken ct = default);
+    Task<Result<long>> CreateAsync(long companyId, long supplierId, string requisitionNumber, DateOnly requestedDate, CurrencyCode currency, IReadOnlyList<PurchaseRequisitionLineRequest> lines,
+        RequisitionDetails? details = null, CancellationToken ct = default);
 
     /// <summary>Submits a draft requisition for approval.</summary>
     /// <param name="companyId">The company.</param>
