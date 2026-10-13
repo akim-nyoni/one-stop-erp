@@ -147,6 +147,12 @@ public sealed class Company : SoftDeletableEntity
     /// <summary>How far (percent of the ordered quantity) a goods receipt may go over a purchase order line without a supervisor (brief §4.3).</summary>
     public decimal OverReceiptTolerancePercent { get; set; }
 
+    /// <summary>
+    /// Gets or sets the largest discount off the price list a sales order may carry without authority (brief §4.4 price and discount control); beyond it
+    /// an authoriser who may override prices signs it off, or the company's SalesDiscount workflow approves it. Null: no limit.
+    /// </summary>
+    public decimal? MaxSalesDiscountPercent { get; set; }
+
     /// <summary>The fee discount for children of staff while the parent is employed (0: none); the better of it and any sibling discount applies.</summary>
     public decimal StaffChildDiscountPercent { get; set; }
 

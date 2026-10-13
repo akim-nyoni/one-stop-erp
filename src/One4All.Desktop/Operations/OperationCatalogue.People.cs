@@ -1476,6 +1476,23 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Sales discount limit", ListTitle = "Orders waiting for discount approval",
+            Description = "The largest discount off the price list a sales order may carry without authority. Beyond it the order needs an authoriser who may override "
+                + "discounts (Sales.Invoice), or the company's SalesDiscount workflow approves it (the order cannot be despatched until then). Blank: no limit.",
+            Fields = [OptNum("Limit", "Largest discount % without authority (blank: no limit)")],
+            Run = async (c, i) =>
+            {
+                Core.System.Company company = await c.Db.Companies.FirstAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                company.MaxSalesDiscountPercent = i.OptionalNumber("Limit") is decimal limit && limit >= 0m ? limit : null;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return company.MaxSalesDiscountPercent is decimal set ? $"Sales orders may be discounted up to {set:0.##}% without authority." : "Sales discounts are not limited.";
+            },
+            List = async c => Table(await c.Db.Set<Core.SalesOrders.SalesOrder>().AsNoTracking().Where(o => o.CompanyId == c.CompanyId && o.AwaitingDiscountApproval)
+                    .OrderBy(o => o.OrderDate).ToListAsync().ConfigureAwait(true),
+                ("Order", o => o.OrderNumber), ("Date", o => D(o.OrderDate)), ("Customer", o => o.CustomerId)),
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Reserve stock for a sales order", ListTitle = "Stock reserved for orders",
             Description = "Holds free stock in a warehouse for an order's lines still to despatch, first come first served; no other issue (a till sale, another order) can take it "
                 + "until the order despatches it. Release gives it back; cancelling the order releases it too.",

@@ -30,6 +30,9 @@ public static class WorkflowDocumentTypes
     /// <summary>Purchase requisitions.</summary>
     public const string PurchaseRequisition = "PurchaseRequisition";
 
+    /// <summary>Sales orders discounted beyond the company's limit.</summary>
+    public const string SalesDiscount = "SalesDiscount";
+
     /// <summary>Manual journals held for approval.</summary>
     public const string Journal = "Journal";
 

@@ -71,6 +71,23 @@ public sealed class SalesOrder : AuditableEntity, ICompanyScoped
     /// <summary>Gets or sets the date the customer asked to receive the goods (for on-time-in-full measurement).</summary>
     public DateOnly? RequestedDeliveryDate { get; set; }
 
+    /// <summary>Gets a value indicating whether the order waits for its discount to be approved (nothing is despatched until it is).</summary>
+    public bool AwaitingDiscountApproval { get; private set; }
+
+    /// <summary>Gets who authorised a discount beyond the company's limit.</summary>
+    public long? DiscountAuthorisedByUserId { get; private set; }
+
+    /// <summary>Holds the order until its discount is approved.</summary>
+    public void HoldForDiscount() => AwaitingDiscountApproval = true;
+
+    /// <summary>Records the discount's approval and releases the order.</summary>
+    /// <param name="userId">Who approved it.</param>
+    public void ApproveDiscount(long userId)
+    {
+        AwaitingDiscountApproval = false;
+        DiscountAuthorisedByUserId = userId;
+    }
+
     /// <summary>The order lines.</summary>
     public IReadOnlyList<SalesOrderLine> Lines => _lines.AsReadOnly();
 
@@ -247,6 +264,9 @@ public sealed class SalesOrderLine : Entity
 
     /// <summary>The unit price.</summary>
     public decimal UnitPrice { get; private set; }
+
+    /// <summary>Gets or sets the price-list price when the line was keyed below it.</summary>
+    public decimal? ListUnitPrice { get; set; }
 
     /// <summary>The tax code.</summary>
     public string? TaxCode { get; private set; }

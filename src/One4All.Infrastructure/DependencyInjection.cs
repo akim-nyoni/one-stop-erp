@@ -339,6 +339,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.System.IMasterDataChangeService>(sp => sp.GetRequiredService<SystemServices.MasterDataChangeService>());
         services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, SystemServices.MasterDataChangeWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Procurement.PurchaseOrderWorkflowHandler>();
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, SalesOrders.SalesDiscountWorkflowHandler>();
         services.AddScoped<Schools.SchoolBursaryService>();
         services.AddScoped<Application.Abstractions.Budgeting.IBudgetFrameworkService, Budgeting.BudgetFrameworkService>();
         services.AddScoped<Application.Abstractions.Schools.ISchoolBursaryService>(sp => sp.GetRequiredService<Schools.SchoolBursaryService>());

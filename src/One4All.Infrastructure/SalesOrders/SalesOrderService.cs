@@ -18,6 +18,8 @@ public sealed class SalesOrderService : ISalesOrderService
     private readonly ISalesLedgerService _salesLedger;
     private readonly IPricingService _pricing;
     private readonly One4All.Application.Abstractions.Numbering.INumberSequenceService _numbers;
+    private readonly One4All.Application.Abstractions.Security.IPermissionService? _permissions;
+    private readonly Lazy<One4All.Application.Abstractions.Workflow.IWorkflowService>? _workflow;
 
     /// <summary>The document-type key of the sales-order number sequence.</summary>
     public const string OrderNumberSequence = "SO";
@@ -28,8 +30,13 @@ public sealed class SalesOrderService : ISalesOrderService
     /// <param name="salesLedger">The AR service (for invoicing).</param>
     /// <param name="pricing">The pricing service (resolves unpriced order lines from the price lists).</param>
     /// <param name="numbers">The number-sequence service (allocates order numbers left blank).</param>
-    public SalesOrderService(One4AllDbContext db, IInventoryService inventory, ISalesLedgerService salesLedger, IPricingService pricing, One4All.Application.Abstractions.Numbering.INumberSequenceService numbers)
+    /// <param name="permissions">Checks who may authorise a discount beyond the limit.</param>
+    /// <param name="workflow">The workflow service (a SalesDiscount workflow approves discounts beyond the limit).</param>
+    public SalesOrderService(One4AllDbContext db, IInventoryService inventory, ISalesLedgerService salesLedger, IPricingService pricing, One4All.Application.Abstractions.Numbering.INumberSequenceService numbers,
+        One4All.Application.Abstractions.Security.IPermissionService? permissions = null, Lazy<One4All.Application.Abstractions.Workflow.IWorkflowService>? workflow = null)
     {
+        _permissions = permissions;
+        _workflow = workflow;
         _db = db;
         _inventory = inventory;
         _salesLedger = salesLedger;
@@ -68,12 +75,23 @@ public sealed class SalesOrderService : ISalesOrderService
         }
 
         SalesOrder order = new(request.CompanyId, request.CustomerId, orderNumber, request.OrderDate, request.Currency) { RequestedDeliveryDate = request.RequestedDeliveryDate };
+        decimal? limit = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.MaxSalesDiscountPercent).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        decimal deepest = 0m;
+        List<(SalesOrderLineRequest Line, decimal? ListPrice)> listed = [];
         foreach (SalesOrderLineRequest line in request.Lines)
         {
             decimal unitPrice;
             if (line.UnitPrice is { } given)
             {
                 unitPrice = given;
+
+                // A keyed price below the price list is a discount: measured against the company's limit.
+                if (limit is not null && await _pricing.PriceAsync(request.CompanyId, request.CustomerId, line.ItemId, line.Quantity, request.OrderDate, ct).ConfigureAwait(false) is
+                    { IsSuccess: true } list && list.Value.Currency == request.Currency && list.Value.UnitPrice > 0m && given < list.Value.UnitPrice)
+                {
+                    deepest = Math.Max(deepest, (list.Value.UnitPrice - given) / list.Value.UnitPrice * 100m);
+                    listed.Add((line, list.Value.UnitPrice));
+                }
             }
             else
             {
@@ -95,8 +113,56 @@ public sealed class SalesOrderService : ISalesOrderService
             order.AddLine(line.ItemId, line.Description, line.Quantity, unitPrice, line.TaxCode, line.RevenueAccountCode);
         }
 
+        foreach ((SalesOrderLineRequest line, decimal? listPrice) in listed)
+        {
+            order.Lines.First(l => l.ItemId == line.ItemId && l.Description == line.Description && l.OrderedQuantity == line.Quantity).ListUnitPrice = listPrice;
+        }
+
+        bool overLimit = limit is decimal max && deepest > max + 0.0001m;
+        if (overLimit && request.DiscountAuthorisedByUserId is long authoriser)
+        {
+            if (authoriser == request.RaisedByUserId)
+            {
+                return Error.Forbidden("Sop.DiscountSelfAuthorised", "Whoever raises the order cannot authorise its discount.");
+            }
+
+            if (_permissions is not null && !(await _permissions.ResolveAsync(authoriser, ct).ConfigureAwait(false)).Has("Sales.Invoice", Core.Security.OperationFlags.OverrideDiscount))
+            {
+                return Error.Forbidden("Sop.DiscountAuthority", $"A {deepest:0.##}% discount is beyond the {limit:0.##}% limit and the authoriser may not override discounts.");
+            }
+
+            order.ApproveDiscount(authoriser);
+            overLimit = false;
+        }
+
+        // No authoriser: only the company's SalesDiscount workflow can let it through; without one the order is refused, unsaved.
+        if (overLimit && (request.RaisedByUserId is null || _workflow is null
+            || !await _db.WorkflowDefinitions.AnyAsync(d => d.CompanyId == request.CompanyId && d.DocumentType == Application.Abstractions.Workflow.WorkflowDocumentTypes.SalesDiscount && d.IsActive, ct)
+                .ConfigureAwait(false)))
+        {
+            return Error.Rule("Sop.DiscountOverLimit", $"A {deepest:0.##}% discount is beyond the {limit:0.##}% limit: an authoriser who may override discounts must sign it off.");
+        }
+
         _db.Set<SalesOrder>().Add(order);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (overLimit)
+        {
+            // No authoriser: the company's SalesDiscount workflow approves it, or the order is refused.
+            Result<bool> governed = request.RaisedByUserId is long raiser
+                ? await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, request.CompanyId, Application.Abstractions.Workflow.WorkflowDocumentTypes.SalesDiscount, order.OrderNumber,
+                    order.Lines.Sum(l => l.OrderedQuantity * l.UnitPrice), raiser, [("Currency", order.Currency.Value), ("Discount", deepest.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))], ct)
+                    .ConfigureAwait(false)
+                : false;
+            if (governed.IsFailure || !governed.Value)
+            {
+                return governed.IsFailure ? governed.Error
+                    : Error.Rule("Sop.DiscountOverLimit", $"A {deepest:0.##}% discount is beyond the {limit:0.##}% limit: an authoriser who may override discounts must sign it off.");
+            }
+
+            order.HoldForDiscount();
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
         return new SalesOrderResult(order.Id, order.OrderNumber);
     }
 
@@ -205,6 +271,11 @@ public sealed class SalesOrderService : ISalesOrderService
         if (order.Status == SalesOrderStatus.Cancelled)
         {
             return Error.Rule("Sop.OrderCancelled", $"Sales order {order.OrderNumber} is cancelled.");
+        }
+
+        if (order.AwaitingDiscountApproval)
+        {
+            return Error.Rule("Sop.DiscountApproval", $"Sales order {order.OrderNumber} waits for its discount to be approved.");
         }
 
         List<(SalesOrderLine Line, decimal Quantity)> despatches = [];
@@ -441,5 +512,38 @@ public sealed class SalesOrderService : ISalesOrderService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return new InvoiceOrderResult(invoice.Value.OpenItemId, invoice.Value.JournalNumber, net + tax);
+    }
+}
+
+/// <summary>Concludes the SalesDiscount workflow: an approved discount releases the order; a refused one cancels it.</summary>
+internal sealed class SalesDiscountWorkflowHandler : Application.Abstractions.Workflow.IWorkflowDocumentHandler
+{
+    private readonly One4AllDbContext _db;
+
+    public SalesDiscountWorkflowHandler(One4AllDbContext db) => _db = db;
+
+    public string DocumentType => Application.Abstractions.Workflow.WorkflowDocumentTypes.SalesDiscount;
+
+    public async Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+    {
+        SalesOrder? order = await _db.Set<SalesOrder>().Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.CompanyId == companyId && o.OrderNumber == documentReference && o.AwaitingDiscountApproval, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Result.Success();
+        }
+
+        order.ApproveDiscount(decidedByUserId);
+        if (outcome != Core.Workflow.WorkflowStatus.Approved)
+        {
+            Result cancelled = order.Cancel();
+            if (cancelled.IsFailure)
+            {
+                return cancelled;
+            }
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 }

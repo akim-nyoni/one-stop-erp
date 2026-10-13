@@ -28642,6 +28642,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<bool>("AwaitingDiscountApproval")
+                        .HasColumnType("boolean")
+                        .HasColumnName("awaiting_discount_approval");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -28663,6 +28667,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("CustomerId")
                         .HasColumnType("bigint")
                         .HasColumnName("customer_id");
+
+                    b.Property<long?>("DiscountAuthorisedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("discount_authorised_by_user_id");
 
                     b.Property<long?>("LastAmendedByUserId")
                         .HasColumnType("bigint")
@@ -28742,6 +28750,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("ItemId")
                         .HasColumnType("bigint")
                         .HasColumnName("item_id");
+
+                    b.Property<decimal?>("ListUnitPrice")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("list_unit_price");
 
                     b.Property<decimal>("OrderedQuantity")
                         .HasPrecision(19, 4)
@@ -30928,6 +30941,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("manual_journal_approval_threshold");
+
+                    b.Property<decimal?>("MaxSalesDiscountPercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("max_sales_discount_percent");
 
                     b.Property<decimal?>("MinimumTakeHomeAmount")
                         .HasPrecision(19, 4)

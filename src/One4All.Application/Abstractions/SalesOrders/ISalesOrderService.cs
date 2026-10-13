@@ -35,6 +35,12 @@ public sealed class CreateSalesOrderRequest
 
     /// <summary>Gets the date the customer wants the goods.</summary>
     public DateOnly? RequestedDeliveryDate { get; init; }
+
+    /// <summary>Gets who raises the order (the discount workflow's requester; cannot authorise their own discount).</summary>
+    public long? RaisedByUserId { get; init; }
+
+    /// <summary>Gets who authorises a discount beyond the company's limit (needs the Sales.Invoice override-discount right).</summary>
+    public long? DiscountAuthorisedByUserId { get; init; }
 }
 
 /// <summary>A despatched line.</summary>
