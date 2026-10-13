@@ -21,6 +21,11 @@ public static class ProcurementReports
         yield return Listing("PO125", "Approval History / Authorisation Audit", "Purchasing", "Every workflow action in the period: document, stage, who, what and when, with the document value.",
             "ProcApprovalHistory", [new Column("When", "When", 115), new Column("Document", "Document", 110), new Column("Reference", "Reference", 100), new Column("Stage", "Stage", 45),
              new Column("User", "User", 90), new Column("Action", "Action", 65), new Column("Comment", "Comment", 180), new Column("Value", "Value", 95, true)], Period);
+        yield return Listing("PO137", "Approval Turnaround & SLA", "Purchasing", "Per document type and stage: decisions in the period, average and longest hours to decide, how many "
+            + "took longer than the stage's escalation time, and what is still waiting with the oldest wait.",
+            "ProcApprovalSla", [new Column("Document", "Document", 110), new Column("Stage", "Stage", 45), new Column("Decisions", "Decisions", 65), new Column("AverageHours", "Avg hours", 70),
+             new Column("LongestHours", "Longest", 65), new Column("SlaHours", "SLA hours", 65), new Column("Breaches", "Over SLA", 60), new Column("Waiting", "Waiting", 60),
+             new Column("OldestWaitHours", "Oldest wait", 75, true)], Period);
         yield return Listing("PO126", "Purchase Order Listing", "Purchasing", "Every order in the period with status, required-by date, overdue flag and the value still to be received.",
             "ProcOrders", [new Column("Order", "Order", 85), new Column("Date", "Date", 75), new Column("Supplier", "Supplier", 140), new Column("Status", "Status", 85), new Column("RequiredBy", "Required by", 75),
              new Column("Overdue", "Overdue", 70), new Column("Currency", "Currency", 55), new Column("Ordered", "Ordered", 90), new Column("Received", "Received", 90),

@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-559 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+560 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -470,6 +470,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | PO134 | Procurement Spend Analysis | Order value in the period by supplier and currency, with lines, items and share. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Currency, Orders, Lines, Items, Share, Spend | — | Sum(Spend) |
 | PO135 | Supplier Lead Time Analysis | Per supplier: days from order to first receipt (average, fastest, slowest) and orders received by their required date. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Orders, Average, Fastest, Slowest, OnTime | — | — |
 | PO136 | Budget Availability at Requisition | Open requisition lines charged to a budgeted expense account: the vote's appropriation, spent and committed to date, available before the line and after it. | AsAtDate (Date, optional) | Requisition, Date, Account, Line, Appropriation, Spent, Committed, Before, Status, After | — | Sum(After) |
+| PO137 | Approval Turnaround & SLA | Per document type and stage: decisions in the period, average and longest hours to decide, how many took longer than the stage's escalation time, and what is still waiting with the oldest wait. | FromDate (Date, optional), ToDate (Date, optional) | Document, Stage, Decisions, AverageHours, LongestHours, SlaHours, Breaches, Waiting, OldestWaitHours | — | Sum(OldestWaitHours) |
 | POP-OPEN | Open Purchase Orders | Purchase orders not yet fully received/invoiced, with their order value. | — | OrderNumber, OrderDate, Supplier, Status, TotalNet | — | Sum(TotalNet) |
 | POP-REQ | Purchase Requisitions | Requisitions with supplier, date, estimated value and status, newest first. | — | RequisitionNumber, Supplier, RequestedDate, Total, Status | — | Sum(Total) |
 

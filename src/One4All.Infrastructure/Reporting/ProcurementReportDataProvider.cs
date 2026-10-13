@@ -98,6 +98,7 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
             "PROCBUDGETCHECK" => await BudgetCheckAsync(companyId, DateParameter(parameters, "AsAtDate") ?? DateOnly.FromDateTime(DateTime.Today), ct).ConfigureAwait(false),
             "PROCREQUISITIONTURNAROUND" => await RequisitionTurnaroundAsync(companyId, fromDate, to, ct).ConfigureAwait(false),
             "PROCAPPROVALHISTORY" => await ApprovalHistoryAsync(companyId, fromDate, to, ct).ConfigureAwait(false),
+            "PROCAPPROVALSLA" => await ApprovalSlaAsync(companyId, fromDate, to, ct).ConfigureAwait(false),
             "PROCORDERS" => await OrdersAsync(companyId, fromDate, to, asAt, ct).ConfigureAwait(false),
             "PROCCOMMITMENTS" => await CommitmentsAsync(companyId, ct).ConfigureAwait(false),
             "PROCGOODSRECEIVED" => await GoodsReceivedAsync(companyId, fromDate, to, ct).ConfigureAwait(false),
@@ -144,6 +145,53 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
             .Select(x => Row(("When", x.Action.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Document", x.Instance.DocumentType), ("Reference", x.Instance.DocumentReference),
                 ("Stage", x.Action.StageSequence), ("User", users.GetValueOrDefault(x.Action.UserId, $"user {x.Action.UserId}")), ("Action", x.Action.Action.ToString()),
                 ("Comment", x.Action.Comment ?? string.Empty), ("Value", x.Instance.Value)))];
+    }
+
+    // How long each stage took: from the instance's start (first stage) or the previous decision to this one; pending stages from when they were entered.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ApprovalSlaAsync(long companyId, DateOnly fromDate, DateOnly to, CancellationToken ct)
+    {
+        DateTimeOffset start = new(fromDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero), end = new(to.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        List<WorkflowInstance> instances = await _db.Set<WorkflowInstance>().AsNoTracking().Include(w => w.Approvals)
+            .Where(w => w.CompanyId == companyId && (w.Status == WorkflowStatus.InProgress || w.Approvals.Any(a => a.OccurredOnUtc >= start && a.OccurredOnUtc <= end)))
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<long> definitionIds = [.. instances.Select(w => w.WorkflowDefinitionId).Distinct()];
+        Dictionary<(long Definition, int Stage), int?> sla = (await _db.Set<WorkflowDefinition>().AsNoTracking().IgnoreQueryFilters().Include(d => d.Stages)
+                .Where(d => definitionIds.Contains(d.Id)).ToListAsync(ct).ConfigureAwait(false))
+            .SelectMany(d => d.Stages.Select(s => (Key: (d.Id, s.Sequence), s.EscalateAfterHours))).ToDictionary(x => x.Key, x => x.EscalateAfterHours);
+
+        List<(string Document, int Stage, long Definition, double? Hours, double? WaitingHours)> stages = [];
+        foreach (WorkflowInstance instance in instances)
+        {
+            DateTimeOffset since = instance.CreatedOnUtc;
+            foreach (WorkflowApproval decision in instance.Approvals.OrderBy(a => a.OccurredOnUtc))
+            {
+                if (decision.OccurredOnUtc >= start && decision.OccurredOnUtc <= end)
+                {
+                    stages.Add((instance.DocumentType, decision.StageSequence, instance.WorkflowDefinitionId, (decision.OccurredOnUtc - since).TotalHours, null));
+                }
+
+                since = decision.OccurredOnUtc;
+            }
+
+            if (instance.Status == WorkflowStatus.InProgress)
+            {
+                stages.Add((instance.DocumentType, instance.CurrentStageSequence, instance.WorkflowDefinitionId, null, (now - (instance.StageEnteredOnUtc ?? since)).TotalHours));
+            }
+        }
+
+        return [.. stages.GroupBy(s => (s.Document, s.Stage)).OrderBy(g => g.Key.Document, StringComparer.Ordinal).ThenBy(g => g.Key.Stage).Select(g =>
+        {
+            List<double> decided = [.. g.Where(s => s.Hours is not null).Select(s => s.Hours!.Value)];
+            List<(double Hours, int? Sla)> timed = [.. g.Where(s => s.Hours is not null).Select(s => (s.Hours!.Value, sla.GetValueOrDefault((s.Definition, s.Stage))))];
+            List<double> waiting = [.. g.Where(s => s.WaitingHours is not null).Select(s => s.WaitingHours!.Value)];
+            int? stageSla = g.Select(s => sla.GetValueOrDefault((s.Definition, s.Stage))).FirstOrDefault(h => h is not null);
+            return Row(("Document", g.Key.Document), ("Stage", g.Key.Stage), ("Decisions", decided.Count),
+                ("AverageHours", decided.Count == 0 ? "—" : Math.Round(decided.Average(), 1).ToString("0.0", CultureInfo.InvariantCulture)),
+                ("LongestHours", decided.Count == 0 ? "—" : Math.Round(decided.Max(), 1).ToString("0.0", CultureInfo.InvariantCulture)),
+                ("SlaHours", stageSla?.ToString(CultureInfo.InvariantCulture) ?? "—"), ("Breaches", timed.Count(t => t.Sla is int h && t.Hours > h)), ("Waiting", waiting.Count),
+                ("OldestWaitHours", waiting.Count == 0 ? 0m : (decimal)Math.Round(waiting.Max(), 1)));
+        })];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> OrdersAsync(long companyId, DateOnly fromDate, DateOnly to, DateOnly asAt, CancellationToken ct)
