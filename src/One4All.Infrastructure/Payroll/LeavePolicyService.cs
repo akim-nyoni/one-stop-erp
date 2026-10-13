@@ -39,6 +39,20 @@ public sealed class LeavePolicyService : ILeavePolicyService
             return Result.Failure(Error.Validation("Pay.LeaveRules", "A balance ceiling must be positive, carried days must lapse 1–12 months into the year, advances cannot be negative, and sick tiers need distinct days from 1 at 0–100% pay."));
         }
 
+        if (request.MaxAwayPerDepartment < 1)
+        {
+            return Result.Failure(Error.Validation("Pay.LeaveCover", "At least one person of a department must be allowed away at once."));
+        }
+
+        foreach (string part in (request.GradeDays ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] bits = part.Split('=', StringSplitOptions.TrimEntries);
+            if (bits.Length != 2 || bits[0].Length == 0 || !decimal.TryParse(bits[1], System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal gradeDays) || gradeDays < 0m)
+            {
+                return Result.Failure(Error.Validation("Pay.LeaveGradeDays", $"Write each grade as GRADE=days (\"{part}\")."));
+            }
+        }
+
         LeavePolicy? policy = await _db.Set<LeavePolicy>().Include(p => p.Bands).Include(p => p.SickTiers).FirstOrDefaultAsync(p => p.CompanyId == request.CompanyId && p.LeaveType == type, ct).ConfigureAwait(false);
         if (policy is null)
         {
@@ -56,6 +70,8 @@ public sealed class LeavePolicyService : ILeavePolicyService
         policy.CarryOverExpiryMonths = request.CarryOverExpiryMonths;
         policy.NegativeBalanceDays = request.NegativeBalanceDays;
         policy.SetSickTiers(tiers);
+        policy.GradeDays = string.IsNullOrWhiteSpace(request.GradeDays) ? null : request.GradeDays.Trim();
+        policy.MaxAwayPerDepartment = request.MaxAwayPerDepartment;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
@@ -107,7 +123,7 @@ public sealed class LeavePolicyService : ILeavePolicyService
                         }
                     }
 
-                    decimal earned = LeavePolicyRules.DaysForMonth(policy, employee.EngagementDate, employee.TerminationDate, month);
+                    decimal earned = LeavePolicyRules.DaysForMonth(policy, employee.EngagementDate, employee.TerminationDate, month, employee.Grade);
                     if (balance is null)
                     {
                         if (earned == 0m)
@@ -243,6 +259,35 @@ public sealed class LeavePolicyService : ILeavePolicyService
         }
 
         return decimal.Round(unpaid, 4, MidpointRounding.AwayFromZero);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<decimal>> CreditTimeOffAsync(long companyId, string employeeNumber, decimal overtimeHours, decimal hoursPerDay, decimal ratio = 1m, string leaveType = "TOIL",
+        CancellationToken ct = default)
+    {
+        decimal days = LeavePolicyRules.TimeOffInLieu(overtimeHours, hoursPerDay, ratio);
+        if (days <= 0m)
+        {
+            return Error.Validation("Pay.Toil", "Time off in lieu needs overtime hours, the hours in a day and a ratio, all positive.");
+        }
+
+        string number = (employeeNumber ?? string.Empty).Trim().ToUpperInvariant(), type = (leaveType ?? "TOIL").Trim().ToUpperInvariant();
+        long? employee = await _db.Employees.Where(e => e.CompanyId == companyId && e.EmployeeNumber == number).Select(e => (long?)e.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (employee is not long id)
+        {
+            return Error.NotFound("Pay.EmployeeNotFound", $"No employee {number}.");
+        }
+
+        EmployeeLeaveBalance? balance = await _db.Set<EmployeeLeaveBalance>().FirstOrDefaultAsync(b => b.CompanyId == companyId && b.EmployeeId == id && b.LeaveType == type, ct).ConfigureAwait(false);
+        if (balance is null)
+        {
+            balance = new EmployeeLeaveBalance(companyId, id, type);
+            _db.Set<EmployeeLeaveBalance>().Add(balance);
+        }
+
+        balance.Accrue(days);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return days;
     }
 }
 

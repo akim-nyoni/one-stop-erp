@@ -69,6 +69,12 @@ public sealed class LeavePolicy : AuditableEntity, ICompanyScoped
     /// <summary>Whether the policy is in use.</summary>
     public bool IsActive { get; set; } = true;
 
+    /// <summary>Gets or sets the yearly days by grade ("B1=24; B2=28"), in place of <see cref="AnnualDays"/> for those grades (a service band still wins when higher).</summary>
+    public string? GradeDays { get; set; }
+
+    /// <summary>Gets or sets the most people of one department who may be away on any leave at once (null: no limit).</summary>
+    public int? MaxAwayPerDepartment { get; set; }
+
     /// <summary>Entitlements by completed years of service (the highest band reached applies).</summary>
     public IReadOnlyList<LeaveServiceBand> Bands => _bands.OrderBy(b => b.FromYears).ToList();
 

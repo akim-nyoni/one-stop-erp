@@ -601,6 +601,7 @@ internal sealed class LeavePolicyConfiguration : IEntityTypeConfiguration<LeaveP
 {
     public void Configure(EntityTypeBuilder<LeavePolicy> b)
     {
+        b.Property(x => x.GradeDays).HasMaxLength(400);
         b.ToTable("leave_policy", Schemas.Payroll);
         b.HasKey(x => x.Id);
         b.Property(x => x.LeaveType).HasMaxLength(20);

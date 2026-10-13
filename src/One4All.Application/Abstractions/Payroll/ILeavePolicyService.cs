@@ -13,7 +13,14 @@ namespace One4All.Application.Abstractions.Payroll;
 /// <param name="Bands">Service bands: completed years → yearly days.</param>
 public sealed record LeavePolicyRequest(long CompanyId, string LeaveType, decimal AnnualDays, bool AccruesMonthly, int LeaveYearStartMonth, decimal? CarryOverCapDays, bool ProRataJoiners,
     IReadOnlyList<(int FromYears, decimal AnnualDays)> Bands, decimal? MaxAccumulationDays = null, int? CarryOverExpiryMonths = null, decimal NegativeBalanceDays = 0m,
-    IReadOnlyList<(int FromDay, decimal PayPercent)>? SickTiers = null);
+    IReadOnlyList<(int FromDay, decimal PayPercent)>? SickTiers = null)
+{
+    /// <summary>Gets the yearly days by grade ("B1=24; B2=28").</summary>
+    public string? GradeDays { get; init; }
+
+    /// <summary>Gets the most people of one department who may be away at once.</summary>
+    public int? MaxAwayPerDepartment { get; init; }
+}
 
 /// <summary>One employee's sick pay for a period under the tiers.</summary>
 /// <param name="EmployeeId">The employee.</param>
@@ -72,4 +79,18 @@ public interface ILeavePolicyService
     /// </summary>
     Task<Result<IReadOnlyList<LeaveAdvanceLine>>> AdvanceLeavePayAsync(long companyId, string leaveType, DateOnly fromDate, DateOnly toDate, string periodLabel, string recoveryPeriodLabel,
         string advanceElementCode, string recoveryElementCode, decimal workingDaysPerMonth, CancellationToken ct = default);
+
+    /// <summary>
+    /// Credits time off in lieu for overtime (brief §4.15 TOIL): the hours worked, at the ratio, over the hours in a day, added to the employee's balance
+    /// of the leave type (created when they have none).
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="employeeNumber">The employee.</param>
+    /// <param name="overtimeHours">The overtime worked.</param>
+    /// <param name="hoursPerDay">The hours in a working day.</param>
+    /// <param name="ratio">Hours off per hour worked.</param>
+    /// <param name="leaveType">The leave type the time is credited to.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The days credited, or why not.</returns>
+    Task<Result<decimal>> CreditTimeOffAsync(long companyId, string employeeNumber, decimal overtimeHours, decimal hoursPerDay, decimal ratio = 1m, string leaveType = "TOIL", CancellationToken ct = default);
 }

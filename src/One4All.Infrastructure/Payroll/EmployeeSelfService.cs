@@ -152,7 +152,25 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
         }
 
         Employee me = (await MeAsync(userId, ct).ConfigureAwait(false)).Value;
-        LeaveApplication application = new(me.CompanyId, me.Id, balance!.LeaveType, fromDate, toDate, days);
+
+        // Department cover (brief §4.15): no more of the department away at once than the leave type's policy allows.
+        string leaveCode = balance!.LeaveType;
+        int? maxAway = await _db.Set<LeavePolicy>().Where(p => p.CompanyId == me.CompanyId && p.LeaveType == leaveCode).Select(p => p.MaxAwayPerDepartment).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (maxAway is int limit && !string.IsNullOrWhiteSpace(me.Department))
+        {
+            string department = me.Department;
+            int away = await (from a in _db.LeaveApplications
+                              join e in _db.Employees on a.EmployeeId equals e.Id
+                              where a.CompanyId == me.CompanyId && e.Department == department && a.EmployeeId != me.Id && a.Status != SelfServiceStatus.Rejected
+                                  && a.FromDate <= toDate && a.ToDate >= fromDate
+                              select a.EmployeeId).Distinct().CountAsync(ct).ConfigureAwait(false);
+            if (away >= limit)
+            {
+                return Error.Rule("Ess.LeaveCover", $"{away} of the {department} department are already away then; at most {limit} may be away at once.");
+            }
+        }
+
+        LeaveApplication application = new(me.CompanyId, me.Id, balance.LeaveType, fromDate, toDate, days);
         _db.LeaveApplications.Add(application);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, me.CompanyId, WorkflowDocumentTypes.LeaveApplication, LeaveReference(application.Id), days, userId,

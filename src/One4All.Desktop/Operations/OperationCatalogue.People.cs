@@ -406,11 +406,13 @@ public static partial class OperationCatalogue
                 + "into the year; leave can be taken in advance down to so many days; sick tiers \"11:50;21:0\" pay so much from the nth sick day of the year. "
                 + "Run month accrues for a month (the scheduled task does the month just ended); Apply sick pay sets the period's deductions. Advance leave pay pays the "
                 + "leave starting in the month ahead into the pay period (LEAVEPAY) and recovers it in the recovery period (LEAVEADV).",
-            Fields = [Pick("Step", "Step", ["Save policy", "Run month", "Apply sick pay", "Advance leave pay"]), Req("Type", "Leave type", "ANNUAL"), OptNum("Days", "Days a year"), Tick("Monthly", "Earned monthly", true),
+            Fields = [Pick("Step", "Step", ["Save policy", "Run month", "Apply sick pay", "Advance leave pay", "Credit time off in lieu"]), Req("Type", "Leave type", "ANNUAL"), OptNum("Days", "Days a year"), Tick("Monthly", "Earned monthly", true),
                 Num("Start", "Leave year starts (month)", "1"), OptNum("Cap", "Carry-over cap (days, blank: none)"), Tick("ProRata", "Joiners pro rata", true), Opt("Bands", "Service bands (years:days;...)"),
                 OptNum("Ceiling", "Balance ceiling (days, blank: none)"), OptNum("Lapse", "Carried days lapse after (months, blank: never)"), Num("Advance", "May go negative by (days)", "0"),
                 Opt("Tiers", "Sick tiers (from day:pay %;...)"), Today("Month", "Month to run"), Opt("Period", "Pay period (sick pay)"), Opt("Element", "Deduction element (sick pay)"),
-                Num("WorkDays", "Working days a month (sick pay)", "21.67"), Opt("Recovery", "Recovery period (advance)")],
+                Num("WorkDays", "Working days a month (sick pay)", "21.67"), Opt("Recovery", "Recovery period (advance)"), Opt("GradeDays", "Days by grade GRADE=days; … (policy)"),
+                OptNum("MaxAway", "Most of a department away at once (policy)"), Opt("Employee", "Employee number (time off in lieu)"), OptNum("Hours", "Overtime hours (time off in lieu)"),
+                Num("HoursPerDay", "Hours in a working day", "8"), Num("Ratio", "Hours off per hour worked", "1")],
             Run = async (c, i) =>
             {
                 ILeavePolicyService policies = c.Get<ILeavePolicyService>();
@@ -418,6 +420,13 @@ public static partial class OperationCatalogue
                 {
                     LeaveAccrualRun run = Check(await policies.RunMonthAsync(c.CompanyId, i.Date("Month")).ConfigureAwait(true));
                     return $"{run.Period}: {run.Accrued} balance(s) earned {Q(run.DaysAccrued)} day(s); {Q(run.DaysForfeited)} forfeited; {run.AlreadyRun} already run.";
+                }
+
+                if (i.Text("Step") == "Credit time off in lieu")
+                {
+                    decimal credited = Check(await policies.CreditTimeOffAsync(c.CompanyId, i.Optional("Employee") ?? string.Empty, i.OptionalNumber("Hours") ?? 0m, i.Number("HoursPerDay"),
+                        i.Number("Ratio"), i.Text("Type")).ConfigureAwait(true));
+                    return $"{Q(credited)} day(s) of {i.Text("Type").ToUpperInvariant()} credited.";
                 }
 
                 if (i.Text("Step") == "Advance leave pay")
@@ -453,7 +462,10 @@ public static partial class OperationCatalogue
                 }
 
                 return Check(await policies.SavePolicyAsync(new LeavePolicyRequest(c.CompanyId, i.Text("Type"), i.OptionalNumber("Days") ?? 0m, i.Flag("Monthly"), i.Whole("Start"), i.OptionalNumber("Cap"),
-                    i.Flag("ProRata"), bands, i.OptionalNumber("Ceiling"), i.OptionalNumber("Lapse") is decimal lapse ? (int)lapse : null, i.Number("Advance"), tiers)).ConfigureAwait(true),
+                    i.Flag("ProRata"), bands, i.OptionalNumber("Ceiling"), i.OptionalNumber("Lapse") is decimal lapse ? (int)lapse : null, i.Number("Advance"), tiers)
+                {
+                    GradeDays = i.Optional("GradeDays"), MaxAwayPerDepartment = i.OptionalNumber("MaxAway") is decimal away ? (int)away : null,
+                }).ConfigureAwait(true),
                     "Leave policy saved.");
             },
             List = async c => Table(await c.Db.Set<Core.Payroll.LeavePolicy>().AsNoTracking().Include(p => p.Bands).Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.LeaveType).ToListAsync().ConfigureAwait(true),

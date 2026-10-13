@@ -20,11 +20,46 @@ public static class LeavePolicyRules
     /// <param name="engaged">The engagement date.</param>
     /// <param name="asAt">The date.</param>
     /// <returns>Days a year.</returns>
-    public static decimal AnnualEntitlement(LeavePolicy policy, DateOnly engaged, DateOnly asAt)
+    /// <param name="grade">The employee's grade (its days, when the policy lists it, replace the policy's own).</param>
+    public static decimal AnnualEntitlement(LeavePolicy policy, DateOnly engaged, DateOnly asAt, string? grade = null)
     {
         int years = YearsOfService(engaged, asAt);
-        return policy.Bands.Where(b => b.FromYears <= years).OrderByDescending(b => b.FromYears).Select(b => (decimal?)b.AnnualDays).FirstOrDefault() ?? policy.AnnualDays;
+        decimal basis = GradeDays(policy.GradeDays, grade) ?? policy.AnnualDays;
+        decimal? band = policy.Bands.Where(b => b.FromYears <= years).OrderByDescending(b => b.FromYears).Select(b => (decimal?)b.AnnualDays).FirstOrDefault();
+        return band is decimal service ? Math.Max(service, basis) : basis;
     }
+
+    /// <summary>The days a grade gets under a "GRADE=days; …" list, or null when it is not listed.</summary>
+    /// <param name="gradeDays">The list.</param>
+    /// <param name="grade">The grade.</param>
+    /// <returns>The days, or null.</returns>
+    public static decimal? GradeDays(string? gradeDays, string? grade)
+    {
+        if (string.IsNullOrWhiteSpace(gradeDays) || string.IsNullOrWhiteSpace(grade))
+        {
+            return null;
+        }
+
+        foreach (string part in gradeDays.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] bits = part.Split('=', StringSplitOptions.TrimEntries);
+            if (bits.Length == 2 && string.Equals(bits[0], grade.Trim(), StringComparison.OrdinalIgnoreCase)
+                && decimal.TryParse(bits[1], System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal days))
+            {
+                return days;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The days of time off in lieu overtime hours earn.</summary>
+    /// <param name="overtimeHours">The overtime worked.</param>
+    /// <param name="hoursPerDay">The hours in a working day.</param>
+    /// <param name="ratio">The hours off per hour worked (1 = hour for hour, 1.5 = time and a half).</param>
+    /// <returns>The days, to four places.</returns>
+    public static decimal TimeOffInLieu(decimal overtimeHours, decimal hoursPerDay, decimal ratio = 1m)
+        => overtimeHours <= 0m || hoursPerDay <= 0m || ratio <= 0m ? 0m : decimal.Round(overtimeHours * ratio / hoursPerDay, 4, MidpointRounding.AwayFromZero);
 
     /// <summary>
     /// The days earned for a month: monthly policies a twelfth of the entitlement (a joiner's first month and a leaver's last pro rata by days
@@ -36,7 +71,8 @@ public static class LeavePolicyRules
     /// <param name="terminated">The termination date, if any.</param>
     /// <param name="month">Any day in the month.</param>
     /// <returns>The days, to four places.</returns>
-    public static decimal DaysForMonth(LeavePolicy policy, DateOnly engaged, DateOnly? terminated, DateOnly month)
+    /// <param name="grade">The employee's grade.</param>
+    public static decimal DaysForMonth(LeavePolicy policy, DateOnly engaged, DateOnly? terminated, DateOnly month, string? grade = null)
     {
         DateOnly first = new(month.Year, month.Month, 1), last = first.AddMonths(1).AddDays(-1);
         if (engaged > last || (terminated is DateOnly t && t < first))
@@ -44,7 +80,7 @@ public static class LeavePolicyRules
             return 0m;
         }
 
-        decimal annual = AnnualEntitlement(policy, engaged, last);
+        decimal annual = AnnualEntitlement(policy, engaged, last, grade);
         if (policy.AccruesMonthly)
         {
             DateOnly from = engaged > first ? engaged : first, to = terminated is DateOnly end && end < last ? end : last;

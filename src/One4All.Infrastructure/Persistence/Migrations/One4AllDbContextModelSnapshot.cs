@@ -20357,6 +20357,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<string>("GradeDays")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)")
+                        .HasColumnName("grade_days");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
@@ -20375,6 +20380,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(9, 4)
                         .HasColumnType("numeric(9,4)")
                         .HasColumnName("max_accumulation_days");
+
+                    b.Property<int?>("MaxAwayPerDepartment")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_away_per_department");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
