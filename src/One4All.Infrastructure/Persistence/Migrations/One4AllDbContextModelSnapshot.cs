@@ -26488,6 +26488,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("delivery_folder");
 
+                    b.Property<string>("DeliveryPrinter")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("delivery_printer");
+
                     b.Property<int>("Format")
                         .HasColumnType("integer")
                         .HasColumnName("format");

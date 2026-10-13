@@ -147,6 +147,36 @@ public sealed partial class ReportViewerViewModel : ObservableObject
     [ObservableProperty]
     private bool _isBusy;
 
+    /// <summary>The addresses to email the report to from the viewer ("a@x.com; b@y.com").</summary>
+    [ObservableProperty]
+    private string _emailTo = string.Empty;
+
+    /// <summary>Emails the selected report, in the chosen export format, to the addresses typed (queued for the despatch job).</summary>
+    [RelayCommand]
+    private async Task EmailAsync()
+    {
+        List<string> recipients = [.. EmailTo.Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase)];
+        if (SelectedReport is null || recipients.Count == 0 || recipients.Any(r => !r.Contains('@', StringComparison.Ordinal)))
+        {
+            StatusMessage = "Select a report and type the email addresses (separated by ;).";
+            return;
+        }
+
+        Result<RenderedDocument> rendered = await RenderAsync(SelectedFormat, ReportRunPurpose.Export).ConfigureAwait(true);
+        if (rendered.IsFailure)
+        {
+            StatusMessage = rendered.Error.Message;
+            return;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        RenderedDocument document = rendered.Value;
+        Result<long> batch = await scope.ServiceProvider.GetRequiredService<Application.Abstractions.Communications.INotificationService>().QueueDirectAsync(_companyId,
+            $"Report {SelectedReport.Code}", Core.Communications.MessageChannel.Email, recipients, $"{SelectedReport.Name}", $"Please find the {SelectedReport.Name} report attached.",
+            new Application.Abstractions.Communications.MessageAttachment(document.FileName, document.ContentType, document.Content)).ConfigureAwait(true);
+        StatusMessage = batch.IsSuccess ? $"Emailed to {recipients.Count} address(es) (batch {batch.Value})." : batch.Error.Message;
+    }
+
     /// <summary>Loads the report catalogue and resolves the working company.</summary>
     public async Task LoadAsync(CancellationToken ct = default)
     {

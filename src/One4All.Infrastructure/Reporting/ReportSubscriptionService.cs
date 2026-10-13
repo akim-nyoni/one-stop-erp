@@ -19,14 +19,18 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
     private readonly INotificationService _messages;
     private readonly IReportBurstService? _burst;
     private readonly ReportDeliveryOptions _delivery;
+    private readonly IReportPrinter? _printer;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="runner">The report runner.</param>
     /// <param name="messages">The notification service.</param>
     /// <param name="delivery">Where file deliveries may go.</param>
-    public ReportSubscriptionService(One4AllDbContext db, IReportRunner runner, INotificationService messages, IReportBurstService? burst = null, ReportDeliveryOptions? delivery = null)
+    /// <param name="printer">The printer subscriptions with a printer print on.</param>
+    public ReportSubscriptionService(One4AllDbContext db, IReportRunner runner, INotificationService messages, IReportBurstService? burst = null, ReportDeliveryOptions? delivery = null,
+        IReportPrinter? printer = null)
     {
+        _printer = printer;
         _delivery = delivery ?? new ReportDeliveryOptions();
         _burst = burst;
         _db = db;
@@ -47,10 +51,16 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
                 : $"Folder '{folder}' must be a relative folder inside the delivery root."));
         }
 
-        if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.ReportCode) || (!bursting && recipients.Count == 0 && folder is null) || !Enum.IsDefined(request.Format)
+        string? printer = string.IsNullOrWhiteSpace(request.DeliveryPrinter) ? null : request.DeliveryPrinter.Trim();
+        if (printer is not null && bursting)
+        {
+            return Result.Failure(Error.Validation("Rpt.DeliveryPrinter", "A burst subscription is delivered by email, not to a printer."));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(request.ReportCode) || (!bursting && recipients.Count == 0 && folder is null && printer is null) || !Enum.IsDefined(request.Format)
             || recipients.Any(r => !r.Contains('@', StringComparison.Ordinal)))
         {
-            return Result.Failure(Error.Validation("Rpt.Subscription", "A subscription needs a code, a report, a format and at least one email address (or a burst key, or a folder)."));
+            return Result.Failure(Error.Validation("Rpt.Subscription", "A subscription needs a code, a report, a format and at least one email address (or a burst key, a folder or a printer)."));
         }
 
         if (bursting && string.IsNullOrWhiteSpace(request.BurstRecipientField) && request.BurstLedger is null)
@@ -79,7 +89,7 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
         _db.Set<ReportSubscription>().Add(new ReportSubscription(request.CompanyId, code, reportCode, (int)request.Format, JsonSerializer.Serialize(request.Parameters), recipients)
         {
             BurstKeyField = bursting ? request.BurstKeyField!.Trim() : null, BurstRecipientField = bursting ? request.BurstRecipientField?.Trim() : null,
-            BurstLedger = bursting ? (int?)request.BurstLedger : null, DeliveryFolder = folder,
+            BurstLedger = bursting ? (int?)request.BurstLedger : null, DeliveryFolder = folder, DeliveryPrinter = printer,
         });
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
@@ -207,10 +217,27 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
             }
         }
 
+        if (subscription.DeliveryPrinter is string printerName)
+        {
+            Result printed = _printer is null
+                ? Result.Failure(Error.Rule("Rpt.PrinterUnavailable", "No printer service is registered on this host."))
+                : await _printer.PrintAsync(printerName, document, ct).ConfigureAwait(false);
+            _db.Set<ReportDelivery>().Add(new ReportDelivery(subscription.CompanyId, subscription.Id, runAt, $"printer:{printerName}", document.FileName, printed.IsSuccess,
+                printed.IsSuccess ? $"Sent to printer {printerName}" : printed.Error.Message));
+            if (printed.IsSuccess)
+            {
+                delivered++;
+            }
+            else
+            {
+                folderFailed = true;
+            }
+        }
+
         if (subscription.Recipients.Count == 0)
         {
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-            return folderFailed ? Error.Failure("Rpt.FolderDelivery", $"Subscription {subscription.Code} could not be saved to its folder.") : delivered;
+            return folderFailed ? Error.Failure("Rpt.FolderDelivery", $"Subscription {subscription.Code} could not be saved to its folder or printed.") : delivered;
         }
 
         string summary = string.Join(", ", parameters.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key} = {Format(p.Value)}"));

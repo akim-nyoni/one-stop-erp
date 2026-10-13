@@ -68,6 +68,9 @@ public sealed class ReportSubscription : AuditableEntity, ICompanyScoped
     /// <summary>A folder (under the configured delivery root) each run is also saved to; null: email only.</summary>
     public string? DeliveryFolder { get; set; }
 
+    /// <summary>Gets or sets the printer each run is printed on.</summary>
+    public string? DeliveryPrinter { get; set; }
+
     /// <summary>Starts or stops it.</summary>
     /// <param name="active">Whether it runs.</param>
     public void SetActive(bool active) => IsActive = active;

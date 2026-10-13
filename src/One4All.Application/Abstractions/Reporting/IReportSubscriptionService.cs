@@ -34,6 +34,9 @@ public sealed class SubscriptionRequest
 
     /// <summary>A folder, relative to the configured delivery root, each run is saved to (with or instead of emailing it).</summary>
     public string? DeliveryFolder { get; init; }
+
+    /// <summary>A printer each run is printed on (with or instead of emailing or saving it).</summary>
+    public string? DeliveryPrinter { get; init; }
 }
 
 /// <summary>A delivery log line.</summary>
