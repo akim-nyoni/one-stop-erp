@@ -244,14 +244,16 @@ public static partial class OperationCatalogue
             Module = module, Title = "Pay elements and tax tables", ListTitle = "Pay elements",
             Description = "Create a pay element, assign one to (or end one for) an employee, create a tax table — bands as 'from-to:rate' separated by ';', the last open-ended, e.g. "
                 + "'0-100:0; 100-300:20; 300-:30' — or add the standard elements (BASIC, OVERTIME, HOUSING, TRANSPORT, PAYE on the tax table).",
-            Fields = [Pick("Step", "Step", ["Create element", "Assign to employee", "End for employee", "Create tax table", "Add standard elements"]), Opt("Code", "Element / table code"),
+            Fields = [Pick("Step", "Step", ["Create element", "Assign to employee", "End for employee", "Create tax table", "Add standard elements", "Preview formula"]), Opt("Code", "Element / table code"),
                 Opt("Name", "Element name"), Pick("Type", "Element type", Enum.GetNames<PayElementType>()), Pick("Basis", "Calculation", Enum.GetNames<CalculationBasis>()), OptNum("Sequence", "Sequence"),
                 Opt("Account", "Account (salaries expense for the standard set)"), Opt("Liability", "PAYE liability account (standard set)"), OptNum("Amount", "Fixed / override amount"),
                 OptNum("Rate", "Rate / override rate"), OptNum("Units", "Units"), Opt("Formula", "Formula"), Tick("Taxable", "Taxable"), Opt("TaxTable", "Tax table code"),
                 Opt("Employee", "Employee number"), Today("From", "Tax table effective from"), Opt("Bands", "Tax bands"), Tick("Pensionable", "Pensionable"),
                 Tick("SocialSecurity", "Subject to social security"), Tick("OvertimeBase", "In the overtime base"), Tick("LeaveBase", "In the leave-pay base"), Opt("Group", "Adds to group"),
                 Opt("BasisGroup", "Percentage of group (percent-of-group)"), OptNum("Floor", "Floor"), OptNum("Ceiling", "Ceiling"), OptNum("RoundTo", "Round to (unit)"),
-                Pick("Rounding", "Rounding", Enum.GetNames<PayRounding>()), Opt("Expense", "Expense account (contribution / provision)"), Opt("DeptAccounts", "Accounts by department: DEPT=ACCOUNT; …")],
+                Pick("Rounding", "Rounding", Enum.GetNames<PayRounding>()), Opt("Expense", "Expense account (contribution / provision)"), Opt("DeptAccounts", "Accounts by department: DEPT=ACCOUNT; …"),
+                Opt("LookupVariable", "Lookup variable (table lookup; blank: BASIC)"), Opt("LookupBands", "Lookup bands from-to:amount or rate%; … (table lookup)"),
+                Opt("Values", "Preview values NAME=value; …")],
             Run = async (c, i) =>
             {
                 IPayrollSetupService setup = c.Get<IPayrollSetupService>();
@@ -281,6 +283,17 @@ public static partial class OperationCatalogue
 
                         long table = Check(await setup.CreateTaxTableAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Date("From"), null, bands).ConfigureAwait(true));
                         return $"Tax table created (id {table}).";
+                    case "Preview formula":
+                        Dictionary<string, decimal> values = new(StringComparer.OrdinalIgnoreCase);
+                        foreach (string pair in (i.Optional("Values") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        {
+                            string[] bits = pair.Split('=', StringSplitOptions.TrimEntries);
+                            values[bits[0]] = bits.Length == 2 && decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal v)
+                                ? v : throw new OperationException($"Write each value as NAME=number (\"{pair}\").");
+                        }
+
+                        decimal previewed = Check(await setup.PreviewFormulaAsync(c.CompanyId, i.Optional("Formula") ?? string.Empty, i.Optional("Employee"), values).ConfigureAwait(true));
+                        return $"{i.Optional("Formula")} = {M(previewed)}";
                     case "Add standard elements":
                         IReadOnlyList<string> added = Check(await setup.SeedStandardElementsAsync(c.CompanyId, i.Optional("Account") ?? string.Empty, i.Optional("Liability") ?? string.Empty,
                             i.Optional("TaxTable") ?? "PAYE").ConfigureAwait(true));
@@ -293,6 +306,7 @@ public static partial class OperationCatalogue
                             Pensionable = i.Flag("Pensionable"), SubjectToSocialSecurity = i.Flag("SocialSecurity"), OvertimeBase = i.Flag("OvertimeBase"), LeavePayBase = i.Flag("LeaveBase"),
                             Group = i.Optional("Group"), BasisGroup = i.Optional("BasisGroup"), Floor = i.OptionalNumber("Floor"), Ceiling = i.OptionalNumber("Ceiling"), RoundTo = i.OptionalNumber("RoundTo"),
                             Rounding = Enum.Parse<PayRounding>(i.Text("Rounding")), ContributionExpenseAccountCode = i.Optional("Expense"), DepartmentAccounts = i.Optional("DeptAccounts"),
+                            LookupVariable = i.Optional("LookupVariable"), LookupBands = i.Optional("LookupBands"),
                         }).ConfigureAwait(true));
                         return $"Pay element created (id {element}).";
                 }

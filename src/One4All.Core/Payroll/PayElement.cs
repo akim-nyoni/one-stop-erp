@@ -45,6 +45,9 @@ public enum CalculationBasis
 
     /// <summary>A percentage of a named element group's total this period (<see cref="PayElement.BasisGroup"/>).</summary>
     PercentOfGroup = 6,
+
+    /// <summary>An amount (or percentage) looked up in the element's table by a variable's value (<see cref="PayElement.LookupBands"/>).</summary>
+    TableLookup = 7,
 }
 
 /// <summary>
@@ -107,6 +110,12 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>The formula (for <see cref="CalculationBasis.Formula"/>), over variables like BASIC/GROSS/TAXABLE and element codes.</summary>
     public string? Formula { get; set; }
+
+    /// <summary>Gets or sets the variable a table-lookup element looks up (BASIC when blank).</summary>
+    public string? LookupVariable { get; set; }
+
+    /// <summary>Gets or sets a table-lookup element's bands ("0-1000:50; 1000-5000:2.5%; 5000-:150").</summary>
+    public string? LookupBands { get; set; }
 
     /// <summary>Whether the element is taxable (earnings) or pre-tax (deductions).</summary>
     public bool Taxable { get; set; }

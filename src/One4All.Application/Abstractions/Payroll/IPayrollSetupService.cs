@@ -192,6 +192,12 @@ public sealed record NewPayElement(string Code, string Name, PayElementType Type
     /// <summary>Rate (percentage and per-unit bases).</summary>
     public decimal Rate { get; init; }
 
+    /// <summary>The variable a table-lookup element looks up (BASIC when blank).</summary>
+    public string? LookupVariable { get; init; }
+
+    /// <summary>A table-lookup element's bands ("0-1000:50; 1000-5000:2.5%; 5000-:150").</summary>
+    public string? LookupBands { get; init; }
+
     /// <summary>Formula (formula basis), e.g. <c>BASIC</c> or <c>TAXABLE * 10 / 100</c>.</summary>
     public string? Formula { get; init; }
 
@@ -258,6 +264,18 @@ public interface IPayrollSetupService
 
     /// <summary>Creates a pay element.</summary>
     Task<Result<long>> CreatePayElementAsync(long companyId, NewPayElement element, CancellationToken ct = default);
+
+    /// <summary>
+    /// Works a formula out before it is saved on an element (brief §4.15.2 "formula preview"): against an employee's basic pay (BASIC, GROSS) and any other
+    /// variables given, so a mistyped formula is caught at the desk and not in the run.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="formula">The formula.</param>
+    /// <param name="employeeNumber">The employee whose basic pay it uses (blank: none).</param>
+    /// <param name="values">Other variables (OVERTIMEHOURS, an element code…).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The amount, or why the formula fails.</returns>
+    Task<Result<decimal>> PreviewFormulaAsync(long companyId, string formula, string? employeeNumber, IReadOnlyDictionary<string, decimal> values, CancellationToken ct = default);
 
     /// <summary>Changes a pay element's amount, rate, formula or taxability.</summary>
     Task<Result> UpdatePayElementAsync(long companyId, string code, decimal? fixedAmount, decimal? rate, string? formula, bool? taxable, CancellationToken ct = default);

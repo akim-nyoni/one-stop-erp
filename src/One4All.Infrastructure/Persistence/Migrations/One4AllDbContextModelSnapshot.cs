@@ -20698,6 +20698,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("leave_pay_base");
 
+                    b.Property<string>("LookupBands")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("lookup_bands");
+
+                    b.Property<string>("LookupVariable")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("lookup_variable");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");

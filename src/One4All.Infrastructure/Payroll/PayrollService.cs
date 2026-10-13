@@ -627,6 +627,10 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                 return TaxFromTable(element, vars);
             case CalculationBasis.PercentOfGroup:
                 return (vars.GetValueOrDefault(GroupVariable(element.BasisGroup)) is decimal groupTotal ? groupTotal : 0m) * rate / 100m;
+            case CalculationBasis.TableLookup:
+                Result<IReadOnlyList<Application.Payroll.PayLookupBand>> table = Application.Payroll.PayLookupTable.Parse(element.LookupBands);
+                return table.IsFailure ? table.Error
+                    : Application.Payroll.PayLookupTable.Amount(table.Value, vars.GetValueOrDefault(element.LookupVariable ?? "BASIC") is decimal looked ? looked : 0m);
             case CalculationBasis.Formula:
                 if (string.IsNullOrWhiteSpace(element.Formula))
                 {

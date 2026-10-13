@@ -217,6 +217,11 @@ public sealed class PayrollSetupService : IPayrollSetupService
             return Error.Validation("Payroll.ContributionAccount", "An employer contribution or provision needs the expense account it is charged to.");
         }
 
+        if (element.Basis == CalculationBasis.TableLookup && Application.Payroll.PayLookupTable.Parse(element.LookupBands) is { IsFailure: true } badTable)
+        {
+            return badTable.Error;
+        }
+
         if (element.Basis == CalculationBasis.PercentOfGroup && string.IsNullOrWhiteSpace(element.BasisGroup))
         {
             return Error.Validation("Payroll.BasisGroupRequired", "A percent-of-group element needs the group it is a percentage of.");
@@ -245,10 +250,50 @@ public sealed class PayrollSetupService : IPayrollSetupService
             SubjectToSocialSecurity = element.SubjectToSocialSecurity, OvertimeBase = element.OvertimeBase, LeavePayBase = element.LeavePayBase,
             Group = Clean(element.Group)?.ToUpperInvariant(), BasisGroup = Clean(element.BasisGroup)?.ToUpperInvariant(), Floor = element.Floor, Ceiling = element.Ceiling,
             RoundTo = element.RoundTo, Rounding = element.Rounding, DepartmentAccounts = Clean(element.DepartmentAccounts),
+            LookupVariable = Clean(element.LookupVariable)?.ToUpperInvariant(), LookupBands = Clean(element.LookupBands),
         };
         _db.PayElements.Add(created);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return created.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<decimal>> PreviewFormulaAsync(long companyId, string formula, string? employeeNumber, IReadOnlyDictionary<string, decimal> values, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        if (string.IsNullOrWhiteSpace(formula))
+        {
+            return Error.Validation("Payroll.FormulaRequired", "Give the formula to preview.");
+        }
+
+        Dictionary<string, object?> vars = new(StringComparer.OrdinalIgnoreCase) { ["BASIC"] = 0m, ["GROSS"] = 0m, ["TAXABLE"] = 0m };
+        if (!string.IsNullOrWhiteSpace(employeeNumber))
+        {
+            string number = employeeNumber.Trim().ToUpperInvariant();
+            decimal? basic = await _db.Employees.AsNoTracking().Where(e => e.CompanyId == companyId && e.EmployeeNumber == number).Select(e => (decimal?)e.BasicSalary).FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+            if (basic is null)
+            {
+                return Error.NotFound("Payroll.EmployeeNotFound", $"No employee {number}.");
+            }
+
+            vars["BASIC"] = vars["GROSS"] = vars["TAXABLE"] = basic.Value;
+        }
+
+        foreach ((string name, decimal value) in values)
+        {
+            vars[name.Trim().ToUpperInvariant()] = value;
+        }
+
+        try
+        {
+            object? value = new One4All.Reporting.Expressions.ReportExpressionEngine().Evaluate(formula.Trim(), new One4All.Reporting.Expressions.ReportExpressionContext { Fields = vars });
+            return value is null ? 0m : Convert.ToDecimal(value, System.Globalization.CultureInfo.InvariantCulture);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return Error.Validation("Payroll.FormulaError", $"The formula fails: {ex.Message}");
+        }
     }
 
     /// <inheritdoc />
