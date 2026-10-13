@@ -136,13 +136,19 @@ public sealed class AuditService : IAuditService
         return await _db.AtomicAsync(async () =>
         {
             // The chain is read and extended under its lock, so a concurrent writer cannot link to the same previous entry.
-            await Persistence.Auditing.AuditChainLock.AcquireAsync(_db, [auditEvent.CompanyId], ct).ConfigureAwait(false);
-            string previous = await _db.ChangeLog.Where(c => c.CompanyId == auditEvent.CompanyId).OrderByDescending(c => c.Id).Select(c => c.RowHash).FirstOrDefaultAsync(ct).ConfigureAwait(false)
-                ?? (await AuditArchiveService.ChainHeadsAsync(_db, ct).ConfigureAwait(false)).GetValueOrDefault(AuditArchiveService.ChainKey(auditEvent.CompanyId)) ?? string.Empty;
+            string? previous = Persistence.Auditing.AuditChainLock.HeldHead(_db, auditEvent.CompanyId);
+            if (previous is null)
+            {
+                await Persistence.Auditing.AuditChainLock.AcquireAsync(_db, [auditEvent.CompanyId], ct).ConfigureAwait(false);
+                previous = await _db.ChangeLog.Where(c => c.CompanyId == auditEvent.CompanyId).OrderByDescending(c => c.Id).Select(c => c.RowHash).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+                    ?? (await AuditArchiveService.ChainHeadsAsync(_db, ct).ConfigureAwait(false)).GetValueOrDefault(AuditArchiveService.ChainKey(auditEvent.CompanyId)) ?? string.Empty;
+            }
+
             ChangeLogEntry entry = ChangeLogEntry.Create(previous, DateTimeOffset.UtcNow, auditEvent.CompanyId, auditEvent.UserId, auditEvent.UserName, auditEvent.Module, auditEvent.EntityType,
                 auditEvent.EntityId, auditEvent.Action, newValues: auditEvent.Details, reason: auditEvent.Reason, terminal: auditEvent.Terminal);
             _db.ChangeLog.Add(entry);
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            Persistence.Auditing.AuditChainLock.Advance(_db, auditEvent.CompanyId, entry.RowHash);
             return Result.Success(entry.Id);
         }, ct).ConfigureAwait(false);
     }

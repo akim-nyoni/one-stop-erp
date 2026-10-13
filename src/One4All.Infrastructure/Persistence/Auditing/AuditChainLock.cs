@@ -28,4 +28,36 @@ public static class AuditChainLock
             await context.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({key})", ct).ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// The chain head this context already wrote in its current transaction (the chain's lock is still held, so nothing else can have extended it),
+    /// or null when the chain has not been written in this transaction.
+    /// </summary>
+    /// <param name="context">The context.</param>
+    /// <param name="companyId">The chain (null: the system chain).</param>
+    /// <returns>The head, or null.</returns>
+    public static string? HeldHead(DbContext context, long? companyId)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return context is One4AllDbContext db && context.Database.CurrentTransaction is { } transaction && db.ChainHeads is { } held && ReferenceEquals(held.Transaction, transaction)
+            && held.Heads.TryGetValue(companyId ?? -1L, out string? head) ? head : null;
+    }
+
+    /// <summary>Remembers a chain's new head for the rest of the context's current transaction (saving the lock and the read on the next write).</summary>
+    /// <param name="context">The context.</param>
+    /// <param name="companyId">The chain.</param>
+    /// <param name="head">The hash just written.</param>
+    public static void Advance(DbContext context, long? companyId, string head)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (context is One4AllDbContext db && context.Database.CurrentTransaction is { } transaction)
+        {
+            if (db.ChainHeads is not { } held || !ReferenceEquals(held.Transaction, transaction))
+            {
+                db.ChainHeads = (transaction, new Dictionary<long, string>());
+            }
+
+            db.ChainHeads.Value.Heads[companyId ?? -1L] = head;
+        }
+    }
 }

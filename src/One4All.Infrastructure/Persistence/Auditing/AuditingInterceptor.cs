@@ -114,13 +114,14 @@ public sealed class AuditingInterceptor : SaveChangesInterceptor
                 : null;
             try
             {
-            await AuditChainLock.AcquireAsync(context, _pending.Select(p => ExtractCompanyId(p.Entry)), ct).ConfigureAwait(false);
+            // Chains already written in this transaction are still locked and their heads known; only the others are locked and read.
+            await AuditChainLock.AcquireAsync(context, _pending.Select(p => ExtractCompanyId(p.Entry)).Where(c => AuditChainLock.HeldHead(context, c) is null), ct).ConfigureAwait(false);
 
             foreach (PendingAudit pending in _pending)
             {
                 long? companyId = ExtractCompanyId(pending.Entry);
                 long companyKey = companyId ?? -1;
-                if (!lastHashByCompany.TryGetValue(companyKey, out string? previousHash))
+                if (!lastHashByCompany.TryGetValue(companyKey, out string? previousHash) && (previousHash = AuditChainLock.HeldHead(context, companyId)) is null)
                 {
                     previousHash = await context.Set<ChangeLogEntry>()
                         .Where(c => c.CompanyId == companyId)
@@ -164,6 +165,11 @@ public sealed class AuditingInterceptor : SaveChangesInterceptor
 
             _pending.Clear();
             await context.SaveChangesAsync(ct).ConfigureAwait(false);
+            foreach ((long key, string head) in lastHashByCompany)
+            {
+                AuditChainLock.Advance(context, key == -1 ? null : key, head);
+            }
+
             if (own is not null)
             {
                 await own.CommitAsync(ct).ConfigureAwait(false);

@@ -156,6 +156,9 @@ public class One4AllDbContext : DbContext
     /// <summary>The append-only audit change log.</summary>
     public DbSet<ChangeLogEntry> ChangeLog => Set<ChangeLogEntry>();
 
+    /// <summary>Gets or sets the audit chain heads written in the current transaction (see <see cref="Auditing.AuditChainLock.HeldHead"/>).</summary>
+    internal (object Transaction, Dictionary<long, string> Heads)? ChainHeads { get; set; }
+
     /// <summary>Archived years of the audit log.</summary>
     public DbSet<AuditArchive> AuditArchives => Set<AuditArchive>();
 
