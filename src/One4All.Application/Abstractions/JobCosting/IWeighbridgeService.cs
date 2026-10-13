@@ -42,6 +42,9 @@ public sealed class FirstWeighRequest
     /// <summary>Gets the concrete batch run the load came from.</summary>
     public string? BatchRunNumber { get; init; }
 
+    /// <summary>Gets the sales order the load is delivered against (outbound; open, for the same customer, with a line for the product).</summary>
+    public string? SalesOrderNumber { get; init; }
+
     /// <summary>Gets the date.</summary>
     public DateOnly Date { get; init; }
 
@@ -162,4 +165,14 @@ public interface IWeighbridgeService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>What was billed, or nothing to bill, an unknown tax code or a posting failure.</returns>
     Task<Result<WeighbridgeInvoice>> InvoiceTicketsAsync(WeighbridgeInvoiceRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// The printed weighbridge ticket (brief §6 report 198): vehicle, driver, product, customer or supplier, order, site, gross, tare, deduction and net
+    /// weights with the volume, times in and out, a keyed weight flagged, and lines for the driver's and weighbridge clerk's signatures.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="ticketNumber">The ticket.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The ticket text, or why there is none.</returns>
+    Task<Result<string>> RenderTicketAsync(long companyId, string ticketNumber, CancellationToken ct = default);
 }

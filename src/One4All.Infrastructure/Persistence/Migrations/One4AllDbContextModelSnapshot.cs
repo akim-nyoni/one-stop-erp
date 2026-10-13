@@ -15767,6 +15767,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<long?>("SalesOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sales_order_id");
+
                     b.Property<string>("SiteName")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)")
@@ -15807,6 +15811,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_weighbridge_ticket");
+
+                    b.HasIndex("SalesOrderId")
+                        .HasDatabaseName("ix_weighbridge_ticket_sales_order_id");
 
                     b.HasIndex("CompanyId", "TicketNumber")
                         .IsUnique()

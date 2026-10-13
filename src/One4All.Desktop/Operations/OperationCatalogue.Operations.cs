@@ -48,13 +48,14 @@ public static partial class OperationCatalogue
             Fields = [Pick("Direction", "Direction", "Outbound", "Inbound"), Req("Vehicle", "Vehicle registration"), Req("Item", "Product (item code)"), Num("Density", "m³ per tonne", "0.6"), Today(),
                 OptNum("Weight", "Weight kg (blank = stored tare)"), Opt("Customer", "Customer code"), Opt("Supplier", "Supplier code"), Opt("Driver", "Driver"), Opt("Site", "Delivery site"),
                 Opt("Stockpile", "Stockpile (warehouse code)"), OptNum("Distance", "Haulage distance km"), Opt("Batch", "Concrete batch run"), Tick("Manual", "Weight keyed by hand"), Opt("Reason", "Why keyed"),
-                Opt("AuthorisedBy", "Authorised by (user name)")],
+                Opt("AuthorisedBy", "Authorised by (user name)"), Opt("Order", "Sales order number (outbound)"), Tick("Scale", "Read the weight from the scale")],
             Run = async (c, i) =>
             {
+                decimal? weight = i.Flag("Scale") ? await ScaleWeightAsync(c).ConfigureAwait(true) : i.OptionalNumber("Weight");
                 var (_, number) = Check(await c.Get<IWeighbridgeService>().FirstWeighAsync(new FirstWeighRequest
                 {
                     CompanyId = c.CompanyId, Direction = Enum.Parse<WeighDirection>(i.Text("Direction")), Vehicle = i.Text("Vehicle"), ItemId = await ItemAsync(c, i.Text("Item")).ConfigureAwait(true),
-                    CubicMetresPerTonne = i.Number("Density"), Date = i.Date("Date"), WeightKg = i.OptionalNumber("Weight"),
+                    CubicMetresPerTonne = i.Number("Density"), Date = i.Date("Date"), WeightKg = weight, SalesOrderNumber = i.Optional("Order"),
                     CustomerId = i.Optional("Customer") is string cu ? await CustomerAsync(c, cu).ConfigureAwait(true) : null,
                     SupplierId = i.Optional("Supplier") is string su ? await SupplierAsync(c, su).ConfigureAwait(true) : null,
                     Driver = i.Optional("Driver"), Site = i.Optional("Site"), WarehouseId = i.Optional("Stockpile") is string sp ? await WarehouseAsync(c, sp).ConfigureAwait(true) : null,
@@ -69,17 +70,19 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Second weigh (complete a ticket)", ListTitle = "Tickets still on the bridge",
             Description = "Completes the ticket: net weight, haulage by zone and — for an outbound load from a stockpile — the stock issue.",
-            Fields = [Req("Ticket", "Ticket number"), Num("Weight", "Weight kg"), Num("Deduction", "Deduction kg (moisture etc.)", "0"), Tick("Manual", "Weight keyed by hand"), Opt("Reason", "Why keyed"),
-                Opt("AuthorisedBy", "Authorised by (user name)")],
+            Fields = [Req("Ticket", "Ticket number"), OptNum("Weight", "Weight kg"), Num("Deduction", "Deduction kg (moisture etc.)", "0"), Tick("Manual", "Weight keyed by hand"), Opt("Reason", "Why keyed"),
+                Opt("AuthorisedBy", "Authorised by (user name)"), Tick("Scale", "Read the weight from the scale"), Tick("Print", "Show the printed ticket")],
             Run = async (c, i) =>
             {
                 long ticket = await FindAsync(c.Db.WeighbridgeTickets, t => t.CompanyId == c.CompanyId && t.TicketNumber == i.Text("Ticket").ToUpper(), t => t.Id, "ticket", i.Text("Ticket")).ConfigureAwait(true);
+                decimal weight = (i.Flag("Scale") ? await ScaleWeightAsync(c).ConfigureAwait(true) : i.OptionalNumber("Weight")) ?? throw new OperationException("Give the weight, or read it from the scale.");
                 WeighbridgeCompletion done = Check(await c.Get<IWeighbridgeService>().SecondWeighAsync(new SecondWeighRequest
                 {
-                    CompanyId = c.CompanyId, TicketId = ticket, WeightKg = i.Number("Weight"), DeductionKg = i.Number("Deduction"), OperatorUserId = c.UserId, IsManual = i.Flag("Manual"),
+                    CompanyId = c.CompanyId, TicketId = ticket, WeightKg = weight, DeductionKg = i.Number("Deduction"), OperatorUserId = c.UserId, IsManual = i.Flag("Manual"),
                     ManualReason = i.Optional("Reason"), AuthorisedByUserId = await OptionalUserAsync(c, i.Optional("AuthorisedBy")).ConfigureAwait(true),
                 }).ConfigureAwait(true));
-                return $"Net {Q(done.NetTonnes)} t ({Q(done.NetCubicMetres)} m³), haulage {M(done.HaulageCharge)}." + (done.Overloaded ? " OVERLOADED — over the vehicle's legal maximum." : string.Empty);
+                string summary = $"Net {Q(done.NetTonnes)} t ({Q(done.NetCubicMetres)} m³), haulage {M(done.HaulageCharge)}." + (done.Overloaded ? " OVERLOADED — over the vehicle's legal maximum." : string.Empty);
+                return i.Flag("Print") ? summary + Environment.NewLine + Environment.NewLine + Check(await c.Get<IWeighbridgeService>().RenderTicketAsync(c.CompanyId, i.Text("Ticket")).ConfigureAwait(true)) : summary;
             },
             List = OpenTicketsAsync,
         };
@@ -105,6 +108,14 @@ public static partial class OperationCatalogue
                 ("Ticket", t => t.TicketNumber), ("Date", t => D(t.Date)), ("Vehicle", t => t.VehicleRegistration), ("Product", t => t.Product), ("Net t", t => Q(t.NetTonnes)),
                 ("Haulage", t => M(t.HaulageCharge)), ("Site", t => t.SiteName)),
         };
+    }
+
+    // The weight on the weighbridge scale: a settled reading only (a moving lorry gives a moving weight).
+    private static async Task<decimal> ScaleWeightAsync(OperationContext c)
+    {
+        Application.Abstractions.Pos.IScale scale = c.Get<Application.Abstractions.Pos.IDeviceProvider>().Scale ?? throw new OperationException("No scale is connected to this computer.");
+        Application.Pos.ScaleReading reading = await scale.ReadAsync().ConfigureAwait(true) ?? throw new OperationException("The scale did not answer.");
+        return reading.Stable ? reading.Kilograms : throw new OperationException($"The scale is still moving ({reading.Kilograms:0} kg); wait for it to settle.");
     }
 
     private static async Task<System.Data.DataTable> OpenTicketsAsync(OperationContext c)

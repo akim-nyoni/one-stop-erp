@@ -112,6 +112,67 @@ public sealed class WeighbridgeService : IWeighbridgeService
     }
 
     /// <inheritdoc />
+    public async Task<Result<string>> RenderTicketAsync(long companyId, string ticketNumber, CancellationToken ct = default)
+    {
+        string number = (ticketNumber ?? string.Empty).Trim().ToUpperInvariant();
+        WeighbridgeTicket? ticket = await _db.WeighbridgeTickets.AsNoTracking().FirstOrDefaultAsync(t => t.CompanyId == companyId && t.TicketNumber.ToUpper() == number, ct).ConfigureAwait(false);
+        if (ticket is null)
+        {
+            return Error.NotFound("Wb.TicketNotFound", $"No weighbridge ticket {number}.");
+        }
+
+        string company = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? string.Empty;
+        string? party = ticket.CustomerId is long customer
+            ? await _db.Customers.Where(c => c.Id == customer).Select(c => c.Code + " " + c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+            : ticket.SupplierId is long supplier ? await _db.Suppliers.Where(s => s.Id == supplier).Select(s => s.Code + " " + s.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) : null;
+        string? order = ticket.SalesOrderId is long id ? await _db.SalesOrders.Where(o => o.Id == id).Select(o => o.OrderNumber).FirstOrDefaultAsync(ct).ConfigureAwait(false) : null;
+
+        System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
+        const int Width = 48;
+        string rule = new('-', Width);
+        string Row(string label, string value) => label.PadRight(16) + value;
+        string Kg(decimal kg) => kg.ToString("#,##0", inv) + " kg";
+        System.Text.StringBuilder sb = new();
+        sb.AppendLine(company);
+        sb.AppendLine("WEIGHBRIDGE TICKET");
+        sb.AppendLine(rule);
+        sb.AppendLine(Row("Ticket", ticket.TicketNumber));
+        sb.AppendLine(Row("Date", ticket.Date.ToString("yyyy-MM-dd", inv)));
+        sb.AppendLine(Row("Direction", ticket.Direction.ToString()));
+        sb.AppendLine(Row("Vehicle", ticket.VehicleRegistration));
+        sb.AppendLine(Row("Driver", ticket.DriverName ?? "-"));
+        sb.AppendLine(Row("Product", ticket.Product));
+        sb.AppendLine(Row(ticket.Direction == WeighDirection.Outbound ? "Customer" : "Supplier", party ?? "-"));
+        if (order is not null)
+        {
+            sb.AppendLine(Row("Sales order", order));
+        }
+
+        sb.AppendLine(Row("Site", ticket.SiteName ?? "-"));
+        sb.AppendLine(rule);
+        sb.AppendLine(Row("Gross", ticket.IsComplete || ticket.Direction == WeighDirection.Inbound ? Kg(ticket.GrossWeightKg) : "-"));
+        sb.AppendLine(Row("Tare", ticket.IsComplete || ticket.Direction == WeighDirection.Outbound ? Kg(ticket.TareWeightKg) : "-"));
+        sb.AppendLine(Row("Deduction", Kg(ticket.DeductionKg)));
+        sb.AppendLine(Row("NET", ticket.IsComplete ? $"{Kg(ticket.NetWeightKg)}  ({ticket.NetTonnes.ToString("0.000", inv)} t, {ticket.NetCubicMetres.ToString("0.00", inv)} m3)" : "on the bridge"));
+        if (ticket.HaulageCharge > 0m)
+        {
+            sb.AppendLine(Row("Haulage", ticket.HaulageCharge.ToString("N2", inv)));
+        }
+
+        sb.AppendLine(Row("Time in", ticket.TimeInUtc?.ToString("yyyy-MM-dd HH:mm", inv) ?? "-"));
+        sb.AppendLine(Row("Time out", ticket.TimeOutUtc?.ToString("yyyy-MM-dd HH:mm", inv) ?? "-"));
+        if (ticket.IsManualWeight)
+        {
+            sb.AppendLine(Row("KEYED WEIGHT", ticket.ManualReason ?? string.Empty));
+        }
+
+        sb.AppendLine(rule);
+        sb.AppendLine("Driver: ____________________");
+        sb.AppendLine("Weighbridge clerk: __________");
+        return sb.ToString();
+    }
+
+    /// <inheritdoc />
     public Task<Result<(long TicketId, string TicketNumber)>> FirstWeighAsync(FirstWeighRequest request, CancellationToken ct = default)
         => _db.AtomicAsync(() => FirstWeighCoreAsync(request, ct), ct);
 
@@ -147,6 +208,27 @@ public sealed class WeighbridgeService : IWeighbridgeService
             return Error.NotFound("Wb.ProductNotFound", "The product is not an item of this company.");
         }
 
+        // A load against a sales order: an open order of the same customer that has a line for the product.
+        long? orderId = null;
+        if (!string.IsNullOrWhiteSpace(request.SalesOrderNumber))
+        {
+            string orderNumber = request.SalesOrderNumber.Trim().ToUpperInvariant();
+            var order = await _db.SalesOrders.AsNoTracking().Where(o => o.CompanyId == request.CompanyId && o.OrderNumber.ToUpper() == orderNumber)
+                .Select(o => new { o.Id, o.CustomerId, o.Status, HasProduct = o.Lines.Any(l => l.ItemId == request.ItemId) }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (order is null)
+            {
+                return Error.NotFound("Wb.OrderNotFound", $"No sales order {orderNumber}.");
+            }
+
+            if (request.Direction != WeighDirection.Outbound || order.CustomerId != request.CustomerId || !order.HasProduct
+                || order.Status is Core.SalesOrders.SalesOrderStatus.Cancelled or Core.SalesOrders.SalesOrderStatus.Invoiced)
+            {
+                return Error.Rule("Wb.OrderMismatch", $"Sales order {orderNumber} is not an open order of this customer for this product.");
+            }
+
+            orderId = order.Id;
+        }
+
         Result<string> number = await _numbers.AllocateAsync(request.CompanyId, "WB", request.Date, ct: ct).ConfigureAwait(false);
         if (number.IsFailure)
         {
@@ -164,6 +246,7 @@ public sealed class WeighbridgeService : IWeighbridgeService
         ticket.WarehouseId = request.WarehouseId;
         ticket.DistanceKm = request.DistanceKm;
         ticket.BatchRunNumber = request.BatchRunNumber;
+        ticket.SalesOrderId = orderId;
         ticket.TimeInUtc = _clock.UtcNow;
         ticket.OperatorUserId = request.OperatorUserId;
         if (request.IsManual)

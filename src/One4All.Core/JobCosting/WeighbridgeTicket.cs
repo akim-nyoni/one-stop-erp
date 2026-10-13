@@ -231,6 +231,9 @@ public sealed class WeighbridgeTicket : AuditableEntity, ICompanyScoped
     /// <summary>Gets or sets the concrete batch (assembly run) the load came from.</summary>
     public string? BatchRunNumber { get; set; }
 
+    /// <summary>Gets or sets the sales order the load is delivered against (its customer must match).</summary>
+    public long? SalesOrderId { get; set; }
+
     /// <summary>Gets the sales invoice the load was billed on (null: not yet invoiced); a ticket is invoiced once.</summary>
     public string? InvoiceNumber { get; private set; }
 
