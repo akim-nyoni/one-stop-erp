@@ -15,6 +15,9 @@ public sealed class WebhookService : IWebhookService
     private readonly One4AllDbContext _db;
     private readonly HttpClient _http;
 
+    // The company's active subscriptions, read once for a short while: a run of postings publishes on every one, and they change rarely.
+    private readonly Dictionary<long, (DateTimeOffset ReadAt, List<WebhookSubscription> Active)> _subscriptions = [];
+
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="http">Posts deliveries.</param>
@@ -27,6 +30,7 @@ public sealed class WebhookService : IWebhookService
     /// <inheritdoc />
     public async Task<Result<long>> SubscribeAsync(long companyId, string eventType, string url, string secret, CancellationToken ct = default)
     {
+        _subscriptions.Remove(companyId);
         string evt = (eventType ?? string.Empty).Trim().ToLowerInvariant();
         if ((evt != "*" && !WebhookEvents.All.Contains(evt)) || !Uri.TryCreate(url?.Trim(), UriKind.Absolute, out Uri? endpoint)
             || endpoint.Scheme is not ("https" or "http") || (secret ?? string.Empty).Length < 16)
@@ -43,6 +47,7 @@ public sealed class WebhookService : IWebhookService
     /// <inheritdoc />
     public async Task<Result> UnsubscribeAsync(long companyId, long subscriptionId, CancellationToken ct = default)
     {
+        _subscriptions.Remove(companyId);
         WebhookSubscription? subscription = await _db.Set<WebhookSubscription>().FirstOrDefaultAsync(s => s.Id == subscriptionId && s.CompanyId == companyId, ct).ConfigureAwait(false);
         if (subscription is null)
         {
@@ -57,8 +62,14 @@ public sealed class WebhookService : IWebhookService
     /// <inheritdoc />
     public async Task<int> PublishAsync(long companyId, string eventType, object data, CancellationToken ct = default)
     {
-        List<WebhookSubscription> subscribers = [.. (await _db.Set<WebhookSubscription>().AsNoTracking().Where(s => s.CompanyId == companyId && s.IsActive).ToListAsync(ct).ConfigureAwait(false))
-            .Where(s => s.Takes(eventType))];
+        DateTimeOffset readAt = DateTimeOffset.UtcNow;
+        if (!_subscriptions.TryGetValue(companyId, out var cached) || readAt - cached.ReadAt > TimeSpan.FromSeconds(30))
+        {
+            cached = (readAt, await _db.Set<WebhookSubscription>().AsNoTracking().Where(s => s.CompanyId == companyId && s.IsActive).ToListAsync(ct).ConfigureAwait(false));
+            _subscriptions[companyId] = cached;
+        }
+
+        List<WebhookSubscription> subscribers = [.. cached.Active.Where(s => s.Takes(eventType))];
         if (subscribers.Count == 0)
         {
             return 0;

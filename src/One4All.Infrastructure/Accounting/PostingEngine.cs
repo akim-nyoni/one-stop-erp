@@ -411,12 +411,34 @@ public sealed class PostingEngine : IPostingEngine
         return posted.Value;
     }
 
+    // Accounts this engine has read (a long run of postings reads each once): a copy this context tracks wins, as it may hold unsaved changes.
+    private readonly Dictionary<(long CompanyId, string Code), LedgerAccount> _accounts = [];
+
+    private async Task<LedgerAccount?> AccountAsync(long companyId, string code, CancellationToken ct)
+    {
+        if (_db.Accounts.Local.FirstOrDefault(a => a.CompanyId == companyId && a.AccountCode == code) is LedgerAccount tracked)
+        {
+            return tracked;
+        }
+
+        if (_accounts.TryGetValue((companyId, code), out LedgerAccount? known))
+        {
+            return known;
+        }
+
+        LedgerAccount? account = await _db.Accounts.AsNoTracking().FirstOrDefaultAsync(a => a.CompanyId == companyId && a.AccountCode == code, ct).ConfigureAwait(false);
+        if (account is not null)
+        {
+            _accounts[(companyId, code)] = account;
+        }
+
+        return account;
+    }
+
     private async Task<Result<JournalLine>> BuildLineAsync(JournalRequest request, JournalLineRequest lineRequest, CurrencyCode baseCurrency, string? defaultFund, CancellationToken ct)
     {
         AccountKey key = lineRequest.ToKey();
-        LedgerAccount? account = await _db.Accounts
-            .FirstOrDefaultAsync(a => a.CompanyId == request.CompanyId && a.AccountCode == key.AccountCode, ct)
-            .ConfigureAwait(false);
+        LedgerAccount? account = await AccountAsync(request.CompanyId, key.AccountCode, ct).ConfigureAwait(false);
 
         if (account is null)
         {
