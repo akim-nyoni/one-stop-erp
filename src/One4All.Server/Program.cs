@@ -2851,6 +2851,87 @@ api.MapPost("/api/hr/self-service/detail/{requestId:long}/decide", async (long r
 .RequireAuthorization()
 .WithName("EssDecideDetail");
 
+// --- Payroll & HR for third parties (brief §10): employees, leave, time-and-attendance and variable feeds, runs ----------
+api.MapGet("/api/hr/employees", async (long companyId, string? status, string? department, int? skip, int? take, One4AllDbContext db, CancellationToken ct) =>
+{
+    IQueryable<One4All.Core.Payroll.Employee> employees = db.Employees.AsNoTracking().Where(e => e.CompanyId == companyId);
+    if (status is not null && Enum.TryParse(status, true, out One4All.Core.Payroll.EmployeeStatus wanted))
+    {
+        employees = employees.Where(e => e.Status == wanted);
+    }
+
+    if (!string.IsNullOrWhiteSpace(department))
+    {
+        employees = employees.Where(e => e.Department == department.Trim().ToUpper());
+    }
+
+    // Paged, and without pay: salaries are for the payroll screens and reports that check the right to see them.
+    return Results.Ok(await employees.OrderBy(e => e.EmployeeNumber).Skip(Math.Max(0, skip ?? 0)).Take(Math.Clamp(take ?? 100, 1, 500))
+        .Select(e => new
+        {
+            e.EmployeeNumber, e.FullName, e.Department, e.CostCentre, e.Grade, e.JobTitle, Status = e.Status.ToString(), EmploymentType = e.EmploymentType.ToString(),
+            e.EngagementDate, e.TerminationDate, e.PayGroup, e.Email, e.Phone,
+        }).ToListAsync(ct).ConfigureAwait(false));
+})
+.RequireAuthorization()
+.WithName("HrEmployees");
+
+api.MapGet("/api/hr/leave-balances", async (long companyId, string? employeeNumber, One4AllDbContext db, CancellationToken ct) =>
+{
+    string? number = string.IsNullOrWhiteSpace(employeeNumber) ? null : employeeNumber.Trim().ToUpper();
+    return Results.Ok(await (from b in db.EmployeeLeaveBalances.AsNoTracking()
+                             join e in db.Employees.AsNoTracking() on b.EmployeeId equals e.Id
+                             where b.CompanyId == companyId && (number == null || e.EmployeeNumber.ToUpper() == number)
+                             orderby e.EmployeeNumber, b.LeaveType
+                             select new { e.EmployeeNumber, e.FullName, b.LeaveType, b.AccruedDays, b.TakenDays, Balance = b.AccruedDays - b.TakenDays, b.CarriedOverDays, b.CarryExpiresOn })
+        .Take(5000).ToListAsync(ct).ConfigureAwait(false));
+})
+.RequireAuthorization()
+.WithName("HrLeaveBalances");
+
+api.MapPost("/api/hr/attendance/clock-import", async (HttpRequest http, long companyId, decimal? overtimeMultiplier, One4All.Application.Abstractions.Payroll.IAttendanceService attendance, CancellationToken ct) =>
+{
+    using StreamReader reader = new(http.Body, Encoding.UTF8);
+    return ValueResponse(await attendance.ImportClockAsync(companyId, await reader.ReadToEndAsync(ct).ConfigureAwait(false), overtimeMultiplier ?? 1.5m, ct).ConfigureAwait(false));
+})
+.RequireAuthorization()
+.WithName("HrClockImport");
+
+api.MapPost("/api/payroll/variables", async (long companyId, string employeeNumber, string elementCode, string period, decimal? units, decimal? amount, One4AllDbContext db,
+    One4All.Application.Abstractions.Payroll.IPayrollVariableService variables, CancellationToken ct) =>
+{
+    long? employee = await db.Employees.AsNoTracking().Where(e => e.CompanyId == companyId && e.EmployeeNumber.ToUpper() == employeeNumber.Trim().ToUpper()).Select(e => (long?)e.Id)
+        .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+    return employee is long id
+        ? ValueResponse(await variables.SetAsync(companyId, id, elementCode, period, units, amount, ct).ConfigureAwait(false))
+        : Results.Json(new { error = $"No employee {employeeNumber}." }, statusCode: StatusCodes.Status404NotFound);
+})
+.RequireAuthorization()
+.WithName("PayrollSetVariable");
+
+api.MapPost("/api/payroll/variables/import", async (HttpRequest http, long companyId, string period, bool? preview, One4All.Application.Abstractions.Payroll.IPayrollVariableService variables, CancellationToken ct) =>
+{
+    using StreamReader reader = new(http.Body, Encoding.UTF8);
+    string csv = await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+    return preview == true
+        ? ValueResponse(await variables.PreviewImportAsync(companyId, period, csv, ct).ConfigureAwait(false))
+        : ValueResponse(await variables.ImportAsync(companyId, period, csv, ct).ConfigureAwait(false));
+})
+.RequireAuthorization()
+.WithName("PayrollImportVariables");
+
+api.MapGet("/api/payroll/runs", async (long companyId, int? take, One4AllDbContext db, CancellationToken ct) =>
+    Results.Ok(await db.Set<One4All.Core.Payroll.PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == companyId).OrderByDescending(r => r.Id).Take(Math.Clamp(take ?? 24, 1, 200))
+        .Select(r => new { r.PeriodLabel, r.PayDate, Kind = r.Kind.ToString(), r.Employees, r.Gross, r.Deductions, r.Net, r.JournalNumber }).ToListAsync(ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PayrollRuns");
+
+api.MapPost("/api/payroll/runs", async (long companyId, string period, DateOnly payDate, string netPayAccount, string documentNumber, string? payGroup,
+    One4All.Application.Abstractions.Payroll.IPayrollService payroll, CancellationToken ct) =>
+    ValueResponse(await payroll.RunGroupAsync(companyId, payGroup, period, payDate, netPayAccount, documentNumber, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PayrollRun");
+
 app.Run();
 
 // The top-level scalar values of a JSON request body, read without consuming it (the endpoint still binds it), for the access check.

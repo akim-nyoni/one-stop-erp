@@ -73,6 +73,8 @@ public sealed class MunicipalReportsTests
         }
 
         (await Render("M146")).Should().Contain($"{proposed.RunNumber},Refuse,2026-04,Ward 1,Posted,2,2,0.00,user 72,60");
+        (await Render("M150")).Should().Contain("2026-04,Ward 1,Refuse,60.00,0.00,0.0%,60", "the run billed 60 and nothing is collected yet");
+        (await Render("M165")).Should().NotContain("MR1", "no deposits are held");
         string exceptions = await Render("M147");
         exceptions.Should().Contain($"{proposed.RunNumber},MR3,AlreadyBilled").And.Contain($"{proposed.RunNumber},MR5,NothingToBill");
         (await Render("M148")).Should().Contain("Ward 1,Domestic,Refuse,1,");

@@ -108,11 +108,19 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
         DateOnly to = ReportParameters.Date(parameters, "ToDate");
         DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
         IncomeStatement report = await _reports.IncomeStatementAsync(companyId, from, to, await OptionsAsync(companyId, parameters, to, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
+        IncomeStatement prior = await _reports.IncomeStatementAsync(companyId, from.AddYears(-1), to.AddYears(-1),
+            await OptionsAsync(companyId, parameters, to.AddYears(-1), ct).ConfigureAwait(false), ct).ConfigureAwait(false);
 
-        List<IReadOnlyDictionary<string, object?>> rows = [];
-        rows.AddRange(report.Income.Select(l => Row(new() { ["Category"] = "Income", ["AccountCode"] = l.AccountCode, ["AccountName"] = l.AccountName, ["Amount"] = l.Amount })));
-        rows.AddRange(report.Expenses.Select(l => Row(new() { ["Category"] = "Expense", ["AccountCode"] = l.AccountCode, ["AccountName"] = l.AccountName, ["Amount"] = -l.Amount })));
-        rows.Add(Row(new() { ["Category"] = "Result", ["AccountCode"] = string.Empty, ["AccountName"] = "Net profit", ["Amount"] = report.NetProfit }));
+        List<IReadOnlyDictionary<string, object?>> rows =
+        [
+            .. Compared("Income", report.Income.Select(l => (l.AccountCode, l.AccountName, l.Amount)), prior.Income.Select(l => (l.AccountCode, l.AccountName, l.Amount))),
+            .. Compared("Expense", report.Expenses.Select(l => (l.AccountCode, l.AccountName, -l.Amount)), prior.Expenses.Select(l => (l.AccountCode, l.AccountName, -l.Amount))),
+        ];
+        rows.Add(Row(new()
+        {
+            ["Category"] = "Result", ["AccountCode"] = string.Empty, ["AccountName"] = "Net profit", ["Amount"] = report.NetProfit, ["PriorAmount"] = prior.NetProfit,
+            ["Change"] = report.NetProfit - prior.NetProfit,
+        }));
         return rows;
     }
 
@@ -120,12 +128,15 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
     {
         DateOnly balanceDate = ReportParameters.Date(parameters, "AsAtDate");
         BalanceSheet report = await _reports.BalanceSheetAsync(companyId, balanceDate, await OptionsAsync(companyId, parameters, balanceDate, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
-
-        List<IReadOnlyDictionary<string, object?>> rows = [];
-        rows.AddRange(report.Assets.Select(l => Row(new() { ["Category"] = "Asset", ["AccountCode"] = l.AccountCode, ["AccountName"] = l.AccountName, ["Amount"] = l.Amount })));
-        rows.AddRange(report.Liabilities.Select(l => Row(new() { ["Category"] = "Liability", ["AccountCode"] = l.AccountCode, ["AccountName"] = l.AccountName, ["Amount"] = l.Amount })));
-        rows.AddRange(report.Equity.Select(l => Row(new() { ["Category"] = "Equity", ["AccountCode"] = l.AccountCode, ["AccountName"] = l.AccountName, ["Amount"] = l.Amount })));
-        return rows;
+        DateOnly priorDate = balanceDate.AddYears(-1);
+        BalanceSheet prior = await _reports.BalanceSheetAsync(companyId, priorDate, await OptionsAsync(companyId, parameters, priorDate, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
+        static IEnumerable<(string, string, decimal)> Lines(IEnumerable<StatementLine> lines) => lines.Select(l => (l.AccountCode, l.AccountName, l.Amount));
+        return
+        [
+            .. Compared("Asset", Lines(report.Assets), Lines(prior.Assets)),
+            .. Compared("Liability", Lines(report.Liabilities), Lines(prior.Liabilities)),
+            .. Compared("Equity", Lines(report.Equity), Lines(prior.Equity)),
+        ];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DepartmentalIncomeStatementAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
@@ -280,4 +291,17 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
     }
 
     private static IReadOnlyDictionary<string, object?> Row(Dictionary<string, object?> values) => values;
+
+    // A statement section beside its comparative: every account in either year, in this year's order and then the accounts only the prior year had.
+    private static IEnumerable<IReadOnlyDictionary<string, object?>> Compared(string category, IEnumerable<(string Code, string Name, decimal Amount)> current,
+        IEnumerable<(string Code, string Name, decimal Amount)> prior)
+    {
+        Dictionary<string, (string Code, string Name, decimal Amount)> before = prior.GroupBy(l => l.Code).ToDictionary(g => g.Key, g => (g.Key, g.First().Name, g.Sum(l => l.Amount)));
+        List<(string Code, string Name, decimal Amount)> now = [.. current];
+        foreach ((string code, string name, decimal amount) in now.Concat(before.Values.Where(p => now.All(c => c.Code != p.Code)).Select(p => (p.Code, p.Name, 0m))))
+        {
+            decimal earlier = before.TryGetValue(code, out var p) ? p.Amount : 0m;
+            yield return Row(new() { ["Category"] = category, ["AccountCode"] = code, ["AccountName"] = name, ["Amount"] = amount, ["PriorAmount"] = earlier, ["Change"] = amount - earlier });
+        }
+    }
 }

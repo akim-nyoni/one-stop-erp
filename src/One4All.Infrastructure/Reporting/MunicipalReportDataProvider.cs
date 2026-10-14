@@ -43,6 +43,11 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
             "MUNISERVICEORDERS" => await ServiceOrdersAsync(companyId, ct).ConfigureAwait(false),
             "MUNIARRANGEMENTS" => await ArrangementsAsync(companyId, asAt, ct).ConfigureAwait(false),
             "MUNIINDIGENT" => await IndigentAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "MUNIREVENUECOLLECTION" => [.. (await CollectionAnalysis.ComputeAsync(_db, companyId, Date(parameters, "FromDate") ?? new DateOnly(asAt.Year, 1, 1), Date(parameters, "ToDate") ?? asAt, ct)
+                    .ConfigureAwait(false))
+                .Select(c => Row(("Month", c.Month), ("Ward", c.Ward), ("Service", c.Service), ("Billed", Money(c.Billed)), ("Collected", Money(c.Collected)),
+                    ("Efficiency", c.Efficiency is decimal e ? e.ToString("0.0", CultureInfo.InvariantCulture) + "%" : "—"), ("Outstanding", c.Billed - c.Collected)))],
+            "MUNIDEPOSITSHELD" => await DepositsHeldAsync(companyId, asAt, ct).ConfigureAwait(false),
             "MUNILICENCES" => await LicencesAsync(companyId, asAt, ct).ConfigureAwait(false),
             "MUNITICKETSLA" => await TicketSlaAsync(companyId, asAt, ct).ConfigureAwait(false),
             "MUNITARIFFS" => await TariffsAsync(companyId, ct).ConfigureAwait(false),
@@ -597,6 +602,16 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
 
         return rows;
     }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DepositsHeldAsync(long companyId, DateOnly asAt, CancellationToken ct)
+        => [.. (await (from d in _db.Set<ServiceDeposit>().AsNoTracking()
+                       join p in _db.Properties.AsNoTracking() on d.PropertyId equals p.Id
+                       join c in _db.Customers.AsNoTracking() on d.RatepayerCustomerId equals c.Id
+                       where d.CompanyId == companyId && d.TakenOn <= asAt && (d.ReleasedOn == null || d.ReleasedOn > asAt)
+                       select new { p.Ward, Consumer = c.Code + " " + c.Name, p.StandNumber, d.ServiceType, d.Reference, d.TakenOn, d.Amount }).ToListAsync(ct).ConfigureAwait(false))
+            .OrderBy(d => d.Ward, StringComparer.Ordinal).ThenBy(d => d.Consumer, StringComparer.Ordinal).ThenBy(d => d.Reference, StringComparer.Ordinal)
+            .Select(d => Row(("Ward", d.Ward), ("Consumer", d.Consumer), ("Stand", d.StandNumber), ("Service", d.ServiceType.ToString()), ("Reference", d.Reference),
+                ("TakenOn", Date(d.TakenOn)), ("Amount", d.Amount)))];
 
     private Task<Dictionary<long, string>> UsersAsync(CancellationToken ct) => _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct);
 

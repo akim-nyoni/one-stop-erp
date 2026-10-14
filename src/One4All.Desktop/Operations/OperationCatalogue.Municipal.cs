@@ -115,14 +115,15 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Ratepayer statement", ListTitle = "Properties",
-            Description = "The ratepayer's statement for a stand, as at a date, ready to print or hand over, with a consumption graph for each of the stand's meters "
-                + "over the months chosen.",
+            Description = "The ratepayer's statement for a stand, as at a date, ready to print or hand over: the account, then each service with its tariff (fixed charge, "
+                + "rates and steps) and the meter's last readings, and a consumption graph for each meter over the months chosen.",
             Fields = [Req("Stand", "Stand number"), Today("AsAt", "As at"), Num("Months", "Months of consumption graph (0: none)", "12")],
             Run = async (c, i) =>
             {
                 long propertyId = await PropertyAsync(c, i.Text("Stand")).ConfigureAwait(true);
                 long ratepayer = await c.Db.Properties.AsNoTracking().Where(p => p.Id == propertyId).Select(p => p.RatepayerCustomerId).SingleAsync().ConfigureAwait(true);
-                string statement = Check(await c.Get<IStatementService>().RenderCustomerStatementTextAsync(c.CompanyId, ratepayer, i.Date("AsAt"), 72).ConfigureAwait(true));
+                string statement = Check(await c.Get<IStatementService>().RenderCustomerStatementTextAsync(c.CompanyId, ratepayer, i.Date("AsAt"), 72).ConfigureAwait(true))
+                    + await ServicesAndReadingsAsync(c, propertyId, i.Date("AsAt")).ConfigureAwait(true);
                 if (i.Whole("Months") <= 0)
                 {
                     return statement;
@@ -651,5 +652,66 @@ public static partial class OperationCatalogue
         string key = stand.Trim();
         return await c.Db.Properties.AsNoTracking().Where(p => p.CompanyId == c.CompanyId && p.StandNumber == key).Select(p => (long?)p.Id).FirstOrDefaultAsync().ConfigureAwait(true)
             ?? throw new OperationException($"No stand {key}.");
+    }
+
+    // The bill's services block: each active service with its tariff, and for a metered one the last readings up to the date.
+    private static async Task<string> ServicesAndReadingsAsync(OperationContext c, long propertyId, DateOnly asAt)
+    {
+        Core.Municipal.Property property = await c.Db.Properties.AsNoTracking().Include(p => p.Services).SingleAsync(p => p.Id == propertyId).ConfigureAwait(true);
+        List<Core.Municipal.PropertyServiceLink> services = [.. property.Services.Where(s => s.IsActive && s.StartDate <= asAt && (s.EndDate == null || s.EndDate >= asAt))];
+        if (services.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        List<long> tariffIds = [.. services.Select(s => s.TariffId)];
+        Dictionary<long, Core.Municipal.Tariff> tariffs = await c.Db.Tariffs.AsNoTracking().Include(t => t.Blocks).Where(t => tariffIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id).ConfigureAwait(true);
+        List<string> text = [string.Empty, $"SERVICES AND READINGS — stand {property.StandNumber}, {property.Ward}"];
+        foreach (Core.Municipal.PropertyServiceLink service in services.OrderBy(s => s.ServiceType))
+        {
+            Core.Municipal.Tariff? tariff = tariffs.GetValueOrDefault(service.TariffId);
+            List<string> terms = [];
+            if (tariff is not null)
+            {
+                if (tariff.FixedCharge != 0m)
+                {
+                    terms.Add($"fixed {M(tariff.FixedCharge)}");
+                }
+
+                if (tariff.PerUnitRate != 0m)
+                {
+                    terms.Add($"{M(tariff.PerUnitRate)} a unit");
+                }
+
+                if (tariff.RatePerValuationCents != 0m)
+                {
+                    terms.Add($"{tariff.RatePerValuationCents.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)} c in the dollar of {M(property.Valuation)}");
+                }
+
+                if (tariff.RatePerSquareMetre != 0m)
+                {
+                    terms.Add($"{M(tariff.RatePerSquareMetre)} a m² of {Q(property.SizeSquareMetres)}");
+                }
+
+                terms.AddRange(tariff.Blocks.Select(b => $"{Q(b.FromUnit)}–{(b.ToUnit is decimal to ? Q(to) : "up")} at {M(b.Rate)}"));
+                if (tariff.MinimumCharge != 0m)
+                {
+                    terms.Add($"minimum {M(tariff.MinimumCharge)}");
+                }
+            }
+
+            text.Add($"  {service.ServiceType,-10} {(tariff is null ? "?" : $"{tariff.Code} {tariff.Name}")}: {(terms.Count == 0 ? "no charge" : string.Join("; ", terms))}");
+            if (service.MeterId is long meterId)
+            {
+                string serial = await c.Db.Meters.AsNoTracking().Where(m => m.Id == meterId).Select(m => m.Serial).FirstOrDefaultAsync().ConfigureAwait(true) ?? "?";
+                List<Core.Municipal.MeterReading> readings = await c.Db.MeterReadings.AsNoTracking().Where(r => r.MeterId == meterId && r.ReadingDate <= asAt)
+                    .OrderByDescending(r => r.ReadingDate).Take(2).ToListAsync().ConfigureAwait(true);
+                text.AddRange(readings.Count == 0
+                    ? [$"    meter {serial}: no readings yet"]
+                    : readings.Select(r => $"    meter {serial}: {D(r.ReadingDate)} read {Q(r.Reading)} (previous {Q(r.PreviousReading)}), used {Q(r.Consumption)} — {r.Kind}"));
+            }
+        }
+
+        return Environment.NewLine + string.Join(Environment.NewLine, text);
     }
 }

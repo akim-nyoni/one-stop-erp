@@ -47,6 +47,8 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLCOSTTOCOMPANY" => await CostToCompanyAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLTAX" => await TaxAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLLEAVE" => await LeaveAsync(companyId, ct).ConfigureAwait(false),
+            "PYRLLEAVEBALANCES" => await LeaveBalancesAsync(companyId, ct).ConfigureAwait(false),
+            "PYRLEMPLOYEEMASTER" => await EmployeeMasterAsync(companyId, ct).ConfigureAwait(false),
             "PYRLSALARYCHANGES" => await SalaryChangesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLLABOURCOST" => await LabourCostAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLBUDGET" => await BudgetAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -278,6 +280,27 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
                     ("DailyRate", Money(daily)), ("Liability", Math.Round(Math.Max(0m, balance) * daily, 2, MidpointRounding.AwayFromZero)));
             })];
     }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LeaveBalancesAsync(long companyId, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<string, decimal> entitlement = await _db.Set<LeavePolicy>().AsNoTracking().Where(p => p.CompanyId == companyId && p.IsActive)
+            .ToDictionaryAsync(p => p.LeaveType, p => p.AnnualDays, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
+        return [.. (await _db.EmployeeLeaveBalances.AsNoTracking().Where(b => b.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false))
+            .Where(b => employees.TryGetValue(b.EmployeeId, out Employee? e) && e.Status != EmployeeStatus.Terminated)
+            .OrderBy(b => employees[b.EmployeeId].Department ?? string.Empty, StringComparer.Ordinal).ThenBy(b => Name(employees, b.EmployeeId), StringComparer.Ordinal)
+            .ThenBy(b => b.LeaveType, StringComparer.Ordinal)
+            .Select(b => Row(("Department", employees[b.EmployeeId].Department ?? "—"), ("Employee", Name(employees, b.EmployeeId)), ("LeaveType", b.LeaveType),
+                ("Entitlement", entitlement.TryGetValue(b.LeaveType, out decimal days) ? Qty(days) : "—"), ("Accrued", Qty(b.AccruedDays)), ("Taken", Qty(b.TakenDays)),
+                ("CarriedForward", Qty(b.CarriedOverDays)), ("Expiring", b.CarriedOverDays > 0m && b.CarryExpiresOn is DateOnly lapse ? $"{Qty(b.CarriedOverDays)} on {Date(lapse)}" : "—"),
+                ("Balance", b.BalanceDays)))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EmployeeMasterAsync(long companyId, CancellationToken ct)
+        => [.. (await EmployeesAsync(companyId, ct).ConfigureAwait(false)).Values
+            .OrderBy(e => e.Department ?? string.Empty, StringComparer.Ordinal).ThenBy(e => e.EmployeeNumber, StringComparer.Ordinal)
+            .Select(e => Row(("Department", e.Department ?? "—"), ("Number", e.EmployeeNumber), ("Name", e.FullName), ("Grade", e.Grade ?? "—"), ("ContractType", e.EmploymentType.ToString()),
+                ("Status", e.Status.ToString()), ("Engaged", Date(e.EngagementDate)), ("JobTitle", e.JobTitle ?? "—"), ("PayGroup", e.PayGroup ?? "—")))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SalaryChangesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {

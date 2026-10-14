@@ -11,7 +11,7 @@ public sealed class StandLifecycleService : IStandLifecycleService
 {
     // These moves belong to their own documents (allocation run / offer, sale, cession, repossession, consolidation, re-subdivision).
     private static readonly HashSet<StandStatus> DocumentOnly =
-        [StandStatus.Allocated, StandStatus.Sold, StandStatus.Transferred, StandStatus.ConsolidatedAway, StandStatus.ReSubdivided];
+        [StandStatus.Allocated, StandStatus.Sold, StandStatus.Transferred, StandStatus.ConsolidatedAway, StandStatus.ReSubdivided, StandStatus.Repossessed];
 
     private readonly One4AllDbContext _db;
 

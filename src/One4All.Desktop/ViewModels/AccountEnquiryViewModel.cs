@@ -95,6 +95,10 @@ public sealed partial class AccountEnquiryViewModel : ObservableObject
     [ObservableProperty]
     private string _journalNarrative = string.Empty;
 
+    /// <summary>The document the selected posting came from (the last step of the drill-down).</summary>
+    [ObservableProperty]
+    private string _sourceDocument = string.Empty;
+
     /// <summary>A status line.</summary>
     [ObservableProperty]
     private string _statusMessage = "Loading…";
@@ -187,6 +191,7 @@ public sealed partial class AccountEnquiryViewModel : ObservableObject
     {
         JournalLines.Clear();
         JournalNarrative = string.Empty;
+        SourceDocument = string.Empty;
         if (row is null)
         {
             JournalHeading = "Select a posting to see its journal.";
@@ -217,6 +222,7 @@ public sealed partial class AccountEnquiryViewModel : ObservableObject
             }
 
             JournalLines.Add(new JournalLineRowVm("Total", string.Empty, Money(journal.TotalDebit), Money(journal.TotalCredit), string.Empty));
+            SourceDocument = await scope.ServiceProvider.GetRequiredService<ISourceDocumentService>().DescribeAsync(_companyId, row.JournalNumber).ConfigureAwait(true);
         }
         catch (Exception ex)
         {

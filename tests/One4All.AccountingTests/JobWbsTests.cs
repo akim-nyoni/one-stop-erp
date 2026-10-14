@@ -57,6 +57,14 @@ public sealed class JobWbsTests
         WbsLineOf(breakdown, "1").Variance.Should().Be(-2_000m);
         WbsLineOf(breakdown, string.Empty).Actual.Should().Be(800m);
         breakdown.Total.ForecastFinalCost.Should().Be(37_800m);
+
+        // JC186 shows the same per cost head: budget, committed (the roof subcontract), cost to date and what is left.
+        await scope.ServiceProvider.GetRequiredService<One4All.Infrastructure.Persistence.Seeding.ReportCatalogueSeeder>().SeedAsync();
+        var report = await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Reporting.IReportRunner>()
+            .RenderAsync(companyId, "JC186", new Dictionary<string, object?>(), One4All.Application.Abstractions.Reporting.ReportFormat.Csv);
+        report.IsSuccess.Should().BeTrue(report.IsFailure ? report.Error.Message : null);
+        System.Text.Encoding.UTF8.GetString(report.Value.Content).Should().Contain("WBS-1,Clinic,Masonry,Labour,\"20,000.00\",0.00,\"12,000.00\",93.8%,8000")
+            .And.Contain("WBS-1,Clinic,Roofing,—,\"15,000.00\",\"14,000.00\",0.00,0.0%,1000");
     }
 
     private static Application.JobCosting.WbsLine WbsLineOf(WbsBreakdown breakdown, string code) => breakdown.Lines.Single(l => l.Code == code);

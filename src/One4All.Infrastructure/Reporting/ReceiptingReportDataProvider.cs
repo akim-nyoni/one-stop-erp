@@ -33,6 +33,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC6" => await CollectionByServiceAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC7" => await CollectionByTenderAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC8" => await CollectionByCurrencyAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC9" => await CollectionByWardAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC10" => await HourlyVolumeAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC11" => await CashierProductivityAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC12" => await GlReconciliationAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -63,6 +64,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC44" => await DormantAccountsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC45" => await AgentReconciliationAsync(companyId, ct).ConfigureAwait(false),
             "RC46" => await AgentAgeingAsync(companyId, ct).ConfigureAwait(false),
+            "RC49" => await CollectionEfficiencyAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC51" => await CollectionTrendAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
@@ -107,6 +109,29 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .OrderBy(g => g.Key)
             .Select(g => Row(new() { ["Service"] = g.Key, ["Amount"] = g.Sum(l => l.Amount) }))
             .ToList();
+    }
+
+    // Collections by the payer's ward (their first property); money from payers with no property shows apart.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CollectionByWardAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        (DateOnly from, DateOnly to) = Range(parameters);
+        return [.. (await CollectionAnalysis.ComputeAsync(_db, companyId, from, to, ct).ConfigureAwait(false)).Where(c => c.Collected != 0m)
+            .GroupBy(c => c.Ward).OrderBy(g => g.Key == CollectionAnalysis.NoWard).ThenBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => Row(new() { ["Area"] = g.Key, ["Amount"] = g.Sum(c => c.Collected) }))];
+    }
+
+    // Billed against collected per service over the period.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CollectionEfficiencyAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        (DateOnly from, DateOnly to) = Range(parameters);
+        return [.. (await CollectionAnalysis.ComputeAsync(_db, companyId, from, to, ct).ConfigureAwait(false))
+            .GroupBy(c => c.Service).OrderBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => (Service: g.Key, Billed: g.Sum(c => c.Billed), Collected: g.Sum(c => c.Collected)))
+            .Select(s => Row(new()
+            {
+                ["Service"] = s.Service, ["Billed"] = s.Billed, ["Collected"] = s.Collected,
+                ["Percent"] = s.Billed == 0m ? "—" : (s.Collected * 100m / s.Billed).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%",
+            }))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CollectionByTenderAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

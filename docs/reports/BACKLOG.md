@@ -58,7 +58,7 @@ missing domain data. Items are struck through as they ship (with the report code
 - ~~140 OTIF (SO140)~~, ~~141 POD Outstanding (SO141)~~, ~~142 Load Sheet (SO142)~~
 
 ## I. Municipality (the M series)
-- ~~146 Billing Run Summary (M146)~~, ~~147 Billing Exceptions (M147)~~, ~~148 Aged Debtors by Ward / Category / Service (M148)~~, ~~151 Valuation Roll (M151)~~, ~~152 Property Register (M152)~~, ~~153 Clearance Register (M153)~~, ~~154 Reading Sheets (M154)~~, ~~155 Reading Exceptions (M155)~~, ~~156 Consumption (M156)~~, ~~159 Meter Register (M159)~~, ~~160 Disconnection / Reconnection (M160)~~, ~~161 Arrangements (M161)~~, ~~162 Indigent & Subsidy (M162)~~, ~~166 Licences (M166)~~, ~~167 Ticket SLA (M167)~~, ~~168 Tariff Schedule (M168)~~, ~~149 Arrears (M149)~~, ~~163 Interest (M163)~~, ~~164 Write-offs (M164)~~, ~~169 Revenue by Source (M169)~~, ~~170 Ward Pack (M170)~~, ~~171 Statutory Age Analysis (M171)~~, ~~172 Prepaid vs Conventional (M172)~~
+- ~~146 Billing Run Summary (M146)~~, ~~147 Billing Exceptions (M147)~~, ~~148 Aged Debtors by Ward / Category / Service (M148)~~, ~~151 Valuation Roll (M151)~~, ~~152 Property Register (M152)~~, ~~153 Clearance Register (M153)~~, ~~154 Reading Sheets (M154)~~, ~~155 Reading Exceptions (M155)~~, ~~156 Consumption (M156)~~, ~~159 Meter Register (M159)~~, ~~160 Disconnection / Reconnection (M160)~~, ~~161 Arrangements (M161)~~, ~~162 Indigent & Subsidy (M162)~~, ~~166 Licences (M166)~~, ~~167 Ticket SLA (M167)~~, ~~168 Tariff Schedule (M168)~~, ~~149 Arrears (M149)~~, ~~163 Interest (M163)~~, ~~164 Write-offs (M164)~~, ~~169 Revenue by Source (M169)~~, ~~170 Ward Pack (M170)~~, ~~171 Statutory Age Analysis (M171)~~, ~~172 Prepaid vs Conventional (M172)~~, ~~150 Revenue Collection (M150)~~, ~~165 Deposits Held by Consumer (M165)~~
 - ~~157 Water Balance / NRW (M157)~~, ~~158 Unread / Faulty / Tampered Meters (M158)~~
 - ~~145 municipal bill~~
 
@@ -97,7 +97,8 @@ missing domain data. Items are struck through as they ship (with the report code
 - ~~PR14, PR34, PR52, PR54, PR62, PR69~~ (split pay, benefits in kind, terminal benefits, labour mix, reprints)
 - ~~PR8, PR9, PR10~~ (legacy parallel run, supplementary runs and reversals, backpay)
 - ~~PR23, PR24~~ (staff purchases and housing rent recovered through payroll)
-- ~~PR35~~ (multi-currency tax split) — the PR series is complete
+- ~~PR35~~ (multi-currency tax split)
+- ~~PR37, PR44~~ (leave balances with entitlement and carried days; employee master listing) — the PR series is complete
 
 ## P. Audit, Security & Compliance
 - ~~237 Permission Matrix (SYS237)~~, ~~238 Membership (SYS238)~~, ~~239 SoD all modules (SYS239)~~, ~~240 Master Data Changes (SYS240)~~, ~~242 Back-dated (SYS242)~~, ~~243 Deleted & Voided (SYS243)~~, ~~244 Numbering Gaps (SYS244, journals)~~, ~~245 Unposted (SYS245)~~, ~~248 Licences (SYS248)~~, ~~250 Report Run Log (SYS250)~~

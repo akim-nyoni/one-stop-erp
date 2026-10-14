@@ -65,6 +65,12 @@ public sealed class PayrollReportsTests
         await db.SaveChangesAsync();
         (await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-01", new DateOnly(2026, 1, 25), "2420", "PRR-2026-01")).IsSuccess.Should().BeTrue();
 
+        EmployeeLeaveBalance annual = new(companyId, employee.Id, "ANNUAL");
+        annual.Accrue(10m);
+        annual.Take(2m);
+        db.Add(annual);
+        await db.SaveChangesAsync();
+
         IReportRunner runner = scope.ServiceProvider.GetRequiredService<IReportRunner>();
         async Task<string> Render(string code)
         {
@@ -97,6 +103,8 @@ public sealed class PayrollReportsTests
         (await Render("PR31")).Should().Contain("PEN Pension Fund,PR-EMP Pat Payee,PF-77,100.00,0.00,100");
         (await Render("PR36")).Should().Contain("TAX26,2026-01-01,0.00,\"1,000.00\",0,0.00").And.Contain("and above");
 
+        (await Render("PR37")).Should().Contain("—,PR-EMP Pat Payee,ANNUAL,—,10,2,0,—,8");
+        (await Render("PR44")).Should().Contain("—,PR-EMP,Pat Payee,G3,Permanent,Active,2025-01-01,—,—").And.Contain("PR-EMP2,Casey Casual,G1");
         (await Render("PR58")).Should().Contain("PR-EMP Pat Payee,—,1,\"2,000.00\",0.00,\"24,000.00\",2000");
 
         foreach (string code in PayrollReports.All().Select(r => r.Code))

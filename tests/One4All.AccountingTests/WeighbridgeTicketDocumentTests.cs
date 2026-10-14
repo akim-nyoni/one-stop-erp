@@ -63,5 +63,31 @@ public sealed class WeighbridgeTicketDocumentTests
         printed.Should().Contain("WEIGHBRIDGE TICKET").And.Contain("WT-1").And.Contain("T. Moyo").And.Contain("WT-SO1").And.Contain("WT-B Ticket Builder")
             .And.Contain("21,500 kg").And.Contain("9,000 kg").And.Contain("12,000 kg").And.Contain("12.000 t").And.Contain("Driver: ____");
         (await bridge.RenderTicketAsync(companyId, "NOPE")).Error.Code.Should().Be("Wb.TicketNotFound");
+
+        // A load from a stockpile is despatched on its order, and invoiced at the order's price when no price is given.
+        sand.CostOfSalesAccountCode = "5000";
+        Warehouse pile = new(companyId, "WT-PILE", "Sand stockpile");
+        db.Warehouses.Add(pile);
+        await db.SaveChangesAsync();
+        (await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Inventory.IInventoryService>().ReceiveAsync(new One4All.Application.Abstractions.Inventory.ReceiveStockRequest
+        {
+            CompanyId = companyId, ItemId = sand.Id, WarehouseId = pile.Id, Date = new DateOnly(2026, 3, 1), Quantity = 100m, UnitCost = 5m, CreditAccountCode = "1100",
+        })).IsSuccess.Should().BeTrue();
+        FirstWeighRequest fromPile = Weigh("WT-SO1");
+        (long piled, _) = (await bridge.FirstWeighAsync(new FirstWeighRequest
+        {
+            CompanyId = fromPile.CompanyId, Direction = fromPile.Direction, Vehicle = fromPile.Vehicle, ItemId = fromPile.ItemId, CubicMetresPerTonne = fromPile.CubicMetresPerTonne,
+            CustomerId = fromPile.CustomerId, Date = fromPile.Date, OperatorUserId = 1, SalesOrderNumber = "WT-SO1", WarehouseId = pile.Id,
+        })).Value;
+        (await bridge.SecondWeighAsync(new SecondWeighRequest { CompanyId = companyId, TicketId = piled, WeightKg = 19_000m, OperatorUserId = 1 })).IsSuccess.Should().BeTrue();
+        long so1 = await db.Set<Core.SalesOrders.SalesOrder>().Where(o => o.CompanyId == companyId && o.OrderNumber == "WT-SO1").Select(o => o.Id).SingleAsync();
+        Core.SalesOrders.SalesOrderLine line = await db.Set<Core.SalesOrders.SalesOrderLine>().AsNoTracking().SingleAsync(l => l.SalesOrderId == so1);
+        line.DespatchedQuantity.Should().Be(10m, "the 10 t load went out on the order");
+        WeighbridgeInvoice billed = (await bridge.InvoiceTicketsAsync(new WeighbridgeInvoiceRequest
+        {
+            CompanyId = companyId, CustomerId = builder.Id, DocumentNumber = "WT-INV1", DocumentDate = new DateOnly(2026, 3, 31), SalesAccountCode = "4000",
+        })).Value;
+        billed.Product.Should().Be(22m * 12m, "both loads (12 t and 10 t) at the order's 12 a tonne");
+        (await db.Set<Core.SalesOrders.SalesOrderLine>().AsNoTracking().SingleAsync(l => l.Id == line.Id)).InvoicedQuantity.Should().Be(10m, "only what was despatched on the order");
     }
 }

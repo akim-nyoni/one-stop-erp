@@ -217,8 +217,9 @@ public static class SystemReports
     /// <summary>Builds the Income Statement definition (brief §14 report 7).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition IncomeStatement() => Listing(IncomeStatementCode, "Income Statement", "GeneralLedger",
-        "Income and expenses for a period; the difference is the net profit.", "IncomeStatement",
-        [new Column("Category", "Section", 120), new Column("AccountName", "Account", 250), new Column("Amount", "Amount", 100, true)],
+        "Income and expenses for a period; the difference is the net profit — beside the same period a year earlier and the change.", "IncomeStatement",
+        [new Column("Category", "Section", 110), new Column("AccountName", "Account", 220), new Column("Amount", "This period", 95, true), new Column("PriorAmount", "Prior year", 95, true),
+            new Column("Change", "Change", 90, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String)]);
 
     /// <summary>The code of the statement laid out by a reporting tree.</summary>
@@ -293,8 +294,9 @@ public static class SystemReports
     /// <summary>Builds the Balance Sheet definition (brief §14 report 6).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition BalanceSheet() => Listing(BalanceSheetCode, "Balance Sheet", "GeneralLedger",
-        "Assets, liabilities and equity as at a date; assets equal liabilities plus equity.", "BalanceSheet",
-        [new Column("Category", "Section", 120), new Column("AccountName", "Account", 250), new Column("Amount", "Amount", 100, true)],
+        "Assets, liabilities and equity as at a date; assets equal liabilities plus equity — beside the position a year earlier and the change.", "BalanceSheet",
+        [new Column("Category", "Section", 110), new Column("AccountName", "Account", 220), new Column("Amount", "This year", 95, true), new Column("PriorAmount", "Prior year", 95, true),
+            new Column("Change", "Change", 90, true)],
         [("AsAtDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String)]);
 
     /// <summary>Builds the Statement of Cash Flows definition (IAS 7, movement method).</summary>

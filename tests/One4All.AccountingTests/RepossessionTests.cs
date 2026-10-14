@@ -67,7 +67,10 @@ public sealed class RepossessionTests
         (await repossessions.RepossessAsync(Request(71, 72))).Error.Code.Should().Be("Hse.AgreementClosed");
 
         HousingStand stand = await db.HousingStands.AsNoTracking().Include(s => s.Ownership).SingleAsync(s => s.Id == standId);
-        stand.Status.Should().Be(StandStatus.Available);
+        stand.Status.Should().Be(StandStatus.Repossessed);
+        IStandLifecycleService lifecycle = scope.ServiceProvider.GetRequiredService<IStandLifecycleService>();
+        (await lifecycle.MoveAsync(companyId, "RP-1", StandStatus.Available, new DateOnly(2026, 4, 20), 72, "Committee 12/2026", "Cleared for re-allocation")).IsSuccess.Should().BeTrue();
+        (await db.HousingStands.AsNoTracking().SingleAsync(s => s.Id == standId)).Status.Should().Be(StandStatus.Available);
         stand.CurrentHolderCustomerId.Should().BeNull();
         stand.AllocatedCost.Should().Be(20000m);
         stand.Ownership[^1].ChangeType.Should().Be(OwnershipChangeType.Repossession);

@@ -67,13 +67,16 @@ public enum StandStatus
 
     /// <summary>Split into new stands (re-subdivision); no longer exists on its own.</summary>
     ReSubdivided = 35,
+
+    /// <summary>Taken back by council from a defaulting buyer; released to available once it may be re-allocated.</summary>
+    Repossessed = 36,
 }
 
 /// <summary>
 /// The stand status state machine (brief §4.10.2): which moves are allowed, so no state is jumped. The main line runs raw land → planned →
 /// surveyed → under servicing → serviced → available → (reserved / offered) → allocated → sold (under agreement; transferred after a cession)
 /// → fully paid → title applied → registered → handed over, with side branches for a hold, surrender, a cancelled offer, consolidation and
-/// re-subdivision. Repossession returns a stand straight to available (its own document).
+/// re-subdivision. Repossession (its own document) takes a sold stand to repossessed, from where it is released to available for re-allocation.
 /// </summary>
 public static class StandLifecycle
 {
@@ -89,12 +92,13 @@ public static class StandLifecycle
         [StandStatus.Offered] = [StandStatus.Allocated, StandStatus.OfferCancelled],
         [StandStatus.OfferCancelled] = [StandStatus.Available],
         [StandStatus.Allocated] = [StandStatus.Sold, StandStatus.Available, StandStatus.Surrendered],
-        [StandStatus.Sold] = [StandStatus.Transferred, StandStatus.FullyPaid, StandStatus.Available, StandStatus.Surrendered],
-        [StandStatus.Transferred] = [StandStatus.Transferred, StandStatus.FullyPaid, StandStatus.Available, StandStatus.Surrendered],
         [StandStatus.FullyPaid] = [StandStatus.TitleApplied, StandStatus.Transferred],
         [StandStatus.TitleApplied] = [StandStatus.TitleRegistered],
         [StandStatus.TitleRegistered] = [StandStatus.TitleHandedOver],
         [StandStatus.Surrendered] = [StandStatus.Available],
+        [StandStatus.Sold] = [StandStatus.Transferred, StandStatus.FullyPaid, StandStatus.Available, StandStatus.Surrendered, StandStatus.Repossessed],
+        [StandStatus.Transferred] = [StandStatus.Transferred, StandStatus.FullyPaid, StandStatus.Available, StandStatus.Surrendered, StandStatus.Repossessed],
+        [StandStatus.Repossessed] = [StandStatus.Available],
     };
 
     /// <summary>States a stand can be consolidated or re-subdivided from (nobody holds or is promised it).</summary>
@@ -435,7 +439,7 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
     {
         AllocatedCost = carryingAmount;
         CurrentHolderCustomerId = null;
-        SetStatus(StandStatus.Available, date, null, "Repossession", "Repossessed and back in stock");
+        SetStatus(StandStatus.Repossessed, date, null, "Repossession", "Repossessed and back in stock, to be released for re-allocation");
         AppendOwnership(OwnershipChangeType.Repossession, null, "Council (repossessed)", date, 0m);
     }
 

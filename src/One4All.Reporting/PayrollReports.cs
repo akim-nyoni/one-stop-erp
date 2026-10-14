@@ -39,6 +39,15 @@ public static class PayrollReports
              new Column("Taxable", "Taxable", 55), new Column("Amount", "Amount", 95, true)], Period);
         yield return Listing("PR29", "Tax Reconciliation", "Payroll", "Per employee over the period: taxable earnings, PAYE deducted and the effective rate.",
             "PyrlTax", [new Column("Employee", "Employee", 160), new Column("Taxable", "Taxable earnings", 100), new Column("Rate", "Effective rate", 80), new Column("Tax", "Tax deducted", 100, true)], Period);
+        yield return Listing("PR37", "Leave Balances", "Payroll", "Each current employee's leave by department and type: the year's entitlement, accrued, taken, carried forward, "
+            + "carried days about to lapse, and the balance.",
+            "PyrlLeaveBalances", [new Column("Department", "Department", 85), new Column("Employee", "Employee", 160), new Column("LeaveType", "Leave", 75), new Column("Entitlement", "Entitlement", 70),
+             new Column("Accrued", "Accrued", 60), new Column("Taken", "Taken", 55), new Column("CarriedForward", "Carried fwd", 65), new Column("Expiring", "Carried lapsing", 110),
+             new Column("Balance", "Balance", 65, true)], []);
+        yield return Listing("PR44", "Employee Master Listing", "Payroll", "Every employee by department: grade, contract type, status, engagement, job title and pay group.",
+            "PyrlEmployeeMaster", [new Column("Department", "Department", 85), new Column("Number", "Number", 70), new Column("Name", "Name", 150), new Column("Grade", "Grade", 50),
+             new Column("ContractType", "Contract", 75), new Column("Status", "Status", 70), new Column("Engaged", "Engaged", 75), new Column("JobTitle", "Job title", 120),
+             new Column("PayGroup", "Pay group", 70)], []);
         yield return Listing("PR38", "Leave Liability (IAS 19)", "Payroll", "Leave days owed at the date per employee and type, valued at the daily rate of basic salary (annual ÷ 260).",
             "PyrlLeave", [new Column("Employee", "Employee", 160), new Column("LeaveType", "Leave", 90), new Column("Accrued", "Accrued", 65), new Column("Taken", "Taken", 60), new Column("Balance", "Balance", 65),
              new Column("DailyRate", "Daily rate", 80), new Column("Liability", "Liability", 100, true)], []);

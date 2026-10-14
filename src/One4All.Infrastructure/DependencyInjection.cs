@@ -242,6 +242,7 @@ public static class DependencyInjection
         services.AddSingleton<IFiscalDeviceProvider>(_ => Environment.GetEnvironmentVariable("ONE4ALL_FISCAL_SIMULATE") == "1"
             ? new SimulatedFiscalDeviceProvider() : new NullFiscalDeviceProvider());
         services.AddScoped<Application.Abstractions.Reporting.IGeneralLedgerReports, GeneralLedgerReports>();
+        services.AddScoped<Application.Abstractions.Reporting.ISourceDocumentService, Reporting.SourceDocumentService>();
         services.AddScoped<Application.Abstractions.Reporting.IConsolidationService, Accounting.ConsolidationService>();
         services.AddScoped<Application.Abstractions.Reporting.IWorkingCapitalService, Accounting.WorkingCapitalService>();
         services.AddScoped<Application.Abstractions.Reporting.IFinancialReportRenderer, Reporting.FinancialReportRenderer>();

@@ -57,6 +57,9 @@ public sealed class ReportRunnerTests
             string income = await RenderHtml(runner, companyId, "GL-IS", new() { ["FromDate"] = new DateOnly(2026, 1, 1), ["ToDate"] = new DateOnly(2026, 3, 31) });
             income.Should().Contain("Income Statement");
             income.Should().Contain("1,234.00");
+            income.Should().Contain("Prior year", "the statement shows the same period a year earlier beside it");
+            string position = await RenderHtml(runner, companyId, "GL-BS", new() { ["AsAtDate"] = new DateOnly(2026, 3, 31) });
+            position.Should().Contain("Prior year").And.Contain("1,234.00");
 
             // AR — Aged Debtors (the customer with 1234 outstanding).
             string aged = await RenderHtml(runner, companyId, "AR-AGE", new() { ["AsAtDate"] = new DateOnly(2026, 3, 31) });

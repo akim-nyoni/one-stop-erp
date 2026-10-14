@@ -26,8 +26,13 @@ public sealed class WeighbridgeService : IWeighbridgeService
     /// <param name="numbers">Numbers the tickets.</param>
     /// <param name="clock">Stamps time in and out.</param>
     /// <param name="ar">Posts the customer's invoice.</param>
-    public WeighbridgeService(One4AllDbContext db, IInventoryService inventory, INumberSequenceService numbers, IClock clock, ISalesLedgerService ar)
+    /// <param name="orders">Despatches a load against its sales order.</param>
+    /// <param name="pricing">Prices a load from the customer's price book when no price is given.</param>
+    public WeighbridgeService(One4AllDbContext db, IInventoryService inventory, INumberSequenceService numbers, IClock clock, ISalesLedgerService ar,
+        Application.Abstractions.SalesOrders.ISalesOrderService? orders = null, IPricingService? pricing = null)
     {
+        _orders = orders;
+        _pricing = pricing;
         _db = db;
         _inventory = inventory;
         _numbers = numbers;
@@ -36,6 +41,8 @@ public sealed class WeighbridgeService : IWeighbridgeService
     }
 
     private readonly ISalesLedgerService _ar;
+    private readonly Application.Abstractions.SalesOrders.ISalesOrderService? _orders;
+    private readonly IPricingService? _pricing;
 
     /// <inheritdoc />
     public Task<Result<WeighbridgeInvoice>> InvoiceTicketsAsync(WeighbridgeInvoiceRequest request, CancellationToken ct = default)
@@ -44,9 +51,9 @@ public sealed class WeighbridgeService : IWeighbridgeService
     // One unit of work: the invoice posts and the tickets are marked billed together, so no load is billed twice or missed.
     private async Task<Result<WeighbridgeInvoice>> InvoiceTicketsCoreAsync(WeighbridgeInvoiceRequest request, CancellationToken ct)
     {
-        if (request.PricePerTonne <= 0m || string.IsNullOrWhiteSpace(request.SalesAccountCode) || string.IsNullOrWhiteSpace(request.DocumentNumber))
+        if (request.PricePerTonne < 0m || string.IsNullOrWhiteSpace(request.SalesAccountCode) || string.IsNullOrWhiteSpace(request.DocumentNumber))
         {
-            return Error.Validation("Wb.Invoice", "An invoice number, a price per tonne and a sales account are required.");
+            return Error.Validation("Wb.Invoice", "An invoice number and a sales account are required, and a price per tonne cannot be negative.");
         }
 
         Core.Trading.Customer? customer = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == request.CustomerId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
@@ -64,7 +71,43 @@ public sealed class WeighbridgeService : IWeighbridgeService
             return Error.Rule("Wb.NothingToInvoice", $"{customer.Name} has no completed loads to invoice up to {request.DocumentDate:yyyy-MM-dd}.");
         }
 
-        decimal product = tickets.Sum(t => decimal.Round(t.NetTonnes * request.PricePerTonne, 2, MidpointRounding.AwayFromZero));
+        // Each load at the price given, or else its sales order's price, or else the customer's price book for the product.
+        List<long> orderIds = [.. tickets.Where(t => t.SalesOrderId is not null).Select(t => t.SalesOrderId!.Value).Distinct()];
+        List<Core.SalesOrders.SalesOrder> orders = await _db.SalesOrders.Include(o => o.Lines).Where(o => orderIds.Contains(o.Id)).ToListAsync(ct).ConfigureAwait(false);
+        decimal product = 0m;
+        foreach (WeighbridgeTicket t in tickets)
+        {
+            Core.SalesOrders.SalesOrderLine? orderLine = orders.FirstOrDefault(o => o.Id == t.SalesOrderId)?.Lines.FirstOrDefault(l => l.ItemId == t.ItemId);
+            decimal price = request.PricePerTonne;
+            if (price == 0m && orderLine is not null)
+            {
+                price = orderLine.UnitPrice;
+            }
+            else if (price == 0m && _pricing is not null && t.ItemId is long itemId
+                && await _pricing.PriceAsync(request.CompanyId, customer.Id, itemId, t.NetTonnes, t.Date, ct).ConfigureAwait(false) is { IsSuccess: true } listed && listed.Value.Currency == customer.Currency)
+            {
+                price = listed.Value.UnitPrice;
+            }
+
+            if (price <= 0m)
+            {
+                return Error.Rule("Wb.NoPrice", $"Ticket {t.TicketNumber} has no price: give a price per tonne, or price the product for the customer or on the order.");
+            }
+
+            product += decimal.Round(t.NetTonnes * price, 2, MidpointRounding.AwayFromZero);
+
+            // A load against an order is invoiced on the order too, up to what it despatched.
+            if (orderLine is not null)
+            {
+                orderLine.Invoice(Math.Min(t.NetTonnes, Math.Max(0m, orderLine.DespatchedQuantity - orderLine.InvoicedQuantity)));
+            }
+        }
+
+        foreach (Core.SalesOrders.SalesOrder order in orders)
+        {
+            order.RecomputeStatus();
+        }
+
         decimal haulage = tickets.Sum(t => t.HaulageCharge);
         string salesAccount = request.SalesAccountCode.Trim();
         string haulageAccount = string.IsNullOrWhiteSpace(request.HaulageAccountCode) ? salesAccount : request.HaulageAccountCode.Trim();
@@ -316,13 +359,40 @@ public sealed class WeighbridgeService : IWeighbridgeService
 
         if (ticket is { Direction: WeighDirection.Outbound, WarehouseId: long stockpile, ItemId: long itemId })
         {
-            Result<StockMovementResult> issue = await _inventory.IssueAsync(new IssueStockRequest
+            // A load against a sales order is despatched on the order (its delivery, stock issued at cost), as far as the order still wants it;
+            // anything over is issued from the stockpile as it stands.
+            decimal toIssue = ticket.NetTonnes;
+            if (_orders is not null && ticket.SalesOrderId is long orderId)
             {
-                CompanyId = request.CompanyId, ItemId = itemId, WarehouseId = stockpile, Date = ticket.Date, Quantity = ticket.NetTonnes, Reference = ticket.TicketNumber,
-            }, ct).ConfigureAwait(false);
-            if (issue.IsFailure)
+                var line = await _db.Set<Core.SalesOrders.SalesOrderLine>().AsNoTracking().Where(l => l.SalesOrderId == orderId && l.ItemId == itemId)
+                    .Select(l => new { l.Id, Outstanding = l.OrderedQuantity - l.DespatchedQuantity }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+                decimal onOrder = Math.Min(toIssue, Math.Max(0m, line?.Outstanding ?? 0m));
+                if (line is not null && onOrder > 0m)
+                {
+                    Result<Application.Abstractions.SalesOrders.DespatchResult> despatched = await _orders.DespatchAsync(new Application.Abstractions.SalesOrders.DespatchRequest
+                    {
+                        CompanyId = request.CompanyId, SalesOrderId = orderId, WarehouseId = stockpile, Date = ticket.Date, Reference = ticket.TicketNumber,
+                        Lines = [new Application.Abstractions.SalesOrders.DespatchLine(line.Id, onOrder)], Vehicle = ticket.VehicleRegistration, Driver = ticket.DriverName,
+                    }, ct).ConfigureAwait(false);
+                    if (despatched.IsFailure)
+                    {
+                        return despatched.Error;
+                    }
+
+                    toIssue -= onOrder;
+                }
+            }
+
+            if (toIssue > 0m)
             {
-                return issue.Error;
+                Result<StockMovementResult> issue = await _inventory.IssueAsync(new IssueStockRequest
+                {
+                    CompanyId = request.CompanyId, ItemId = itemId, WarehouseId = stockpile, Date = ticket.Date, Quantity = toIssue, Reference = ticket.TicketNumber,
+                }, ct).ConfigureAwait(false);
+                if (issue.IsFailure)
+                {
+                    return issue.Error;
+                }
             }
         }
 

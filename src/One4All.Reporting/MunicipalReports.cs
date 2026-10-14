@@ -26,6 +26,10 @@ public static class MunicipalReports
             "MuniAgedDebtors", [new Column("Ward", "Ward", 60), new Column("Category", "Category", 90), new Column("Service", "Service", 80), new Column("Accounts", "Accounts", 60),
              new Column("Current", "Current", 85), new Column("D30", "1–30", 85), new Column("D60", "31–60", 85), new Column("D90", "61–90", 85), new Column("D120", "91–120", 85),
              new Column("Over120", "120+", 85), new Column("Total", "Total", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("M150", "Revenue Collection Report", "Municipal", "Billed against collected by month, ward and service, with the collection efficiency.",
+            "MuniRevenueCollection", [new Column("Month", "Month", 65), new Column("Ward", "Ward", 90), new Column("Service", "Service", 100), new Column("Billed", "Billed", 100),
+             new Column("Collected", "Collected", 100), new Column("Efficiency", "Collected %", 70), new Column("Outstanding", "Billed not collected", 110, true)],
+            [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
         yield return Listing("M151", "Valuation Roll & Supplementary Roll", "Municipal", "Every valuation entry (general, supplementary, objection) with its effective date, and objections with their outcome.",
             "MuniValuationRoll", [new Column("Stand", "Stand", 80), new Column("Ward", "Ward", 60), new Column("Kind", "Kind", 90), new Column("Reference", "Reference", 100),
              new Column("EffectiveFrom", "Effective", 75), new Column("Objection", "Objection", 150), new Column("Value", "Value", 110, true)], []);
@@ -70,6 +74,9 @@ public static class MunicipalReports
              new Column("ApprovedFrom", "From", 75), new Column("ReviewDue", "Review due", 75), new Column("Status", "Status", 70), new Column("Subsidy", "Subsidy YTD", 95, true)], [("AsAtDate", ParameterType.Date)]);
 
         // Licensing, service delivery and tariffs.
+        yield return Listing("M165", "Deposits Held by Consumer", "Municipal", "Service deposits held at the date, by ward and consumer: the stand, service, when taken and the amount.",
+            "MuniDepositsHeld", [new Column("Ward", "Ward", 70), new Column("Consumer", "Consumer", 170), new Column("Stand", "Stand", 80), new Column("Service", "Service", 80),
+             new Column("Reference", "Deposit", 90), new Column("TakenOn", "Taken", 75), new Column("Amount", "Held", 100, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("M166", "Licences & Permits Register and Renewals Due", "Municipal", "Every licence with holder, expiry, days to expiry at the date, renewals and the latest inspection.",
             "MuniLicences", [new Column("Licence", "Licence", 90), new Column("Kind", "Kind", 80), new Column("Holder", "Holder", 140), new Column("Expires", "Expires", 75), new Column("Due", "Days to expiry", 75),
              new Column("Status", "Status", 70), new Column("Renewals", "Renewals", 55), new Column("Inspection", "Last inspection", 150), new Column("Fee", "Fee", 85, true)], [("AsAtDate", ParameterType.Date)]);

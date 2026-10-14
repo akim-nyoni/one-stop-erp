@@ -79,6 +79,14 @@
         </Border>
 
         <!-- Journal drill-down -->
+        <Border DockPanel.Dock="Bottom" Style="{StaticResource Tile}" MaxHeight="160">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="Source document" FontWeight="SemiBold" Foreground="#1E3A2E" />
+                    <TextBlock Text="{Binding SourceDocument}" FontFamily="Consolas" FontSize="12" Foreground="#334" TextWrapping="Wrap" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
         <Border DockPanel.Dock="Bottom" Style="{StaticResource Tile}" Height="230">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Top" Margin="0,0,0,6">

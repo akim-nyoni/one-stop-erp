@@ -53,7 +53,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             "OPSSTUDENTBALANCES" => await StudentBalancesAsync(companyId, asAt, ct).ConfigureAwait(false),
             "OPSJOBCOSTS" => await JobCostsAsync(companyId, ct).ConfigureAwait(false),
             "OPSCOSTTOCOMPLETE" => await CostToCompleteAsync(companyId, ct).ConfigureAwait(false),
-            "OPSRETENTION" => await RetentionAsync(companyId, ct).ConfigureAwait(false),
+            "OPSRETENTION" => await RetentionAsync(companyId, asAt, ct).ConfigureAwait(false),
             "OPSVARIATIONS" => await VariationsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "OPSTIMESHEETS" => await TimesheetsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "OPSSUBCONTRACTS" => await SubcontractsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -166,11 +166,64 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         Dictionary<long, JobContract> contracts = await _db.JobContracts.AsNoTracking().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, ct).ConfigureAwait(false);
         var costs = await _db.Set<JobCostEntry>().AsNoTracking().Where(e => e.CompanyId == companyId).GroupBy(e => new { e.JobContractId, e.CostHead, e.Source })
             .Select(g => new { g.Key.JobContractId, g.Key.CostHead, g.Key.Source, Amount = g.Sum(e => e.Amount) }).ToListAsync(ct).ConfigureAwait(false);
-        return [.. costs.Where(c => contracts.ContainsKey(c.JobContractId)).GroupBy(c => c.JobContractId).OrderBy(g => contracts[g.Key].ContractNumber, StringComparer.Ordinal).SelectMany(g =>
+
+        // The budget by cost head comes from the work breakdown; what is committed is ordered for the job but not yet received.
+        var budgets = await _db.JobWbsElements.AsNoTracking().Where(w => w.CompanyId == companyId && w.CostHead != null).GroupBy(w => new { w.JobContractId, w.CostHead })
+            .Select(g => new { g.Key.JobContractId, g.Key.CostHead, Budget = g.Sum(w => w.BudgetCost) }).ToListAsync(ct).ConfigureAwait(false);
+        var committed = await (from l in _db.Set<Core.Procurement.PurchaseOrderLine>().AsNoTracking()
+                               join o in _db.PurchaseOrders.AsNoTracking() on l.PurchaseOrderId equals o.Id
+                               where o.CompanyId == companyId && l.JobContractId != null && l.OrderedQuantity > l.ReceivedQuantity
+                                   && o.Status != Core.Procurement.PurchaseOrderStatus.Cancelled && o.Status != Core.Procurement.PurchaseOrderStatus.Closed
+                               select new { JobContractId = l.JobContractId!.Value, l.JobCostHead, Amount = (l.OrderedQuantity - l.ReceivedQuantity) * l.UnitPrice })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        List<Core.JobCosting.Subcontract> subcontracts = await _db.Subcontracts.AsNoTracking().Include(x => x.Certificates).Where(x => x.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+
+        // Cost heads match whatever their case; each shows as the work breakdown (or else the first source) spells it.
+        Dictionary<string, string> spelling = new(StringComparer.Ordinal);
+        string Head(string? head)
         {
-            decimal total = g.Sum(c => c.Amount);
-            return g.OrderByDescending(c => c.Amount).Select(c => Row(("Contract", contracts[g.Key].ContractNumber), ("Name", contracts[g.Key].Name), ("CostHead", c.CostHead), ("Source", c.Source.ToString()),
-                ("Share", total == 0m ? "—" : (c.Amount * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Cost", c.Amount)));
+            string shown = string.IsNullOrWhiteSpace(head) ? "General" : head.Trim();
+            string key = shown.ToUpperInvariant();
+            return spelling.TryAdd(key, shown) ? shown : spelling[key];
+        }
+
+        Dictionary<(long Contract, string Head), (decimal Budget, decimal Committed, decimal Cost, SortedSet<string> Sources)> heads = [];
+        (decimal Budget, decimal Committed, decimal Cost, SortedSet<string> Sources) At(long contract, string head)
+            => heads.TryGetValue((contract, head), out var found) ? found : heads[(contract, head)] = (0m, 0m, 0m, new SortedSet<string>(StringComparer.Ordinal));
+        foreach (var b in budgets)
+        {
+            var h = At(b.JobContractId, Head(b.CostHead));
+            heads[(b.JobContractId, Head(b.CostHead))] = (h.Budget + b.Budget, h.Committed, h.Cost, h.Sources);
+        }
+
+        foreach (var c in committed)
+        {
+            var h = At(c.JobContractId, Head(c.JobCostHead));
+            heads[(c.JobContractId, Head(c.JobCostHead))] = (h.Budget, h.Committed + c.Amount, h.Cost, h.Sources);
+        }
+
+        foreach (Core.JobCosting.Subcontract sub in subcontracts)
+        {
+            var h = At(sub.JobContractId, Head(sub.CostHead));
+            heads[(sub.JobContractId, Head(sub.CostHead))] = (h.Budget, h.Committed + Math.Max(0m, sub.Value - sub.CertifiedToDate), h.Cost, h.Sources);
+        }
+
+        foreach (var c in costs)
+        {
+            var h = At(c.JobContractId, Head(c.CostHead));
+            h.Sources.Add(c.Source.ToString());
+            heads[(c.JobContractId, Head(c.CostHead))] = (h.Budget, h.Committed, h.Cost + c.Amount, h.Sources);
+        }
+
+        return [.. heads.Where(h => contracts.ContainsKey(h.Key.Contract)).GroupBy(h => h.Key.Contract).OrderBy(g => contracts[g.Key].ContractNumber, StringComparer.Ordinal).SelectMany(g =>
+        {
+            decimal total = g.Sum(h => h.Value.Cost);
+            return g.OrderByDescending(h => h.Value.Cost).ThenBy(h => h.Key.Head, StringComparer.Ordinal).Select(h => Row(("Contract", contracts[g.Key].ContractNumber),
+                ("Name", contracts[g.Key].Name), ("CostHead", h.Key.Head), ("Sources", h.Value.Sources.Count == 0 ? "—" : string.Join(", ", h.Value.Sources)),
+                ("Budget", Money(h.Value.Budget)), ("Committed", Money(h.Value.Committed)), ("Cost", Money(h.Value.Cost)),
+                ("Share", total == 0m ? "—" : (h.Value.Cost * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%"),
+                ("Variance", h.Value.Budget - h.Value.Committed - h.Value.Cost)));
         })];
     }
 
@@ -190,12 +243,15 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         })];
     }
 
-    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RetentionAsync(long companyId, CancellationToken ct)
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RetentionAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {
         Dictionary<long, string> customers = await GuardiansAsync(companyId, ct).ConfigureAwait(false);
-        return [.. (await _db.JobContracts.AsNoTracking().Where(c => c.CompanyId == companyId && c.RetentionHeld != 0m).OrderBy(c => c.ContractNumber).ToListAsync(ct).ConfigureAwait(false))
+        return [.. (await _db.JobContracts.AsNoTracking().Where(c => c.CompanyId == companyId && (c.RetentionHeld != 0m || c.RetentionReleased != 0m)).OrderBy(c => c.ContractNumber)
+                .ToListAsync(ct).ConfigureAwait(false))
             .Select(c => Row(("Contract", c.ContractNumber), ("Name", c.Name), ("Customer", customers.GetValueOrDefault(c.CustomerId, "?")), ("Status", c.Status.ToString()),
-                ("Rate", c.RetentionPercent.ToString("0.##", CultureInfo.InvariantCulture)), ("Certified", Money(c.CertifiedToDate)), ("Retention", c.RetentionHeld)))];
+                ("Rate", c.RetentionPercent.ToString("0.##", CultureInfo.InvariantCulture)), ("Certified", Money(c.CertifiedToDate)), ("Released", Money(c.RetentionReleased)),
+                ("Completed", c.PracticalCompletionDate is DateOnly done ? Date(done) : "—"), ("DefectsEnd", c.DefectsLiabilityEnds is DateOnly end ? Date(end) : "—"),
+                ("Releasable", Money(c.RetentionReleasable(asAt))), ("Retention", c.RetentionHeld)))];
     }
 
     private Task<Dictionary<long, string>> ContractNumbersAsync(long companyId, CancellationToken ct)

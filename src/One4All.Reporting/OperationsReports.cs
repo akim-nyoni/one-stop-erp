@@ -50,15 +50,19 @@ public static class OperationsReports
         yield return Listing("SC185", "Tuck Shop Sales & Student Account Spend", "School", "Per student over the period: wallet balance brought forward, top-ups, tuck-shop spend and the balance carried forward.",
             "OpsWallets", [new Column("Student", "Student", 170), new Column("Grade", "Grade", 60), new Column("Opening", "B/f", 85), new Column("TopUps", "Top-ups", 85), new Column("Spend", "Spend", 85),
              new Column("Days", "Days spent", 60), new Column("Closing", "C/f", 90, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
-        yield return Listing("JC186", "Job Cost Report by Cost Head", "JobCosting", "Per contract and cost head: cost to date and share of the contract's cost, against its budget.",
-            "OpsJobCosts", [new Column("Contract", "Contract", 90), new Column("Name", "Name", 150), new Column("CostHead", "Cost head", 110), new Column("Source", "Source", 90), new Column("Share", "Share", 60),
-             new Column("Cost", "Cost to date", 100, true)], []);
+        yield return Listing("JC186", "Job Cost Report by Cost Head", "JobCosting", "Per contract and cost head: the budget (from the work breakdown), what is committed on open orders, "
+            + "the cost to date with where it came from, and what is left of the budget after both.",
+            "OpsJobCosts", [new Column("Contract", "Contract", 80), new Column("Name", "Name", 130), new Column("CostHead", "Cost head", 100), new Column("Sources", "Sources", 110),
+             new Column("Budget", "Budget", 90), new Column("Committed", "Committed", 90), new Column("Cost", "Cost to date", 90), new Column("Share", "Share", 50),
+             new Column("Variance", "Budget left", 95, true)], []);
         yield return Listing("JC189", "Cost to Complete & Forecast Final Cost", "JobCosting", "Per contract: value, budget, cost to date, % complete by certification, forecast final cost and the variance to budget.",
             "OpsCostToComplete", [new Column("Contract", "Contract", 90), new Column("Name", "Name", 150), new Column("Value", "Contract value", 100), new Column("Budget", "Budget", 95), new Column("Actual", "Cost to date", 95),
              new Column("Complete", "% complete", 70), new Column("Forecast", "Forecast final", 100), new Column("Variance", "Over / (under) budget", 105, true)], []);
-        yield return Listing("JC190", "Retention Held by Contract", "JobCosting", "Retention held on each contract's certificates, with the contract status.",
-            "OpsRetention", [new Column("Contract", "Contract", 90), new Column("Name", "Name", 150), new Column("Customer", "Customer", 140), new Column("Status", "Status", 70), new Column("Rate", "Retention %", 70),
-             new Column("Certified", "Certified", 100), new Column("Retention", "Retention held", 100, true)], []);
+        yield return Listing("JC190", "WIP & Retention Report", "JobCosting", "Retention held on each contract, what has been released, practical completion and when the defects "
+            + "liability period ends, and what may be released at the date (half at completion, the rest when the defects period ends).",
+            "OpsRetention", [new Column("Contract", "Contract", 80), new Column("Name", "Name", 130), new Column("Customer", "Customer", 120), new Column("Status", "Status", 60), new Column("Rate", "Ret. %", 45),
+             new Column("Certified", "Certified", 90), new Column("Released", "Released", 80), new Column("Completed", "Completed", 75), new Column("DefectsEnd", "Defects end", 75),
+             new Column("Releasable", "Releasable now", 90), new Column("Retention", "Retention held", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("JC191", "Variation Order Register", "JobCosting", "Every variation submitted in the period: contract, status, decision, and the value and cost impact (approved impacts move the contract).",
             "OpsVariations", [new Column("Contract", "Contract", 85), new Column("Number", "VO", 70), new Column("Description", "Description", 180), new Column("Submitted", "Submitted", 75), new Column("Status", "Status", 70),
              new Column("Decided", "Decided", 75), new Column("CostImpact", "Cost impact", 90), new Column("ValueImpact", "Value impact", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
