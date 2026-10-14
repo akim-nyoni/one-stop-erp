@@ -11,6 +11,102 @@ namespace One4All.Desktop.Operations;
 /// <content>Customer and supplier documents: invoices and credit notes, receipts and payments, statements.</content>
 public static partial class OperationCatalogue
 {
+    // The allocation workbench for one ledger: match, unmatch, contra (customers) and write off (customers, with VAT relief) or write back (suppliers).
+    private static Operation Allocations(TradingLedger ledger)
+    {
+        bool customers = ledger == TradingLedger.AccountsReceivable;
+        string trader = customers ? "Customer" : "Supplier";
+        return new Operation
+        {
+            Module = customers ? "Customers" : "Suppliers", Title = $"Allocate {trader.ToLowerInvariant()} items", ListTitle = $"Open {trader.ToLowerInvariant()} items",
+            Description = customers
+                ? "Match a receipt or credit note to an invoice (in part: give the amount; blank matches as much as both have open), undo an allocation, settle a customer "
+                    + "invoice against the same party's supplier invoice (contra), or write off a bad debt claiming back the VAT on it once it is overdue long enough."
+                : "Match a payment or credit note to an invoice (in part: give the amount; blank matches as much as both have open), undo an allocation, or write back "
+                    + "an old creditor invoice that will never be paid (the liability released to income).",
+            Fields = [Pick("Step", "Step", customers ? ["Allocate", "Unallocate", "Contra", "Write off"] : ["Allocate", "Unallocate", "Write back"]), Req("Trader", $"{trader} code"),
+                Opt("Debit", customers ? "Invoice number" : "Debit document (payment / debit note)"), Opt("Credit", customers ? "Receipt / credit note number" : "Invoice number"),
+                OptNum("Amount", "Amount (blank: as much as is open)"), Today(), OptNum("Allocation", "Allocation id (unallocate; blank: the latest on the document)"),
+                .. (customers ? new[] { Opt("Supplier", "Supplier code (contra)"), Opt("SupplierInvoice", "Supplier invoice number (contra)"), Opt("Clearing", "Contra clearing account") } : []),
+                Opt("Account", customers ? "Bad debt expense account (write off)" : "Write-back income account"), Opt("Reason", "Reason (write off / back)"),
+                .. (customers ? new[] { Num("Days", "Overdue at least (days) for VAT relief", "180") } : []), Opt("Document", "Document number (contra)")],
+            Run = async (c, i) =>
+            {
+                long traderId = customers ? await CustomerAsync(c, i.Text("Trader")).ConfigureAwait(true) : await SupplierAsync(c, i.Text("Trader")).ConfigureAwait(true);
+                async Task<Core.Trading.OpenItem> ItemAsync(TradingLedger inLedger, long ofTrader, string field, LedgerSign? sign = null)
+                {
+                    string number = (i.Optional(field) ?? throw new OperationException($"Give the {field.ToLowerInvariant()} document.")).Trim();
+                    return await c.Db.OpenItems.AsNoTracking().Where(o => o.CompanyId == c.CompanyId && o.Ledger == inLedger && o.TraderId == ofTrader && o.DocumentNumber.ToUpper() == number.ToUpper()
+                            && (sign == null || o.Sign == sign)).OrderByDescending(o => o.OutstandingTransaction).FirstOrDefaultAsync().ConfigureAwait(true)
+                        ?? throw new OperationException($"No open item {number} on that account.");
+                }
+
+                IAllocationService allocations = c.Get<IAllocationService>();
+                DateOnly date = i.Date("Date");
+                switch (i.Text("Step"))
+                {
+                    case "Allocate":
+                    {
+                        Core.Trading.OpenItem debit = await ItemAsync(ledger, traderId, "Debit", LedgerSign.Debit).ConfigureAwait(true);
+                        Core.Trading.OpenItem credit = await ItemAsync(ledger, traderId, "Credit", LedgerSign.Credit).ConfigureAwait(true);
+                        decimal amount = i.OptionalNumber("Amount") ?? Math.Min(Math.Abs(debit.OutstandingTransaction), Math.Abs(credit.OutstandingTransaction));
+                        AllocationResult done = Check(await allocations.AllocateAsync(c.CompanyId, ledger, debit.Id, credit.Id, amount, date).ConfigureAwait(true));
+                        return $"Allocated {M(done.TransactionAmount)} ({debit.DocumentNumber} against {credit.DocumentNumber}, allocation {done.AllocationId})."
+                            + (done.RealisedFxBase != 0m ? $" Realised exchange difference {M(done.RealisedFxBase)} (journal {done.FxJournalNumber})." : string.Empty);
+                    }
+
+                    case "Unallocate":
+                    {
+                        long allocationId;
+                        if (i.OptionalNumber("Allocation") is decimal given)
+                        {
+                            allocationId = (long)given;
+                        }
+                        else
+                        {
+                            string field = i.Optional("Debit") is not null ? "Debit" : "Credit";
+                            Core.Trading.OpenItem item = await ItemAsync(ledger, traderId, field).ConfigureAwait(true);
+                            allocationId = await c.Db.Set<Core.Trading.Allocation>().AsNoTracking().Where(a => a.CompanyId == c.CompanyId && (a.DebitItemId == item.Id || a.CreditItemId == item.Id))
+                                .OrderByDescending(a => a.Id).Select(a => (long?)a.Id).FirstOrDefaultAsync().ConfigureAwait(true) ?? throw new OperationException($"{item.DocumentNumber} has no allocation to undo.");
+                        }
+
+                        UnallocationResult undone = Check(await allocations.UnallocateAsync(c.CompanyId, allocationId, date).ConfigureAwait(true));
+                        return $"Allocation {undone.AllocationId} undone; {M(undone.RestoredTransaction)} open again.";
+                    }
+
+                    case "Contra":
+                    {
+                        Core.Trading.OpenItem invoice = await ItemAsync(ledger, traderId, "Debit", LedgerSign.Debit).ConfigureAwait(true);
+                        long supplierId = await SupplierAsync(c, i.Optional("Supplier") ?? throw new OperationException("Give the supplier to contra against.")).ConfigureAwait(true);
+                        Core.Trading.OpenItem supplierInvoice = await ItemAsync(TradingLedger.AccountsPayable, supplierId, "SupplierInvoice").ConfigureAwait(true);
+                        decimal amount = i.OptionalNumber("Amount") ?? Math.Min(Math.Abs(invoice.OutstandingBase), Math.Abs(supplierInvoice.OutstandingBase));
+                        return Check(await allocations.ContraAsync(c.CompanyId, traderId, invoice.Id, supplierId, supplierInvoice.Id, amount, date,
+                            i.Optional("Clearing") ?? throw new OperationException("Give the contra clearing account."), i.Optional("Document") ?? $"CONTRA-{invoice.DocumentNumber}").ConfigureAwait(true),
+                            $"Contra of {M(amount)}: {invoice.DocumentNumber} settled against {supplierInvoice.DocumentNumber}.");
+                    }
+
+                    case "Write off":
+                    {
+                        Core.Trading.OpenItem invoice = await ItemAsync(ledger, traderId, "Debit", LedgerSign.Debit).ConfigureAwait(true);
+                        VatReliefWriteOff off = Check(await c.Get<ISalesLedgerService>().WriteOffWithVatReliefAsync(c.CompanyId, invoice.Id, date,
+                            i.Optional("Account") ?? throw new OperationException("Give the bad debt expense account."), i.Optional("Reason") ?? throw new OperationException("Give the reason."),
+                            (int)i.Number("Days")).ConfigureAwait(true));
+                        return $"{invoice.DocumentNumber} written off: {M(off.WrittenOffToBadDebt)} to bad debts, {M(off.VatRelief)} VAT relief claimed.";
+                    }
+
+                    default:
+                    {
+                        Core.Trading.OpenItem invoice = await ItemAsync(ledger, traderId, "Credit", LedgerSign.Credit).ConfigureAwait(true);
+                        TradingPostingResult back = Check(await c.Get<IPurchaseLedgerService>().WriteBackAsync(c.CompanyId, invoice.Id, date,
+                            i.Optional("Account") ?? throw new OperationException("Give the write-back income account."), i.Optional("Reason") ?? throw new OperationException("Give the reason.")).ConfigureAwait(true));
+                        return $"{invoice.DocumentNumber} written back to income (journal {back.JournalNumber}).";
+                    }
+                }
+            },
+            List = c => OpenItemsAsync(c, ledger),
+        };
+    }
+
     private static IEnumerable<Operation> Trading()
     {
         foreach (string module in new[] { "Customers", "Suppliers" })
@@ -158,6 +254,8 @@ public static partial class OperationCatalogue
             },
             List = c => OpenItemsAsync(c, TradingLedger.AccountsReceivable),
         };
+        yield return Allocations(TradingLedger.AccountsReceivable);
+        yield return Allocations(TradingLedger.AccountsPayable);
         yield return new Operation
         {
             Module = "Customers", Title = "Customer statement", ListTitle = "Open customer items",

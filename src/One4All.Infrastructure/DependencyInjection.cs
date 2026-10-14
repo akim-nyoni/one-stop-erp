@@ -211,6 +211,8 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Reporting.ReportSubscriptionsTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.DespatchMessagesTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.LapseOffersTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.MonthlyDepreciationTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.WaitingListRenewalsTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Backup.BackupTask>();
         services.AddScoped<Application.Abstractions.Reporting.IReportingSnapshotService, Reporting.ReportingSnapshotService>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Reporting.RefreshSnapshotsTask>();

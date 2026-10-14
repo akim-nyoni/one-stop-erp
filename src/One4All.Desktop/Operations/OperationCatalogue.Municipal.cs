@@ -101,6 +101,19 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Fault ticket categories", ListTitle = "Fault ticket categories",
+            Description = "The kinds of fault the public reports (a burst pipe, a missed refuse collection), each with the service it concerns and its response and resolution times — "
+                + "the clocks the fault desk measures every ticket against.",
+            Fields = [Req("Code", "Category code"), Req("Name", "Name"), Pick("Service", "Service", ["(none)", .. Enum.GetNames<ServiceType>()]), Num("Response", "Respond within (hours)", "4"),
+                Num("Resolution", "Resolve within (hours)", "48")],
+            Run = async (c, i) => Check(await c.Get<IServiceDeskService>().DefineCategoryAsync(c.CompanyId, i.Text("Code"), i.Text("Name"),
+                    i.Text("Service") == "(none)" ? null : Enum.Parse<ServiceType>(i.Text("Service")), i.Number("Response"), i.Number("Resolution")).ConfigureAwait(true),
+                id => $"Category {i.Text("Code").ToUpperInvariant()} saved."),
+            List = async c => Table(await c.Db.Set<TicketCategory>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", x => x.Code), ("Name", x => x.Name), ("Service", x => x.ServiceType?.ToString() ?? "-"), ("Respond (h)", x => x.ResponseHours), ("Resolve (h)", x => x.ResolutionHours)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Ratepayer statement", ListTitle = "Properties",
             Description = "The ratepayer's statement for a stand, as at a date, ready to print or hand over, with a consumption graph for each of the stand's meters "
                 + "over the months chosen.",

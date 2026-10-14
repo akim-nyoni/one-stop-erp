@@ -350,7 +350,7 @@ public static partial class OperationCatalogue
             Description = "Lodge a claim on a land parcel, serve the notice (opening the objection window), record objections and decide them, assess, offer and record the answer, "
                 + "refer a dispute and record the award (each moving the provision), pay in part or settle, take possession (once the window has closed with no objection standing), "
                 + "or withdraw. Ids for objections, offers and disputes are given when they are recorded.",
-            Fields = [Pick("Step", "Step", ["Lodge", "Serve notice", "Objection", "Decide objection", "Assess", "Offer", "Answer offer", "Dispute", "Award", "Pay part", "Settle", "Possession", "Withdraw"]),
+            Fields = [Pick("Step", "Step", ["Lodge", "Serve notice", "Objection", "Decide objection", "Assess", "Provide", "Offer", "Answer offer", "Dispute", "Award", "Pay part", "Settle", "Possession", "Withdraw"]),
                 Opt("Claim", "Claim number"), Opt("Parcel", "Land parcel number (lodge)"), Opt("Party", "Claimant / objector / assessor / forum / notice reference"), Opt("Note", "Grounds / note"),
                 OptNum("Amount", "Amount"), OptNum("Id", "Objection / offer / dispute id"), Tick("Yes", "Upheld / accepted"), Num("Days", "Objection window (days)", "30"),
                 Opt("LandAccount", "Land cost account (lodge)"), Opt("ProvisionAccount", "Provision account (lodge)"), Opt("Bank", "Bank account (pay)"), Today()],
@@ -375,6 +375,9 @@ public static partial class OperationCatalogue
                         return Check(await compensation.DecideObjectionAsync(c.CompanyId, claim, id, i.Flag("Yes"), date, i.Optional("Note")).ConfigureAwait(true), i.Flag("Yes") ? "Objection upheld." : "Objection dismissed.");
                     case "Assess":
                         return Check(await compensation.AssessAsync(c.CompanyId, claim, party, date, amount).ConfigureAwait(true), $"Assessed at {M(amount)}; provided for.");
+                    case "Provide":
+                        decimal provision = Check(await compensation.ProvideAsync(c.CompanyId, claim, amount, date).ConfigureAwait(true));
+                        return $"Provision for {claim} now {M(provision)} (the best estimate of what will be paid).";
                     case "Offer":
                         return $"Offer {Check(await compensation.OfferAsync(c.CompanyId, claim, amount, date).ConfigureAwait(true))} made.";
                     case "Answer offer":

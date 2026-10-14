@@ -41,6 +41,9 @@ public sealed class CreateSalesOrderRequest
 
     /// <summary>Gets who authorises a discount beyond the company's limit (needs the Sales.Invoice override-discount right).</summary>
     public long? DiscountAuthorisedByUserId { get; init; }
+
+    /// <summary>Gets the supervisor letting an order through that would take the customer over a blocking credit limit (needs the override-credit-limit right).</summary>
+    public long? CreditLimitOverrideByUserId { get; init; }
 }
 
 /// <summary>A despatched line.</summary>

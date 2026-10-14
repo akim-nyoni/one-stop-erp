@@ -128,6 +128,66 @@ public static partial class OperationCatalogue
         const string module = "Fixed Assets";
         yield return new Operation
         {
+            Module = module, Title = "Asset register", ListTitle = "Fixed asset register",
+            Description = "Register an asset (Dr cost, Cr the funding account; the class fills in method, life, residual and accounts left blank), run the month's depreciation "
+                + "for every active asset (a month already charged is skipped), dispose of an asset with the profit or loss on disposal, revalue it (IAS 16: an uplift to the "
+                + "revaluation reserve, a write-down to expense), move it to a new location or custodian, or record maintenance work on it.",
+            Fields = [Pick("Step", "Step", ["Register", "Run depreciation", "Dispose", "Revalue", "Move", "Maintenance"]), Opt("Asset", "Asset number (all but the run)"), Today(),
+                Opt("Description", "Description (register, maintenance)"), Opt("Class", "Asset class (register)"), OptNum("Amount", "Cost / proceeds / new carrying amount / maintenance cost"),
+                Opt("Funding", "Funding account (register: credited; dispose: debited with proceeds)"), Opt("Parent", "Parent asset (register a component)"),
+                Opt("CostCentre", "Cost centre (register)"), Opt("Department", "Department (register)"), Opt("Gain", "Gain on disposal account"), Opt("Loss", "Loss on disposal account"),
+                Opt("Reserve", "Revaluation reserve account"), Opt("WriteDown", "Revaluation write-down expense account"), Opt("Location", "New location (move)"),
+                Opt("Custodian", "New custodian (move)"), Opt("Provider", "Service provider (maintenance)"), Opt("Document", "Document number")],
+            Run = async (c, i) =>
+            {
+                IFixedAssetService assets = c.Get<IFixedAssetService>();
+                string step = i.Text("Step");
+                DateOnly date = i.Date("Date");
+                string document = i.Optional("Document") ?? $"FA-{date:yyyyMMdd}-{(i.Optional("Asset") ?? "RUN").ToUpperInvariant()}";
+                if (step == "Run depreciation")
+                {
+                    DepreciationRunResult run = Check(await assets.RunDepreciationAsync(c.CompanyId, date, document).ConfigureAwait(true));
+                    return $"{run.AssetsDepreciated} asset(s) depreciated, {M(run.TotalDepreciation)} charged" + (run.JournalNumber is string j ? $" (journal {j})" : string.Empty)
+                        + $"; {run.SkippedAlreadyDepreciated} already charged this month, {run.SkippedNotYetAcquired} not yet acquired.";
+                }
+
+                string number = (i.Optional("Asset") ?? throw new OperationException("Give the asset number.")).Trim().ToUpperInvariant();
+                if (step == "Register")
+                {
+                    return Check(await assets.RegisterAsync(new RegisterAssetRequest
+                    {
+                        CompanyId = c.CompanyId, AssetNumber = number, Description = i.Optional("Description") ?? number, AssetClass = i.Optional("Class") ?? string.Empty,
+                        Cost = i.OptionalNumber("Amount") ?? throw new OperationException("Give the asset's cost."), AcquisitionDate = date,
+                        FundingAccountCode = i.Optional("Funding") ?? throw new OperationException("Give the funding account credited with the cost."), DocumentNumber = document,
+                        ParentAssetNumber = i.Optional("Parent"), CostCentre = i.Optional("CostCentre"), Department = i.Optional("Department"),
+                    }).ConfigureAwait(true), id => $"Asset {number} registered and capitalised.");
+                }
+
+                long asset = await FindAsync(c.Db.FixedAssets, a => a.CompanyId == c.CompanyId && a.AssetNumber.ToUpper() == number, a => a.Id, "asset", number).ConfigureAwait(true);
+                switch (step)
+                {
+                    case "Dispose":
+                        DisposalResult disposal = Check(await assets.DisposeAsync(c.CompanyId, asset, i.OptionalNumber("Amount") ?? 0m, date, i.Optional("Funding") ?? string.Empty,
+                            i.Optional("Gain") ?? string.Empty, i.Optional("Loss") ?? string.Empty, document).ConfigureAwait(true));
+                        return $"{number} disposed: proceeds {M(disposal.Proceeds)} against book value {M(disposal.NetBookValue)}, "
+                            + (disposal.GainOrLoss >= 0m ? $"profit {M(disposal.GainOrLoss)}" : $"loss {M(-disposal.GainOrLoss)}") + $" (journal {disposal.JournalNumber}).";
+                    case "Revalue":
+                        RevaluationResult revaluation = Check(await assets.RevalueAsync(c.CompanyId, asset, i.OptionalNumber("Amount") ?? throw new OperationException("Give the new carrying amount."),
+                            date, i.Optional("Reserve") ?? string.Empty, i.Optional("WriteDown") ?? string.Empty, document).ConfigureAwait(true));
+                        return $"{number} revalued to {M(revaluation.NewCarryingAmount)} ({(revaluation.Delta >= 0m ? "uplift" : "write-down")} {M(Math.Abs(revaluation.Delta))}, journal {revaluation.JournalNumber}).";
+                    case "Move":
+                        return Check(await assets.TransferAsync(c.CompanyId, asset, i.Optional("Location"), i.Optional("Custodian")).ConfigureAwait(true), $"{number} moved.");
+                    default:
+                        return Check(await assets.RecordMaintenanceAsync(c.CompanyId, asset, date, i.Optional("Description") ?? throw new OperationException("Describe the work done."),
+                            i.OptionalNumber("Amount") ?? 0m, i.Optional("Provider")).ConfigureAwait(true), id => $"Maintenance on {number} recorded.");
+                }
+            },
+            List = async c => Table(await c.Db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderBy(a => a.AssetNumber).Take(500).ToListAsync().ConfigureAwait(true),
+                ("Asset", a => a.AssetNumber), ("Description", a => a.Description), ("Class", a => a.AssetClass), ("Cost", a => M(a.Cost)), ("Depreciation", a => M(a.AccumulatedDepreciation)),
+                ("Book value", a => M(a.NetBookValue)), ("Status", a => a.Status.ToString()), ("Location", a => a.Location ?? "-"), ("Custodian", a => a.Custodian ?? "-")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Asset classes and impairment", ListTitle = "Asset classes",
             Description = "Classes hold the defaults an asset registered in them takes (method, life, residual %, rate and accounts). An impairment test (IAS 36) books a "
                 + "recoverable amount below the carrying amount as a loss, or reverses an earlier loss when it recovers — never above what it would have been unimpaired.",
@@ -305,6 +365,38 @@ public static partial class OperationCatalogue
     private static IEnumerable<Operation> Contracts()
     {
         const string module = "Contracts";
+        yield return new Operation
+        {
+            Module = module, Title = "Contract revenue, losses and budget", ListTitle = "Job contracts",
+            Description = "Recognise a contract's revenue by stage of completion (cost to date over budgeted cost) against certified billing — the difference to the contract asset "
+                + "or liability; provide for a foreseeable loss (the whole expected loss at once, the provision trued up); or revise the budgeted cost with the reason.",
+            Fields = [Pick("Step", "Step", ["Recognise revenue", "Provide for loss", "Revise budget"]), Req("Contract", "Contract number"), Today(), Opt("AssetAccount", "Contract asset account (revenue)"),
+                Opt("LiabilityAccount", "Contract liability account (revenue)"), Opt("LossAccount", "Loss expense account (loss)"), Opt("ProvisionAccount", "Loss provision account (loss)"),
+                Opt("Document", "Document number"), OptNum("Budget", "New budgeted cost (revise)"), Opt("Reason", "Why the budget changes (revise)")],
+            Run = async (c, i) =>
+            {
+                IJobCostingService jobs = c.Get<IJobCostingService>();
+                long contract = await ContractAsync(c, i.Text("Contract")).ConfigureAwait(true);
+                string document = i.Optional("Document") ?? $"{i.Text("Contract").ToUpperInvariant()}-{i.Date("Date"):yyyyMMdd}";
+                switch (i.Text("Step"))
+                {
+                    case "Recognise revenue":
+                        RevenueRecognitionResult recognised = Check(await jobs.RecogniseRevenueAsync(c.CompanyId, contract, i.Date("Date"), i.Optional("AssetAccount") ?? string.Empty,
+                            i.Optional("LiabilityAccount") ?? string.Empty, document).ConfigureAwait(true));
+                        return $"{recognised.PercentComplete:0.#}% complete: earned {M(recognised.EarnedToDate)} against {M(recognised.CertifiedToDate)} certified; movement {M(recognised.Movement)}"
+                            + (recognised.JournalNumber is string j ? $" (journal {j})." : ".");
+                    case "Provide for loss":
+                        ExpectedLossResult loss = Check(await jobs.ProvideForExpectedLossAsync(c.CompanyId, contract, i.Date("Date"), i.Optional("LossAccount") ?? string.Empty,
+                            i.Optional("ProvisionAccount") ?? string.Empty, document).ConfigureAwait(true));
+                        return $"Expected loss {M(loss.ExpectedLoss)} (provided before {M(loss.PriorProvision)}); movement {M(loss.Movement)}" + (loss.JournalNumber is string lj ? $" (journal {lj})." : ".");
+                    default:
+                        return Check(await jobs.ReviseBudgetAsync(c.CompanyId, contract, i.OptionalNumber("Budget") ?? throw new OperationException("Give the new budgeted cost."),
+                            i.Optional("Reason") ?? string.Empty).ConfigureAwait(true), "Budget revised.");
+                }
+            },
+            List = async c => Table(await c.Db.Set<JobContract>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.ContractNumber).Take(300).ToListAsync().ConfigureAwait(true),
+                ("Contract", x => x.ContractNumber), ("Name", x => x.Name), ("Value", x => M(x.ContractValue)), ("Budget", x => M(x.BudgetCost))),
+        };
         yield return new Operation
         {
             Module = module, Title = "Open a job contract", ListTitle = "Job contracts",

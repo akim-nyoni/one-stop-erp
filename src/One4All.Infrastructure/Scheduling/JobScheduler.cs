@@ -204,6 +204,48 @@ public sealed class DespatchMessagesTask : IScheduledTask
     }
 }
 
+/// <summary>Built-in task: the waiting list's yearly renewals — applicants who have not renewed are suspended, and removed after the grace period.</summary>
+public sealed class WaitingListRenewalsTask : IScheduledTask
+{
+    private readonly Application.Abstractions.Housing.IWaitingListControlService _waitingList;
+
+    /// <summary>Creates the task.</summary>
+    /// <param name="waitingList">The waiting-list control service.</param>
+    public WaitingListRenewalsTask(Application.Abstractions.Housing.IWaitingListControlService waitingList) => _waitingList = waitingList;
+
+    /// <inheritdoc />
+    public string Key => "housing.renewals";
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
+    {
+        Application.Abstractions.Housing.RenewalRunResult run = await _waitingList.RunRenewalsAsync(companyId, DateOnly.FromDateTime(runAt.UtcDateTime), 12, 30, ct).ConfigureAwait(false);
+        return $"{run.Suspended} applicant(s) suspended for not renewing, {run.Removed} removed after the grace period.";
+    }
+}
+
+/// <summary>Built-in task: depreciate the fixed assets for the month just ended (a month already charged is skipped, so running it daily is harmless).</summary>
+public sealed class MonthlyDepreciationTask : IScheduledTask
+{
+    private readonly Application.Abstractions.FixedAssets.IFixedAssetService _assets;
+
+    /// <summary>Creates the task.</summary>
+    /// <param name="assets">The fixed-asset service.</param>
+    public MonthlyDepreciationTask(Application.Abstractions.FixedAssets.IFixedAssetService assets) => _assets = assets;
+
+    /// <inheritdoc />
+    public string Key => "assets.depreciation";
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
+    {
+        DateOnly today = DateOnly.FromDateTime(runAt.UtcDateTime);
+        DateOnly monthEnd = new DateOnly(today.Year, today.Month, 1).AddDays(-1);
+        Result<Application.Abstractions.FixedAssets.DepreciationRunResult> run = await _assets.RunDepreciationAsync(companyId, monthEnd, $"DEP-{monthEnd:yyyyMM}", ct).ConfigureAwait(false);
+        return run.IsFailure ? run.Error : $"{run.Value.AssetsDepreciated} asset(s) depreciated for {monthEnd:MMMM yyyy}, {run.Value.TotalDepreciation:N2} charged.";
+    }
+}
+
 /// <summary>Built-in task: lapse allocation offers not accepted by their deadline.</summary>
 public sealed class LapseOffersTask : IScheduledTask
 {

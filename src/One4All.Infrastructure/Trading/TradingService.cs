@@ -25,9 +25,12 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     /// <param name="db">The database context.</param>
     /// <param name="postingEngine">The posting engine.</param>
     /// <param name="webhooks">Publishes invoice and payment events.</param>
+    /// <param name="permissions">Checks who may override discounts, rates and budget blocks.</param>
+    /// <param name="budget">The budget gate an invoice without an order passes at posting (brief §4.18.5).</param>
     public TradingService(One4AllDbContext db, IPostingEngine postingEngine, Application.Abstractions.Integration.IWebhookService? webhooks = null,
-        Application.Abstractions.Security.IPermissionService? permissions = null)
+        Application.Abstractions.Security.IPermissionService? permissions = null, Application.Abstractions.Budgeting.IBudgetGateService? budget = null)
     {
+        _budget = budget;
         _permissions = permissions;
         _db = db;
         _postingEngine = postingEngine;
@@ -35,6 +38,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     private readonly Application.Abstractions.Integration.IWebhookService? _webhooks;
+    private readonly Application.Abstractions.Budgeting.IBudgetGateService? _budget;
 
     /// <inheritdoc />
     public Task<Result<TradingPostingResult>> PostInvoiceAsync(SalesInvoiceRequest request, CancellationToken ct = default)
@@ -819,6 +823,27 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         decimal baseNet = Round(request.NetAmount * rate);
         decimal baseTax = Round(request.TaxAmount * rate);
         decimal baseGross = baseNet + baseTax;
+
+        // An invoice with no order behind it never passed the gate at order raising, so it passes it here (brief §4.18.5): the spend against what is left of the vote.
+        if (_budget is not null && request.NetAmount > 0m)
+        {
+            static string? Dimension(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+            List<Application.Abstractions.Budgeting.BudgetDemand> demands = request.ExpenseLines.Count == 0
+                ? [new(request.ExpenseAccountCode.Trim(), Dimension(request.Department), baseNet)]
+                : [.. request.ExpenseLines.Select(l => new Application.Abstractions.Budgeting.BudgetDemand(l.AccountCode.Trim(), Dimension(l.Department ?? request.Department), Round(l.NetAmount * rate)))];
+            Result<Application.Abstractions.Budgeting.BudgetGateResult> check = await _budget.CheckAsync(request.CompanyId, request.DocumentDate, demands, ct).ConfigureAwait(false);
+            if (check.IsSuccess && check.Value.Outcome == Core.Budgeting.BudgetAction.Block)
+            {
+                return Error.Rule("Budget.Blocked", check.Value.Warning!);
+            }
+
+            if (check.IsSuccess && check.Value.Outcome == Core.Budgeting.BudgetAction.RequireApproval
+                && (request.BudgetApprovedByUserId is not long approver || _permissions is null
+                    || !(await _permissions.ResolveAsync(approver, ct).ConfigureAwait(false)).Has("Budget.OverrideBlock", Core.Security.OperationFlags.View)))
+            {
+                return Error.Rule("Budget.ApprovalNeeded", $"{check.Value.Warning} It needs the approval of someone who may override budget blocks.");
+            }
+        }
 
         List<JournalLineRequest> lines = [Line(controlResult.Value, JournalSide.Credit, gross, rate, baseGross)];
         if (request.ExpenseLines.Count == 0)

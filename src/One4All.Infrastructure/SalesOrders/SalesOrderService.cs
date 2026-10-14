@@ -118,6 +118,48 @@ public sealed class SalesOrderService : ISalesOrderService
             order.Lines.First(l => l.ItemId == line.ItemId && l.Description == line.Description && l.OrderedQuantity == line.Quantity).ListUnitPrice = listPrice;
         }
 
+        CreditLimitOverride? creditException = null;
+
+        // Credit control at order taking (brief §4.5): the debtor balance, the orders not yet invoiced and this one, against the limit under the customer's policy.
+        if (customer.CreditLimit > 0m && customer.CreditLimitPolicy != CreditLimitPolicy.Ignore
+            && await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false) == request.Currency)
+        {
+            IQueryable<OpenItem> ar = _db.OpenItems.Where(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == customer.Id);
+            decimal balance = (await ar.Where(i => i.Sign == LedgerSign.Debit).SumAsync(i => (decimal?)i.OutstandingBase, ct).ConfigureAwait(false) ?? 0m)
+                - (await ar.Where(i => i.Sign == LedgerSign.Credit).SumAsync(i => (decimal?)i.OutstandingBase, ct).ConfigureAwait(false) ?? 0m);
+            decimal onOrder = await _db.Set<SalesOrder>().Where(o => o.CompanyId == request.CompanyId && o.CustomerId == customer.Id && o.Currency == request.Currency
+                    && o.Status != SalesOrderStatus.Cancelled)
+                .SelectMany(o => o.Lines).SumAsync(l => (decimal?)((l.OrderedQuantity - l.InvoicedQuantity) * l.UnitPrice), ct).ConfigureAwait(false) ?? 0m;
+            decimal exposure = balance + onOrder + order.Lines.Sum(l => l.OrderedQuantity * l.UnitPrice);
+            if (exposure > customer.CreditLimit)
+            {
+                long overrider = 0;
+                if (customer.CreditLimitPolicy == CreditLimitPolicy.Block)
+                {
+                    if (request.CreditLimitOverrideByUserId is not long given)
+                    {
+                        return Error.Rule("Sop.CreditLimitExceeded", $"Customer {customer.Code}: with this order the exposure would be {exposure:0.00} (balance {balance:0.00}, "
+                            + $"on order {onOrder:0.00}), over the credit limit of {customer.CreditLimit:0.00}.");
+                    }
+
+                    if (given == request.RaisedByUserId)
+                    {
+                        return Error.Rule("Sop.CreditOverrideSelf", "Whoever raises the order cannot override the credit limit for it.");
+                    }
+
+                    if (_permissions is null || !(await _permissions.ResolveAsync(given, ct).ConfigureAwait(false)).Has("Sales.Customer", Core.Security.OperationFlags.OverrideCreditLimit))
+                    {
+                        return Error.Forbidden("Sop.CreditOverrideNotAllowed", "Only a user who may override credit limits can let this order through.");
+                    }
+
+                    overrider = given;
+                }
+
+                // A warning, or an authorised override, is kept for the credit-limit exceptions report.
+                creditException = new CreditLimitOverride(request.CompanyId, customer.Id, orderNumber, customer.CreditLimit, exposure, overrider, request.RaisedByUserId, DateTimeOffset.UtcNow);
+            }
+        }
+
         bool overLimit = limit is decimal max && deepest > max + 0.0001m;
         if (overLimit && request.DiscountAuthorisedByUserId is long authoriser)
         {
@@ -144,6 +186,11 @@ public sealed class SalesOrderService : ISalesOrderService
         }
 
         _db.Set<SalesOrder>().Add(order);
+        if (creditException is not null)
+        {
+            _db.Set<CreditLimitOverride>().Add(creditException);
+        }
+
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         if (overLimit)
         {

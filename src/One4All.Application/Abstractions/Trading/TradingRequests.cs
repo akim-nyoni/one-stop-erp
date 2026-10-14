@@ -178,6 +178,9 @@ public sealed class PurchaseInvoiceRequest : ITradingAnalysis
 
     /// <summary>The job cost head.</summary>
     public string? JobCostHead { get; init; }
+
+    /// <summary>Gets the user approving a budget overrun, where the budget rule asks for approval rather than blocking.</summary>
+    public long? BudgetApprovedByUserId { get; init; }
 }
 
 /// <summary>A request to post a credit note to a customer (AR) — reduces the debtor balance.</summary>
