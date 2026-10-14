@@ -301,7 +301,7 @@ public static partial class OperationCatalogue
                         return Check(await framework.LockAsync(c.CompanyId, budget).ConfigureAwait(true), "Budget locked.");
                 }
             },
-            List = async c => Table(await c.Db.Set<Budget>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Take(100).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<Budget>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Page(c, 100).ToListAsync().ConfigureAwait(true),
                 ("Id", b => b.Id), ("Label", b => b.Label), ("Type", b => b.Type), ("Version", b => b.VersionNumber), ("Status", b => b.Status), ("Department", b => b.Department),
                 ("Rolled from", b => b.RolledFromBudgetId)),
         };

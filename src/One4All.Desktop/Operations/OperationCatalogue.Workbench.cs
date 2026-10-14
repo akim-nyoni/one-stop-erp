@@ -118,7 +118,7 @@ public static partial class OperationCatalogue
                         return $"Issue note {issued.IssueNoteNumber}: {M(issued.Cost)}{(issued.FullyIssued ? "; requisition complete." : "; more to issue.")}";
                 }
             },
-            List = async c => Table(await c.Db.Set<StoreRequisition>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<StoreRequisition>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Requisition", r => r.Number), ("Status", r => r.Status)),
         };
         yield return new Operation
@@ -140,7 +140,7 @@ public static partial class OperationCatalogue
                     i.Optional("Reference") ?? string.Empty).ConfigureAwait(true);
                 return $"Repaid; {M(Check(await loans.RecordRepaymentAsync(c.CompanyId, loan, i.Number("Amount"), i.Date("Date"), i.Text("Funding"), i.Text("Document")).ConfigureAwait(true)))} outstanding.";
             },
-            List = async c => Table(await c.Db.Set<Core.Payroll.EmployeeLoan>().AsNoTracking().Where(l => l.CompanyId == c.CompanyId).OrderByDescending(l => l.Id).Take(300).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<Core.Payroll.EmployeeLoan>().AsNoTracking().Where(l => l.CompanyId == c.CompanyId).OrderByDescending(l => l.Id).Page(c, 300).ToListAsync().ConfigureAwait(true),
                 ("Loan", l => l.Reference), ("Employee", l => l.EmployeeId), ("Principal", l => M(l.Principal)), ("Outstanding", l => M(l.Outstanding))),
         };
         yield return new Operation
@@ -212,7 +212,7 @@ public static partial class OperationCatalogue
                             _ => "Converted into a sales order.");
                 }
             },
-            List = async c => Table(await c.Db.Set<Core.SalesOrders.Quotation>().AsNoTracking().Where(q => q.CompanyId == c.CompanyId).OrderByDescending(q => q.Id).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<Core.SalesOrders.Quotation>().AsNoTracking().Where(q => q.CompanyId == c.CompanyId).OrderByDescending(q => q.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Quotation", q => q.QuoteNumber), ("Status", q => q.Status)),
         };
         yield return new Operation
@@ -355,7 +355,7 @@ public static partial class OperationCatalogue
                         return defaulted.Count == 0 ? "No overdue lay-bys." : string.Join(Environment.NewLine, defaulted.Select(d => $"{d.PlanNumber}: forfeited {M(d.Forfeited)}, refunded {M(d.Refunded)}"));
                 }
             },
-            List = async c => Table(await c.Db.Set<Core.Trading.LaybyPlan>().AsNoTracking().Where(l => l.CompanyId == c.CompanyId).OrderByDescending(l => l.Id).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<Core.Trading.LaybyPlan>().AsNoTracking().Where(l => l.CompanyId == c.CompanyId).OrderByDescending(l => l.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Plan", l => l.PlanNumber), ("Status", l => l.Status)),
         };
         foreach (string ledger in new[] { customers, suppliers })

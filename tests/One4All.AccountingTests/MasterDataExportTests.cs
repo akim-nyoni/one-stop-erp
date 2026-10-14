@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Onboarding;
 using One4All.Core.Inventory;
@@ -36,6 +37,8 @@ public sealed class MasterDataExportTests
         customers.Should().StartWith("code,name,currency,credit_limit").And.Contain("MDX-C1,\"Smith, Jones & Co\",USD,2500");
         string items = (await export.ExportAsync(source, "Items")).Value;
         string accounts = (await export.ExportAsync(source, "Accounts")).Value;
+        (await db.ChangeLog.AsNoTracking().CountAsync(e => e.CompanyId == source && e.EntityType == "MasterDataExport" && e.Action == Core.Audit.AuditAction.Export))
+            .Should().Be(3, "every export is recorded");
 
         long target = await Scenario.SeedAsync(db);
         IOpeningBalanceService ob = scope.ServiceProvider.GetRequiredService<IOpeningBalanceService>();

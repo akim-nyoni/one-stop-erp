@@ -11,7 +11,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 {
     private static readonly HashSet<string> Commands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "TrialBalance", "TrialBalanceByType", "IncomeStatement", "BalanceSheet", "CashFlow", "DepartmentalIncomeStatement", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts", "FinancialSnapshot", "VatReturn", "ControlReconciliation", "VatReturnByCode",
+        "TrialBalance", "TrialBalanceByType", "IncomeStatement", "IncomeStatementByFunction", "BalanceSheet", "CashFlow", "DepartmentalIncomeStatement", "NominalActivity", "JournalDaybook", "TrialBalanceMovement", "ChartOfAccounts", "FinancialSnapshot", "VatReturn", "ControlReconciliation", "VatReturnByCode",
     };
 
     private readonly IGeneralLedgerReports _reports;
@@ -73,6 +73,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             "TRIALBALANCE" => await TrialBalanceAsync(companyId, parameters, ct).ConfigureAwait(false),
             "TRIALBALANCEBYTYPE" => await TrialBalanceByTypeAsync(companyId, parameters, ct).ConfigureAwait(false),
             "INCOMESTATEMENT" => await IncomeStatementAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "INCOMESTATEMENTBYFUNCTION" => await IncomeStatementByFunctionAsync(companyId, parameters, ct).ConfigureAwait(false),
             "BALANCESHEET" => await BalanceSheetAsync(companyId, parameters, ct).ConfigureAwait(false),
             "CASHFLOW" => await CashFlowAsync(companyId, parameters, ct).ConfigureAwait(false),
             "DEPARTMENTALINCOMESTATEMENT" => await DepartmentalIncomeStatementAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -131,6 +132,53 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             ["Change"] = report.NetProfit - prior.NetProfit,
         }));
         return rows;
+    }
+
+    // IAS 1.103: expenses by function. An account's report category names its function; the accounts items post cost of sales to are cost of sales.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> IncomeStatementByFunctionAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly to = ReportParameters.Date(parameters, "ToDate");
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
+        HashSet<string> costOfSales = _db is null ? [] : new HashSet<string>(await _db.Items.AsNoTracking().Where(i => i.CompanyId == companyId && i.CostOfSalesAccountCode != null)
+            .Select(i => i.CostOfSalesAccountCode!).Distinct().ToListAsync(ct).ConfigureAwait(false), StringComparer.OrdinalIgnoreCase);
+        IncomeStatement now = await _reports.IncomeStatementAsync(companyId, from, to, await OptionsAsync(companyId, parameters, to, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
+        IncomeStatement prior = await _reports.IncomeStatementAsync(companyId, from.AddYears(-1), to.AddYears(-1), await OptionsAsync(companyId, parameters, to.AddYears(-1), ct).ConfigureAwait(false), ct)
+            .ConfigureAwait(false);
+
+        static bool Has(StatementLine line, params string[] words) => words.Any(w => line.Category.Contains(w, StringComparison.OrdinalIgnoreCase) || line.AccountName.Contains(w, StringComparison.OrdinalIgnoreCase));
+        string Function(StatementLine expense) =>
+            costOfSales.Contains(expense.AccountCode) || Has(expense, "cost of sales", "cost of goods") ? "Cost of sales"
+            : Has(expense, "distribution", "selling", "marketing") ? "Distribution costs"
+            : Has(expense, "administrative", "administration") ? "Administrative expenses"
+            : Has(expense, "finance cost", "interest", "finance") ? "Finance costs"
+            : "Other operating expenses";
+        (decimal Revenue, decimal OtherIncome, Dictionary<string, decimal> Functions) Split(IncomeStatement statement)
+        {
+            decimal other = statement.Income.Where(l => Has(l, "other income")).Sum(l => l.Amount);
+            Dictionary<string, decimal> functions = statement.Expenses.GroupBy(Function).ToDictionary(g => g.Key, g => g.Sum(l => l.Amount));
+            return (statement.TotalIncome - other, other, functions);
+        }
+
+        var (revenue, otherIncome, functions) = Split(now);
+        var (priorRevenue, priorOtherIncome, priorFunctions) = Split(prior);
+        decimal F(Dictionary<string, decimal> map, string key) => map.GetValueOrDefault(key);
+        decimal gross = revenue - F(functions, "Cost of sales"), priorGross = priorRevenue - F(priorFunctions, "Cost of sales");
+        decimal operating = gross + otherIncome - F(functions, "Distribution costs") - F(functions, "Administrative expenses") - F(functions, "Other operating expenses");
+        decimal priorOperating = priorGross + priorOtherIncome - F(priorFunctions, "Distribution costs") - F(priorFunctions, "Administrative expenses") - F(priorFunctions, "Other operating expenses");
+        IReadOnlyDictionary<string, object?> Line(string label, decimal amount, decimal priorAmount) => Row(new() { ["Line"] = label, ["Amount"] = amount, ["PriorAmount"] = priorAmount });
+        return
+        [
+            Line("Revenue", revenue, priorRevenue),
+            Line("Cost of sales", -F(functions, "Cost of sales"), -F(priorFunctions, "Cost of sales")),
+            Line("Gross profit", gross, priorGross),
+            Line("Other income", otherIncome, priorOtherIncome),
+            Line("Distribution costs", -F(functions, "Distribution costs"), -F(priorFunctions, "Distribution costs")),
+            Line("Administrative expenses", -F(functions, "Administrative expenses"), -F(priorFunctions, "Administrative expenses")),
+            Line("Other operating expenses", -F(functions, "Other operating expenses"), -F(priorFunctions, "Other operating expenses")),
+            Line("Operating profit", operating, priorOperating),
+            Line("Finance costs", -F(functions, "Finance costs"), -F(priorFunctions, "Finance costs")),
+            Line("Profit for the period", operating - F(functions, "Finance costs"), priorOperating - F(priorFunctions, "Finance costs")),
+        ];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BalanceSheetAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

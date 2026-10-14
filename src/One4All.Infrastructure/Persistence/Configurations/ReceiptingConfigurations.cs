@@ -276,3 +276,14 @@ internal sealed class ReceiptTenderConfiguration : IEntityTypeConfiguration<Rece
         b.Property(x => x.Reference).HasMaxLength(60);
     }
 }
+
+internal sealed class CashierRelatedAccountConfiguration : IEntityTypeConfiguration<CashierRelatedAccount>
+{
+    public void Configure(EntityTypeBuilder<CashierRelatedAccount> b)
+    {
+        b.ToTable("cashier_related_account", "rcp");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Relationship).HasMaxLength(40);
+        b.HasIndex(x => new { x.CompanyId, x.UserId, x.CustomerId }).IsUnique();
+    }
+}

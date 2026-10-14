@@ -54,7 +54,7 @@ public static partial class OperationCatalogue
                         j => $"Claim {reference} reimbursed ({j})."),
                 };
             },
-            List = async c => Table(await c.Db.ExpenseClaims.AsNoTracking().Include(x => x.Lines).Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.Id).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.ExpenseClaims.AsNoTracking().Include(x => x.Lines).Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Claim", x => x.Reference), ("Employee", x => x.EmployeeId), ("Date", x => D(x.ClaimDate)), ("Amount", x => M(x.Lines.Sum(l => l.Amount))), ("Status", x => x.Status),
                 ("Journal", x => x.JournalNumber ?? string.Empty)),
         };
@@ -115,7 +115,7 @@ public static partial class OperationCatalogue
                         }).ConfigureAwait(true), n => $"{n} line(s) added.");
                 }
             },
-            List = async c => Table(await c.Db.Set<Core.Budgeting.Budget>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Take(100).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<Core.Budgeting.Budget>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Page(c, 100).ToListAsync().ConfigureAwait(true),
                 ("Id", b => b.Id), ("Label", b => b.Label), ("Type", b => b.Type), ("Department", b => b.Department), ("Version", b => b.VersionNumber), ("Active", b => b.IsActive)),
         };
         yield return new Operation
@@ -158,7 +158,7 @@ public static partial class OperationCatalogue
                         return string.Join(Environment.NewLine, rows.Select(r => $"{r.AccountCode,-12} original {M(r.Original),14}  in {M(r.VirementsIn),12}  out {M(r.VirementsOut),12}  now {M(r.Current),14}"));
                 }
             },
-            List = async c => Table(await c.Db.Set<BudgetVirement>().AsNoTracking().Where(v => v.CompanyId == c.CompanyId).OrderByDescending(v => v.Id).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<BudgetVirement>().AsNoTracking().Where(v => v.CompanyId == c.CompanyId).OrderByDescending(v => v.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Virement", v => v.Id), ("Budget", v => v.BudgetId), ("From", v => v.FromAccountCode), ("To", v => v.ToAccountCode), ("Period", v => v.Period), ("Amount", v => M(v.Amount)),
                 ("Status", v => v.Status), ("Why", v => v.Justification)),
         };
@@ -208,7 +208,7 @@ public static partial class OperationCatalogue
                     await YearAsync(c, start + 1).ConfigureAwait(true), carry, c.UserId).ConfigureAwait(true));
                 return $"{closed.CarriedForward.Count} carried forward ({M(closed.CarriedForward.Sum(x => x.Amount))}); {closed.Lapsed.Count} lapsed ({M(closed.Lapsed.Sum(x => x.Amount))}).";
             },
-            List = async c => Table(await c.Db.BudgetCommitments.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.Status == CommitmentStatus.Open).OrderBy(x => x.AccountCode).Take(500)
+            List = async c => Table(await c.Db.BudgetCommitments.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.Status == CommitmentStatus.Open).OrderBy(x => x.AccountCode).Page(c, 500)
                     .ToListAsync().ConfigureAwait(true),
                 ("Id", x => x.Id), ("Year", x => x.FiscalYearId), ("Account", x => x.AccountCode), ("Reference", x => x.Reference), ("Period", x => x.Period), ("Amount", x => M(x.Amount))),
         };
@@ -286,7 +286,7 @@ public static partial class OperationCatalogue
                         return problems.Count == 0 ? "Every agreement document matches its hash." : string.Join(Environment.NewLine, problems.Prepend("ALTERED OR MISSING:"));
                 }
             },
-            List = async c => Table(await c.Db.Set<Core.Housing.HousingAgreement>().AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Take(500).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<Core.Housing.HousingAgreement>().AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Agreement", a => a.AgreementNumber), ("Type", a => a.AgreementType), ("Party", a => a.PartyCustomerId), ("Stand", a => a.StandId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty)),
         };
         yield return new Operation

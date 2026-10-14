@@ -91,7 +91,7 @@ public static partial class OperationCatalogue
 
                 return done.Count == 0 ? "Nothing to do." : string.Join(" ", done);
             },
-            List = async c => Table(await c.Db.Set<Core.Integration.WebhookDelivery>().AsNoTracking().Where(d => d.CompanyId == c.CompanyId).OrderByDescending(d => d.Id).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<Core.Integration.WebhookDelivery>().AsNoTracking().Where(d => d.CompanyId == c.CompanyId).OrderByDescending(d => d.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Id", d => d.Id), ("Subscription", d => d.SubscriptionId), ("Event", d => d.EventType), ("Status", d => d.Status), ("Attempts", d => d.Attempts),
                 ("Next attempt", d => d.NextAttemptOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Last status", d => d.LastStatusCode), ("Last error", d => d.LastError)),
         };
@@ -141,11 +141,11 @@ public static partial class OperationCatalogue
                         return list.Count == 0 ? "No attachments." : string.Join(Environment.NewLine, list.Select(a => $"{a.Id,6}  {a.FileName}  {a.SizeBytes / 1024} KB  {a.UploadedOnUtc:yyyy-MM-dd}  {a.Description}"));
                 }
             },
-            List = async c => Table(await c.Db.Set<Attachment>().AsNoTracking().Where(a => a.CompanyId == c.CompanyId && a.RemovedOnUtc == null).OrderByDescending(a => a.Id).Take(200).ToListAsync()
+            List = async c => Table(await c.Db.Set<Attachment>().AsNoTracking().Where(a => a.CompanyId == c.CompanyId && a.RemovedOnUtc == null).OrderByDescending(a => a.Id).Page(c, 200).ToListAsync()
                     .ConfigureAwait(true), ("Id", a => a.Id), ("Record", a => a.Target), ("Number", a => a.TargetKey), ("File", a => a.FileName), ("KB", a => a.SizeBytes / 1024),
                 ("Uploaded", a => a.UploadedOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Description", a => a.Description)),
         };
-        string[] imports = ["Accounts", "Warehouses", "Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "PayrollYtd",
+        string[] imports = ["Accounts", "Warehouses", "Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "PayrollYtd", "LeaveBalances",
             "Properties", "Meters", "Students", "Stands", "RentalUnits", "Budget"];
         yield return new Operation
         {
@@ -207,6 +207,7 @@ public static partial class OperationCatalogue
                 + "FixedAssets: asset_number,description,class,acquired,cost,accumulated,life_months,cost_account,accum_account,expense_account[,residual,method,rate]. "
                 + "Employees: employee_number,name,basic_salary,engaged[,national_id,department,cost_centre,grade]. StaffLoans: employee_number,reference,outstanding,instalment,loan_account. "
                 + "PayrollYtd: employee_number,tax_year,code,amount (TAXABLE for taxable pay so far, or a pay element such as PAYE for tax already deducted). "
+                + "LeaveBalances: employee_number,leave_type,days[,taken] (the leave owed at take-on). "
                 + "Properties: stand,ward,ratepayer[,valuation,size,connected,services e.g. Water:WAT1;Refuse:REF1]. "
                 + "Meters: serial,stand,service,reading,date[,digits,multiplier]. Students: admission,name,grade,guardian[,boarder,admitted]. "
                 + "Stands: stand,parcel,size[,cost,scheme,status] (a parcel not yet registered is created from its stands). Budget: account,period,amount[,cost_centre,quantity] for the year of the date. "
@@ -236,6 +237,7 @@ public static partial class OperationCatalogue
                     "Employees" => await registers.ImportEmployeesAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "StaffLoans" => await registers.ImportEmployeeLoansAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),
                     "PayrollYtd" => await registers.ImportPayrollYtdAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
+                    "LeaveBalances" => await registers.ImportLeaveBalancesAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "Properties" => await registers.ImportPropertiesAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "Meters" => await registers.ImportMetersAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "Students" => await registers.ImportStudentsAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
@@ -474,7 +476,7 @@ public static partial class OperationCatalogue
             Fields = [Req("From", "From currency"), Req("To", "To currency"), Pick("Type", "Rate type", Enum.GetNames<ExchangeRateType>()), Today(), Num("Rate", "Rate")],
             Run = async (c, i) => Check(await c.Get<IMasterDataService>().SetExchangeRateAsync(CurrencyCode.Parse(i.Text("From")), CurrencyCode.Parse(i.Text("To")),
                 Enum.Parse<ExchangeRateType>(i.Text("Type")), i.Date("Date"), i.Number("Rate")).ConfigureAwait(true), "Rate set."),
-            List = async c => Table(await c.Db.ExchangeRates.AsNoTracking().OrderByDescending(x => x.EffectiveFrom).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.ExchangeRates.AsNoTracking().OrderByDescending(x => x.EffectiveFrom).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("From", x => x.FromCurrency.Value), ("To", x => x.ToCurrency.Value), ("Type", x => x.RateType), ("Effective", x => D(x.EffectiveFrom)), ("Rate", x => x.Rate.ToString("0.######", CultureInfo.InvariantCulture))),
         };
         yield return new Operation
@@ -524,7 +526,7 @@ public static partial class OperationCatalogue
                 OptNum("Standard", "Standard cost")],
             Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateItemAsync(new NewItem(c.CompanyId, i.Text("Code"), i.Text("Description"), Enum.Parse<ItemType>(i.Text("Type")),
                 i.Optional("Revenue"), i.Optional("Cost"), i.OptionalNumber("Standard"))).ConfigureAwait(true), id => "Item added."),
-            List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Take(500).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Code", x => x.Code), ("Description", x => x.Description), ("Type", x => x.ItemType), ("Revenue", x => x.RevenueAccountCode), ("Cost of sales", x => x.CostOfSalesAccountCode)),
         };
         yield return new Operation

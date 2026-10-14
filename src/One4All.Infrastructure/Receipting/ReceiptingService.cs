@@ -25,14 +25,18 @@ public sealed class ReceiptingService : IReceiptingService
     private readonly IPostingEngine _posting;
     private readonly ISalesLedgerService _salesLedger;
     private readonly IAllocationService _allocation;
+    private readonly Application.Abstractions.Security.IAuditService? _audit;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="posting">The central posting engine.</param>
     /// <param name="salesLedger">The AR ledger (debtor receipts).</param>
     /// <param name="allocation">The allocation service (match receipt to invoices).</param>
-    public ReceiptingService(One4AllDbContext db, IPostingEngine posting, ISalesLedgerService salesLedger, IAllocationService allocation)
+    /// <param name="audit">Logs a refused receipt against a cashier's own or related account.</param>
+    public ReceiptingService(One4AllDbContext db, IPostingEngine posting, ISalesLedgerService salesLedger, IAllocationService allocation,
+        Application.Abstractions.Security.IAuditService? audit = null)
     {
+        _audit = audit;
         _db = db;
         _posting = posting;
         _salesLedger = salesLedger;
@@ -67,8 +71,31 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
-    public Task<Result<ReceiptResult>> PostReceiptAsync(RcpReceiptRequest request, CancellationToken ct = default)
-        => _db.AtomicAsync(() => PostReceiptCoreAsync(request, ct), ct);
+    public async Task<Result<ReceiptResult>> PostReceiptAsync(RcpReceiptRequest request, CancellationToken ct = default)
+    {
+        // A cashier may not receipt against their own or a related account (receipting §15); the attempt is logged outside the
+        // receipt's unit of work so that it survives the refusal.
+        if (request.PayerAccountId is long payer)
+        {
+            long? cashier = await _db.Set<CashierSession>().AsNoTracking().Where(s => s.Id == request.SessionId && s.CompanyId == request.CompanyId).Select(s => (long?)s.CashierUserId)
+                .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            string? relationship = cashier is long user ? await _db.Set<CashierRelatedAccount>().AsNoTracking()
+                .Where(r => r.CompanyId == request.CompanyId && r.UserId == user && r.CustomerId == payer).Select(r => r.Relationship).FirstOrDefaultAsync(ct).ConfigureAwait(false) : null;
+            if (relationship is not null)
+            {
+                if (_audit is not null)
+                {
+                    await _audit.RecordAsync(new Application.Abstractions.Security.AuditEvent(request.CompanyId, cashier, $"user {cashier}", "Receipting", "RelatedAccountReceipt",
+                        payer.ToString(System.Globalization.CultureInfo.InvariantCulture), Core.Audit.AuditAction.Reject, Reason: relationship,
+                        Details: request.Lines.Sum(l => l.Amount).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)), ct).ConfigureAwait(false);
+                }
+
+                return Error.Forbidden("Rcp.RelatedAccount", $"This account is the cashier's {relationship.ToLowerInvariant()} account: another cashier must take the payment.");
+            }
+        }
+
+        return await _db.AtomicAsync(() => PostReceiptCoreAsync(request, ct), ct).ConfigureAwait(false);
+    }
 
     // One unit of work: its postings and record changes commit together or not at all.
     private async Task<Result<ReceiptResult>> PostReceiptCoreAsync(RcpReceiptRequest request, CancellationToken ct)

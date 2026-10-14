@@ -225,6 +225,18 @@ public static class SystemReports
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String),
             ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
 
+    /// <summary>The Income Statement by Function report code.</summary>
+    public const string IncomeStatementByFunctionCode = "GL-IS-FN";
+
+    /// <summary>Builds the Income Statement by Function (IAS 1.103, the cost-of-sales method).</summary>
+    /// <returns>The definition.</returns>
+    public static ReportDefinition IncomeStatementByFunction() => Listing(IncomeStatementByFunctionCode, "Income Statement by Function", "GeneralLedger",
+        "Revenue, cost of sales and gross profit, then distribution, administrative and other operating expenses, operating profit, finance costs and the "
+            + "profit for the period, beside the same period a year earlier. Expenses fall to a function by their account's report category (\"Distribution\", "
+            + "\"Administrative\", \"Finance\"…); the accounts items post cost of sales to are cost of sales.", "IncomeStatementByFunction",
+        [new Column("Line", "", 260), new Column("Amount", "This period", 100, true), new Column("PriorAmount", "Prior year", 100, true)],
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
+
     /// <summary>The code of the statement laid out by a reporting tree.</summary>
     public const string TreeStatementCode = "GL-TREE";
 
@@ -469,8 +481,9 @@ public static class SystemReports
     /// <summary>Builds the Stock Valuation definition (brief §4.11 inventory).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition StockValuation() => Listing(StockValuationCode, "Stock Valuation", "Inventory",
-        "Quantity on hand and value at moving average cost, per item and warehouse.", "StockValuation",
-        [new Column("ItemCode", "Item", 90), new Column("Description", "Description", 180), new Column("WarehouseCode", "Warehouse", 90), new Column("Quantity", "Qty", 70, true), new Column("AverageCost", "Avg cost", 80, true), new Column("Value", "Value", 90, true)],
+        "Quantity on hand and value per item and warehouse, with the item's category and costing method — now, or as at any earlier date (from the stock movements to it).", "StockValuation",
+        [new Column("ItemCode", "Item", 80), new Column("Description", "Description", 160), new Column("Category", "Category", 80), new Column("Costing", "Costing", 85),
+            new Column("WarehouseCode", "Warehouse", 80), new Column("Quantity", "Qty", 65, true), new Column("AverageCost", "Avg cost", 75, true), new Column("Value", "Value", 90, true)],
         [("AsAtDate", ParameterType.Date)]);
 
     /// <summary>Builds the Stock Movements definition (inventory transaction history).</summary>

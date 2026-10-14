@@ -78,6 +78,7 @@ public sealed partial class OperationsViewModel : ObservableObject
     private readonly IServiceProvider _services;
     private readonly long _userId;
     private long _companyId;
+    private int _listPage;
 
     /// <summary>Creates the view model.</summary>
     /// <param name="services">The application service provider.</param>
@@ -116,7 +117,7 @@ public sealed partial class OperationsViewModel : ObservableObject
 
     /// <summary>The chosen operation.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RunCommand), nameof(RefreshCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunCommand), nameof(RefreshCommand), nameof(PreviousPageCommand), nameof(NextPageCommand))]
     private Operation? _selected;
 
     /// <summary>The outcome of the last run (or the printed document).</summary>
@@ -137,7 +138,7 @@ public sealed partial class OperationsViewModel : ObservableObject
 
     /// <summary>True while running.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(RunCommand), nameof(RefreshCommand))]
+    [NotifyCanExecuteChangedFor(nameof(RunCommand), nameof(RefreshCommand), nameof(PreviousPageCommand), nameof(NextPageCommand))]
     private bool _isBusy;
 
     private bool CanRun => Selected is not null && !IsBusy;
@@ -157,6 +158,8 @@ public sealed partial class OperationsViewModel : ObservableObject
         Result = string.Empty;
         Failed = false;
         List = null;
+        _listPage = 0;
+        OnPropertyChanged(nameof(PageText));
         StatusMessage = value?.Description ?? "Choose an action.";
         _ = LoadChoicesAsync();
         if (value?.List is not null)
@@ -220,7 +223,7 @@ public sealed partial class OperationsViewModel : ObservableObject
             _companyId = companies.FirstOrDefault(c => reach.Allows(Core.Security.ScopeDimension.Company, c.Code, c.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)))?.Id ?? 0;
         }
 
-        return await work(new OperationContext(scope.ServiceProvider, _companyId, _userId)).ConfigureAwait(true);
+        return await work(new OperationContext(scope.ServiceProvider, _companyId, _userId) { ListPage = _listPage }).ConfigureAwait(true);
     }
 
     /// <summary>Runs the chosen operation with the form's values.</summary>
@@ -266,6 +269,39 @@ public sealed partial class OperationsViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    /// <summary>Gets which page of the list is shown.</summary>
+    public string PageText => $"Page {_listPage + 1}";
+
+    /// <summary>Shows the list's previous page.</summary>
+    /// <returns>A task.</returns>
+    [RelayCommand(CanExecute = nameof(CanRefresh))]
+    private async Task PreviousPageAsync()
+    {
+        if (_listPage > 0)
+        {
+            _listPage--;
+            OnPropertyChanged(nameof(PageText));
+            await RefreshAsync().ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>Shows the list's next page (back to the last when there is nothing further).</summary>
+    /// <returns>A task.</returns>
+    [RelayCommand(CanExecute = nameof(CanRefresh))]
+    private async Task NextPageAsync()
+    {
+        _listPage++;
+        OnPropertyChanged(nameof(PageText));
+        await RefreshAsync().ConfigureAwait(true);
+        if (List is { Count: 0 } && _listPage > 0)
+        {
+            _listPage--;
+            OnPropertyChanged(nameof(PageText));
+            await RefreshAsync().ConfigureAwait(true);
+            StatusMessage = "That is the last page.";
         }
     }
 

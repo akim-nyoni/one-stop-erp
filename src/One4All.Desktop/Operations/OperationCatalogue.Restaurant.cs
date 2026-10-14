@@ -317,7 +317,7 @@ public static partial class OperationCatalogue
                 return $"Billed {M(bill.Gross)} (net {M(bill.Net)}, tax {M(bill.Tax)}, service {M(bill.ServiceCharge)}, tip {M(bill.Tip)}, discount {M(bill.Discount)}); cost of sales {M(bill.CostOfSales)} "
                     + $"({bill.RevenueJournalNumber}).{(bill.FullyBilled ? " The order is closed." : " Some of the order is still to bill.")}";
             },
-            List = async c => Table(await c.Db.Set<RestaurantBill>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<RestaurantBill>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Bill", b => b.Id), ("Date", b => D(b.Date)), ("Gross", b => M(b.Gross)), ("Tip", b => M(b.Tip)), ("Journal", b => b.RevenueJournalNumber), ("Reversed", b => b.IsReversed)),
         };
         yield return new Operation
@@ -439,7 +439,7 @@ public static partial class OperationCatalogue
                     await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true), i.Date("Date"), i.Number("Quantity"), i.Text("Account"), i.Text("Reason")).ConfigureAwait(true));
                 return $"Wastage of {M(value)} written off.";
             },
-            List = async c => Table(await c.Db.Set<WastageRecord>().AsNoTracking().Where(w => w.CompanyId == c.CompanyId).OrderByDescending(w => w.Id).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<WastageRecord>().AsNoTracking().Where(w => w.CompanyId == c.CompanyId).OrderByDescending(w => w.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Date", w => D(w.Date)), ("Item", w => w.ItemId), ("Quantity", w => w.Quantity), ("Value", w => M(w.Value)), ("Reason", w => w.Reason)),
         };
     }

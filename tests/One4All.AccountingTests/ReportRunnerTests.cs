@@ -58,6 +58,8 @@ public sealed class ReportRunnerTests
             income.Should().Contain("Income Statement");
             income.Should().Contain("1,234.00");
             income.Should().Contain("Prior year", "the statement shows the same period a year earlier beside it");
+            string byFunction = await RenderHtml(runner, companyId, "GL-IS-FN", new() { ["FromDate"] = new DateOnly(2026, 1, 1), ["ToDate"] = new DateOnly(2026, 3, 31) });
+            byFunction.Should().Contain("Income Statement by Function").And.Contain("Gross profit").And.Contain("Profit for the period").And.Contain("1,234.00");
             string position = await RenderHtml(runner, companyId, "GL-BS", new() { ["AsAtDate"] = new DateOnly(2026, 3, 31) });
             position.Should().Contain("Prior year").And.Contain("1,234.00");
 

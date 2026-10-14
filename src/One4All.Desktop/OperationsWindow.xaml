@@ -108,6 +108,9 @@
                 <!-- List -->
                 <DockPanel Grid.Row="2" Margin="0,8,0,4">
                     <Button DockPanel.Dock="Right" Content="{loc:T 'Refresh'}" Padding="12,4" Command="{Binding RefreshCommand}" />
+                    <Button DockPanel.Dock="Right" Content="{loc:T 'Next ▶'}" Padding="10,4" Margin="0,0,6,0" Command="{Binding NextPageCommand}" />
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding PageText}" Foreground="#667" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <Button DockPanel.Dock="Right" Content="{loc:T '◀ Previous'}" Padding="10,4" Margin="0,0,6,0" Command="{Binding PreviousPageCommand}" />
                     <TextBlock Text="{Binding Selected.ListTitle, Converter={StaticResource Text}}" FontWeight="SemiBold" Foreground="#445" VerticalAlignment="Center" />
                 </DockPanel>
                 <DataGrid x:Name="ListGrid" Grid.Row="3" ItemsSource="{Binding List}" AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False"

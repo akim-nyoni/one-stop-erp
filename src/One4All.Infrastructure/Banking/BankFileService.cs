@@ -16,7 +16,28 @@ public sealed class BankFileService : IBankFileService
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
-    public BankFileService(One4AllDbContext db) => _db = db;
+    /// <param name="audit">Records each payroll bank file produced.</param>
+    /// <param name="user">The user producing it.</param>
+    public BankFileService(One4AllDbContext db, Application.Abstractions.Security.IAuditService? audit = null, Application.Abstractions.Security.ICurrentUser? user = null)
+    {
+        _db = db;
+        _audit = audit;
+        _user = user;
+    }
+
+    private readonly Application.Abstractions.Security.IAuditService? _audit;
+    private readonly Application.Abstractions.Security.ICurrentUser? _user;
+
+    // Every export of personal or payroll data is recorded (brief §4.15.10: a payroll export is a data-breach risk).
+    private async Task RecordExportAsync(long companyId, string module, string entityType, string? entityId, string details, CancellationToken ct)
+    {
+        if (_audit is not null)
+        {
+            await _audit.RecordAsync(new Application.Abstractions.Security.AuditEvent(companyId, _user?.UserId, _user?.UserName ?? "system", module, entityType, entityId,
+                Core.Audit.AuditAction.Export, Details: details, Terminal: _user?.Terminal), ct).ConfigureAwait(false);
+        }
+    }
+
 
     /// <inheritdoc />
     public async Task<Result<long>> SaveLayoutAsync(BankFileLayoutRequest request, CancellationToken ct = default)
@@ -51,6 +72,17 @@ public sealed class BankFileService : IBankFileService
 
     /// <inheritdoc />
     public async Task<Result<IReadOnlyList<BankFileOutput>>> PayrollFilesAsync(long companyId, string runNumber, string layoutCode, CancellationToken ct = default)
+    {
+        Result<IReadOnlyList<BankFileOutput>> files = await PayrollFilesCoreAsync(companyId, runNumber, layoutCode, ct).ConfigureAwait(false);
+        if (files.IsSuccess)
+        {
+            await RecordExportAsync(companyId, "Payroll", "PayrollBankFile", (runNumber ?? string.Empty).Trim(), $"{files.Value.Count} file(s), layout {layoutCode}", ct).ConfigureAwait(false);
+        }
+
+        return files;
+    }
+
+    private async Task<Result<IReadOnlyList<BankFileOutput>>> PayrollFilesCoreAsync(long companyId, string runNumber, string layoutCode, CancellationToken ct)
     {
         BankFileLayout? layout = await _db.BankFileLayouts.AsNoTracking().FirstOrDefaultAsync(l => l.CompanyId == companyId && l.Code == (layoutCode ?? string.Empty).Trim().ToUpper(), ct).ConfigureAwait(false);
         if (layout is null)

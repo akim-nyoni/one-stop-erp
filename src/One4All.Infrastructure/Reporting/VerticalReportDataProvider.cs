@@ -53,7 +53,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
     {
         return command.ToUpperInvariant() switch
         {
-            "STOCKVALUATION" => await StockValuationAsync(companyId, ct).ConfigureAwait(false),
+            "STOCKVALUATION" => await StockValuationAsync(companyId, parameters, ct).ConfigureAwait(false),
             "STOCKMOVEMENTS" => await StockMovementsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "REORDER" => await ReorderAsync(companyId, ct).ConfigureAwait(false),
             "BACKORDERS" => await BackOrdersAsync(companyId, ct).ConfigureAwait(false),
@@ -289,13 +289,37 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
         })).ToList();
     }
 
-    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> StockValuationAsync(long companyId, CancellationToken ct)
+    // Today's valuation from the stock balances; at an earlier date, the signed sum of the movements up to it per item and warehouse.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> StockValuationAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
     {
+        var items = await _db.Items.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => i.CompanyId == companyId)
+            .Select(i => new { i.Id, i.Code, i.Description, i.Category, i.CostingMethod }).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<string, (string? Category, string Costing)> byCode = items.GroupBy(i => i.Code, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => (g.First().Category, g.First().CostingMethod.ToString()), StringComparer.OrdinalIgnoreCase);
+        if (ReportParameters.TryDate(parameters, "AsAtDate") is DateOnly asAt && asAt < DateOnly.FromDateTime(DateTime.Today))
+        {
+            Dictionary<long, string> warehouses = await _db.Warehouses.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(w => w.CompanyId == companyId)
+                .ToDictionaryAsync(w => w.Id, w => w.Code, ct).ConfigureAwait(false);
+            var held = await _db.StockMovements.AsNoTracking().Where(m => m.CompanyId == companyId && m.Date <= asAt).GroupBy(m => new { m.ItemId, m.WarehouseId })
+                .Select(g => new { g.Key.ItemId, g.Key.WarehouseId, Quantity = g.Sum(m => m.Quantity), Value = g.Sum(m => m.Value) }).ToListAsync(ct).ConfigureAwait(false);
+            var itemById = items.ToDictionary(i => i.Id);
+            return [.. held.Where(h => h.Quantity != 0m && itemById.ContainsKey(h.ItemId))
+                .OrderBy(h => itemById[h.ItemId].Code, StringComparer.Ordinal).ThenBy(h => warehouses.GetValueOrDefault(h.WarehouseId), StringComparer.Ordinal)
+                .Select(h => Row(new()
+                {
+                    ["ItemCode"] = itemById[h.ItemId].Code, ["Description"] = itemById[h.ItemId].Description, ["Category"] = itemById[h.ItemId].Category ?? "—",
+                    ["Costing"] = itemById[h.ItemId].CostingMethod.ToString(), ["WarehouseCode"] = warehouses.GetValueOrDefault(h.WarehouseId, "?"), ["Quantity"] = h.Quantity,
+                    ["AverageCost"] = Math.Round(h.Value / h.Quantity, 4, MidpointRounding.AwayFromZero), ["Value"] = Math.Round(h.Value, 2, MidpointRounding.AwayFromZero),
+                }))];
+        }
+
         IReadOnlyList<StockValuationLine> lines = await _inventory.StockValuationAsync(companyId, null, ct).ConfigureAwait(false);
         return lines.Select(l => Row(new()
         {
             ["ItemCode"] = l.ItemCode,
             ["Description"] = l.Description,
+            ["Category"] = byCode.TryGetValue(l.ItemCode, out var known) ? known.Category ?? "—" : "—",
+            ["Costing"] = byCode.TryGetValue(l.ItemCode, out var method) ? method.Costing : "—",
             ["WarehouseCode"] = l.WarehouseCode,
             ["Quantity"] = l.Quantity,
             ["AverageCost"] = l.AverageCost,

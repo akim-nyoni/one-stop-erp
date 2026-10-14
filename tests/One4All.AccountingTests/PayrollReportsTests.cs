@@ -103,6 +103,7 @@ public sealed class PayrollReportsTests
         (await Render("PR31")).Should().Contain("PEN Pension Fund,PR-EMP Pat Payee,PF-77,100.00,0.00,100");
         (await Render("PR36")).Should().Contain("TAX26,2026-01-01,0.00,\"1,000.00\",0,0.00").And.Contain("and above");
 
+        (await Render("PR18")).Should().Contain("PAYE,PAYE,—,1,180.00,180.00,180").And.Contain("PENSION,Pension (5% of basic),—,1,100.00,100.00,100");
         (await Render("PR37")).Should().Contain("—,PR-EMP Pat Payee,ANNUAL,—,10,2,0,—,8");
         (await Render("PR44")).Should().Contain("—,PR-EMP,Pat Payee,G3,Permanent,Active,2025-01-01,—,—").And.Contain("PR-EMP2,Casey Casual,G1");
         (await Render("PR58")).Should().Contain("PR-EMP Pat Payee,—,1,\"2,000.00\",0.00,\"24,000.00\",2000");

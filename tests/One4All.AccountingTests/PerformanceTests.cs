@@ -213,4 +213,80 @@ public sealed class PerformanceTests
         _output.WriteLine($"Billing run of {accounts:N0} accounts: proposed in {proposing:0.0} s, posted in {watch.Elapsed.TotalSeconds - proposing:0.0} s.");
         watch.Elapsed.TotalMinutes.Should().BeLessThan(15d * accounts / 50_000, "the brief's target: 50,000 accounts in under 15 minutes (pro rata for a smaller try)");
     }
+
+    [SkippableFact]
+    public async Task Budget_vs_actual_over_5000_lines_renders_within_3_seconds()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        Skip.IfNot(Enabled, "Set ONE4ALL_PERF=1 to run the performance pack.");
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        long yearId = await db.FiscalYears.Where(y => y.CompanyId == companyId).Select(y => y.Id).FirstAsync();
+
+        // 420 expense accounts × 12 periods = 5,040 budget lines.
+        for (int i = 0; i < 420; i++)
+        {
+            db.Accounts.Add(new Core.Accounting.LedgerAccount(companyId, $"PX{i:000}", $"Expense line {i}", Core.Accounting.AccountType.Expense));
+        }
+
+        await db.SaveChangesAsync();
+        List<Application.Abstractions.Budgeting.NewBudgetLine> lines = [.. Enumerable.Range(0, 420).SelectMany(i => Enumerable.Range(1, 12)
+            .Select(period => new Application.Abstractions.Budgeting.NewBudgetLine($"PX{i:000}", period, 100m + i))) ];
+        Application.Abstractions.Budgeting.IBudgetingService budgeting = scope.ServiceProvider.GetRequiredService<Application.Abstractions.Budgeting.IBudgetingService>();
+        Stopwatch saving = Stopwatch.StartNew();
+        long budget = (await budgeting.CreateBudgetAsync(companyId, yearId, "PERF", Core.Budgeting.BudgetType.OriginalApproved, null, lines)).Value;
+        (await budgeting.ActivateAsync(companyId, budget)).IsSuccess.Should().BeTrue();
+        saving.Stop();
+
+        Stopwatch watch = Stopwatch.StartNew();
+        var report = await budgeting.BudgetVsActualAsync(companyId, yearId, Core.Budgeting.BudgetType.OriginalApproved, null, 12);
+        watch.Stop();
+        report.IsSuccess.Should().BeTrue(report.IsFailure ? report.Error.Message : null);
+        _output.WriteLine($"Budget of {lines.Count:N0} lines saved in {saving.Elapsed.TotalSeconds:0.00} s; budget vs actual rendered in {watch.Elapsed.TotalSeconds:0.00} s.");
+        watch.Elapsed.TotalSeconds.Should().BeLessThan(3, "the brief's target: budget vs actual over 12 periods and 5,000 lines in under 3 s");
+    }
+
+    [SkippableFact]
+    public async Task Payslip_pdfs_for_1000_employees_are_produced_within_5_minutes()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        Skip.IfNot(Enabled, "Set ONE4ALL_PERF=1 to run the performance pack.");
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        PayElement basic = new(companyId, "BASIC", "Basic Salary", PayElementType.Earning, CalculationBasis.Formula, 1, "6100") { Formula = "BASIC", Taxable = true };
+        PayElement paye = new(companyId, "PAYE", "PAYE", PayElementType.Deduction, CalculationBasis.Formula, 2, "2400") { Formula = "TAXABLE * 20 / 100" };
+        db.PayElements.AddRange(basic, paye);
+        await db.SaveChangesAsync();
+        List<Employee> staff = [];
+        for (int i = 0; i < 1_000; i++)
+        {
+            Employee employee = new(companyId, $"PDF{companyId % 10000}-{i:0000}", $"Employee {i}", 900m + (i % 40) * 25m, new DateOnly(2024, 1, 1));
+            employee.AssignPayElement(basic.Id);
+            employee.AssignPayElement(paye.Id);
+            employee.NationalIdNumber = $"63-{i:000000}A07"; // the payslip PDF is protected with it
+            staff.Add(employee);
+        }
+
+        db.Employees.AddRange(staff);
+        await db.SaveChangesAsync();
+        (await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-03", new DateOnly(2026, 3, 25), "2420", $"PDF-{companyId}")).IsSuccess.Should().BeTrue();
+
+        IPayslipDistributionService payslips = scope.ServiceProvider.GetRequiredService<IPayslipDistributionService>();
+        Stopwatch watch = Stopwatch.StartNew();
+        long bytes = 0;
+        foreach (Employee employee in staff)
+        {
+            var pdf = await payslips.PayslipPdfAsync(companyId, employee.Id, "2026-03");
+            pdf.IsSuccess.Should().BeTrue(pdf.IsFailure ? pdf.Error.Message : null);
+            bytes += pdf.Value.Length;
+        }
+
+        watch.Stop();
+        _output.WriteLine($"1,000 payslip PDFs ({bytes / 1024:N0} KB) produced in {watch.Elapsed.TotalSeconds:0.0} s.");
+        watch.Elapsed.TotalMinutes.Should().BeLessThan(5, "the brief's target: payslip PDFs and email for 1,000 employees in under 5 minutes");
+    }
 }

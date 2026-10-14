@@ -13,13 +13,45 @@ public sealed class MasterDataExportService : IMasterDataExportService
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
-    public MasterDataExportService(One4AllDbContext db) => _db = db;
+    /// <param name="audit">Records each export.</param>
+    /// <param name="user">The user exporting (salaries and national IDs are left out unless they may see salaries).</param>
+    public MasterDataExportService(One4AllDbContext db, Application.Abstractions.Security.IAuditService? audit = null, Application.Abstractions.Security.ICurrentUser? user = null)
+    {
+        _db = db;
+        _audit = audit;
+        _user = user;
+    }
+
+    private readonly Application.Abstractions.Security.IAuditService? _audit;
+    private readonly Application.Abstractions.Security.ICurrentUser? _user;
+
+    // Every export of personal or payroll data is recorded (brief §4.15.10: a payroll export is a data-breach risk).
+    private async Task RecordExportAsync(long companyId, string module, string entityType, string? entityId, string details, CancellationToken ct)
+    {
+        if (_audit is not null)
+        {
+            await _audit.RecordAsync(new Application.Abstractions.Security.AuditEvent(companyId, _user?.UserId, _user?.UserName ?? "system", module, entityType, entityId,
+                Core.Audit.AuditAction.Export, Details: details, Terminal: _user?.Terminal), ct).ConfigureAwait(false);
+        }
+    }
+
 
     /// <inheritdoc />
     public IReadOnlyList<string> Kinds { get; } = ["Accounts", "Warehouses", "Customers", "Suppliers", "Items", "Employees"];
 
     /// <inheritdoc />
     public async Task<Result<string>> ExportAsync(long companyId, string kind, CancellationToken ct = default)
+    {
+        Result<string> exported = await ExportCoreAsync(companyId, kind, ct).ConfigureAwait(false);
+        if (exported.IsSuccess)
+        {
+            await RecordExportAsync(companyId, "Onboarding", "MasterDataExport", (kind ?? string.Empty).Trim(), $"{exported.Value.Count(ch => ch == '\n')} line(s)", ct).ConfigureAwait(false);
+        }
+
+        return exported;
+    }
+
+    private async Task<Result<string>> ExportCoreAsync(long companyId, string kind, CancellationToken ct)
     {
         switch ((kind ?? string.Empty).Trim().ToUpperInvariant())
         {
@@ -42,8 +74,10 @@ public sealed class MasterDataExportService : IMasterDataExportService
                     items.Select(i => new object?[] { i.Code, i.Description, i.ItemType.ToString(), i.RevenueAccountCode, i.CostOfSalesAccountCode, i.Category }));
             case "EMPLOYEES":
                 var employees = await _db.Employees.AsNoTracking().Where(e => e.CompanyId == companyId).OrderBy(e => e.EmployeeNumber).ToListAsync(ct).ConfigureAwait(false);
+                // Pay and national IDs only for a user who may see salaries (an unattended export, with no user, has them).
+                bool salaries = _user is not { IsAuthenticated: true } signedIn || signedIn.Permissions.Has("Payroll.ViewSalary", Core.Security.OperationFlags.View);
                 return ImportTemplates.Csv("employee_number,name,basic_salary,engaged,national_id,department,cost_centre,grade",
-                    employees.Select(e => new object?[] { e.EmployeeNumber, e.FullName, e.BasicSalary, e.EngagementDate, e.NationalIdNumber, e.Department, e.CostCentre, e.Grade }));
+                    employees.Select(e => new object?[] { e.EmployeeNumber, e.FullName, salaries ? e.BasicSalary : null, e.EngagementDate, salaries ? e.NationalIdNumber : null, e.Department, e.CostCentre, e.Grade }));
             default:
                 return Error.Validation("Import.ExportKind", $"Nothing to export for {kind}; one of {string.Join(", ", Kinds)}.");
         }

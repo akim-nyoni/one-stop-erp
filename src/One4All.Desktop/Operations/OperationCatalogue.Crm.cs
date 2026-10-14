@@ -60,7 +60,7 @@ public static partial class OperationCatalogue
                 }
             },
             List = async c => Table(await c.Db.Set<Opportunity>().AsNoTracking().Where(o => o.CompanyId == c.CompanyId && o.Stage != OpportunityStage.Won && o.Stage != OpportunityStage.Lost)
-                    .OrderBy(o => o.ExpectedCloseOn).ThenBy(o => o.Id).Take(300).ToListAsync().ConfigureAwait(true),
+                    .OrderBy(o => o.ExpectedCloseOn).ThenBy(o => o.Id).Page(c, 300).ToListAsync().ConfigureAwait(true),
                 ("Id", o => o.Id), ("Opportunity", o => o.Name), ("Stage", o => o.Stage), ("Value", o => M(o.EstimatedValue)), ("Probability", o => $"{o.ProbabilityPercent:0}%"),
                 ("Expected close", o => o.ExpectedCloseOn is DateOnly d ? D(d) : "-")),
         };

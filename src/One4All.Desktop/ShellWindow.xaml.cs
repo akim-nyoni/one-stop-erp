@@ -251,6 +251,12 @@ public partial class ShellWindow : Window
         floor.Show();
     }
 
+    private void OpenEnquiryDesk_Click(object sender, RoutedEventArgs e)
+    {
+        EnquiryDeskWindow desk = new(_services) { Owner = this };
+        desk.Show();
+    }
+
     private void OpenFaultDesk_Click(object sender, RoutedEventArgs e)
     {
         FaultDeskWindow desk = new(_services) { Owner = this };

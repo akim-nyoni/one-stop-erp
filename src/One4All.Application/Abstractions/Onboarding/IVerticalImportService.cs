@@ -47,6 +47,17 @@ public interface IVerticalImportService
     Task<ImportReport> ImportPayrollYtdAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
 
     /// <summary>
+    /// Opening leave balances: <c>employee_number, leave_type, days</c> (optional <c>taken</c>) — each employee's leave owed when the system takes over,
+    /// accrued as the opening and less what was taken; an employee already holding a balance of that type is skipped.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="csv">The file.</param>
+    /// <param name="commit">False to check only.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What was (or would be) imported.</returns>
+    Task<ImportReport> ImportLeaveBalancesAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
+
+    /// <summary>
     /// The meter register: <c>serial, stand, service, reading, date</c> (optional <c>digits, multiplier</c>) — each meter goes on the register with
     /// its opening reading as an accepted actual reading and is linked to the property's active service of that type (Water, Sewer…), which must
     /// not already be metered.

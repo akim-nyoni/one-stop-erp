@@ -44,6 +44,9 @@ public sealed record OperationField(string Name, string Label, FieldKind Kind = 
 /// <param name="UserId">The signed-in user.</param>
 public sealed record OperationContext(IServiceProvider Services, long CompanyId, long UserId)
 {
+    /// <summary>Gets the page of the live list being shown (0: the first); lists read one page at a time from the database.</summary>
+    public int ListPage { get; init; }
+
     /// <summary>Gets the scope's database context.</summary>
     public One4AllDbContext Db => Services.GetRequiredService<One4AllDbContext>();
 
@@ -203,6 +206,22 @@ public sealed class OperationInput
 /// <summary>Helpers shared by the operations: result checks, record look-ups by code, and list building.</summary>
 public static class Ops
 {
+    /// <summary>One page of a list query, read from the database (the console's page, of the list's page size).</summary>
+    /// <typeparam name="T">The row.</typeparam>
+    /// <param name="query">The ordered query.</param>
+    /// <param name="c">The context (its list page).</param>
+    /// <param name="size">The page size.</param>
+    /// <returns>The page.</returns>
+    public static IQueryable<T> Page<T>(this IQueryable<T> query, OperationContext c, int size) => query.Skip(Math.Max(0, c.ListPage) * size).Take(size);
+
+    /// <summary>One page of rows already read.</summary>
+    /// <typeparam name="T">The row.</typeparam>
+    /// <param name="rows">The rows.</param>
+    /// <param name="c">The context (its list page).</param>
+    /// <param name="size">The page size.</param>
+    /// <returns>The page.</returns>
+    public static IEnumerable<T> Page<T>(this IEnumerable<T> rows, OperationContext c, int size) => rows.Skip(Math.Max(0, c.ListPage) * size).Take(size);
+
     /// <summary>The standard date format.</summary>
     /// <param name="date">The date.</param>
     /// <returns>yyyy-MM-dd.</returns>

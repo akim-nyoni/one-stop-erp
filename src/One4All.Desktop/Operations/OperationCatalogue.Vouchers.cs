@@ -51,7 +51,7 @@ public static partial class OperationCatalogue
                     _ => Check(await vouchers.RenderAsync(c.CompanyId, id).ConfigureAwait(true)),
                 };
             },
-            List = async c => Table(await c.Db.Set<AccountingVoucher>().AsNoTracking().Where(v => v.CompanyId == c.CompanyId).OrderByDescending(v => v.Id).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<AccountingVoucher>().AsNoTracking().Where(v => v.CompanyId == c.CompanyId).OrderByDescending(v => v.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Voucher", v => v.Number), ("Type", v => v.Type), ("Date", v => D(v.Date)), ("Party", v => v.Party), ("Status", v => v.Status),
                 ("Checked", v => v.CheckedByUserId is null ? string.Empty : "yes"), ("Journal", v => v.JournalNumber ?? string.Empty)),
         };
@@ -177,7 +177,7 @@ public static partial class OperationCatalogue
                         return $"{run.CardsExpired} expired card(s); breakage {M(run.TotalBreakage)} recognised.";
                 }
             },
-            List = async c => Table(await c.Db.Set<GiftCard>().AsNoTracking().Where(g => g.CompanyId == c.CompanyId && g.Balance != 0m).OrderBy(g => g.CardNumber).Take(500).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<GiftCard>().AsNoTracking().Where(g => g.CompanyId == c.CompanyId && g.Balance != 0m).OrderBy(g => g.CardNumber).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Card", g => g.CardNumber), ("Balance", g => M(g.Balance)), ("Issued", g => D(g.IssuedDate)), ("Expires", g => g.ExpiryDate is DateOnly e ? D(e) : string.Empty), ("Status", g => g.Status)),
         };
     }

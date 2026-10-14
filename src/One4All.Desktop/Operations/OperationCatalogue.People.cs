@@ -65,7 +65,7 @@ public static partial class OperationCatalogue
                 string working = earned + less + owed;
                 return i.Text("Step") == "Preview" ? "Preview: " + working : "Terminated. " + working;
             },
-            List = async c => Table(await c.Db.Set<Termination>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderByDescending(t => t.Id).Take(50)
+            List = async c => Table(await c.Db.Set<Termination>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderByDescending(t => t.Id).Page(c, 50)
                     .SelectMany(t => t.Clearance.Select(item => new { t.EmployeeId, t.LastDay, item.Id, item.Description, item.IsCleared })).ToListAsync().ConfigureAwait(true),
                 ("Item", x => x.Id), ("Employee id", x => x.EmployeeId), ("Left", x => D(x.LastDay)), ("To clear", x => x.Description), ("Cleared", x => x.IsCleared)),
         };
@@ -209,7 +209,7 @@ public static partial class OperationCatalogue
                 }
             },
             List = async c => Table(await c.Db.EmployeeDependants.AsNoTracking().Where(d => d.CompanyId == c.CompanyId)
-                    .Join(c.Db.Employees, d => d.EmployeeId, e => e.Id, (d, e) => new { d, e.EmployeeNumber }).OrderBy(x => x.EmployeeNumber).ThenBy(x => x.d.Kind).Take(500).ToListAsync().ConfigureAwait(true),
+                    .Join(c.Db.Employees, d => d.EmployeeId, e => e.Id, (d, e) => new { d, e.EmployeeNumber }).OrderBy(x => x.EmployeeNumber).ThenBy(x => x.d.Kind).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Id", x => x.d.Id), ("Employee", x => x.EmployeeNumber), ("Name", x => x.d.Name), ("Is", x => x.d.Kind), ("Relationship", x => x.d.Relationship),
                 ("Share %", x => x.d.SharePercent?.ToString("0.##", CultureInfo.InvariantCulture) ?? string.Empty), ("Medical aid", x => x.d.MedicalAidNumber ?? string.Empty)),
         };
@@ -258,7 +258,7 @@ public static partial class OperationCatalogue
                 }).ConfigureAwait(true));
                 return $"Employee {i.Text("Number").ToUpperInvariant()} engaged (id {id}).";
             },
-            List = async c => Table(await c.Db.Employees.AsNoTracking().Where(e => e.CompanyId == c.CompanyId).OrderBy(e => e.EmployeeNumber).Take(500).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Employees.AsNoTracking().Where(e => e.CompanyId == c.CompanyId).OrderBy(e => e.EmployeeNumber).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Number", e => e.EmployeeNumber), ("Name", e => e.FullName), ("Department", e => e.Department ?? string.Empty), ("Grade", e => e.Grade ?? string.Empty),
                 ("Type", e => e.EmploymentType), ("Job title", e => e.JobTitle ?? string.Empty), ("Phone", e => e.Phone ?? string.Empty), ("Status", e => e.Status),
                 ("Engaged", e => D(e.EngagementDate))),
@@ -580,7 +580,7 @@ public static partial class OperationCatalogue
                             + $"{M(stage.NetPayOutstanding)} still on the net pay control.";
                 }
             },
-            List = async c => Table(await c.Db.Set<Core.Payroll.PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.PayDate).Take(200)
+            List = async c => Table(await c.Db.Set<Core.Payroll.PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.PayDate).Page(c, 200)
                     .ToListAsync().ConfigureAwait(true),
                 ("Run", r => r.DocumentNumber), ("Period", r => r.PeriodLabel), ("Group", r => r.PayGroup), ("Kind", r => r.Kind), ("Net", r => M(r.Net)),
                 ("Paid", r => r.PaidOn is DateOnly p ? D(p) : "-"), ("Closed", r => r.ClosedOn is DateOnly cl ? D(cl) : "-"), ("Reversed", r => r.IsReversed ? "yes" : "")),
@@ -698,7 +698,7 @@ public static partial class OperationCatalogue
             Run = async (c, i) => Check(await c.Get<IEstablishmentService>().AppointActingAsync(c.CompanyId, i.Text("Employee"), i.Text("Grade"), i.Whole("Notch"), i.Date("From"),
                 i.OptionalDate("To")).ConfigureAwait(true), "Acting appointment recorded."),
             List = async c => Table(await c.Db.ActingAppointments.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.From)
-                .Join(c.Db.Employees.AsNoTracking(), a => a.EmployeeId, e => e.Id, (a, e) => new { e.EmployeeNumber, e.FullName, a.Grade, a.Notch, a.From, a.To }).Take(200).ToListAsync()
+                .Join(c.Db.Employees.AsNoTracking(), a => a.EmployeeId, e => e.Id, (a, e) => new { e.EmployeeNumber, e.FullName, a.Grade, a.Notch, a.From, a.To }).Page(c, 200).ToListAsync()
                 .ConfigureAwait(true), ("Employee", a => a.EmployeeNumber), ("Name", a => a.FullName), ("Grade", a => a.Grade), ("Notch", a => a.Notch), ("From", a => D(a.From)),
                 ("To", a => a.To is DateOnly t ? D(t) : "open")),
         };
@@ -1361,7 +1361,7 @@ public static partial class OperationCatalogue
                         i.Optional("Guardian") ?? string.Empty, i.Date("Date")).ConfigureAwait(true))}).",
                 };
             },
-            List = async c => Table(await c.Db.Students.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.AdmissionNumber).Take(500).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Students.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.AdmissionNumber).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Admission", s => s.AdmissionNumber), ("Name", s => s.ShownName(false)), ("Grade", s => s.Grade), ("Boarder", s => s.IsBoarder ? "yes" : string.Empty),
                 ("Enrolled", s => s.IsEnrolled ? "yes" : "left")),
         };
@@ -1444,7 +1444,7 @@ public static partial class OperationCatalogue
                                            join s in c.Db.Students.AsNoTracking() on a.StudentId equals s.Id
                                            where a.CompanyId == c.CompanyId
                                            orderby a.Id descending
-                                           select new { a.Reference, s.AdmissionNumber, a.Type, a.Value, a.Reason, a.Status, a.RequestedOn }).Take(100).ToListAsync().ConfigureAwait(true),
+                                           select new { a.Reference, s.AdmissionNumber, a.Type, a.Value, a.Reason, a.Status, a.RequestedOn }).Page(c, 100).ToListAsync().ConfigureAwait(true),
                 ("Reference", a => a.Reference), ("Student", a => a.AdmissionNumber), ("Type", a => a.Type), ("Value", a => Q(a.Value)), ("Reason", a => a.Reason), ("Status", a => a.Status),
                 ("Requested", a => D(a.RequestedOn))),
         };
@@ -1709,7 +1709,7 @@ public static partial class OperationCatalogue
                     {
                         o.OrderNumber, o.OrderDate, Customer = cu.Code, o.Status, Ordered = o.Lines.Sum(l => l.OrderedQuantity), Despatched = o.Lines.Sum(l => l.DespatchedQuantity),
                         Invoiced = o.Lines.Sum(l => l.InvoicedQuantity), Value = o.Lines.Sum(l => l.OrderedQuantity * l.UnitPrice),
-                    }).Take(500).ToListAsync().ConfigureAwait(true),
+                    }).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Order", r => r.OrderNumber), ("Date", r => D(r.OrderDate)), ("Customer", r => r.Customer), ("Status", r => r.Status.ToString()), ("Ordered", r => Q(r.Ordered)),
                 ("Despatched", r => Q(r.Despatched)), ("Invoiced", r => Q(r.Invoiced)), ("Back order", r => Q(r.Ordered - r.Despatched)), ("Value", r => M(r.Value))),
         };
@@ -1820,7 +1820,7 @@ public static partial class OperationCatalogue
                 return Check(await service.OrderAsync(c.CompanyId, order.Id, await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true), i.Text("Reference"), i.Date("Date"), lines).ConfigureAwait(true),
                     id => $"Drop-shipment {i.Text("Reference").ToUpperInvariant()} placed.");
             },
-            List = async c => Table(await c.Db.DropShipments.AsNoTracking().Include(d => d.Lines).Where(d => d.CompanyId == c.CompanyId).OrderByDescending(d => d.Id).Take(50).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.DropShipments.AsNoTracking().Include(d => d.Lines).Where(d => d.CompanyId == c.CompanyId).OrderByDescending(d => d.Id).Page(c, 50).ToListAsync().ConfigureAwait(true),
                 ("Reference", d => d.Reference), ("Ordered", d => D(d.OrderedOn)), ("Delivered", d => d.DeliveredOn is DateOnly on ? D(on) : "pending"), ("Supplier invoice", d => d.SupplierInvoiceNumber),
                 ("Cost", d => M(d.Cost))),
         };
@@ -1856,7 +1856,7 @@ public static partial class OperationCatalogue
                                            join o in c.Db.SalesOrders.AsNoTracking() on r.SalesOrderId equals o.Id
                                            where r.CompanyId == c.CompanyId
                                            orderby r.Id descending
-                                           select new { o.OrderNumber, r.Version, r.TotalNet, r.Reason, r.AmendedOn }).Take(50).ToListAsync().ConfigureAwait(true),
+                                           select new { o.OrderNumber, r.Version, r.TotalNet, r.Reason, r.AmendedOn }).Page(c, 50).ToListAsync().ConfigureAwait(true),
                 ("Order", r => r.OrderNumber), ("Version replaced", r => r.Version.ToString(CultureInfo.InvariantCulture)), ("Value then", r => M(r.TotalNet)), ("Reason", r => r.Reason), ("On", r => D(r.AmendedOn))),
         };
         yield return new Operation

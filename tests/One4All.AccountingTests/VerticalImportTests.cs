@@ -66,6 +66,10 @@ public sealed class VerticalImportTests
         (await import.ImportEmployeesAsync(companyId, detailed + "VI-E3,Chipo Moyo,900,2024-01-01,T-77,1990-05-04,Female,Contract,BankTransfer,CBZ,4400123,,wages,2026-12-31\n", commit: true))
             .Created.Should().Be(1);
         Core.Payroll.Employee chipo = await db.Employees.AsNoTracking().SingleAsync(e => e.CompanyId == companyId && e.EmployeeNumber == "VI-E3");
+        (await import.ImportLeaveBalancesAsync(companyId, "employee_number,leave_type,days,taken\nVI-E3,annual,12.5,2\nVI-NOPE,annual,3,0\n", commit: true)).Errors.Single().LineNumber.Should().Be(3);
+        (await import.ImportLeaveBalancesAsync(companyId, "employee_number,leave_type,days,taken\nVI-E3,annual,12.5,2\n", commit: true)).Created.Should().Be(1);
+        (await import.ImportLeaveBalancesAsync(companyId, "employee_number,leave_type,days\nvi-e3,ANNUAL,99\n", commit: true)).Skipped.Should().Be(1);
+        (await db.EmployeeLeaveBalances.AsNoTracking().SingleAsync(b => b.EmployeeId == chipo.Id)).BalanceDays.Should().Be(10.5m);
         (chipo.TaxNumber, chipo.DateOfBirth, chipo.Gender, chipo.EmploymentType, chipo.BankAccountNumber, chipo.PayGroup, chipo.ContractEndDate)
             .Should().Be(("T-77", new DateOnly(1990, 5, 4), Core.Payroll.Gender.Female, Core.Payroll.EmploymentType.Contract, "4400123", "WAGES", new DateOnly(2026, 12, 31)));
         (await import.ImportEmployeeLoansAsync(companyId, "employee_number,reference,outstanding,instalment,loan_account\nVI-E1,LN-1,600,100,1350\n", asAt, "2991", commit: true)).Created.Should().Be(1);

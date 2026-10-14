@@ -211,6 +211,11 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Reporting.ReportSubscriptionsTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.DespatchMessagesTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.LapseOffersTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.RecurringJournalsTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.RecurringInvoicesTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.StandingOrdersTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.HousingBillingTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.ApplicantDuplicateScanTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.LeaveProvisionTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.MonthlyDepreciationTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.WaitingListRenewalsTask>();

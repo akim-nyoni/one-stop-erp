@@ -15,6 +15,7 @@ public static class SystemReportCatalogue
         yield return SystemReports.TrialBalance();
         yield return SystemReports.CustomerStatement();
         yield return SystemReports.IncomeStatement();
+        yield return SystemReports.IncomeStatementByFunction();
         yield return SystemReports.BalanceSheet();
         yield return SystemReports.CashFlow();
         yield return SystemReports.DepartmentalIncomeStatement();

@@ -36,6 +36,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         return command.ToUpperInvariant() switch
         {
             "PYRLSUMMARY" => await SummaryAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLDEDUCTIONS" => await DeductionsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLJOURNAL" => await JournalAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLVARIANCE" => await VarianceAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLTRACE" => await TraceAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -148,6 +149,21 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             .GroupBy(x => (x.PayGroup, x.Line.Type, x.Line.ElementCode)).OrderBy(g => g.Key.PayGroup, StringComparer.Ordinal).ThenBy(g => g.Key.Type).ThenBy(g => g.Key.ElementCode, StringComparer.Ordinal)
             .Select(g => Row(("PayGroup", g.Key.PayGroup.Length == 0 ? "Default" : g.Key.PayGroup), ("Type", g.Key.Type.ToString()), ("Element", g.Key.ElementCode), ("Description", g.First().Line.Description), ("Employees", g.Select(x => x.EmployeeId).Distinct().Count()),
                 ("Amount", g.Sum(x => x.Line.Amount))))];
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DeductionsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
+        return [.. (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false))
+            .SelectMany(p => p.Lines.Where(l => l.Type == PayElementType.Deduction).Select(l => (p.EmployeeId, Department: employees.TryGetValue(p.EmployeeId, out Employee? e) ? e.Department ?? "—" : "—", Line: l)))
+            .GroupBy(x => (x.Line.ElementCode, x.Department)).OrderBy(g => g.Key.ElementCode, StringComparer.Ordinal).ThenBy(g => g.Key.Department, StringComparer.Ordinal)
+            .Select(g =>
+            {
+                // Per employee over the period (several payslips add up), then the spread across employees.
+                List<decimal> perEmployee = [.. g.GroupBy(x => x.EmployeeId).Select(e => e.Sum(x => x.Line.Amount))];
+                return Row(("Element", g.Key.ElementCode), ("Description", g.First().Line.Description), ("Department", g.Key.Department), ("Employees", perEmployee.Count),
+                    ("Average", Money(perEmployee.Average())), ("Largest", Money(perEmployee.Max())), ("Amount", perEmployee.Sum()));
+            })];
+    }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> JournalAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {

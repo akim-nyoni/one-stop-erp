@@ -424,7 +424,7 @@ public static partial class OperationCatalogue
                         return Show(Check(await runs.GetAsync(c.CompanyId, run).ConfigureAwait(true)));
                 }
             },
-            List = async c => Table(await c.Db.Set<PaymentRunBatch>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<PaymentRunBatch>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Run", b => b.Number), ("Status", b => b.Status), ("Pay date", b => D(b.PaymentDate)), ("Due by", b => D(b.DueOnOrBefore)), ("Bank", b => b.BankAccountCode),
                 ("Currency", b => b.Currency), ("Proposed by", b => b.ProposedByUserId), ("Approved by", b => b.ApprovedByUserId)),
         };

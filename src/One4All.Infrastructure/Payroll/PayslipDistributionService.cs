@@ -24,14 +24,41 @@ public sealed class PayslipDistributionService : IPayslipDistributionService
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="notifications">The messaging service the e-mails are queued through.</param>
-    public PayslipDistributionService(One4AllDbContext db, INotificationService notifications)
+    public PayslipDistributionService(One4AllDbContext db, INotificationService notifications, Application.Abstractions.Security.IAuditService? audit = null,
+        Application.Abstractions.Security.ICurrentUser? user = null)
     {
+        _audit = audit;
+        _user = user;
         _db = db;
         _notifications = notifications;
     }
 
     /// <inheritdoc />
+    private readonly Application.Abstractions.Security.IAuditService? _audit;
+    private readonly Application.Abstractions.Security.ICurrentUser? _user;
+
+    // Every export of personal or payroll data is recorded (brief §4.15.10: a payroll export is a data-breach risk).
+    private async Task RecordExportAsync(long companyId, string module, string entityType, string? entityId, string details, CancellationToken ct)
+    {
+        if (_audit is not null)
+        {
+            await _audit.RecordAsync(new Application.Abstractions.Security.AuditEvent(companyId, _user?.UserId, _user?.UserName ?? "system", module, entityType, entityId,
+                Core.Audit.AuditAction.Export, Details: details, Terminal: _user?.Terminal), ct).ConfigureAwait(false);
+        }
+    }
+
     public async Task<Result<byte[]>> PayslipPdfAsync(long companyId, long employeeId, string periodLabel, CancellationToken ct = default)
+    {
+        Result<byte[]> pdf = await PayslipPdfCoreAsync(companyId, employeeId, periodLabel, ct).ConfigureAwait(false);
+        if (pdf.IsSuccess)
+        {
+            await RecordExportAsync(companyId, "Payroll", "PayslipPdf", $"{employeeId}/{periodLabel}", $"{pdf.Value.Length} bytes", ct).ConfigureAwait(false);
+        }
+
+        return pdf;
+    }
+
+    private async Task<Result<byte[]>> PayslipPdfCoreAsync(long companyId, long employeeId, string periodLabel, CancellationToken ct)
     {
         Employee? employee = await _db.Employees.AsNoTracking().FirstOrDefaultAsync(e => e.Id == employeeId && e.CompanyId == companyId, ct).ConfigureAwait(false);
         if (employee is null)

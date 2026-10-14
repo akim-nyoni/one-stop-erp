@@ -187,7 +187,7 @@ public static partial class OperationCatalogue
                             i.OptionalNumber("Amount") ?? 0m, i.Optional("Provider")).ConfigureAwait(true), id => $"Maintenance on {number} recorded.");
                 }
             },
-            List = async c => Table(await c.Db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderBy(a => a.AssetNumber).Take(500).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderBy(a => a.AssetNumber).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Asset", a => a.AssetNumber), ("Description", a => a.Description), ("Class", a => a.AssetClass), ("Cost", a => M(a.Cost)), ("Depreciation", a => M(a.AccumulatedDepreciation)),
                 ("Book value", a => M(a.NetBookValue)), ("Status", a => a.Status.ToString()), ("Location", a => a.Location ?? "-"), ("Custodian", a => a.Custodian ?? "-"),
                 ("Tag", a => a.TagNumber ?? "-")),
@@ -247,7 +247,7 @@ public static partial class OperationCatalogue
                 CompanyId = c.CompanyId, InvoiceNumber = i.Text("Invoice"), SupplierCode = i.Optional("Supplier"), AssetNumber = i.Text("Asset"), Description = i.Text("Description"),
                 AssetClass = i.Text("Class"), Cost = i.OptionalNumber("Cost"), InvoiceAccountCode = i.Optional("Account"), DocumentNumber = i.Optional("Document"),
             }).ConfigureAwait(true), id => $"Asset {i.Text("Asset").ToUpperInvariant()} capitalised (id {id})."),
-            List = async c => Table(await c.Db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == c.CompanyId && a.SourceOpenItemId != null).OrderByDescending(a => a.Id).Take(200)
+            List = async c => Table(await c.Db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == c.CompanyId && a.SourceOpenItemId != null).OrderByDescending(a => a.Id).Page(c, 200)
                 .Join(c.Db.OpenItems.AsNoTracking(), a => a.SourceOpenItemId, o => (long?)o.Id, (a, o) => new { a.AssetNumber, a.Description, a.Cost, o.DocumentNumber, a.SourceAccountCode, a.AcquisitionDate })
                 .ToListAsync().ConfigureAwait(true), ("Asset", a => a.AssetNumber), ("Description", a => a.Description), ("Cost", a => M(a.Cost)), ("Invoice", a => a.DocumentNumber),
                 ("Coded to", a => a.SourceAccountCode), ("Acquired", a => D(a.AcquisitionDate))),
@@ -400,7 +400,7 @@ public static partial class OperationCatalogue
                             i.Optional("Reason") ?? string.Empty).ConfigureAwait(true), "Budget revised.");
                 }
             },
-            List = async c => Table(await c.Db.Set<JobContract>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.ContractNumber).Take(300).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<JobContract>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.ContractNumber).Page(c, 300).ToListAsync().ConfigureAwait(true),
                 ("Contract", x => x.ContractNumber), ("Name", x => x.Name), ("Value", x => M(x.ContractValue)), ("Budget", x => M(x.BudgetCost))),
         };
         yield return new Operation
@@ -425,7 +425,7 @@ public static partial class OperationCatalogue
                     .ConfigureAwait(true), i.Number("Value"), i.Number("Budget"), i.Number("Retention"), i.Optional("Revenue") ?? string.Empty).ConfigureAwait(true));
                 return $"Contract {i.Text("Contract").ToUpperInvariant()} opened (id {id}).";
             },
-            List = async c => Table(await c.Db.JobContracts.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.ContractNumber).Take(500).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.JobContracts.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.ContractNumber).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Contract", x => x.ContractNumber), ("Name", x => x.Name), ("Value", x => M(x.ContractValue)), ("Budget", x => M(x.BudgetCost)), ("Status", x => x.Status)),
         };
         yield return new Operation

@@ -66,7 +66,7 @@ public static partial class OperationCatalogue
                     join y in c.Db.FiscalYears.AsNoTracking() on b.FiscalYearId equals y.Id
                     where b.CompanyId == c.CompanyId
                     orderby y.StartDate descending, b.Id descending
-                    select new { b.Id, Year = y.Code, b.Label, b.Type, b.Department, b.VersionNumber, b.Status, b.IsActive, b.Reason }).Take(300).ToListAsync().ConfigureAwait(true),
+                    select new { b.Id, Year = y.Code, b.Label, b.Type, b.Department, b.VersionNumber, b.Status, b.IsActive, b.Reason }).Page(c, 300).ToListAsync().ConfigureAwait(true),
                 ("Id", b => b.Id), ("Year", b => b.Year), ("Label", b => b.Label), ("Type", b => b.Type.ToString()), ("Department", b => b.Department ?? "-"), ("Version", b => b.VersionNumber),
                 ("Status", b => b.Status.ToString()), ("Active", b => b.IsActive ? "yes" : string.Empty), ("Note", b => b.Reason ?? string.Empty)),
         };
@@ -101,7 +101,7 @@ public static partial class OperationCatalogue
                 decimal total = Check(await carry.ApproveAsync(c.CompanyId, year, target, amounts, i.Optional("Reference") ?? string.Empty, c.UserId, i.Date("AsAt")).ConfigureAwait(true));
                 return $"{M(total)} of unspent capital carried into {label}.";
             },
-            List = async c => Table(await c.Db.Set<Budget>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId && b.Type == BudgetType.Capital).OrderByDescending(b => b.Id).Take(100)
+            List = async c => Table(await c.Db.Set<Budget>().AsNoTracking().Where(b => b.CompanyId == c.CompanyId && b.Type == BudgetType.Capital).OrderByDescending(b => b.Id).Page(c, 100)
                     .ToListAsync().ConfigureAwait(true),
                 ("Budget", b => b.Label), ("Version", b => b.VersionNumber), ("Status", b => b.Status)),
         };
@@ -334,7 +334,7 @@ public static partial class OperationCatalogue
                     i.Text("Reason"), c.UserId).ConfigureAwait(true));
                 return $"Re-phasing {id} requested.";
             },
-            List = async c => Table(await c.Db.Set<BudgetRephase>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<BudgetRephase>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Id", r => r.Id), ("Budget", r => r.BudgetId), ("Account", r => r.AccountCode), ("From", r => r.FromPeriod), ("To", r => r.ToPeriod), ("Amount", r => M(r.Amount)),
                 ("Reason", r => r.Reason), ("Status", r => r.Status)),
         };

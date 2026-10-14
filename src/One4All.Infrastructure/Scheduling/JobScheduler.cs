@@ -271,6 +271,133 @@ public sealed class LeaveProvisionTask : IScheduledTask
     }
 }
 
+/// <summary>Built-in task: the nightly sweep of the waiting list for applicants registered twice or reported deceased (each opens a case to review).</summary>
+public sealed class ApplicantDuplicateScanTask : IScheduledTask
+{
+    private readonly Application.Abstractions.Housing.IApplicantIntakeService _intake;
+
+    /// <summary>Creates the task.</summary>
+    /// <param name="intake">The applicant intake service.</param>
+    public ApplicantDuplicateScanTask(Application.Abstractions.Housing.IApplicantIntakeService intake) => _intake = intake;
+
+    /// <inheritdoc />
+    public string Key => "housing.duplicate-scan";
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
+    {
+        Application.Abstractions.Housing.DuplicateScan scan = await _intake.ScanAsync(companyId, DateOnly.FromDateTime(runAt.UtcDateTime), ct).ConfigureAwait(false);
+        return $"{scan.Opened} possible duplicate(s) and {scan.Deceased} deceased applicant(s) opened for review.";
+    }
+}
+
+/// <summary>Built-in task: post every recurring journal that has fallen due (each template only once per due date).</summary>
+public sealed class RecurringJournalsTask : IScheduledTask
+{
+    private readonly Application.Abstractions.Accounting.IRecurringJournalService _journals;
+
+    /// <summary>Creates the task.</summary>
+    /// <param name="journals">The recurring journal service.</param>
+    public RecurringJournalsTask(Application.Abstractions.Accounting.IRecurringJournalService journals) => _journals = journals;
+
+    /// <inheritdoc />
+    public string Key => "gl.recurring-journals";
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
+    {
+        Result<IReadOnlyList<Application.Abstractions.Accounting.RecurringRunLine>> run = await _journals.PostAllActiveAsync(companyId, DateOnly.FromDateTime(runAt.UtcDateTime), ct).ConfigureAwait(false);
+        return run.IsFailure ? run.Error : $"{run.Value.Count(l => !l.AlreadyPosted)} recurring journal(s) posted.";
+    }
+}
+
+/// <summary>Built-in task: raise the recurring customer and supplier invoices that have fallen due.</summary>
+public sealed class RecurringInvoicesTask : IScheduledTask
+{
+    private readonly Application.Abstractions.Trading.IRecurringSalesInvoiceService _sales;
+    private readonly Application.Abstractions.Trading.IRecurringPurchaseInvoiceService _purchases;
+
+    /// <summary>Creates the task.</summary>
+    /// <param name="sales">The recurring sales invoices.</param>
+    /// <param name="purchases">The recurring supplier invoices.</param>
+    public RecurringInvoicesTask(Application.Abstractions.Trading.IRecurringSalesInvoiceService sales, Application.Abstractions.Trading.IRecurringPurchaseInvoiceService purchases)
+    {
+        _sales = sales;
+        _purchases = purchases;
+    }
+
+    /// <inheritdoc />
+    public string Key => "trading.recurring-invoices";
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
+    {
+        DateOnly today = DateOnly.FromDateTime(runAt.UtcDateTime);
+        Result<int> sales = await _sales.GenerateDueAsync(companyId, today, ct).ConfigureAwait(false);
+        if (sales.IsFailure)
+        {
+            return sales.Error;
+        }
+
+        Result<int> purchases = await _purchases.GenerateDueAsync(companyId, today, ct).ConfigureAwait(false);
+        return purchases.IsFailure ? purchases.Error : $"{sales.Value} recurring customer invoice(s) and {purchases.Value} supplier invoice(s) raised.";
+    }
+}
+
+/// <summary>Built-in task: pay or collect the standing orders and direct debits that have fallen due.</summary>
+public sealed class StandingOrdersTask : IScheduledTask
+{
+    private readonly Application.Abstractions.Banking.IStandingOrderService _orders;
+
+    /// <summary>Creates the task.</summary>
+    /// <param name="orders">The standing order service.</param>
+    public StandingOrdersTask(Application.Abstractions.Banking.IStandingOrderService orders) => _orders = orders;
+
+    /// <inheritdoc />
+    public string Key => "bank.standing-orders";
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
+    {
+        Result<Application.Abstractions.Banking.RecurringBankRun> run = await _orders.RunDueAsync(companyId, DateOnly.FromDateTime(runAt.UtcDateTime), ct).ConfigureAwait(false);
+        return run.IsFailure ? run.Error : $"{run.Value.Lines.Count} standing order(s) run, {run.Value.NothingOwed} with nothing owed.";
+    }
+}
+
+/// <summary>Built-in task: raise the housing instalments due and bill the month's rent (both skip what is already raised).</summary>
+public sealed class HousingBillingTask : IScheduledTask
+{
+    private readonly Application.Abstractions.Housing.IInstalmentSaleService _instalments;
+    private readonly Application.Abstractions.Housing.IRentalHousingService _rentals;
+
+    /// <summary>Creates the task.</summary>
+    /// <param name="instalments">The instalment sale service.</param>
+    /// <param name="rentals">The rental housing service.</param>
+    public HousingBillingTask(Application.Abstractions.Housing.IInstalmentSaleService instalments, Application.Abstractions.Housing.IRentalHousingService rentals)
+    {
+        _instalments = instalments;
+        _rentals = rentals;
+    }
+
+    /// <inheritdoc />
+    public string Key => "housing.billing";
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
+    {
+        DateOnly today = DateOnly.FromDateTime(runAt.UtcDateTime);
+        Result<Application.Abstractions.Housing.InstalmentRunResult> instalments = await _instalments.RaiseDueAsync(companyId, today, ct).ConfigureAwait(false);
+        if (instalments.IsFailure)
+        {
+            return instalments.Error;
+        }
+
+        Result<Application.Abstractions.Housing.RentRunResult> rent = await _rentals.RunRentAsync(companyId, new DateOnly(today.Year, today.Month, 1), ct).ConfigureAwait(false);
+        return rent.IsFailure ? rent.Error
+            : $"{instalments.Value.InstalmentsRaised} instalment(s) raised ({instalments.Value.InterestRaised:N2} interest); {rent.Value.TenanciesBilled} tenancy(ies) billed {rent.Value.TotalRent:N2} rent.";
+    }
+}
+
 /// <summary>Built-in task: lapse allocation offers not accepted by their deadline.</summary>
 public sealed class LapseOffersTask : IScheduledTask
 {

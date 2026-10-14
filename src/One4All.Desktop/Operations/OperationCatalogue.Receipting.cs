@@ -13,6 +13,7 @@ public static partial class OperationCatalogue
     private static IEnumerable<Operation> Receipting()
     {
         const string module = "Receipting";
+        yield return CashierRelatedAccounts();
         yield return new Operation
         {
             Module = module, Title = "Cash office drawer", ListTitle = "Payments awaiting clearance",
@@ -45,7 +46,7 @@ public static partial class OperationCatalogue
                             i.Optional("Bank") ?? throw new OperationException("Give the bank account.")).ConfigureAwait(true))}).";
                 }
             },
-            List = async c => Table(await c.Db.PendingTenders.AsNoTracking().Where(p => p.CompanyId == c.CompanyId && p.ConfirmedOn == null).OrderBy(p => p.Date).Take(300).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.PendingTenders.AsNoTracking().Where(p => p.CompanyId == c.CompanyId && p.ConfirmedOn == null).OrderBy(p => p.Date).Page(c, 300).ToListAsync().ConfigureAwait(true),
                 ("Id", p => p.Id), ("Receipt", p => p.ReceiptNumber), ("Tender", p => p.TenderType), ("Reference", p => p.Reference ?? string.Empty), ("Amount", p => M(p.Amount)),
                 ("Date", p => p.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))),
         };
@@ -85,7 +86,7 @@ public static partial class OperationCatalogue
                         return $"Arrangement {arrangement} captured.";
                 }
             },
-            List = async c => Table(await c.Db.PaymentArrangements.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Take(300).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.PaymentArrangements.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Page(c, 300).ToListAsync().ConfigureAwait(true),
                 ("Id", a => a.Id), ("Customer", a => a.CustomerId), ("Total", a => M(a.TotalAmount)), ("Instalment", a => M(a.InstalmentAmount)),
                 ("From", a => a.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Status", a => a.Status)),
         };
@@ -112,7 +113,7 @@ public static partial class OperationCatalogue
                 return $"Closed: expected {M(up.ExpectedCashBase)}, counted {M(up.CountedCashBase)}, variance {M(up.VarianceBase)}"
                     + (up.VarianceJournalNumber is null ? "." : $" (journal {up.VarianceJournalNumber}).");
             },
-            List = async c => Table(await c.Db.CashierSessions.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderByDescending(s => s.Id).Take(100).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.CashierSessions.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderByDescending(s => s.Id).Page(c, 100).ToListAsync().ConfigureAwait(true),
                 ("Session", s => s.Id), ("Station", s => s.StationId), ("Cashier", s => s.CashierUserId), ("Opened", s => s.OpenedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
                 ("Closed", s => s.ClosedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Verified by", s => s.VerifiedByUserId)),
         };
@@ -246,7 +247,7 @@ public static partial class OperationCatalogue
                         return Check(await banking.PostInterestReceivedAsync(c.CompanyId, i.Number("Amount"), i.Date("Date"), reference, bank, other).ConfigureAwait(true), j => $"Interest posted ({j}).");
                 }
             },
-            List = async c => Table(await c.Db.BankDeposits.AsNoTracking().Where(d => d.CompanyId == c.CompanyId).OrderByDescending(d => d.Id).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.BankDeposits.AsNoTracking().Where(d => d.CompanyId == c.CompanyId).OrderByDescending(d => d.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Reference", d => d.Reference), ("Date", d => D(d.DepositDate)), ("Amount", d => M(d.Amount)), ("Status", d => d.Status), ("Banked", d => d.BankedOn is DateOnly b ? D(b) : string.Empty)),
         };
         yield return new Operation
@@ -292,7 +293,7 @@ public static partial class OperationCatalogue
                 }).ConfigureAwait(true));
                 return $"{imported.TotalLines} line(s): {imported.Matched} matched ({M(imported.MatchedAmount)}), {imported.Unmatched} to suspense ({M(imported.UnmatchedAmount)}).";
             },
-            List = async c => Table(await c.Db.ImportBatches.AsNoTracking().Include(b => b.Lines).Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Take(100).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.ImportBatches.AsNoTracking().Include(b => b.Lines).Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Page(c, 100).ToListAsync().ConfigureAwait(true),
                 ("File", b => b.FileReference), ("Source", b => b.Source), ("Date", b => D(b.ImportDate)), ("Matched", b => b.MatchedCount), ("Unmatched", b => b.UnmatchedCount)),
         };
         yield return new Operation
@@ -324,7 +325,7 @@ public static partial class OperationCatalogue
                 IReadOnlyList<long> unused = Check(await stationery.GetUnusedSerialsAsync(c.CompanyId, book).ConfigureAwait(true));
                 return unused.Count == 0 ? "Every serial is used." : $"{unused.Count} unused: {string.Join(", ", unused)}";
             },
-            List = async c => Table(await c.Db.StationeryBooks.AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Take(200).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.StationeryBooks.AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Book", b => b.BookNumber), ("From", b => b.FromSerial), ("To", b => b.ToSerial), ("Issued to", b => b.IssuedToUserId), ("Issued", b => D(b.IssuedOn)), ("Status", b => b.Status)),
         };
     }
@@ -342,4 +343,50 @@ public static partial class OperationCatalogue
         return customer ?? await c.Db.Properties.AsNoTracking().Where(p => p.CompanyId == c.CompanyId && p.StandNumber == key).Select(p => (long?)p.RatepayerCustomerId).FirstOrDefaultAsync().ConfigureAwait(true)
             ?? throw new OperationException($"No customer or stand {key}.");
     }
+
+    /// <summary>The register of accounts each cashier may not receipt against.</summary>
+    /// <returns>The operation.</returns>
+    private static Operation CashierRelatedAccounts() => new()
+    {
+        Module = "Receipting", Title = "Cashiers' own and related accounts", ListTitle = "Accounts cashiers may not receipt",
+        Description = "The accounts a cashier may not take payments on — their own, a spouse's or relative's, a business they have an interest in. Another cashier must "
+            + "take those payments; an attempt is refused and shows on RC23.",
+        Fields = [Pick("Step", "Step", ["Add", "Remove"]), Req("Cashier", "Cashier (user name)"), Req("Customer", "Account (customer code)"),
+            Pick("Relationship", "Relationship", ["Own", "Spouse", "Relative", "Business"])],
+        Run = async (c, i) =>
+        {
+            long user = await UserAsync(c, i.Text("Cashier")).ConfigureAwait(true);
+            long customer = await CustomerAsync(c, i.Text("Customer")).ConfigureAwait(true);
+            Core.Receipting.CashierRelatedAccount? existing = await c.Db.Set<Core.Receipting.CashierRelatedAccount>()
+                .FirstOrDefaultAsync(r => r.CompanyId == c.CompanyId && r.UserId == user && r.CustomerId == customer).ConfigureAwait(true);
+            if (i.Text("Step") == "Remove")
+            {
+                if (existing is null)
+                {
+                    throw new OperationException("That account is not on the cashier's list.");
+                }
+
+                c.Db.Remove(existing);
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return "Removed.";
+            }
+
+            if (existing is not null)
+            {
+                throw new OperationException("That account is already on the cashier's list.");
+            }
+
+            c.Db.Add(new Core.Receipting.CashierRelatedAccount(c.CompanyId, user, customer, i.Text("Relationship")));
+            await c.Db.SaveChangesAsync().ConfigureAwait(true);
+            return $"{i.Text("Cashier")} may no longer receipt against {i.Text("Customer").ToUpperInvariant()} ({i.Text("Relationship").ToLowerInvariant()}).";
+        },
+        List = async c => Table(await (
+                from r in c.Db.Set<Core.Receipting.CashierRelatedAccount>().AsNoTracking()
+                join u in c.Db.Users.AsNoTracking() on r.UserId equals u.Id
+                join cu in c.Db.Customers.AsNoTracking() on r.CustomerId equals cu.Id
+                where r.CompanyId == c.CompanyId
+                orderby u.Username, cu.Code
+                select new { u.Username, cu.Code, cu.Name, r.Relationship }).Page(c, 300).ToListAsync().ConfigureAwait(true),
+            ("Cashier", r => r.Username), ("Account", r => r.Code), ("Name", r => r.Name), ("Relationship", r => r.Relationship)),
+    };
 }

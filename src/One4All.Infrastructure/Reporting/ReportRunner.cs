@@ -272,6 +272,7 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.TrialBalanceCode => SystemReports.TrialBalance(),
         SystemReports.CustomerStatementCode => SystemReports.CustomerStatement(),
         SystemReports.IncomeStatementCode => SystemReports.IncomeStatement(),
+        SystemReports.IncomeStatementByFunctionCode => SystemReports.IncomeStatementByFunction(),
         SystemReports.BalanceSheetCode => SystemReports.BalanceSheet(),
         SystemReports.CashFlowCode => SystemReports.CashFlow(),
         SystemReports.DepartmentalIncomeStatementCode => SystemReports.DepartmentalIncomeStatement(),

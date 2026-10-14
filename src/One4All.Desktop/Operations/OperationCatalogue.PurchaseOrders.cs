@@ -63,7 +63,7 @@ public static partial class OperationCatalogue
                         return $"Purchase order {order} raised from the requisition.";
                 }
             },
-            List = async c => Table(await c.Db.PurchaseRequisitions.AsNoTracking().Include(r => r.Lines).Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Take(200).ToListAsync()
+            List = async c => Table(await c.Db.PurchaseRequisitions.AsNoTracking().Include(r => r.Lines).Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Page(c, 200).ToListAsync()
                     .ConfigureAwait(true), ("Number", r => r.RequisitionNumber), ("Supplier", r => r.SupplierId), ("Date", r => D(r.RequestedDate)), ("Currency", r => r.Currency),
                 ("Value", r => M(r.Lines.Sum(l => l.Quantity * l.UnitPrice))), ("Status", r => r.Status), ("Budget", r => r.BudgetOutcome), ("Order", r => r.PurchaseOrderId)),
         };
@@ -213,7 +213,7 @@ public static partial class OperationCatalogue
                         return $"Awarded; purchase order {order.OrderNumber} raised.";
                 }
             },
-            List = async c => Table(await c.Db.Set<Rfq>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Take(100).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<Rfq>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Page(c, 100).ToListAsync().ConfigureAwait(true),
                 ("RFQ", r => r.RfqNumber)),
         };
         yield return new Operation

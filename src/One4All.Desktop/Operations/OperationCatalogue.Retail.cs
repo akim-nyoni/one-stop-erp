@@ -409,7 +409,7 @@ public static partial class OperationCatalogue
                         }).ConfigureAwait(true), "Item details saved.");
                 }
             },
-            List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Take(500).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Item", x => x.Code), ("Description", x => x.Description), ("L × W × H (cm)", x => x.LengthCm is null ? string.Empty : $"{x.LengthCm:0.#} × {x.WidthCm:0.#} × {x.HeightCm:0.#}"),
                 ("Weight (kg)", x => x.UnitWeightKg?.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty)),
         };
@@ -597,7 +597,7 @@ public static partial class OperationCatalogue
                     SeasonalFactors = i.Optional("Seasonal"),
                 }).ConfigureAwait(true), "Replenishment policy saved."),
             List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && (x.ReorderLevel > 0m || x.MaximumStock > 0m || x.ForecastWindowDays > 0))
-                    .OrderBy(x => x.Code).Take(200).ToListAsync().ConfigureAwait(true),
+                    .OrderBy(x => x.Code).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("Item", x => x.Code), ("Minimum", x => Q(x.ReorderLevel)), ("Reorder qty", x => Q(x.ReorderQuantity)), ("Maximum", x => Q(x.MaximumStock)),
                 ("Lead time", x => x.LeadTimeDays), ("Window", x => x.ForecastWindowDays), ("Seasonal factors", x => x.SeasonalFactors ?? string.Empty)),
         };
@@ -627,7 +627,7 @@ public static partial class OperationCatalogue
                 List<long> done = await c.Db.StockLotMovements.Where(l => l.CompanyId == c.CompanyId).Select(l => l.StockMovementId).Distinct().ToListAsync().ConfigureAwait(true);
                 Dictionary<long, string> items = await c.Db.Items.Where(x => tracked.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Code).ConfigureAwait(true);
                 return Table(await c.Db.StockMovements.AsNoTracking().Where(m => m.CompanyId == c.CompanyId && tracked.Contains(m.ItemId) && !done.Contains(m.Id) && m.Quantity != 0m)
-                        .OrderByDescending(m => m.Id).Take(50).ToListAsync().ConfigureAwait(true),
+                        .OrderByDescending(m => m.Id).Page(c, 50).ToListAsync().ConfigureAwait(true),
                     ("Movement", m => m.Id), ("Date", m => D(m.Date)), ("Type", m => m.Type), ("Item", m => items.GetValueOrDefault(m.ItemId)), ("Quantity", m => Q(m.Quantity)), ("Reference", m => m.Reference));
             },
         };

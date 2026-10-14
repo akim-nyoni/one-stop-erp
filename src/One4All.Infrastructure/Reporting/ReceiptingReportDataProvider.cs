@@ -46,6 +46,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC20" => await StationeryControlAsync(companyId, ct).ConfigureAwait(false),
             "RC21" => await AuditTrailAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC22" => await SodViolationsAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC23" => await RelatedPartyAttemptsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC25" => await DailyBankingSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC26" => await CashInTransitAgeingAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC28" => await CashMovementsAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -132,6 +133,25 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
                 ["Service"] = s.Service, ["Billed"] = s.Billed, ["Collected"] = s.Collected,
                 ["Percent"] = s.Billed == 0m ? "—" : (s.Collected * 100m / s.Billed).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%",
             }))];
+    }
+
+    // Receipts refused because the account is the cashier's own or related (logged by the receipting service).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RelatedPartyAttemptsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        (DateOnly from, DateOnly to) = Range(parameters);
+        DateTimeOffset start = new(from.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero), end = new(to.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
+        var attempts = await _db.ChangeLog.AsNoTracking().Where(c => c.CompanyId == companyId && c.EntityType == "RelatedAccountReceipt" && c.OccurredOnUtc >= start && c.OccurredOnUtc <= end)
+            .OrderBy(c => c.Id).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        List<long> ids = [.. attempts.Select(a => long.TryParse(a.EntityId, out long id) ? id : 0L).Distinct()];
+        Dictionary<long, string> accounts = await _db.Customers.AsNoTracking().Where(c => ids.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Code + " " + c.Name, ct).ConfigureAwait(false);
+        return [.. attempts.Select(a => Row(new()
+        {
+            ["Cashier"] = a.UserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "?",
+            ["Account"] = long.TryParse(a.EntityId, out long id) ? accounts.GetValueOrDefault(id, a.EntityId!) : a.EntityId,
+            ["Outcome"] = $"Refused ({a.Reason})",
+            ["Amount"] = decimal.TryParse(a.NewValues, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal amount) ? amount : 0m,
+        }))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CollectionByTenderAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

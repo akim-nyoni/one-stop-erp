@@ -1,0 +1,83 @@
+<Window x:Class="One4All.Desktop.EnquiryDeskWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Enquiry Desk" Height="720" Width="1180"
+        WindowStartupLocation="CenterOwner" Background="#F4F6F4" FontFamily="Segoe UI">
+    <DockPanel Margin="10">
+        <!-- Look-up -->
+        <DockPanel DockPanel.Dock="Top" Margin="6,0,6,6">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Stand" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBox Text="{Binding StandNumber, UpdateSourceTrigger=PropertyChanged}" Width="120" Margin="0,0,10,0" />
+                <TextBlock Text="As at" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <DatePicker SelectedDate="{Binding AsAt}" Width="120" Margin="0,0,10,0" />
+                <Button Content="Look up" Padding="14,6" FontWeight="SemiBold" Background="#DDEFE0" Command="{Binding LookUpCommand}" IsDefault="True" Margin="0,0,6,0" />
+                <Button Content="Print statement" Padding="14,6" Command="{Binding PrintCommand}" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="Enquiry Desk" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
+                <TextBlock Text="{Binding Heading}" Foreground="#667" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom" Background="#E8EEE8" Padding="10,5" Margin="6,6,6,0" CornerRadius="4">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#334" FontSize="12" />
+        </Border>
+
+        <Grid Margin="6,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <DockPanel Grid.Column="0">
+                <Border DockPanel.Dock="Top" Background="#EAF4EC" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,6">
+                    <TextBlock Text="{Binding Balance}" FontSize="16" FontWeight="SemiBold" Foreground="#1E3A2E" />
+                </Border>
+                <Border DockPanel.Dock="Top" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="6" Margin="0,0,0,6">
+                    <ListView ItemsSource="{Binding Services}" BorderThickness="0" MaxHeight="160">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Service" Width="90" DisplayMemberBinding="{Binding Service}" />
+                                <GridViewColumn Header="Tariff" Width="90" DisplayMemberBinding="{Binding Tariff}" />
+                                <GridViewColumn Header="State" Width="95" DisplayMemberBinding="{Binding State}" />
+                                <GridViewColumn Header="Meter" Width="230" DisplayMemberBinding="{Binding Meter}" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </Border>
+                <Border DockPanel.Dock="Top" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,6">
+                    <TextBlock Text="{Binding Notes}" TextWrapping="Wrap" Foreground="#334" />
+                </Border>
+                <Border Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="6">
+                    <ListView ItemsSource="{Binding Transactions}" BorderThickness="0">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Date" Width="85" DisplayMemberBinding="{Binding Date}" />
+                                <GridViewColumn Header="Document" Width="120" DisplayMemberBinding="{Binding Document}" />
+                                <GridViewColumn Header="Type" Width="95" DisplayMemberBinding="{Binding Type}" />
+                                <GridViewColumn Header="Amount" Width="100" DisplayMemberBinding="{Binding Amount}" />
+                                <GridViewColumn Header="Open" Width="100" DisplayMemberBinding="{Binding Outstanding}" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </Border>
+            </DockPanel>
+
+            <DockPanel Grid.Column="2">
+                <Border DockPanel.Dock="Top" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="10" Margin="0,0,0,6" MaxHeight="300">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                        <TextBlock Text="{Binding Graph}" FontFamily="Consolas" FontSize="11" />
+                    </ScrollViewer>
+                </Border>
+                <Border Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="10">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                        <TextBlock Text="{Binding Statement}" FontFamily="Consolas" FontSize="11" />
+                    </ScrollViewer>
+                </Border>
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+</Window>

@@ -34,6 +34,9 @@ public static class PayrollReports
         yield return Listing("PR17", "Earnings Analysis", "Payroll", "Earnings in the period by department and element.",
             "PyrlEarnings", [new Column("Department", "Department", 100), new Column("Element", "Element", 80), new Column("Description", "Description", 160), new Column("Employees", "Employees", 70),
              new Column("Amount", "Amount", 100, true)], Period);
+        yield return Listing("PR18", "Deductions Analysis", "Payroll", "Each deduction over the period: how many employees had it, the total, the average and the largest, by department.",
+            "PyrlDeductions", [new Column("Element", "Deduction", 80), new Column("Description", "Description", 160), new Column("Department", "Department", 90), new Column("Employees", "Employees", 70),
+             new Column("Average", "Average", 85), new Column("Largest", "Largest", 85), new Column("Amount", "Total", 100, true)], Period);
         yield return Listing("PR26", "Allowance Analysis", "Payroll", "Earnings other than basic salary in the period, per employee and allowance.",
             "PyrlAllowances", [new Column("Employee", "Employee", 160), new Column("Department", "Department", 90), new Column("Element", "Allowance", 80), new Column("Description", "Description", 150),
              new Column("Taxable", "Taxable", 55), new Column("Amount", "Amount", 95, true)], Period);

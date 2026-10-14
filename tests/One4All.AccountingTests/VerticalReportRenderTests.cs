@@ -97,6 +97,8 @@ public sealed class VerticalReportRenderTests
             IReportRunner runner = scope.ServiceProvider.GetRequiredService<IReportRunner>();
 
             (await Html(runner, companyId, "INV-VAL", new())).Should().Contain("WIDGET").And.Contain("200.00");
+            (await Html(runner, companyId, "INV-VAL", new() { ["AsAtDate"] = new DateOnly(2026, 3, 31) })).Should().Contain("WIDGET").And.Contain("200.00").And.Contain("WeightedAverage");
+            (await Html(runner, companyId, "INV-VAL", new() { ["AsAtDate"] = new DateOnly(2026, 2, 28) })).Should().NotContain("WIDGET", "nothing was in stock before the March receipt");
             (await Html(runner, companyId, "FA-REG", new())).Should().Contain("VH-9").And.Contain("24,000.00");
             (await Html(runner, companyId, "PAY-SUM", new() { ["FromDate"] = new DateOnly(2026, 1, 1), ["ToDate"] = new DateOnly(2026, 12, 31) })).Should().Contain("Ann Employee").And.Contain("1,800.00");
             (await Html(runner, companyId, "MUN-PROP", new())).Should().Contain("STAND-X").And.Contain("100,000.00");

@@ -316,6 +316,70 @@ public sealed class VerticalImportService : IVerticalImportService
     }
 
     /// <inheritdoc />
+    public async Task<ImportReport> ImportLeaveBalancesAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "employee_number", "leave_type", "days");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        Dictionary<string, long> employees = await _db.Employees.Where(e => e.CompanyId == companyId).ToDictionaryAsync(e => e.EmployeeNumber, e => e.Id, StringComparer.OrdinalIgnoreCase, ct)
+            .ConfigureAwait(false);
+        HashSet<(long, string)> held = [.. (await _db.EmployeeLeaveBalances.Where(b => b.CompanyId == companyId).Select(b => new { b.EmployeeId, b.LeaveType }).ToListAsync(ct).ConfigureAwait(false))
+            .Select(b => (b.EmployeeId, b.LeaveType.ToUpperInvariant()))];
+        List<ImportError> errors = [];
+        List<EmployeeLeaveBalance> toCreate = [];
+        HashSet<(long, string)> seen = [];
+        int skipped = 0;
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string number = Code(row.Text("employee_number")), type = Code(row.Text("leave_type"));
+                decimal? days = row.Number("days"), taken = row.Number("taken");
+                if (!employees.TryGetValue(number, out long employee))
+                {
+                    return $"No employee {number} (import employees first).";
+                }
+
+                if (type.Length == 0 || days is not >= 0m || taken is < 0m)
+                {
+                    return "An opening leave balance needs a leave type and days of nil or more (and taken, if given, nil or more).";
+                }
+
+                if (!seen.Add((employee, type)))
+                {
+                    return $"{number} {type} appears twice.";
+                }
+
+                if (held.Contains((employee, type)))
+                {
+                    skipped++;
+                    return null;
+                }
+
+                EmployeeLeaveBalance balance = new(companyId, employee, type);
+                balance.Accrue(days.Value);
+                if (taken is decimal used && used > 0m)
+                {
+                    balance.Take(used);
+                }
+
+                toCreate.Add(balance);
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, skipped, errors, commit, ct, async () =>
+        {
+            _db.EmployeeLeaveBalances.AddRange(toCreate);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return toCreate.Count;
+        }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<ImportReport> ImportPayrollYtdAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
     {
         (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "employee_number", "tax_year", "code", "amount");
