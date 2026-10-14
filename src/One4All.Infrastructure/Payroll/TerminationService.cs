@@ -108,8 +108,9 @@ public sealed class TerminationService : ITerminationService
             ApprovedByUserId = request.ApprovedByUserId, JournalNumber = journal, YearsOfService = statement.YearsOfService, ProRataSalary = statement.ProRataSalary, Notice = statement.Notice,
             LeaveDays = statement.LeaveDays, Leave = statement.Leave, Gratuity = statement.Gratuity, Severance = statement.Severance, OrdinaryTax = statement.OrdinaryTax,
             TerminalTax = statement.TerminalTax, Recoveries = statement.Recoveries, UnrecoveredLoans = statement.UnrecoveredLoans, NetPay = statement.Net,
+            NetPayAccountCode = request.NetPayAccount.Trim(),
         };
-        termination.AddClearance("Final pay posted" + (journal is null ? " (nothing due)" : $" ({journal})"), cleared: true);
+        termination.AddClearance("Final pay calculated and accrued" + (journal is null ? " (nothing due)" : $" ({journal}); paid once the checklist is cleared"), cleared: true);
         termination.AddClearance(statement.UnrecoveredLoans > 0m ? $"Loans still owed: {statement.UnrecoveredLoans:N2} — arrange repayment" : "Staff loans settled", statement.UnrecoveredLoans == 0m);
         termination.AddClearance("Company property returned (keys, ID card, equipment, uniform)", cleared: false);
         foreach (EmployeeAssetIssue issued in await _db.Set<EmployeeAssetIssue>().AsNoTracking().Where(a => a.EmployeeId == employee.Id && a.ReturnedOn == null)
@@ -213,6 +214,62 @@ public sealed class TerminationService : ITerminationService
             request.Policy, Tax);
         return (employee, statement, loans);
     }
+
+    /// <inheritdoc />
+    public Task<Result<string?>> ReleaseFinalPayAsync(long companyId, string employeeNumber, DateOnly date, string bankAccountCode, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            Termination? termination = await LatestAsync(companyId, employeeNumber, ct).ConfigureAwait(false);
+            if (termination is null)
+            {
+                return NotTerminated(employeeNumber);
+            }
+
+            if (termination.PaidOn is DateOnly paid)
+            {
+                return Error.Conflict("Payroll.FinalPayReleased", $"The final pay of {employeeNumber} was already released on {paid:yyyy-MM-dd}.");
+            }
+
+            // The final payment is held until the leaver has cleared: property returned, loans arranged, access withdrawn, housing vacated.
+            List<string> outstanding = [.. termination.Clearance.Where(i => !i.IsCleared).Select(i => i.Description)];
+            if (outstanding.Count > 0)
+            {
+                return Error.Rule("Payroll.ClearanceOutstanding", $"The final pay is held until the clearance is complete; still to clear: {string.Join("; ", outstanding)}.");
+            }
+
+            string? journal = null;
+            if (termination.NetPay > 0m)
+            {
+                if (string.IsNullOrWhiteSpace(bankAccountCode) || string.IsNullOrWhiteSpace(termination.NetPayAccountCode))
+                {
+                    return Error.Validation("Payroll.FinalPayAccounts", "Give the bank account the final pay is paid from.");
+                }
+
+                Employee employee = await _db.Employees.AsNoTracking().SingleAsync(e => e.Id == termination.EmployeeId, ct).ConfigureAwait(false);
+                Core.System.Company company = await _db.Companies.SingleAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+                Result<PostingReceipt> posted = await _engine.PostAsync(new JournalRequest
+                {
+                    CompanyId = companyId, SourceModule = "GL", PostingDate = date, TransactionCurrency = company.BaseCurrency, DocumentType = "FinalPayment",
+                    DocumentNumber = employee.EmployeeNumber, Narrative = $"Final pay released to {employee.EmployeeNumber} {employee.FullName}",
+                    Lines =
+                    [
+                        new JournalLineRequest { AccountCode = termination.NetPayAccountCode, Side = JournalSide.Debit, TransactionAmount = termination.NetPay, Narrative = "Net final pay" },
+                        new JournalLineRequest { AccountCode = bankAccountCode.Trim(), Side = JournalSide.Credit, TransactionAmount = termination.NetPay, Narrative = "Final pay paid" },
+                    ],
+                }, ct).ConfigureAwait(false);
+                if (posted.IsFailure)
+                {
+                    return posted.Error;
+                }
+
+                journal = posted.Value.JournalNumber;
+            }
+
+            termination.PaidOn = date;
+            termination.PaymentJournalNumber = journal;
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result<string?>.Success(journal);
+        }, ct);
 
     private Task<Termination?> LatestAsync(long companyId, string employeeNumber, CancellationToken ct)
     {

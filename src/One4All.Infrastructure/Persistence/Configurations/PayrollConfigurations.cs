@@ -581,6 +581,8 @@ internal sealed class TerminationConfiguration : IEntityTypeConfiguration<Termin
         b.HasKey(x => x.Id);
         b.Property(x => x.Reason).HasMaxLength(300);
         b.Property(x => x.JournalNumber).HasMaxLength(30);
+        b.Property(x => x.NetPayAccountCode).HasMaxLength(20);
+        b.Property(x => x.PaymentJournalNumber).HasMaxLength(30);
         b.HasIndex(x => new { x.CompanyId, x.EmployeeId });
         b.HasMany(x => x.Clearance).WithOne().HasForeignKey(x => x.TerminationId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Clearance).UsePropertyAccessMode(PropertyAccessMode.Field);

@@ -271,9 +271,37 @@ public sealed class VerticalImportService : IVerticalImportService
                     return null;
                 }
 
+                // The optional columns a payroll needs from day one: tax and bank details, how and how often the employee is paid, and the contract.
+                Gender gender = Gender.Unspecified;
+                EmploymentType employment = EmploymentType.Permanent;
+                PayMethod method = PayMethod.BankTransfer;
+                PayFrequency frequency = PayFrequency.Monthly;
+                if ((row.Text("gender") is string g && (!Enum.TryParse(g, true, out gender) || !Enum.IsDefined(gender)))
+                    || (row.Text("employment_type") is string t && (!Enum.TryParse(t, true, out employment) || !Enum.IsDefined(employment)))
+                    || (row.Text("payment_method") is string m && (!Enum.TryParse(m, true, out method) || !Enum.IsDefined(method)))
+                    || (row.Text("pay_frequency") is string f && (!Enum.TryParse(f, true, out frequency) || !Enum.IsDefined(frequency))))
+                {
+                    return $"Gender ({string.Join("/", Enum.GetNames<Gender>())}), employment type ({string.Join("/", Enum.GetNames<EmploymentType>())}), "
+                        + $"payment method ({string.Join("/", Enum.GetNames<PayMethod>())}) or pay frequency ({string.Join("/", Enum.GetNames<PayFrequency>())}) is not one of the choices.";
+                }
+
+                if (method == PayMethod.BankTransfer && row.Text("bank_account") is null && row.Text("bank_name") is not null)
+                {
+                    return "A bank name needs the bank account number.";
+                }
+
+                if (method == PayMethod.MobileMoney && row.Text("mobile_money") is null)
+                {
+                    return "Payment by mobile money needs the mobile money number.";
+                }
+
                 toCreate.Add(new Employee(companyId, number, name, salary, engaged.Value)
                 {
                     NationalIdNumber = row.Text("national_id"), Department = department, CostCentre = costCentre, Grade = row.Text("grade"),
+                    TaxNumber = row.Text("tax_number"), DateOfBirth = row.Date("date_of_birth"), Gender = gender, EmploymentType = employment, PaymentMethod = method,
+                    PayFrequency = frequency, PayGroup = row.Text("pay_group")?.ToUpperInvariant(), BankName = row.Text("bank_name"), BankBranch = row.Text("bank_branch"),
+                    BankAccountNumber = row.Text("bank_account"), MobileMoneyNumber = row.Text("mobile_money"), Email = row.Text("email"), Phone = row.Text("phone"),
+                    JobTitle = row.Text("job_title"), ContractEndDate = row.Date("contract_end"), SocialSecurityNumber = row.Text("social_security"),
                 });
                 return null;
             });

@@ -200,6 +200,14 @@ public sealed partial class OperationsViewModel : ObservableObject
         Selected = Operations.FirstOrDefault();
     }
 
+    // The signed-in user's permission in the action's module and the module's licence, checked before every run and list (brief §5.1).
+    private Task<string?> RefusalAsync(Operation operation, bool isWrite) => InScopeAsync(async c =>
+    {
+        Core.Security.EffectivePermissions permissions = await c.Get<Application.Abstractions.Security.IPermissionService>().ResolveAsync(c.UserId).ConfigureAwait(true);
+        Application.Abstractions.Licensing.ILicenceService licence = c.Get<Application.Abstractions.Licensing.ILicenceService>();
+        return Application.Security.DesktopAccessRules.Refusal(permissions, operation.Module, isWrite, licence.IsModuleLicensed);
+    });
+
     private async Task<T> InScopeAsync<T>(Func<OperationContext, Task<T>> work)
     {
         using IServiceScope scope = _services.CreateScope();
@@ -224,6 +232,14 @@ public sealed partial class OperationsViewModel : ObservableObject
         IsBusy = true;
         try
         {
+            if (await RefusalAsync(operation, !operation.IsDocument).ConfigureAwait(true) is string refused)
+            {
+                Result = refused;
+                Failed = true;
+                StatusMessage = "Not allowed.";
+                return;
+            }
+
             OperationInput input = new(Fields.ToDictionary(f => f.Field.Name, f => f.Raw()), Fields.ToDictionary(f => f.Field.Name, f => f.Field.Label));
             Result = await InScopeAsync(c => operation.Run(c, input)).ConfigureAwait(true);
             Failed = false;
@@ -265,6 +281,13 @@ public sealed partial class OperationsViewModel : ObservableObject
 
         try
         {
+            if (await RefusalAsync(Selected, false).ConfigureAwait(true) is string refused)
+            {
+                StatusMessage = refused;
+                List = null;
+                return;
+            }
+
             List = (await InScopeAsync(list).ConfigureAwait(true)).DefaultView;
         }
 #pragma warning disable CA1031 // A list that cannot load is reported, not fatal.

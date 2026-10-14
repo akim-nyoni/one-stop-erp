@@ -23,11 +23,13 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Termination and final pay", ListTitle = "Clearance checklist",
             Description = "Preview the final pay (last month pro rata, notice, leave, gratuity, severance by the termination type; PAYE on ordinary pay, the terminal rate on benefits; loans "
-                + "recovered as far as the pay allows), then terminate — the final pay posts in one journal and later runs leave the employee out. Clear checklist items by id; print the certificate.",
-            Fields = [Pick("Step", "Step", ["Preview", "Terminate", "Clear item", "Certificate of service"]), Req("Number", "Employee number"), Pick("Type", "Type", Enum.GetNames<Application.Payroll.TerminationType>()),
+                + "recovered as far as the pay allows), then terminate — the final pay posts in one journal and later runs leave the employee out. Clear checklist items by id; once all are "
+                + "cleared, release the final pay from the bank; print the certificate.",
+            Fields = [Pick("Step", "Step", ["Preview", "Terminate", "Clear item", "Release final pay", "Certificate of service"]), Req("Number", "Employee number"), Pick("Type", "Type", Enum.GetNames<Application.Payroll.TerminationType>()),
                 Today("LastDay", "Last day"), Opt("Reason", "Reason"), Num("NoticeMonths", "Notice (months)", "1"), Num("WorkingDays", "Working days a month", "22"), Num("GratuityWeeks", "Gratuity weeks a year", "2"),
                 Num("SeveranceWeeks", "Severance weeks a year", "4"), Num("TerminalTax", "Terminal benefits tax %", "0"), Req("Salary", "Salary expense account", "6100"),
-                Req("Benefits", "Terminal benefits account", "6100"), Req("Paye", "PAYE liability account", "2400"), Req("NetPay", "Net pay account", "2420"), OptNum("Item", "Checklist item id")],
+                Req("Benefits", "Terminal benefits account", "6100"), Req("Paye", "PAYE liability account", "2400"), Req("NetPay", "Net pay account", "2420"), OptNum("Item", "Checklist item id"),
+                Opt("Bank", "Bank account paying (release)")],
             Run = async (c, i) =>
             {
                 ITerminationService terminations = c.Get<ITerminationService>();
@@ -38,6 +40,10 @@ public static partial class OperationCatalogue
                         return "Item cleared.";
                     case "Certificate of service":
                         return Check(await terminations.CertificateOfServiceAsync(c.CompanyId, i.Text("Number")).ConfigureAwait(true));
+                    case "Release final pay":
+                        string? paid = Check(await terminations.ReleaseFinalPayAsync(c.CompanyId, i.Text("Number"), i.Date("LastDay"),
+                            i.Optional("Bank") ?? throw new OperationException("Give the bank account paying.")).ConfigureAwait(true));
+                        return paid is null ? "Released (nothing was due)." : $"Final pay released (journal {paid}).";
                 }
 
                 TerminationRequest request = new(c.CompanyId, i.Text("Number"), Enum.Parse<Application.Payroll.TerminationType>(i.Text("Type")), i.Date("LastDay"), i.Optional("Reason") ?? string.Empty)
@@ -58,6 +64,20 @@ public static partial class OperationCatalogue
             List = async c => Table(await c.Db.Set<Termination>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderByDescending(t => t.Id).Take(50)
                     .SelectMany(t => t.Clearance.Select(item => new { t.EmployeeId, t.LastDay, item.Id, item.Description, item.IsCleared })).ToListAsync().ConfigureAwait(true),
                 ("Item", x => x.Id), ("Employee id", x => x.EmployeeId), ("Left", x => D(x.LastDay)), ("To clear", x => x.Description), ("Cleared", x => x.IsCleared)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Leave provision (IAS 19)",
+            Description = "Trues the provision for leave owed to staff up (or down) to its value at the date: each employee's untaken days at their own daily rate of basic "
+                + "(annual ÷ 260), or one rate for everyone; only the movement posts. The scheduled task payroll.leave-provision does this at each month end.",
+            Fields = [Today(), OptNum("Rate", "One daily rate for everyone (blank: each employee's own)"), Req("Expense", "Leave expense account", "6600"),
+                Req("Provision", "Leave provision account", "2460"), Opt("Document", "Document number")],
+            Run = async (c, i) =>
+            {
+                decimal provision = Check(await c.Get<ILeaveService>().RaiseLeaveProvisionAsync(c.CompanyId, i.Date("Date"), i.OptionalNumber("Rate") ?? 0m, i.Text("Expense"), i.Text("Provision"),
+                    i.Optional("Document") ?? $"LEAVE-PROV-{i.Date("Date"):yyyyMMdd}").ConfigureAwait(true));
+                return $"Leave provision at {D(i.Date("Date"))} is {M(provision)}.";
+            },
         };
         yield return new Operation
         {
@@ -1117,6 +1137,37 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Bank statement import and sign-off", ListTitle = "Bank accounts",
+            Description = "Import the bank's statement file (CSV, MT940, CAMT.053 or OFX) into the account's unreconciled lines, or sign the reconciliation off as at a date: "
+                + "it must balance, and once signed the period's matched items are locked against change.",
+            Fields = [Pick("Step", "Step", ["Import", "Sign off"]), Req("Bank", "Bank account code"), Opt("File", "Statement file (full path)"),
+                Pick("Format", "File format", Enum.GetNames<Application.Banking.StatementFileFormat>()), Today("AsAt", "Sign off as at")],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.Banking.IBankReconciliationService bank = c.Get<Application.Abstractions.Banking.IBankReconciliationService>();
+                long account = await BankAsync(c, i.Text("Bank")).ConfigureAwait(true);
+                if (i.Text("Step") == "Import")
+                {
+                    string path = i.Optional("File") ?? throw new OperationException("Give the statement file.");
+                    if (!System.IO.File.Exists(path))
+                    {
+                        throw new OperationException($"There is no file {path}.");
+                    }
+
+                    int imported = Check(await bank.ImportStatementFileAsync(c.CompanyId, account, await System.IO.File.ReadAllTextAsync(path).ConfigureAwait(true),
+                        Enum.Parse<Application.Banking.StatementFileFormat>(i.Text("Format")), new Application.Banking.BankCsvLayout()).ConfigureAwait(true));
+                    return $"{imported} statement line(s) imported (lines already imported are skipped).";
+                }
+
+                Application.Abstractions.Banking.BankReconciliationReport report = Check(await bank.SignOffAsync(c.CompanyId, account, i.Date("AsAt"), c.UserId).ConfigureAwait(true));
+                return $"Reconciliation of {report.BankAccountCode} signed off as at {D(report.AsAtDate)}: ledger {M(report.GlBalance)}, statement {M(report.StatementBalance)}, "
+                    + $"{report.UnpresentedGlItems.Count} unpresented and {report.UnmatchedStatementItems.Count} unmatched item(s).";
+            },
+            List = async c => Table(await c.Db.BankAccounts.AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderBy(b => b.Code).ToListAsync().ConfigureAwait(true),
+                ("Bank", b => b.Code), ("Name", b => b.Name), ("Currency", b => b.Currency), ("Ledger account", b => b.GlAccountCode)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set up a standing order", ListTitle = "Standing orders and direct debits",
             Description = "A fixed payment out of the bank on a schedule: to a supplier (purchase ledger) or to a GL account. Give a supplier or an account, not both.",
             Fields = [Req("Reference", "Reference"), Req("Bank", "Bank account", "1100"), Num("Amount", "Amount"), Pick("Frequency", "Frequency", Enum.GetNames<RecurrenceFrequency>()),
@@ -1516,6 +1567,147 @@ public static partial class OperationCatalogue
             List = async c => Table(await c.Db.Set<Core.SalesOrders.SalesOrder>().AsNoTracking().Where(o => o.CompanyId == c.CompanyId && o.AwaitingDiscountApproval)
                     .OrderBy(o => o.OrderDate).ToListAsync().ConfigureAwait(true),
                 ("Order", o => o.OrderNumber), ("Date", o => D(o.OrderDate)), ("Customer", o => o.CustomerId)),
+        };
+        yield return new Operation
+        {
+            Module = "Sales & Schools", Title = "Sales order processing", ListTitle = "Open sales orders",
+            Description = "Take an order (lines ITEM:quantity[:price[:tax code]]; no price takes the customer's price book), despatch it from a warehouse (stock issued at cost; "
+                + "lines ITEM:quantity, or blank for everything outstanding — a part despatch leaves the rest on back order), invoice what has been despatched (tax at each "
+                + "line's tax code), take back goods returned from a despatch, or cancel what is left of the order.",
+            Fields = [Pick("Step", "Step", ["Create", "Despatch", "Invoice", "Return", "Cancel"]), Req("Order", "Order number"), Today(), Opt("Customer", "Customer code (create)"),
+                Opt("Lines", "Lines (create: ITEM:qty[:price[:tax]]; despatch/return: ITEM:qty)"), Opt("Revenue", "Revenue account (create; blank: the item's)"),
+                Opt("Warehouse", "Warehouse code (despatch, return)"), Opt("Reference", "Delivery / invoice number"), Opt("Vehicle", "Vehicle (despatch)"), Opt("Driver", "Driver (despatch)"),
+                Opt("TaxAccount", "Output tax account (invoice)"), Opt("Reason", "Reason (return, cancel)")],
+            Run = async (c, i) =>
+            {
+                ISalesOrderService orders = c.Get<ISalesOrderService>();
+                string number = i.Text("Order").Trim().ToUpperInvariant();
+                DateOnly date = i.Date("Date");
+                if (i.Text("Step") == "Create")
+                {
+                    long customerId = await CustomerAsync(c, i.Optional("Customer") ?? throw new OperationException("Give the customer.")).ConfigureAwait(true);
+                    Core.Trading.Customer customer = await c.Db.Customers.AsNoTracking().FirstAsync(x => x.Id == customerId).ConfigureAwait(true);
+                    List<SalesOrderLineRequest> lines = [];
+                    foreach (string part in (i.Optional("Lines") ?? throw new OperationException("Give the order lines.")).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                        if (bits.Length < 2 || !decimal.TryParse(bits[1], System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal quantity))
+                        {
+                            throw new OperationException($"'{part}' is not ITEM:quantity[:price[:tax code]].");
+                        }
+
+                        long itemId = await ItemAsync(c, bits[0]).ConfigureAwait(true);
+                        Core.Inventory.Item item = await c.Db.Items.AsNoTracking().FirstAsync(x => x.Id == itemId).ConfigureAwait(true);
+                        decimal? price = bits.Length > 2 && bits[2].Length > 0 ? decimal.Parse(bits[2], System.Globalization.CultureInfo.InvariantCulture) : null;
+                        string revenue = i.Optional("Revenue") ?? item.RevenueAccountCode ?? throw new OperationException($"Item {item.Code} has no revenue account; give one.");
+                        lines.Add(new SalesOrderLineRequest(itemId, item.Description, quantity, price, bits.Length > 3 && bits[3].Length > 0 ? bits[3].ToUpperInvariant() : null, revenue));
+                    }
+
+                    SalesOrderResult created = Check(await orders.CreateOrderAsync(new CreateSalesOrderRequest
+                    {
+                        CompanyId = c.CompanyId, CustomerId = customerId, OrderNumber = number, OrderDate = date, Currency = customer.Currency, Lines = lines, RaisedByUserId = c.UserId,
+                    }).ConfigureAwait(true));
+                    return $"Order {created.OrderNumber} taken ({lines.Count} line(s)).";
+                }
+
+                Core.SalesOrders.SalesOrder order = await c.Db.Set<Core.SalesOrders.SalesOrder>().AsNoTracking().Include(o => o.Lines).FirstOrDefaultAsync(o => o.CompanyId == c.CompanyId && o.OrderNumber == number)
+                    .ConfigureAwait(true) ?? throw new OperationException($"No sales order {number}.");
+                Dictionary<long, string> codes = await c.Db.Items.AsNoTracking().Where(x => order.Lines.Select(l => l.ItemId).Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Code.ToUpper()).ConfigureAwait(true);
+                List<(Core.SalesOrders.SalesOrderLine Line, decimal Quantity)> Given(Func<Core.SalesOrders.SalesOrderLine, decimal> outstanding)
+                {
+                    if (i.Optional("Lines") is not string text)
+                    {
+                        return [.. order.Lines.Select(l => (l, outstanding(l))).Where(x => x.Item2 > 0m)];
+                    }
+
+                    List<(Core.SalesOrders.SalesOrderLine, decimal)> picked = [];
+                    foreach (string part in text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                        Core.SalesOrders.SalesOrderLine line = order.Lines.FirstOrDefault(l => codes.GetValueOrDefault(l.ItemId) == bits[0].ToUpperInvariant() && outstanding(l) > 0m)
+                            ?? order.Lines.FirstOrDefault(l => codes.GetValueOrDefault(l.ItemId) == bits[0].ToUpperInvariant())
+                            ?? throw new OperationException($"Order {number} has no line for {bits[0]}.");
+                        picked.Add((line, bits.Length > 1 ? decimal.Parse(bits[1], System.Globalization.CultureInfo.InvariantCulture) : outstanding(line)));
+                    }
+
+                    return picked;
+                }
+
+                switch (i.Text("Step"))
+                {
+                    case "Despatch":
+                    {
+                        long warehouse = await WarehouseAsync(c, i.Optional("Warehouse") ?? throw new OperationException("Give the warehouse to despatch from.")).ConfigureAwait(true);
+                        List<(Core.SalesOrders.SalesOrderLine Line, decimal Quantity)> lines = Given(l => l.OrderedQuantity - l.DespatchedQuantity);
+                        if (lines.Count == 0)
+                        {
+                            throw new OperationException($"Nothing on order {number} is left to despatch.");
+                        }
+
+                        DespatchResult despatched = Check(await orders.DespatchAsync(new DespatchRequest
+                        {
+                            CompanyId = c.CompanyId, SalesOrderId = order.Id, WarehouseId = warehouse, Date = date, Reference = i.Optional("Reference") ?? $"DN-{number}-{date:yyyyMMdd}",
+                            Lines = [.. lines.Select(l => new DespatchLine(l.Line.Id, l.Quantity))], Vehicle = i.Optional("Vehicle"), Driver = i.Optional("Driver"),
+                        }).ConfigureAwait(true));
+                        decimal backOrder = order.Lines.Sum(l => l.OrderedQuantity - l.DespatchedQuantity) - lines.Sum(l => l.Quantity);
+                        return $"Despatched {Q(lines.Sum(l => l.Quantity))} (cost of sales {M(despatched.CostOfSales)})." + (backOrder > 0m ? $" {Q(backOrder)} remain on back order." : string.Empty);
+                    }
+
+                    case "Invoice":
+                    {
+                        List<(Core.SalesOrders.SalesOrderLine Line, decimal Quantity)> lines = Given(l => l.DespatchedQuantity - l.InvoicedQuantity);
+                        if (lines.Count == 0)
+                        {
+                            throw new OperationException($"Nothing despatched on order {number} is waiting to be invoiced.");
+                        }
+
+                        List<string> taxCodes = [.. lines.Select(l => l.Line.TaxCode).OfType<string>().Distinct()];
+                        List<Core.Accounting.TaxCode> taxes = await c.Db.Set<Core.Accounting.TaxCode>().AsNoTracking().Include(t => t.Rates).Where(t => t.CompanyId == c.CompanyId && taxCodes.Contains(t.Code))
+                            .ToListAsync().ConfigureAwait(true);
+                        decimal Tax(Core.SalesOrders.SalesOrderLine line, decimal quantity) => line.TaxCode is string code && taxes.FirstOrDefault(t => t.Code == code) is { } tax
+                            ? decimal.Round(quantity * line.UnitPrice * tax.RateOn(date) / 100m, 2, MidpointRounding.AwayFromZero) : 0m;
+                        InvoiceOrderResult invoiced = Check(await orders.InvoiceAsync(new InvoiceOrderRequest
+                        {
+                            CompanyId = c.CompanyId, SalesOrderId = order.Id, InvoiceNumber = i.Optional("Reference") ?? $"INV-{number}-{date:yyyyMMdd}", Date = date, TaxAccountCode = i.Optional("TaxAccount"),
+                            Lines = [.. lines.Select(l => new InvoiceOrderLine(l.Line.Id, l.Quantity, Tax(l.Line, l.Quantity)))],
+                        }).ConfigureAwait(true));
+                        return $"Invoiced {M(invoiced.InvoiceValue)} (journal {invoiced.JournalNumber}).";
+                    }
+
+                    case "Return":
+                    {
+                        long warehouse = await WarehouseAsync(c, i.Optional("Warehouse") ?? throw new OperationException("Give the warehouse the goods come back to.")).ConfigureAwait(true);
+                        if (i.Optional("Lines") is null)
+                        {
+                            throw new OperationException("Give the returned lines as ITEM:quantity.");
+                        }
+
+                        decimal cost = 0m;
+                        foreach ((Core.SalesOrders.SalesOrderLine line, decimal quantity) in Given(l => l.DespatchedQuantity))
+                        {
+                            cost += Check(await orders.ReturnDespatchAsync(c.CompanyId, order.Id, line.Id, warehouse, date, quantity, i.Optional("Reason") ?? "Returned").ConfigureAwait(true));
+                        }
+
+                        return $"Goods returned to stock ({M(cost)} back from cost of sales).";
+                    }
+
+                    default:
+                        return Check(await orders.CancelOrderAsync(c.CompanyId, order.Id, i.Optional("Reason") ?? throw new OperationException("Give the reason for cancelling.")).ConfigureAwait(true),
+                            $"Order {number} cancelled.");
+                }
+            },
+            List = async c => Table(await (
+                    from o in c.Db.Set<Core.SalesOrders.SalesOrder>().AsNoTracking()
+                    join cu in c.Db.Customers.AsNoTracking() on o.CustomerId equals cu.Id
+                    where o.CompanyId == c.CompanyId && o.Lines.Any(l => l.OrderedQuantity > l.InvoicedQuantity)
+                    orderby o.OrderDate descending
+                    select new
+                    {
+                        o.OrderNumber, o.OrderDate, Customer = cu.Code, o.Status, Ordered = o.Lines.Sum(l => l.OrderedQuantity), Despatched = o.Lines.Sum(l => l.DespatchedQuantity),
+                        Invoiced = o.Lines.Sum(l => l.InvoicedQuantity), Value = o.Lines.Sum(l => l.OrderedQuantity * l.UnitPrice),
+                    }).Take(500).ToListAsync().ConfigureAwait(true),
+                ("Order", r => r.OrderNumber), ("Date", r => D(r.OrderDate)), ("Customer", r => r.Customer), ("Status", r => r.Status.ToString()), ("Ordered", r => Q(r.Ordered)),
+                ("Despatched", r => Q(r.Despatched)), ("Invoiced", r => Q(r.Invoiced)), ("Back order", r => Q(r.Ordered - r.Despatched)), ("Value", r => M(r.Value))),
         };
         yield return new Operation
         {

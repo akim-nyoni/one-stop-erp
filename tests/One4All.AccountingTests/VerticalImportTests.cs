@@ -58,6 +58,16 @@ public sealed class VerticalImportTests
         (await import.ImportEmployeesAsync(companyId, "employee_number,name,basic_salary,engaged,department\nVI-E1,Ann Clerk,1500,2020-02-01,FIN\nVI-E2,Bob Driver,1200,2021-06-01,TRANSPORT\n", commit: true))
             .Errors.Single().Message.Should().Contain("three characters");
         (await import.ImportEmployeesAsync(companyId, "employee_number,name,basic_salary,engaged,department\nvi-e1,Ann Clerk,1500,2020-02-01,FIN\n", commit: true)).Created.Should().Be(1);
+
+        // The payroll details come with the employee: tax and bank, how and how often paid, the contract.
+        const string detailed = "employee_number,name,basic_salary,engaged,tax_number,date_of_birth,gender,employment_type,payment_method,bank_name,bank_account,mobile_money,pay_group,contract_end\n";
+        (await import.ImportEmployeesAsync(companyId, detailed + "VI-E3,Chipo Moyo,900,2024-01-01,T-77,1990-05-04,Female,Contract,MobileMoney,,,,,2026-12-31\n", commit: true))
+            .Errors.Single().Message.Should().Contain("mobile money number");
+        (await import.ImportEmployeesAsync(companyId, detailed + "VI-E3,Chipo Moyo,900,2024-01-01,T-77,1990-05-04,Female,Contract,BankTransfer,CBZ,4400123,,wages,2026-12-31\n", commit: true))
+            .Created.Should().Be(1);
+        Core.Payroll.Employee chipo = await db.Employees.AsNoTracking().SingleAsync(e => e.CompanyId == companyId && e.EmployeeNumber == "VI-E3");
+        (chipo.TaxNumber, chipo.DateOfBirth, chipo.Gender, chipo.EmploymentType, chipo.BankAccountNumber, chipo.PayGroup, chipo.ContractEndDate)
+            .Should().Be(("T-77", new DateOnly(1990, 5, 4), Core.Payroll.Gender.Female, Core.Payroll.EmploymentType.Contract, "4400123", "WAGES", new DateOnly(2026, 12, 31)));
         (await import.ImportEmployeeLoansAsync(companyId, "employee_number,reference,outstanding,instalment,loan_account\nVI-E1,LN-1,600,100,1350\n", asAt, "2991", commit: true)).Created.Should().Be(1);
 
         // Properties with their water service, and a student under the same customer.

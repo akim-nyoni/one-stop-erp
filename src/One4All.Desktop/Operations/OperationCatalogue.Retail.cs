@@ -633,6 +633,39 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Recall trace of a batch / serial",
+            Description = "For a recall: where a batch or serial came from (receipts, with the supplier), where it went (issues and sales, with the customer), "
+                + "and what is still on hand in each warehouse.",
+            Fields = [Req("Item", "Item code"), Req("Lot", "Batch / serial number")],
+            Run = async (c, i) =>
+            {
+                LotTrace trace = Check(await c.Get<ILotTrackingService>().TraceAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Text("Lot").Trim()).ConfigureAwait(true));
+                Dictionary<long, string> warehouses = await c.Db.Warehouses.AsNoTracking().Where(w => w.CompanyId == c.CompanyId).ToDictionaryAsync(w => w.Id, w => w.Code).ConfigureAwait(true);
+                string Line(LotTraceMovement m) => $"  {D(m.Date)}  {Q(m.Quantity),10}  {warehouses.GetValueOrDefault(m.WarehouseId, "-"),-8} {m.Reference ?? "-",-16} {m.Party ?? string.Empty}";
+                List<string> text =
+                [
+                    $"{i.Text("Item").ToUpperInvariant()} lot {trace.LotNumber}" + (trace.ExpiryDate is DateOnly e ? $" (expires {D(e)})" : string.Empty),
+                    "Came from:", .. trace.CameFrom.Select(Line), "Went to:", .. trace.WentTo.Select(Line),
+                    "On hand: " + (trace.OnHand.Count == 0 ? "none" : string.Join(", ", trace.OnHand.Select(h => $"{warehouses.GetValueOrDefault(h.Key, "?")} {Q(h.Value)}"))),
+                    "Customers to notify: " + (trace.Customers.Count == 0 ? "none" : string.Join(", ", trace.Customers)),
+                ];
+                return string.Join(Environment.NewLine, text);
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Revalue an item's standard cost",
+            Description = "Sets a new standard cost for a standard-costed item: the stock on hand is revalued at the new standard and the difference posts to the revaluation account.",
+            Fields = [Req("Item", "Item code"), Num("Cost", "New standard cost"), Today(), Req("Account", "Revaluation account")],
+            Run = async (c, i) =>
+            {
+                decimal change = Check(await c.Get<IInventoryService>().RevalueStandardCostAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Number("Cost"), i.Date("Date"),
+                    i.Text("Account")).ConfigureAwait(true));
+                return $"Standard cost of {i.Text("Item").ToUpperInvariant()} set to {M(i.Number("Cost"))}; stock on hand revalued by {M(change)}.";
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Suggest picks (first expiry, first out)", Description = "Which batches to pick for a quantity, earliest expiry first, never expired stock.",
             Fields = [Req("Item", "Item code"), Req("Warehouse", "Warehouse code"), Num("Quantity", "Quantity"), Today()],
             Run = async (c, i) =>

@@ -81,6 +81,15 @@ public sealed class Termination : AuditableEntity, ICompanyScoped
     /// <summary>The net final pay.</summary>
     public decimal NetPay { get; set; }
 
+    /// <summary>Gets or sets the account the net final pay was accrued to (cleared when it is paid).</summary>
+    public string? NetPayAccountCode { get; set; }
+
+    /// <summary>Gets or sets when the final pay was released to the leaver, once the clearance checklist was complete.</summary>
+    public DateOnly? PaidOn { get; set; }
+
+    /// <summary>Gets or sets the payment journal.</summary>
+    public string? PaymentJournalNumber { get; set; }
+
     /// <summary>The clearance checklist.</summary>
     public IReadOnlyList<TerminationClearanceItem> Clearance => _clearance.AsReadOnly();
 

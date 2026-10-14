@@ -15,6 +15,63 @@ public static partial class OperationCatalogue
         const string module = "Budgeting";
         yield return new Operation
         {
+            Module = module, Title = "Create or copy a budget", ListTitle = "Budgets",
+            Description = "Create a budget for a fiscal year from lines ACCOUNT:period:amount[:cost centre]; or copy an existing budget as the start of a new version "
+                + "(a revision, a supplementary budget or a reforecast), optionally uplifted by a percentage — the copy records which budget it came from.",
+            Fields = [Pick("Step", "Step", ["Create", "Copy"]), Opt("Year", "Fiscal year code (create)"), Opt("Label", "Label"), Pick("Type", "Budget type", Enum.GetNames<Core.Budgeting.BudgetType>()),
+                Opt("Department", "Department (blank: company-wide)"), Opt("Lines", "Lines ACCOUNT:period:amount[:cost centre]; … (create)"), OptNum("From", "Budget id to copy"),
+                OptNum("Uplift", "Uplift % on the copy"), Opt("Reason", "Why (copy)")],
+            Run = async (c, i) =>
+            {
+                IBudgetingService budgeting = c.Get<IBudgetingService>();
+                Core.Budgeting.BudgetType type = Enum.Parse<Core.Budgeting.BudgetType>(i.Text("Type"));
+                if (i.Text("Step") == "Create")
+                {
+                    string code = i.Optional("Year") ?? throw new OperationException("Give the fiscal year.");
+                    long year = await FindAsync(c.Db.FiscalYears, y => y.CompanyId == c.CompanyId && y.Code == code, y => y.Id, "fiscal year", code).ConfigureAwait(true);
+                    List<NewBudgetLine> lines = [];
+                    foreach (string part in (i.Optional("Lines") ?? throw new OperationException("Give the budget lines.")).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                        if (bits.Length < 3 || !int.TryParse(bits[1], out int period)
+                            || !decimal.TryParse(bits[2], System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal amount))
+                        {
+                            throw new OperationException($"'{part}' is not ACCOUNT:period:amount[:cost centre].");
+                        }
+
+                        lines.Add(new NewBudgetLine(bits[0], period, amount, bits.Length > 3 && bits[3].Length > 0 ? bits[3] : null));
+                    }
+
+                    long created = Check(await budgeting.CreateBudgetAsync(c.CompanyId, year, i.Optional("Label") ?? code, type, i.Optional("Department"), lines).ConfigureAwait(true));
+                    return $"Budget {created} created with {lines.Count} line(s), total {M(lines.Sum(l => l.Amount))}.";
+                }
+
+                long sourceId = (long)(i.OptionalNumber("From") ?? throw new OperationException("Give the budget to copy."));
+                Core.Budgeting.Budget source = await c.Db.Set<Core.Budgeting.Budget>().AsNoTracking().Include(b => b.Lines).FirstOrDefaultAsync(b => b.CompanyId == c.CompanyId && b.Id == sourceId)
+                    .ConfigureAwait(true) ?? throw new OperationException($"No budget {sourceId}.");
+                decimal factor = 1m + ((i.OptionalNumber("Uplift") ?? 0m) / 100m);
+                List<NewBudgetLine> copied = [.. source.Lines.GroupBy(l => (l.AccountCode, l.CostCentre, l.Period, l.Project, l.Fund, l.Branch))
+                    .Select(g => new NewBudgetLine(g.Key.AccountCode, g.Key.Period, decimal.Round(g.Sum(l => l.Amount) * factor, 2, MidpointRounding.AwayFromZero), g.Key.CostCentre,
+                        Project: g.Key.Project, Fund: g.Key.Fund, Branch: g.Key.Branch))
+                    .Where(l => l.Amount != 0m)];
+                long copy = Check(await budgeting.CreateBudgetAsync(c.CompanyId, source.FiscalYearId, i.Optional("Label") ?? source.Label, type, i.Optional("Department") ?? source.Department, copied)
+                    .ConfigureAwait(true));
+                Core.Budgeting.Budget made = await c.Db.Set<Core.Budgeting.Budget>().FirstAsync(b => b.Id == copy).ConfigureAwait(true);
+                made.Reason = $"Copied from budget {source.Id} ({source.Label} {source.Type} v{source.VersionNumber})" + (i.Optional("Reason") is string why ? $": {why}" : ".");
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Budget {copy} (v{made.VersionNumber}) created from budget {source.Id}: {copied.Count} line(s), total {M(copied.Sum(l => l.Amount))}.";
+            },
+            List = async c => Table(await (
+                    from b in c.Db.Set<Core.Budgeting.Budget>().AsNoTracking()
+                    join y in c.Db.FiscalYears.AsNoTracking() on b.FiscalYearId equals y.Id
+                    where b.CompanyId == c.CompanyId
+                    orderby y.StartDate descending, b.Id descending
+                    select new { b.Id, Year = y.Code, b.Label, b.Type, b.Department, b.VersionNumber, b.Status, b.IsActive, b.Reason }).Take(300).ToListAsync().ConfigureAwait(true),
+                ("Id", b => b.Id), ("Year", b => b.Year), ("Label", b => b.Label), ("Type", b => b.Type.ToString()), ("Department", b => b.Department ?? "-"), ("Version", b => b.VersionNumber),
+                ("Status", b => b.Status.ToString()), ("Active", b => b.IsActive ? "yes" : string.Empty), ("Note", b => b.Reason ?? string.Empty)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Carry unspent capital forward", ListTitle = "Capital budgets",
             Description = "Year-end: Propose lists each capital vote's approved budget, what was spent and what may still be carried; Approve carries the given amounts (VOTE:amount; …) "
                 + "into a later year's capital budget under the approval reference — a separate act, recorded for audit.",

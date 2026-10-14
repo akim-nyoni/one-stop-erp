@@ -246,6 +246,31 @@ public sealed class MonthlyDepreciationTask : IScheduledTask
     }
 }
 
+/// <summary>
+/// Built-in task: true the IAS 19 leave provision up at the end of the month just ended — the leave staff are owed, at each one's daily rate,
+/// against accounts 6600 (leave expense) and 2460 (leave provision).
+/// </summary>
+public sealed class LeaveProvisionTask : IScheduledTask
+{
+    private readonly Application.Abstractions.Payroll.ILeaveService _leave;
+
+    /// <summary>Creates the task.</summary>
+    /// <param name="leave">The leave service.</param>
+    public LeaveProvisionTask(Application.Abstractions.Payroll.ILeaveService leave) => _leave = leave;
+
+    /// <inheritdoc />
+    public string Key => "payroll.leave-provision";
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
+    {
+        DateOnly today = DateOnly.FromDateTime(runAt.UtcDateTime);
+        DateOnly monthEnd = new DateOnly(today.Year, today.Month, 1).AddDays(-1);
+        Result<decimal> provision = await _leave.RaiseLeaveProvisionAsync(companyId, monthEnd, 0m, "6600", "2460", $"LEAVE-PROV-{monthEnd:yyyyMM}", ct).ConfigureAwait(false);
+        return provision.IsFailure ? provision.Error : $"Leave provision at {monthEnd:yyyy-MM-dd} trued up to {provision.Value:N2}.";
+    }
+}
+
 /// <summary>Built-in task: lapse allocation offers not accepted by their deadline.</summary>
 public sealed class LapseOffersTask : IScheduledTask
 {

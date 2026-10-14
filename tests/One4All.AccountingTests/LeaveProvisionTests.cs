@@ -57,6 +57,10 @@ public sealed class LeaveProvisionTests
 
             // Nil change re-run posts nothing (still 1200).
             (await leave.RaiseLeaveProvisionAsync(companyId, new DateOnly(2026, 4, 30), 100m, "6600", "2460", "PROV-3")).Value.Should().Be(1200m);
+
+            // At the employee's own rate (3,000 × 12 ÷ 260 = 138.46 a day) the 12 days are worth 1,661.52; trued back to the flat rate after.
+            (await leave.RaiseLeaveProvisionAsync(companyId, new DateOnly(2026, 4, 30), 0m, "6600", "2460", "PROV-4")).Value.Should().Be(1_661.52m);
+            (await leave.RaiseLeaveProvisionAsync(companyId, new DateOnly(2026, 4, 30), 100m, "6600", "2460", "PROV-5")).Value.Should().Be(1200m);
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())

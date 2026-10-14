@@ -34,7 +34,7 @@ public interface ILeaveService
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="date">The provision date.</param>
-    /// <param name="dailyRate">The value of one leave day.</param>
+    /// <param name="dailyRate">The value of one leave day for everyone, or 0 to value each employee's days at their own daily rate of basic (annual ÷ 260).</param>
     /// <param name="leaveExpenseAccountCode">The leave-expense account.</param>
     /// <param name="leaveProvisionAccountCode">The leave-provision liability account.</param>
     /// <param name="documentNumber">The provision document number.</param>

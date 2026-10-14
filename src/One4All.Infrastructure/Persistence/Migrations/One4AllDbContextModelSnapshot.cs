@@ -22185,6 +22185,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("net_pay");
 
+                    b.Property<string>("NetPayAccountCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("net_pay_account_code");
+
                     b.Property<decimal>("Notice")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -22194,6 +22199,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("ordinary_tax");
+
+                    b.Property<DateOnly?>("PaidOn")
+                        .HasColumnType("date")
+                        .HasColumnName("paid_on");
+
+                    b.Property<string>("PaymentJournalNumber")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("payment_journal_number");
 
                     b.Property<decimal>("ProRataSalary")
                         .HasPrecision(19, 4)

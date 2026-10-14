@@ -83,10 +83,16 @@ public sealed class TerminationTests
         (await terminations.TerminateAsync(Request("TM-001", TerminationType.Retrenchment))).Error.Code.Should().Be("Payroll.AlreadyTerminated");
 
         // Clearance and certificate.
-        done.Clearance.Should().Contain(i => i.Description.StartsWith("Final pay posted", StringComparison.Ordinal) && i.IsCleared);
+        done.Clearance.Should().Contain(i => i.Description.StartsWith("Final pay calculated", StringComparison.Ordinal) && i.IsCleared);
         ClearanceItem property = done.Clearance.Single(i => i.Description.StartsWith("Company property", StringComparison.Ordinal));
         property.IsCleared.Should().BeFalse();
+        (await terminations.ReleaseFinalPayAsync(companyId, "TM-001", new DateOnly(2026, 4, 16), "1000")).Error.Code.Should().Be("Payroll.ClearanceOutstanding", "property is still out");
         (await terminations.ClearItemAsync(companyId, property.Id, 5, new DateOnly(2026, 4, 16))).IsSuccess.Should().BeTrue();
+        string? payment = (await terminations.ReleaseFinalPayAsync(companyId, "TM-001", new DateOnly(2026, 4, 17), "1000")).Value;
+        List<JournalLine> paid = await (from l in db.Set<JournalLine>().AsNoTracking() join j in db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
+                                        where j.CompanyId == companyId && j.JournalNumber == payment select l).ToListAsync();
+        (paid.Single(l => l.AccountCode == "2420").BaseDebit, paid.Single(l => l.AccountCode == "1000").BaseCredit).Should().Be((8_631.47m, 8_631.47m));
+        (await terminations.ReleaseFinalPayAsync(companyId, "TM-001", new DateOnly(2026, 4, 17), "1000")).Error.Code.Should().Be("Payroll.FinalPayReleased");
         (await terminations.ClearanceAsync(companyId, "tm-001")).Value.Single(i => i.Id == property.Id).IsCleared.Should().BeTrue();
         string certificate = (await terminations.CertificateOfServiceAsync(companyId, "TM-001")).Value;
         certificate.Should().Contain("CERTIFICATE OF SERVICE").And.Contain("Tafadzwa Ncube").And.Contain("15 January 2020").And.Contain("15 April 2026").And.Contain("retrenchment")

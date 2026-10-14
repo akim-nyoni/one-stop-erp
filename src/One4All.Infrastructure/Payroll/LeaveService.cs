@@ -153,11 +153,14 @@ public sealed class LeaveService : ILeaveService
             return Error.Rule("Pay.NegativeRate", "The daily rate cannot be negative.");
         }
 
-        // Target provision = value of all outstanding leave.
-        decimal totalDays = await _db.Set<EmployeeLeaveBalance>()
-            .Where(b => b.CompanyId == companyId)
-            .SumAsync(b => (decimal?)(b.AccruedDays - b.TakenDays), ct).ConfigureAwait(false) ?? 0m;
-        decimal target = decimal.Round(totalDays * dailyRate, 4, MidpointRounding.ToEven);
+        // Target provision = the leave still owed to staff (leavers' leave was paid out in their final pay), each day at the employee's own
+        // daily rate of basic (annual ÷ 260, as the PR38 leave liability report values it) unless one rate is given.
+        var owed = await (from b in _db.Set<EmployeeLeaveBalance>()
+                          join e in _db.Employees on b.EmployeeId equals e.Id
+                          where b.CompanyId == companyId && e.Status != EmployeeStatus.Terminated && b.AccruedDays > b.TakenDays
+                          select new { Days = b.AccruedDays - b.TakenDays, e.BasicSalary }).ToListAsync(ct).ConfigureAwait(false);
+        decimal target = decimal.Round(owed.Sum(b => b.Days * (dailyRate > 0m ? dailyRate : Math.Round(b.BasicSalary * 12m / 260m, 2, MidpointRounding.AwayFromZero))),
+            2, MidpointRounding.AwayFromZero);
 
         // Current provision = net credit balance on the provision account across posted journals to date.
         decimal provided = await (
