@@ -196,6 +196,38 @@ public sealed partial class PermissionGridViewModel : ObservableObject
 
     partial void OnFilterChanged(string value) => PermissionsView.Refresh();
 
+    /// <summary>Gets the rows the filter shows.</summary>
+    public IEnumerable<PermissionRowViewModel> VisibleRows => PermissionsView.Cast<PermissionRowViewModel>();
+
+    /// <summary>
+    /// Ticks or clears many cells at once (brief §5.1 "select all in row/column"): every offered cell of the rows given, or just one column of them.
+    /// Clearing a user's cells returns them to what the user's roles give.
+    /// </summary>
+    /// <param name="rows">The rows.</param>
+    /// <param name="column">One column (its index), or null for every column.</param>
+    /// <param name="on">True to tick (grant), false to clear.</param>
+    /// <returns>How many cells changed.</returns>
+    public int SetCells(IEnumerable<PermissionRowViewModel> rows, int? column, bool on)
+    {
+        int changed = 0;
+        foreach (PermissionRowViewModel row in rows)
+        {
+            for (int i = 0; i < row.Cells.Length; i++)
+            {
+                PermissionCellViewModel cell = row.Cells[i];
+                bool? value = on ? true : cell.ThreeState ? null : false;
+                if ((column is null || column == i) && cell.Offered && cell.Value != value)
+                {
+                    cell.Value = value;
+                    changed++;
+                }
+            }
+        }
+
+        StatusMessage = changed == 0 ? "Nothing to change." : $"{changed} operation(s) {(on ? "ticked" : "cleared")} — Save to keep them.";
+        return changed;
+    }
+
     async partial void OnSelectedRoleChanged(RoleItem? value)
     {
         Permissions.Clear();

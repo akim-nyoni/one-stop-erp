@@ -56,6 +56,11 @@ public sealed class BackDatedReceiptReportTests
             var result = await runner.RenderAsync(companyId, "RC18", new Dictionary<string, object?> { ["FromDate"] = new DateOnly(2026, 1, 1), ["ToDate"] = new DateOnly(2026, 12, 31) }, ReportFormat.Html);
             result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.ToString() : null);
             Encoding.UTF8.GetString(result.Value.Content).Should().Contain("BD-000001").And.Contain("75.00");
+
+            // The 75 cash taken has not been banked.
+            var unbanked = await runner.RenderAsync(companyId, "RC27", new Dictionary<string, object?> { ["AsAtDate"] = new DateOnly(2026, 2, 28) }, ReportFormat.Csv);
+            unbanked.IsSuccess.Should().BeTrue(unbanked.IsFailure ? unbanked.Error.ToString() : null);
+            Encoding.UTF8.GetString(unbanked.Value.Content).Should().Contain("TILL-BD").And.Contain("75");
         }
     }
 }

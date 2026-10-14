@@ -208,11 +208,19 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Accept or decline an offer", ListTitle = "Stands",
-            Description = "Records the applicant's answer to an allocation offer by its certificate number; a decline needs the reason and frees the stand.",
-            Fields = [Req("Certificate", "Certificate number"), Pick("Answer", "Answer", ["Accept", "Decline"]), Opt("Reason", "Reason (decline)"), Today("Date", "Date")],
+            Description = "Records the applicant's answer to an allocation offer by its certificate number; a decline needs the reason and frees the stand. "
+                + "Offer letter prints the offer (price, deposit, deadline) for the applicant; Allocation letter prints the confirmation once accepted.",
+            Fields = [Req("Certificate", "Certificate number"), Pick("Answer", "Answer", ["Accept", "Decline", "Offer letter", "Allocation letter"]), Opt("Reason", "Reason (decline)"),
+                Today("Date", "Date"), OptNum("Deposit", "Deposit % (letters)")],
             Run = async (c, i) =>
             {
                 IAllocationService allocation = c.Get<IAllocationService>();
+                if (i.Text("Answer").EndsWith("letter", StringComparison.Ordinal))
+                {
+                    return await HousingLetterAsync(c, i.Text("Certificate").Trim().ToUpperInvariant(), i.Text("Answer") == "Offer letter", i.Date("Date"), i.OptionalNumber("Deposit") ?? 10m)
+                        .ConfigureAwait(true);
+                }
+
                 if (i.Text("Answer") == "Accept")
                 {
                     _ = Check(await allocation.AcceptAsync(c.CompanyId, i.Text("Certificate"), i.Date("Date")).ConfigureAwait(true), string.Empty);
@@ -1691,4 +1699,46 @@ public static partial class OperationCatalogue
 
     private static DateOnly Day(string text)
         => DateOnly.TryParseExact(text.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly day) ? day : throw new OperationException($"\"{text}\" is not a date (yyyy-MM-dd).");
+
+    // The offer letter and the allocation letter (brief §4.10.4): the applicant, the stand and scheme, the price and deposit, and the deadline or the confirmation.
+    private static async Task<string> HousingLetterAsync(OperationContext c, string certificate, bool offer, DateOnly date, decimal depositPercent)
+    {
+        Core.Housing.StandAllocation line = await c.Db.Set<Core.Housing.StandAllocation>().AsNoTracking().FirstOrDefaultAsync(a => a.CompanyId == c.CompanyId && a.CertificateNumber == certificate)
+            .ConfigureAwait(true) ?? throw new OperationException($"No offer with certificate {certificate}.");
+        if (!offer && line.Status != Core.Housing.AllocationStatus.Accepted)
+        {
+            throw new OperationException($"Offer {certificate} is {line.Status}; the allocation letter follows acceptance.");
+        }
+
+        Core.Housing.HousingStand stand = await c.Db.HousingStands.AsNoTracking().SingleAsync(s => s.Id == line.StandId).ConfigureAwait(true);
+        Core.Housing.HousingApplicant applicant = await c.Db.HousingApplicants.AsNoTracking().SingleAsync(a => a.Id == line.ApplicantId).ConfigureAwait(true);
+        string scheme = stand.SchemeId is long schemeId ? await c.Db.HousingSchemes.AsNoTracking().Where(s => s.Id == schemeId).Select(s => s.Code + " " + s.Name).FirstOrDefaultAsync().ConfigureAwait(true) ?? "-" : "-";
+        string council = await c.Db.Companies.AsNoTracking().Where(x => x.Id == c.CompanyId).Select(x => x.Name).SingleAsync().ConfigureAwait(true);
+        decimal price = line.OfferedPrice ?? stand.SellingPrice;
+        decimal deposit = Math.Round(price * depositPercent / 100m, 2, MidpointRounding.AwayFromZero);
+        List<string> text =
+        [
+            council.ToUpperInvariant(), string.Empty, D(date), string.Empty,
+            $"{applicant.FullName}", $"ID {applicant.IdNumber}" + (applicant.WaitingListNumber is null ? string.Empty : $" · waiting list {applicant.WaitingListNumber}"), string.Empty,
+            offer ? $"OFFER OF STAND {stand.StandNumber} — certificate {certificate}" : $"ALLOCATION OF STAND {stand.StandNumber} — certificate {certificate}", new string('=', 60),
+            $"Scheme : {scheme}", $"Stand  : {stand.StandNumber}, {Q(stand.SizeSquareMetres)} m²", $"Price  : {M(price)}", $"Deposit: {M(deposit)} ({depositPercent:0.##}%)", string.Empty,
+        ];
+        text.AddRange(offer
+            ?
+            [
+                "We are pleased to offer you the stand above from the council's housing waiting list.",
+                line.OfferExpires is DateOnly expires
+                    ? $"To accept, sign below and return this letter, with the deposit, by {D(expires)}. If we have not heard from you by then the offer lapses and the stand is offered to the next applicant."
+                    : "To accept, sign below and return this letter with the deposit.",
+                string.Empty, "Accepted: ______________________   Date: ____________",
+            ]
+            :
+            [
+                $"Your acceptance has been recorded{(line.DecidedOn is DateOnly decided ? $" on {D(decided)}" : string.Empty)} and the stand is allocated to you.",
+                "The balance of the price is payable under the instalment agreement you will be asked to sign; the stand may not be sold, ceded or",
+                "built on until the agreement is signed and the deposit is paid.",
+                string.Empty, "For the council: ______________________",
+            ]);
+        return string.Join(Environment.NewLine, text);
+    }
 }

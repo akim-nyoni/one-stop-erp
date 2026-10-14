@@ -77,7 +77,7 @@ public static partial class OperationCatalogue
 
                 return text.ToString();
             },
-            List = async c => Table(await c.Db.Properties.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.StandNumber).Take(500).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Properties.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.StandNumber).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Stand", p => p.StandNumber), ("Ward", p => p.Ward), ("Ratepayer", p => p.RatepayerCustomerId)),
         };
         yield return new Operation
@@ -95,7 +95,7 @@ public static partial class OperationCatalogue
                     : Check(await register.SetLocationAsync(c.CompanyId, i.Optional("Stand") ?? string.Empty, i.Optional("Suburb"), i.OptionalNumber("Latitude"), i.OptionalNumber("Longitude"))
                         .ConfigureAwait(true), "Stand location saved.");
             },
-            List = async c => Table(await c.Db.Set<Meter>().AsNoTracking().Where(m => m.CompanyId == c.CompanyId).OrderBy(m => m.Serial).Take(500).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<Meter>().AsNoTracking().Where(m => m.CompanyId == c.CompanyId).OrderBy(m => m.Serial).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Serial", m => m.Serial), ("Type", m => m.MeterType ?? string.Empty), ("Size (mm)", m => m.SizeMm?.ToString(CultureInfo.InvariantCulture) ?? string.Empty),
                 ("Where", m => m.Location ?? string.Empty), ("Installed", m => m.InstalledOn is DateOnly d ? D(d) : string.Empty)),
         };
@@ -133,7 +133,7 @@ public static partial class OperationCatalogue
                     .ConsumptionAsync(c.CompanyId, i.Text("Stand"), i.Date("AsAt"), i.Whole("Months")).ConfigureAwait(true));
                 return statement + string.Concat(meters.Select(m => Environment.NewLine + Application.Municipal.ConsumptionGraph.Render(m, 72)));
             },
-            List = async c => Table(await c.Db.Properties.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.StandNumber).Take(500).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Properties.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.StandNumber).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Stand", p => p.StandNumber), ("Ward", p => p.Ward), ("Ratepayer", p => p.RatepayerCustomerId)),
         };
         yield return new Operation
@@ -250,7 +250,7 @@ public static partial class OperationCatalogue
                         return "Run cancelled.";
                 }
             },
-            List = async c => Table(await c.Db.Set<BillingRun>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Take(100).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Set<BillingRun>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Page(c, 100).ToListAsync().ConfigureAwait(true),
                 ("Run", r => r.RunNumber), ("Service", r => r.ServiceType), ("Bill date", r => r.BillDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Ward", r => r.Ward),
                 ("Route", r => r.RouteCode), ("Cycle", r => r.Cycle),
                 ("Status", r => r.Status), ("Proposed by", r => r.ProposedByUserId)),
@@ -303,13 +303,20 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Rates clearance certificates",
-            Description = "Quotes what a stand must pay for a clearance certificate (its balance plus so many months' billing in advance), and issues the certificate once that is "
-                + "paid, valid for so many days.",
-            Fields = [Pick("Step", "Step", ["Quote", "Issue"]), Req("Stand", "Stand number"), Num("Months", "Months in advance", "3"), Num("Valid", "Valid for (days)", "60"), Today()],
+            Description = "Quotes what a stand must pay for a clearance certificate (its balance plus so many months' billing in advance), issues the certificate once that is "
+                + "paid, valid for so many days, and prints it (Print reprints an issued certificate by its number).",
+            Fields = [Pick("Step", "Step", ["Quote", "Issue", "Print"]), Opt("Stand", "Stand number (quote, issue)"), Num("Months", "Months in advance", "3"), Num("Valid", "Valid for (days)", "60"), Today(),
+                Opt("Certificate", "Certificate number (print)")],
             Run = async (c, i) =>
             {
                 IClearanceService clearance = c.Get<IClearanceService>();
-                long property = await PropertyAsync(c, i.Text("Stand")).ConfigureAwait(true);
+                if (i.Text("Step") == "Print")
+                {
+                    string number = (i.Optional("Certificate") ?? throw new OperationException("Give the certificate number.")).Trim().ToUpperInvariant();
+                    return await ClearanceCertificateTextAsync(c, number).ConfigureAwait(true);
+                }
+
+                long property = await PropertyAsync(c, i.Optional("Stand") ?? throw new OperationException("Give the stand.")).ConfigureAwait(true);
                 if (i.Text("Step") == "Quote")
                 {
                     One4All.Application.Municipal.ClearanceQuote quote = Check(await clearance.QuoteAsync(c.CompanyId, property, i.Date("Date"), i.Whole("Months")).ConfigureAwait(true));
@@ -318,8 +325,15 @@ public static partial class OperationCatalogue
                 }
 
                 IssuedClearance issued = Check(await clearance.IssueAsync(c.CompanyId, property, i.Date("Date"), i.Whole("Months"), i.Whole("Valid"), c.UserId).ConfigureAwait(true));
-                return $"Certificate {issued.CertificateNumber} for {issued.StandNumber}, valid until {issued.ValidUntil:yyyy-MM-dd}; advance held {M(issued.AdvanceHeld)}.";
+                return await ClearanceCertificateTextAsync(c, issued.CertificateNumber).ConfigureAwait(true);
             },
+            List = async c => Table(await (
+                    from cert in c.Db.Set<Core.Municipal.ClearanceCertificate>().AsNoTracking()
+                    join p in c.Db.Properties.AsNoTracking() on cert.PropertyId equals p.Id
+                    where cert.CompanyId == c.CompanyId
+                    orderby cert.IssuedOn descending
+                    select new { cert.CertificateNumber, p.StandNumber, cert.IssuedOn, cert.ValidUntil, cert.AdvanceHeld }).Page(c, 200).ToListAsync().ConfigureAwait(true),
+                ("Certificate", x => x.CertificateNumber), ("Stand", x => x.StandNumber), ("Issued", x => D(x.IssuedOn)), ("Valid until", x => D(x.ValidUntil)), ("Advance held", x => M(x.AdvanceHeld))),
         };
         yield return new Operation
         {
@@ -713,5 +727,36 @@ public static partial class OperationCatalogue
         }
 
         return Environment.NewLine + string.Join(Environment.NewLine, text);
+    }
+
+    // The printed rates clearance certificate (§14 I.153): the council, the stand and its owners, that the rates and charges are paid with the advance held, and the validity.
+    private static async Task<string> ClearanceCertificateTextAsync(OperationContext c, string certificateNumber)
+    {
+        Core.Municipal.ClearanceCertificate certificate = await c.Db.Set<Core.Municipal.ClearanceCertificate>().AsNoTracking()
+            .FirstOrDefaultAsync(x => x.CompanyId == c.CompanyId && x.CertificateNumber == certificateNumber).ConfigureAwait(true) ?? throw new OperationException($"No certificate {certificateNumber}.");
+        Core.Municipal.Property property = await c.Db.Properties.AsNoTracking().SingleAsync(p => p.Id == certificate.PropertyId).ConfigureAwait(true);
+        string council = await c.Db.Companies.AsNoTracking().Where(x => x.Id == c.CompanyId).Select(x => x.Name).SingleAsync().ConfigureAwait(true);
+        string ratepayer = await c.Db.Customers.AsNoTracking().Where(x => x.Id == property.RatepayerCustomerId).Select(x => x.Code + " " + x.Name).FirstOrDefaultAsync().ConfigureAwait(true) ?? "?";
+        string issuer = await c.Db.Users.AsNoTracking().Where(u => u.Id == certificate.IssuedByUserId).Select(u => u.DisplayName).FirstOrDefaultAsync().ConfigureAwait(true) ?? "—";
+        const int width = 72;
+        string Centre(string text) => text.Length >= width ? text : new string(' ', (width - text.Length) / 2) + text;
+        return string.Join(Environment.NewLine,
+        [
+            Centre(council.ToUpperInvariant()), Centre("RATES CLEARANCE CERTIFICATE"), new string('=', width),
+            $"Certificate number : {certificate.CertificateNumber}",
+            $"Stand              : {property.StandNumber}, ward {property.Ward}" + (property.Address is null ? string.Empty : $", {property.Address}"),
+            $"Ratepayer          : {ratepayer}",
+            $"Municipal valuation: {M(property.Valuation)}",
+            string.Empty,
+            "It is certified that all rates, service charges and other amounts due to the council on the",
+            $"above property have been paid up to {D(certificate.IssuedOn)}, and that {M(certificate.AdvanceHeld)} is held in advance",
+            "against charges to come.",
+            string.Empty,
+            $"Issued on          : {D(certificate.IssuedOn)}",
+            $"Valid until        : {D(certificate.ValidUntil)}",
+            $"Issued by          : {issuer}",
+            string.Empty,
+            "Signature: ______________________          Official stamp:",
+        ]);
     }
 }

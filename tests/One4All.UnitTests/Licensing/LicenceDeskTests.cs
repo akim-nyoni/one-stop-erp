@@ -148,5 +148,15 @@ public sealed class LicenceDeskTests : IDisposable
         Validate(standard.Token).Payload!.Features.Should().BeEquivalentTo(LicenceFeatures.ForEdition(LicenceEdition.Standard));
         IssuedLicence chosen = desk.Issue(new IssueRequest { CustomerId = "cust-f", Edition = LicenceEdition.Standard, Features = ["api_access"] });
         Validate(chosen.Token).Payload!.Features.Should().Equal("API_ACCESS");
+
+        // Limits, for the licence and per module.
+        IssuedLicence limited = desk.Issue(new IssueRequest
+        {
+            CustomerId = "cust-f", Edition = LicenceEdition.Standard, Limits = new Dictionary<string, int?> { ["named_users"] = 10 },
+            ModuleLimits = new Dictionary<string, IReadOnlyDictionary<string, int?>> { ["pos"] = new Dictionary<string, int?> { ["Terminals"] = 3 } },
+        });
+        LicensePayload payload = Validate(limited.Token).Payload!;
+        payload.Limits["named_users"].Should().Be(10);
+        payload.Modules.Single(m => m.Code == "POS").Limits["terminals"].Should().Be(3);
     }
 }

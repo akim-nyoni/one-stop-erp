@@ -173,6 +173,34 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "System Manager", Title = "Report version history", ListTitle = "Saved report versions",
+            Description = "Every saved version of a company's report layout: list them, see what changed between two versions (field by field), or roll back to an earlier "
+                + "one (saved as a new version, so nothing is lost).",
+            Fields = [Pick("Step", "Step", ["History", "Compare", "Roll back"]), Req("Report", "Report code"), OptNum("From", "Earlier version (compare) / version to restore"), OptNum("To", "Later version (compare)")],
+            Run = async (c, i) =>
+            {
+                Application.Abstractions.Reporting.IReportDefinitionService reports = c.Get<Application.Abstractions.Reporting.IReportDefinitionService>();
+                string code = i.Text("Report").Trim().ToUpperInvariant();
+                switch (i.Text("Step"))
+                {
+                    case "History":
+                        IReadOnlyList<Application.Abstractions.Reporting.ReportVersionEntry> versions = Check(await reports.HistoryAsync(c.CompanyId, code).ConfigureAwait(true));
+                        return versions.Count == 0 ? $"{code} has no saved versions (it is the system layout)."
+                            : string.Join(Environment.NewLine, versions.Select(v => $"v{v.Version}{(v.IsCurrent ? " (current)" : string.Empty)}  {v.SavedAt:yyyy-MM-dd HH:mm}  user {v.SavedByUserId?.ToString(CultureInfo.InvariantCulture) ?? "-"}  {v.Note}"));
+                    case "Compare":
+                        int from = (int)(i.OptionalNumber("From") ?? throw new OperationException("Give the earlier version.")), to = (int)(i.OptionalNumber("To") ?? throw new OperationException("Give the later version."));
+                        IReadOnlyList<Application.Reporting.JsonChange> changes = Check(await reports.DiffAsync(c.CompanyId, code, from, to).ConfigureAwait(true));
+                        return changes.Count == 0 ? $"v{from} and v{to} are the same."
+                            : string.Join(Environment.NewLine, changes.Select(ch => $"{ch.Kind,-8} {ch.Path}: {ch.Before ?? "—"} → {ch.After ?? "—"}"));
+                    default:
+                        int version = (int)(i.OptionalNumber("From") ?? throw new OperationException("Give the version to restore."));
+                        int saved = Check(await reports.RollbackAsync(c.CompanyId, code, version, c.UserId).ConfigureAwait(true));
+                        return $"{code} rolled back to v{version} (saved as v{saved}).";
+                }
+            },
+        };
+        yield return new Operation
+        {
             Module = "Fixed Assets", Title = "Asset insurance and warranty", ListTitle = "Insurance and warranty",
             Description = "Who insures an asset, the policy and the sum insured with its expiry, and when the manufacturer's warranty ends (report M213 and the expiry alerts read them).",
             Fields = [Req("Asset", "Asset number"), Opt("Insurer", "Insurer"), Opt("Policy", "Policy number"), OptNum("Insured", "Sum insured"), Opt("InsuredTo", "Insurance expires (yyyy-MM-dd)"),

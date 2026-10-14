@@ -59,6 +59,21 @@
                     </GroupStyle.ContainerStyle>
                 </GroupStyle>
             </DataGrid.GroupStyle>
+            <DataGrid.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Tick the whole row" Tag="row+" Click="Bulk_Click" />
+                    <MenuItem Header="Clear the whole row" Tag="row-" Click="Bulk_Click" />
+                    <Separator />
+                    <MenuItem Header="Tick the whole module" Tag="module+" Click="Bulk_Click" />
+                    <MenuItem Header="Clear the whole module" Tag="module-" Click="Bulk_Click" />
+                    <Separator />
+                    <MenuItem Header="Tick this column for the rows shown" Tag="column+" Click="Bulk_Click" />
+                    <MenuItem Header="Clear this column for the rows shown" Tag="column-" Click="Bulk_Click" />
+                    <Separator />
+                    <MenuItem Header="Tick everything shown" Tag="all+" Click="Bulk_Click" />
+                    <MenuItem Header="Clear everything shown" Tag="all-" Click="Bulk_Click" />
+                </ContextMenu>
+            </DataGrid.ContextMenu>
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Feature" Binding="{Binding Feature}" IsReadOnly="True" Width="260" />
             </DataGrid.Columns>

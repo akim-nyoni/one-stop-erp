@@ -289,4 +289,59 @@ public sealed class PerformanceTests
         _output.WriteLine($"1,000 payslip PDFs ({bytes / 1024:N0} KB) produced in {watch.Elapsed.TotalSeconds:0.0} s.");
         watch.Elapsed.TotalMinutes.Should().BeLessThan(5, "the brief's target: payslip PDFs and email for 1,000 employees in under 5 minutes");
     }
+
+    [SkippableFact]
+    public async Task Fifty_concurrent_users_post_and_read_without_errors()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        Skip.IfNot(Enabled, "Set ONE4ALL_PERF=1 to run the performance pack.");
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        long companyId;
+        List<long> customers = [];
+        await using (AsyncServiceScope setup = provider.CreateAsyncScope())
+        {
+            One4AllDbContext db = setup.ServiceProvider.GetRequiredService<One4AllDbContext>();
+            companyId = await Scenario.SeedAsync(db);
+            for (int i = 0; i < 50; i++)
+            {
+                Customer customer = new(companyId, $"CON-{i:00}", $"Concurrent customer {i}", Scenario.Usd);
+                db.Customers.Add(customer);
+                await db.SaveChangesAsync();
+                customers.Add(customer.Id);
+            }
+        }
+
+        // 50 users at once, each in their own scope: post 10 invoices and read the trial balance after each.
+        int errors = 0;
+        Stopwatch watch = Stopwatch.StartNew();
+        await Parallel.ForEachAsync(Enumerable.Range(0, 50), new ParallelOptions { MaxDegreeOfParallelism = 50 }, async (user, ct) =>
+        {
+            await using AsyncServiceScope scope = provider.CreateAsyncScope();
+            Application.Abstractions.Trading.ISalesLedgerService ar = scope.ServiceProvider.GetRequiredService<Application.Abstractions.Trading.ISalesLedgerService>();
+            IGeneralLedgerReports reports = scope.ServiceProvider.GetRequiredService<IGeneralLedgerReports>();
+            for (int n = 0; n < 10; n++)
+            {
+                var posted = await ar.PostInvoiceAsync(new Application.Abstractions.Trading.SalesInvoiceRequest
+                {
+                    CompanyId = companyId, CustomerId = customers[user], DocumentNumber = $"CON-{user:00}-{n:00}", DocumentDate = new DateOnly(2026, 3, 1), Currency = Scenario.Usd,
+                    NetAmount = 100m + n, SalesAccountCode = "4000",
+                }, ct);
+                if (posted.IsFailure)
+                {
+                    Interlocked.Increment(ref errors);
+                }
+
+                _ = await reports.TrialBalanceAsync(companyId, new DateOnly(2026, 3, 31), ct);
+            }
+        });
+        watch.Stop();
+
+        await using AsyncServiceScope check = provider.CreateAsyncScope();
+        TrialBalanceReport tb = await check.ServiceProvider.GetRequiredService<IGeneralLedgerReports>().TrialBalanceAsync(companyId, new DateOnly(2026, 3, 31));
+        _output.WriteLine($"50 concurrent users posted 500 invoices and read 500 trial balances in {watch.Elapsed.TotalSeconds:0.0} s ({errors} failed).");
+        errors.Should().Be(0);
+        tb.IsBalanced.Should().BeTrue();
+        tb.Rows.Single(r => r.AccountCode == "4000").Credit.Should().Be(50m * (10m * 100m + 45m), "every invoice posted once");
+        watch.Elapsed.TotalSeconds.Should().BeLessThan(120, "the brief's baseline: 50 concurrent users per server");
+    }
 }

@@ -49,6 +49,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC23" => await RelatedPartyAttemptsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC25" => await DailyBankingSummaryAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC26" => await CashInTransitAgeingAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC27" => await UnbankedCollectionsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC28" => await CashMovementsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC29" => await SuspenseRegisterAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC30" => await SuspenseAllocationLogAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -67,6 +68,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC46" => await AgentAgeingAsync(companyId, ct).ConfigureAwait(false),
             "RC49" => await CollectionEfficiencyAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC51" => await CollectionTrendAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC52" => await PrepaidTokensAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -452,6 +454,48 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .OrderBy(d => d.DepositDate)
             .ToListAsync(ct).ConfigureAwait(false);
         return deposits.Select(d => Row(new() { ["Reference"] = d.Reference, ["DepositDate"] = d.DepositDate.ToDateTime(TimeOnly.MinValue), ["Days"] = Math.Max(0, asAt.DayNumber - d.DepositDate.DayNumber), ["Amount"] = d.Amount })).ToList();
+    }
+
+    // Cash taken at the counters and not yet banked: the cash tenders of each session to the date, with the deposits made to the date set
+    // against the oldest sessions first; what is left of each session is still unbanked.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> UnbankedCollectionsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly asAt = ReportParameters.Date(parameters, "AsAtDate");
+        var taken = await (from r in _db.Set<Receipt>().AsNoTracking()
+                           from t in r.Tenders
+                           where r.CompanyId == companyId && r.Status == ReceiptStatus.Committed && r.Date <= asAt && t.Type == TenderType.Cash
+                           group t by r.CashierSessionId into g
+                           select new { SessionId = g.Key, Cash = g.Sum(t => t.Amount) }).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, (long Station, DateOnly Opened)> sessions = await _db.Set<CashierSession>().AsNoTracking().Where(s => s.CompanyId == companyId)
+            .ToDictionaryAsync(s => s.Id, s => (s.StationId, s.OpenedOn), ct).ConfigureAwait(false);
+        Dictionary<long, string> stations = await _db.Set<CashierStation>().AsNoTracking().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.Code, ct).ConfigureAwait(false);
+        decimal deposited = await _db.Set<BankDeposit>().AsNoTracking().Where(d => d.CompanyId == companyId && d.DepositDate <= asAt).SumAsync(d => (decimal?)d.Amount, ct).ConfigureAwait(false) ?? 0m;
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (var session in taken.Where(t => sessions.ContainsKey(t.SessionId)).OrderBy(t => sessions[t.SessionId].Opened).ThenBy(t => t.SessionId))
+        {
+            decimal covered = Math.Min(deposited, session.Cash);
+            deposited -= covered;
+            if (session.Cash - covered > 0m)
+            {
+                rows.Add(Row(new()
+                {
+                    ["Station"] = stations.GetValueOrDefault(sessions[session.SessionId].Station, "?"),
+                    ["Session"] = $"{session.SessionId} ({sessions[session.SessionId].Opened:yyyy-MM-dd})",
+                    ["Amount"] = session.Cash - covered,
+                }));
+            }
+        }
+
+        return rows;
+    }
+
+    // Prepaid token sales by day: the value issued and the part of each sale taken to the ratepayer's arrears.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PrepaidTokensAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        (DateOnly from, DateOnly to) = Range(parameters);
+        return [.. (await _db.Set<Core.Municipal.PrepaidSale>().AsNoTracking().Where(s => s.CompanyId == companyId && s.SoldOn >= from && s.SoldOn <= to)
+                .GroupBy(s => s.SoldOn).Select(g => new { Date = g.Key, Value = g.Sum(s => s.Amount - s.ToArrears), Arrears = g.Sum(s => s.ToArrears) }).ToListAsync(ct).ConfigureAwait(false))
+            .OrderBy(d => d.Date).Select(d => Row(new() { ["Date"] = d.Date.ToDateTime(TimeOnly.MinValue), ["TokenValue"] = d.Value, ["ArrearsRecovered"] = d.Arrears }))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PendingTendersAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

@@ -33,7 +33,15 @@ public sealed record NewTaxCode(long CompanyId, string Code, string Name, TaxTyp
 /// <param name="RevenueAccountCode">Where its sales post.</param>
 /// <param name="CostOfSalesAccountCode">Where its cost of sales posts.</param>
 /// <param name="StandardCost">A standard cost, if standard-costed.</param>
-public sealed record NewItem(long CompanyId, string Code, string Description, ItemType Type, string? RevenueAccountCode, string? CostOfSalesAccountCode, decimal? StandardCost = null);
+/// <param name="Costing">How its stock is costed (brief §3.6): weighted average, FIFO, standard or specific identification.</param>
+/// <param name="Tracking">Batch or serial tracking, if any.</param>
+/// <param name="ShelfLifeDays">Days from receipt to expiry for a batch received without one.</param>
+/// <param name="PriceVarianceAccountCode">Where purchase price variances go (standard costing).</param>
+/// <param name="UsageVarianceAccountCode">Where usage variances go (standard costing).</param>
+/// <param name="Category">The item category.</param>
+public sealed record NewItem(long CompanyId, string Code, string Description, ItemType Type, string? RevenueAccountCode, string? CostOfSalesAccountCode, decimal? StandardCost = null,
+    CostingMethod Costing = CostingMethod.WeightedAverage, ItemTracking Tracking = ItemTracking.None, int? ShelfLifeDays = null, string? PriceVarianceAccountCode = null,
+    string? UsageVarianceAccountCode = null, string? Category = null);
 
 /// <summary>
 /// Creates the master data the rest of the system runs on (brief §4.17 System Manager): companies, branches, fiscal years, the chart of

@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.MasterData;
@@ -59,6 +60,11 @@ public sealed class MasterDataTests
         (await master.CreateSupplierAsync(companyId, "S001", "First supplier", Scenario.Usd)).IsSuccess.Should().BeTrue();
         (await master.CreateItemAsync(new NewItem(companyId, "WIDGET", "Widget", ItemType.Stock, "4000", "5000"))).Error.Code.Should().Be("Master.AccountNotFound");
         (await master.CreateItemAsync(new NewItem(companyId, "WIDGET", "Widget", ItemType.Stock, "4000", null))).IsSuccess.Should().BeTrue();
+        (await master.CreateItemAsync(new NewItem(companyId, "STD-1", "Standard part", ItemType.Stock, "4000", null, Costing: CostingMethod.Standard))).Error.Code.Should().NotBeNullOrEmpty();
+        long batch = (await master.CreateItemAsync(new NewItem(companyId, "VAX-1", "Vaccine", ItemType.Stock, "4000", null, Costing: CostingMethod.Fifo, Tracking: ItemTracking.Batch, ShelfLifeDays: 180,
+            Category: "pharma"))).Value;
+        Item vaccine = await db.Items.AsNoTracking().SingleAsync(x => x.Id == batch);
+        (vaccine.CostingMethod, vaccine.Tracking, vaccine.ShelfLifeDays, vaccine.Category).Should().Be((CostingMethod.Fifo, ItemTracking.Batch, 180, "PHARMA"));
 
         // The new company posts.
         (await scope.ServiceProvider.GetRequiredService<IPostingEngine>().PostAsync(new JournalRequest

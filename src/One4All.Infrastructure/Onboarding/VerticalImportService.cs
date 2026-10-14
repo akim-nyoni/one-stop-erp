@@ -316,6 +316,127 @@ public sealed class VerticalImportService : IVerticalImportService
     }
 
     /// <inheritdoc />
+    public async Task<ImportReport> ImportDimensionsAsync(long companyId, string csv, bool departments, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "code", "name");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        string what = departments ? "department" : "cost centre";
+        HashSet<string> existing = departments
+            ? [.. await _db.Departments.Where(d => d.CompanyId == companyId).Select(d => d.Code).ToListAsync(ct).ConfigureAwait(false)]
+            : [.. await _db.CostCentres.Where(c => c.CompanyId == companyId).Select(c => c.Code).ToListAsync(ct).ConfigureAwait(false)];
+        List<ImportError> errors = [];
+        List<(string Code, string Name)> toCreate = [];
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        int skipped = 0;
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string code = Code(row.Text("code")), name = row.Text("name") ?? string.Empty;
+                if (code.Length is 0 or > 3 || name.Length == 0)
+                {
+                    return $"A {what} needs a code of one to three characters and a name.";
+                }
+
+                if (!seen.Add(code))
+                {
+                    return $"The {what} {code} appears twice.";
+                }
+
+                if (existing.Contains(code))
+                {
+                    skipped++;
+                    return null;
+                }
+
+                toCreate.Add((code, name));
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, skipped, errors, commit, ct, async () =>
+        {
+            foreach ((string code, string name) in toCreate)
+            {
+                if (departments)
+                {
+                    _db.Departments.Add(new Department(companyId, code, name));
+                }
+                else
+                {
+                    _db.CostCentres.Add(new CostCentre(companyId, code, name));
+                }
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return toCreate.Count;
+        }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<ImportReport> ImportTaxCodesAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "code", "name", "type", "rate", "effective_from");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        HashSet<string> existing = [.. await _db.TaxCodes.Where(t => t.CompanyId == companyId).Select(t => t.Code).ToListAsync(ct).ConfigureAwait(false)];
+        HashSet<string> accounts = new(await _db.Accounts.Where(a => a.CompanyId == companyId).Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false), StringComparer.OrdinalIgnoreCase);
+        List<ImportError> errors = [];
+        List<TaxCode> toCreate = [];
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        int skipped = 0;
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string code = Code(row.Text("code")), name = row.Text("name") ?? string.Empty;
+                decimal? rate = row.Number("rate");
+                DateOnly? from = row.Date("effective_from");
+                string? output = row.Text("output_account"), input = row.Text("input_account");
+                if (code.Length == 0 || name.Length == 0 || !Enum.TryParse(row.Text("type"), true, out TaxType type) || !Enum.IsDefined(type) || rate is not (>= 0m and <= 100m) || from is null)
+                {
+                    return $"A tax code needs a code, a name, a type ({string.Join("/", Enum.GetNames<TaxType>())}), a rate from 0 to 100 and the date it applies from.";
+                }
+
+                if ((output is not null && !accounts.Contains(output)) || (input is not null && !accounts.Contains(input)))
+                {
+                    return "The output or input tax account is not in the chart of accounts.";
+                }
+
+                if (!seen.Add(code))
+                {
+                    return $"Tax code {code} appears twice.";
+                }
+
+                if (existing.Contains(code))
+                {
+                    skipped++;
+                    return null;
+                }
+
+                TaxCode tax = new(companyId, code, name, type) { OutputAccountCode = output, InputAccountCode = input };
+                tax.AddRate(from.Value, rate.Value);
+                toCreate.Add(tax);
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, skipped, errors, commit, ct, async () =>
+        {
+            _db.TaxCodes.AddRange(toCreate);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return toCreate.Count;
+        }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<ImportReport> ImportLeaveBalancesAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
     {
         (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "employee_number", "leave_type", "days");

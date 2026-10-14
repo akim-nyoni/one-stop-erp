@@ -145,7 +145,7 @@ public static partial class OperationCatalogue
                     .ConfigureAwait(true), ("Id", a => a.Id), ("Record", a => a.Target), ("Number", a => a.TargetKey), ("File", a => a.FileName), ("KB", a => a.SizeBytes / 1024),
                 ("Uploaded", a => a.UploadedOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Description", a => a.Description)),
         };
-        string[] imports = ["Accounts", "Warehouses", "Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "PayrollYtd", "LeaveBalances",
+        string[] imports = ["Accounts", "Warehouses", "Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "PayrollYtd", "LeaveBalances", "CostCentres", "Departments", "TaxCodes",
             "Properties", "Meters", "Students", "Stands", "RentalUnits", "Budget"];
         yield return new Operation
         {
@@ -207,7 +207,8 @@ public static partial class OperationCatalogue
                 + "FixedAssets: asset_number,description,class,acquired,cost,accumulated,life_months,cost_account,accum_account,expense_account[,residual,method,rate]. "
                 + "Employees: employee_number,name,basic_salary,engaged[,national_id,department,cost_centre,grade]. StaffLoans: employee_number,reference,outstanding,instalment,loan_account. "
                 + "PayrollYtd: employee_number,tax_year,code,amount (TAXABLE for taxable pay so far, or a pay element such as PAYE for tax already deducted). "
-                + "LeaveBalances: employee_number,leave_type,days[,taken] (the leave owed at take-on). "
+                + "LeaveBalances: employee_number,leave_type,days[,taken] (the leave owed at take-on). CostCentres/Departments: code,name. "
+                + "TaxCodes: code,name,type,rate,effective_from[,output_account,input_account]. "
                 + "Properties: stand,ward,ratepayer[,valuation,size,connected,services e.g. Water:WAT1;Refuse:REF1]. "
                 + "Meters: serial,stand,service,reading,date[,digits,multiplier]. Students: admission,name,grade,guardian[,boarder,admitted]. "
                 + "Stands: stand,parcel,size[,cost,scheme,status] (a parcel not yet registered is created from its stands). Budget: account,period,amount[,cost_centre,quantity] for the year of the date. "
@@ -238,6 +239,9 @@ public static partial class OperationCatalogue
                     "StaffLoans" => await registers.ImportEmployeeLoansAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),
                     "PayrollYtd" => await registers.ImportPayrollYtdAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "LeaveBalances" => await registers.ImportLeaveBalancesAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
+                    "CostCentres" => await registers.ImportDimensionsAsync(c.CompanyId, csv, departments: false, commit).ConfigureAwait(true),
+                    "Departments" => await registers.ImportDimensionsAsync(c.CompanyId, csv, departments: true, commit).ConfigureAwait(true),
+                    "TaxCodes" => await registers.ImportTaxCodesAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "Properties" => await registers.ImportPropertiesAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "Meters" => await registers.ImportMetersAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "Students" => await registers.ImportStudentsAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
@@ -521,13 +525,19 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Add an item", ListTitle = "Items", Description = "A stock, service or other item with the accounts its sales and cost post to.",
+            Module = module, Title = "Add an item", ListTitle = "Items",
+            Description = "A stock, service or other item with the accounts its sales and cost post to, how its stock is costed (weighted average, FIFO, standard with its "
+                + "variance accounts, or specific identification), batch or serial tracking and a shelf life.",
             Fields = [Req("Code", "Item code"), Req("Description", "Description"), Pick("Type", "Type", Enum.GetNames<ItemType>()), Opt("Revenue", "Revenue account"), Opt("Cost", "Cost of sales account"),
-                OptNum("Standard", "Standard cost")],
+                Pick("Costing", "Costing method", Enum.GetNames<CostingMethod>()), OptNum("Standard", "Standard cost"), Opt("PriceVariance", "Price variance account (standard)"),
+                Opt("UsageVariance", "Usage variance account (standard)"), Pick("Tracking", "Tracking", Enum.GetNames<ItemTracking>()), OptNum("ShelfLife", "Shelf life (days)"), Opt("Category", "Category")],
             Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateItemAsync(new NewItem(c.CompanyId, i.Text("Code"), i.Text("Description"), Enum.Parse<ItemType>(i.Text("Type")),
-                i.Optional("Revenue"), i.Optional("Cost"), i.OptionalNumber("Standard"))).ConfigureAwait(true), id => "Item added."),
+                i.Optional("Revenue"), i.Optional("Cost"), i.OptionalNumber("Standard"), Enum.Parse<CostingMethod>(i.Text("Costing")), Enum.Parse<ItemTracking>(i.Text("Tracking")),
+                i.OptionalNumber("ShelfLife") is decimal days ? (int)days : null, i.Optional("PriceVariance"), i.Optional("UsageVariance"), i.Optional("Category"))).ConfigureAwait(true),
+                id => "Item added."),
             List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Page(c, 500).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Description", x => x.Description), ("Type", x => x.ItemType), ("Revenue", x => x.RevenueAccountCode), ("Cost of sales", x => x.CostOfSalesAccountCode)),
+                ("Code", x => x.Code), ("Description", x => x.Description), ("Type", x => x.ItemType), ("Revenue", x => x.RevenueAccountCode), ("Cost of sales", x => x.CostOfSalesAccountCode),
+                ("Costing", x => x.CostingMethod.ToString()), ("Tracking", x => x.Tracking.ToString()), ("Shelf life", x => x.ShelfLifeDays)),
         };
         yield return new Operation
         {

@@ -66,7 +66,7 @@ public static class BuiltInModules
             ["statements.email", "trading.recurring-invoices"], ["Sales & Schools", "Customers"]),
         new ModuleDescriptor("Purchasing", "Accounts Payable", LicenceModules.AccountsPayable, "\U0001F4B8", "#C62828", ["ap", "trading"], [], ["Suppliers"]),
         new ModuleDescriptor("CashBook", "Cash Book", LicenceModules.CashBook, "\U0001F3E6", "#00838F", ["banking", "treasury", "receipting"], ["bank.standing-orders"], ["Banking", "Receipting"]),
-        new ModuleDescriptor("Inventory", "Inventory", LicenceModules.Inventory, "\U0001F4E6", "#6D4C41", ["stock", "pricing"], [], ["Stock", "Weighbridge"]),
+        new ModuleDescriptor("Inventory", "Inventory", LicenceModules.Inventory, "\U0001F4E6", "#6D4C41", ["stock", "pricing"], ["stock.expiry-alerts"], ["Stock", "Weighbridge"]),
         new ModuleDescriptor("Procurement", "Procurement", LicenceModules.Procurement, "\U0001F4CB", "#5E35B1", ["pop"], [], ["Purchasing"]),
         new ModuleDescriptor("SalesOrders", "Order Entry", LicenceModules.SalesOrders, "\U0001F5D2", "#00695C", ["sop"], [], []),
         new ModuleDescriptor("Pos", "Point of Sale", LicenceModules.PointOfSale, "\U0001F6D2", "#AD1457", [], ["pos.fiscal-retry"], ["Point of Sale", "Restaurant"]),

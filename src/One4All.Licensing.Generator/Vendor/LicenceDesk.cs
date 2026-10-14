@@ -121,6 +121,9 @@ public sealed class IssueRequest
     /// <summary>Gets or sets the limits.</summary>
     public IReadOnlyDictionary<string, int?> Limits { get; set; } = new Dictionary<string, int?>();
 
+    /// <summary>Gets or sets per-module limits (module code → limit → value), e.g. PAY payrolls or POS terminals.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyDictionary<string, int?>> ModuleLimits { get; set; } = new Dictionary<string, IReadOnlyDictionary<string, int?>>();
+
     /// <summary>Gets or sets machine fingerprints to bind to.</summary>
     public IReadOnlyList<string> Fingerprints { get; set; } = [];
 
@@ -587,7 +590,13 @@ public sealed class LicenceDesk
                 moduleEnd = licenceEnd;
             }
 
-            payload.Modules.Add(new LicenceModuleGrant { Code = code, ValidTo = moduleEnd });
+            LicenceModuleGrant grant = new() { Code = code, ValidTo = moduleEnd };
+            foreach ((string key, int? value) in request.ModuleLimits.FirstOrDefault(m => string.Equals(m.Key, code, StringComparison.OrdinalIgnoreCase)).Value ?? new Dictionary<string, int?>())
+            {
+                grant.Limits[key.Trim().ToLowerInvariant()] = value;
+            }
+
+            payload.Modules.Add(grant);
         }
 
         return Record(payload, action, supersedes, $"{payload.Edition} {payload.LicenceType} to {(end?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "perpetual")}");

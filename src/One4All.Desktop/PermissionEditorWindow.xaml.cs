@@ -56,6 +56,33 @@ public partial class PermissionEditorWindow : Window
         return words[..1] + words[1..].ToLowerInvariant();
     }
 
+    // Bulk ticking from the grid's menu: the current row, its module, the current column for the rows shown, or everything shown.
+    private void Bulk_Click(object sender, RoutedEventArgs e)
+    {
+        string tag = (string)((MenuItem)sender).Tag;
+        bool on = tag.EndsWith('+');
+        PermissionRowViewModel? row = Grid.CurrentItem as PermissionRowViewModel ?? Grid.SelectedItem as PermissionRowViewModel;
+        int? column = Grid.CurrentColumn is { DisplayIndex: > 0 } current ? current.DisplayIndex - 1 : null;
+        switch (tag[..^1])
+        {
+            case "row" when row is not null:
+                _viewModel.SetCells([row], null, on);
+                break;
+            case "module" when row is not null:
+                _viewModel.SetCells(_viewModel.Permissions.Where(r => r.Module == row.Module), null, on);
+                break;
+            case "column" when column is not null:
+                _viewModel.SetCells(_viewModel.VisibleRows, column, on);
+                break;
+            case "all":
+                _viewModel.SetCells(_viewModel.VisibleRows, null, on);
+                break;
+            default:
+                _viewModel.StatusMessage = "Click a cell first, then choose from the menu.";
+                break;
+        }
+    }
+
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
         Result result = await _viewModel.SaveAsync().ConfigureAwait(true);

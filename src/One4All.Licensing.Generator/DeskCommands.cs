@@ -52,6 +52,11 @@ internal static class DeskCommands
                     ModuleTerms = a.TryGetValue("module-terms", out string? terms)
                         ? terms.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(t => t.Split('=')).ToDictionary(p => p[0].Trim().ToUpperInvariant(), p => p[1].Trim())
                         : new Dictionary<string, string>(),
+                    Limits = a.TryGetValue("limits", out string? limits) ? Limits(limits) : new Dictionary<string, int?>(),
+                    ModuleLimits = a.TryGetValue("module-limits", out string? moduleLimits)
+                        ? moduleLimits.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(m => m.Split(':', 2))
+                            .ToDictionary(m => m[0].Trim().ToUpperInvariant(), m => (IReadOnlyDictionary<string, int?>)Limits(m.Length > 1 ? m[1] : string.Empty))
+                        : new Dictionary<string, IReadOnlyDictionary<string, int?>>(),
                     Fingerprints = a.TryGetValue("fingerprint", out string? fp) ? [fp] : [], RequestCode = a.GetValueOrDefault("request"),
                     GraceDays = int.Parse(a.GetValueOrDefault("grace", "14"), CultureInfo.InvariantCulture), HardStop = a.ContainsKey("hard-stop"), Notes = a.GetValueOrDefault("notes"),
                 }), a);
@@ -137,6 +142,11 @@ internal static class DeskCommands
     }
 
     private static string Date(DateOnly? date) => date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "perpetual";
+
+    // "named_users=10,pos_terminals=5" (a value of "unlimited" or blank: no limit).
+    private static Dictionary<string, int?> Limits(string text)
+        => text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(l => l.Split('=', 2))
+            .ToDictionary(l => l[0].Trim().ToLowerInvariant(), l => l.Length > 1 && int.TryParse(l[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : (int?)null);
 
     private static string Need(IReadOnlyDictionary<string, string> a, string key)
         => a.TryGetValue(key, out string? value) ? value : throw new ArgumentException($"Missing required argument --{key}.");

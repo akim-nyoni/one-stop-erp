@@ -398,6 +398,58 @@ public sealed class HousingBillingTask : IScheduledTask
     }
 }
 
+/// <summary>
+/// Built-in task: tells the stock users (roles with an inventory right) and administrators which batches on hand have expired or expire
+/// within 30 days (brief §4.2 expiry alerts), soonest first.
+/// </summary>
+public sealed class LotExpiryAlertsTask : IScheduledTask
+{
+    private readonly Persistence.One4AllDbContext _db;
+    private readonly Application.Abstractions.Communications.INotificationService _notifications;
+
+    /// <summary>Creates the task.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="notifications">Sends the in-app notifications.</param>
+    public LotExpiryAlertsTask(Persistence.One4AllDbContext db, Application.Abstractions.Communications.INotificationService notifications)
+    {
+        _db = db;
+        _notifications = notifications;
+    }
+
+    /// <inheritdoc />
+    public string Key => "stock.expiry-alerts";
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
+    {
+        DateOnly today = DateOnly.FromDateTime(runAt.UtcDateTime), horizon = today.AddDays(30);
+        var lots = await _db.StockLotMovements.AsNoTracking().Where(l => l.CompanyId == companyId).GroupBy(l => new { l.ItemId, l.WarehouseId, l.LotNumber })
+            .Select(g => new { g.Key.ItemId, g.Key.WarehouseId, g.Key.LotNumber, OnHand = g.Sum(l => l.Quantity), Expiry = g.Max(l => l.ExpiryDate) })
+            .Where(l => l.OnHand > 0m && l.Expiry != null && l.Expiry <= horizon).ToListAsync(ct).ConfigureAwait(false);
+        if (lots.Count == 0)
+        {
+            return "No batches on hand expire within 30 days.";
+        }
+
+        Dictionary<long, string> items = await _db.Items.AsNoTracking().Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => i.Code, ct).ConfigureAwait(false);
+        Dictionary<long, string> warehouses = await _db.Warehouses.AsNoTracking().Where(w => w.CompanyId == companyId).ToDictionaryAsync(w => w.Id, w => w.Code, ct).ConfigureAwait(false);
+        string body = string.Join(Environment.NewLine, lots.OrderBy(l => l.Expiry).Select(l =>
+            $"{items.GetValueOrDefault(l.ItemId, "?")} batch {l.LotNumber} in {warehouses.GetValueOrDefault(l.WarehouseId, "?")}: {l.OnHand:0.###} {(l.Expiry < today ? "expired" : "expires")} {l.Expiry:yyyy-MM-dd}"));
+        List<long> roles = await _db.Roles.Where(r => r.Permissions.Any(p => p.PermissionCode.StartsWith("Inventory."))).Select(r => r.Id).ToListAsync(ct).ConfigureAwait(false);
+        List<long> users = await _db.Users.Where(u => u.IsActive && (u.IsSystemAdministrator || u.Roles.Any(r => roles.Contains(r.RoleId)))).Select(u => u.Id).ToListAsync(ct).ConfigureAwait(false);
+        int sent = 0;
+        foreach (long user in users)
+        {
+            if ((await _notifications.NotifyUserAsync(companyId, user, $"{lots.Count} batch(es) expiring", body, ct).ConfigureAwait(false)).IsSuccess)
+            {
+                sent++;
+            }
+        }
+
+        return $"{lots.Count} batch(es) expired or expiring within 30 days; {sent} user(s) told.";
+    }
+}
+
 /// <summary>Built-in task: lapse allocation offers not accepted by their deadline.</summary>
 public sealed class LapseOffersTask : IScheduledTask
 {

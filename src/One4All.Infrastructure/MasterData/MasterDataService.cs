@@ -426,7 +426,18 @@ public sealed class MasterDataService : IMasterDataService
             return Duplicate("item", key);
         }
 
-        foreach (string? accountCode in new[] { item.RevenueAccountCode, item.CostOfSalesAccountCode })
+        // A standard-costed item needs its standard and somewhere for the price variance to go; a shelf life is whole days.
+        if (item.Costing == CostingMethod.Standard && (item.StandardCost is not > 0m || string.IsNullOrWhiteSpace(item.PriceVarianceAccountCode)))
+        {
+            return Invalid("A standard-costed item needs a standard cost above nil and a price variance account.");
+        }
+
+        if (item.ShelfLifeDays is < 1)
+        {
+            return Invalid("A shelf life is at least one day.");
+        }
+
+        foreach (string? accountCode in new[] { item.RevenueAccountCode, item.CostOfSalesAccountCode, item.PriceVarianceAccountCode, item.UsageVarianceAccountCode })
         {
             if (await AccountMissingAsync(item.CompanyId, accountCode, ct).ConfigureAwait(false) is Error noAccount)
             {
@@ -434,9 +445,11 @@ public sealed class MasterDataService : IMasterDataService
             }
         }
 
-        Item created = new(item.CompanyId, key, item.Description.Trim(), item.Type)
+        Item created = new(item.CompanyId, key, item.Description.Trim(), item.Type, item.Costing)
         {
             RevenueAccountCode = Code(item.RevenueAccountCode), CostOfSalesAccountCode = Code(item.CostOfSalesAccountCode), StandardCost = item.StandardCost,
+            Tracking = item.Tracking, ShelfLifeDays = item.ShelfLifeDays, PriceVarianceAccountCode = Code(item.PriceVarianceAccountCode),
+            UsageVarianceAccountCode = Code(item.UsageVarianceAccountCode), Category = string.IsNullOrWhiteSpace(item.Category) ? null : item.Category.Trim().ToUpperInvariant(),
         };
         _db.Items.Add(created);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

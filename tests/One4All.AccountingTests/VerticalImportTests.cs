@@ -70,6 +70,14 @@ public sealed class VerticalImportTests
         (await import.ImportLeaveBalancesAsync(companyId, "employee_number,leave_type,days,taken\nVI-E3,annual,12.5,2\n", commit: true)).Created.Should().Be(1);
         (await import.ImportLeaveBalancesAsync(companyId, "employee_number,leave_type,days\nvi-e3,ANNUAL,99\n", commit: true)).Skipped.Should().Be(1);
         (await db.EmployeeLeaveBalances.AsNoTracking().SingleAsync(b => b.EmployeeId == chipo.Id)).BalanceDays.Should().Be(10.5m);
+
+        // Reference data: cost centres, departments and tax codes.
+        (await import.ImportDimensionsAsync(companyId, "code,name\nNTH,North\nTOOLONG,Bad\n", departments: false, commit: true)).Errors.Single().LineNumber.Should().Be(3);
+        (await import.ImportDimensionsAsync(companyId, "code,name\nNTH,North\nsth,South\n", departments: false, commit: true)).Created.Should().Be(2);
+        (await import.ImportDimensionsAsync(companyId, "code,name\nADM,Administration\n", departments: true, commit: true)).Created.Should().Be(1);
+        (await import.ImportTaxCodesAsync(companyId, "code,name,type,rate,effective_from\nVI-VAT,Imported VAT,Nonsense,15,2026-01-01\n", commit: true)).Errors.Should().ContainSingle();
+        (await import.ImportTaxCodesAsync(companyId, "code,name,type,rate,effective_from\nVI-VAT,Imported VAT,Standard,15,2026-01-01\n", commit: true)).Created.Should().Be(1);
+        (await db.TaxCodes.AsNoTracking().Include(t => t.Rates).SingleAsync(t => t.CompanyId == companyId && t.Code == "VI-VAT")).RateOn(new DateOnly(2026, 6, 1)).Should().Be(15m);
         (chipo.TaxNumber, chipo.DateOfBirth, chipo.Gender, chipo.EmploymentType, chipo.BankAccountNumber, chipo.PayGroup, chipo.ContractEndDate)
             .Should().Be(("T-77", new DateOnly(1990, 5, 4), Core.Payroll.Gender.Female, Core.Payroll.EmploymentType.Contract, "4400123", "WAGES", new DateOnly(2026, 12, 31)));
         (await import.ImportEmployeeLoansAsync(companyId, "employee_number,reference,outstanding,instalment,loan_account\nVI-E1,LN-1,600,100,1350\n", asAt, "2991", commit: true)).Created.Should().Be(1);
