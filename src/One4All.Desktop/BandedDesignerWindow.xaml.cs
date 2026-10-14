@@ -629,6 +629,10 @@ public partial class BandedDesignerWindow : Window
         }
     }
 
+    private void ToFront_Click(object sender, RoutedEventArgs e) => Act(s => s.Restack(_selected, true));
+
+    private void ToBack_Click(object sender, RoutedEventArgs e) => Act(s => s.Restack(_selected, false));
+
     private void Delete_Click(object sender, RoutedEventArgs e)
     {
         if (Keyboard.FocusedElement is TextBox)
@@ -704,6 +708,52 @@ public partial class BandedDesignerWindow : Window
             ],
         };
         await OpenAsync(new DesignerReport(code, blank.Name, blank.Module, ReportDefinitionSerializer.Serialize(blank), true), blank).ConfigureAwait(true);
+    }
+
+    // A layout travels between companies and installations as a .mrpt file (the definition's JSON).
+    private void ExportFile_Click(object sender, RoutedEventArgs e)
+    {
+        if (_session is null)
+        {
+            Status.Text = "Open a report first.";
+            return;
+        }
+
+        Microsoft.Win32.SaveFileDialog dialog = new() { Filter = "Report layouts (*.mrpt)|*.mrpt", FileName = $"{_session.Definition.Code}.mrpt" };
+        if (dialog.ShowDialog(this) == true)
+        {
+            System.IO.File.WriteAllText(dialog.FileName, ReportDefinitionSerializer.Serialize(_session.Definition));
+            Status.Text = $"Layout {_session.Definition.Code} exported to {dialog.FileName}.";
+        }
+    }
+
+    private async void ImportFile_Click(object sender, RoutedEventArgs e)
+    {
+        Microsoft.Win32.OpenFileDialog dialog = new() { Filter = "Report layouts (*.mrpt)|*.mrpt" };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            string json = System.IO.File.ReadAllText(dialog.FileName);
+            ReportDefinition imported = ReportDefinitionSerializer.Deserialize(json);
+            if (string.IsNullOrWhiteSpace(imported.Code) || imported.Bands.Count == 0)
+            {
+                Status.Text = "That file is not a report layout.";
+                return;
+            }
+
+            await OpenAsync(new DesignerReport(imported.Code, imported.Name, imported.Module, json, true), imported).ConfigureAwait(true);
+            Status.Text = $"Layout {imported.Code} imported from {System.IO.Path.GetFileName(dialog.FileName)}; save a version to keep it.";
+        }
+#pragma warning disable CA1031 // A file that cannot be read is reported, not fatal.
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            Status.Text = $"Could not import the layout: {ex.GetBaseException().Message}";
+        }
     }
 
     private void Preview_Click(object sender, RoutedEventArgs e)

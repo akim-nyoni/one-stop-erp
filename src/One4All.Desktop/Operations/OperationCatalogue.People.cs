@@ -29,7 +29,8 @@ public static partial class OperationCatalogue
                 Today("LastDay", "Last day"), Opt("Reason", "Reason"), Num("NoticeMonths", "Notice (months)", "1"), Num("WorkingDays", "Working days a month", "22"), Num("GratuityWeeks", "Gratuity weeks a year", "2"),
                 Num("SeveranceWeeks", "Severance weeks a year", "4"), Num("TerminalTax", "Terminal benefits tax %", "0"), Req("Salary", "Salary expense account", "6100"),
                 Req("Benefits", "Terminal benefits account", "6100"), Req("Paye", "PAYE liability account", "2400"), Req("NetPay", "Net pay account", "2420"), OptNum("Item", "Checklist item id"),
-                Opt("Bank", "Bank account paying (release)")],
+                Opt("Bank", "Bank account paying (release)"), OptNum("Bonus", "Year's bonus (paid pro rata)"), OptNum("Overpayment", "Overpayment to recover"),
+                Opt("Recoveries", "Recoveries account (property, overpayments)")],
             Run = async (c, i) =>
             {
                 ITerminationService terminations = c.Get<ITerminationService>();
@@ -50,6 +51,7 @@ public static partial class OperationCatalogue
                 {
                     Policy = new Application.Payroll.TerminalPolicy(i.Number("NoticeMonths"), i.Number("WorkingDays"), i.Number("GratuityWeeks"), i.Number("SeveranceWeeks"), i.Number("TerminalTax")),
                     SalaryExpenseAccount = i.Text("Salary"), TerminalBenefitsAccount = i.Text("Benefits"), PayeLiabilityAccount = i.Text("Paye"), NetPayAccount = i.Text("NetPay"), ApprovedByUserId = c.UserId,
+                    AnnualBonus = i.OptionalNumber("Bonus") ?? 0m, Overpayment = i.OptionalNumber("Overpayment") ?? 0m, RecoveriesAccount = i.Optional("Recoveries"),
                 };
                 Application.Payroll.FinalPayStatement statement = i.Text("Step") == "Preview"
                     ? Check(await terminations.PreviewAsync(request).ConfigureAwait(true))
@@ -57,7 +59,9 @@ public static partial class OperationCatalogue
                 string earned = FormattableString.Invariant(
                     $"{statement.YearsOfService} year(s). Salary {statement.ProRataSalary:N2} + notice {statement.Notice:N2} + leave ({statement.LeaveDays:0.##} days) {statement.Leave:N2} + gratuity {statement.Gratuity:N2} + severance {statement.Severance:N2} ");
                 string less = FormattableString.Invariant($"− PAYE {statement.OrdinaryTax:N2} − terminal tax {statement.TerminalTax:N2} − loans {statement.Recoveries:N2} = net {statement.Net:N2}");
-                string owed = statement.UnrecoveredLoans > 0m ? FormattableString.Invariant($"; loans still owed {statement.UnrecoveredLoans:N2}.") : ".";
+                string owed = (statement.ProRataBonus > 0m ? FormattableString.Invariant($" (incl. bonus {statement.ProRataBonus:N2})") : string.Empty)
+                    + (statement.OtherRecoveries > 0m ? FormattableString.Invariant($"; property and overpayments recovered {statement.OtherRecoveries:N2}") : string.Empty)
+                    + (statement.UnrecoveredLoans + statement.UnrecoveredOther > 0m ? FormattableString.Invariant($"; still owed {statement.UnrecoveredLoans + statement.UnrecoveredOther:N2}.") : ".");
                 string working = earned + less + owed;
                 return i.Text("Step") == "Preview" ? "Preview: " + working : "Terminated. " + working;
             },

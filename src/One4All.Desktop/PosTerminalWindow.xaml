@@ -137,6 +137,7 @@
                             <Button Content="Clear" Width="60" Height="26" Command="{Binding ClearFinderCommand}" />
                         </WrapPanel>
                     </DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding CategoryPath}" Foreground="{DynamicResource Ink}" Opacity="0.75" FontSize="12" Margin="4,0,0,2" />
                     <ListBox DockPanel.Dock="Top" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}"
                              Background="Transparent" BorderThickness="0" Margin="0,0,0,8">
                         <ListBox.ItemsPanel>

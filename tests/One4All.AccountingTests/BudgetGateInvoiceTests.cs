@@ -51,4 +51,28 @@ public sealed class BudgetGateInvoiceTests
         (await purchases.PostInvoiceAsync(Invoice("BGI-3", 800m))).Error.Code.Should().Be("Budget.Blocked");
         (await purchases.PostInvoiceAsync(Invoice("BGI-4", 700m))).IsSuccess.Should().BeTrue();
     }
+
+    [SkippableFact]
+    public async Task An_expense_claim_is_checked_against_the_budget_when_approved()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        long yearId = await db.FiscalYears.Where(y => y.CompanyId == companyId).Select(y => y.Id).FirstAsync();
+        Core.Payroll.Employee claimant = new(companyId, "BGI-E1", "Travelling Clerk", 1_000m, new DateOnly(2025, 1, 1));
+        db.Add(claimant);
+        await db.SaveChangesAsync();
+        IBudgetingService budgeting = scope.ServiceProvider.GetRequiredService<IBudgetingService>();
+        long budget = (await budgeting.CreateBudgetAsync(companyId, yearId, "2026", BudgetType.OriginalApproved, null, [new NewBudgetLine("6100", 1, 100m)])).Value;
+        (await budgeting.ActivateAsync(companyId, budget)).IsSuccess.Should().BeTrue();
+        (await scope.ServiceProvider.GetRequiredService<IBudgetGateService>().SetRuleAsync(companyId, null, "61", 0m, BudgetAction.Block)).IsSuccess.Should().BeTrue();
+
+        Application.Abstractions.Expenses.IExpenseClaimService claims = scope.ServiceProvider.GetRequiredService<Application.Abstractions.Expenses.IExpenseClaimService>();
+        long big = (await claims.CreateAsync(companyId, claimant.Id, "BGI-C1", new DateOnly(2026, 4, 1), [new("Hotel", "6100", 150m)])).Value;
+        (await claims.ApproveAsync(companyId, big, 5)).Error.Code.Should().Be("Budget.Blocked");
+        long small = (await claims.CreateAsync(companyId, claimant.Id, "BGI-C2", new DateOnly(2026, 4, 1), [new("Taxi", "6100", 80m)])).Value;
+        (await claims.ApproveAsync(companyId, small, 5)).IsSuccess.Should().BeTrue();
+    }
 }

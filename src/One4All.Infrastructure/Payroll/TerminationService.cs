@@ -84,6 +84,16 @@ public sealed class TerminationService : ITerminationService
             toRecover -= recovered;
         }
 
+        if (statement.OtherRecoveries > 0m)
+        {
+            if (string.IsNullOrWhiteSpace(request.RecoveriesAccount))
+            {
+                return Error.Validation("Payroll.RecoveriesAccount", "Property or overpayments are recovered from the final pay: give the account they are credited to.");
+            }
+
+            Line(request.RecoveriesAccount.Trim(), JournalSide.Credit, statement.OtherRecoveries, "Property and overpayments recovered");
+        }
+
         Line(request.NetPayAccount, JournalSide.Credit, statement.Net, "Net final pay");
         string? journal = null;
         if (lines.Count > 0)
@@ -210,8 +220,10 @@ public sealed class TerminationService : ITerminationService
         TaxTable? table = (await _db.Set<TaxTable>().Include(t => t.Bands).Where(t => t.CompanyId == request.CompanyId && t.Code == tableCode && t.Currency == null && t.EffectiveFrom <= payDate)
             .ToListAsync(ct).ConfigureAwait(false)).OrderBy(t => t.EffectiveFrom).LastOrDefault();
         decimal Tax(decimal ordinary) => table is null ? 0m : PayeTable.Tax(table.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), ordinary);
+        // Company property still out with the leaver is recovered at its recorded value, with any overpayment.
+        decimal unreturned = await _db.Set<EmployeeAssetIssue>().Where(a => a.EmployeeId == employee.Id && a.ReturnedOn == null).SumAsync(a => (decimal?)a.Value, ct).ConfigureAwait(false) ?? 0m;
         FinalPayStatement statement = FinalPay.Calculate(request.Type, employee.BasicSalary, employee.EngagementDate, request.LastDay, lastMonthPaid, leaveDays, loans.Sum(l => l.Outstanding),
-            request.Policy, Tax);
+            request.Policy, Tax, request.AnnualBonus, unreturned + Math.Max(0m, request.Overpayment));
         return (employee, statement, loans);
     }
 

@@ -18,14 +18,21 @@ public sealed class ExpenseClaimService : IExpenseClaimService
 {
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _posting;
+    private readonly Application.Abstractions.Budgeting.IBudgetGateService? _budget;
+    private readonly Application.Abstractions.Security.IPermissionService? _permissions;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="posting">The central posting engine.</param>
-    public ExpenseClaimService(One4AllDbContext db, IPostingEngine posting)
+    /// <param name="budget">The budget gate a claim passes when it is approved (brief §4.18.5).</param>
+    /// <param name="permissions">Checks whether the approver may override a budget block.</param>
+    public ExpenseClaimService(One4AllDbContext db, IPostingEngine posting, Application.Abstractions.Budgeting.IBudgetGateService? budget = null,
+        Application.Abstractions.Security.IPermissionService? permissions = null)
     {
         _db = db;
         _posting = posting;
+        _budget = budget;
+        _permissions = permissions;
     }
 
     /// <inheritdoc />
@@ -80,6 +87,26 @@ public sealed class ExpenseClaimService : IExpenseClaimService
         if (claim.Status != ExpenseClaimStatus.Draft)
         {
             return Result.Failure(Error.Rule("Exp.NotDraft", $"Only a draft claim can be approved; {claim.Reference} is {claim.Status}."));
+        }
+
+        // The spend is checked against what is left of each vote at approval: a blocking rule refuses it; one asking for approval needs an
+        // approver who may override budget blocks.
+        if (_budget is not null)
+        {
+            string? department = await _db.Set<Employee>().Where(e => e.Id == claim.EmployeeId).Select(e => e.Department).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            List<Application.Abstractions.Budgeting.BudgetDemand> demands = [.. claim.Lines.GroupBy(l => l.ExpenseAccountCode.Trim())
+                .Select(g => new Application.Abstractions.Budgeting.BudgetDemand(g.Key, string.IsNullOrWhiteSpace(department) ? null : department.Trim().ToUpperInvariant(), g.Sum(l => l.Amount)))];
+            Result<Application.Abstractions.Budgeting.BudgetGateResult> check = await _budget.CheckAsync(companyId, claim.ClaimDate, demands, ct).ConfigureAwait(false);
+            if (check.IsSuccess && check.Value.Outcome == Core.Budgeting.BudgetAction.Block)
+            {
+                return Result.Failure(Error.Rule("Budget.Blocked", check.Value.Warning!));
+            }
+
+            if (check.IsSuccess && check.Value.Outcome == Core.Budgeting.BudgetAction.RequireApproval
+                && (_permissions is null || !(await _permissions.ResolveAsync(approvedByUserId, ct).ConfigureAwait(false)).Has("Budget.OverrideBlock", Core.Security.OperationFlags.View)))
+            {
+                return Result.Failure(Error.Rule("Budget.ApprovalNeeded", $"{check.Value.Warning} The approver needs the right to override budget blocks."));
+            }
         }
 
         claim.Approve(approvedByUserId);

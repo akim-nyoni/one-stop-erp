@@ -35,4 +35,14 @@ public sealed class FinalPayTests
         (statement.ProRataSalary, statement.OrdinaryTax, statement.Recoveries, statement.UnrecoveredLoans, statement.Net).Should().Be((1_500m, 150m, 1_350m, 650m, 0m));
         statement.Net.Should().Be(statement.Gross - statement.OrdinaryTax - statement.TerminalTax - statement.Recoveries);
     }
+
+    [Fact]
+    public void The_bonus_is_paid_pro_rata_and_property_is_recovered_after_loans()
+    {
+        FinalPay.ProRataBonus(3_650m, new DateOnly(2020, 1, 1), new DateOnly(2026, 3, 31)).Should().Be(900m); // 90 of 365 days
+        FinalPay.ProRataBonus(3_650m, new DateOnly(2026, 3, 1), new DateOnly(2026, 3, 31)).Should().Be(310m); // engaged this year: 31 days
+        FinalPayStatement statement = FinalPay.Calculate(TerminationType.Resignation, 3_100m, new DateOnly(2020, 1, 1), new DateOnly(2026, 3, 31), false, 0m, 1_000m, Policy, _ => 0m,
+            annualBonus: 3_650m, otherDeductions: 3_500m);
+        (statement.ProRataBonus, statement.Recoveries, statement.OtherRecoveries, statement.UnrecoveredOther, statement.Net).Should().Be((900m, 1_000m, 3_000m, 500m, 0m));
+    }
 }

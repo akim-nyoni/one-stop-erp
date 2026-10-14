@@ -5367,6 +5367,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("status");
 
+                    b.Property<string>("TagNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("tag_number");
+
                     b.Property<decimal?>("TotalEstimatedUnits")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -5393,6 +5398,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_asset_company_id_asset_number")
                         .HasFilter("is_deleted = false");
+
+                    b.HasIndex("CompanyId", "TagNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_asset_company_id_tag_number")
+                        .HasFilter("tag_number IS NOT NULL");
 
                     b.ToTable("asset", "fa");
                 });

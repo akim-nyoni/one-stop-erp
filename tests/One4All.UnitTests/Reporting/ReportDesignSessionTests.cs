@@ -127,4 +127,21 @@ public sealed class ReportDesignSessionTests
         s.Fields(row).Should().Equal("Amount", "Name", "Reference");
         s.Fields(null).Should().Equal("Reference");
     }
+
+    [Fact]
+    public void Elements_can_be_brought_to_the_front_or_sent_to_the_back()
+    {
+        ReportDesignSession session = new(new ReportDefinition { Code = "Z", Bands = [new ReportBand { Type = BandType.Detail, Height = 20 }] });
+        string a = session.AddElement(BandType.Detail, ElementKind.Label, 0, 0, "A");
+        string b = session.AddElement(BandType.Detail, ElementKind.Label, 0, 0, "B");
+        string c = session.AddElement(BandType.Detail, ElementKind.Label, 0, 0, "C");
+        List<string> Order() => [.. session.Definition.Bands.Single().Elements.Select(e => e.Name)];
+
+        session.Restack([a], toFront: true);
+        Order().Should().Equal(b, c, a);
+        session.Restack([c, a], toFront: false);
+        Order().Should().Equal(c, a, b);
+        session.Undo().Should().BeTrue();
+        Order().Should().Equal(b, c, a);
+    }
 }

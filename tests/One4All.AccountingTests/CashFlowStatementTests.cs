@@ -75,6 +75,12 @@ public sealed class CashFlowStatementTests
             cf.ClosingCash.Should().Be(700m);  // 1000 − 100 − 500 + 300
             cf.NetChange.Should().Be(700m);
             cf.ClassifiedChange.Should().Be(cf.NetChange);
+
+            // The indirect method: profit, then each account's movement, adding up to each activity's total.
+            cf.Lines.Should().ContainEquivalentOf(new CashFlowLine("Operating", string.Empty, "Profit for the period", 900m));
+            cf.Lines.Should().ContainEquivalentOf(new CashFlowLine("Investing", "1600", "Increase in Motor Vehicles at Cost", -500m));
+            cf.Lines.Should().ContainEquivalentOf(new CashFlowLine("Financing", "2470", "Increase in Accruals", 300m));
+            cf.Lines.Where(l => l.Section == "Operating").Sum(l => l.Amount).Should().Be(cf.Operating);
         }
     }
 

@@ -137,7 +137,8 @@ public static partial class OperationCatalogue
                 Opt("Funding", "Funding account (register: credited; dispose: debited with proceeds)"), Opt("Parent", "Parent asset (register a component)"),
                 Opt("CostCentre", "Cost centre (register)"), Opt("Department", "Department (register)"), Opt("Gain", "Gain on disposal account"), Opt("Loss", "Loss on disposal account"),
                 Opt("Reserve", "Revaluation reserve account"), Opt("WriteDown", "Revaluation write-down expense account"), Opt("Location", "New location (move)"),
-                Opt("Custodian", "New custodian (move)"), Opt("Provider", "Service provider (maintenance)"), Opt("Document", "Document number")],
+                Opt("Custodian", "New custodian (move)"), Opt("Provider", "Service provider (maintenance)"), Opt("Document", "Document number"),
+                Opt("Tag", "Barcode / tag number (register, move)")],
             Run = async (c, i) =>
             {
                 IFixedAssetService assets = c.Get<IFixedAssetService>();
@@ -154,13 +155,15 @@ public static partial class OperationCatalogue
                 string number = (i.Optional("Asset") ?? throw new OperationException("Give the asset number.")).Trim().ToUpperInvariant();
                 if (step == "Register")
                 {
-                    return Check(await assets.RegisterAsync(new RegisterAssetRequest
+                    long registered = Check(await assets.RegisterAsync(new RegisterAssetRequest
                     {
                         CompanyId = c.CompanyId, AssetNumber = number, Description = i.Optional("Description") ?? number, AssetClass = i.Optional("Class") ?? string.Empty,
                         Cost = i.OptionalNumber("Amount") ?? throw new OperationException("Give the asset's cost."), AcquisitionDate = date,
                         FundingAccountCode = i.Optional("Funding") ?? throw new OperationException("Give the funding account credited with the cost."), DocumentNumber = document,
                         ParentAssetNumber = i.Optional("Parent"), CostCentre = i.Optional("CostCentre"), Department = i.Optional("Department"),
-                    }).ConfigureAwait(true), id => $"Asset {number} registered and capitalised.");
+                    }).ConfigureAwait(true));
+                    await TagAsync(c, registered, i.Optional("Tag")).ConfigureAwait(true);
+                    return $"Asset {number} registered and capitalised" + (i.Optional("Tag") is string tagged ? $", tag {tagged.ToUpperInvariant()}." : ".");
                 }
 
                 long asset = await FindAsync(c.Db.FixedAssets, a => a.CompanyId == c.CompanyId && a.AssetNumber.ToUpper() == number, a => a.Id, "asset", number).ConfigureAwait(true);
@@ -176,7 +179,9 @@ public static partial class OperationCatalogue
                             date, i.Optional("Reserve") ?? string.Empty, i.Optional("WriteDown") ?? string.Empty, document).ConfigureAwait(true));
                         return $"{number} revalued to {M(revaluation.NewCarryingAmount)} ({(revaluation.Delta >= 0m ? "uplift" : "write-down")} {M(Math.Abs(revaluation.Delta))}, journal {revaluation.JournalNumber}).";
                     case "Move":
-                        return Check(await assets.TransferAsync(c.CompanyId, asset, i.Optional("Location"), i.Optional("Custodian")).ConfigureAwait(true), $"{number} moved.");
+                        _ = Check(await assets.TransferAsync(c.CompanyId, asset, i.Optional("Location"), i.Optional("Custodian")).ConfigureAwait(true), string.Empty);
+                        await TagAsync(c, asset, i.Optional("Tag")).ConfigureAwait(true);
+                        return $"{number} moved" + (i.Optional("Tag") is string retagged ? $" and tagged {retagged.ToUpperInvariant()}." : ".");
                     default:
                         return Check(await assets.RecordMaintenanceAsync(c.CompanyId, asset, date, i.Optional("Description") ?? throw new OperationException("Describe the work done."),
                             i.OptionalNumber("Amount") ?? 0m, i.Optional("Provider")).ConfigureAwait(true), id => $"Maintenance on {number} recorded.");
@@ -184,7 +189,8 @@ public static partial class OperationCatalogue
             },
             List = async c => Table(await c.Db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderBy(a => a.AssetNumber).Take(500).ToListAsync().ConfigureAwait(true),
                 ("Asset", a => a.AssetNumber), ("Description", a => a.Description), ("Class", a => a.AssetClass), ("Cost", a => M(a.Cost)), ("Depreciation", a => M(a.AccumulatedDepreciation)),
-                ("Book value", a => M(a.NetBookValue)), ("Status", a => a.Status.ToString()), ("Location", a => a.Location ?? "-"), ("Custodian", a => a.Custodian ?? "-")),
+                ("Book value", a => M(a.NetBookValue)), ("Status", a => a.Status.ToString()), ("Location", a => a.Location ?? "-"), ("Custodian", a => a.Custodian ?? "-"),
+                ("Tag", a => a.TagNumber ?? "-")),
         };
         yield return new Operation
         {
@@ -687,5 +693,24 @@ public static partial class OperationCatalogue
         return Table((await c.Db.JobWbsElements.AsNoTracking().Where(e => e.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true)).OrderBy(e => contracts.GetValueOrDefault(e.JobContractId)).ThenBy(e => e.Code),
             ("Contract", e => contracts.GetValueOrDefault(e.JobContractId)), ("Code", e => e.Code), ("Name", e => e.Name), ("Cost head", e => e.CostHead), ("Budget", e => M(e.BudgetCost)),
             ("Estimate to complete", e => e.EstimateToComplete is decimal etc ? M(etc) : null));
+    }
+
+    // Fixes a barcode / tag number to an asset; a tag already on another asset is refused.
+    private static async Task TagAsync(OperationContext c, long assetId, string? tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return;
+        }
+
+        string code = tag.Trim().ToUpperInvariant();
+        if (await c.Db.FixedAssets.AnyAsync(a => a.CompanyId == c.CompanyId && a.TagNumber == code && a.Id != assetId).ConfigureAwait(true))
+        {
+            throw new OperationException($"Tag {code} is already on another asset.");
+        }
+
+        Core.FixedAssets.FixedAsset asset = await c.Db.FixedAssets.FirstAsync(a => a.Id == assetId).ConfigureAwait(true);
+        asset.TagNumber = code;
+        await c.Db.SaveChangesAsync().ConfigureAwait(true);
     }
 }

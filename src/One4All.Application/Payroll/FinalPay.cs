@@ -37,11 +37,14 @@ public enum TerminationType
 /// <param name="TerminalTax">Tax on the gratuity and severance.</param>
 /// <param name="Recoveries">Loans recovered.</param>
 /// <param name="UnrecoveredLoans">Loans the final pay could not cover (still owed).</param>
+/// <param name="ProRataBonus">The year's bonus for the part of the year served.</param>
+/// <param name="OtherRecoveries">Unreturned company property and overpayments recovered (after the loans).</param>
+/// <param name="UnrecoveredOther">What of those the final pay could not cover (still owed).</param>
 public sealed record FinalPayStatement(int YearsOfService, decimal ProRataSalary, decimal Notice, decimal LeaveDays, decimal Leave, decimal Gratuity, decimal Severance,
-    decimal OrdinaryTax, decimal TerminalTax, decimal Recoveries, decimal UnrecoveredLoans)
+    decimal OrdinaryTax, decimal TerminalTax, decimal Recoveries, decimal UnrecoveredLoans, decimal ProRataBonus = 0m, decimal OtherRecoveries = 0m, decimal UnrecoveredOther = 0m)
 {
-    /// <summary>Ordinary pay: salary, notice and leave.</summary>
-    public decimal Ordinary => ProRataSalary + Notice + Leave;
+    /// <summary>Ordinary pay: salary, notice, leave and the pro-rata bonus.</summary>
+    public decimal Ordinary => ProRataSalary + Notice + Leave + ProRataBonus;
 
     /// <summary>Terminal benefits: gratuity and severance.</summary>
     public decimal Terminal => Gratuity + Severance;
@@ -50,7 +53,7 @@ public sealed record FinalPayStatement(int YearsOfService, decimal ProRataSalary
     public decimal Gross => Ordinary + Terminal;
 
     /// <summary>What is paid out.</summary>
-    public decimal Net => Gross - OrdinaryTax - TerminalTax - Recoveries;
+    public decimal Net => Gross - OrdinaryTax - TerminalTax - Recoveries - OtherRecoveries;
 }
 
 /// <summary>
@@ -86,20 +89,42 @@ public static class FinalPay
     /// <param name="loans">Outstanding loans.</param>
     /// <param name="policy">The company's terminal policy.</param>
     /// <param name="ordinaryTax">PAYE for an amount of ordinary pay (the tax table in force).</param>
+    /// <param name="annualBonus">The year's bonus, paid for the part of the calendar year served (nil: none).</param>
+    /// <param name="otherDeductions">Unreturned company property and overpayments to recover after the loans.</param>
     /// <returns>The statement.</returns>
     public static FinalPayStatement Calculate(TerminationType type, decimal monthlyBasic, DateOnly engaged, DateOnly lastDay, bool lastMonthPaid, decimal leaveDays, decimal loans,
-        TerminalPolicy policy, Func<decimal, decimal> ordinaryTax)
+        TerminalPolicy policy, Func<decimal, decimal> ordinaryTax, decimal annualBonus = 0m, decimal otherDeductions = 0m)
     {
         (bool notice, bool gratuity, bool severance) = Entitlements(type);
         FinalSettlement settled = TerminalBenefits.Settle(monthlyBasic, engaged, lastDay, leaveDays, severance, 0m, policy);
         decimal proRata = lastMonthPaid ? 0m : ProRata(monthlyBasic, lastDay);
         decimal noticePay = notice ? settled.Notice : 0m, gratuityPay = gratuity ? settled.Gratuity : 0m, severancePay = severance ? settled.Severance : 0m;
-        decimal ordinary = proRata + noticePay + settled.Leave;
+        decimal bonus = ProRataBonus(annualBonus, engaged, lastDay);
+        decimal ordinary = proRata + noticePay + settled.Leave + bonus;
         decimal taxOnOrdinary = Math.Round(Math.Max(0m, ordinaryTax(ordinary)), 2, MidpointRounding.AwayFromZero);
         decimal taxOnTerminal = Math.Round((gratuityPay + severancePay) * policy.TerminalTaxRatePercent / 100m, 2, MidpointRounding.AwayFromZero);
         decimal available = Math.Max(0m, ordinary + gratuityPay + severancePay - taxOnOrdinary - taxOnTerminal);
         decimal recovered = Math.Min(Math.Max(0m, loans), available);
+        decimal other = Math.Min(Math.Max(0m, otherDeductions), available - recovered);
         return new FinalPayStatement(settled.Years, proRata, noticePay, Math.Max(0m, leaveDays), settled.Leave, gratuityPay, severancePay, taxOnOrdinary, taxOnTerminal, recovered,
-            Math.Max(0m, loans) - recovered);
+            Math.Max(0m, loans) - recovered, bonus, other, Math.Max(0m, otherDeductions) - other);
+    }
+
+    /// <summary>The year's bonus for the days of the calendar year served up to the last day (from the engagement date when engaged that year).</summary>
+    /// <param name="annualBonus">The full year's bonus.</param>
+    /// <param name="engaged">The engagement date.</param>
+    /// <param name="lastDay">The last day of service.</param>
+    /// <returns>The pro-rata bonus.</returns>
+    public static decimal ProRataBonus(decimal annualBonus, DateOnly engaged, DateOnly lastDay)
+    {
+        if (annualBonus <= 0m)
+        {
+            return 0m;
+        }
+
+        DateOnly start = engaged.Year == lastDay.Year ? engaged : new DateOnly(lastDay.Year, 1, 1);
+        int served = Math.Max(0, lastDay.DayNumber - start.DayNumber + 1);
+        int yearDays = DateTime.IsLeapYear(lastDay.Year) ? 366 : 365;
+        return Math.Round(annualBonus * served / yearDays, 2, MidpointRounding.AwayFromZero);
     }
 }

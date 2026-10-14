@@ -49,6 +49,8 @@
                 <Button Content="Distribute" Padding="6,2" Margin="1" Click="Distribute_Click" />
                 <Separator Margin="6,0" />
                 <Button Content="Duplicate" Padding="6,2" Margin="1" Click="Duplicate_Click" />
+                <Button Content="To front" Padding="6,2" Margin="1" Click="ToFront_Click" ToolTip="Draw the selected elements over the others in their band" />
+                <Button Content="To back" Padding="6,2" Margin="1" Click="ToBack_Click" ToolTip="Draw the selected elements behind the others in their band" />
                 <Button Content="Delete" Padding="6,2" Margin="1" Click="Delete_Click" />
                 <Button Content="↶ Undo" Padding="6,2" Margin="1" Click="Undo_Click" />
                 <Button Content="Redo ↷" Padding="6,2" Margin="1" Click="Redo_Click" />
@@ -91,6 +93,8 @@
                     <UniformGrid Columns="2">
                         <Button Content="Preview" Height="30" Margin="0,0,4,0" Click="Preview_Click" />
                         <Button Content="Save version" Height="30" FontWeight="SemiBold" Click="Save_Click" />
+                        <Button Content="Import .mrpt…" Height="26" Margin="0,4,4,0" Click="ImportFile_Click" ToolTip="Open a report layout file (from another company or installation) to edit and save here" />
+                        <Button Content="Export .mrpt…" Height="26" Margin="0,4,0,0" Click="ExportFile_Click" ToolTip="Save this layout to a file to copy it to another company or installation" />
                     </UniformGrid>
                 </StackPanel>
                 <ListBox x:Name="FieldList" Margin="8,0" MouseDoubleClick="Field_DoubleClick" />

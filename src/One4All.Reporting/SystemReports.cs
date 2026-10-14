@@ -26,6 +26,8 @@ public static class SystemReports
         def.Parameters.Add(new ReportParameter { Name = "AsAtDate", Type = ParameterType.Date, Prompt = "As at date" });
         def.Parameters.Add(new ReportParameter { Name = "IncludeUnposted", Type = ParameterType.Boolean, Prompt = "Include unposted (draft and deferred) journals", Required = false });
         def.Parameters.Add(new ReportParameter { Name = "ReportingCurrency", Type = ParameterType.String, Prompt = "Reporting currency (blank: base)", Required = false });
+        def.Parameters.Add(new ReportParameter { Name = "CostCentre", Type = ParameterType.String, Prompt = "Cost centre (blank: all)", Required = false });
+        def.Parameters.Add(new ReportParameter { Name = "Department", Type = ParameterType.String, Prompt = "Department (blank: all)", Required = false });
 
         def.Bands.Add(new ReportBand
         {
@@ -220,7 +222,8 @@ public static class SystemReports
         "Income and expenses for a period; the difference is the net profit — beside the same period a year earlier and the change.", "IncomeStatement",
         [new Column("Category", "Section", 110), new Column("AccountName", "Account", 220), new Column("Amount", "This period", 95, true), new Column("PriorAmount", "Prior year", 95, true),
             new Column("Change", "Change", 90, true)],
-        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String)]);
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String),
+            ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
 
     /// <summary>The code of the statement laid out by a reporting tree.</summary>
     public const string TreeStatementCode = "GL-TREE";
@@ -297,7 +300,8 @@ public static class SystemReports
         "Assets, liabilities and equity as at a date; assets equal liabilities plus equity — beside the position a year earlier and the change.", "BalanceSheet",
         [new Column("Category", "Section", 110), new Column("AccountName", "Account", 220), new Column("Amount", "This year", 95, true), new Column("PriorAmount", "Prior year", 95, true),
             new Column("Change", "Change", 90, true)],
-        [("AsAtDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String)]);
+        [("AsAtDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String), ("CostCentre", ParameterType.String),
+            ("Department", ParameterType.String)]);
 
     /// <summary>Builds the Statement of Cash Flows definition (IAS 7, movement method).</summary>
     /// <returns>The definition.</returns>

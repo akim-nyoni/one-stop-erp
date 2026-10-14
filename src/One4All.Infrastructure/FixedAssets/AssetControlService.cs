@@ -70,7 +70,16 @@ public sealed class AssetControlService : IAssetControlService
         AssetCountLine? line = count.Lines.FirstOrDefault(l => string.Equals(l.Tag, scanned, StringComparison.OrdinalIgnoreCase));
         if (line is null)
         {
-            FixedAsset? asset = await _db.Set<FixedAsset>().AsNoTracking().FirstOrDefaultAsync(a => a.CompanyId == companyId && a.AssetNumber == scanned, ct).ConfigureAwait(false);
+            // The scan is the asset number or the barcode / tag fixed to it.
+            FixedAsset? asset = await _db.Set<FixedAsset>().AsNoTracking().FirstOrDefaultAsync(a => a.CompanyId == companyId && (a.AssetNumber == scanned || a.TagNumber == scanned), ct)
+                .ConfigureAwait(false);
+            line = asset is not null ? count.Lines.FirstOrDefault(l => l.AssetId == asset.Id) : null;
+        }
+
+        if (line is null)
+        {
+            FixedAsset? asset = await _db.Set<FixedAsset>().AsNoTracking().FirstOrDefaultAsync(a => a.CompanyId == companyId && (a.AssetNumber == scanned || a.TagNumber == scanned), ct)
+                .ConfigureAwait(false);
             line = asset is null
                 ? new AssetCountLine(null, scanned, null, AssetCountResult.Unregistered)
                 : new AssetCountLine(asset.Id, asset.AssetNumber, asset.Location, AssetCountResult.NotSeen);

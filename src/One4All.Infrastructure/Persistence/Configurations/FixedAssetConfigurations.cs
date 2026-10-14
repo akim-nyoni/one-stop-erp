@@ -12,6 +12,8 @@ internal sealed class FixedAssetConfiguration : IEntityTypeConfiguration<FixedAs
         b.ToTable("asset", Schemas.FixedAssets);
         b.Property(x => x.TotalEstimatedUnits).HasPrecision(19, 4);
         b.Property(x => x.SourceAccountCode).HasMaxLength(20);
+        b.Property(x => x.TagNumber).HasMaxLength(40);
+        b.HasIndex(x => new { x.CompanyId, x.TagNumber }).IsUnique().HasFilter("tag_number IS NOT NULL");
         b.HasIndex(x => x.SourceOpenItemId);
         b.Property(x => x.CostCentre).HasMaxLength(3);
         b.Property(x => x.Department).HasMaxLength(3);

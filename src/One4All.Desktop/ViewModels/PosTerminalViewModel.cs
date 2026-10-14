@@ -567,6 +567,28 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         return true;
     }
     private Dictionary<string, string?> _categoryParents = new(StringComparer.OrdinalIgnoreCase);
+
+    // The category tree by code (parent → children) for drilling down, and the category whose children the chips show (null: the top).
+    private Dictionary<string, List<string>> _categoryChildren = new(StringComparer.OrdinalIgnoreCase);
+    private string? _categoryLevel;
+
+    /// <summary>The chip that goes back up a level.</summary>
+    public const string BackChip = "◀ Back";
+
+    /// <summary>Gets where in the category tree the chips are (All › Drinks › Soft drinks).</summary>
+    public string CategoryPath
+    {
+        get
+        {
+            List<string> path = [];
+            for (string? level = _categoryLevel; level is not null; level = _categoryParents.GetValueOrDefault(level))
+            {
+                path.Insert(0, level);
+            }
+
+            return string.Join(" › ", ["All", .. path]);
+        }
+    }
     private bool _online;
     private CancellationTokenSource? _searching;
     private List<OfflineCustomer> _customers = [];
@@ -660,10 +682,15 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         OnPropertyChanged(nameof(FunctionKeysText));
         OnPropertyChanged(nameof(IsScaleVisible));
         _categoryParents = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        _categoryChildren = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         foreach (ItemCategory category in await db.ItemCategories.AsNoTracking().Where(c => c.CompanyId == _companyId).ToListAsync(ct).ConfigureAwait(true))
         {
             _categoryParents[category.Code] = category.ParentCode;
             _categoryParents.TryAdd(category.Name, category.ParentCode);
+            if (category.ParentCode is string parent)
+            {
+                (_categoryChildren.TryGetValue(parent, out List<string>? children) ? children : _categoryChildren[parent] = []).Add(category.Code);
+            }
         }
 
         _online = true;
@@ -679,21 +706,53 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             _allProducts.Add(Product(tile));
         }
 
+        _categoryLevel = null;
+        ShowCategoryLevel();
+        SelectedCategory = "All";
+        ApplyCategoryFilter();
+    }
+
+    // The chips for the current level: at the top All, the favourites pages and the top categories that have something to sell under them;
+    // inside a category, Back, the category itself (everything under it) and its children with products.
+    private void ShowCategoryLevel()
+    {
         Categories.Clear();
-        Categories.Add("All");
-        // One favourites tab per page (a bar or restaurant till opens on its favourites).
-        foreach (int page in _favourites.Select(f => f.Page).Distinct().Order())
+        if (_categoryLevel is null)
         {
-            Categories.Add(FavouritesPage(page));
+            Categories.Add("All");
+            // One favourites tab per page (a bar or restaurant till opens on its favourites).
+            foreach (int page in _favourites.Select(f => f.Page).Distinct().Order())
+            {
+                Categories.Add(FavouritesPage(page));
+            }
+        }
+        else
+        {
+            Categories.Add(BackChip);
+            Categories.Add(_categoryLevel);
         }
 
-        foreach (string category in _allProducts.Select(p => p.Category).Distinct().OrderBy(c => c))
+        IEnumerable<string> level = _categoryLevel is null
+            ? _allProducts.Select(p => TopOf(p.Category)).Distinct(StringComparer.OrdinalIgnoreCase)
+            : _categoryChildren.GetValueOrDefault(_categoryLevel) ?? [];
+        foreach (string category in level.Where(c => _allProducts.Any(p => InCategory(p, c))).OrderBy(c => c, StringComparer.OrdinalIgnoreCase))
         {
             Categories.Add(category);
         }
 
-        SelectedCategory = "All";
-        ApplyCategoryFilter();
+        OnPropertyChanged(nameof(CategoryPath));
+    }
+
+    // The top of a category's tree (a category with no parent, or one the tree does not know).
+    private string TopOf(string category)
+    {
+        string top = category;
+        for (int guard = 0; guard < 20 && _categoryParents.GetValueOrDefault(top) is string parent; guard++)
+        {
+            top = parent;
+        }
+
+        return top;
     }
 
     private static string FavouritesPage(int page) => page <= 1 ? FavouritesTab : $"{FavouritesTab} {page}";
@@ -922,7 +981,33 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     private static string? FindByName(IEnumerable<LedgerAccount> accounts, params string[] keywords) =>
         accounts.FirstOrDefault(a => keywords.Any(k => a.Name.Contains(k, StringComparison.OrdinalIgnoreCase)))?.AccountCode;
 
-    partial void OnSelectedCategoryChanged(string value) => ApplyCategoryFilter();
+    partial void OnSelectedCategoryChanged(string value)
+    {
+        if (value is null)
+        {
+            return; // the chips are being rebuilt
+        }
+
+        if (value == BackChip)
+        {
+            _categoryLevel = _categoryLevel is null ? null : _categoryParents.GetValueOrDefault(_categoryLevel);
+            ShowCategoryLevel();
+            SelectedCategory = _categoryLevel ?? "All";
+            return;
+        }
+
+        // A category with sub-categories opens them (its own chip then shows everything under it).
+        if (!string.Equals(value, _categoryLevel, StringComparison.OrdinalIgnoreCase) && _categoryChildren.TryGetValue(value, out List<string>? children)
+            && children.Any(c => _allProducts.Any(p => InCategory(p, c))))
+        {
+            _categoryLevel = value;
+            ShowCategoryLevel();
+            SelectedCategory = value;
+            return;
+        }
+
+        ApplyCategoryFilter();
+    }
 
     // Typing in the scan box narrows the tiles as you type (code, name, barcode or PLU); Enter still adds the exact match.
     partial void OnScanEntryChanged(string value) => ApplyCategoryFilter();

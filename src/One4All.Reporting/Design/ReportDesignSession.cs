@@ -288,6 +288,30 @@ public sealed class ReportDesignSession
         chosen.ForEach(c => c.Band.Elements.Remove(c.Element));
     }
 
+    /// <summary>
+    /// Brings elements in front of the others in their band, or sends them behind (an element later in its band draws over those before it).
+    /// The chosen keep their order among themselves.
+    /// </summary>
+    /// <param name="names">The elements.</param>
+    /// <param name="toFront">True: to the front; false: to the back.</param>
+    public void Restack(IEnumerable<string> names, bool toFront)
+    {
+        List<(ReportElement Element, ReportBand Band)> chosen = Resolve(names);
+        if (chosen.Count == 0)
+        {
+            return;
+        }
+
+        Checkpoint();
+        foreach (IGrouping<ReportBand, ReportElement> band in chosen.GroupBy(c => c.Band, c => c.Element))
+        {
+            List<ReportElement> moving = [.. band.Key.Elements.Where(e => band.Contains(e))];
+            List<ReportElement> staying = [.. band.Key.Elements.Where(e => !moving.Contains(e))];
+            band.Key.Elements.Clear();
+            band.Key.Elements.AddRange(toFront ? staying.Concat(moving) : moving.Concat(staying));
+        }
+    }
+
     /// <summary>Copies elements to the same band, offset by one grid step (or 8 points).</summary>
     /// <param name="names">The elements.</param>
     /// <returns>The copies' names.</returns>

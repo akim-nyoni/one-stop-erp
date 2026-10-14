@@ -30,6 +30,15 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
     // The common parameters: IncludeUnposted (true / yes / 1) and ReportingCurrency, translated at the spot rate on the date (base when no rate is held).
     private async Task<LedgerReportOptions> OptionsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, DateOnly date, CancellationToken ct)
     {
+        // A cost centre or department narrows the report to the lines analysed to it.
+        static string? Dimension(IReadOnlyDictionary<string, object?> values, string name)
+            => values.TryGetValue(name, out object? given) && given is string text && text.Trim().Length > 0 ? text.Trim().ToUpperInvariant() : null;
+        LedgerReportOptions options = await CurrencyOptionsAsync(companyId, parameters, date, ct).ConfigureAwait(false);
+        return options with { CostCentre = Dimension(parameters, "CostCentre"), Department = Dimension(parameters, "Department") };
+    }
+
+    private async Task<LedgerReportOptions> CurrencyOptionsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, DateOnly date, CancellationToken ct)
+    {
         bool unposted = parameters.TryGetValue("IncludeUnposted", out object? flag) && flag switch
         {
             bool b => b,
@@ -159,16 +168,25 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
         DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
         CashFlowStatement cf = await _reports.CashFlowStatementAsync(companyId, from, to, ct).ConfigureAwait(false);
 
-        return
-        [
-            Row(new() { ["Activity"] = "Operating activities", ["Amount"] = cf.Operating }),
-            Row(new() { ["Activity"] = "Investing activities", ["Amount"] = cf.Investing }),
-            Row(new() { ["Activity"] = "Financing activities", ["Amount"] = cf.Financing }),
-            Row(new() { ["Activity"] = "Unclassified", ["Amount"] = cf.Unclassified }),
-            Row(new() { ["Activity"] = "Net change in cash", ["Amount"] = cf.NetChange }),
-            Row(new() { ["Activity"] = "Opening cash", ["Amount"] = cf.OpeningCash }),
-            Row(new() { ["Activity"] = "Closing cash", ["Amount"] = cf.ClosingCash }),
-        ];
+        // The indirect method: each activity's lines (profit, then the movement on each account), then the activity's total.
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach ((string section, string heading, decimal total) in new[]
+        {
+            ("Operating", "Operating activities", cf.Operating), ("Investing", "Investing activities", cf.Investing), ("Financing", "Financing activities", cf.Financing),
+            ("Unclassified", "Unclassified", cf.Unclassified),
+        })
+        {
+            rows.AddRange(cf.Lines.Where(l => l.Section == section).Select(l => Row(new() { ["Activity"] = "    " + l.Label, ["Amount"] = l.Amount })));
+            if (section != "Unclassified" || total != 0m)
+            {
+                rows.Add(Row(new() { ["Activity"] = heading, ["Amount"] = total }));
+            }
+        }
+
+        rows.Add(Row(new() { ["Activity"] = "Net change in cash", ["Amount"] = cf.NetChange }));
+        rows.Add(Row(new() { ["Activity"] = "Opening cash", ["Amount"] = cf.OpeningCash }));
+        rows.Add(Row(new() { ["Activity"] = "Closing cash", ["Amount"] = cf.ClosingCash }));
+        return rows;
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> NominalActivityAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

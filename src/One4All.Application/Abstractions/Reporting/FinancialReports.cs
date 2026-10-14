@@ -268,7 +268,21 @@ public sealed record CashFlowStatement(
 
     /// <summary>The change explained by the classified activities (equals <see cref="NetChange"/> when the books balance).</summary>
     public decimal ClassifiedChange => Operating + Investing + Financing + Unclassified;
+
+    /// <summary>
+    /// Gets the lines behind each activity, the indirect method (IAS 7.18(b)): the profit or loss of the period, then the movement on each
+    /// balance-sheet account in that activity — working capital and non-cash items under operating, each asset and source of finance under
+    /// investing and financing. Each section's lines add up to its total.
+    /// </summary>
+    public IReadOnlyList<CashFlowLine> Lines { get; init; } = [];
 }
+
+/// <summary>One line of the cash flow statement.</summary>
+/// <param name="Section">The activity (Operating, Investing, Financing or Unclassified).</param>
+/// <param name="AccountCode">The account (empty for the profit line).</param>
+/// <param name="Label">What the line is.</param>
+/// <param name="Amount">Its cash effect (positive: cash in).</param>
+public sealed record CashFlowLine(string Section, string AccountCode, string Label, decimal Amount);
 
 /// <summary>
 /// Read-side services producing the core general-ledger financial reports from posted data (brief §16
@@ -466,7 +480,9 @@ public interface IGeneralLedgerReports
 /// <param name="IncludeUnposted">Count draft and deferred journals too (a preview of what posting them would do).</param>
 /// <param name="ReportingCurrency">The reporting currency, or null for the base currency.</param>
 /// <param name="Rate">Reporting-currency units per unit of base currency (1 for the base currency).</param>
-public sealed record LedgerReportOptions(bool IncludeUnposted = false, string? ReportingCurrency = null, decimal Rate = 1m)
+/// <param name="CostCentre">Only lines analysed to this cost centre (a trial balance or statement for one cost centre).</param>
+/// <param name="Department">Only lines analysed to this department.</param>
+public sealed record LedgerReportOptions(bool IncludeUnposted = false, string? ReportingCurrency = null, decimal Rate = 1m, string? CostCentre = null, string? Department = null)
 {
     /// <summary>Posted journals in the base currency.</summary>
     public static LedgerReportOptions Default { get; } = new();

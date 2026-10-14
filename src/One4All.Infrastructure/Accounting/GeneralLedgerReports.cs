@@ -38,7 +38,10 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         // Filter lines by their journal (posted, or also draft / deferred when asked) via a correlated subquery, then group by account code
         // in SQL. This translates cleanly (no projected-record grouping).
         bool unposted = options.IncludeUnposted;
+        string? costCentre = string.IsNullOrWhiteSpace(options.CostCentre) ? null : options.CostCentre.Trim().ToUpperInvariant();
+        string? department = string.IsNullOrWhiteSpace(options.Department) ? null : options.Department.Trim().ToUpperInvariant();
         var totals = await _db.Set<JournalLine>()
+            .Where(l => (costCentre == null || l.CostCentre == costCentre) && (department == null || l.Department == department))
             .Where(l => _db.Journals.Any(j =>
                 j.Id == l.JournalEntryId && j.CompanyId == companyId
                 && (j.Status == JournalStatus.Posted || (unposted && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred))) &&
@@ -412,6 +415,8 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         decimal openingCash = 0m;
         decimal closingCash = 0m;
         decimal operating = 0m, investing = 0m, financing = 0m, unclassified = 0m;
+        Dictionary<CashFlowCategory, decimal> profit = [];
+        List<(CashFlowCategory Category, string Code, string Label, decimal Amount)> movements = [];
 
         foreach (string code in opening.Keys.Union(movement.Keys))
         {
@@ -430,6 +435,21 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
 
             // A non-cash debit movement consumes cash; a credit movement provides it — hence the sign flip.
             decimal cashEffect = -movementNet;
+
+            // The indirect method's lines: income and expense make up the profit; each balance-sheet account is a movement line.
+            CashFlowCategory section = category is CashFlowCategory.Operating or CashFlowCategory.Investing or CashFlowCategory.Financing ? category : CashFlowCategory.None;
+            if (meta?.Type is AccountType.Income or AccountType.Expense)
+            {
+                profit[section] = profit.GetValueOrDefault(section) + cashEffect;
+            }
+            else if (cashEffect != 0m)
+            {
+                string name = meta?.Name ?? code;
+                string label = meta?.Type == AccountType.Asset ? (cashEffect > 0m ? $"Decrease in {name}" : $"Increase in {name}")
+                    : cashEffect > 0m ? $"Increase in {name}" : $"Decrease in {name}";
+                movements.Add((section, code, label, cashEffect));
+            }
+
             switch (category)
             {
                 case CashFlowCategory.Operating: operating += cashEffect; break;
@@ -439,6 +459,19 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
             }
         }
 
+        static string Section(CashFlowCategory category) => category == CashFlowCategory.None ? "Unclassified" : category.ToString();
+        List<CashFlowLine> lines = [];
+        foreach (CashFlowCategory section in new[] { CashFlowCategory.Operating, CashFlowCategory.Investing, CashFlowCategory.Financing, CashFlowCategory.None })
+        {
+            if (profit.GetValueOrDefault(section) is decimal earned && earned != 0m)
+            {
+                lines.Add(new CashFlowLine(Section(section), string.Empty, earned >= 0m ? "Profit for the period" : "Loss for the period", decimal.Round(earned, 2, MidpointRounding.ToEven)));
+            }
+
+            lines.AddRange(movements.Where(m => m.Category == section).OrderBy(m => m.Code, StringComparer.Ordinal)
+                .Select(m => new CashFlowLine(Section(section), m.Code, m.Label, decimal.Round(m.Amount, 2, MidpointRounding.ToEven))));
+        }
+
         return new CashFlowStatement(
             fromDate, toDate,
             decimal.Round(operating, 2, MidpointRounding.ToEven),
@@ -446,7 +479,10 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
             decimal.Round(financing, 2, MidpointRounding.ToEven),
             decimal.Round(unclassified, 2, MidpointRounding.ToEven),
             decimal.Round(openingCash, 2, MidpointRounding.ToEven),
-            decimal.Round(closingCash, 2, MidpointRounding.ToEven));
+            decimal.Round(closingCash, 2, MidpointRounding.ToEven))
+        {
+            Lines = lines,
+        };
     }
 
     /// <inheritdoc />

@@ -121,6 +121,9 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
     /// <summary>The custodian.</summary>
     public string? Custodian { get; set; }
 
+    /// <summary>Gets or sets the barcode or tag number fixed to the asset (what a count scans); unique in the company.</summary>
+    public string? TagNumber { get; set; }
+
     /// <summary>The location.</summary>
     public string? Location { get; set; }
 

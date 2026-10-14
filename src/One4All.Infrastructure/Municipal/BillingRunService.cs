@@ -324,6 +324,7 @@ public sealed class BillingRunService : IBillingRunService
             foreach (BillingRunLine[] batch in chunk.Chunk(TransactionBatch))
             {
                 await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+                List<(BillingRunLine Line, Result<TradingPostingResult>? Posted)> outcomes = [];
                 foreach (BillingRunLine line in batch)
                 {
                     Result<TradingPostingResult>? posted = null;
@@ -348,8 +349,14 @@ public sealed class BillingRunService : IBillingRunService
                         }
                     }
 
-                    // Whatever the posting left tracked goes, then only the line is recorded.
+                    // Whatever the posting left tracked goes; the line's outcome is recorded with the batch's.
                     _db.ChangeTracker.Clear();
+                    outcomes.Add((line, posted));
+                }
+
+                // The batch's lines are marked in one save (one round trip and one audit write for the lot) inside the batch's transaction.
+                foreach ((BillingRunLine line, Result<TradingPostingResult>? posted) in outcomes)
+                {
                     _db.Attach(line);
                     if (posted is null)
                     {
@@ -363,11 +370,10 @@ public sealed class BillingRunService : IBillingRunService
                     {
                         line.MarkFailed(posted.Error.Message);
                     }
-
-                    await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-                    _db.ChangeTracker.Clear();
                 }
 
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+                _db.ChangeTracker.Clear();
                 await transaction.CommitAsync(ct).ConfigureAwait(false);
             }
 

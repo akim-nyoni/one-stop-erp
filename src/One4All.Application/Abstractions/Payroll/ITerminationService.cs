@@ -27,6 +27,15 @@ public sealed record TerminationRequest(long CompanyId, string EmployeeNumber, T
     /// <summary>Net pay owed (paid by the bank later).</summary>
     public string NetPayAccount { get; init; } = string.Empty;
 
+    /// <summary>Gets the year's bonus, paid for the part of the year served (nil: none).</summary>
+    public decimal AnnualBonus { get; init; }
+
+    /// <summary>Gets salary overpaid to the leaver, recovered from the final pay (company property not returned is added from the asset register).</summary>
+    public decimal Overpayment { get; init; }
+
+    /// <summary>Gets the account credited with property and overpayments recovered (needed when there are any).</summary>
+    public string? RecoveriesAccount { get; init; }
+
     /// <summary>Who authorised it.</summary>
     public long ApprovedByUserId { get; init; }
 }

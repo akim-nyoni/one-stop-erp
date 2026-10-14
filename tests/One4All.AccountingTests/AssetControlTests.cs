@@ -54,12 +54,13 @@ public sealed class AssetControlTests
         (await db.FixedAssets.SingleAsync(a => a.Id == printer)).WarrantyExpiry = new DateOnly(2026, 3, 1);
         FixedAsset forkliftRow = await db.FixedAssets.SingleAsync(a => a.Id == forklift);
         (forkliftRow.InsuredValue, forkliftRow.InsuranceExpiry, forkliftRow.WarrantyExpiry) = (10_000m, new DateOnly(2027, 1, 1), new DateOnly(2028, 1, 1));
+        forkliftRow.TagNumber = "BC-0099";
         await db.SaveChangesAsync();
 
         IAssetControlService control = scope.ServiceProvider.GetRequiredService<IAssetControlService>();
         long count = (await control.StartCountAsync(companyId, new DateOnly(2026, 3, 15), "HQ")).Value;
         (await control.RecordSightingAsync(companyId, count, "acl-lap", "HQ", "Good")).IsSuccess.Should().BeTrue();
-        (await control.RecordSightingAsync(companyId, count, "ACL-FRK", "HQ", "Worn tyres")).IsSuccess.Should().BeTrue();
+        (await control.RecordSightingAsync(companyId, count, "bc-0099", "HQ", "Worn tyres")).IsSuccess.Should().BeTrue(); // the forklift's barcode
         (await control.RecordSightingAsync(companyId, count, "GHOST-1", "HQ", null)).IsSuccess.Should().BeTrue();
         (await control.CloseCountAsync(companyId, count, updateLocations: true)).Value.Should().Be(1);
         (await control.RecordSightingAsync(companyId, count, "ACL-PRN", "HQ", null)).Error.Code.Should().Be("Fa.CountClosed");
