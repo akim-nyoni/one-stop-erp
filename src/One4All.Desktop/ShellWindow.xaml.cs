@@ -4,7 +4,7 @@ using One4All.Desktop.ViewModels;
 
 namespace One4All.Desktop;
 
-/// <summary>The main shell window (Sage Evolution layout: menu, toolbar, System Tree, module grid).</summary>
+/// <summary>The main shell window: menus, a search box, the module list and a home page of modules; each screen opens in its own window.</summary>
 public partial class ShellWindow : Window
 {
     private readonly IServiceProvider _services;
@@ -12,6 +12,9 @@ public partial class ShellWindow : Window
 
     /// <summary>Gets the command that locks the session (Ctrl+L).</summary>
     public static RoutedCommand LockCommand { get; } = new(nameof(LockCommand), typeof(ShellWindow));
+
+    /// <summary>Gets the command that puts the cursor in the search box (Ctrl+F).</summary>
+    public static RoutedCommand SearchCommand { get; } = new(nameof(SearchCommand), typeof(ShellWindow));
 
     /// <summary>Creates the shell window bound to a session view model.</summary>
     /// <param name="viewModel">The shell view model.</param>
@@ -21,35 +24,10 @@ public partial class ShellWindow : Window
         _services = services;
         DataContext = viewModel;
         InitializeComponent();
-        BuildAreaMenus(viewModel);
+        BuildMenus(viewModel);
         FlowDirection = Localization.UiText.Direction;
         StartLicenceChecks(viewModel);
         _idleLock = new IdleLock(services);
-        Loaded += (_, _) => HideUnavailableOperations(viewModel);
-    }
-
-    // Operation groups belong to modules: a group no licensed, permitted module owns is not offered (brief §10).
-    private void HideUnavailableOperations(ShellViewModel viewModel)
-    {
-        foreach (System.Windows.Controls.MenuItem item in LogicalTreeHelperItems(MainMenu))
-        {
-            if (item.Tag is string group && group.Length > 0)
-            {
-                item.Visibility = viewModel.IsMenuEntryAvailable(group) ? Visibility.Visible : Visibility.Collapsed;
-            }
-        }
-    }
-
-    private static IEnumerable<System.Windows.Controls.MenuItem> LogicalTreeHelperItems(System.Windows.Controls.ItemsControl parent)
-    {
-        foreach (System.Windows.Controls.MenuItem item in parent.Items.OfType<System.Windows.Controls.MenuItem>())
-        {
-            yield return item;
-            foreach (System.Windows.Controls.MenuItem child in LogicalTreeHelperItems(item))
-            {
-                yield return child;
-            }
-        }
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
@@ -137,8 +115,6 @@ public partial class ShellWindow : Window
         terminal.Show();
     }
 
-    // Each of Maintenance, Transactions, Enquiries and Utilities lists, after its own windows, the modules that have actions of that kind; each opens
-    // the module's console showing just those actions (Sage style).
     // Every hour the licence is re-read (an expiry, a revocation list or a new licence installed elsewhere takes effect), and from seven days
     // before expiry — or while it is in grace, read-only or unusable — the user is reminded once a day (brief §11.5).
     private void StartLicenceChecks(ShellViewModel viewModel)
@@ -168,44 +144,237 @@ public partial class ShellWindow : Window
         Closed += (_, _) => timer.Stop();
     }
 
-    private void BuildAreaMenus(ShellViewModel viewModel)
+    // The menus are built from the navigation: Modules ▸ module ▸ group ▸ screen, and each kind of work (Maintenance, Transactions, Enquiries,
+    // Utilities) ▸ module ▸ (group ▸) screen, so a module's submenu only ever shows that module's screens.
+    private void BuildMenus(ShellViewModel viewModel)
     {
-        IReadOnlyList<Operations.Operation> all = Operations.OperationCatalogue.All();
+        foreach (Navigation.NavModule module in viewModel.NavModules)
+        {
+            System.Windows.Controls.MenuItem moduleItem = new() { Header = $"{module.Glyph}  {Localization.UiText.T(module.Title)}" };
+            foreach (Navigation.NavGroup group in module.Groups)
+            {
+                System.Windows.Controls.MenuItem groupItem = new() { Header = Localization.UiText.T(group.Title) };
+                AddEntries(groupItem, group.Entries);
+                moduleItem.Items.Add(groupItem);
+            }
+
+            ModulesMenu.Items.Add(moduleItem);
+        }
+
         foreach ((System.Windows.Controls.MenuItem menu, Application.Navigation.MenuArea area) in new[]
         {
             (MaintenanceMenu, Application.Navigation.MenuArea.Maintenance), (TransactionsMenu, Application.Navigation.MenuArea.Transactions),
             (EnquiriesMenu, Application.Navigation.MenuArea.Enquiries), (UtilitiesMenu, Application.Navigation.MenuArea.Utilities),
         })
         {
-            List<string> modules = [.. Operations.OperationCatalogue.Modules.Where(m => all.Any(o => o.Module == m && o.MenuArea == area) && viewModel.IsMenuEntryAvailable(m))];
-            if (modules.Count == 0)
+            foreach (Navigation.NavModule module in viewModel.NavModules)
             {
-                continue;
-            }
+                List<Navigation.NavGroup> groups = [.. module.Groups.Select(g => g with { Entries = [.. g.Entries.Where(e => e.Area == area)] }).Where(g => g.Entries.Count > 0)];
+                if (groups.Count == 0)
+                {
+                    continue;
+                }
 
-            menu.Items.Add(new System.Windows.Controls.Separator());
-            foreach (string module in modules)
-            {
-                System.Windows.Controls.MenuItem item = new() { Header = Localization.UiText.T(module) + "…", Tag = (module, area) };
-                item.Click += OpenArea_Click;
-                menu.Items.Add(item);
+                System.Windows.Controls.MenuItem moduleItem = new() { Header = $"{module.Glyph}  {Localization.UiText.T(module.Title)}" };
+                if (groups.Count == 1 || groups.Sum(g => g.Entries.Count) <= 8)
+                {
+                    // Few screens: list them straight under the module.
+                    AddEntries(moduleItem, groups.SelectMany(g => g.Entries));
+                }
+                else
+                {
+                    foreach (Navigation.NavGroup group in groups)
+                    {
+                        System.Windows.Controls.MenuItem groupItem = new() { Header = Localization.UiText.T(group.Title) };
+                        AddEntries(groupItem, group.Entries);
+                        moduleItem.Items.Add(groupItem);
+                    }
+                }
+
+                menu.Items.Add(moduleItem);
             }
         }
     }
 
-    private void OpenArea_Click(object sender, RoutedEventArgs e)
+    private void AddEntries(System.Windows.Controls.MenuItem parent, IEnumerable<Navigation.NavEntry> entries)
     {
-        ShellViewModel vm = (ShellViewModel)DataContext;
-        (string module, Application.Navigation.MenuArea area) = ((string, Application.Navigation.MenuArea))((FrameworkElement)sender).Tag;
-        new OperationsWindow(_services, vm.UserId, module, area) { Owner = this }.Show();
+        foreach (Navigation.NavEntry entry in entries)
+        {
+            System.Windows.Controls.MenuItem item = new() { Header = Localization.UiText.T(entry.Title) + "…", ToolTip = entry.Purpose };
+            item.Click += (_, _) => OpenEntry(entry);
+            parent.Items.Add(item);
+        }
     }
 
-    private void OpenOperations_Click(object sender, RoutedEventArgs e)
+    // Every screen opens in its own window: an action in a window of its own (its form and its list), or its dedicated window.
+    private void OpenEntry(Navigation.NavEntry entry)
     {
         ShellViewModel vm = (ShellViewModel)DataContext;
-        OperationsWindow operations = new(_services, vm.UserId, (string)((FrameworkElement)sender).Tag) { Owner = this };
-        operations.Show();
+        if (entry.Operation is Operations.Operation operation)
+        {
+            new OperationsWindow(_services, vm.UserId, operation, entry.Title) { Owner = this }.Show();
+            return;
+        }
+
+        RoutedEventArgs args = new();
+        Action? open = entry.WindowKey switch
+        {
+            "pos-terminal" => () => OpenPosTerminal_Click(this, args),
+            "teller" => () => OpenTeller_Click(this, args),
+            "approvals" => () => OpenApprovals_Click(this, args),
+            "notifications" => () => OpenNotifications_Click(this, args),
+            "fault-desk" => () => OpenFaultDesk_Click(this, args),
+            "enquiry-desk" => () => OpenEnquiryDesk_Click(this, args),
+            "floor-plan" => () => OpenFloorPlan_Click(this, args),
+            "journal-approvals" => () => OpenJournalApprovals_Click(this, args),
+            "replenishment" => () => OpenReplenishment_Click(this, args),
+            "payment-run" => () => OpenPaymentRun_Click(this, args),
+            "bank-rec" => () => OpenBankReconciliation_Click(this, args),
+            "supplier-rec" => () => OpenSupplierReconciliation_Click(this, args),
+            "account-enquiry" => () => OpenAccountEnquiry_Click(this, args),
+            "analytics" => () => OpenAnalytics_Click(this, args),
+            "credit-control" => () => OpenCreditControl_Click(this, args),
+            "customer-documents" => () => OpenCustomerDocuments_Click(this, args),
+            "group-consolidation" => () => OpenGroupConsolidation_Click(this, args),
+            "title-pipeline" => () => OpenTitlePipeline_Click(this, args),
+            "report-viewer" => () => OpenReportViewer_Click(this, args),
+            "report-designer" => () => OpenBandedDesigner_Click(this, args),
+            "quick-layout" => () => OpenReportDesigner_Click(this, args),
+            "period-close" => () => OpenPeriodClose_Click(this, args),
+            "bank-rules" => () => OpenBankRules_Click(this, args),
+            "audit-trail" => () => OpenAuditTrail_Click(this, args),
+            "record-history" => () => OpenRecordHistory_Click(this, args),
+            "check-data" => () => OpenCheckData_Click(this, args),
+            "data-health" => () => OpenDataHealth_Click(this, args),
+            "scheduled-jobs" => () => OpenScheduledJobs_Click(this, args),
+            "permissions" => () => OpenPermissionEditor_Click(this, args),
+            "two-factor" => () => OpenTwoFactor_Click(this, args),
+            _ => null,
+        };
+        open?.Invoke();
     }
+
+    private void Entry_Click(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is Navigation.NavEntry entry)
+        {
+            OpenEntry(entry);
+        }
+    }
+
+    // Choosing a module (or anything in it) in the tree shows that module's page; clicking a screen opens it.
+    private void ModuleTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    {
+        ShellViewModel vm = (ShellViewModel)DataContext;
+        Navigation.NavModule? module = e.NewValue switch
+        {
+            Navigation.NavModule m => m,
+            Navigation.NavGroup g => vm.NavModules.FirstOrDefault(m => m.Groups.Contains(g)),
+            Navigation.NavEntry entry => vm.NavModules.FirstOrDefault(m => m.Title == entry.ModuleTitle),
+            _ => null,
+        };
+        if (module is not null)
+        {
+            vm.SelectedModule = module;
+        }
+    }
+
+    private void ModuleTree_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        for (DependencyObject? at = e.OriginalSource as DependencyObject; at is not null && at != ModuleTree; at = System.Windows.Media.VisualTreeHelper.GetParent(at))
+        {
+            if (at is System.Windows.Controls.TreeViewItem item)
+            {
+                if (item.DataContext is Navigation.NavEntry entry)
+                {
+                    OpenEntry(entry);
+                }
+
+                return;
+            }
+        }
+    }
+
+    private void ModuleTree_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && ModuleTree.SelectedItem is Navigation.NavEntry entry)
+        {
+            OpenEntry(entry);
+            e.Handled = true;
+        }
+    }
+
+    // The search: typing lists matching screens under the box; Down moves into the list, Enter opens the first (or chosen) one, Escape clears it.
+    private void FocusSearch(object sender, ExecutedRoutedEventArgs e)
+    {
+        SearchBox.Focus();
+        SearchBox.SelectAll();
+    }
+
+    private void SearchBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        ShellViewModel vm = (ShellViewModel)DataContext;
+        if (e.Key == Key.Escape)
+        {
+            vm.SearchText = string.Empty;
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Down && vm.SearchResults.Count > 0)
+        {
+            SearchList.SelectedIndex = 0;
+            SearchList.UpdateLayout();
+            ((System.Windows.Controls.ListBoxItem?)SearchList.ItemContainerGenerator.ContainerFromIndex(0))?.Focus();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Enter && vm.SearchResults.Count > 0)
+        {
+            OpenFromSearch(vm.SearchResults[0]);
+            e.Handled = true;
+        }
+    }
+
+    private void SearchList_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (SearchList.SelectedItem is Navigation.NavEntry entry)
+        {
+            OpenFromSearch(entry);
+        }
+    }
+
+    private void SearchList_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && SearchList.SelectedItem is Navigation.NavEntry entry)
+        {
+            OpenFromSearch(entry);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            ((ShellViewModel)DataContext).SearchText = string.Empty;
+            SearchBox.Focus();
+            e.Handled = true;
+        }
+    }
+
+    private void OpenFromSearch(Navigation.NavEntry entry)
+    {
+        ShellViewModel vm = (ShellViewModel)DataContext;
+        vm.SelectedModule = vm.NavModules.FirstOrDefault(m => m.Title == entry.ModuleTitle);
+        vm.SearchText = string.Empty;
+        OpenEntry(entry);
+    }
+
+    private void HowTo_Click(object sender, RoutedEventArgs e) => MessageBox.Show(this,
+        "Three ways to find a screen:" + Environment.NewLine + Environment.NewLine
+        + "1.  Type what you want to do in the search box at the top (for example \"add a product\", \"pay a supplier\", \"register an applicant\") and press Enter."
+        + Environment.NewLine + Environment.NewLine
+        + "2.  Click a module on the home page (or in the list on the left). Its page shows only that module's screens, grouped by the work they are for."
+        + Environment.NewLine + Environment.NewLine
+        + "3.  Use the menus: Modules ▸ module ▸ group ▸ screen; or by the kind of work — Maintenance (setting up), Transactions (day-to-day work), "
+        + "Enquiries (looking things up), Utilities (period end and housekeeping) — ▸ module ▸ screen."
+        + Environment.NewLine + Environment.NewLine
+        + "Every screen opens in its own window, so you can keep several open at once.",
+        "How to find a screen", MessageBoxButton.OK, MessageBoxImage.Information);
 
     private void OpenAccountEnquiry_Click(object sender, RoutedEventArgs e)
     {

@@ -1,45 +1,40 @@
-# Desktop Shell — UI Reference (follow Sage Evolution)
+# Desktop Shell — UI Reference (module-centric, built for non-technical users)
 
-The One4All back-office shell (`One4All.Desktop/Shell`) follows the **Sage Evolution** layout.
+Since 2026-10-14 the shell is organised **by business module, in plain language**, after user testing showed the Sage-style
+"kind of work first" menus were hard to follow. The source of truth is `One4All.Desktop/Navigation/NavigationMap.cs`.
 
 ## Layout regions
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
-│ Menu bar:  File  View  Dashboard  My Desktop  Administration  Maintenance   │
-│            Reports  Transactions  Enquiries  Visual Reports  Charts …  Help │
+│ File  Modules  Maintenance  Transactions  Enquiries  Utilities  Reports  View  Help │
 ├───────────────────────────────────────────────────────────────────────────┤
-│ Toolbar:  Exit | ◀ Back  ▶ Forward | ★ Favourites | [quick icons…] | 🔍Search│
+│ 🏠 Home   🔍 [ What do you want to do?  e.g. "add a product" ]  (Ctrl+F)        │
 ├──────────────────┬────────────────────────────────────────────────────────┤
-│ System Tree      │  Content area (tabbed)                                   │
-│ (left navigator) │                                                          │
-│                  │   ┌─ Module home: grid of large module icons ─────────┐ │
-│ ▸ One4All (root) │   │  [GL] [AR] [AP] [Cash] [Inventory] [Procurement]  │ │
-│  ▾ My Desktop    │   │  [POS] [Vouchers] [Municipal] [Housing] [Payroll] │ │
-│     My Authorisns│   │  [Budget] [Job Costing] [Fixed Assets] [Reports]  │ │
-│     My Calendar  │   └───────────────────────────────────────────────────┘ │
-│     Notifications│                                                          │
-│  ▸ General Ledger│   Selecting a module opens its workspace as a tab.       │
-│  ▸ Accounts Rec. │                                                          │
-│  ▸ Inventory     │                                                          │
-│    ▾ Maintenance │                                                          │
-│      Transactions│                                                          │
-│      Enquiries   │                                                          │
-│      Reports     │                                                          │
+│ Module list      │  Home: one card per module (icon, name, what it is for) │
+│ ▸ Sales & Cust.  │                                                          │
+│ ▾ Stock & Prod.  │  Module page: that module's screens only, in group cards │
+│   ▾ Products     │   ┌ Products ──────────┐ ┌ Stock levels ──────────┐       │
+│      Add a prod… │   │ Add a product…     │ │ Stock take…            │       │
+│   ▸ Stock levels │   └────────────────────┘ └────────────────────────┘       │
+│ ▸ Housing        │                                                          │
 └──────────────────┴────────────────────────────────────────────────────────┘
 ```
 
-## Behaviour rules (from the brief)
+## Behaviour rules
 
-- **Navigation is data-driven**: the System Tree and the module-icon grid are built at runtime from
-  the modules that are **licensed** (`ILicenceService.IsModuleLicensed`) **and permitted** for the
-  signed-in user (`View` on at least one feature in the module). A locked module is *hidden*, not greyed.
-- Each module node expands to the standard child groups **Maintenance / Transactions / Enquiries / Reports**
-  (Sage's convention), themselves filtered by permission.
-- The content area is **tabbed**; the module home tab shows the icon grid.
-- A **company + period + currency indicator** sits in the status bar; a company/period switcher is on the toolbar.
-- **Favourites** and **My Desktop** (authorisations due, notifications, requisitions) are per-user.
-- Colour accent: green on white, dense back-office styling (POS uses a separate touch-first theme).
+- **20 modules** (Sales & Customers, Purchases & Suppliers, Stock & Products, Point of Sale, Restaurant, Accounting, Cash & Banking,
+  Cashiering, Budgets, Fixed Assets, HR & Payroll, Municipality, Housing, Projects & Contracts, Weighbridge, Schools, CRM, Approvals,
+  Reports, Administration), each with plain-language **groups** of screens.
+- Opening a module shows **only that module's screens**. Menus are multi-level: **Modules ▸ module ▸ group ▸ screen**, and
+  **Maintenance / Transactions / Enquiries / Utilities ▸ module ▸ (group ▸) screen** — Transactions ▸ Housing lists Housing only.
+- **Every screen opens in its own window** (`OperationsWindow` for a single action, or the dedicated window), so several can be open.
+- The **search box** finds any screen by what it does (every typed word must match; plurals match singulars); Enter opens the first hit.
+- Data-driven and gated: entries a user's **licence and permissions** do not cover are hidden; empty groups and modules disappear.
+- Any console action the map does not name falls into its module's **More** group, so nothing is unreachable;
+  `NavigationBuilder.Unresolved` lists map entries whose action no longer exists (keep it empty).
+- Adding a screen: place it in `NavigationMap` under the right module and group with a plain title; a new window also needs a key in
+  `ShellWindow.OpenEntry`.
 
 ## MVVM constraint (brief §2.2)
 

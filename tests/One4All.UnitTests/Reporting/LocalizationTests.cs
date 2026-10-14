@@ -33,7 +33,7 @@ public sealed partial class LocalizationTests
     {
         string shell = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "One4All.Desktop", "ShellWindow.xaml"));
         List<string> texts = [.. LocText().Matches(shell).Select(m => m.Groups[1].Value.Replace("&amp;", "&", StringComparison.Ordinal))];
-        texts.Should().HaveCountGreaterThan(40);
+        texts.Should().HaveCountGreaterThan(15);
         TextCatalog.Missing("pt", texts).Should().BeEmpty("translate new menu entries in src/One4All.Application/Localization/Strings/strings.pt.json");
     }
 

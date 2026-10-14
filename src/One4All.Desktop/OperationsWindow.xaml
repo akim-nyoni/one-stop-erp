@@ -12,7 +12,8 @@
     <DockPanel Margin="10">
         <!-- Header -->
         <DockPanel DockPanel.Dock="Top" Margin="6,0,6,6">
-            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
+                        Visibility="{Binding ShowsActionList, Converter={StaticResource Visible}}">
                 <TextBlock Text="{loc:T 'Module'}" Foreground="#667" VerticalAlignment="Center" Margin="0,0,8,0" />
                 <ComboBox ItemsSource="{Binding Modules}" SelectedItem="{Binding Module}" Width="180" />
             </StackPanel>
@@ -30,12 +31,13 @@
 
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" />
+                <ColumnDefinition x:Name="ActionColumn" Width="280" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <!-- Actions -->
-            <Border Grid.Column="0" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Margin="6,0,6,0">
+            <Border Grid.Column="0" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Margin="6,0,6,0"
+                    Visibility="{Binding ShowsActionList, Converter={StaticResource Visible}}">
                 <ListBox ItemsSource="{Binding Operations}" SelectedItem="{Binding Selected}" BorderThickness="0" Margin="4">
                     <ListBox.ItemTemplate>
                         <DataTemplate>

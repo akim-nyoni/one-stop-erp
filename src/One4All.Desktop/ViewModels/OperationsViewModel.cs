@@ -94,6 +94,31 @@ public sealed partial class OperationsViewModel : ObservableObject
         ShowModule();
     }
 
+    /// <summary>Creates the view model for one action, opened in its own window from the navigation.</summary>
+    /// <param name="services">The application service provider.</param>
+    /// <param name="userId">The signed-in user.</param>
+    /// <param name="operation">The action.</param>
+    /// <param name="title">The name the navigation shows for it.</param>
+    public OperationsViewModel(IServiceProvider services, long userId, Operation operation, string? title = null)
+    {
+        _services = services;
+        _userId = userId;
+        _module = operation.Module;
+        IsSingle = true;
+        SingleTitle = title ?? operation.Title;
+        Operations.Add(operation);
+        Selected = operation;
+    }
+
+    /// <summary>Gets a value indicating whether the window shows one action (opened from the navigation) rather than a module's list of actions.</summary>
+    public bool IsSingle { get; }
+
+    /// <summary>Gets a value indicating whether the module's list of actions is shown.</summary>
+    public bool ShowsActionList => !IsSingle;
+
+    /// <summary>Gets the action's name when the window shows one action.</summary>
+    public string? SingleTitle { get; }
+
     /// <summary>Gets the modules.</summary>
     public IReadOnlyList<string> Modules => OperationCatalogue.Modules;
 
@@ -101,7 +126,7 @@ public sealed partial class OperationsViewModel : ObservableObject
     public Application.Navigation.MenuArea? Area { get; }
 
     /// <summary>Gets the console's heading: the module, and the menu area when one was chosen.</summary>
-    public string Heading => Area is Application.Navigation.MenuArea area
+    public string Heading => IsSingle ? SingleTitle! : Area is Application.Navigation.MenuArea area
         ? $"{Localization.UiText.T(Module)} — {Localization.UiText.T(area.ToString())}"
         : Localization.UiText.T(Module);
 

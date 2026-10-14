@@ -23,6 +23,21 @@ public partial class OperationsWindow : Window
         InitializeComponent();
     }
 
+    /// <summary>Opens one action in its own window (from the navigation).</summary>
+    /// <param name="services">The application service provider.</param>
+    /// <param name="userId">The signed-in user.</param>
+    /// <param name="operation">The action.</param>
+    /// <param name="title">The name the navigation shows for it.</param>
+    public OperationsWindow(IServiceProvider services, long userId, Operations.Operation operation, string? title = null)
+    {
+        _services = services;
+        DataContext = new OperationsViewModel(services, userId, operation, title);
+        InitializeComponent();
+        Title = title ?? operation.Title;
+        Width = 1000;
+        ActionColumn.Width = new GridLength(0);
+    }
+
     // The selected row's Id (and the record type to choose) in the record-history window.
     private void WhoTouched_Click(object sender, RoutedEventArgs e)
     {

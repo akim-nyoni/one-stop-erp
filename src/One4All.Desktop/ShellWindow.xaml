@@ -3,38 +3,53 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:One4All.Desktop"
         xmlns:loc="clr-namespace:One4All.Desktop.Localization"
-        xmlns:vm="clr-namespace:One4All.Desktop.ViewModels"
-        Title="One4All ERP" Height="760" Width="1200"
+        xmlns:nav="clr-namespace:One4All.Desktop.Navigation"
+        Title="One4All ERP" Height="800" Width="1280"
         WindowStartupLocation="CenterScreen" Background="White">
     <Window.Resources>
         <local:StringToBrushConverter x:Key="BrushConv" />
+        <BooleanToVisibilityConverter x:Key="Visible" />
 
-        <!-- Module tile button -->
-        <Style x:Key="TileStyle" TargetType="Button">
-            <Setter Property="Width" Value="132" />
-            <Setter Property="Height" Value="104" />
-            <Setter Property="Margin" Value="8" />
+        <!-- A plain, clickable card (module on the home page, screen on a module page) -->
+        <Style x:Key="CardButton" TargetType="Button">
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Card" Background="White" BorderBrush="#E0E6E0" BorderThickness="1" CornerRadius="4">
-                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                                <Border Width="52" Height="52" CornerRadius="26"
-                                        Background="{Binding Accent, Converter={StaticResource BrushConv}}">
-                                    <TextBlock Text="{Binding Glyph}" FontSize="24" Foreground="White"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                </Border>
-                                <TextBlock Text="{Binding Title}" Margin="4,10,4,0" TextAlignment="Center"
-                                           TextWrapping="Wrap" FontSize="12" Foreground="#333" />
-                            </StackPanel>
+                        <Border x:Name="Card" Background="White" BorderBrush="#E0E6E0" BorderThickness="1" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource BrandBrush}" />
-                                <Setter TargetName="Card" Property="Background" Value="#F5FAF5" />
+                                <Setter TargetName="Card" Property="Background" Value="#F3F9F3" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource BrandBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A screen inside a group: its name and one line on what it is for -->
+        <Style x:Key="EntryButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Row" Background="Transparent" CornerRadius="4" Padding="8,6">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="#EAF4EC" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="#EAF4EC" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -45,108 +60,85 @@
 
     <Window.InputBindings>
         <KeyBinding Key="L" Modifiers="Control" Command="{x:Static local:ShellWindow.LockCommand}" />
+        <KeyBinding Key="F" Modifiers="Control" Command="{x:Static local:ShellWindow.SearchCommand}" />
     </Window.InputBindings>
     <Window.CommandBindings>
         <CommandBinding Command="{x:Static local:ShellWindow.LockCommand}" Executed="Lock_Click" />
+        <CommandBinding Command="{x:Static local:ShellWindow.SearchCommand}" Executed="FocusSearch" />
     </Window.CommandBindings>
 
     <DockPanel>
-        <!-- Menu bar -->
-        <Menu x:Name="MainMenu" DockPanel.Dock="Top" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+        <!-- Menus: Modules ▸ group ▸ screen, and the same screens by kind of work (Maintenance, Transactions, Enquiries, Utilities) ▸ module ▸ group ▸ screen -->
+        <Menu x:Name="MainMenu" DockPanel.Dock="Top" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="2">
             <MenuItem Header="{loc:T '_File'}">
+                <MenuItem Header="{loc:T 'Home'}" Command="{Binding GoHomeCommand}" />
+                <Separator />
                 <MenuItem Header="{loc:T 'Lock'}" InputGestureText="Ctrl+L" Click="Lock_Click" />
                 <MenuItem Header="{loc:T 'Sign-in Security (two-factor)…'}" Click="OpenTwoFactor_Click" />
                 <Separator />
                 <MenuItem Header="{loc:T 'Exit'}" Click="Exit_Click" />
             </MenuItem>
-            <MenuItem Header="{loc:T '_View'}">
-                <MenuItem Header="{loc:T 'All Operations by Module'}">
-                    <MenuItem Header="{loc:T 'System Manager — Companies, Accounts, Tax, Traders, Items…'}" Tag="System Manager" Click="OpenOperations_Click" />
-                    <Separator />
-                    <MenuItem Header="{loc:T 'General Ledger — Manual Journals, Funds, Projects, Fund Accounting…'}" Tag="General Ledger" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Customers — Invoices, Credit Notes, Receipts, Statements…'}" Tag="Customers" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Suppliers — Invoices, Credit Notes, Payments, Statements…'}" Tag="Suppliers" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Point of Sale — Refunds, Till Events, Gift Cards…'}" Tag="Point of Sale" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Restaurant — Menu, Tables, Orders, Kitchen, Billing, Reservations…'}" Tag="Restaurant" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Stock — Lots, Transfers, Stocktakes, Assembly, Pricing…'}" Tag="Stock" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Purchasing — Requisitions, Orders, Goods Received, Invoice Matching, Budget Gate…'}" Tag="Purchasing" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Budgeting — Preparation, Review &amp; Approval…'}" Tag="Budgeting" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'CRM — Leads, Activities &amp; Agenda…'}" Tag="CRM" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Municipality — Enquiry Desk, Meter Readings, Billing Runs, Statements…'}" Tag="Municipality" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Receipting — Cashier Session, Payments, Reversals…'}" Tag="Receipting" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Housing — Waiting List, Allocation Runs, Offers, Stands…'}" Tag="Housing" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Weighbridge…'}" Tag="Weighbridge" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Fixed Assets — Counts, Maintenance, CWIP…'}" Tag="Fixed Assets" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Contracts — Variations, BOQ, WBS, Subcontracts, Plant…'}" Tag="Contracts" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'HR &amp; Attendance…'}" Tag="HR &amp; Attendance" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Banking — Cheques, Standing Orders, Direct Debits…'}" Tag="Banking" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Approvals — Delegation &amp; Escalation…'}" Tag="Approvals" Click="OpenOperations_Click" />
-                    <MenuItem Header="{loc:T 'Sales &amp; Schools — Deliveries, Wallets…'}" Tag="Sales &amp; Schools" Click="OpenOperations_Click" />
-                    <Separator />
-                    <MenuItem Header="{loc:T 'Document Printer…'}" Tag="Documents" Click="OpenOperations_Click" />
-                </MenuItem>
-                <Separator />
-                <MenuItem Header="{loc:T 'Larger Text'}" InputGestureText="Ctrl++" Click="LargerText_Click" />
-                <MenuItem Header="{loc:T 'Smaller Text'}" InputGestureText="Ctrl+−" Click="SmallerText_Click" />
-                <MenuItem Header="{loc:T 'Normal Text Size'}" InputGestureText="Ctrl+0" Click="NormalText_Click" />
-            </MenuItem>
-            <MenuItem x:Name="MaintenanceMenu" Header="{loc:T '_Maintenance'}">
-                <MenuItem Header="{loc:T 'Roles &amp; Permissions…'}" Click="OpenPermissionEditor_Click" />
-            </MenuItem>
-            <MenuItem x:Name="TransactionsMenu" Header="{loc:T '_Transactions'}">
-                <MenuItem Header="{loc:T 'Point of Sale — Touch Terminal…'}" Click="OpenPosTerminal_Click" />
-                <MenuItem Header="{loc:T 'Teller — Take a Payment…'}" Click="OpenTeller_Click" />
-                <Separator />
-                <MenuItem Header="{loc:T 'My Approvals…'}" Click="OpenApprovals_Click" />
-                <MenuItem Header="{loc:T 'My Notifications…'}" Click="OpenNotifications_Click" />
-                <MenuItem Header="{loc:T 'Fault Desk…'}" Click="OpenFaultDesk_Click" />
-                <MenuItem Header="{loc:T 'Enquiry Desk…'}" Click="OpenEnquiryDesk_Click" />
-                <MenuItem Header="{loc:T 'Restaurant Floor…'}" Click="OpenFloorPlan_Click" />
-                <MenuItem Header="{loc:T 'Journals Awaiting Approval…'}" Click="OpenJournalApprovals_Click" />
-                <MenuItem Header="{loc:T 'Stock Replenishment…'}" Click="OpenReplenishment_Click" />
-                <MenuItem Header="{loc:T 'Supplier Payment Run…'}" Click="OpenPaymentRun_Click" />
-                <MenuItem Header="{loc:T 'Bank Reconciliation…'}" Click="OpenBankReconciliation_Click" />
-                <MenuItem Header="{loc:T 'Supplier Statement Reconciliation…'}" Click="OpenSupplierReconciliation_Click" />
-            </MenuItem>
-
-            <MenuItem x:Name="EnquiriesMenu" Header="{loc:T '_Enquiries'}">
-                <MenuItem Header="{loc:T 'Account Enquiry…'}" Click="OpenAccountEnquiry_Click" />
-                <MenuItem Header="{loc:T 'Analytics Dashboard…'}" Click="OpenAnalytics_Click" />
-                <MenuItem Header="{loc:T 'Credit Control…'}" Click="OpenCreditControl_Click" />
-                <MenuItem Header="{loc:T 'Customer Documents…'}" Click="OpenCustomerDocuments_Click" />
-                <MenuItem Header="{loc:T 'Group Consolidation…'}" Click="OpenGroupConsolidation_Click" />
-                <MenuItem Header="{loc:T 'Title Deed Pipeline…'}" Click="OpenTitlePipeline_Click" />
-            </MenuItem>
+            <MenuItem x:Name="ModulesMenu" Header="{loc:T 'M_odules'}" />
+            <MenuItem x:Name="MaintenanceMenu" Header="{loc:T '_Maintenance'}" ToolTip="Setting things up: records, rules, rates and policies" />
+            <MenuItem x:Name="TransactionsMenu" Header="{loc:T '_Transactions'}" ToolTip="The day-to-day work: documents, payments and postings" />
+            <MenuItem x:Name="EnquiriesMenu" Header="{loc:T '_Enquiries'}" ToolTip="Looking things up: statements, balances and positions" />
+            <MenuItem x:Name="UtilitiesMenu" Header="{loc:T '_Utilities'}" ToolTip="Period-end runs, imports and housekeeping" />
             <MenuItem Header="{loc:T '_Reports'}">
                 <MenuItem Header="{loc:T 'Report Viewer…'}" Click="OpenReportViewer_Click" />
                 <MenuItem Header="{loc:T 'Report Designer…'}" Click="OpenBandedDesigner_Click" />
                 <MenuItem Header="{loc:T 'Quick Column Layout…'}" Click="OpenReportDesigner_Click" />
             </MenuItem>
-            <MenuItem x:Name="UtilitiesMenu" Header="{loc:T '_Utilities'}">
-                <MenuItem Header="{loc:T 'Period Close Checklist…'}" Click="OpenPeriodClose_Click" />
-                <MenuItem Header="{loc:T 'Bank Rules…'}" Click="OpenBankRules_Click" />
-                <MenuItem Header="{loc:T 'Audit Trail…'}" Click="OpenAuditTrail_Click" />
-                <MenuItem Header="{loc:T 'Who Touched This Record…'}" Click="OpenRecordHistory_Click" />
-                <MenuItem Header="{loc:T 'Check Data…'}" Click="OpenCheckData_Click" />
-                <MenuItem Header="{loc:T 'Data Health…'}" Click="OpenDataHealth_Click" />
-                <MenuItem Header="{loc:T 'Scheduled Jobs…'}" Click="OpenScheduledJobs_Click" />
+            <MenuItem Header="{loc:T '_View'}">
+                <MenuItem Header="{loc:T 'Larger Text'}" InputGestureText="Ctrl++" Click="LargerText_Click" />
+                <MenuItem Header="{loc:T 'Smaller Text'}" InputGestureText="Ctrl+−" Click="SmallerText_Click" />
+                <MenuItem Header="{loc:T 'Normal Text Size'}" InputGestureText="Ctrl+0" Click="NormalText_Click" />
             </MenuItem>
             <MenuItem Header="{loc:T '_Help'}">
+                <MenuItem Header="{loc:T 'How to find a screen'}" Click="HowTo_Click" />
                 <MenuItem Header="{loc:T 'Check for Updates…'}" Click="CheckForUpdates_Click" />
             </MenuItem>
         </Menu>
 
-        <!-- Toolbar -->
+        <!-- Toolbar: home, and a search that finds any screen by what it does -->
         <Border DockPanel.Dock="Top" Background="{StaticResource ToolbarBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
-            <DockPanel LastChildFill="False" Margin="8,5">
-                <Button Content="Exit" Padding="10,3" Click="Exit_Click" DockPanel.Dock="Left" Margin="0,0,8,0" />
-                <Button Content="◀ Back" Padding="10,3" IsEnabled="False" DockPanel.Dock="Left" Margin="0,0,4,0" />
-                <Button Content="Forward ▶" Padding="10,3" IsEnabled="False" DockPanel.Dock="Left" Margin="0,0,12,0" />
-                <Button Content="★ Favourites" Padding="10,3" DockPanel.Dock="Left" />
-                <TextBlock Text="{Binding LicenceStatusText}" DockPanel.Dock="Right" VerticalAlignment="Center"
-                           Margin="12,0" Foreground="#556" FontSize="12" />
-                <TextBox DockPanel.Dock="Right" Width="180" Height="24" VerticalContentAlignment="Center"
-                         Padding="6,0" Text="Search" Foreground="#999" />
+            <DockPanel LastChildFill="False" Margin="8,6">
+                <Button Content="🏠  Home" Padding="12,4" Command="{Binding GoHomeCommand}" DockPanel.Dock="Left" Margin="0,0,10,0" ToolTip="Back to the list of modules" />
+                <Grid DockPanel.Dock="Left" Width="420">
+                    <TextBox x:Name="SearchBox" Height="28" VerticalContentAlignment="Center" Padding="8,0"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" PreviewKeyDown="SearchBox_PreviewKeyDown"
+                             ToolTip="Type what you want to do, e.g. add a product, pay a supplier, register an applicant (Ctrl+F)" />
+                    <TextBlock Text="🔍  What do you want to do? (e.g. add a product)" Foreground="#9AA" Margin="10,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Popup x:Name="SearchPopup" PlacementTarget="{Binding ElementName=SearchBox}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True"
+                           IsOpen="{Binding HasSearchResults, Mode=OneWay}" Width="560">
+                        <Border Background="White" BorderBrush="{StaticResource BrandBrush}" BorderThickness="1" CornerRadius="4" Padding="4">
+                            <ListBox x:Name="SearchList" ItemsSource="{Binding SearchResults}" BorderThickness="0" MaxHeight="440"
+                                     MouseLeftButtonUp="SearchList_Click" KeyDown="SearchList_KeyDown">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type nav:NavEntry}">
+                                        <StackPanel Margin="2,3">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="#1E3A2E" />
+                                            <TextBlock FontSize="11" Foreground="#778">
+                                                <Run Text="{Binding ModuleTitle, Mode=OneWay}" /><Run Text="  ›  " /><Run Text="{Binding GroupTitle, Mode=OneWay}" /><Run Text="  —  " /><Run Text="{Binding Purpose, Mode=OneWay}" />
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+                    </Popup>
+                </Grid>
+                <TextBlock Text="{Binding LicenceStatusText}" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="12,0" Foreground="#556" FontSize="12" />
             </DockPanel>
         </Border>
 
@@ -158,65 +150,107 @@
             </DockPanel>
         </Border>
 
-        <!-- Main: System Tree + content -->
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="248" />
+                <ColumnDefinition Width="270" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- System Tree -->
+            <!-- Modules: each opens to its groups and screens -->
             <DockPanel Grid.Column="0" Background="{StaticResource TreeBrush}">
-                <Border DockPanel.Dock="Top" Background="#ECF1EC" Padding="10,6" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
-                    <TextBlock Text="System Tree" FontWeight="SemiBold" Foreground="#445" />
+                <Border DockPanel.Dock="Top" Background="#ECF1EC" Padding="10,7" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                    <TextBlock Text="Modules" FontWeight="SemiBold" Foreground="#445" />
                 </Border>
-                <TreeView BorderThickness="0" Background="Transparent" Padding="4">
-                    <TreeViewItem Header="{Binding TreeRoot.Title}" IsExpanded="True"
-                                  ItemsSource="{Binding TreeRoot.Children}">
-                        <TreeViewItem.ItemTemplate>
-                            <HierarchicalDataTemplate DataType="{x:Type vm:NavNode}" ItemsSource="{Binding Children}">
-                                <TextBlock Text="{Binding Title}" />
-                            </HierarchicalDataTemplate>
-                        </TreeViewItem.ItemTemplate>
-                    </TreeViewItem>
+                <TreeView x:Name="ModuleTree" BorderThickness="0" Background="Transparent" Padding="4" ItemsSource="{Binding NavModules}"
+                          SelectedItemChanged="ModuleTree_SelectedItemChanged" MouseLeftButtonUp="ModuleTree_MouseLeftButtonUp" KeyDown="ModuleTree_KeyDown">
+                    <TreeView.Resources>
+                        <HierarchicalDataTemplate DataType="{x:Type nav:NavModule}" ItemsSource="{Binding Groups}">
+                            <StackPanel Orientation="Horizontal" Margin="0,3">
+                                <TextBlock Text="{Binding Glyph}" Width="24" />
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </HierarchicalDataTemplate>
+                        <HierarchicalDataTemplate DataType="{x:Type nav:NavGroup}" ItemsSource="{Binding Entries}">
+                            <TextBlock Text="{Binding Title}" Foreground="#445" Margin="0,2" />
+                        </HierarchicalDataTemplate>
+                        <DataTemplate DataType="{x:Type nav:NavEntry}">
+                            <TextBlock Text="{Binding Title}" Foreground="#1E5E2E" Margin="0,1" ToolTip="{Binding Purpose}" />
+                        </DataTemplate>
+                    </TreeView.Resources>
                 </TreeView>
             </DockPanel>
 
             <GridSplitter Grid.Column="1" Width="3" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{StaticResource BorderBrush}" />
 
-            <!-- Content -->
-            <DockPanel Grid.Column="2" Margin="0">
-                <Border DockPanel.Dock="Top" Padding="18,12" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
-                    <TextBlock Text="{Binding ContentHeader}" FontSize="20" FontWeight="Bold" Foreground="{StaticResource BrandDarkBrush}" />
+            <!-- The page: home (the modules) or one module's screens in their groups -->
+            <DockPanel Grid.Column="2" Background="#F6F8F6">
+                <Border DockPanel.Dock="Top" Padding="22,14" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="◀  All modules" Padding="12,4" VerticalAlignment="Center" Command="{Binding GoHomeCommand}"
+                                Visibility="{Binding IsModulePage, Converter={StaticResource Visible}}" />
+                        <StackPanel>
+                            <TextBlock Text="{Binding PageTitle}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BrandDarkBrush}" />
+                            <TextBlock Text="{Binding PageSubtitle}" Foreground="#667" FontSize="13" TextWrapping="Wrap" Margin="0,3,0,0" />
+                        </StackPanel>
+                    </DockPanel>
                 </Border>
 
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" MaxHeight="420">
-                        <ItemsControl ItemsSource="{Binding Modules}" Margin="12">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <Grid Margin="14">
+                        <!-- Home: one card per module -->
+                        <ItemsControl ItemsSource="{Binding NavModules}" Visibility="{Binding IsHome, Converter={StaticResource Visible}}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Button Style="{StaticResource TileStyle}"
-                                            Command="{Binding DataContext.OpenModuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                            CommandParameter="{Binding}" />
+                                <DataTemplate DataType="{x:Type nav:NavModule}">
+                                    <Button Style="{StaticResource CardButton}" Width="250" Height="118" Margin="8" Padding="14,12"
+                                            Command="{Binding DataContext.OpenModuleCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
+                                        <DockPanel>
+                                            <Border DockPanel.Dock="Left" Width="46" Height="46" CornerRadius="23" VerticalAlignment="Top" Margin="0,0,12,0"
+                                                    Background="{Binding Accent, Converter={StaticResource BrushConv}}">
+                                                <TextBlock Text="{Binding Glyph}" FontSize="22" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Foreground="#223" />
+                                                <TextBlock Text="{Binding Purpose}" FontSize="12" Foreground="#667" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                    </ScrollViewer>
 
-                    <Border Grid.Row="1" Margin="18,4,18,18" Padding="18" Background="#F8FAF8"
-                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" VerticalAlignment="Top">
-                        <TextBlock Text="{Binding ContentMessage}" TextWrapping="Wrap" Foreground="#555" FontSize="13" />
-                    </Border>
-                </Grid>
+                        <!-- A module: its groups, each listing its screens -->
+                        <ItemsControl ItemsSource="{Binding SelectedModule.Groups}" Visibility="{Binding IsModulePage, Converter={StaticResource Visible}}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type nav:NavGroup}">
+                                    <Border Width="380" Margin="8" Padding="12,10" Background="White" BorderBrush="#E0E6E0" BorderThickness="1" CornerRadius="6" VerticalAlignment="Top">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource BrandDarkBrush}" Margin="8,0,0,6" />
+                                            <ItemsControl ItemsSource="{Binding Entries}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate DataType="{x:Type nav:NavEntry}">
+                                                        <Button Style="{StaticResource EntryButton}" Click="Entry_Click" ToolTip="{Binding Purpose}">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="#1E5E2E" TextWrapping="Wrap" />
+                                                                <TextBlock Text="{Binding Purpose}" FontSize="11" Foreground="#778" TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </ScrollViewer>
             </DockPanel>
         </Grid>
     </DockPanel>
