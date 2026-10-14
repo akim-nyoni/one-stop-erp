@@ -266,16 +266,36 @@ public partial class ShellWindow : Window
     private void ModuleTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         ShellViewModel vm = (ShellViewModel)DataContext;
-        Navigation.NavModule? module = e.NewValue switch
+        switch (e.NewValue)
         {
-            Navigation.NavModule m => m,
-            Navigation.NavGroup g => vm.NavModules.FirstOrDefault(m => m.Groups.Contains(g)),
-            Navigation.NavEntry entry => vm.NavModules.FirstOrDefault(m => m.Title == entry.ModuleTitle),
-            _ => null,
-        };
-        if (module is not null)
+            case Navigation.NavModule module:
+                vm.OpenModuleCommand.Execute(module);
+                break;
+            case Navigation.NavGroup group:
+                vm.OpenGroupCommand.Execute(group);
+                break;
+            case Navigation.NavEntry entry:
+                ShowGroupOf(entry);
+                break;
+        }
+    }
+
+    // Shows the page of the group a screen is in.
+    private void ShowGroupOf(Navigation.NavEntry entry)
+    {
+        ShellViewModel vm = (ShellViewModel)DataContext;
+        Navigation.NavGroup? group = vm.NavModules.SelectMany(m => m.Groups).FirstOrDefault(g => g.Entries.Contains(entry));
+        if (group is not null)
         {
-            vm.SelectedModule = module;
+            vm.OpenGroupCommand.Execute(group);
+        }
+    }
+
+    private void Group_Click(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is Navigation.NavGroup group)
+        {
+            ((ShellViewModel)DataContext).OpenGroupCommand.Execute(group);
         }
     }
 
@@ -359,7 +379,7 @@ public partial class ShellWindow : Window
     private void OpenFromSearch(Navigation.NavEntry entry)
     {
         ShellViewModel vm = (ShellViewModel)DataContext;
-        vm.SelectedModule = vm.NavModules.FirstOrDefault(m => m.Title == entry.ModuleTitle);
+        ShowGroupOf(entry);
         vm.SearchText = string.Empty;
         OpenEntry(entry);
     }
@@ -368,7 +388,8 @@ public partial class ShellWindow : Window
         "Three ways to find a screen:" + Environment.NewLine + Environment.NewLine
         + "1.  Type what you want to do in the search box at the top (for example \"add a product\", \"pay a supplier\", \"register an applicant\") and press Enter."
         + Environment.NewLine + Environment.NewLine
-        + "2.  Click a module on the home page (or in the list on the left). Its page shows only that module's screens, grouped by the work they are for."
+        + "2.  Click a module on the home page (or in the list on the left). Its page shows only that module's areas of work; click an area to see its screens. "
+        + "The line at the top (Home › module › area) shows where you are, and the back button goes up one level."
         + Environment.NewLine + Environment.NewLine
         + "3.  Use the menus: Modules ▸ module ▸ group ▸ screen; or by the kind of work — Maintenance (setting up), Transactions (day-to-day work), "
         + "Enquiries (looking things up), Utilities (period end and housekeeping) — ▸ module ▸ screen."

@@ -27,6 +27,15 @@ public sealed class NavEntry
     /// <summary>Gets the group it is under.</summary>
     public required string GroupTitle { get; init; }
 
+    /// <summary>Gets the kind of work in plain words (setting up, day-to-day, looking up, period end).</summary>
+    public string AreaLabel => Area switch
+    {
+        MenuArea.Maintenance => "Setting up",
+        MenuArea.Enquiries => "Look up",
+        MenuArea.Utilities => "Period end / housekeeping",
+        _ => "Day-to-day",
+    };
+
     /// <summary>Gets the words a search looks through.</summary>
     public string SearchText => $"{Title} {Purpose} {ModuleTitle} {GroupTitle} {Operation?.Title}";
 }
@@ -34,7 +43,23 @@ public sealed class NavEntry
 /// <summary>A group of screens in a module.</summary>
 /// <param name="Title">The group's name.</param>
 /// <param name="Entries">Its screens.</param>
-public sealed record NavGroup(string Title, IReadOnlyList<NavEntry> Entries);
+public sealed record NavGroup(string Title, IReadOnlyList<NavEntry> Entries)
+{
+    /// <summary>Gets the group's icon.</summary>
+    public string Glyph { get; init; } = "📁";
+
+    /// <summary>Gets its colour (the module's).</summary>
+    public string Accent { get; init; } = "#2E7D32";
+
+    /// <summary>Gets how many screens it has.</summary>
+    public int Count => Entries.Count;
+
+    /// <summary>Gets "n screens" for the card.</summary>
+    public string CountText => Entries.Count == 1 ? "1 screen" : $"{Entries.Count} screens";
+
+    /// <summary>Gets the first few screens' names, as a hint of what is inside.</summary>
+    public string Preview => string.Join("  ·  ", Entries.Take(3).Select(e => e.Title)) + (Entries.Count > 3 ? "  ·  …" : string.Empty);
+}
 
 /// <summary>A module the user may use, with the groups and screens they may use in it.</summary>
 /// <param name="Title">The module's name.</param>
@@ -97,7 +122,7 @@ public static class NavigationBuilder
 
                 if (entries.Count > 0)
                 {
-                    groups.Add(new NavGroup(group.Title, entries));
+                    groups.Add(new NavGroup(group.Title, entries) { Glyph = GroupGlyph(group.Title, spec.Glyph), Accent = spec.Accent });
                 }
             }
 
@@ -111,7 +136,7 @@ public static class NavigationBuilder
             NavModule home = modules[index];
             List<NavEntry> more = [.. stray.Select(o => Entry(o, null, home.Title, "More"))];
             NavGroup? existing = home.Groups.FirstOrDefault(g => g.Title == "More");
-            List<NavGroup> groups = [.. home.Groups.Where(g => g != existing), new NavGroup("More", [.. existing?.Entries ?? [], .. more])];
+            List<NavGroup> groups = [.. home.Groups.Where(g => g != existing), new NavGroup("More", [.. existing?.Entries ?? [], .. more]) { Glyph = "➕", Accent = home.Accent }];
             modules[index] = home with { Groups = groups };
         }
 
@@ -129,6 +154,38 @@ public static class NavigationBuilder
     {
         Title = title ?? operation.Title, Purpose = FirstSentence(operation.Description), Area = operation.MenuArea, Operation = operation, ModuleTitle = module, GroupTitle = group,
     };
+
+    // An icon for a group from the words in its name, so the cards are easy to tell apart; otherwise the module's own icon.
+    private static readonly (string Word, string Glyph)[] GroupGlyphs =
+    [
+        ("report", "📊"), ("enquir", "🔎"), ("look", "🔎"), ("setup", "⚙️"), ("set up", "⚙️"), ("setting", "⚙️"), ("rule", "⚙️"), ("polic", "📜"),
+        ("import", "📥"), ("export", "📤"), ("period", "📅"), ("year", "📅"), ("calendar", "📅"), ("leave", "🌴"), ("attendance", "⏱️"), ("time", "⏱️"),
+        ("payroll", "💵"), ("pay", "💳"), ("receipt", "🧾"), ("invoice", "🧾"), ("bill", "🧾"), ("statement", "📄"), ("document", "📄"), ("letter", "✉️"),
+        ("message", "✉️"), ("customer", "👥"), ("supplier", "🚚"), ("employee", "🧑‍💼"), ("people", "👥"), ("applicant", "🧑"), ("waiting", "⏳"),
+        ("product", "📦"), ("stock", "🏬"), ("warehouse", "🏬"), ("count", "🔢"), ("production", "🏭"), ("price", "🏷️"), ("promotion", "🏷️"),
+        ("loyalty", "⭐"), ("gift", "🎁"), ("refund", "↩️"), ("return", "↩️"), ("till", "🖥️"), ("table", "🍽️"), ("kitchen", "🍳"), ("order", "📝"),
+        ("quote", "📝"), ("requisition", "📝"), ("bank", "🏦"), ("cash", "💰"), ("cheque", "💰"), ("journal", "📒"), ("ledger", "📒"), ("account", "📒"),
+        ("tax", "🏛️"), ("currenc", "💱"), ("budget", "📈"), ("asset", "🏢"), ("depreciat", "📉"), ("maintenance", "🔧"), ("fault", "🔧"),
+        ("land", "🗺️"), ("stand", "🗺️"), ("allocation", "🔑"), ("title", "📜"), ("ownership", "📜"), ("rental", "🏠"), ("scheme", "🏗️"),
+        ("property", "🏠"), ("meter", "📟"), ("tariff", "🏷️"), ("licen", "📜"), ("clearance", "✅"), ("approv", "✅"), ("contract", "📑"),
+        ("certificate", "📜"), ("weigh", "⚖️"), ("student", "🎓"), ("class", "🏫"), ("fee", "💳"), ("bursar", "🎓"), ("lead", "🎯"),
+        ("opportunit", "🎯"), ("activit", "📌"), ("user", "👤"), ("security", "🔒"), ("permission", "🔒"), ("company", "🏢"), ("data", "🗄️"),
+        ("schedul", "⏰"), ("audit", "🕵️"), ("design", "✏️"), ("training", "📚"), ("disciplin", "⚠️"), ("grievance", "⚠️"),
+    ];
+
+    private static string GroupGlyph(string title, string fallback)
+    {
+        string lower = title.ToLowerInvariant();
+        foreach ((string word, string glyph) in GroupGlyphs)
+        {
+            if (lower.Contains(word, StringComparison.Ordinal))
+            {
+                return glyph;
+            }
+        }
+
+        return fallback;
+    }
 
     // The description's first sentence, kept short for a card.
     private static string FirstSentence(string text)

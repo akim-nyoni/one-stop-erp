@@ -70,8 +70,13 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>The module shown (null: the home page).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsHome), nameof(IsModulePage), nameof(PageTitle), nameof(PageSubtitle))]
+    [NotifyPropertyChangedFor(nameof(IsHome), nameof(IsModulePage), nameof(IsGroupPage), nameof(PageTitle), nameof(PageSubtitle), nameof(Breadcrumb), nameof(BackText))]
     private NavModule? _selectedModule;
+
+    /// <summary>The group shown inside the module (null: the module's groups).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsModulePage), nameof(IsGroupPage), nameof(PageTitle), nameof(PageSubtitle), nameof(Breadcrumb), nameof(BackText))]
+    private NavGroup? _selectedGroup;
 
     /// <summary>What is typed in the search box.</summary>
     [ObservableProperty]
@@ -81,17 +86,29 @@ public sealed partial class ShellViewModel : ObservableObject
     /// <summary>Gets a value indicating whether the home page is shown.</summary>
     public bool IsHome => SelectedModule is null;
 
-    /// <summary>Gets a value indicating whether a module's page is shown.</summary>
-    public bool IsModulePage => SelectedModule is not null;
+    /// <summary>Gets a value indicating whether a module's page (its groups) is shown.</summary>
+    public bool IsModulePage => SelectedModule is not null && SelectedGroup is null;
+
+    /// <summary>Gets a value indicating whether a group's page (its screens) is shown.</summary>
+    public bool IsGroupPage => SelectedModule is not null && SelectedGroup is not null;
+
+    /// <summary>Gets where the page is: Home › module › group.</summary>
+    public string Breadcrumb => SelectedModule is null ? "Home"
+        : SelectedGroup is null ? $"Home  ›  {SelectedModule.Title}" : $"Home  ›  {SelectedModule.Title}  ›  {SelectedGroup.Title}";
+
+    /// <summary>Gets the back button's text.</summary>
+    public string BackText => SelectedGroup is not null && SelectedModule is { Groups.Count: > 1 } ? $"◀  {SelectedModule.Title}" : "◀  All modules";
 
     /// <summary>Gets a value indicating whether the search found anything.</summary>
     public bool HasSearchResults => SearchResults.Count > 0;
 
     /// <summary>Gets the page's title.</summary>
-    public string PageTitle => SelectedModule?.Title ?? "Home";
+    public string PageTitle => SelectedGroup?.Title ?? SelectedModule?.Title ?? "Home";
 
     /// <summary>Gets the line under the page's title.</summary>
-    public string PageSubtitle => SelectedModule?.Purpose ?? Welcome;
+    public string PageSubtitle => SelectedGroup is not null ? $"{SelectedGroup.CountText} in {SelectedModule?.Title}. Click one to open it in its own window."
+        : SelectedModule is not null ? $"{SelectedModule.Purpose} Choose an area to see its screens."
+        : Welcome;
 
     /// <summary>Re-reads the licence status line.</summary>
     /// <param name="licence">The licence.</param>
@@ -128,10 +145,44 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>Shows the home page.</summary>
     [RelayCommand]
-    private void GoHome() => SelectedModule = null;
+    private void GoHome()
+    {
+        SelectedGroup = null;
+        SelectedModule = null;
+    }
 
-    /// <summary>Shows a module's page.</summary>
+    /// <summary>Goes up one level: from a group to its module, from a module to the home page.</summary>
+    [RelayCommand]
+    private void GoBack()
+    {
+        if (SelectedGroup is not null && SelectedModule is { Groups.Count: > 1 })
+        {
+            SelectedGroup = null;
+        }
+        else
+        {
+            GoHome();
+        }
+    }
+
+    /// <summary>Shows a module's page; a module with a single group opens straight to its screens.</summary>
     /// <param name="module">The module.</param>
     [RelayCommand]
-    private void OpenModule(NavModule? module) => SelectedModule = module;
+    private void OpenModule(NavModule? module)
+    {
+        SelectedGroup = module is { Groups.Count: 1 } ? module.Groups[0] : null;
+        SelectedModule = module;
+    }
+
+    /// <summary>Shows a group's screens.</summary>
+    /// <param name="group">The group.</param>
+    [RelayCommand]
+    private void OpenGroup(NavGroup? group)
+    {
+        if (group is not null)
+        {
+            SelectedModule = NavModules.FirstOrDefault(m => m.Groups.Contains(group)) ?? SelectedModule;
+            SelectedGroup = group;
+        }
+    }
 }

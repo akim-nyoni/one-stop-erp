@@ -33,29 +33,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
-        <!-- A screen inside a group: its name and one line on what it is for -->
-        <Style x:Key="EntryButton" TargetType="Button">
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Row" Background="Transparent" CornerRadius="4" Padding="8,6">
-                            <ContentPresenter />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Row" Property="Background" Value="#EAF4EC" />
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Row" Property="Background" Value="#EAF4EC" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Window.Resources>
 
     <Window.InputBindings>
@@ -138,15 +115,14 @@
                         </Border>
                     </Popup>
                 </Grid>
-                <TextBlock Text="{Binding LicenceStatusText}" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="12,0" Foreground="#556" FontSize="12" />
             </DockPanel>
         </Border>
 
         <!-- Status bar -->
         <Border DockPanel.Dock="Bottom" Background="{StaticResource BrandBrush}">
-            <DockPanel Margin="10,4">
+            <DockPanel Margin="10,4" LastChildFill="False">
                 <TextBlock Text="{Binding UserDisplayName, StringFormat='Signed in: {0}'}" Foreground="White" FontSize="12" DockPanel.Dock="Left" />
-                <TextBlock Text="{Binding LicenceStatusText}" Foreground="#DCEFDD" FontSize="12" DockPanel.Dock="Right" />
+                <TextBlock Text="{Binding LicenceStatusText, StringFormat='Licence: {0}'}" Foreground="#DCEFDD" FontSize="12" DockPanel.Dock="Right" />
             </DockPanel>
         </Border>
 
@@ -183,38 +159,49 @@
 
             <GridSplitter Grid.Column="1" Width="3" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{StaticResource BorderBrush}" />
 
-            <!-- The page: home (the modules) or one module's screens in their groups -->
+            <!-- The page, three levels of cards: Home (the modules) › a module (its areas of work) › an area (its screens) -->
             <DockPanel Grid.Column="2" Background="#F6F8F6">
-                <Border DockPanel.Dock="Top" Padding="22,14" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                <Border DockPanel.Dock="Top" Padding="22,12" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="◀  All modules" Padding="12,4" VerticalAlignment="Center" Command="{Binding GoHomeCommand}"
-                                Visibility="{Binding IsModulePage, Converter={StaticResource Visible}}" />
+                        <Button DockPanel.Dock="Right" Content="{Binding BackText}" Padding="14,6" VerticalAlignment="Center" Command="{Binding GoBackCommand}"
+                                ToolTip="Go up one level">
+                            <Button.Style>
+                                <Style TargetType="Button">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsHome}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
                         <StackPanel>
+                            <TextBlock Text="{Binding Breadcrumb}" Foreground="#8A958A" FontSize="12" Margin="0,0,0,2" />
                             <TextBlock Text="{Binding PageTitle}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BrandDarkBrush}" />
                             <TextBlock Text="{Binding PageSubtitle}" Foreground="#667" FontSize="13" TextWrapping="Wrap" Margin="0,3,0,0" />
                         </StackPanel>
                     </DockPanel>
                 </Border>
 
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <Grid Margin="14">
                         <!-- Home: one card per module -->
                         <ItemsControl ItemsSource="{Binding NavModules}" Visibility="{Binding IsHome, Converter={StaticResource Visible}}">
                             <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                <ItemsPanelTemplate><nav:FillWrapPanel MinItemWidth="290" /></ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type nav:NavModule}">
-                                    <Button Style="{StaticResource CardButton}" Width="250" Height="118" Margin="8" Padding="14,12"
+                                    <Button Style="{StaticResource CardButton}" MinHeight="120" Margin="8" Padding="16,14"
                                             Command="{Binding DataContext.OpenModuleCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}">
                                         <DockPanel>
-                                            <Border DockPanel.Dock="Left" Width="46" Height="46" CornerRadius="23" VerticalAlignment="Top" Margin="0,0,12,0"
+                                            <Border DockPanel.Dock="Left" Width="50" Height="50" CornerRadius="25" VerticalAlignment="Top" Margin="0,0,14,0"
                                                     Background="{Binding Accent, Converter={StaticResource BrushConv}}">
-                                                <TextBlock Text="{Binding Glyph}" FontSize="22" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <TextBlock Text="{Binding Glyph}" FontSize="23" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Border>
                                             <StackPanel>
-                                                <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Foreground="#223" />
-                                                <TextBlock Text="{Binding Purpose}" FontSize="12" Foreground="#667" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" Foreground="#223" />
+                                                <TextBlock Text="{Binding Purpose}" FontSize="12.5" Foreground="#667" TextWrapping="Wrap" Margin="0,4,0,0" />
                                             </StackPanel>
                                         </DockPanel>
                                     </Button>
@@ -222,30 +209,60 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <!-- A module: its groups, each listing its screens -->
+                        <!-- A module: one card per area of work, with how many screens it has and the first few of them -->
                         <ItemsControl ItemsSource="{Binding SelectedModule.Groups}" Visibility="{Binding IsModulePage, Converter={StaticResource Visible}}">
                             <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                <ItemsPanelTemplate><nav:FillWrapPanel MinItemWidth="300" /></ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type nav:NavGroup}">
-                                    <Border Width="380" Margin="8" Padding="12,10" Background="White" BorderBrush="#E0E6E0" BorderThickness="1" CornerRadius="6" VerticalAlignment="Top">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource BrandDarkBrush}" Margin="8,0,0,6" />
-                                            <ItemsControl ItemsSource="{Binding Entries}">
-                                                <ItemsControl.ItemTemplate>
-                                                    <DataTemplate DataType="{x:Type nav:NavEntry}">
-                                                        <Button Style="{StaticResource EntryButton}" Click="Entry_Click" ToolTip="{Binding Purpose}">
-                                                            <StackPanel>
-                                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="#1E5E2E" TextWrapping="Wrap" />
-                                                                <TextBlock Text="{Binding Purpose}" FontSize="11" Foreground="#778" TextWrapping="Wrap" />
-                                                            </StackPanel>
-                                                        </Button>
-                                                    </DataTemplate>
-                                                </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </StackPanel>
-                                    </Border>
+                                    <Button Style="{StaticResource CardButton}" MinHeight="120" Margin="8" Padding="16,14" Click="Group_Click">
+                                        <DockPanel>
+                                            <Border DockPanel.Dock="Left" Width="50" Height="50" CornerRadius="25" VerticalAlignment="Top" Margin="0,0,14,0"
+                                                    Background="{Binding Accent, Converter={StaticResource BrushConv}}">
+                                                <TextBlock Text="{Binding Glyph}" FontSize="22" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
+                                            <TextBlock DockPanel.Dock="Right" Text="›" FontSize="26" Foreground="#B5C2B5" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                            <StackPanel>
+                                                <DockPanel>
+                                                    <Border DockPanel.Dock="Right" Background="#EAF4EC" CornerRadius="9" Padding="8,1" VerticalAlignment="Center" Margin="8,0,0,0">
+                                                        <TextBlock Text="{Binding CountText}" FontSize="11" Foreground="{StaticResource BrandDarkBrush}" />
+                                                    </Border>
+                                                    <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" Foreground="#223" TextWrapping="Wrap" />
+                                                </DockPanel>
+                                                <TextBlock Text="{Binding Preview}" FontSize="12.5" Foreground="#667" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- An area: one card per screen, with what it is for and the kind of work; each opens in its own window -->
+                        <ItemsControl ItemsSource="{Binding SelectedGroup.Entries}" Visibility="{Binding IsGroupPage, Converter={StaticResource Visible}}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><nav:FillWrapPanel MinItemWidth="300" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type nav:NavEntry}">
+                                    <Button Style="{StaticResource CardButton}" MinHeight="112" Margin="8" Padding="0" Click="Entry_Click">
+                                        <DockPanel>
+                                            <Border DockPanel.Dock="Left" Width="5" CornerRadius="6,0,0,6"
+                                                    Background="{Binding DataContext.SelectedModule.Accent, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BrushConv}}" />
+                                            <DockPanel Margin="14,12,14,10">
+                                                <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                                                    <TextBlock DockPanel.Dock="Right" Text="Open  ›" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource BrandBrush}" VerticalAlignment="Center" />
+                                                    <Border Background="#F0F2F0" CornerRadius="9" Padding="8,1" HorizontalAlignment="Left">
+                                                        <TextBlock Text="{Binding AreaLabel}" FontSize="11" Foreground="#667" />
+                                                    </Border>
+                                                </DockPanel>
+                                                <StackPanel>
+                                                    <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Foreground="#1E3A2E" TextWrapping="Wrap" />
+                                                    <TextBlock Text="{Binding Purpose}" FontSize="12.5" Foreground="#667" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                </StackPanel>
+                                            </DockPanel>
+                                        </DockPanel>
+                                    </Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>

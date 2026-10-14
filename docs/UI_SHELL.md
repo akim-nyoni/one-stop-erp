@@ -26,6 +26,9 @@ Since 2026-10-14 the shell is organised **by business module, in plain language*
 - **20 modules** (Sales & Customers, Purchases & Suppliers, Stock & Products, Point of Sale, Restaurant, Accounting, Cash & Banking,
   Cashiering, Budgets, Fixed Assets, HR & Payroll, Municipality, Housing, Projects & Contracts, Weighbridge, Schools, CRM, Approvals,
   Reports, Administration), each with plain-language **groups** of screens.
+- **Three levels of cards** that fill the page width (`FillWrapPanel`: equal columns, each card at least ~300 px, cards in a row share a height): 
+  Home (module cards) ▸ module (one card per area of work: icon, screen count, first few screen names) ▸ area (one card per screen: what it is for,
+  the kind of work, Open ›). A breadcrumb (Home › module › area) and a back button go up one level; a module with one area opens straight to it.
 - Opening a module shows **only that module's screens**. Menus are multi-level: **Modules ▸ module ▸ group ▸ screen**, and
   **Maintenance / Transactions / Enquiries / Utilities ▸ module ▸ (group ▸) screen** — Transactions ▸ Housing lists Housing only.
 - **Every screen opens in its own window** (`OperationsWindow` for a single action, or the dedicated window), so several can be open.
