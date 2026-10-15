@@ -33,6 +33,53 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- A row in the module list: lights on hover -->
+        <Style x:Key="TreeRow" TargetType="Border">
+            <Setter Property="Padding" Value="6,3" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E3EFE5" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- A module in the list: lit, with a bar in its colour, while it is the one shown -->
+        <Style x:Key="ModuleRow" TargetType="Border" BasedOn="{StaticResource TreeRow}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                    <Setter Property="Background" Value="#D6EBDA" />
+                    <Setter Property="BorderBrush" Value="{Binding Accent, Converter={StaticResource BrushConv}}" />
+                </DataTrigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E3EFE5" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ModuleTreeItem" TargetType="TreeViewItem">
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+            <Setter Property="Margin" Value="0,1" />
+        </Style>
+        <Style x:Key="PlainTreeItem" TargetType="TreeViewItem" />
+
+        <!-- The × on an open screen's chip -->
+        <Style x:Key="ChipClose" TargetType="Button">
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="#778" />
+            <Setter Property="ToolTip" Value="Close this screen" />
+        </Style>
     </Window.Resources>
 
     <Window.InputBindings>
@@ -45,7 +92,7 @@
     </Window.CommandBindings>
 
     <DockPanel>
-        <!-- Menus: Modules ▸ group ▸ screen, and the same screens by kind of work (Maintenance, Transactions, Enquiries, Utilities) ▸ module ▸ group ▸ screen -->
+        <!-- Menus: Modules ▸ module ▸ kind of work ▸ screen, and Maintenance / Transactions / Enquiries / Utilities ▸ module ▸ screen -->
         <Menu x:Name="MainMenu" DockPanel.Dock="Top" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="2">
             <MenuItem Header="{loc:T '_File'}">
                 <MenuItem Header="{loc:T 'Home'}" Command="{Binding GoHomeCommand}" />
@@ -139,31 +186,50 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Modules: each opens to its groups and screens -->
+            <!-- Modules: each opens to its kinds of work and screens; the module shown is lit -->
             <DockPanel Grid.Column="0" Background="{StaticResource TreeBrush}">
                 <Border DockPanel.Dock="Top" Background="#ECF1EC" Padding="10,7" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
                     <TextBlock Text="Modules" FontWeight="SemiBold" Foreground="#445" />
                 </Border>
                 <TreeView x:Name="ModuleTree" BorderThickness="0" Background="Transparent" Padding="4" ItemsSource="{Binding NavModules}"
+                          ItemContainerStyle="{StaticResource ModuleTreeItem}"
                           SelectedItemChanged="ModuleTree_SelectedItemChanged" MouseLeftButtonUp="ModuleTree_MouseLeftButtonUp" KeyDown="ModuleTree_KeyDown">
                     <TreeView.Resources>
-                        <HierarchicalDataTemplate DataType="{x:Type nav:NavModule}" ItemsSource="{Binding Groups}">
-                            <StackPanel Orientation="Horizontal" Margin="0,3">
-                                <TextBlock Text="{Binding Glyph}" Width="24" />
-                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
-                            </StackPanel>
+                        <HierarchicalDataTemplate DataType="{x:Type nav:NavModule}" ItemsSource="{Binding Categories}" ItemContainerStyle="{StaticResource PlainTreeItem}">
+                            <Border Style="{StaticResource ModuleRow}" ToolTip="{Binding Purpose}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Glyph}" Width="24" />
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                        <Setter Property="FontWeight" Value="Bold" />
+                                                        <Setter Property="Foreground" Value="{Binding Accent, Converter={StaticResource BrushConv}}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
                         </HierarchicalDataTemplate>
-                        <HierarchicalDataTemplate DataType="{x:Type nav:NavGroup}" ItemsSource="{Binding Entries}">
-                            <StackPanel Orientation="Horizontal" Margin="0,2">
-                                <TextBlock Text="{Binding Glyph}" Width="22" Foreground="{Binding Accent, Converter={StaticResource BrushConv}}" />
-                                <TextBlock Text="{Binding Title}" Foreground="#445" />
-                            </StackPanel>
+                        <HierarchicalDataTemplate DataType="{x:Type nav:NavCategory}" ItemsSource="{Binding Entries}" ItemContainerStyle="{StaticResource PlainTreeItem}">
+                            <Border Style="{StaticResource TreeRow}" ToolTip="{Binding Purpose}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Glyph}" Width="22" />
+                                    <TextBlock Text="{Binding Title}" Foreground="#445" />
+                                    <TextBlock Text="{Binding Entries.Count, StringFormat='  ({0})'}" Foreground="#99A" />
+                                </StackPanel>
+                            </Border>
                         </HierarchicalDataTemplate>
                         <DataTemplate DataType="{x:Type nav:NavEntry}">
-                            <StackPanel Orientation="Horizontal" Margin="0,1" ToolTip="{Binding Purpose}">
-                                <TextBlock Text="{Binding Glyph}" Width="22" FontSize="11" VerticalAlignment="Center" Foreground="{Binding Accent, Converter={StaticResource BrushConv}}" />
-                                <TextBlock Text="{Binding Title}" Foreground="#1E5E2E" />
-                            </StackPanel>
+                            <Border Style="{StaticResource TreeRow}" ToolTip="{Binding Purpose}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding Glyph}" Width="22" FontSize="11" VerticalAlignment="Center" Foreground="{Binding Accent, Converter={StaticResource BrushConv}}" />
+                                    <TextBlock Text="{Binding Title}" Foreground="#1E5E2E" />
+                                </StackPanel>
+                            </Border>
                         </DataTemplate>
                     </TreeView.Resources>
                 </TreeView>
@@ -171,11 +237,11 @@
 
             <GridSplitter Grid.Column="1" Width="3" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="{StaticResource BorderBrush}" />
 
-            <!-- The page, three levels of cards: Home (the modules) › a module (its areas of work) › an area (its screens) -->
+            <!-- The page: Home (a card per module) or a module (every screen, under its kind of work) -->
             <DockPanel Grid.Column="2" Background="#F6F8F6">
                 <Border DockPanel.Dock="Top" Padding="22,12" Background="White" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="{Binding BackText}" Padding="14,6" VerticalAlignment="Center" Command="{Binding GoBackCommand}"
+                        <Button DockPanel.Dock="Right" Content="◀  All modules" Padding="14,6" VerticalAlignment="Center" Command="{Binding GoBackCommand}"
                                 ToolTip="Go up one level">
                             <Button.Style>
                                 <Style TargetType="Button">
@@ -195,7 +261,36 @@
                     </DockPanel>
                 </Border>
 
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <!-- Open screens: a chip per screen window open; click brings it to the front, × closes it -->
+                <Border DockPanel.Dock="Top" Background="#EEF3EE" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="14,5"
+                        Visibility="{Binding HasOpenScreens, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Visible}}">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left" Text="Open screens:" Foreground="#667" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
+                        <Button DockPanel.Dock="Right" Content="Close all" FontSize="11" Padding="8,2" VerticalAlignment="Center" Click="CloseAllScreens_Click" />
+                        <ItemsControl ItemsSource="{Binding OpenScreens, RelativeSource={RelativeSource AncestorType=Window}}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type local:OpenScreen}">
+                                    <Border Background="White" BorderBrush="{Binding Entry.Accent, Converter={StaticResource BrushConv}}" BorderThickness="1" CornerRadius="12" Padding="8,2" Margin="0,2,6,2">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Click="ShowScreen_Click" Background="Transparent" BorderThickness="0" Padding="0" Cursor="Hand" ToolTip="Bring this screen to the front">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Entry.Glyph}" Margin="0,0,5,0" Foreground="{Binding Entry.Accent, Converter={StaticResource BrushConv}}" />
+                                                    <TextBlock Text="{Binding Entry.Title}" FontSize="12" MaxWidth="200" TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Content="✕" Style="{StaticResource ChipClose}" Click="CloseScreen_Click" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </DockPanel>
+                </Border>
+
+                <ScrollViewer x:Name="PageScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <Grid Margin="14">
                         <!-- Home: one card per module -->
                         <ItemsControl ItemsSource="{Binding NavModules}" Visibility="{Binding IsHome, Converter={StaticResource Visible}}">
@@ -221,63 +316,56 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <!-- A module: one card per area of work, with how many screens it has and the first few of them -->
-                        <ItemsControl ItemsSource="{Binding SelectedModule.Groups}" Visibility="{Binding IsModulePage, Converter={StaticResource Visible}}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate><nav:FillWrapPanel MinItemWidth="300" /></ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
+                        <!-- A module: every screen, under a label per kind of work — Maintenance, Transactions, Enquiries, Utilities -->
+                        <ItemsControl x:Name="ModuleSections" ItemsSource="{Binding SelectedModule.Categories}" Visibility="{Binding IsModulePage, Converter={StaticResource Visible}}">
                             <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type nav:NavGroup}">
-                                    <Button Style="{StaticResource CardButton}" MinHeight="120" Margin="8" Padding="16,14" Click="Group_Click">
-                                        <DockPanel>
-                                            <Border DockPanel.Dock="Left" Width="50" Height="50" CornerRadius="25" VerticalAlignment="Top" Margin="0,0,14,0"
-                                                    Background="{Binding Accent, Converter={StaticResource BrushConv}}">
-                                                <TextBlock Text="{Binding Glyph}" FontSize="22" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Border>
-                                            <TextBlock DockPanel.Dock="Right" Text="›" FontSize="26" Foreground="#B5C2B5" VerticalAlignment="Center" Margin="8,0,0,0" />
-                                            <StackPanel>
-                                                <DockPanel>
-                                                    <Border DockPanel.Dock="Right" Background="#EAF4EC" CornerRadius="9" Padding="8,1" VerticalAlignment="Center" Margin="8,0,0,0">
-                                                        <TextBlock Text="{Binding CountText}" FontSize="11" Foreground="{StaticResource BrandDarkBrush}" />
-                                                    </Border>
-                                                    <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" Foreground="#223" TextWrapping="Wrap" />
-                                                </DockPanel>
-                                                <TextBlock Text="{Binding Preview}" FontSize="12.5" Foreground="#667" TextWrapping="Wrap" Margin="0,6,0,0" />
-                                            </StackPanel>
-                                        </DockPanel>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <!-- An area: one card per screen, with what it is for and the kind of work; each opens in its own window -->
-                        <ItemsControl ItemsSource="{Binding SelectedGroup.Entries}" Visibility="{Binding IsGroupPage, Converter={StaticResource Visible}}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate><nav:FillWrapPanel MinItemWidth="300" /></ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate DataType="{x:Type nav:NavEntry}">
-                                    <Button Style="{StaticResource CardButton}" MinHeight="112" Margin="8" Padding="0" Click="Entry_Click">
-                                        <DockPanel>
-                                            <Border DockPanel.Dock="Left" Width="5" CornerRadius="6,0,0,6" Background="{Binding Accent, Converter={StaticResource BrushConv}}" />
-                                            <Border DockPanel.Dock="Left" Width="44" Height="44" CornerRadius="22" VerticalAlignment="Top" Margin="14,14,0,0"
-                                                    Background="{Binding Accent, Converter={StaticResource BrushConv}}">
-                                                <TextBlock Text="{Binding Glyph}" FontSize="20" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            </Border>
-                                            <DockPanel Margin="14,12,14,10">
-                                                <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-                                                    <TextBlock DockPanel.Dock="Right" Text="Open  ›" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource BrandBrush}" VerticalAlignment="Center" />
-                                                    <Border Background="#F0F2F0" CornerRadius="9" Padding="8,1" HorizontalAlignment="Left">
-                                                        <TextBlock Text="{Binding AreaLabel}" FontSize="11" Foreground="#667" />
-                                                    </Border>
-                                                </DockPanel>
-                                                <StackPanel>
-                                                    <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Foreground="#1E3A2E" TextWrapping="Wrap" />
-                                                    <TextBlock Text="{Binding Purpose}" FontSize="12.5" Foreground="#667" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                <DataTemplate DataType="{x:Type nav:NavCategory}">
+                                    <StackPanel Margin="0,0,0,18">
+                                        <Border Margin="8,4,8,4" Padding="12,10" CornerRadius="6" Background="White" BorderBrush="{Binding Accent, Converter={StaticResource BrushConv}}" BorderThickness="5,0,0,0">
+                                            <DockPanel>
+                                                <Border DockPanel.Dock="Left" Width="44" Height="44" CornerRadius="22" Margin="0,0,14,0" Background="{Binding Accent, Converter={StaticResource BrushConv}}">
+                                                    <TextBlock Text="{Binding Glyph}" FontSize="20" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                </Border>
+                                                <Border DockPanel.Dock="Right" Background="#EAF4EC" CornerRadius="9" Padding="10,2" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding CountText}" FontSize="12" Foreground="{StaticResource BrandDarkBrush}" />
+                                                </Border>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Title}" FontSize="19" FontWeight="Bold" Foreground="#223" />
+                                                    <TextBlock Text="{Binding Purpose}" FontSize="12.5" Foreground="#667" TextWrapping="Wrap" />
                                                 </StackPanel>
                                             </DockPanel>
-                                        </DockPanel>
-                                    </Button>
+                                        </Border>
+                                        <ItemsControl ItemsSource="{Binding Entries}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><nav:FillWrapPanel MinItemWidth="290" /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate DataType="{x:Type nav:NavEntry}">
+                                                        <Button Style="{StaticResource CardButton}" MinHeight="112" Margin="8" Padding="0" Click="Entry_Click">
+                                                            <DockPanel>
+                                                                <Border DockPanel.Dock="Left" Width="5" CornerRadius="6,0,0,6" Background="{Binding Accent, Converter={StaticResource BrushConv}}" />
+                                                                <Border DockPanel.Dock="Left" Width="44" Height="44" CornerRadius="22" VerticalAlignment="Top" Margin="14,14,0,0"
+                                                                        Background="{Binding Accent, Converter={StaticResource BrushConv}}">
+                                                                    <TextBlock Text="{Binding Glyph}" FontSize="20" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                </Border>
+                                                                <DockPanel Margin="14,12,14,10">
+                                                                    <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                                                                        <TextBlock DockPanel.Dock="Right" Text="Open  ›" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource BrandBrush}" VerticalAlignment="Center" />
+                                                                        <Border Background="#F0F2F0" CornerRadius="9" Padding="8,1" HorizontalAlignment="Left">
+                                                                            <TextBlock Text="{Binding GroupTitle}" FontSize="11" Foreground="#667" />
+                                                                        </Border>
+                                                                    </DockPanel>
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" Foreground="#1E3A2E" TextWrapping="Wrap" />
+                                                                        <TextBlock Text="{Binding Purpose}" FontSize="12.5" Foreground="#667" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                                    </StackPanel>
+                                                                </DockPanel>
+                                                            </DockPanel>
+                                                        </Button>
+                                                    </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>

@@ -67,19 +67,120 @@ public sealed record NavGroup(string Title, IReadOnlyList<NavEntry> Entries)
     public string Preview => string.Join("  ·  ", Entries.Take(3).Select(e => e.Title)) + (Entries.Count > 3 ? "  ·  …" : string.Empty);
 }
 
+/// <summary>
+/// One kind of work in a module — Maintenance (setting up), Transactions (day-to-day), Enquiries (looking up) or Utilities (period end and
+/// housekeeping) — with the module's screens of that kind, still in their groups.
+/// </summary>
+public sealed class NavCategory
+{
+    /// <summary>Gets the kind of work.</summary>
+    public required MenuArea Area { get; init; }
+
+    /// <summary>Gets its name (Maintenance, Transactions, Enquiries, Utilities).</summary>
+    public required string Title { get; init; }
+
+    /// <summary>Gets its icon.</summary>
+    public required string Glyph { get; init; }
+
+    /// <summary>Gets what it is for, in plain words.</summary>
+    public required string Purpose { get; init; }
+
+    /// <summary>Gets its colour (the module's).</summary>
+    public required string Accent { get; init; }
+
+    /// <summary>Gets the module it is in.</summary>
+    public required string ModuleTitle { get; init; }
+
+    /// <summary>Gets the module's groups, each with only its screens of this kind.</summary>
+    public required IReadOnlyList<NavGroup> Groups { get; init; }
+
+    /// <summary>Gets every screen of this kind.</summary>
+    public IReadOnlyList<NavEntry> Entries => [.. Groups.SelectMany(g => g.Entries)];
+
+    /// <summary>Gets "n screens" for the card.</summary>
+    public string CountText => Entries.Count == 1 ? "1 screen" : $"{Entries.Count} screens";
+
+    /// <summary>Gets the first few screens' names.</summary>
+    public string Preview => string.Join("  ·  ", Entries.Take(4).Select(e => e.Title)) + (Entries.Count > 4 ? "  ·  …" : string.Empty);
+
+    /// <summary>The four kinds of work, in menu order, with their icons and plain descriptions.</summary>
+    public static readonly (MenuArea Area, string Title, string Glyph, string Purpose)[] Kinds =
+    [
+        (MenuArea.Maintenance, "Maintenance", "⚙️", "Setting things up: records, codes, rates, rules and policies."),
+        (MenuArea.Transactions, "Transactions", "📝", "The day-to-day work: documents, payments, movements and postings."),
+        (MenuArea.Enquiries, "Enquiries", "🔎", "Looking things up: balances, statements, histories and positions."),
+        (MenuArea.Utilities, "Utilities", "🧰", "Period-end runs, imports, approvals and housekeeping."),
+    ];
+}
+
 /// <summary>A module the user may use, with the groups and screens they may use in it.</summary>
 /// <param name="Title">The module's name.</param>
 /// <param name="Glyph">Its icon.</param>
 /// <param name="Accent">Its colour.</param>
 /// <param name="Purpose">What it is for.</param>
 /// <param name="Groups">Its groups.</param>
-public sealed record NavModule(string Title, string Glyph, string Accent, string Purpose, IReadOnlyList<NavGroup> Groups)
+public sealed record NavModule(string Title, string Glyph, string Accent, string Purpose, IReadOnlyList<NavGroup> Groups) : System.ComponentModel.INotifyPropertyChanged
 {
+    private IReadOnlyList<NavCategory>? _categories;
+    private bool _isActive;
+    private bool _isExpanded;
+
+    /// <inheritdoc />
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
     /// <summary>Gets every screen in the module.</summary>
     public IEnumerable<NavEntry> Entries => Groups.SelectMany(g => g.Entries);
 
     /// <summary>Gets how many screens it has.</summary>
     public int Count => Groups.Sum(g => g.Entries.Count);
+
+    /// <summary>Gets the module's screens by kind of work (only the kinds it has), built once.</summary>
+    public IReadOnlyList<NavCategory> Categories => _categories ??= [.. NavCategory.Kinds.Select(k => new NavCategory
+    {
+        Area = k.Area, Title = k.Title, Glyph = k.Glyph, Purpose = k.Purpose, Accent = Accent, ModuleTitle = Title,
+        Groups = [.. Groups.Select(g => g with { Entries = [.. g.Entries.Where(e => e.Area == k.Area)] }).Where(g => g.Entries.Count > 0)],
+    }).Where(c => c.Groups.Count > 0)];
+
+    /// <summary>Gets or sets a value indicating whether the module is the one shown (lit in the module list).</summary>
+    public bool IsActive
+    {
+        get => _isActive;
+        set
+        {
+            if (_isActive != value)
+            {
+                _isActive = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsActive)));
+            }
+        }
+    }
+
+    /// <summary>Gets or sets a value indicating whether the module is open in the module list.</summary>
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            if (_isExpanded != value)
+            {
+                _isExpanded = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsExpanded)));
+            }
+        }
+    }
+
+    /// <summary>Whether this is the same module (by reference: its lit/open state changes, so it must not take part in equality).</summary>
+    /// <param name="other">The other module.</param>
+    /// <returns>True when it is the same object.</returns>
+    public bool Equals(NavModule? other) => ReferenceEquals(this, other);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this);
+
+    /// <summary>The category a screen is in.</summary>
+    /// <param name="entry">The screen.</param>
+    /// <returns>Its category, or null when it is not in this module.</returns>
+    public NavCategory? CategoryOf(NavEntry entry) => Categories.FirstOrDefault(c => c.Groups.Any(g => g.Entries.Contains(entry)));
 }
 
 /// <summary>Builds the navigation the signed-in user sees from <see cref="NavigationMap"/>, the console's actions and what they may use.</summary>
@@ -244,7 +345,17 @@ public static class NavigationBuilder
     // The description's first sentence, kept short for a card.
     private static string FirstSentence(string text)
     {
-        int stop = text.IndexOfAny(['.', ';', ':']);
+        // A full stop ends the sentence only when a space or the end follows it ("e.g." and "1.5" do not end one).
+        int stop = text.IndexOfAny([';', ':']);
+        for (int at = text.IndexOf('.'); at >= 0; at = text.IndexOf('.', at + 1))
+        {
+            if ((at + 1 == text.Length || text[at + 1] == ' ') && (stop < 0 || at < stop))
+            {
+                stop = at;
+                break;
+            }
+        }
+
         string first = stop > 20 ? text[..stop] : text;
         return first.Length > 150 ? first[..147].TrimEnd() + "…" : first;
     }

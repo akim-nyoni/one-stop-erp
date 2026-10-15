@@ -4,8 +4,16 @@ using One4All.Desktop.ViewModels;
 
 namespace One4All.Desktop;
 
-/// <summary>The main shell window: menus, a search box, the module list and a home page of modules; each screen opens in its own window.</summary>
-public partial class ShellWindow : Window
+/// <summary>A screen open in its own window, listed on the shell's "Open screens" bar.</summary>
+/// <param name="Entry">The screen.</param>
+/// <param name="Window">Its window.</param>
+public sealed record OpenScreen(Navigation.NavEntry Entry, Window Window);
+
+/// <summary>
+/// The main shell window: menus, a search box, the module list and the page — Home (the modules) or a module (every screen by kind of work).
+/// Each screen opens in its own window; the "Open screens" bar lists them to jump between.
+/// </summary>
+public partial class ShellWindow : Window, System.ComponentModel.INotifyPropertyChanged
 {
     private readonly IServiceProvider _services;
     private readonly IdleLock _idleLock;
@@ -16,6 +24,12 @@ public partial class ShellWindow : Window
     /// <summary>Gets the command that puts the cursor in the search box (Ctrl+F).</summary>
     public static RoutedCommand SearchCommand { get; } = new(nameof(SearchCommand), typeof(ShellWindow));
 
+    /// <summary>Gets the screens open in their own windows.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<OpenScreen> OpenScreens { get; } = [];
+
+    /// <summary>Gets a value indicating whether any screen is open.</summary>
+    public bool HasOpenScreens => OpenScreens.Count > 0;
+
     /// <summary>Creates the shell window bound to a session view model.</summary>
     /// <param name="viewModel">The shell view model.</param>
     /// <param name="services">The application service provider (used to open tool windows such as the report viewer).</param>
@@ -25,6 +39,29 @@ public partial class ShellWindow : Window
         DataContext = viewModel;
         InitializeComponent();
         BuildMenus(viewModel);
+
+        OpenScreens.CollectionChanged += (_, _) => NotifyOpenScreens();
+
+        // Going to a module (from the tree, a card, the back button or search) starts its page at the top; a kind of work scrolls to its section.
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ShellViewModel.SelectedModule))
+            {
+                PageScroller.ScrollToTop();
+            }
+        };
+        viewModel.CategoryRequested += category =>
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                ModuleSections.UpdateLayout();
+                if (ModuleSections.ItemContainerGenerator.ContainerFromItem(category) is FrameworkElement section)
+                {
+                    Point at = section.TranslatePoint(new Point(0, 0), PageScroller);
+                    PageScroller.ScrollToVerticalOffset(PageScroller.VerticalOffset + at.Y - 8);
+                }
+            }, System.Windows.Threading.DispatcherPriority.Loaded);
+        };
         FlowDirection = Localization.UiText.Direction;
         StartLicenceChecks(viewModel);
         _idleLock = new IdleLock(services);
@@ -144,18 +181,18 @@ public partial class ShellWindow : Window
         Closed += (_, _) => timer.Stop();
     }
 
-    // The menus are built from the navigation: Modules ▸ module ▸ group ▸ screen, and each kind of work (Maintenance, Transactions, Enquiries,
-    // Utilities) ▸ module ▸ (group ▸) screen, so a module's submenu only ever shows that module's screens.
+    // The menus are built from the navigation: Modules ▸ module ▸ kind of work ▸ (group ▸) screen, and each kind of work (Maintenance,
+    // Transactions, Enquiries, Utilities) ▸ module ▸ (group ▸) screen, so a module's submenu only ever shows that module's screens.
     private void BuildMenus(ShellViewModel viewModel)
     {
         foreach (Navigation.NavModule module in viewModel.NavModules)
         {
             System.Windows.Controls.MenuItem moduleItem = new() { Header = Localization.UiText.T(module.Title), Icon = MenuIcon(module.Glyph, module.Accent) };
-            foreach (Navigation.NavGroup group in module.Groups)
+            foreach (Navigation.NavCategory category in module.Categories)
             {
-                System.Windows.Controls.MenuItem groupItem = new() { Header = Localization.UiText.T(group.Title), Icon = MenuIcon(group.Glyph, group.Accent) };
-                AddEntries(groupItem, group.Entries);
-                moduleItem.Items.Add(groupItem);
+                System.Windows.Controls.MenuItem categoryItem = new() { Header = Localization.UiText.T(category.Title), Icon = MenuIcon(category.Glyph, category.Accent), ToolTip = category.Purpose };
+                AddGroups(categoryItem, category.Groups);
+                moduleItem.Items.Add(categoryItem);
             }
 
             ModulesMenu.Items.Add(moduleItem);
@@ -169,30 +206,30 @@ public partial class ShellWindow : Window
         {
             foreach (Navigation.NavModule module in viewModel.NavModules)
             {
-                List<Navigation.NavGroup> groups = [.. module.Groups.Select(g => g with { Entries = [.. g.Entries.Where(e => e.Area == area)] }).Where(g => g.Entries.Count > 0)];
-                if (groups.Count == 0)
+                if (module.Categories.FirstOrDefault(c => c.Area == area) is Navigation.NavCategory category)
                 {
-                    continue;
+                    System.Windows.Controls.MenuItem moduleItem = new() { Header = Localization.UiText.T(module.Title), Icon = MenuIcon(module.Glyph, module.Accent) };
+                    AddGroups(moduleItem, category.Groups);
+                    menu.Items.Add(moduleItem);
                 }
-
-                System.Windows.Controls.MenuItem moduleItem = new() { Header = Localization.UiText.T(module.Title), Icon = MenuIcon(module.Glyph, module.Accent) };
-                if (groups.Count == 1 || groups.Sum(g => g.Entries.Count) <= 8)
-                {
-                    // Few screens: list them straight under the module.
-                    AddEntries(moduleItem, groups.SelectMany(g => g.Entries));
-                }
-                else
-                {
-                    foreach (Navigation.NavGroup group in groups)
-                    {
-                        System.Windows.Controls.MenuItem groupItem = new() { Header = Localization.UiText.T(group.Title), Icon = MenuIcon(group.Glyph, group.Accent) };
-                        AddEntries(groupItem, group.Entries);
-                        moduleItem.Items.Add(groupItem);
-                    }
-                }
-
-                menu.Items.Add(moduleItem);
             }
+        }
+    }
+
+    // A few screens are listed straight in the menu; more are split by their group.
+    private void AddGroups(System.Windows.Controls.MenuItem parent, IReadOnlyList<Navigation.NavGroup> groups)
+    {
+        if (groups.Count == 1 || groups.Sum(g => g.Entries.Count) <= 8)
+        {
+            AddEntries(parent, groups.SelectMany(g => g.Entries));
+            return;
+        }
+
+        foreach (Navigation.NavGroup group in groups)
+        {
+            System.Windows.Controls.MenuItem groupItem = new() { Header = Localization.UiText.T(group.Title), Icon = MenuIcon(group.Glyph, group.Accent) };
+            AddEntries(groupItem, group.Entries);
+            parent.Items.Add(groupItem);
         }
     }
 
@@ -213,13 +250,22 @@ public partial class ShellWindow : Window
         Foreground = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString(accent)!,
     };
 
-    // Every screen opens in its own window: an action in a window of its own (its form and its list), or its dedicated window.
+    // A screen opens in its own window (one already open is brought to the front) and is listed on the "Open screens" bar until it closes.
     private void OpenEntry(Navigation.NavEntry entry)
     {
         ShellViewModel vm = (ShellViewModel)DataContext;
+        if (OpenScreens.FirstOrDefault(o => ReferenceEquals(o.Entry, entry)) is OpenScreen already)
+        {
+            Bring(already.Window);
+            return;
+        }
+
         if (entry.Operation is Operations.Operation operation)
         {
-            new OperationsWindow(_services, vm.UserId, operation, entry.Title, $"{entry.ModuleTitle}  ›  {entry.GroupTitle}") { Owner = this }.Show();
+            string area = Navigation.NavCategory.Kinds.First(k => k.Area == entry.Area).Title;
+            OperationsWindow window = new(_services, vm.UserId, operation, entry.Title, $"{entry.ModuleTitle}  ›  {area}  ›  {entry.GroupTitle}") { Owner = this };
+            Track(entry, window);
+            window.Show();
             return;
         }
 
@@ -278,31 +324,64 @@ public partial class ShellWindow : Window
             case Navigation.NavModule module:
                 vm.OpenModuleCommand.Execute(module);
                 break;
-            case Navigation.NavGroup group:
-                vm.OpenGroupCommand.Execute(group);
+            case Navigation.NavCategory category:
+                vm.OpenCategoryCommand.Execute(category);
                 break;
             case Navigation.NavEntry entry:
-                ShowGroupOf(entry);
+                vm.ShowPageOf(entry);
                 break;
         }
     }
 
-    // Shows the page of the group a screen is in.
-    private void ShowGroupOf(Navigation.NavEntry entry)
+    // ---- Open screens: every screen window, listed on the bar; click a chip to bring it to the front, × to close it. ----
+    private void Track(Navigation.NavEntry entry, Window window)
     {
-        ShellViewModel vm = (ShellViewModel)DataContext;
-        Navigation.NavGroup? group = vm.NavModules.SelectMany(m => m.Groups).FirstOrDefault(g => g.Entries.Contains(entry));
-        if (group is not null)
+        OpenScreen open = new(entry, window);
+        OpenScreens.Add(open);
+        window.Closed += (_, _) => OpenScreens.Remove(open);
+    }
+
+    private static void Bring(Window window)
+    {
+        if (window.WindowState == WindowState.Minimized)
         {
-            vm.OpenGroupCommand.Execute(group);
+            window.WindowState = WindowState.Normal;
+        }
+
+        window.Activate();
+    }
+
+    private void NotifyOpenScreens()
+    {
+        // The bar shows while anything is open; a plain property, so the binding is told by hand.
+        System.ComponentModel.PropertyChangedEventHandler? handler = PropertyChanged;
+        handler?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(HasOpenScreens)));
+    }
+
+    /// <inheritdoc />
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+    private void ShowScreen_Click(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is OpenScreen open)
+        {
+            Bring(open.Window);
         }
     }
 
-    private void Group_Click(object sender, RoutedEventArgs e)
+    private void CloseScreen_Click(object sender, RoutedEventArgs e)
     {
-        if (((FrameworkElement)sender).DataContext is Navigation.NavGroup group)
+        if (((FrameworkElement)sender).DataContext is OpenScreen open)
         {
-            ((ShellViewModel)DataContext).OpenGroupCommand.Execute(group);
+            open.Window.Close();
+        }
+    }
+
+    private void CloseAllScreens_Click(object sender, RoutedEventArgs e)
+    {
+        foreach (OpenScreen open in OpenScreens.ToList())
+        {
+            open.Window.Close();
         }
     }
 
@@ -386,7 +465,7 @@ public partial class ShellWindow : Window
     private void OpenFromSearch(Navigation.NavEntry entry)
     {
         ShellViewModel vm = (ShellViewModel)DataContext;
-        ShowGroupOf(entry);
+        vm.ShowPageOf(entry);
         vm.SearchText = string.Empty;
         OpenEntry(entry);
     }
@@ -395,13 +474,14 @@ public partial class ShellWindow : Window
         "Three ways to find a screen:" + Environment.NewLine + Environment.NewLine
         + "1.  Type what you want to do in the search box at the top (for example \"add a product\", \"pay a supplier\", \"register an applicant\") and press Enter."
         + Environment.NewLine + Environment.NewLine
-        + "2.  Click a module on the home page (or in the list on the left). Its page shows only that module's areas of work; click an area to see its screens. "
-        + "The line at the top (Home › module › area) shows where you are, and the back button goes up one level."
+        + "2.  Click a module on the Home tab (or in the list on the left — the module you are in is lit). It shows four kinds of work: Maintenance (setting up), "
+        + "Transactions (day-to-day work), Enquiries (looking things up) and Utilities (period end and housekeeping); choose one to see its screens. "
+        + "The line at the top (Home › module › kind of work) shows where you are, and the back button goes up one level."
         + Environment.NewLine + Environment.NewLine
-        + "3.  Use the menus: Modules ▸ module ▸ group ▸ screen; or by the kind of work — Maintenance (setting up), Transactions (day-to-day work), "
-        + "Enquiries (looking things up), Utilities (period end and housekeeping) — ▸ module ▸ screen."
+        + "3.  Use the menus: Modules ▸ module ▸ kind of work ▸ screen; or Maintenance / Transactions / Enquiries / Utilities ▸ module ▸ screen."
         + Environment.NewLine + Environment.NewLine
-        + "Every screen opens in its own window, so you can keep several open at once.",
+        + "Every screen opens in its own window, so you can work on several at once. The \"Open screens\" bar at the top of the page lists them: "
+        + "click one to bring it to the front, or ✕ to close it.",
         "How to find a screen", MessageBoxButton.OK, MessageBoxImage.Information);
 
     private void OpenAccountEnquiry_Click(object sender, RoutedEventArgs e)

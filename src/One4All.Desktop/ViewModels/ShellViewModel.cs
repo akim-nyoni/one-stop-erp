@@ -70,13 +70,11 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>The module shown (null: the home page).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsHome), nameof(IsModulePage), nameof(IsGroupPage), nameof(PageTitle), nameof(PageSubtitle), nameof(Breadcrumb), nameof(BackText))]
+    [NotifyPropertyChangedFor(nameof(IsHome), nameof(IsModulePage), nameof(PageTitle), nameof(PageSubtitle), nameof(Breadcrumb))]
     private NavModule? _selectedModule;
 
-    /// <summary>The group shown inside the module (null: the module's groups).</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsModulePage), nameof(IsGroupPage), nameof(PageTitle), nameof(PageSubtitle), nameof(Breadcrumb), nameof(BackText))]
-    private NavGroup? _selectedGroup;
+    /// <summary>Raised when a kind of work is chosen (the page scrolls to its section).</summary>
+    public event Action<NavCategory>? CategoryRequested;
 
     /// <summary>What is typed in the search box.</summary>
     [ObservableProperty]
@@ -86,28 +84,21 @@ public sealed partial class ShellViewModel : ObservableObject
     /// <summary>Gets a value indicating whether the home page is shown.</summary>
     public bool IsHome => SelectedModule is null;
 
-    /// <summary>Gets a value indicating whether a module's page (its groups) is shown.</summary>
-    public bool IsModulePage => SelectedModule is not null && SelectedGroup is null;
+    /// <summary>Gets a value indicating whether a module's page is shown: all its screens, under Maintenance, Transactions, Enquiries and Utilities.</summary>
+    public bool IsModulePage => SelectedModule is not null;
 
-    /// <summary>Gets a value indicating whether a group's page (its screens) is shown.</summary>
-    public bool IsGroupPage => SelectedModule is not null && SelectedGroup is not null;
-
-    /// <summary>Gets where the page is: Home › module › group.</summary>
-    public string Breadcrumb => SelectedModule is null ? "Home"
-        : SelectedGroup is null ? $"Home  ›  {SelectedModule.Title}" : $"Home  ›  {SelectedModule.Title}  ›  {SelectedGroup.Title}";
-
-    /// <summary>Gets the back button's text.</summary>
-    public string BackText => SelectedGroup is not null && SelectedModule is { Groups.Count: > 1 } ? $"◀  {SelectedModule.Title}" : "◀  All modules";
+    /// <summary>Gets where the page is: Home › module.</summary>
+    public string Breadcrumb => SelectedModule is null ? "Home" : $"Home  ›  {SelectedModule.Title}";
 
     /// <summary>Gets a value indicating whether the search found anything.</summary>
     public bool HasSearchResults => SearchResults.Count > 0;
 
     /// <summary>Gets the page's title.</summary>
-    public string PageTitle => SelectedGroup?.Title ?? SelectedModule?.Title ?? "Home";
+    public string PageTitle => SelectedModule?.Title ?? "Home";
 
     /// <summary>Gets the line under the page's title.</summary>
-    public string PageSubtitle => SelectedGroup is not null ? $"{SelectedGroup.CountText} in {SelectedModule?.Title}. Click one to open it in its own window."
-        : SelectedModule is not null ? $"{SelectedModule.Purpose} Choose an area to see its screens."
+    public string PageSubtitle => SelectedModule is not null
+        ? $"{SelectedModule.Purpose} Its screens are below by kind of work — Maintenance, Transactions, Enquiries, Utilities; each opens in its own window."
         : Welcome;
 
     /// <summary>Re-reads the licence status line.</summary>
@@ -145,44 +136,52 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>Shows the home page.</summary>
     [RelayCommand]
-    private void GoHome()
-    {
-        SelectedGroup = null;
-        SelectedModule = null;
-    }
+    private void GoHome() => SelectedModule = null;
 
-    /// <summary>Goes up one level: from a group to its module, from a module to the home page.</summary>
+    /// <summary>Goes back to the home page.</summary>
     [RelayCommand]
-    private void GoBack()
-    {
-        if (SelectedGroup is not null && SelectedModule is { Groups.Count: > 1 })
-        {
-            SelectedGroup = null;
-        }
-        else
-        {
-            GoHome();
-        }
-    }
+    private void GoBack() => GoHome();
 
-    /// <summary>Shows a module's page; a module with a single group opens straight to its screens.</summary>
+    /// <summary>Shows a module's page.</summary>
     /// <param name="module">The module.</param>
     [RelayCommand]
-    private void OpenModule(NavModule? module)
+    private void OpenModule(NavModule? module) => SelectedModule = module;
+
+    /// <summary>Shows a kind of work: its module's page, scrolled to its section.</summary>
+    /// <param name="category">The kind of work.</param>
+    [RelayCommand]
+    private void OpenCategory(NavCategory? category)
     {
-        SelectedGroup = module is { Groups.Count: 1 } ? module.Groups[0] : null;
-        SelectedModule = module;
+        if (category is not null)
+        {
+            SelectedModule = NavModules.FirstOrDefault(m => m.Categories.Contains(category)) ?? SelectedModule;
+            CategoryRequested?.Invoke(category);
+        }
     }
 
-    /// <summary>Shows a group's screens.</summary>
-    /// <param name="group">The group.</param>
-    [RelayCommand]
-    private void OpenGroup(NavGroup? group)
+    /// <summary>Shows the page a screen is on, at its kind of work.</summary>
+    /// <param name="entry">The screen.</param>
+    public void ShowPageOf(NavEntry entry)
     {
-        if (group is not null)
+        ArgumentNullException.ThrowIfNull(entry);
+        NavModule? module = NavModules.FirstOrDefault(m => m.Title == entry.ModuleTitle);
+        if (module?.CategoryOf(entry) is NavCategory category)
         {
-            SelectedModule = NavModules.FirstOrDefault(m => m.Groups.Contains(group)) ?? SelectedModule;
-            SelectedGroup = group;
+            SelectedModule = module;
+            CategoryRequested?.Invoke(category);
+        }
+    }
+
+    // The module shown is lit, and opened, in the module list.
+    partial void OnSelectedModuleChanged(NavModule? value)
+    {
+        foreach (NavModule module in NavModules)
+        {
+            module.IsActive = ReferenceEquals(module, value);
+            if (module.IsActive)
+            {
+                module.IsExpanded = true;
+            }
         }
     }
 }

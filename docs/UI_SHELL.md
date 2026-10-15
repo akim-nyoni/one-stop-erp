@@ -13,11 +13,12 @@ Since 2026-10-14 the shell is organised **by business module, in plain language*
 ├──────────────────┬────────────────────────────────────────────────────────┤
 │ Module list      │  Home: one card per module (icon, name, what it is for) │
 │ ▸ Sales & Cust.  │                                                          │
-│ ▾ Stock & Prod.  │  Module page: that module's screens only, in group cards │
-│   ▾ Products     │   ┌ Products ──────────┐ ┌ Stock levels ──────────┐       │
-│      Add a prod… │   │ Add a product…     │ │ Stock take…            │       │
-│   ▸ Stock levels │   └────────────────────┘ └────────────────────────┘       │
-│ ▸ Housing        │                                                          │
+│ ▾ Accounting ◀lit│  Module page — Home › Accounting                         │
+│   ▸ Maintenance  │  Open screens: [📒 Add an account ✕] [🧾 Journal ✕]  Close all │
+│   ▸ Transactions │   ┌ ⚙ Maintenance — setting up ─────────── 11 screens ┐ │
+│   ▸ Enquiries    │   │ [Add an account] [Add a cost centre] [Tax code] … │ │
+│   ▸ Utilities    │   ┌ 📝 Transactions — day-to-day ────────── 7 screens ┐ │
+│ ▸ Housing        │   │ [Post a journal] [Recurring journals] …           │ │
 └──────────────────┴────────────────────────────────────────────────────────┘
 ```
 
@@ -25,17 +26,18 @@ Since 2026-10-14 the shell is organised **by business module, in plain language*
 
 - **20 modules** (Sales & Customers, Purchases & Suppliers, Stock & Products, Point of Sale, Restaurant, Accounting, Cash & Banking,
   Cashiering, Budgets, Fixed Assets, HR & Payroll, Municipality, Housing, Projects & Contracts, Weighbridge, Schools, CRM, Approvals,
-  Reports, Administration), each with plain-language **groups** of screens.
-- **Three levels of cards** that fill the page width (`FillWrapPanel`: equal columns, each card at least ~300 px, cards in a row share a height): 
-  Home (module cards) ▸ module (one card per area of work: icon, screen count, first few screen names) ▸ area (one card per screen: what it is for,
-  the kind of work, Open ›). A breadcrumb (Home › module › area) and a back button go up one level; a module with one area opens straight to it.
-- Opening a module shows **only that module's screens**. Menus are multi-level: **Modules ▸ module ▸ group ▸ screen**, and
-  **Maintenance / Transactions / Enquiries / Utilities ▸ module ▸ (group ▸) screen** — Transactions ▸ Housing lists Housing only.
-- **Every screen opens in its own window** (`OperationsWindow` for a single action, or the dedicated window), so several can be open.
+  Reports, Administration), each with plain-language **groups** of screens (`NavigationMap`).
+- **A module page shows every one of its screens, labelled by kind of work**: a section each for Maintenance (setting up), Transactions
+  (day-to-day), Enquiries (looking up) and Utilities (period end and housekeeping) — `NavModule.Categories` — with the group as a chip on each
+  screen card. Choosing a kind of work (sidebar, menu, search) scrolls the page to that section.
+- **The sidebar** is Module ▸ kind of work ▸ screen; the module shown is lit (bar in its colour, bold title) and rows highlight on hover.
+- **Every screen opens in its own window** (`OperationsWindow` hosting `OperationsView`, or the dedicated window), so several can be worked on
+  at once; the **Open screens** bar on the page lists them — click a chip to bring that window to the front, ✕ to close it, "Close all".
+- Menus are multi-level: **Modules ▸ module ▸ kind of work ▸ (group ▸) screen**, and **Maintenance / Transactions / Enquiries / Utilities ▸ module ▸ screen**.
 - The **search box** finds any screen by what it does (every typed word must match; plurals match singulars); Enter opens the first hit.
-- Data-driven and gated: entries a user's **licence and permissions** do not cover are hidden; empty groups and modules disappear.
-- Any console action the map does not name falls into its module's **More** group, so nothing is unreachable;
-  `NavigationBuilder.Unresolved` lists map entries whose action no longer exists (keep it empty).
+- Data-driven and gated: entries a user's **licence and permissions** do not cover are hidden; empty sections and modules disappear.
+- Any console action the map does not name falls into its module's **More** group; `NavigationBuilder.Unresolved` lists map entries whose
+  action no longer exists (keep it empty).
 - Adding a screen: place it in `NavigationMap` under the right module and group with a plain title; a new window also needs a key in
   `ShellWindow.OpenEntry`.
 

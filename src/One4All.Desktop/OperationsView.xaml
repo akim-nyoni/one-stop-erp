@@ -1,0 +1,128 @@
+<UserControl x:Class="One4All.Desktop.OperationsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:One4All.Desktop.Localization"
+             Background="#F4F6F4" FontFamily="Segoe UI">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="Visible" />
+        <loc:TextConverter x:Key="Text" />
+    </UserControl.Resources>
+
+    <DockPanel Margin="10">
+        <!-- Header -->
+        <DockPanel DockPanel.Dock="Top" Margin="6,0,6,6">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
+                        Visibility="{Binding ShowsActionList, Converter={StaticResource Visible}}">
+                <TextBlock Text="{loc:T 'Module'}" Foreground="#667" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <ComboBox ItemsSource="{Binding Modules}" SelectedItem="{Binding Module}" Width="180" />
+            </StackPanel>
+            <StackPanel>
+                <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
+                <TextBlock Text="{Binding Subtitle}" Foreground="#667" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom" Background="#E8EEE8" Padding="10,5" Margin="6,6,6,0" CornerRadius="4">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#334" FontSize="12" TextWrapping="Wrap" />
+        </Border>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="ActionColumn" Width="280" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Actions -->
+            <Border Grid.Column="0" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Margin="6,0,6,0"
+                    Visibility="{Binding ShowsActionList, Converter={StaticResource Visible}}">
+                <ListBox ItemsSource="{Binding Operations}" SelectedItem="{Binding Selected}" BorderThickness="0" Margin="4">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Title, Converter={StaticResource Text}}" Padding="4,5" TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+
+            <Grid Grid.Column="1" Margin="6,0,6,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Form -->
+                <Border Grid.Row="0" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="12,10">
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                            <TextBlock Text="{Binding Selected.Title, Converter={StaticResource Text}}" FontSize="15" FontWeight="SemiBold" Foreground="#1E3A2E" />
+                            <TextBlock Text="{Binding Selected.Description, Converter={StaticResource Text}}" Foreground="#667" FontSize="12" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button DockPanel.Dock="Bottom" Content="{Binding RunText}" HorizontalAlignment="Right" Padding="22,7" Margin="0,8,0,0" MinWidth="110"
+                                Background="#DDEFE0" FontWeight="SemiBold" Command="{Binding RunCommand}" IsDefault="True" />
+                        <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding Fields}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Width="250" Margin="0,0,12,8">
+                                            <TextBlock Text="{Binding Label, Converter={StaticResource Text}}" Foreground="#667" FontSize="12" TextWrapping="Wrap" />
+                                            <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" Margin="0,3,0,0"
+                                                     Visibility="{Binding IsText, Converter={StaticResource Visible}}" />
+                                            <DatePicker SelectedDate="{Binding DateValue}" Margin="0,3,0,0" SelectedDateFormat="Short"
+                                                        Visibility="{Binding IsDate, Converter={StaticResource Visible}}" />
+                                            <CheckBox IsChecked="{Binding IsTicked}" Content="{loc:T 'Yes'}" Margin="0,5,0,0"
+                                                      Visibility="{Binding IsFlag, Converter={StaticResource Visible}}" />
+                                            <ComboBox ItemsSource="{Binding Choices}" SelectedItem="{Binding Value}" Margin="0,3,0,0"
+                                                      Visibility="{Binding IsChoice, Converter={StaticResource Visible}}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
+
+                <!-- Result -->
+                <TextBox Grid.Row="1" Text="{Binding Result, Mode=OneWay}" IsReadOnly="True" Margin="0,6,0,0" Padding="8"
+                         FontFamily="Consolas" FontSize="12" TextWrapping="NoWrap" AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" BorderBrush="#D9E0D9">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox">
+                            <Setter Property="Foreground" Value="#1E3A2E" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Failed}" Value="True">
+                                    <Setter Property="Foreground" Value="#8B1E1E" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
+
+                <!-- List -->
+                <DockPanel Grid.Row="2" Margin="0,8,0,4">
+                    <Button DockPanel.Dock="Right" Content="{loc:T 'Refresh'}" Padding="12,4" Command="{Binding RefreshCommand}" />
+                    <Button DockPanel.Dock="Right" Content="{loc:T 'Next ▶'}" Padding="10,4" Margin="0,0,6,0" Command="{Binding NextPageCommand}" />
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding PageText}" Foreground="#667" VerticalAlignment="Center" Margin="0,0,6,0" />
+                    <Button DockPanel.Dock="Right" Content="{loc:T '◀ Previous'}" Padding="10,4" Margin="0,0,6,0" Command="{Binding PreviousPageCommand}" />
+                    <TextBlock Text="{Binding Selected.ListTitle, Converter={StaticResource Text}}" FontWeight="SemiBold" Foreground="#445" VerticalAlignment="Center" />
+                </DockPanel>
+                <DataGrid x:Name="ListGrid" Grid.Row="3" ItemsSource="{Binding List}" AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal" Background="White" BorderBrush="#D9E0D9"
+                          RowBackground="White" AlternatingRowBackground="#F7FAF7" AutoGeneratingColumn="ListGrid_AutoGeneratingColumn">
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="{loc:T 'Who touched this record?'}" Click="WhoTouched_Click" />
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+                </DataGrid>
+            </Grid>
+        </Grid>
+    </DockPanel>
+</UserControl>

@@ -15,6 +15,7 @@ public sealed class AccountingFixture : IAsyncLifetime
 {
     private string _adminConnectionString = string.Empty;
     private string _databaseName = string.Empty;
+    private bool _created;
 
     /// <summary>True when a database was created.</summary>
     public bool Available { get; private set; }
@@ -58,8 +59,10 @@ public sealed class AccountingFixture : IAsyncLifetime
             await using (NpgsqlConnection connection = new(_adminConnectionString))
             {
                 await connection.OpenAsync();
+                await DropAbandonedAsync(connection);
                 await using NpgsqlCommand create = new($"CREATE DATABASE \"{_databaseName}\"", connection);
                 await create.ExecuteNonQueryAsync();
+                _created = true;
             }
 
             csb.Database = _databaseName;
@@ -77,10 +80,40 @@ public sealed class AccountingFixture : IAsyncLifetime
         }
     }
 
+    // Test databases left by runs that were stopped before they could clean up (a killed build, a closed terminal): any one4all_acc_ database
+    // nobody is connected to belongs to no running test, so it is dropped. Best effort.
+    private static async Task DropAbandonedAsync(NpgsqlConnection connection)
+    {
+        try
+        {
+            List<string> abandoned = [];
+            await using (NpgsqlCommand find = new(
+                "SELECT d.datname FROM pg_database d WHERE d.datname LIKE 'one4all\\_acc\\_%' AND NOT EXISTS (SELECT 1 FROM pg_stat_activity a WHERE a.datname = d.datname)", connection))
+            await using (NpgsqlDataReader reader = await find.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    abandoned.Add(reader.GetString(0));
+                }
+            }
+
+            foreach (string name in abandoned)
+            {
+                await using NpgsqlCommand drop = new($"DROP DATABASE IF EXISTS \"{name}\"", connection);
+                await drop.ExecuteNonQueryAsync();
+            }
+        }
+        catch (NpgsqlException)
+        {
+            // best-effort
+        }
+    }
+
     /// <inheritdoc />
     public async Task DisposeAsync()
     {
-        if (!Available)
+        // Dropped whenever it was created — also when migrating it failed — so no test database is left behind.
+        if (!_created)
         {
             return;
         }
