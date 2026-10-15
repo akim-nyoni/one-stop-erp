@@ -157,3 +157,49 @@ public sealed class FinanceChargeService : IFinanceChargeService
         return new FinanceChargeRunResult(charges, charges.Sum(c => c.Interest), exempt.Count);
     }
 }
+
+/// <summary>
+/// Built-in task <c>ar.finance-charges</c>: raises interest on overdue customer accounts on the company's <see cref="FinanceChargePolicy"/> as at the
+/// run date (schedule it monthly). Each open item is charged only for the days since it was last charged, so a re-run the same day charges nothing more.
+/// </summary>
+public sealed class FinanceChargesTask : Application.Abstractions.Scheduling.IScheduledTask
+{
+    private readonly One4AllDbContext _db;
+    private readonly IFinanceChargeService _charges;
+
+    /// <summary>Creates the task.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="charges">The finance-charge service.</param>
+    public FinanceChargesTask(One4AllDbContext db, IFinanceChargeService charges)
+    {
+        _db = db;
+        _charges = charges;
+    }
+
+    /// <inheritdoc />
+    public string Key => "ar.finance-charges";
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
+    {
+        FinanceChargePolicy? policy = await _db.Set<FinanceChargePolicy>().AsNoTracking().FirstOrDefaultAsync(p => p.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (policy is null)
+        {
+            return "No finance-charge policy is set (Sales & Customers › Interest on overdue accounts › Save as the monthly policy); nothing charged.";
+        }
+
+        Result<FinanceChargeRunResult> run = await _charges.RaiseChargesAsync(new FinanceChargeRunRequest
+        {
+            CompanyId = companyId, AsAtDate = DateOnly.FromDateTime(runAt.UtcDateTime), AnnualRatePercent = policy.AnnualRatePercent, GraceDays = policy.GraceDays,
+            MinimumCharge = policy.MinimumCharge, InterestIncomeAccountCode = policy.InterestIncomeAccountCode, DocumentPrefix = policy.DocumentPrefix, Compound = policy.Compound,
+            ExemptIndigent = policy.ExemptIndigent,
+        }, ct).ConfigureAwait(false);
+        if (run.IsFailure)
+        {
+            return run.Error;
+        }
+
+        return $"{run.Value.Charges.Count} customer(s) charged {run.Value.TotalInterest:N2} interest at {policy.AnnualRatePercent:0.##}%"
+            + (run.Value.CustomersExempted > 0 ? $"; {run.Value.CustomersExempted} exempted." : ".");
+    }
+}

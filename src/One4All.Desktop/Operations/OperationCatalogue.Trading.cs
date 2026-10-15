@@ -509,19 +509,55 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = credit, Title = "Raise finance charges",
+            ListTitle = "Monthly finance-charge policy",
             Description = "Charges interest on overdue customer balances past the grace days at the annual rate (simple or compound, with a minimum charge), optionally exempting "
-                + "indigent customers.",
+                + "indigent customers. Tick \"Save as the monthly policy\" to keep these terms: the scheduled task ar.finance-charges (Administration › Scheduled jobs) then "
+                + "charges on them every month without anyone running it.",
             Fields = [Today("Date", "As at"), Num("Rate", "Annual rate %"), Num("Grace", "Grace days", "30"), Num("Minimum", "Minimum charge", "0"), Req("Income", "Interest income account"),
-                Req("Prefix", "Document prefix", "FC"), Tick("Compound", "Compound"), Tick("Indigent", "Exempt indigent customers", true)],
+                Req("Prefix", "Document prefix", "FC"), Tick("Compound", "Compound"), Tick("Indigent", "Exempt indigent customers", true),
+                Tick("Policy", "Save as the monthly policy"), Tick("PolicyOnly", "Save the policy only (charge nothing now)")],
             Run = async (c, i) =>
             {
+                string saved = string.Empty;
+                if (i.Flag("Policy") || i.Flag("PolicyOnly"))
+                {
+                    if (i.Number("Rate") <= 0m || i.Whole("Grace") < 0)
+                    {
+                        throw new OperationException("The policy needs a rate above zero and grace days of zero or more.");
+                    }
+
+                    Core.Trading.FinanceChargePolicy? policy = await c.Db.Set<Core.Trading.FinanceChargePolicy>().FirstOrDefaultAsync(p => p.CompanyId == c.CompanyId).ConfigureAwait(true);
+                    if (policy is null)
+                    {
+                        policy = new Core.Trading.FinanceChargePolicy(c.CompanyId, i.Number("Rate"), i.Text("Income"));
+                        c.Db.Add(policy);
+                    }
+
+                    policy.AnnualRatePercent = i.Number("Rate");
+                    policy.InterestIncomeAccountCode = i.Text("Income").Trim();
+                    policy.GraceDays = i.Whole("Grace");
+                    policy.MinimumCharge = i.Number("Minimum");
+                    policy.DocumentPrefix = i.Text("Prefix").Trim();
+                    policy.Compound = i.Flag("Compound");
+                    policy.ExemptIndigent = i.Flag("Indigent");
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    saved = " Saved as the monthly policy: schedule the task ar.finance-charges to run it every month.";
+                    if (i.Flag("PolicyOnly"))
+                    {
+                        return saved.Trim();
+                    }
+                }
+
                 FinanceChargeRunResult run = Check(await c.Get<IFinanceChargeService>().RaiseChargesAsync(new FinanceChargeRunRequest
                 {
                     CompanyId = c.CompanyId, AsAtDate = i.Date("Date"), AnnualRatePercent = i.Number("Rate"), GraceDays = i.Whole("Grace"), MinimumCharge = i.Number("Minimum"),
                     InterestIncomeAccountCode = i.Text("Income"), DocumentPrefix = i.Text("Prefix"), Compound = i.Flag("Compound"), ExemptIndigent = i.Flag("Indigent"),
                 }).ConfigureAwait(true));
-                return $"{run.Charges.Count} customer(s) charged {M(run.TotalInterest)}{(run.CustomersExempted > 0 ? $"; {run.CustomersExempted} exempted" : string.Empty)}.";
+                return $"{run.Charges.Count} customer(s) charged {M(run.TotalInterest)}{(run.CustomersExempted > 0 ? $"; {run.CustomersExempted} exempted" : string.Empty)}.{saved}";
             },
+            List = async c => Table(await c.Db.Set<Core.Trading.FinanceChargePolicy>().AsNoTracking().Where(p => p.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true),
+                ("Rate %", p => p.AnnualRatePercent), ("Grace days", p => p.GraceDays), ("Minimum", p => M(p.MinimumCharge)), ("Income account", p => p.InterestIncomeAccountCode),
+                ("Prefix", p => p.DocumentPrefix), ("Compound", p => p.Compound), ("Exempt indigent", p => p.ExemptIndigent)),
         };
         yield return new Operation
         {

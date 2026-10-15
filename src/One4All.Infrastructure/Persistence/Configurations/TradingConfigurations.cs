@@ -366,3 +366,17 @@ internal sealed class DunningLogConfiguration : IEntityTypeConfiguration<Dunning
         b.HasIndex(x => new { x.CustomerId, x.Level, x.SentOn });
     }
 }
+
+internal sealed class FinanceChargePolicyConfiguration : IEntityTypeConfiguration<FinanceChargePolicy>
+{
+    public void Configure(EntityTypeBuilder<FinanceChargePolicy> b)
+    {
+        b.ToTable("finance_charge_policy", Schemas.Trading);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => x.CompanyId).IsUnique();
+        b.Property(x => x.AnnualRatePercent).HasPrecision(9, 4);
+        b.Property(x => x.MinimumCharge).HasPrecision(18, 2);
+        b.Property(x => x.InterestIncomeAccountCode).HasMaxLength(30).IsRequired();
+        b.Property(x => x.DocumentPrefix).HasMaxLength(10).IsRequired();
+    }
+}

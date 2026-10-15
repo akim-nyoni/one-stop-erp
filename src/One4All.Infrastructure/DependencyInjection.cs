@@ -297,6 +297,7 @@ public static class DependencyInjection
         services.AddScoped<Trading.PaymentRunService>();
         services.AddScoped<Application.Abstractions.Trading.IPaymentRunService>(sp => sp.GetRequiredService<Trading.PaymentRunService>());
         services.AddScoped<Application.Abstractions.Trading.IFinanceChargeService, Trading.FinanceChargeService>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Trading.FinanceChargesTask>();
         services.AddScoped<Application.Abstractions.Trading.IDunningService, Trading.DunningService>();
         services.AddScoped<Application.Abstractions.Trading.IRemittanceService, Trading.RemittanceService>();
         services.AddScoped<Application.Abstractions.Trading.ICreditControlService, Trading.CreditControlService>();
