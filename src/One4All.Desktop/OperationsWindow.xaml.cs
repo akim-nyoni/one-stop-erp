@@ -28,10 +28,11 @@ public partial class OperationsWindow : Window
     /// <param name="userId">The signed-in user.</param>
     /// <param name="operation">The action.</param>
     /// <param name="title">The name the navigation shows for it.</param>
-    public OperationsWindow(IServiceProvider services, long userId, Operations.Operation operation, string? title = null)
+    /// <param name="context">Where it sits in the navigation.</param>
+    public OperationsWindow(IServiceProvider services, long userId, Operations.Operation operation, string? title = null, string? context = null)
     {
         _services = services;
-        DataContext = new OperationsViewModel(services, userId, operation, title);
+        DataContext = new OperationsViewModel(services, userId, operation, title, context);
         InitializeComponent();
         Title = title ?? operation.Title;
         Width = 1000;

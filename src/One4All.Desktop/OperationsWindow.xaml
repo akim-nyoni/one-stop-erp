@@ -19,8 +19,7 @@
             </StackPanel>
             <StackPanel>
                 <TextBlock Text="{Binding Heading}" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
-                <TextBlock Text="{loc:T 'Choose an action, fill the form and run it. Records are looked up by their codes; every rule is enforced by the posting services.'}"
-                           Foreground="#667" FontSize="12" />
+                <TextBlock Text="{Binding Subtitle}" Foreground="#667" FontSize="12" TextWrapping="Wrap" />
             </StackPanel>
         </DockPanel>
 
@@ -62,7 +61,7 @@
                             <TextBlock Text="{Binding Selected.Title, Converter={StaticResource Text}}" FontSize="15" FontWeight="SemiBold" Foreground="#1E3A2E" />
                             <TextBlock Text="{Binding Selected.Description, Converter={StaticResource Text}}" Foreground="#667" FontSize="12" TextWrapping="Wrap" />
                         </StackPanel>
-                        <Button DockPanel.Dock="Bottom" Content="{loc:T 'Run'}" HorizontalAlignment="Right" Padding="22,7" Margin="0,8,0,0" MinWidth="110"
+                        <Button DockPanel.Dock="Bottom" Content="{Binding RunText}" HorizontalAlignment="Right" Padding="22,7" Margin="0,8,0,0" MinWidth="110"
                                 Background="#DDEFE0" FontWeight="SemiBold" Command="{Binding RunCommand}" IsDefault="True" />
                         <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding Fields}">

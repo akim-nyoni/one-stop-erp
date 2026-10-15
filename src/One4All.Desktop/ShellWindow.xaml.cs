@@ -219,7 +219,7 @@ public partial class ShellWindow : Window
         ShellViewModel vm = (ShellViewModel)DataContext;
         if (entry.Operation is Operations.Operation operation)
         {
-            new OperationsWindow(_services, vm.UserId, operation, entry.Title) { Owner = this }.Show();
+            new OperationsWindow(_services, vm.UserId, operation, entry.Title, $"{entry.ModuleTitle}  ›  {entry.GroupTitle}") { Owner = this }.Show();
             return;
         }
 

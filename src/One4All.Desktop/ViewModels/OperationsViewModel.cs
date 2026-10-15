@@ -99,13 +99,15 @@ public sealed partial class OperationsViewModel : ObservableObject
     /// <param name="userId">The signed-in user.</param>
     /// <param name="operation">The action.</param>
     /// <param name="title">The name the navigation shows for it.</param>
-    public OperationsViewModel(IServiceProvider services, long userId, Operation operation, string? title = null)
+    /// <param name="context">Where it sits in the navigation ("HR &amp; Payroll › Leave").</param>
+    public OperationsViewModel(IServiceProvider services, long userId, Operation operation, string? title = null, string? context = null)
     {
         _services = services;
         _userId = userId;
         _module = operation.Module;
         IsSingle = true;
         SingleTitle = title ?? operation.Title;
+        SingleContext = context;
         Operations.Add(operation);
         Selected = operation;
     }
@@ -118,6 +120,17 @@ public sealed partial class OperationsViewModel : ObservableObject
 
     /// <summary>Gets the action's name when the window shows one action.</summary>
     public string? SingleTitle { get; }
+
+    /// <summary>Gets where the action sits in the navigation, when opened from it.</summary>
+    public string? SingleContext { get; }
+
+    /// <summary>Gets the line under the heading: plain instructions for one screen, the console's own line otherwise.</summary>
+    public string Subtitle => IsSingle
+        ? (SingleContext is null ? string.Empty : SingleContext + "  —  ") + "Fill in the boxes (those marked * must be filled) and press Go. What happened shows underneath; the list at the bottom shows the records."
+        : Localization.UiText.T("Choose an action, fill the form and run it. Records are looked up by their codes; every rule is enforced by the posting services.");
+
+    /// <summary>Gets the button's text.</summary>
+    public string RunText => IsSingle ? "✔  Go" : Localization.UiText.T("Run");
 
     /// <summary>Gets the modules.</summary>
     public IReadOnlyList<string> Modules => OperationCatalogue.Modules;
