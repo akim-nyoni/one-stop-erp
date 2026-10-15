@@ -150,10 +150,10 @@ public partial class ShellWindow : Window
     {
         foreach (Navigation.NavModule module in viewModel.NavModules)
         {
-            System.Windows.Controls.MenuItem moduleItem = new() { Header = $"{module.Glyph}  {Localization.UiText.T(module.Title)}" };
+            System.Windows.Controls.MenuItem moduleItem = new() { Header = Localization.UiText.T(module.Title), Icon = MenuIcon(module.Glyph, module.Accent) };
             foreach (Navigation.NavGroup group in module.Groups)
             {
-                System.Windows.Controls.MenuItem groupItem = new() { Header = Localization.UiText.T(group.Title) };
+                System.Windows.Controls.MenuItem groupItem = new() { Header = Localization.UiText.T(group.Title), Icon = MenuIcon(group.Glyph, group.Accent) };
                 AddEntries(groupItem, group.Entries);
                 moduleItem.Items.Add(groupItem);
             }
@@ -175,7 +175,7 @@ public partial class ShellWindow : Window
                     continue;
                 }
 
-                System.Windows.Controls.MenuItem moduleItem = new() { Header = $"{module.Glyph}  {Localization.UiText.T(module.Title)}" };
+                System.Windows.Controls.MenuItem moduleItem = new() { Header = Localization.UiText.T(module.Title), Icon = MenuIcon(module.Glyph, module.Accent) };
                 if (groups.Count == 1 || groups.Sum(g => g.Entries.Count) <= 8)
                 {
                     // Few screens: list them straight under the module.
@@ -185,7 +185,7 @@ public partial class ShellWindow : Window
                 {
                     foreach (Navigation.NavGroup group in groups)
                     {
-                        System.Windows.Controls.MenuItem groupItem = new() { Header = Localization.UiText.T(group.Title) };
+                        System.Windows.Controls.MenuItem groupItem = new() { Header = Localization.UiText.T(group.Title), Icon = MenuIcon(group.Glyph, group.Accent) };
                         AddEntries(groupItem, group.Entries);
                         moduleItem.Items.Add(groupItem);
                     }
@@ -200,11 +200,18 @@ public partial class ShellWindow : Window
     {
         foreach (Navigation.NavEntry entry in entries)
         {
-            System.Windows.Controls.MenuItem item = new() { Header = Localization.UiText.T(entry.Title) + "…", ToolTip = entry.Purpose };
+            System.Windows.Controls.MenuItem item = new() { Header = Localization.UiText.T(entry.Title) + "…", ToolTip = entry.Purpose, Icon = MenuIcon(entry.Glyph, entry.Accent) };
             item.Click += (_, _) => OpenEntry(entry);
             parent.Items.Add(item);
         }
     }
+
+    // A menu item's icon: the glyph in the module's colour.
+    private static System.Windows.Controls.TextBlock MenuIcon(string glyph, string accent) => new()
+    {
+        Text = glyph, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+        Foreground = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString(accent)!,
+    };
 
     // Every screen opens in its own window: an action in a window of its own (its form and its list), or its dedicated window.
     private void OpenEntry(Navigation.NavEntry entry)

@@ -27,6 +27,12 @@ public sealed class NavEntry
     /// <summary>Gets the group it is under.</summary>
     public required string GroupTitle { get; init; }
 
+    /// <summary>Gets the screen's icon.</summary>
+    public string Glyph { get; init; } = "📄";
+
+    /// <summary>Gets its colour (the module's).</summary>
+    public string Accent { get; init; } = "#2E7D32";
+
     /// <summary>Gets the kind of work in plain words (setting up, day-to-day, looking up, period end).</summary>
     public string AreaLabel => Area switch
     {
@@ -98,6 +104,7 @@ public static class NavigationBuilder
             List<NavGroup> groups = [];
             foreach (NavGroupSpec group in spec.Groups)
             {
+                string groupGlyph = GroupGlyph(group.Title, spec.Glyph);
                 List<NavEntry> entries = [];
                 foreach (NavItemSpec item in group.Items)
                 {
@@ -108,21 +115,21 @@ public static class NavigationBuilder
                             continue;
                         }
 
-                        entries.Add(Entry(operation, item.Title, spec.Title, group.Title));
+                        entries.Add(Entry(operation, item.Title, spec, group.Title, groupGlyph));
                     }
                     else if (item.ConsoleModule is null || available(item.ConsoleModule))
                     {
                         entries.Add(new NavEntry
                         {
                             Title = item.Title!, Purpose = item.Purpose ?? string.Empty, Area = item.Area ?? MenuArea.Transactions, WindowKey = item.Window,
-                            ModuleTitle = spec.Title, GroupTitle = group.Title,
+                            ModuleTitle = spec.Title, GroupTitle = group.Title, Glyph = EntryGlyph(item.Title!, groupGlyph), Accent = spec.Accent,
                         });
                     }
                 }
 
                 if (entries.Count > 0)
                 {
-                    groups.Add(new NavGroup(group.Title, entries) { Glyph = GroupGlyph(group.Title, spec.Glyph), Accent = spec.Accent });
+                    groups.Add(new NavGroup(group.Title, entries) { Glyph = groupGlyph, Accent = spec.Accent });
                 }
             }
 
@@ -134,7 +141,8 @@ public static class NavigationBuilder
         {
             int index = Math.Max(0, NavigationMap.Modules.ToList().FindIndex(m => m.Takes.Contains(stray.Key)));
             NavModule home = modules[index];
-            List<NavEntry> more = [.. stray.Select(o => Entry(o, null, home.Title, "More"))];
+            NavModuleSpec homeSpec = NavigationMap.Modules[index];
+            List<NavEntry> more = [.. stray.Select(o => Entry(o, null, homeSpec, "More", home.Glyph))];
             NavGroup? existing = home.Groups.FirstOrDefault(g => g.Title == "More");
             List<NavGroup> groups = [.. home.Groups.Where(g => g != existing), new NavGroup("More", [.. existing?.Entries ?? [], .. more]) { Glyph = "➕", Accent = home.Accent }];
             modules[index] = home with { Groups = groups };
@@ -150,9 +158,10 @@ public static class NavigationBuilder
         => [.. NavigationMap.Modules.SelectMany(m => m.Groups).SelectMany(g => g.Items).Where(i => i.Operation is not null)
             .Where(i => !operations.Any(o => o.Module == i.ConsoleModule && o.Title == i.Operation)).Select(i => $"{i.ConsoleModule}: {i.Operation}")];
 
-    private static NavEntry Entry(Operation operation, string? title, string module, string group) => new()
+    private static NavEntry Entry(Operation operation, string? title, NavModuleSpec module, string group, string groupGlyph) => new()
     {
-        Title = title ?? operation.Title, Purpose = FirstSentence(operation.Description), Area = operation.MenuArea, Operation = operation, ModuleTitle = module, GroupTitle = group,
+        Title = title ?? operation.Title, Purpose = FirstSentence(operation.Description), Area = operation.MenuArea, Operation = operation, ModuleTitle = module.Title,
+        GroupTitle = group, Glyph = EntryGlyph(title ?? operation.Title, groupGlyph), Accent = module.Accent,
     };
 
     // An icon for a group from the words in its name, so the cards are easy to tell apart; otherwise the module's own icon.
@@ -161,7 +170,7 @@ public static class NavigationBuilder
         ("report", "📊"), ("enquir", "🔎"), ("look", "🔎"), ("setup", "⚙️"), ("set up", "⚙️"), ("setting", "⚙️"), ("rule", "⚙️"), ("polic", "📜"),
         ("import", "📥"), ("export", "📤"), ("period", "📅"), ("year", "📅"), ("calendar", "📅"), ("leave", "🌴"), ("attendance", "⏱️"), ("time", "⏱️"),
         ("payroll", "💵"), ("pay", "💳"), ("receipt", "🧾"), ("invoice", "🧾"), ("bill", "🧾"), ("statement", "📄"), ("document", "📄"), ("letter", "✉️"),
-        ("message", "✉️"), ("customer", "👥"), ("supplier", "🚚"), ("employee", "🧑‍💼"), ("people", "👥"), ("applicant", "🧑"), ("waiting", "⏳"),
+        ("message", "✉️"), ("customer", "👥"), ("supplier", "🚚"), ("employee", "👔"), ("people", "👥"), ("applicant", "🧑"), ("waiting", "⏳"),
         ("product", "📦"), ("stock", "🏬"), ("warehouse", "🏬"), ("count", "🔢"), ("production", "🏭"), ("price", "🏷️"), ("promotion", "🏷️"),
         ("loyalty", "⭐"), ("gift", "🎁"), ("refund", "↩️"), ("return", "↩️"), ("till", "🖥️"), ("table", "🍽️"), ("kitchen", "🍳"), ("order", "📝"),
         ("quote", "📝"), ("requisition", "📝"), ("bank", "🏦"), ("cash", "💰"), ("cheque", "💰"), ("journal", "📒"), ("ledger", "📒"), ("account", "📒"),
@@ -173,18 +182,63 @@ public static class NavigationBuilder
         ("schedul", "⏰"), ("audit", "🕵️"), ("design", "✏️"), ("training", "📚"), ("disciplin", "⚠️"), ("grievance", "⚠️"),
     ];
 
-    private static string GroupGlyph(string title, string fallback)
+    // Words that say what a single screen is about (checked before the group words), then what it does.
+    private static readonly (string Word, string Glyph)[] ScreenGlyphs =
+    [
+        ("standard", "💲"), ("standing order", "🔁"), ("salary", "💵"), ("overtime", "⏱️"), ("shift", "🔄"), ("roster", "🗓️"), ("appraisal", "⭐"), ("medical", "🩺"), ("increment", "📈"),
+        ("establishment", "🪑"), ("contact", "📇"), ("photo", "📇"), ("expiry", "🔔"), ("alert", "🔔"), ("reminder", "🔔"), ("discount", "🏷️"),
+        ("transfer", "🔁"), ("adjust", "🔧"), ("print", "🖨️"), ("email", "✉️"), ("sms", "💬"), ("calculat", "🧮"), ("interest", "🧮"),
+        ("instalment", "📆"), ("deposit", "💰"), ("serial", "🔖"), ("batch", "🔖"), ("barcode", "🔖"), ("unit", "📏"), ("recipe", "📋"),
+        ("reservation", "📅"), ("tip", "💁"), ("delivery", "🚚"), ("receiv", "📥"), ("despatch", "📤"), ("dispatch", "📤"), ("credit note", "↩️"),
+        ("debit note", "🧾"), ("write off", "✖️"), ("write-off", "✖️"), ("valuation", "💲"), ("revaluation", "💲"), ("reconcil", "⚖️"),
+        ("consolidat", "🧩"), ("close", "🔒"), ("reopen", "🔓"), ("lock", "🔒"), ("password", "🔑"), ("two-factor", "🔑"), ("role", "🛡️"),
+        ("health", "🩺"), ("history", "🕘"), ("trail", "🕵️"), ("notification", "🔔"), ("desk", "🛎️"), ("touch screen", "🖥️"), ("terminal", "🖥️"),
+        ("float", "💰"), ("cash-up", "🧮"), ("parked", "🅿️"), ("event", "📌"), ("dashboard", "📊"), ("analytics", "📊"), ("pipeline", "📜"),
+        ("map", "🗺️"), ("survey", "📐"), ("inspection", "🔍"), ("valuation roll", "📜"), ("water", "💧"), ("electric", "⚡"), ("token", "⚡"),
+        ("refuse", "🗑️"), ("cemetery", "🪦"), ("grave", "🪦"), ("hall", "🏛️"), ("vehicle", "🚗"), ("fuel", "⛽"), ("concrete", "🧱"),
+        ("load", "🚛"), ("ticket", "🎫"), ("wallet", "👛"), ("sibling", "👪"), ("dependant", "👪"), ("loan", "🤝"), ("advance", "🤝"),
+        ("gratuity", "🎁"), ("bonus", "🎁"), ("final pay", "👋"), ("leaves", "👋"), ("termination", "👋"), ("recruit", "🧲"), ("vacanc", "🧲"),
+    ];
+
+    // What a screen does, when nothing more specific matched.
+    private static readonly (string Word, string Glyph)[] VerbGlyphs =
+    [
+        ("add", "➕"), ("create", "➕"), ("new", "➕"), ("register", "➕"), ("record", "📝"), ("enter", "📝"), ("capture", "📝"), ("change", "✏️"),
+        ("edit", "✏️"), ("update", "✏️"), ("set", "⚙️"), ("approve", "✅"), ("reject", "✖️"), ("cancel", "✖️"), ("reverse", "↩️"), ("run", "▶️"),
+        ("post", "📤"), ("send", "📤"), ("view", "🔎"), ("find", "🔎"), ("search", "🔎"), ("check", "🔍"), ("list", "📋"), ("show", "🔎"),
+    ];
+
+    private static string GroupGlyph(string title, string fallback) => Match(title, GroupGlyphs) ?? fallback;
+
+    // A screen's icon: what it is about, else what its group is about, else what it does, else the group's icon.
+    private static string EntryGlyph(string title, string groupGlyph)
     {
-        string lower = title.ToLowerInvariant();
-        foreach ((string word, string glyph) in GroupGlyphs)
+        string? glyph = Match(title, ScreenGlyphs) ?? Match(title, GroupGlyphs);
+        if (glyph is not null)
         {
-            if (lower.Contains(word, StringComparison.Ordinal))
+            return glyph;
+        }
+
+        string first = title.Split(' ', 2)[0];
+        return Match(first, VerbGlyphs) ?? groupGlyph;
+    }
+
+    private static string? Match(string title, (string Word, string Glyph)[] words)
+    {
+        // A word matches only at the start of a word in the title ("tip" is not found in "multiple").
+        string lower = title.ToLowerInvariant();
+        foreach ((string word, string glyph) in words)
+        {
+            for (int at = lower.IndexOf(word, StringComparison.Ordinal); at >= 0; at = lower.IndexOf(word, at + 1, StringComparison.Ordinal))
             {
-                return glyph;
+                if (at == 0 || !char.IsLetter(lower[at - 1]))
+                {
+                    return glyph;
+                }
             }
         }
 
-        return fallback;
+        return null;
     }
 
     // The description's first sentence, kept short for a card.

@@ -103,12 +103,18 @@
                                      MouseLeftButtonUp="SearchList_Click" KeyDown="SearchList_KeyDown">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate DataType="{x:Type nav:NavEntry}">
-                                        <StackPanel Margin="2,3">
+                                        <DockPanel Margin="2,3">
+                                        <Border DockPanel.Dock="Left" Width="30" Height="30" CornerRadius="15" Margin="0,0,10,0" VerticalAlignment="Center"
+                                                Background="{Binding Accent, Converter={StaticResource BrushConv}}">
+                                            <TextBlock Text="{Binding Glyph}" FontSize="14" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel>
                                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="#1E3A2E" />
                                             <TextBlock FontSize="11" Foreground="#778">
                                                 <Run Text="{Binding ModuleTitle, Mode=OneWay}" /><Run Text="  ›  " /><Run Text="{Binding GroupTitle, Mode=OneWay}" /><Run Text="  —  " /><Run Text="{Binding Purpose, Mode=OneWay}" />
                                             </TextBlock>
                                         </StackPanel>
+                                        </DockPanel>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
@@ -148,10 +154,16 @@
                             </StackPanel>
                         </HierarchicalDataTemplate>
                         <HierarchicalDataTemplate DataType="{x:Type nav:NavGroup}" ItemsSource="{Binding Entries}">
-                            <TextBlock Text="{Binding Title}" Foreground="#445" Margin="0,2" />
+                            <StackPanel Orientation="Horizontal" Margin="0,2">
+                                <TextBlock Text="{Binding Glyph}" Width="22" Foreground="{Binding Accent, Converter={StaticResource BrushConv}}" />
+                                <TextBlock Text="{Binding Title}" Foreground="#445" />
+                            </StackPanel>
                         </HierarchicalDataTemplate>
                         <DataTemplate DataType="{x:Type nav:NavEntry}">
-                            <TextBlock Text="{Binding Title}" Foreground="#1E5E2E" Margin="0,1" ToolTip="{Binding Purpose}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,1" ToolTip="{Binding Purpose}">
+                                <TextBlock Text="{Binding Glyph}" Width="22" FontSize="11" VerticalAlignment="Center" Foreground="{Binding Accent, Converter={StaticResource BrushConv}}" />
+                                <TextBlock Text="{Binding Title}" Foreground="#1E5E2E" />
+                            </StackPanel>
                         </DataTemplate>
                     </TreeView.Resources>
                 </TreeView>
@@ -247,8 +259,11 @@
                                 <DataTemplate DataType="{x:Type nav:NavEntry}">
                                     <Button Style="{StaticResource CardButton}" MinHeight="112" Margin="8" Padding="0" Click="Entry_Click">
                                         <DockPanel>
-                                            <Border DockPanel.Dock="Left" Width="5" CornerRadius="6,0,0,6"
-                                                    Background="{Binding DataContext.SelectedModule.Accent, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BrushConv}}" />
+                                            <Border DockPanel.Dock="Left" Width="5" CornerRadius="6,0,0,6" Background="{Binding Accent, Converter={StaticResource BrushConv}}" />
+                                            <Border DockPanel.Dock="Left" Width="44" Height="44" CornerRadius="22" VerticalAlignment="Top" Margin="14,14,0,0"
+                                                    Background="{Binding Accent, Converter={StaticResource BrushConv}}">
+                                                <TextBlock Text="{Binding Glyph}" FontSize="20" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Border>
                                             <DockPanel Margin="14,12,14,10">
                                                 <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
                                                     <TextBlock DockPanel.Dock="Right" Text="Open  ›" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource BrandBrush}" VerticalAlignment="Center" />
