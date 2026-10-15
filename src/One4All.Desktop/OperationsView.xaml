@@ -79,7 +79,8 @@
                                                         Visibility="{Binding IsDate, Converter={StaticResource Visible}}" />
                                             <CheckBox IsChecked="{Binding IsTicked}" Content="{loc:T 'Yes'}" Margin="0,5,0,0"
                                                       Visibility="{Binding IsFlag, Converter={StaticResource Visible}}" />
-                                            <ComboBox ItemsSource="{Binding Choices}" SelectedItem="{Binding Value}" Margin="0,3,0,0"
+                                            <ComboBox ItemsSource="{Binding Choices}" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,0"
+                                                      IsEditable="{Binding IsLookup}" IsTextSearchEnabled="True" StaysOpenOnEdit="True" MaxDropDownHeight="360"
                                                       Visibility="{Binding IsChoice, Converter={StaticResource Visible}}" />
                                         </StackPanel>
                                     </DataTemplate>

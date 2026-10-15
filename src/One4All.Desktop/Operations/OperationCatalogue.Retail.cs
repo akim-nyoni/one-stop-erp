@@ -57,7 +57,7 @@ public static partial class OperationCatalogue
             Description = "Items pinned to the till's ★ Favourites tabs — for one terminal or every till, and optionally for one cashier (their own come first, then the till's, "
                 + "then every till's), on a page (★ Favourites, ★ Favourites 2…) in a colour (#RRGGBB or a name). Profile: what kind of counter the terminal is. "
                 + "Function keys: the terminal's F1–F12 (F2=TenderCash; F3=TenderCard; …) over its profile's defaults.",
-            Fields = [Pick("Step", "Step", ["Favourite", "Profile", "Function keys"]), Opt("Item", "Item code"), Opt("Terminal", "Terminal code (blank: every till)"), Opt("Cashier", "Cashier user name (blank: anyone)"),
+            Fields = [Pick("Step", "Step", ["Favourite", "Profile", "Function keys"]), ItemPick("Item", "Product", required: false), Opt("Terminal", "Terminal code (blank: every till)"), Opt("Cashier", "Cashier user name (blank: anyone)"),
                 Num("Order", "Position", "10"), Num("Page", "Page", "1"), Opt("Colour", "Tile colour"), Tick("Remove", "Remove it"),
                 Pick("Profile", "Terminal profile", Enum.GetNames<Core.Pos.TerminalProfile>()), Opt("Keys", "Function keys F2=TenderCash; … (blank: the profile's)")],
             Run = async (c, i) =>
@@ -249,7 +249,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Refund without a receipt", Description = "Goods brought back with no receipt: a different supervisor authorises it, within the company's limit; optionally restocked.",
-            Fields = [Num("Terminal", "Till id"), Req("Item", "Item code"), Num("Quantity", "Quantity", "1"), Num("Price", "Unit price refunded (excl. tax)"), Num("Tax", "Tax refunded", "0"),
+            Fields = [Num("Terminal", "Till id"), ItemPick("Item", "Product"), Num("Quantity", "Quantity", "1"), Num("Price", "Unit price refunded (excl. tax)"), Num("Tax", "Tax refunded", "0"),
                 Opt("TaxAccount", "Output tax account"), Req("RefundAccount", "Paid from (cash) account", "1000"), Req("Reason", "Reason"), Req("Supervisor", "Supervisor (user name)"),
                 Opt("Warehouse", "Restock into warehouse"), OptNum("Session", "Paid from till session (cash)"), Today()],
             Run = async (c, i) =>
@@ -300,7 +300,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Refund sale lines", ListTitle = "Recent till events",
             Description = "Refunds units of a completed sale's line (by item code): revenue and tax back, money out of the refund account, goods back on the shelf if ticked. Needs a supervisor other than you.",
-            Fields = [Req("Sale", "Sale number"), Req("Item", "Item code"), Num("Quantity", "Quantity"), Req("Terminal", "Till code"), Today(), Req("RefundAccount", "Refund paid from (account)", "1000"),
+            Fields = [Req("Sale", "Sale number"), ItemPick("Item", "Product"), Num("Quantity", "Quantity"), Req("Terminal", "Till code"), Today(), Req("RefundAccount", "Refund paid from (account)", "1000"),
                 Opt("TaxAccount", "Output tax account", "2200"), Req("Reason", "Reason"), Req("AuthorisedBy", "Authorised by (user name)"), Tick("Restock", "Put the goods back in stock", true),
                 OptNum("Session", "Paid from till session (cash out of the drawer)")],
             Run = async (c, i) =>
@@ -328,7 +328,7 @@ public static partial class OperationCatalogue
                 + "(the customer pays it in cash, or is given the excess back). Returns are checked like a refund and need a supervisor other than you.",
             Fields = [Req("Sale", "Original sale number"), Req("Item", "Item coming back"), Num("Quantity", "Quantity coming back", "1"), Req("NewItem", "Item going out"),
                 Num("NewQuantity", "Quantity going out", "1"), Num("NewPrice", "Unit price going out (excl. tax)"), Num("NewTax", "Tax on the new goods", "0"), Req("NewSale", "New sale number"),
-                Req("Terminal", "Till code"), Num("Session", "Till session"), Req("Warehouse", "Warehouse"), Req("Cash", "Till cash account", "1000"), Opt("TaxAccount", "Output tax account", "2200"),
+                Req("Terminal", "Till code"), Num("Session", "Till session"), WarehousePick("Warehouse", "Warehouse"), Req("Cash", "Till cash account", "1000"), Opt("TaxAccount", "Output tax account", "2200"),
                 Req("Reason", "Reason"), Req("AuthorisedBy", "Authorised by (user name)"), Today()],
             Run = async (c, i) =>
             {
@@ -388,7 +388,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Item picture, description and dimensions", ListTitle = "Items",
             Description = "An item's long description, its length, width and height in centimetres (the volume follows) and weight, and its picture (a JPEG, PNG, GIF or WebP "
                 + "file of at most 1 MB; Remove picture drops it).",
-            Fields = [Pick("Step", "Step", ["Details", "Picture", "Remove picture"]), Req("Item", "Item code"), Opt("LongDescription", "Long description"), OptNum("Length", "Length (cm)"),
+            Fields = [Pick("Step", "Step", ["Details", "Picture", "Remove picture"]), ItemPick("Item", "Product"), Opt("LongDescription", "Long description"), OptNum("Length", "Length (cm)"),
                 OptNum("Width", "Width (cm)"), OptNum("Height", "Height (cm)"), OptNum("Weight", "Weight (kg)"), Opt("File", "Picture file")],
             Run = async (c, i) =>
             {
@@ -419,7 +419,7 @@ public static partial class OperationCatalogue
             Description = "Goods we hold that are not ours: a supplier's consignment stock (with the agreed price) or a customer's goods in our keeping. They stay out of our stock "
                 + "value. Return hands them back; Use (supplier-owned only) takes them into our stock at the agreed price and raises the supplier's invoice through the clearing account.",
             Fields = [Pick("Step", "Step", ["Take in", "Return", "Use"]), Pick("Owner", "Owner is a", Enum.GetNames<HeldStockOwner>()), Opt("OwnerCode", "Supplier or customer code"),
-                Opt("Item", "Item code"), Opt("Warehouse", "Location code"), Num("Quantity", "Quantity", "1"), OptNum("Price", "Agreed price (supplier-owned)"), OptNum("Held", "Holding id"),
+                ItemPick("Item", "Product", required: false), Opt("Warehouse", "Location code"), Num("Quantity", "Quantity", "1"), OptNum("Price", "Agreed price (supplier-owned)"), OptNum("Held", "Holding id"),
                 Opt("Reference", "Reference"), Opt("Clearing", "Consignment clearing account (use)"), Today()],
             Run = async (c, i) =>
             {
@@ -464,7 +464,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Future prices", ListTitle = "Price lists",
             Description = "Schedules a price from a date, or a percentage change of the whole list from a date (e.g. 1 July); orders and sales dated before it keep the earlier price. "
                 + "History lists an item's standing and dated prices.",
-            Fields = [Pick("Step", "Step", ["Schedule price", "Schedule list change", "History"]), Req("List", "Price list code"), Opt("Item", "Item code"), Num("MinQty", "From quantity", "1"),
+            Fields = [Pick("Step", "Step", ["Schedule price", "Schedule list change", "History"]), Req("List", "Price list code"), ItemPick("Item", "Product", required: false), Num("MinQty", "From quantity", "1"),
                 OptNum("Price", "Unit price"), OptNum("Percent", "Change %"), Num("RoundTo", "Price point", "0.05"), Pick("Rounding", "Rounding", Enum.GetNames<PriceRounding>()), Today("From", "Effective from")],
             Run = async (c, i) =>
             {
@@ -492,7 +492,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Set item sale limits", ListTitle = "Items with sale limits",
             Description = "Age-restricted items need the till's age check, a per-sale limit caps the quantity in one sale, and prescription-only items need a prescription reference.",
-            Fields = [Req("Item", "Item code"), OptNum("Age", "Minimum age"), OptNum("Max", "Most per sale"), Tick("Rx", "Prescription only")],
+            Fields = [ItemPick("Item", "Product"), OptNum("Age", "Minimum age"), OptNum("Max", "Most per sale"), Tick("Rx", "Prescription only")],
             Run = async (c, i) => Check(await c.Get<IItemCatalogueService>().SetSaleLimitsAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true),
                 i.OptionalNumber("Age") is decimal age ? (int)age : null, i.OptionalNumber("Max"), i.Flag("Rx")).ConfigureAwait(true), "Sale limits updated."),
             List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && (x.MinimumAge != null || x.MaxQuantityPerSale != null || x.RequiresPrescription))
@@ -514,7 +514,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Add a barcode, synonym, pack or supplier to an item",
             Description = "Barcode / Synonym: the value. Pack: unit code, factor and its barcode. Supplier: supplier code, their item code, lead days, minimum order, last cost, preferred.",
-            Fields = [Req("Item", "Item code"), Pick("What", "Add", "Barcode", "Synonym", "Pack", "Supplier"), Opt("Value", "Barcode / synonym / pack unit / supplier code"), OptNum("Factor", "Pack factor"),
+            Fields = [ItemPick("Item", "Product"), Pick("What", "Add", "Barcode", "Synonym", "Pack", "Supplier"), Opt("Value", "Barcode / synonym / pack unit / supplier code"), OptNum("Factor", "Pack factor"),
                 Opt("Code", "Pack barcode / supplier's item code"), OptNum("Lead", "Lead time (days)"), OptNum("Minimum", "Minimum order"), OptNum("Cost", "Last cost"), Tick("Preferred", "Preferred supplier")],
             Run = async (c, i) =>
             {
@@ -534,8 +534,8 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Bins: add, put away, move, take, pick walk", ListTitle = "Bin contents",
             Description = "Add a bin (sequence, capacity), put stock away (never more than is unbinned), move between bins, take picked stock, or plan a pick walk (Lines: ITEM:qty; …).",
-            Fields = [Req("Warehouse", "Warehouse code"), Pick("Action", "Action", "Pick walk", "Add bin", "Put away", "Move", "Take"), Opt("Bin", "Bin (from)"), Opt("ToBin", "To bin"),
-                Opt("Item", "Item code"), OptNum("Quantity", "Quantity"), OptNum("Sequence", "Pick sequence (add)"), OptNum("Capacity", "Capacity (add)"), Opt("Lines", "Pick lines: ITEM:qty; …")],
+            Fields = [WarehousePick("Warehouse", "Warehouse"), Pick("Action", "Action", "Pick walk", "Add bin", "Put away", "Move", "Take"), Opt("Bin", "Bin (from)"), Opt("ToBin", "To bin"),
+                ItemPick("Item", "Product", required: false), OptNum("Quantity", "Quantity"), OptNum("Sequence", "Pick sequence (add)"), OptNum("Capacity", "Capacity (add)"), Opt("Lines", "Pick lines: ITEM:qty; …")],
             Run = async (c, i) =>
             {
                 IBinService bins = c.Get<IBinService>();
@@ -570,7 +570,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Set a warehouse reorder level", Description = "An item's reorder level and quantity at one warehouse; replenishment for that warehouse uses them.",
-            Fields = [Req("Item", "Item code"), Req("Warehouse", "Warehouse code"), Num("Level", "Reorder level"), Num("Quantity", "Reorder quantity", "0")],
+            Fields = [ItemPick("Item", "Product"), WarehousePick("Warehouse", "Warehouse"), Num("Level", "Reorder level"), Num("Quantity", "Reorder quantity", "0")],
             Run = async (c, i) => Check(await c.Get<IBinService>().SetWarehouseLevelAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true),
                 i.Number("Level"), i.Number("Quantity")).ConfigureAwait(true), "Reorder level saved."),
         };
@@ -579,7 +579,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Set an item as catch-weight",
             Description = "Counted in pieces and weighed: receipts need their weight (and may be costed per weight unit), the average weight per piece must be within the tolerance "
                 + "of the nominal weight, and issues are costed by the weight that leaves. Leave the unit blank to make the item ordinary again (only with no stock on hand).",
-            Fields = [Req("Item", "Item code"), Opt("Unit", "Weight unit (kg, t…)", "kg"), OptNum("Nominal", "Nominal weight per piece"), OptNum("Tolerance", "Tolerance %")],
+            Fields = [ItemPick("Item", "Product"), Opt("Unit", "Weight unit (kg, t…)", "kg"), OptNum("Nominal", "Nominal weight per piece"), OptNum("Tolerance", "Tolerance %")],
             Run = async (c, i) => Check(await c.Get<IInventoryService>().SetCatchWeightAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Optional("Unit"),
                 i.OptionalNumber("Nominal"), i.OptionalNumber("Tolerance")).ConfigureAwait(true), "Catch weight saved."),
         };
@@ -589,7 +589,7 @@ public static partial class OperationCatalogue
             Description = "Min/max and forecast: at or below the reorder level (on hand plus on order) a reorder is suggested, up to the maximum if set, else the reorder quantity. "
                 + "With a forecast window, the reorder level rises to the average daily issues over that window times the lead time — scaled, with seasonal factors, by the "
                 + "factor for the month the lead time ends in (twelve numbers, January first).",
-            Fields = [Req("Item", "Item code"), Num("Level", "Reorder level (minimum)", "0"), Num("Quantity", "Reorder quantity", "0"), Num("Maximum", "Maximum stock", "0"),
+            Fields = [ItemPick("Item", "Product"), Num("Level", "Reorder level (minimum)", "0"), Num("Quantity", "Reorder quantity", "0"), Num("Maximum", "Maximum stock", "0"),
                 Num("LeadTime", "Lead time (days)", "0"), Num("Window", "Forecast window (days, 0 = none)", "0"), Opt("Seasonal", "Seasonal factors Jan…Dec (e.g. 0.8,0.8,1,…)")],
             Run = async (c, i) => Check(await c.Get<IReplenishmentService>().SetPolicyAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true),
                 new ReplenishmentPolicy(i.Number("Level"), i.Number("Quantity"), i.Number("Maximum"), (int)i.Number("LeadTime"), (int)i.Number("Window"))
@@ -636,7 +636,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Recall trace of a batch / serial",
             Description = "For a recall: where a batch or serial came from (receipts, with the supplier), where it went (issues and sales, with the customer), "
                 + "and what is still on hand in each warehouse.",
-            Fields = [Req("Item", "Item code"), Req("Lot", "Batch / serial number")],
+            Fields = [ItemPick("Item", "Product"), Req("Lot", "Batch / serial number")],
             Run = async (c, i) =>
             {
                 LotTrace trace = Check(await c.Get<ILotTrackingService>().TraceAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Text("Lot").Trim()).ConfigureAwait(true));
@@ -656,7 +656,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Revalue an item's standard cost",
             Description = "Sets a new standard cost for a standard-costed item: the stock on hand is revalued at the new standard and the difference posts to the revaluation account.",
-            Fields = [Req("Item", "Item code"), Num("Cost", "New standard cost"), Today(), Req("Account", "Revaluation account")],
+            Fields = [ItemPick("Item", "Product"), Num("Cost", "New standard cost"), Today(), Req("Account", "Revaluation account")],
             Run = async (c, i) =>
             {
                 decimal change = Check(await c.Get<IInventoryService>().RevalueStandardCostAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Number("Cost"), i.Date("Date"),
@@ -667,7 +667,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Suggest picks (first expiry, first out)", Description = "Which batches to pick for a quantity, earliest expiry first, never expired stock.",
-            Fields = [Req("Item", "Item code"), Req("Warehouse", "Warehouse code"), Num("Quantity", "Quantity"), Today()],
+            Fields = [ItemPick("Item", "Product"), WarehousePick("Warehouse", "Warehouse"), Num("Quantity", "Quantity"), Today()],
             Run = async (c, i) =>
             {
                 var (picks, shortfall) = await c.Get<ILotTrackingService>().SuggestPicksAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true),
@@ -679,7 +679,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Adjust stock with a reason", Description = "Sets the counted quantity on hand; the difference posts to the adjustment account under the reason code (DAMAGED, EXPIRED, THEFT…).",
-            Fields = [Req("Item", "Item code"), Req("Warehouse", "Warehouse code"), Num("Counted", "Counted quantity"), Today(), Req("Account", "Adjustment account", "5000"), Opt("Reason", "Reason code"), Opt("Reference", "Reference")],
+            Fields = [ItemPick("Item", "Product"), WarehousePick("Warehouse", "Warehouse"), Num("Counted", "Counted quantity"), Today(), Req("Account", "Adjustment account", "5000"), Opt("Reason", "Reason code"), Opt("Reference", "Reference")],
             Run = async (c, i) =>
             {
                 decimal value = Check(await c.Get<IInventoryService>().AdjustAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true),
@@ -694,7 +694,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Dispatch a transfer", ListTitle = "Transfers in transit",
             Description = "Sends stock from one warehouse towards another through a transit location; receive it at the other end when it arrives.",
-            Fields = [Req("Item", "Item code"), Req("From", "From warehouse"), Req("To", "To warehouse"), Req("Transit", "Transit location"), Num("Quantity", "Quantity"), Today()],
+            Fields = [ItemPick("Item", "Product"), Req("From", "From warehouse"), Req("To", "To warehouse"), Req("Transit", "Transit location"), Num("Quantity", "Quantity"), Today()],
             Run = async (c, i) =>
             {
                 DispatchTransferResult sent = Check(await c.Get<IStockTransferService>().DispatchAsync(new DispatchTransferRequest
@@ -723,7 +723,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Run an assembly / production batch", ListTitle = "Bills of materials",
             Description = "Consumes the BOM's components (or the usage keyed, ITEM:qty;…) and books the output into stock at their cost.",
-            Fields = [Req("Bom", "BOM code"), Req("Warehouse", "Warehouse code"), Num("Planned", "Planned output"), OptNum("Actual", "Actual output (if different)"), Today(),
+            Fields = [Req("Bom", "BOM code"), WarehousePick("Warehouse", "Warehouse"), Num("Planned", "Planned output"), OptNum("Actual", "Actual output (if different)"), Today(),
                 Req("Clearing", "Assembly clearing account"), Opt("Usage", "Actual usage ITEM:qty;… (optional)")],
             Run = async (c, i) =>
             {
@@ -754,7 +754,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Disassemble finished goods", ListTitle = "Bills of materials",
             Description = "Takes finished units apart into their components; their cost is split over the components recovered at each one's average cost, or by their "
                 + "relative sales value on the default price list (joint products: a carcass into cuts).",
-            Fields = [Req("Bom", "BOM code"), Req("Warehouse", "Warehouse code"), Num("Quantity", "Units taken apart"), Today(), Req("Clearing", "Assembly clearing account"),
+            Fields = [Req("Bom", "BOM code"), WarehousePick("Warehouse", "Warehouse"), Num("Quantity", "Units taken apart"), Today(), Req("Clearing", "Assembly clearing account"),
                 Opt("Recovered", "Recovered ITEM:qty;… (if not the BOM quantities)"), Tick("BySales", "Split by sales value")],
             Run = async (c, i) =>
             {
@@ -777,7 +777,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Start a stocktake", ListTitle = "Blind count sheets (draft stocktakes)",
             Description = "Freezes the warehouse's quantities. Counters see only the items, never the system quantity. Counts outside the tolerance must be recounted by someone else.",
-            Fields = [Req("Warehouse", "Warehouse code"), Today(), Req("Reference", "Stocktake reference"), OptNum("Tolerance", "Recount tolerance % (blank: none)")],
+            Fields = [WarehousePick("Warehouse", "Warehouse"), Today(), Req("Reference", "Stocktake reference"), OptNum("Tolerance", "Recount tolerance % (blank: none)")],
             Run = async (c, i) => Check(await c.Get<IStocktakeService>().StartAsync(c.CompanyId, await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true), i.Date("Date"), i.Text("Reference"),
                 recountTolerancePercent: i.OptionalNumber("Tolerance")).ConfigureAwait(true), id => $"Stocktake {id} started."),
             List = CountSheetsAsync,
@@ -787,7 +787,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Start a cycle count", ListTitle = "Blind count sheets (draft stocktakes)",
             Description = "Counts only the items due: never-counted items first, then A items every 30 days, B every 90 and C every 180 (change the days below). "
                 + "Classify items A / B / C first so the busiest items are counted most often. Count, recount and post it like a stocktake.",
-            Fields = [Req("Warehouse", "Warehouse code"), Today(), Req("Reference", "Count reference"), Num("ADays", "Days between counts — A items", "30"),
+            Fields = [WarehousePick("Warehouse", "Warehouse"), Today(), Req("Reference", "Count reference"), Num("ADays", "Days between counts — A items", "30"),
                 Num("BDays", "Days between counts — B items", "90"), Num("CDays", "Days between counts — C items", "180"), Num("Max", "Most items in this count", "50"),
                 OptNum("Tolerance", "Recount tolerance % (blank: none)")],
             Run = async (c, i) => Check(await c.Get<IStocktakeService>().StartCycleCountAsync(c.CompanyId, await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true), i.Date("Date"),
@@ -798,7 +798,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Record a count", ListTitle = "Blind count sheets (draft stocktakes)", Description = "The first count of an item, by the signed-in user.",
-            Fields = [Num("Stocktake", "Stocktake id"), Req("Item", "Item code"), Num("Counted", "Counted quantity")],
+            Fields = [Num("Stocktake", "Stocktake id"), ItemPick("Item", "Product"), Num("Counted", "Counted quantity")],
             Run = async (c, i) => Check(await c.Get<IStocktakeService>().RecordCountAsync(c.CompanyId, (long)i.Number("Stocktake"), await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Number("Counted"),
                 countedByUserId: c.UserId).ConfigureAwait(true), "Count recorded."),
             List = CountSheetsAsync,
@@ -806,7 +806,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Record a recount", ListTitle = "Blind count sheets (draft stocktakes)", Description = "A recount of an item flagged as outside the tolerance, by someone other than the first counter.",
-            Fields = [Num("Stocktake", "Stocktake id"), Req("Item", "Item code"), Num("Counted", "Recounted quantity")],
+            Fields = [Num("Stocktake", "Stocktake id"), ItemPick("Item", "Product"), Num("Counted", "Recounted quantity")],
             Run = async (c, i) => Check(await c.Get<IStocktakeService>().RecordRecountAsync(c.CompanyId, (long)i.Number("Stocktake"), await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Number("Counted"),
                 c.UserId).ConfigureAwait(true), "Recount recorded."),
             List = CountSheetsAsync,

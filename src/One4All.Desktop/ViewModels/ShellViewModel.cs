@@ -35,6 +35,15 @@ public sealed partial class ShellViewModel : ObservableObject
             NavModules.Add(module);
         }
 
+        // The five things most people do first; only those the user may open.
+        foreach (string title in new[] { "Open the till (touch screen)", "Take a payment (teller screen)", "Add a product or service", "Add a customer", "Add or change an employee" })
+        {
+            if (NavModules.SelectMany(m => m.Entries).FirstOrDefault(e => e.Title == title) is NavEntry entry)
+            {
+                QuickStart.Add(entry);
+            }
+        }
+
         _welcome = NavModules.Count == 0 ? "No modules are available for your account. Ask your administrator to give you a role."
             : $"Welcome, {UserDisplayName}. Choose what you want to work on, or type in the search box what you want to do (for example \"add a product\").";
     }
@@ -58,6 +67,12 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>Gets the modules the user may use.</summary>
     public ObservableCollection<NavModule> NavModules { get; } = [];
+
+    /// <summary>Gets the everyday tasks shown first on the home page (those the user may use).</summary>
+    public ObservableCollection<NavEntry> QuickStart { get; } = [];
+
+    /// <summary>Gets a value indicating whether there is a quick-start row to show.</summary>
+    public bool HasQuickStart => QuickStart.Count > 0;
 
     /// <summary>Gets the screens matching the search.</summary>
     public ObservableCollection<NavEntry> SearchResults { get; } = [];

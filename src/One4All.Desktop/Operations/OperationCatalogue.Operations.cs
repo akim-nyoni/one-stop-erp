@@ -46,7 +46,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "First weigh (open a ticket)", ListTitle = "Tickets still on the bridge",
             Description = "Outbound loads weigh empty first (leave the weight blank to use the vehicle's stored tare); inbound loads weigh loaded first. A keyed weight needs a reason and another person's authority.",
             Fields = [Pick("Direction", "Direction", "Outbound", "Inbound"), Req("Vehicle", "Vehicle registration"), Req("Item", "Product (item code)"), Num("Density", "m³ per tonne", "0.6"), Today(),
-                OptNum("Weight", "Weight kg (blank = stored tare)"), Opt("Customer", "Customer code"), Opt("Supplier", "Supplier code"), Opt("Driver", "Driver"), Opt("Site", "Delivery site"),
+                OptNum("Weight", "Weight kg (blank = stored tare)"), CustomerPick("Customer", "Customer", required: false), SupplierPick("Supplier", "Supplier", required: false), Opt("Driver", "Driver"), Opt("Site", "Delivery site"),
                 Opt("Stockpile", "Stockpile (warehouse code)"), OptNum("Distance", "Haulage distance km"), Opt("Batch", "Concrete batch run"), Tick("Manual", "Weight keyed by hand"), Opt("Reason", "Why keyed"),
                 Opt("AuthorisedBy", "Authorised by (user name)"), Opt("Order", "Sales order number (outbound)"), Tick("Scale", "Read the weight from the scale")],
             Run = async (c, i) =>
@@ -91,7 +91,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Invoice weighbridge loads", ListTitle = "Completed loads not yet invoiced",
             Description = "Bills a customer for every completed outbound load up to the invoice date that has not been invoiced: net tonnes at the price, plus each load's haulage, "
                 + "with tax on top. Each ticket is marked with the invoice so it is never billed twice.",
-            Fields = [Req("Customer", "Customer code"), Req("Invoice", "Invoice number"), Today(), OptNum("Price", "Price per tonne (blank: the order's or the price book's)"), Req("Sales", "Sales account", "4000"),
+            Fields = [CustomerPick("Customer", "Customer"), Req("Invoice", "Invoice number"), Today(), OptNum("Price", "Price per tonne (blank: the order's or the price book's)"), Req("Sales", "Sales account", "4000"),
                 Opt("Haulage", "Haulage revenue account (blank = sales)"), Opt("TaxCode", "Tax code")],
             Run = async (c, i) =>
             {
@@ -408,7 +408,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Open a job contract", ListTitle = "Job contracts",
             Description = "A contract (job) for a customer: its value, budgeted cost, retention % on certificates and the revenue account. The WBS, BOQ, variations, certificates and "
                 + "subcontracts all hang off it. Capture a cost books a manual cost to one of its heads (purchases, stock, labour, plant, subcontract, overhead).",
-            Fields = [Pick("Step", "Step", ["Open", "Capture a cost"]), Req("Contract", "Contract number"), Opt("Name", "Name"), Opt("Customer", "Customer code"), Num("Value", "Contract value", "0"),
+            Fields = [Pick("Step", "Step", ["Open", "Capture a cost"]), Req("Contract", "Contract number"), Opt("Name", "Name"), CustomerPick("Customer", "Customer", required: false), Num("Value", "Contract value", "0"),
                 Num("Budget", "Budgeted cost", "0"), Num("Retention", "Retention %", "0"), Opt("Revenue", "Revenue account"), Opt("Head", "Cost head (capture)"),
                 Pick("Source", "Cost from", Enum.GetNames<JobCostSource>()), Num("Amount", "Cost amount", "0"), Opt("Reference", "Reference"), Today()],
             Run = async (c, i) =>
@@ -590,14 +590,14 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Book timesheet hours to a job", Description = "Hours × rate into the job's labour head (at most 24 hours a day per employee).",
-            Fields = [Req("Contract", "Contract number"), Req("Employee", "Employee number"), Today(), Num("Hours", "Hours"), Num("Rate", "Cost per hour"), Opt("Head", "Cost head", "Labour")],
+            Fields = [Req("Contract", "Contract number"), EmployeePick("Employee", "Employee"), Today(), Num("Hours", "Hours"), Num("Rate", "Cost per hour"), Opt("Head", "Cost head", "Labour")],
             Run = async (c, i) => Check(await c.Get<IContractControlService>().RecordTimeAsync(c.CompanyId, await ContractAsync(c, i.Text("Contract")).ConfigureAwait(true), await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true),
                 i.Date("Date"), i.Number("Hours"), i.Number("Rate"), i.Optional("Head")).ConfigureAwait(true), "Hours booked."),
         };
         yield return new Operation
         {
             Module = module, Title = "Issue materials to a job", Description = "Stock out of the warehouse to the contract's WIP account, into the job's materials head.",
-            Fields = [Req("Contract", "Contract number"), Req("Item", "Item code"), Req("Warehouse", "Warehouse / site store"), Num("Quantity", "Quantity"), Today(), Req("Wip", "Contract WIP account")],
+            Fields = [Req("Contract", "Contract number"), ItemPick("Item", "Product"), Req("Warehouse", "Warehouse / site store"), Num("Quantity", "Quantity"), Today(), Req("Wip", "Contract WIP account")],
             Run = async (c, i) => $"Issued at a cost of {M(Check(await c.Get<IContractControlService>().IssueMaterialsAsync(c.CompanyId, await ContractAsync(c, i.Text("Contract")).ConfigureAwait(true),
                 await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true), i.Date("Date"), i.Number("Quantity"), i.Text("Wip")).ConfigureAwait(true)))}.",
         };

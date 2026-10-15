@@ -114,7 +114,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Receive goods", ListTitle = "Purchase orders",
             Description = "Books a goods received note against an order into a warehouse (stock in, goods-received-not-invoiced accrued). Leave Lines blank to receive everything still outstanding; "
                 + "otherwise ITEM:quantity; ITEM:quantity.",
-            Fields = [Req("Order", "Order number"), Req("Warehouse", "Warehouse code"), Req("Grn", "GRN number"), Opt("Lines", "Lines (blank: all outstanding)"), Today("Date", "Date"),
+            Fields = [Req("Order", "Order number"), WarehousePick("Warehouse", "Warehouse"), Req("Grn", "GRN number"), Opt("Lines", "Lines (blank: all outstanding)"), Today("Date", "Date"),
                 Opt("Supervisor", "Supervisor authorising an over-receipt (user name)")],
             Run = async (c, i) =>
             {

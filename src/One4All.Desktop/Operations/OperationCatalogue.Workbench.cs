@@ -40,7 +40,7 @@ public static partial class OperationCatalogue
             Module = stock, Title = "Stock availability and back orders", ListTitle = "Back orders",
             Description = "An item's stock on hand, allocated to sales orders, on order and free — available to promise; the list shows every back-ordered sales order line and whether "
                 + "stock now covers it.",
-            Fields = [Req("Item", "Item code"), Opt("Warehouse", "Warehouse code (blank: all)")],
+            Fields = [ItemPick("Item", "Product"), Opt("Warehouse", "Warehouse code (blank: all)")],
             Run = async (c, i) =>
             {
                 long? warehouse = i.Optional("Warehouse") is string code ? await WarehouseAsync(c, code).ConfigureAwait(true) : null;
@@ -219,7 +219,7 @@ public static partial class OperationCatalogue
         {
             Module = sales, Title = "Pick list for a sales order",
             Description = "The pick list for what is still to despatch on a sales order from a warehouse, in bin order, as text to print.",
-            Fields = [Req("Order", "Sales order number"), Req("Warehouse", "Warehouse code")],
+            Fields = [Req("Order", "Sales order number"), WarehousePick("Warehouse", "Warehouse")],
             Run = async (c, i) =>
             {
                 long order = await FindAsync(c.Db.SalesOrders, o => o.CompanyId == c.CompanyId && o.OrderNumber == i.Text("Order").ToUpper(), o => o.Id, "sales order", i.Text("Order")).ConfigureAwait(true);

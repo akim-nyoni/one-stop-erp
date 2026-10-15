@@ -34,6 +34,9 @@ public sealed class TellerWindow : Window
     private readonly TextBox _reference = new() { Width = 220, Margin = new Thickness(8, 0, 0, 0), VerticalContentAlignment = VerticalAlignment.Center };
     private readonly TextBox _cashAccount = new() { Width = 70, Text = "1000", Margin = new Thickness(6, 0, 0, 0), VerticalContentAlignment = VerticalAlignment.Center };
     private readonly TextBlock _status = new() { Margin = new Thickness(0, 10, 0, 0), TextWrapping = TextWrapping.Wrap, FontSize = 13 };
+    private readonly Border _openPanel = new() { Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xF3, 0xE0)), BorderBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0x7E, 0x22)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6), Padding = new Thickness(12, 10, 12, 10), Margin = new Thickness(0, 0, 0, 10), Visibility = Visibility.Collapsed };
+    private readonly ComboBox _station = new() { Width = 220, FontSize = 14, Margin = new Thickness(8, 0, 16, 0) };
+    private readonly TextBox _float = new() { Width = 90, FontSize = 14, Text = "0", Margin = new Thickness(8, 0, 16, 0), HorizontalContentAlignment = HorizontalAlignment.Right };
     private readonly List<TillCurrency> _rates = [];
     private readonly CheckBox _split = new() { Content = "Split payment (part cash, part card…)", Margin = new Thickness(0, 10, 0, 0), FontSize = 14 };
     private readonly ListBox _parts = new() { Height = 90, FontSize = 14, Margin = new Thickness(0, 4, 0, 0), Visibility = Visibility.Collapsed };
@@ -61,6 +64,18 @@ public sealed class TellerWindow : Window
         Background = Brushes.White;
 
         StackPanel form = new() { Margin = new Thickness(16) };
+
+        // Step 0, shown only while the teller has no open session: pick the counter, type the float, press Open.
+        StackPanel openRow = new() { Orientation = Orientation.Horizontal };
+        openRow.Children.Add(new TextBlock { Text = "Before taking payments, open your session —  counter", FontSize = 14, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+        openRow.Children.Add(_station);
+        openRow.Children.Add(new TextBlock { Text = "cash float", FontSize = 14, VerticalAlignment = VerticalAlignment.Center });
+        openRow.Children.Add(_float);
+        Button openSession = new() { Content = "▶  Open my session", Padding = new Thickness(14, 6, 14, 6), FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x84, 0x49)) };
+        openSession.Click += async (_, _) => await OpenSessionAsync().ConfigureAwait(true);
+        openRow.Children.Add(openSession);
+        _openPanel.Child = openRow;
+        form.Children.Add(_openPanel);
         form.Children.Add(new TextBlock { Text = "Find the payer — account code or name, stand number, student name or admission number", Foreground = Brushes.Gray });
         form.Children.Add(_search);
         form.Children.Add(_hits);
@@ -145,7 +160,20 @@ public sealed class TellerWindow : Window
 
         _currency = _rates[0];
         bool open = await db.CashierSessions.AnyAsync(s => s.CompanyId == _companyId && s.CashierUserId == _userId && s.ClosedOn == null).ConfigureAwait(true);
-        _status.Text = open ? "Ready." : "You have no open cashier session: open one (Receipting › Open a session) before taking payments.";
+        if (!open)
+        {
+            foreach (var station in await db.CashierStations.AsNoTracking().Where(s => s.CompanyId == _companyId).OrderBy(s => s.Code).Select(s => new { s.Id, s.Code, s.Name }).ToListAsync().ConfigureAwait(true))
+            {
+                _station.Items.Add(new ComboBoxItem { Content = $"{station.Code} — {station.Name}", Tag = station.Id });
+            }
+
+            _station.SelectedIndex = _station.Items.Count > 0 ? 0 : -1;
+            _openPanel.Visibility = Visibility.Visible;
+        }
+
+        _status.Text = open ? "Ready: find the payer, type the amount and press the tender."
+            : _station.Items.Count == 0 ? "No cashier station is set up yet: add one under Cashiering › Setup, then open your session here."
+            : "Open your session above (the counter and the cash you start with), then find the payer.";
         Refresh();
         _search.Focus();
     }
@@ -227,6 +255,35 @@ public sealed class TellerWindow : Window
             };
             _currencies.Children.Add(button);
         }
+    }
+
+    // Opens the teller's session at the chosen station with the float, then the screen is ready to take payments.
+    private async Task OpenSessionAsync()
+    {
+        if (_station.SelectedItem is not ComboBoxItem { Tag: long stationId })
+        {
+            _status.Text = "Choose the counter (cashier station) to open at.";
+            return;
+        }
+
+        if (!decimal.TryParse(_float.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out decimal floatAmount) || floatAmount < 0m)
+        {
+            _status.Text = "Type the cash float you are starting with (0 if none).";
+            return;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        Result<long> opened = await scope.ServiceProvider.GetRequiredService<IReceiptingService>()
+            .OpenSessionAsync(_companyId, stationId, _userId, DateOnly.FromDateTime(DateTime.Today), [new FloatDeclaration(_base, floatAmount)]).ConfigureAwait(true);
+        if (opened.IsFailure)
+        {
+            _status.Text = opened.Error.Message;
+            return;
+        }
+
+        _openPanel.Visibility = Visibility.Collapsed;
+        _status.Text = $"Session {opened.Value} open. Find the payer, type the amount and press the tender.";
+        _search.Focus();
     }
 
     private void FillBalance()

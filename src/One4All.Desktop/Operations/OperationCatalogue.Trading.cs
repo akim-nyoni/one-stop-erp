@@ -202,7 +202,7 @@ public static partial class OperationCatalogue
         {
             Module = "Customers", Title = "Customer invoice or credit note", ListTitle = "Open customer items",
             Description = "Posts a sales invoice or credit note to a customer's account (the customer's currency unless another is given; tax at the tax code's account).",
-            Fields = [Pick("Document", "Document", ["Invoice", "Credit note"]), Req("Customer", "Customer code"), Req("Number", "Document number"), Today("Date", "Date"), Num("Net", "Net amount"),
+            Fields = [Pick("Document", "Document", ["Invoice", "Credit note"]), CustomerPick("Customer", "Customer"), Req("Number", "Document number"), Today("Date", "Date"), Num("Net", "Net amount"),
                 Num("Tax", "Tax amount", "0"), Req("Account", "Sales account"), Opt("TaxAccount", "Tax account"), Opt("TaxCode", "Tax code"), Opt("Currency", "Currency (blank: the customer's)"),
                 Opt("Reason", "Reason code (credit note)"), Opt("Narrative", "Narrative"), Opt("Override", "Supervisor allowing it over the credit limit (user name)"),
                 Opt("CostCentre", "Cost centre"), Opt("Department", "Department"), Opt("Project", "Project")],
@@ -238,7 +238,7 @@ public static partial class OperationCatalogue
         {
             Module = "Customers", Title = "Customer receipt (bank)", ListTitle = "Open customer items",
             Description = "A payment received into the bank (EFT, deposit) on a customer's account; allocate it to invoices with auto-allocation or the allocation screens.",
-            Fields = [Req("Customer", "Customer code"), Req("Number", "Receipt number"), Today("Date", "Date"), Num("Amount", "Amount"), Req("Bank", "Bank account", "1100"),
+            Fields = [CustomerPick("Customer", "Customer"), Req("Number", "Receipt number"), Today("Date", "Date"), Num("Amount", "Amount"), Req("Bank", "Bank account", "1100"),
                 Opt("Currency", "Currency (blank: the customer's)"), Opt("Narrative", "Narrative")],
             Run = async (c, i) =>
             {
@@ -261,7 +261,7 @@ public static partial class OperationCatalogue
             Module = "Customers", Title = "Customer statement", ListTitle = "Open customer items",
             Description = "The customer's statement as at a date, ready to print or send: open-item, or balance-forward (brought forward, the period's documents with a running "
                 + "balance, carried forward) for customers set to that style or when a period start is given. Style sets the customer's statement style.",
-            Fields = [Req("Customer", "Customer code"), Today("AsAt", "As at"), Opt("From", "Balance-forward period from (yyyy-MM-dd; blank: the customer's style)"),
+            Fields = [CustomerPick("Customer", "Customer"), Today("AsAt", "As at"), Opt("From", "Balance-forward period from (yyyy-MM-dd; blank: the customer's style)"),
                 Pick("Style", "Set the customer's style", ["(leave)", .. Enum.GetNames<Core.Trading.StatementType>()])],
             Run = async (c, i) =>
             {
@@ -322,7 +322,7 @@ public static partial class OperationCatalogue
         {
             Module = "Suppliers", Title = "Supplier invoice or credit note", ListTitle = "Open supplier items",
             Description = "Posts a supplier's invoice or credit note that has no purchase order (services, utilities); invoices for ordered goods go through Purchasing → Match a supplier invoice.",
-            Fields = [Pick("Document", "Document", ["Invoice", "Credit note"]), Req("Supplier", "Supplier code"), Req("Number", "Supplier's document number"), Today("Date", "Date"), Num("Net", "Net amount"),
+            Fields = [Pick("Document", "Document", ["Invoice", "Credit note"]), SupplierPick("Supplier", "Supplier"), Req("Number", "Supplier's document number"), Today("Date", "Date"), Num("Net", "Net amount"),
                 Num("Tax", "Tax amount", "0"), Opt("Account", "Expense account"), Opt("TaxAccount", "Tax account"), Opt("TaxCode", "Tax code"), Opt("Currency", "Currency (blank: the supplier's)"),
                 Opt("Narrative", "Narrative"), Opt("CostCentre", "Cost centre"), Opt("Department", "Department"), Opt("Project", "Project"),
                 Opt("Lines", "Expense lines ACCOUNT:amount[:cost centre[:department]]; … (invoice)")],
@@ -363,7 +363,7 @@ public static partial class OperationCatalogue
         {
             Module = "Suppliers", Title = "Supplier payment", ListTitle = "Open supplier items",
             Description = "A single payment to a supplier from the bank (several at once go through the payment run).",
-            Fields = [Req("Supplier", "Supplier code"), Req("Number", "Payment number"), Today("Date", "Date"), Num("Amount", "Amount"), Req("Bank", "Bank account", "1100"),
+            Fields = [SupplierPick("Supplier", "Supplier"), Req("Number", "Payment number"), Today("Date", "Date"), Num("Amount", "Amount"), Req("Bank", "Bank account", "1100"),
                 Opt("Currency", "Currency (blank: the supplier's)"), Opt("Narrative", "Narrative")],
             Run = async (c, i) =>
             {
@@ -431,7 +431,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = "Suppliers", Title = "Supplier statement", ListTitle = "Open supplier items", Description = "The supplier account as we see it, as at a date.",
-            Fields = [Req("Supplier", "Supplier code"), Today("AsAt", "As at")],
+            Fields = [SupplierPick("Supplier", "Supplier"), Today("AsAt", "As at")],
             Run = async (c, i) => Check(await c.Get<IStatementService>().RenderSupplierStatementTextAsync(c.CompanyId, await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true), i.Date("AsAt"), 72)
                 .ConfigureAwait(true)),
             List = c => OpenItemsAsync(c, TradingLedger.AccountsPayable),
@@ -564,7 +564,7 @@ public static partial class OperationCatalogue
             Module = credit, Title = "Credit limits", ListTitle = "Increases awaiting approval",
             Description = "Lowers a customer's credit limit at once; an increase is requested with the reason and approved (or rejected) by another user. Policy: what an invoice over "
                 + "the limit does — Block (refused unless a supervisor overrides), Warn (posted, flagged and logged) or Ignore.",
-            Fields = [Pick("Step", "Step", ["Lower", "Request increase", "Approve", "Reject", "Policy"]), Opt("Customer", "Customer code"), Num("Limit", "New limit", "0"), Opt("Reason", "Reason"),
+            Fields = [Pick("Step", "Step", ["Lower", "Request increase", "Approve", "Reject", "Policy"]), CustomerPick("Customer", "Customer", required: false), Num("Limit", "New limit", "0"), Opt("Reason", "Reason"),
                 OptNum("Request", "Request id"), Pick("Policy", "Credit-limit policy", Enum.GetNames<Core.Trading.CreditLimitPolicy>())],
             Run = async (c, i) =>
             {
@@ -621,7 +621,7 @@ public static partial class OperationCatalogue
         {
             Module = credit, Title = "Promises to pay", ListTitle = "Open promises",
             Description = "Records a customer's promise to pay an amount by a date; Review shows, as at a date, which promises were kept, which were broken and how many are still open.",
-            Fields = [Pick("Step", "Step", ["Record", "Review"]), Opt("Customer", "Customer code"), Num("Amount", "Amount", "0"), Today("PayBy", "Pay by"), Opt("Note", "Note"), Today("Date", "Made on / as at")],
+            Fields = [Pick("Step", "Step", ["Record", "Review"]), CustomerPick("Customer", "Customer", required: false), Num("Amount", "Amount", "0"), Today("PayBy", "Pay by"), Opt("Note", "Note"), Today("Date", "Made on / as at")],
             Run = async (c, i) =>
             {
                 IPromiseToPayService promises = c.Get<IPromiseToPayService>();

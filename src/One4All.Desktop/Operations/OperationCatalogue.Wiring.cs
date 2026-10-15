@@ -81,7 +81,7 @@ public static partial class OperationCatalogue
         {
             Module = "Customers", Title = "Customer debit note", ListTitle = "Open customer items",
             Description = "A further charge on an invoice already raised (under-billing, a price correction, a charge omitted): posted as a debit note that refers to the invoice.",
-            Fields = [Req("Customer", "Customer code"), Req("Number", "Debit note number"), Req("Invoice", "Invoice it adds to"), Today(), Num("Net", "Net amount"), Num("Tax", "Tax amount", "0"),
+            Fields = [CustomerPick("Customer", "Customer"), Req("Number", "Debit note number"), Req("Invoice", "Invoice it adds to"), Today(), Num("Net", "Net amount"), Num("Tax", "Tax amount", "0"),
                 Req("Account", "Sales account"), Opt("TaxAccount", "Tax account"), Opt("Narrative", "Narrative")],
             Run = async (c, i) =>
             {
@@ -99,7 +99,7 @@ public static partial class OperationCatalogue
         {
             Module = "Customers", Title = "Customer ageing basis and group", ListTitle = "Customers in groups or aged by invoice date",
             Description = "How a customer's debts are aged (from the invoice date or the due date), and the parent account it belongs to for consolidated group statements (blank: none).",
-            Fields = [Req("Customer", "Customer code"), Pick("Ageing", "Age by", Enum.GetNames<AgeingBasis>()), Opt("Parent", "Parent customer code (blank: none)")],
+            Fields = [CustomerPick("Customer", "Customer"), Pick("Ageing", "Age by", Enum.GetNames<AgeingBasis>()), Opt("Parent", "Parent customer code (blank: none)")],
             Run = async (c, i) =>
             {
                 long id = await CustomerAsync(c, i.Text("Customer")).ConfigureAwait(true);
@@ -124,7 +124,7 @@ public static partial class OperationCatalogue
             Module = "Purchasing", Title = "Return stock to a supplier", ListTitle = "Recent supplier returns",
             Description = "Sends accepted stock back to the supplier: the stock leaves the warehouse at average cost and the supplier's account is debited at the agreed return price "
                 + "(a debit note), any difference to the price variance account.",
-            Fields = [Req("Supplier", "Supplier code"), Req("Item", "Item code"), Req("Warehouse", "Warehouse code"), Num("Quantity", "Quantity"), Num("Price", "Return unit price"), Today(),
+            Fields = [SupplierPick("Supplier", "Supplier"), ItemPick("Item", "Product"), WarehousePick("Warehouse", "Warehouse"), Num("Quantity", "Quantity"), Num("Price", "Return unit price"), Today(),
                 Req("Document", "Return document number"), Req("Variance", "Price variance account", "5010")],
             Run = async (c, i) =>
             {
@@ -141,7 +141,7 @@ public static partial class OperationCatalogue
         {
             Module = "Purchasing", Title = "Framework agreements", ListTitle = "Framework agreements",
             Description = "A supplier contract with a term and a ceiling: orders placed under it are checked against both, and report PO133 shows how much of it is used.",
-            Fields = [Req("Supplier", "Supplier code"), Req("Reference", "Agreement reference"), Req("Description", "Description"), Today("From", "Starts"), Today("To", "Ends"), Num("Ceiling", "Ceiling value")],
+            Fields = [SupplierPick("Supplier", "Supplier"), Req("Reference", "Agreement reference"), Req("Description", "Description"), Today("From", "Starts"), Today("To", "Ends"), Num("Ceiling", "Ceiling value")],
             Run = async (c, i) =>
             {
                 long supplier = await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true);

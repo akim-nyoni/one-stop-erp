@@ -292,8 +292,31 @@
 
                 <ScrollViewer x:Name="PageScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <Grid Margin="14">
-                        <!-- Home: one card per module -->
-                        <ItemsControl ItemsSource="{Binding NavModules}" Visibility="{Binding IsHome, Converter={StaticResource Visible}}">
+<!-- Home: the everyday tasks first, then one card per module -->
+                        <StackPanel Visibility="{Binding IsHome, Converter={StaticResource Visible}}" VerticalAlignment="Top">
+                            <Border Margin="8,0,8,6" Padding="12,8" CornerRadius="6" Background="#EAF4EC" Visibility="{Binding HasQuickStart, Converter={StaticResource Visible}}">
+                                <StackPanel>
+                                    <TextBlock Text="Quick start — the everyday tasks" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource BrandDarkBrush}" />
+                                    <ItemsControl ItemsSource="{Binding QuickStart}" Margin="0,6,0,0">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type nav:NavEntry}">
+                                                <Button Style="{StaticResource CardButton}" Margin="0,0,8,4" Padding="12,8" Click="Entry_Click" ToolTip="{Binding Purpose}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Border Width="30" Height="30" CornerRadius="15" Margin="0,0,8,0" Background="{Binding Accent, Converter={StaticResource BrushConv}}">
+                                                            <TextBlock Text="{Binding Glyph}" FontSize="14" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="#1E3A2E" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+                            <ItemsControl ItemsSource="{Binding NavModules}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate><nav:FillWrapPanel MinItemWidth="290" /></ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
@@ -315,6 +338,7 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                        </StackPanel>
 
                         <!-- A module: every screen, under a label per kind of work — Maintenance, Transactions, Enquiries, Utilities -->
                         <ItemsControl x:Name="ModuleSections" ItemsSource="{Binding SelectedModule.Categories}" Visibility="{Binding IsModulePage, Converter={StaticResource Visible}}">

@@ -432,7 +432,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Kitchen wastage", ListTitle = "Recent wastage",
             Description = "Writes off spoilt, dropped or expired ingredients from a warehouse at cost, with a reason, to the wastage account.",
-            Fields = [Req("Item", "Stock item"), Req("Warehouse", "Warehouse"), Num("Quantity", "Quantity"), Req("Account", "Wastage account"), Req("Reason", "Reason"), Today()],
+            Fields = [Req("Item", "Stock item"), WarehousePick("Warehouse", "Warehouse"), Num("Quantity", "Quantity"), Req("Account", "Wastage account"), Req("Reason", "Reason"), Today()],
             Run = async (c, i) =>
             {
                 decimal value = Check(await c.Get<IRestaurantService>().RecordWastageAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true),

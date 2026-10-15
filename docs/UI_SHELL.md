@@ -34,6 +34,9 @@ Since 2026-10-14 the shell is organised **by business module, in plain language*
 - **Every screen opens in its own window** (`OperationsWindow` hosting `OperationsView`, or the dedicated window), so several can be worked on
   at once; the **Open screens** bar on the page lists them — click a chip to bring that window to the front, ✕ to close it, "Close all".
 - Menus are multi-level: **Modules ▸ module ▸ kind of work ▸ (group ▸) screen**, and **Maintenance / Transactions / Enquiries / Utilities ▸ module ▸ screen**.
+- **Learnability rules**: the Home page starts with a *Quick start* row of everyday tasks; a screen whose first step is a precondition
+  (open the till, open a cashier session) shows that step in place with its controls and a one-line guide; code boxes are lookups
+  (`Ops.CustomerPick` etc.: pick "CODE — Name" or type the code); required boxes are starred.
 - The **search box** finds any screen by what it does (every typed word must match; plurals match singulars); Enter opens the first hit.
 - Data-driven and gated: entries a user's **licence and permissions** do not cover are hidden; empty sections and modules disappear.
 - Any console action the map does not name falls into its module's **More** group; `NavigationBuilder.Unresolved` lists map entries whose

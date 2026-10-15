@@ -117,7 +117,33 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         _services = services;
         _cashierUserId = cashierUserId;
         _cashierName = cashierName;
+        Cart.CollectionChanged += (_, _) => RefreshGuide();
+        Products.CollectionChanged += (_, _) => RefreshGuide();
     }
+
+    /// <summary>Gets what to do next, in one line: open the till, add products, take the payment.</summary>
+    public string GuideText => _companyId == 0 ? "Loading the till…"
+        : _allProducts.Count == 0 ? "No products are priced for the till yet. Add selling prices first (Stock & Products › Prices › Price lists), then reopen the till."
+        : !IsSessionOpen ? "Step 1 of 3 — type the cash you are starting with (the float) and press Open Till."
+        : Cart.Count == 0 ? "Step 2 of 3 — tap a product tile, or scan / type its barcode in the box and press Add. Each tap adds one."
+        : "Step 3 of 3 — type the amount handed over on the keypad, press CASH (or CARD / MOBILE), then PAY / COMPLETE. New Sale starts the next customer.";
+
+    /// <summary>Gets the guide strip's colour: amber until the till is open, green while trading.</summary>
+    public System.Windows.Media.Brush GuideBrush => _allProducts.Count == 0 ? System.Windows.Media.Brushes.Firebrick
+        : !IsSessionOpen ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xD3, 0x54, 0x00))
+        : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1E, 0x84, 0x49));
+
+    /// <summary>Gets a value indicating whether the till still has to be opened.</summary>
+    public bool IsTillClosed => !IsSessionOpen && _companyId != 0 && _allProducts.Count > 0;
+
+    private void RefreshGuide()
+    {
+        OnPropertyChanged(nameof(GuideText));
+        OnPropertyChanged(nameof(GuideBrush));
+        OnPropertyChanged(nameof(IsTillClosed));
+    }
+
+    partial void OnIsSessionOpenChanged(bool value) => RefreshGuide();
 
     /// <summary>The product buttons for the selected category.</summary>
     public ObservableCollection<PosProductVm> Products { get; } = [];
@@ -518,10 +544,11 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         PendingOfflineCount = await LocalQueue.CountAsync(ct).ConfigureAwait(true);
 
         StatusMessage = _allProducts.Count == 0
-            ? "No menu items found — add priced menu items to sell at the terminal."
+            ? "No products are priced for the till — add selling prices (Stock & Products › Prices) and reopen the till."
             : PendingOfflineCount > 0
                 ? $"{PendingOfflineCount} offline sale(s) queued. Open the till to sync and trade."
                 : "Enter an opening float and press Open Till to start trading.";
+        RefreshGuide();
     }
 
     private ILocalOfflineQueue LocalQueue => _services.GetRequiredService<ILocalOfflineQueue>();

@@ -663,7 +663,7 @@ public static partial class OperationCatalogue
             Description = "Instalment debtors post to a dedicated receivables control account per tenure type (instalment sale, rent-to-buy, lease with option): a buyer goes "
                 + "onto it when their agreement is signed. Customer control sets one customer's control directly (only before they have items). The control reconciliation "
                 + "matches each control to its own customers.",
-            Fields = [Pick("Step", "Step", ["Tenure control", "Customer control"]), Pick("Tenure", "Tenure type", Enum.GetNames<InstalmentTenure>()), Opt("Customer", "Customer code"),
+            Fields = [Pick("Step", "Step", ["Tenure control", "Customer control"]), Pick("Tenure", "Tenure type", Enum.GetNames<InstalmentTenure>()), CustomerPick("Customer", "Customer", required: false),
                 Opt("Account", "Receivables control account (blank: main)")],
             Run = async (c, i) =>
             {

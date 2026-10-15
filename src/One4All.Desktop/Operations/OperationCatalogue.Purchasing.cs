@@ -59,7 +59,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Schedule a PO line's deliveries", ListTitle = "Deliveries late or due within a week",
             Description = "Spreads an order line over due dates (DATE:qty;… as yyyy-MM-dd:qty). The quantities must add up to the line's ordered quantity.",
-            Fields = [Req("Order", "Purchase order number"), Req("Item", "Item code"), Req("Deliveries", "Deliveries yyyy-MM-dd:qty;…")],
+            Fields = [Req("Order", "Purchase order number"), ItemPick("Item", "Product"), Req("Deliveries", "Deliveries yyyy-MM-dd:qty;…")],
             Run = async (c, i) =>
             {
                 string order = i.Text("Order").Trim().ToUpperInvariant();

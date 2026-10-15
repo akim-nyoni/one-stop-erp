@@ -386,7 +386,7 @@ public static partial class OperationCatalogue
             Description = "Taxable benefits (a company car valued from the vehicle scale by engine size or cost, housing, school fees, medical): taxed each pay period they "
                 + "apply and shown on the payslip as memo lines. Also the vehicle scale's bands, the deemed interest rate cheap staff loans are taxed at, and a loan's own rate.",
             Fields = [Pick("Step", "Step", ["Add benefit", "End benefit", "Vehicle scale band", "Deemed loan rate", "Loan interest rate", "Suspend loan deductions", "Resume loan deductions",
-                    "Loan interest income account"]), Opt("Employee", "Employee number"), Opt("Account", "Interest income account"),
+                    "Loan interest income account"]), EmployeePick("Employee", "Employee", required: false), Opt("Account", "Interest income account"),
                 Pick("Kind", "Benefit", Enum.GetNames<Core.Payroll.BenefitKind>()), Opt("Description", "What it is (registration, property)"), OptNum("Engine", "Engine capacity (cc)"),
                 OptNum("Cost", "Vehicle cost"), OptNum("Monthly", "Monthly value (blank: from the vehicle scale)"), Pick("Basis", "Scale measured on", Enum.GetNames<Core.Payroll.VehicleScaleBasis>()),
                 OptNum("From", "Scale band from"), OptNum("To", "Scale band to (blank: open)"), OptNum("Rate", "Interest rate % a year"), Opt("Loan", "Loan reference"),

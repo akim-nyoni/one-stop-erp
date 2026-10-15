@@ -65,8 +65,12 @@ public sealed partial class OperationFieldVm : ObservableObject
     {
         FieldKind.Date => DateValue is DateTime d ? Ops.D(DateOnly.FromDateTime(d)) : null,
         FieldKind.Flag => IsTicked ? "True" : "False",
+        FieldKind.Choice => Ops.CodeOf(Value),
         _ => Value,
     };
+
+    /// <summary>Gets a value indicating whether the choices are the company's records (typed codes are accepted too).</summary>
+    public bool IsLookup => Field.ChoicesFrom is not null;
 }
 
 /// <summary>

@@ -36,6 +36,7 @@ public sealed class SampleDataService : ISampleDataService
     private readonly IPurchaseLedgerService _purchases;
     private readonly IPayrollSetupService _payroll;
     private readonly IFixedAssetService _assets;
+    private readonly IPricingService _pricing;
 
     /// <summary>Creates the loader.</summary>
     /// <param name="db">The database context.</param>
@@ -46,8 +47,9 @@ public sealed class SampleDataService : ISampleDataService
     /// <param name="payroll">Sets up the payroll and the employees.</param>
     /// <param name="assets">Registers the assets.</param>
     public SampleDataService(One4AllDbContext db, IMasterDataService master, IInventoryService inventory, ISalesLedgerService sales, IPurchaseLedgerService purchases,
-        IPayrollSetupService payroll, IFixedAssetService assets)
+        IPayrollSetupService payroll, IFixedAssetService assets, IPricingService pricing)
     {
+        _pricing = pricing;
         _db = db;
         _master = master;
         _inventory = inventory;
@@ -123,14 +125,30 @@ public sealed class SampleDataService : ISampleDataService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         // ---- Products, with stock on hand.
-        (string Code, string Name, decimal Cost, int Qty, string Category, string Barcode)[] products =
+        // Categories are the catalogue's own codes where it has them (the till filters by them); the selling price goes on a default price list.
+        HashSet<string> categories = [.. await _db.ItemCategories.Where(x => x.CompanyId == companyId).Select(x => x.Code).ToListAsync(ct).ConfigureAwait(false)];
+        string Cat(string wanted, string fallback) => categories.Contains(wanted) ? wanted : categories.Contains(fallback) ? fallback : wanted;
+        (string Code, string Name, decimal Cost, decimal Price, int Qty, string Category, string Barcode)[] products =
         [
-            ("SMP-BREAD", "Bread, white loaf", 0.85m, 120, "Groceries", "6001001"), ("SMP-MILK", "Milk 1 litre", 1.10m, 80, "Groceries", "6001002"),
-            ("SMP-OIL", "Cooking oil 2 litre", 3.60m, 40, "Groceries", "6001003"), ("SMP-SOAP", "Bath soap 250g", 0.70m, 150, "Toiletries", "6001004"),
-            ("SMP-CEMENT", "Cement 50 kg", 9.50m, 60, "Building", "6002001"), ("SMP-BRICK", "Common brick", 0.12m, 5000, "Building", "6002002"),
-            ("SMP-PIPE", "PVC pipe 110 mm, 6 m", 11.00m, 25, "Building", "6002003"), ("SMP-BOOK", "Exercise book 72 pages", 0.45m, 300, "Stationery", "6003001"),
+            ("SMP-BREAD", "Bread, white loaf", 0.85m, 1.20m, 120, Cat("GROC", "GEN"), "6001001"), ("SMP-MILK", "Milk 1 litre", 1.10m, 1.50m, 80, Cat("GROC", "GEN"), "6001002"),
+            ("SMP-OIL", "Cooking oil 2 litre", 3.60m, 4.75m, 40, Cat("GROC", "GEN"), "6001003"), ("SMP-SOAP", "Bath soap 250g", 0.70m, 1.00m, 150, Cat("PERS", "GEN"), "6001004"),
+            ("SMP-CEMENT", "Cement 50 kg", 9.50m, 12.50m, 60, Cat("BLDG", "GEN"), "6002001"), ("SMP-BRICK", "Common brick", 0.12m, 0.18m, 5000, Cat("BLDG", "GEN"), "6002002"),
+            ("SMP-PIPE", "PVC pipe 110 mm, 6 m", 11.00m, 15.00m, 25, Cat("BLDG", "GEN"), "6002003"), ("SMP-BOOK", "Exercise book 72 pages", 0.45m, 0.65m, 300, Cat("STAT", "GEN"), "6003001"),
         ];
-        foreach ((string code, string name, decimal cost, int qty, string category, string barcode) in products)
+        long priceListId = await _db.PriceLists.Where(p => p.CompanyId == companyId && p.IsDefault).Select(p => (long?)p.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? 0;
+        if (priceListId == 0)
+        {
+            Result<long> list = await _pricing.CreatePriceListAsync(companyId, "RETAIL", "Retail selling prices", currency, true, ct).ConfigureAwait(false);
+            if (list.IsFailure)
+            {
+                return Step("price list", list.Error);
+            }
+
+            priceListId = list.Value;
+            loaded.Add("1 default price list (RETAIL)");
+        }
+
+        foreach ((string code, string name, decimal cost, decimal price, int qty, string category, string barcode) in products)
         {
             Result<long> item = await _master.CreateItemAsync(new NewItem(companyId, code, name, ItemType.Stock, "4000", "5000", cost, Category: category), ct).ConfigureAwait(false);
             if (item.IsFailure)
@@ -142,6 +160,12 @@ public sealed class SampleDataService : ISampleDataService
             record.Barcode = barcode;
             record.ReorderLevel = qty / 4;
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            Result priced = await _pricing.SetPriceAsync(companyId, priceListId, item.Value, 1m, price, ct).ConfigureAwait(false);
+            if (priced.IsFailure)
+            {
+                return Step("price of " + code, priced.Error);
+            }
+
             Result<StockMovementResult> received = await _inventory.ReceiveAsync(new ReceiveStockRequest
             {
                 CompanyId = companyId, ItemId = item.Value, WarehouseId = warehouseId, Date = dates.DaysAgo(60), Quantity = qty, UnitCost = cost, CreditAccountCode = "1100",
@@ -152,7 +176,7 @@ public sealed class SampleDataService : ISampleDataService
             }
         }
 
-        loaded.Add($"{products.Length} products with stock on hand");
+        loaded.Add($"{products.Length} products with selling prices and stock on hand");
 
         // ---- Customers, with invoices (some overdue) and receipts.
         (string Code, string Name, string Email, string Mobile, decimal Limit)[] customers =

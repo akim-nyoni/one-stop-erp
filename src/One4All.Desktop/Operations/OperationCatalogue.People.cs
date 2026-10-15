@@ -272,7 +272,7 @@ public static partial class OperationCatalogue
                 Opt("Name", "Element name"), Pick("Type", "Element type", Enum.GetNames<PayElementType>()), Pick("Basis", "Calculation", Enum.GetNames<CalculationBasis>()), OptNum("Sequence", "Sequence"),
                 Opt("Account", "Account (salaries expense for the standard set)"), Opt("Liability", "PAYE liability account (standard set)"), OptNum("Amount", "Fixed / override amount"),
                 OptNum("Rate", "Rate / override rate"), OptNum("Units", "Units"), Opt("Formula", "Formula"), Tick("Taxable", "Taxable"), Opt("TaxTable", "Tax table code"),
-                Opt("Employee", "Employee number"), Today("From", "Tax table effective from"), Opt("Bands", "Tax bands"), Tick("Pensionable", "Pensionable"),
+                EmployeePick("Employee", "Employee", required: false), Today("From", "Tax table effective from"), Opt("Bands", "Tax bands"), Tick("Pensionable", "Pensionable"),
                 Tick("SocialSecurity", "Subject to social security"), Tick("OvertimeBase", "In the overtime base"), Tick("LeaveBase", "In the leave-pay base"), Opt("Group", "Adds to group"),
                 Opt("BasisGroup", "Percentage of group (percent-of-group)"), OptNum("Floor", "Floor"), OptNum("Ceiling", "Ceiling"), OptNum("RoundTo", "Round to (unit)"),
                 Pick("Rounding", "Rounding", Enum.GetNames<PayRounding>()), Opt("Expense", "Expense account (contribution / provision)"), Opt("DeptAccounts", "Accounts by department: DEPT=ACCOUNT; …"),
@@ -372,7 +372,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Record an attendance day", ListTitle = "Overtime awaiting approval", Description = "One record per employee per day: status, clock times, lateness and overtime.",
-            Fields = [Req("Employee", "Employee number"), Today(), Pick("Status", "Status", Enum.GetNames<AttendanceStatus>()), Opt("In", "Clock in (HH:mm)"), Opt("Out", "Clock out (HH:mm)"),
+            Fields = [EmployeePick("Employee", "Employee"), Today(), Pick("Status", "Status", Enum.GetNames<AttendanceStatus>()), Opt("In", "Clock in (HH:mm)"), Opt("Out", "Clock out (HH:mm)"),
                 Num("Late", "Minutes late", "0"), Num("Overtime", "Overtime hours", "0"), Num("Multiplier", "Overtime multiplier", "1.5")],
             Run = async (c, i) => Check(await c.Get<IAttendanceService>().RecordDayAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Date("Date"),
                 Enum.Parse<AttendanceStatus>(i.Text("Status")), Time(i, "In"), Time(i, "Out"), i.Whole("Late"), i.Number("Overtime"), i.Number("Multiplier")).ConfigureAwait(true), id => $"Day recorded (attendance {id})."),
@@ -393,7 +393,7 @@ public static partial class OperationCatalogue
                 + "Allowances sets each employee's shift allowance for a pay period from the rostered shifts they worked. Attendance lateness is measured against the rostered start.",
             Fields = [Pick("Step", "Step", ["Shift", "Pattern", "Assign", "Generate", "Set day", "Allowances"]), Opt("Code", "Shift / pattern code (or OFF)"), Opt("Name", "Shift name"),
                 Opt("Start", "Start (HH:mm)"), Opt("End", "End (HH:mm)"), Num("Grace", "Grace minutes", "0"), Num("Allowance", "Allowance per shift", "0"), Opt("Steps", "Pattern steps"),
-                Opt("Employee", "Employee number"), Today("From", "From / day"), Today("To", "To"), Opt("Period", "Pay period (allowances)"), Opt("Element", "Allowance element")],
+                EmployeePick("Employee", "Employee", required: false), Today("From", "From / day"), Today("To", "To"), Opt("Period", "Pay period (allowances)"), Opt("Element", "Allowance element")],
             Run = async (c, i) =>
             {
                 IRosterService roster = c.Get<IRosterService>();
@@ -499,7 +499,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Accrue leave", ListTitle = "Leave balances", Description = "Adds days to an employee's leave balance.",
-            Fields = [Req("Employee", "Employee number"), Req("Type", "Leave type", "ANNUAL"), Num("Days", "Days")],
+            Fields = [EmployeePick("Employee", "Employee"), Req("Type", "Leave type", "ANNUAL"), Num("Days", "Days")],
             Run = async (c, i) => $"Balance now {Q(Check(await c.Get<ILeaveService>().AccrueAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Type"), i.Number("Days")).ConfigureAwait(true)))} days.",
             List = LeaveBalancesAsync,
         };
@@ -529,7 +529,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Take leave", ListTitle = "Leave balances", Description = "Records leave taken over a period (never more than the balance).",
-            Fields = [Req("Employee", "Employee number"), Req("Type", "Leave type", "ANNUAL"), Today("From", "From"), Today("To", "To"), Num("Days", "Days")],
+            Fields = [EmployeePick("Employee", "Employee"), Req("Type", "Leave type", "ANNUAL"), Today("From", "From"), Today("To", "To"), Num("Days", "Days")],
             Run = async (c, i) => Check(await c.Get<IAttendanceService>().TakeLeaveAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Type"), i.Date("From"), i.Date("To"),
                 i.Number("Days")).ConfigureAwait(true), "Leave recorded."),
             List = LeaveBalancesAsync,
@@ -655,7 +655,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Encash leave", ListTitle = "Leave balances", Description = "Pays out leave days at a daily rate.",
-            Fields = [Req("Employee", "Employee number"), Req("Type", "Leave type", "ANNUAL"), Today(), Num("Days", "Days"), Num("Rate", "Daily rate")],
+            Fields = [EmployeePick("Employee", "Employee"), Req("Type", "Leave type", "ANNUAL"), Today(), Num("Days", "Days"), Num("Rate", "Daily rate")],
             Run = async (c, i) => Check(await c.Get<IAttendanceService>().EncashLeaveAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Type"), i.Date("Date"),
                 i.Number("Days"), i.Number("Rate")).ConfigureAwait(true), $"Encashed {M(i.Number("Days") * i.Number("Rate"))}."),
             List = LeaveBalancesAsync,
@@ -694,7 +694,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Appoint to act", ListTitle = "Acting appointments",
             Description = "An employee acting in a higher grade for a time is paid ACTINGALLOWANCE (that grade's scale less their basic) through an element whose formula is ACTINGALLOWANCE.",
-            Fields = [Req("Employee", "Employee number"), Req("Grade", "Acting grade"), Num("Notch", "Notch"), new("From", "From", FieldKind.Date), new("To", "To", FieldKind.Date, Required: false)],
+            Fields = [EmployeePick("Employee", "Employee"), Req("Grade", "Acting grade"), Num("Notch", "Notch"), new("From", "From", FieldKind.Date), new("To", "To", FieldKind.Date, Required: false)],
             Run = async (c, i) => Check(await c.Get<IEstablishmentService>().AppointActingAsync(c.CompanyId, i.Text("Employee"), i.Text("Grade"), i.Whole("Notch"), i.Date("From"),
                 i.OptionalDate("To")).ConfigureAwait(true), "Acting appointment recorded."),
             List = async c => Table(await c.Db.ActingAppointments.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.From)
@@ -705,7 +705,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "File an employee document", ListTitle = "Documents expiring in 90 days", Description = "A contract, permit, licence or certificate on the employee's file.",
-            Fields = [Req("Employee", "Employee number"), Req("Type", "Document type"), Opt("Reference", "Reference"), new("Expires", "Expires on", FieldKind.Date, Required: false)],
+            Fields = [EmployeePick("Employee", "Employee"), Req("Type", "Document type"), Opt("Reference", "Reference"), new("Expires", "Expires on", FieldKind.Date, Required: false)],
             Run = async (c, i) => Check(await c.Get<IHrRecordsService>().FileDocumentAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Type"), i.Optional("Reference"),
                 i.OptionalDate("Expires")).ConfigureAwait(true), "Document filed."),
             List = ExpiringDocumentsAsync,
@@ -713,28 +713,28 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Record a disciplinary action", Description = "The offence and the sanction issued.",
-            Fields = [Req("Employee", "Employee number"), Today(), Req("Offence", "Offence"), Pick("Sanction", "Sanction", Enum.GetNames<DisciplinarySanction>())],
+            Fields = [EmployeePick("Employee", "Employee"), Today(), Req("Offence", "Offence"), Pick("Sanction", "Sanction", Enum.GetNames<DisciplinarySanction>())],
             Run = async (c, i) => Check(await c.Get<IHrRecordsService>().RecordDisciplinaryAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Date("Date"), i.Text("Offence"),
                 Enum.Parse<DisciplinarySanction>(i.Text("Sanction")), c.UserId).ConfigureAwait(true), "Recorded."),
         };
         yield return new Operation
         {
             Module = module, Title = "Record training", Description = "A completed course, its cost and when it must be renewed.",
-            Fields = [Req("Employee", "Employee number"), Req("Course", "Course"), Today("Completed", "Completed on"), new("Expires", "Expires on", FieldKind.Date, Required: false), Opt("Provider", "Provider"), Num("Cost", "Cost", "0")],
+            Fields = [EmployeePick("Employee", "Employee"), Req("Course", "Course"), Today("Completed", "Completed on"), new("Expires", "Expires on", FieldKind.Date, Required: false), Opt("Provider", "Provider"), Num("Cost", "Cost", "0")],
             Run = async (c, i) => Check(await c.Get<IHrRecordsService>().RecordTrainingAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Course"), i.Date("Completed"),
                 i.OptionalDate("Expires"), i.Optional("Provider"), i.Number("Cost")).ConfigureAwait(true), "Training recorded."),
         };
         yield return new Operation
         {
             Module = module, Title = "Record an appraisal", Description = "Rating 1–5 and the next appraisal date.",
-            Fields = [Req("Employee", "Employee number"), Today(), Num("Rating", "Rating (1–5)", "3"), Today("Next", "Next due")],
+            Fields = [EmployeePick("Employee", "Employee"), Today(), Num("Rating", "Rating (1–5)", "3"), Today("Next", "Next due")],
             Run = async (c, i) => Check(await c.Get<IHrRecordsService>().RecordAppraisalAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Date("Date"), i.Whole("Rating"),
                 i.Date("Next")).ConfigureAwait(true), "Appraisal recorded."),
         };
         yield return new Operation
         {
             Module = module, Title = "Register a garnishee order", Description = "A court order deducted from pay through a deduction element until the total is settled.",
-            Fields = [Req("Employee", "Employee number"), Req("Reference", "Order reference"), Req("Creditor", "Creditor"), Num("Priority", "Priority", "1"), Num("Instalment", "Instalment per period"),
+            Fields = [EmployeePick("Employee", "Employee"), Req("Reference", "Order reference"), Req("Creditor", "Creditor"), Num("Priority", "Priority", "1"), Num("Instalment", "Instalment per period"),
                 Num("Total", "Total amount"), Req("Element", "Deduction element code"), Today("Issued", "Issued on")],
             Run = async (c, i) => Check(await c.Get<IHrRecordsService>().RegisterGarnisheeAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Reference"), i.Text("Creditor"),
                 i.Whole("Priority"), i.Number("Instalment"), i.Number("Total"), i.Text("Element"), i.Date("Issued")).ConfigureAwait(true), "Garnishee registered."),
@@ -782,7 +782,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Backpay for a salary change", ListTitle = "Payroll runs",
             Description = "Recalculates every period paid since the effective date at the new basic salary and pays the difference. Untick 'Pay now' to preview.",
-            Fields = [Req("Employee", "Employee number"), Num("Basic", "New basic salary"), Today("From", "Effective from"), Tick("Pay", "Pay now"), Req("Period", "Pay in period"), Today("PayDate", "Pay date"),
+            Fields = [EmployeePick("Employee", "Employee"), Num("Basic", "New basic salary"), Today("From", "Effective from"), Tick("Pay", "Pay now"), Req("Period", "Pay in period"), Today("PayDate", "Pay date"),
                 Opt("Document", "Run document number"), Opt("Reason", "Reason"), Req("NetPay", "Net pay control account", "2420")],
             Run = async (c, i) =>
             {
@@ -820,7 +820,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Key a pay variable", Description = "Overtime hours (units on a rate-per-unit element) or a once-off amount for one employee and period.",
-            Fields = [Req("Employee", "Employee number"), Req("Element", "Element code"), Req("Period", "Period", DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture)), OptNum("Units", "Units"),
+            Fields = [EmployeePick("Employee", "Employee"), Req("Element", "Element code"), Req("Period", "Period", DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture)), OptNum("Units", "Units"),
                 OptNum("Amount", "Amount")],
             Run = async (c, i) => Check(await c.Get<IPayrollVariableService>().SetAsync(c.CompanyId, await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true), i.Text("Element"), i.Text("Period"),
                 i.OptionalNumber("Units"), i.OptionalNumber("Amount")).ConfigureAwait(true), id => $"Variable {id} saved for {i.Text("Period")}."),
@@ -929,7 +929,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Split net pay", ListTitle = "Pay splits",
             Description = "Sends part of an employee's net pay to another bank account or wallet — a fixed amount, or a percentage (e.g. 40% to mobile money); the rest goes to their main account. "
                 + "Remove takes a split off.",
-            Fields = [Req("Employee", "Employee number"), Pick("Method", "Paid by", Enum.GetNames<PayMethod>()), Req("Destination", "Account or wallet number"), OptNum("Amount", "Fixed amount"),
+            Fields = [EmployeePick("Employee", "Employee"), Pick("Method", "Paid by", Enum.GetNames<PayMethod>()), Req("Destination", "Account or wallet number"), OptNum("Amount", "Fixed amount"),
                 OptNum("Percent", "Percent of net pay"), Tick("Remove", "Remove this split")],
             Run = async (c, i) =>
             {
@@ -969,7 +969,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Set an employee's pay group", Description = "Moves an employee to a pay group (MONTHLY, WEEKLY, CASUAL…); blank returns them to the default payroll.",
-            Fields = [Req("Employee", "Employee number"), Opt("Group", "Pay group")],
+            Fields = [EmployeePick("Employee", "Employee"), Opt("Group", "Pay group")],
             Run = async (c, i) =>
             {
                 long id = await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true);
@@ -1175,7 +1175,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Set up a standing order", ListTitle = "Standing orders and direct debits",
             Description = "A fixed payment out of the bank on a schedule: to a supplier (purchase ledger) or to a GL account. Give a supplier or an account, not both.",
             Fields = [Req("Reference", "Reference"), Req("Bank", "Bank account", "1100"), Num("Amount", "Amount"), Pick("Frequency", "Frequency", Enum.GetNames<RecurrenceFrequency>()),
-                Today("Start", "First payment"), Opt("End", "Last date (yyyy-MM-dd, optional)"), Opt("Supplier", "Supplier code"), Opt("Account", "GL account"), Opt("Narrative", "What it is for")],
+                Today("Start", "First payment"), Opt("End", "Last date (yyyy-MM-dd, optional)"), SupplierPick("Supplier", "Supplier", required: false), Opt("Account", "GL account"), Opt("Narrative", "What it is for")],
             Run = async (c, i) => Check(await c.Get<IStandingOrderService>().CreateStandingOrderAsync(new StandingOrderRequest
             {
                 CompanyId = c.CompanyId, Reference = i.Text("Reference"), BankAccountCode = i.Text("Bank"), Amount = i.Number("Amount"), Frequency = Enum.Parse<RecurrenceFrequency>(i.Text("Frequency")),
@@ -1188,7 +1188,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Set up a direct debit mandate", ListTitle = "Standing orders and direct debits",
             Description = "The customer's authority to collect on a schedule: a fixed amount, or what they owe (optionally capped).",
-            Fields = [Req("Reference", "Mandate reference"), Req("Customer", "Customer code"), Req("CustomerBank", "Customer's bank account"), Req("Bank", "Collect into bank account", "1100"),
+            Fields = [Req("Reference", "Mandate reference"), CustomerPick("Customer", "Customer"), Req("CustomerBank", "Customer's bank account"), Req("Bank", "Collect into bank account", "1100"),
                 Pick("Frequency", "Frequency", Enum.GetNames<RecurrenceFrequency>()), Today("Start", "First collection"), Opt("End", "Last date (yyyy-MM-dd, optional)"),
                 OptNum("Fixed", "Fixed amount (blank: what is owed)"), OptNum("Max", "Most per collection")],
             Run = async (c, i) => Check(await c.Get<IStandingOrderService>().CreateMandateAsync(new DirectDebitMandateRequest
@@ -1279,7 +1279,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Capture a supplier statement", Description = "The supplier's closing balance and lines, for reconciliation against the ledger (report AP statement reconciliation).",
-            Fields = [Req("Supplier", "Supplier code"), Today(), Num("Closing", "Closing balance"), Req("Lines", "Lines: DOC:amount:yyyy-MM-dd; …")],
+            Fields = [SupplierPick("Supplier", "Supplier"), Today(), Num("Closing", "Closing balance"), Req("Lines", "Lines: DOC:amount:yyyy-MM-dd; …")],
             Run = async (c, i) =>
             {
                 List<StatementLineInput> lines = [.. i.Pairs("Lines").Select(p => new StatementLineInput(p.Code, p.Date ?? i.Date("Date"), p.Quantity))];
@@ -1747,7 +1747,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = "Sales & Schools", Title = "Create a customer contract", Description = "Agreed quantities at agreed prices for a period, drawn down by call-off orders.",
-            Fields = [Req("Customer", "Customer code"), Req("Number", "Contract number"), Today("From", "From"), Today("To", "To"), Req("Lines", "Lines: ITEM:quantity:price; …")],
+            Fields = [CustomerPick("Customer", "Customer"), Req("Number", "Contract number"), Today("From", "From"), Today("To", "To"), Req("Lines", "Lines: ITEM:quantity:price; …")],
             Run = async (c, i) =>
             {
                 List<ContractLineRequest> lines = [];
