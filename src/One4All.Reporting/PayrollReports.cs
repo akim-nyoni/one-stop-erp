@@ -26,8 +26,9 @@ public static class PayrollReports
         yield return Listing("PR6", "Payroll Calculation Trace", "Payroll", "Every payslip line in the period with how its element is calculated and the employee's basic salary.",
             "PyrlTrace", [new Column("Employee", "Employee", 150), new Column("Period", "Period", 70), new Column("Element", "Element", 70), new Column("Basis", "Basis", 100), new Column("Rule", "Rate / formula", 150),
              new Column("Basic", "Basic", 85), new Column("Amount", "Amount", 95, true)], Period);
-        yield return Listing("PR12", "Cash Pay Denomination Breakdown", "Payroll", "Net pay in the period broken into the base currency's notes and coins, per employee, for cash payouts.",
-            "PyrlDenominations", [new Column("Employee", "Employee", 160), new Column("Breakdown", "Notes & coins", 300), new Column("Net", "Net pay", 95, true)], Period);
+        yield return Listing("PR12", "Cash Pay Denomination Breakdown", "Payroll", "Net pay of the employees paid in cash, broken into the base currency's notes and coins, by pay point "
+            + "(branch, else department): each envelope, then the notes and coins the pay point draws from the bank.",
+            "PyrlDenominations", [new Column("PayPoint", "Pay point", 110), new Column("Employee", "Employee", 160), new Column("Breakdown", "Notes & coins", 300), new Column("Net", "Net pay", 95, true)], Period);
         yield return Listing("PR16", "Net Pay Control Reconciliation", "Payroll", "Per pay month: gross, deductions and net from the payslips against the net pay credited in the payroll journals.",
             "PyrlNetControl", [new Column("Month", "Month", 70), new Column("Payslips", "Payslips", 60), new Column("Gross", "Gross", 95), new Column("Deductions", "Deductions", 95), new Column("Net", "Net per payslips", 100),
              new Column("Journal", "Net per journal", 100), new Column("Difference", "Difference", 95, true)], Period);

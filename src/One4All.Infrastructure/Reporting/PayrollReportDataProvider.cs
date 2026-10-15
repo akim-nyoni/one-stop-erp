@@ -220,27 +220,32 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         List<decimal> faces = [.. (await _db.Currencies.AsNoTracking().Include(c => c.Denominations).Where(c => c.Code == baseCurrency).ToListAsync(ct).ConfigureAwait(false))
             .SelectMany(c => c.Denominations).Select(d => d.FaceValue).Where(f => f > 0m).Distinct().OrderByDescending(f => f)];
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
-        return [.. (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).GroupBy(p => p.EmployeeId).OrderBy(g => Name(employees, g.Key), StringComparer.Ordinal).Select(g =>
+        Dictionary<long, string> branches = await _db.Branches.AsNoTracking().Where(b => b.CompanyId == companyId).ToDictionaryAsync(b => b.Id, b => b.Name, ct).ConfigureAwait(false);
+        string PayPoint(long employeeId) => employees.TryGetValue(employeeId, out Employee? e)
+            ? (e.BranchId is long branch && branches.TryGetValue(branch, out string? name) ? name : string.IsNullOrWhiteSpace(e.Department) ? "(none)" : e.Department!)
+            : "(none)";
+
+        // Only the employees paid in cash, grouped by pay point; each pay point ends with the notes and coins it draws.
+        var envelopes = (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false))
+            .Where(p => employees.TryGetValue(p.EmployeeId, out Employee? e) && e.PaymentMethod == PayMethod.Cash)
+            .GroupBy(p => p.EmployeeId)
+            .Select(g => new { EmployeeId = g.Key, PayPoint = PayPoint(g.Key), Net = g.Sum(p => p.NetPay), Pieces = Application.Payroll.CashPayBreakdown.Split(g.Sum(p => p.NetPay), faces) })
+            .ToList();
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (var point in envelopes.GroupBy(x => x.PayPoint).OrderBy(g => g.Key, StringComparer.Ordinal))
         {
-            decimal net = g.Sum(p => p.NetPay), left = net;
-            List<string> parts = [];
-            foreach (decimal face in faces)
+            foreach (var envelope in point.OrderBy(x => Name(employees, x.EmployeeId), StringComparer.Ordinal))
             {
-                int count = (int)Math.Floor(left / face);
-                if (count > 0)
-                {
-                    parts.Add($"{count} × {face:0.##}");
-                    left -= count * face;
-                }
+                rows.Add(Row(("PayPoint", point.Key), ("Employee", Name(employees, envelope.EmployeeId)),
+                    ("Breakdown", faces.Count == 0 ? "no denominations set up" : envelope.Pieces.Describe()), ("Net", envelope.Net)));
             }
 
-            if (left > 0m)
-            {
-                parts.Add($"remainder {left:0.00}");
-            }
+            rows.Add(Row(("PayPoint", point.Key), ("Employee", $"TOTAL — {point.Count()} employee(s)"),
+                ("Breakdown", (faces.Count == 0 ? "-" : Application.Payroll.CashPayBreakdown.Total(point.Select(x => x.Pieces)).Describe())
+                    + $"  (draw {point.Sum(x => x.Net).ToString("N2", CultureInfo.InvariantCulture)})"), ("Net", null))); // the pay point's sum is in the text, so the column total is not doubled
+        }
 
-            return Row(("Employee", Name(employees, g.Key)), ("Breakdown", faces.Count == 0 ? "no denominations set up" : string.Join(", ", parts)), ("Net", net));
-        })];
+        return rows;
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> NetControlAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
