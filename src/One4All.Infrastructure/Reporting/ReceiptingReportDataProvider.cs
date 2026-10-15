@@ -66,11 +66,30 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC44" => await DormantAccountsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC45" => await AgentReconciliationAsync(companyId, ct).ConfigureAwait(false),
             "RC46" => await AgentAgeingAsync(companyId, ct).ConfigureAwait(false),
+            "RC19" => await AllocationOverridesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC49" => await CollectionEfficiencyAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC51" => await CollectionTrendAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC52" => await PrepaidTokensAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
         };
+    }
+
+    // RC19: receipts the cashier allocated against the default (oldest first), with how, why and to whom.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AllocationOverridesAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? DateOnly.MinValue, to = ReportParameters.TryDate(parameters, "ToDate") ?? DateOnly.MaxValue;
+        var receipts = await _db.Set<Receipt>().AsNoTracking().Include(r => r.Lines)
+            .Where(r => r.CompanyId == companyId && r.AllocationOverride != null && r.Date >= from && r.Date <= to)
+            .OrderBy(r => r.Date).ThenBy(r => r.ReceiptNumber).ToListAsync(ct).ConfigureAwait(false);
+        List<long> payers = [.. receipts.Where(r => r.PayerAccountId != null).Select(r => r.PayerAccountId!.Value).Distinct()];
+        Dictionary<long, string> names = await _db.Customers.AsNoTracking().Where(c => payers.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Code + " — " + c.Name, ct).ConfigureAwait(false);
+        return [.. receipts.Select(r => Row(new()
+        {
+            ["ReceiptNumber"] = r.ReceiptNumber,
+            ["Account"] = r.PayerAccountId is long id ? names.GetValueOrDefault(id, id.ToString(System.Globalization.CultureInfo.InvariantCulture)) : "-",
+            ["Reason"] = $"{r.AllocationOverride}: {r.AllocationOverrideReason}",
+            ["Amount"] = r.Lines.Where(l => l.Type == ReceiptLineType.DebtorPayment).Sum(l => l.Amount),
+        }))];
     }
 
     private async Task<List<Receipt>> CommittedReceiptsAsync(long companyId, DateOnly from, DateOnly to, CancellationToken ct) =>

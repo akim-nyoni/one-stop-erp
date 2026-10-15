@@ -128,7 +128,7 @@ public static partial class OperationCatalogue
             Fields = [Pick("Kind", "Payment for", ["Account", "Sundry", "Deposit"]), Opt("Payer", "Customer code or stand number (account)"), Num("Amount", "Amount"),
                 CurrencyPick("Currency", "Currency paid in"), Pick("Tender", "Tender", Enum.GetNames<TenderType>()), Opt("Reference", "Tender reference (card, cheque, mobile money)"), Opt("Account", "GL account (sundry / deposit)"),
                 Opt("Narrative", "Narrative"), Pick("Strategy", "Allocate", Enum.GetNames<ReceiptAllocationStrategy>().Where(s => s != nameof(ReceiptAllocationStrategy.UserDirected)).ToArray()),
-                Today("Date", "Date"), Opt("Cash", "Cash account", "1000"), Tick("Preview", "Preview only")],
+                Opt("AllocationReason", "Why not oldest first (needed if you change Allocate)"), Today("Date", "Date"), Opt("Cash", "Cash account", "1000"), Tick("Preview", "Preview only")],
             Run = async (c, i) =>
             {
                 IReceiptingService receipting = c.Get<IReceiptingService>();
@@ -153,6 +153,7 @@ public static partial class OperationCatalogue
                 {
                     CompanyId = c.CompanyId, SessionId = await MySessionAsync(c).ConfigureAwait(true), PayerKind = customer is null ? PayerKind.Anonymous : PayerKind.ArCustomer,
                     PayerAccountId = customer, Date = i.Date("Date"), CashAccountCode = i.Optional("Cash") ?? "1000", AllocationStrategy = strategy, Lines = [line],
+                    AllocationReason = i.Optional("AllocationReason"),
                     Currency = i.Optional("Currency") is string paidIn ? Core.Accounting.CurrencyCode.Parse(paidIn) : null,
                     Tenders = [new ReceiptTenderRequest(Enum.Parse<TenderType>(i.Text("Tender")), amount, i.Optional("Reference"))],
                 }).ConfigureAwait(true));

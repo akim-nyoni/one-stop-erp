@@ -129,6 +129,13 @@ public sealed class ReceiptingService : IReceiptingService
             return Error.Rule("Rcp.NothingToPost", "A receipt needs either a payer account or a sundry/deposit/suspense code.");
         }
 
+        // Money directed against the default policy (oldest first) needs the cashier's reason; it is reported on RC19.
+        bool overridden = hasDebtor && request.AllocationStrategy != ReceiptAllocationStrategy.OldestFirst;
+        if (overridden && string.IsNullOrWhiteSpace(request.AllocationReason))
+        {
+            return Error.Validation("Rcp.OverrideReason", "Give the reason for allocating other than oldest first.");
+        }
+
         CashierSession? session = await _db.Set<CashierSession>().FirstOrDefaultAsync(s => s.Id == request.SessionId && s.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
         if (session is null)
         {
@@ -164,6 +171,11 @@ public sealed class ReceiptingService : IReceiptingService
         foreach (ReceiptTenderRequest tender in request.Tenders)
         {
             receipt.AddTender(tender.Type, currency, tender.Amount, tender.Reference);
+        }
+
+        if (overridden)
+        {
+            receipt.RecordAllocationOverride(request.AllocationStrategy.ToString(), request.AllocationReason!.Trim());
         }
 
         _db.Set<Receipt>().Add(receipt);

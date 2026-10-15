@@ -82,18 +82,28 @@ public sealed class ReceiptAllocationTests
             var open = await rcp.OpenSessionAsync(companyId, stationId, Cashier, new DateOnly(2026, 4, 1), [new FloatDeclaration(Scenario.Usd, 0m)]);
             long sessionId = open.Value;
 
-            // User-directs 150 specifically to the FEB charge.
-            var receipt = await rcp.PostReceiptAsync(new ReceiptRequest
+            // User-directs 150 specifically to the FEB charge — refused without the reason, then taken with it.
+            ReceiptRequest Directed(string? reason) => new()
             {
                 CompanyId = companyId, SessionId = sessionId, PayerKind = PayerKind.ArCustomer, PayerAccountId = customerId,
                 Date = new DateOnly(2026, 4, 1), CashAccountCode = "1000",
-                AllocationStrategy = ReceiptAllocationStrategy.UserDirected,
+                AllocationStrategy = ReceiptAllocationStrategy.UserDirected, AllocationReason = reason,
                 DirectedAllocations = [new DirectedAllocation(febItemId, 150m)],
                 Lines = [new ReceiptLineRequest(ReceiptLineType.DebtorPayment, 150m)],
                 Tenders = [new ReceiptTenderRequest(TenderType.Cash, 150m)],
-            });
+            };
+            (await rcp.PostReceiptAsync(Directed(null))).Error.Code.Should().Be("Rcp.OverrideReason");
+            var receipt = await rcp.PostReceiptAsync(Directed("Payer disputes JAN; pays FEB only"));
             receipt.IsSuccess.Should().BeTrue(receipt.IsFailure ? receipt.Error.ToString() : null);
             receipt.Value.AllocatedToDebt.Should().Be(150m);
+
+            // The allocation override report lists it with how and why.
+            One4All.Application.Abstractions.Reporting.IReportDataProvider rc = scope.ServiceProvider.GetServices<One4All.Application.Abstractions.Reporting.IReportDataProvider>().OfType<One4All.Infrastructure.Reporting.ReceiptingReportDataProvider>().Single();
+            var rows = await rc.GetRowsAsync(companyId, "RC19", new Dictionary<string, object?>());
+            rows.Should().ContainSingle();
+            rows[0]["ReceiptNumber"].Should().Be(receipt.Value.ReceiptNumber);
+            rows[0]["Reason"].Should().Be("UserDirected: Payer disputes JAN; pays FEB only");
+            rows[0]["Amount"].Should().Be(150m);
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())

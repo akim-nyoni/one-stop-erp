@@ -25707,6 +25707,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("AllocationOverride")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("allocation_override");
+
+                    b.Property<string>("AllocationOverrideReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("allocation_override_reason");
+
                     b.Property<string>("CancellationReason")
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)")

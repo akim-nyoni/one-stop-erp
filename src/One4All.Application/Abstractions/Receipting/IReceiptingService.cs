@@ -124,6 +124,9 @@ public sealed class ReceiptRequest
     /// <summary>The strategy for spreading a debtor payment across outstanding items.</summary>
     public ReceiptAllocationStrategy AllocationStrategy { get; init; } = ReceiptAllocationStrategy.OldestFirst;
 
+    /// <summary>Why the payment is allocated other than oldest first — required then, and listed on the allocation override report (RC19).</summary>
+    public string? AllocationReason { get; init; }
+
     /// <summary>Explicit allocations, when <see cref="AllocationStrategy"/> is user-directed.</summary>
     public IReadOnlyList<DirectedAllocation> DirectedAllocations { get; init; } = [];
 

@@ -182,6 +182,21 @@ public sealed class Receipt : AuditableEntity, ICompanyScoped
         return tender;
     }
 
+    /// <summary>How the cashier allocated the payment when not by the default (oldest first) — e.g. "UserDirected"; null when the default was used.</summary>
+    public string? AllocationOverride { get; private set; }
+
+    /// <summary>Why the cashier allocated against the default (brief §RCP RC19).</summary>
+    public string? AllocationOverrideReason { get; private set; }
+
+    /// <summary>Records an allocation against the default policy and why.</summary>
+    /// <param name="how">The allocation used.</param>
+    /// <param name="reason">Why.</param>
+    public void RecordAllocationOverride(string how, string reason)
+    {
+        AllocationOverride = how;
+        AllocationOverrideReason = reason;
+    }
+
     /// <summary>The reason the receipt was cancelled/reversed, if any.</summary>
     public string? CancellationReason { get; private set; }
 
