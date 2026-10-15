@@ -18,7 +18,8 @@ namespace One4All.Desktop;
 /// <summary>
 /// The teller's screen (brief §RCP-3): find the payer as you type (account, stand or student), see what they owe, pick the currency they hand
 /// over with one click (each button shows its rate and the balance in it; F9 cycles), type or take the full amount, and press the tender —
-/// the receipt posts against the teller's open session.
+/// the receipt posts against the teller's open session. Tick "Split payment" to take it in parts — e.g. part cash, part card — each tender press
+/// adding a part, then "Take split payment" posts one receipt for the total.
 /// </summary>
 public sealed class TellerWindow : Window
 {
@@ -34,6 +35,12 @@ public sealed class TellerWindow : Window
     private readonly TextBox _cashAccount = new() { Width = 70, Text = "1000", Margin = new Thickness(6, 0, 0, 0), VerticalContentAlignment = VerticalAlignment.Center };
     private readonly TextBlock _status = new() { Margin = new Thickness(0, 10, 0, 0), TextWrapping = TextWrapping.Wrap, FontSize = 13 };
     private readonly List<TillCurrency> _rates = [];
+    private readonly CheckBox _split = new() { Content = "Split payment (part cash, part card…)", Margin = new Thickness(0, 10, 0, 0), FontSize = 14 };
+    private readonly ListBox _parts = new() { Height = 90, FontSize = 14, Margin = new Thickness(0, 4, 0, 0), Visibility = Visibility.Collapsed };
+    private readonly StackPanel _splitButtons = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0), Visibility = Visibility.Collapsed };
+    private readonly Button _takeSplit = new() { Content = "Take split payment", Height = 44, Padding = new Thickness(16, 4, 16, 4), FontSize = 16, FontWeight = FontWeights.SemiBold,
+        Foreground = Brushes.White, Background = new SolidColorBrush(Color.FromRgb(0x1F, 0x61, 0x8D)) };
+    private readonly List<ReceiptTenderRequest> _taken = [];
     private CurrencyCode _base = CurrencyCode.Parse("USD");
     private TillCurrency? _currency;
     private PayerHit? _selected;
@@ -85,6 +92,24 @@ public sealed class TellerWindow : Window
         }
 
         form.Children.Add(tenders);
+        form.Children.Add(_split);
+        form.Children.Add(_parts);
+        Button clear = new() { Content = "Clear parts", Height = 44, Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0) };
+        _takeSplit.Click += async (_, _) => await TakeSplitAsync().ConfigureAwait(true);
+        clear.Click += (_, _) =>
+        {
+            _taken.Clear();
+            ShowParts();
+        };
+        _splitButtons.Children.Add(_takeSplit);
+        _splitButtons.Children.Add(clear);
+        form.Children.Add(_splitButtons);
+        _split.Checked += (_, _) => ShowParts();
+        _split.Unchecked += (_, _) =>
+        {
+            _taken.Clear();
+            ShowParts();
+        };
         StackPanel cashRow = new() { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
         cashRow.Children.Add(new TextBlock { Text = "Cash account", Foreground = Brushes.Gray, VerticalAlignment = VerticalAlignment.Center });
         cashRow.Children.Add(_cashAccount);
@@ -222,7 +247,7 @@ public sealed class TellerWindow : Window
 
         if (!decimal.TryParse(_amount.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out decimal amount) || amount <= 0m)
         {
-            _status.Text = "Type the amount handed over (or press Full balance).";
+            _status.Text = _split.IsChecked == true ? "Type this part's amount, then press its tender." : "Type the amount handed over (or press Full balance).";
             return;
         }
 
@@ -231,6 +256,72 @@ public sealed class TellerWindow : Window
             _status.Text = "Give the card, mobile money or cheque reference.";
             return;
         }
+
+        ReceiptTenderRequest part = new(tender, amount, string.IsNullOrWhiteSpace(_reference.Text) ? null : _reference.Text.Trim());
+        if (_split.IsChecked == true)
+        {
+            // A split: the press adds a part; the receipt is taken with "Take split payment".
+            _taken.Add(part);
+            _amount.Text = string.Empty;
+            _reference.Text = string.Empty;
+            ShowParts();
+            _amount.Focus();
+            return;
+        }
+
+        await PostAsync([part]).ConfigureAwait(true);
+    }
+
+    private async Task TakeSplitAsync()
+    {
+        if (_selected is null || _currency is null)
+        {
+            _status.Text = "Find and choose the payer first.";
+            return;
+        }
+
+        if (Application.Receipting.TenderSplit.Problem(_taken) is string problem)
+        {
+            _status.Text = problem;
+            return;
+        }
+
+        await PostAsync(Application.Receipting.TenderSplit.Merge(_taken)).ConfigureAwait(true);
+    }
+
+    // The parts taken so far, their total and what is left of the balance.
+    private void ShowParts()
+    {
+        bool on = _split.IsChecked == true;
+        _parts.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        _splitButtons.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        _parts.Items.Clear();
+        foreach (ReceiptTenderRequest part in _taken)
+        {
+            _parts.Items.Add($"{part.Type,-12} {part.Amount.ToString("N2", CultureInfo.CurrentCulture),12}  {part.Reference}");
+        }
+
+        decimal total = Application.Receipting.TenderSplit.Total(_taken);
+        string code = _currency?.Code.Value ?? _base.Value;
+        decimal left = _currency is null ? 0m : DueIn(_currency) - total;
+        _takeSplit.Content = _taken.Count == 0 ? "Take split payment" : $"Take split payment — {total.ToString("N2", CultureInfo.CurrentCulture)} {code}";
+        if (on)
+        {
+            _status.Text = _taken.Count == 0 ? "Type each part's amount and press its tender; then Take split payment."
+                : $"{_taken.Count} part(s), {total.ToString("N2", CultureInfo.CurrentCulture)} {code}" + (_selected is null ? "." : left > 0m
+                    ? $"; {left.ToString("N2", CultureInfo.CurrentCulture)} {code} of the balance left."
+                    : left < 0m ? $"; {(-left).ToString("N2", CultureInfo.CurrentCulture)} {code} over the balance (credit on account)." : "; the balance is covered.");
+        }
+    }
+
+    private async Task PostAsync(IReadOnlyList<ReceiptTenderRequest> tenders)
+    {
+        if (_selected is null || _currency is null)
+        {
+            return;
+        }
+
+        decimal amount = Application.Receipting.TenderSplit.Total(tenders);
 
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
@@ -248,7 +339,7 @@ public sealed class TellerWindow : Window
             CashAccountCode = string.IsNullOrWhiteSpace(_cashAccount.Text) ? "1000" : _cashAccount.Text.Trim(), AllocationStrategy = ReceiptAllocationStrategy.OldestFirst,
             Currency = _currency.Code == _base ? null : _currency.Code,
             Lines = [new ReceiptLineRequest(ReceiptLineType.DebtorPayment, amount)],
-            Tenders = [new ReceiptTenderRequest(tender, amount, string.IsNullOrWhiteSpace(_reference.Text) ? null : _reference.Text.Trim())],
+            Tenders = tenders,
         }).ConfigureAwait(true);
         if (posted.IsFailure)
         {
@@ -257,10 +348,14 @@ public sealed class TellerWindow : Window
         }
 
         ReceiptResult receipt = posted.Value;
-        _status.Text = $"Receipt {receipt.ReceiptNumber}: {amount.ToString("N2", CultureInfo.CurrentCulture)} {_currency.Code.Value} {tender} from {_selected.Name} — "
+        string how = string.Join(" + ", tenders.Select(t => tenders.Count == 1 ? t.Type.ToString() : $"{t.Type} {t.Amount.ToString("N2", CultureInfo.CurrentCulture)}"));
+        _status.Text = $"Receipt {receipt.ReceiptNumber}: {amount.ToString("N2", CultureInfo.CurrentCulture)} {_currency.Code.Value} ({how}) from {_selected.Name} — "
             + $"{receipt.AllocatedToDebt.ToString("N2", CultureInfo.CurrentCulture)} to the account, {receipt.CreditOnAccount.ToString("N2", CultureInfo.CurrentCulture)} credit on account.";
         _amount.Text = string.Empty;
         _reference.Text = string.Empty;
+        _taken.Clear();
+        _parts.Items.Clear();
+        _takeSplit.Content = "Take split payment";
         _search.Text = string.Empty;
         _hits.Items.Clear();
         Select(null);
