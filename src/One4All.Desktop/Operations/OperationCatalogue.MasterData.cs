@@ -298,6 +298,38 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Load sample data for testing", ListTitle = "Companies",
+            Description = "Fills a company with realistic sample records so every screen has something to show while you try the system: 8 products with stock, 10 customers with "
+                + "invoices (some overdue) and receipts, 5 suppliers with invoices and a payment, 8 employees on the payroll with a PAYE table, 8 rated properties with water meters and "
+                + "readings, a housing scheme with 12 stands and 8 applicants, a bank account, a cashier station and 3 assets. All codes start with SMP-. "
+                + "Tick \"Create a new DEMO company\" to set one up first (every industry, standard chart of accounts, fiscal year) and load into it; otherwise it loads into this company.",
+            Fields = [Tick("New", "Create a new DEMO company first", true), Opt("Code", "New company code", "DEMO"), Opt("Name", "New company name", "Demo Council & Trading"),
+                Opt("Currency", "Base currency (new company)", "USD"), Today("Start", "Fiscal year starts (new company)")],
+            Run = async (c, i) =>
+            {
+                long target = c.CompanyId;
+                string created = string.Empty;
+                if (i.Flag("New"))
+                {
+                    DateOnly start = new(i.Date("Start").Year, 1, 1);
+                    IndustrySetupResult done = Check(await c.Get<IIndustrySetupService>().SetUpCompanyAsync(new IndustrySetupRequest
+                    {
+                        Code = (i.Optional("Code") ?? "DEMO").Trim().ToUpperInvariant(), Name = i.Optional("Name") ?? "Demo Council & Trading",
+                        BaseCurrency = CurrencyCode.Parse(i.Optional("Currency") ?? "USD"), Verticals = Enum.GetValues<Vertical>(), FiscalYearStart = start, VatRatePercent = 15m, WithDemoData = false,
+                    }).ConfigureAwait(true));
+                    target = done.CompanyId;
+                    created = $"Company {i.Optional("Code") ?? "DEMO"} (id {done.CompanyId}) set up with {done.Accounts} accounts, {done.TaxCodes} tax codes, {done.Warehouses} warehouses and {done.Roles} roles; "
+                        + "sign out and in again to see it." + Environment.NewLine;
+                }
+
+                SampleDataSummary summary = Check(await c.Get<ISampleDataService>().LoadAsync(target).ConfigureAwait(true));
+                return created + $"Sample data loaded into company {summary.CompanyId}:" + Environment.NewLine + string.Join(Environment.NewLine, summary.Loaded.Select(l => "  • " + l));
+            },
+            List = async c => Table(await c.Db.Companies.AsNoTracking().OrderBy(x => x.Id).ToListAsync().ConfigureAwait(true), ("Id", x => x.Id), ("Code", x => x.Code), ("Name", x => x.Name),
+                ("Currency", x => x.BaseCurrency.Value)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Create a company", ListTitle = "Companies", Description = "A new company with a head-office branch, held to the licence's company limit.",
             Fields = [Req("Code", "Company code"), Req("Name", "Name"), Req("Currency", "Base currency", "USD"), Req("TimeZone", "Time zone", "UTC")],
             Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateCompanyAsync(i.Text("Code"), i.Text("Name"), CurrencyCode.Parse(i.Text("Currency")), i.Text("TimeZone"))

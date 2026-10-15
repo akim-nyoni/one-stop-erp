@@ -363,7 +363,7 @@ public static class NavigationMap
         new("Administration", "⚙", "#455A64", "The company, users and security, importing data and looking after the system.", ["System Manager", "Documents", "Approvals"],
         [
             G("Company",
-                O("System Manager: Create a company"), O("System Manager: Set up a company for an industry"), O("System Manager: Add an industry to this company"),
+                O("System Manager: Create a company"), O("System Manager: Set up a company for an industry"), O("System Manager: Add an industry to this company"), O("System Manager: Load sample data for testing"),
                 O("System Manager: Add a branch"), O("System Manager: Set the company logo"), O("System Manager: Company email and SMS settings"),
                 O("System Manager: Language and terminology"), O("System Manager: Attachments", "Attachment rules")),
             G("Users and security",

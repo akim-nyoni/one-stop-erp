@@ -66,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditArchiveService, AuditArchiveService>();
         services.AddScoped<Application.Abstractions.MasterData.IMasterDataService, MasterData.MasterDataService>();
         services.AddScoped<Application.Abstractions.MasterData.IIndustrySetupService, MasterData.IndustrySetupService>();
+        services.AddScoped<Application.Abstractions.MasterData.ISampleDataService, MasterData.SampleDataService>();
         services.AddScoped<Application.Abstractions.Onboarding.IOpeningBalanceService, Onboarding.OpeningBalanceService>();
         services.AddScoped<Application.Abstractions.Security.IApiAccessService, Security.ApiAccessService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
