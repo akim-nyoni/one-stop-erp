@@ -22,6 +22,110 @@ public sealed class BillingRunService : IBillingRunService
     // Bills posted in one transaction (each with its own savepoint).
     private const int TransactionBatch = 50;
     private readonly Application.Abstractions.Communications.IStatementDespatchService? _despatch;
+    private readonly Application.Abstractions.Communications.INotificationService? _notifications;
+    private readonly IStatementService? _statements;
+
+    /// <inheritdoc />
+    public async Task<Result<BillSmsDespatch>> SmsBillsAsync(long companyId, string runNumber, string templateCode, string language, CancellationToken ct = default)
+    {
+        Result<(BillingRun Run, List<BillingRunLine> Lines)> posted = await PostedLinesAsync(companyId, runNumber, ct).ConfigureAwait(false);
+        if (posted.IsFailure)
+        {
+            return posted.Error;
+        }
+
+        if (_notifications is null)
+        {
+            return Error.Rule("Mun.NoDespatch", "Bill delivery is not available.");
+        }
+
+        (BillingRun run, List<BillingRunLine> lines) = posted.Value;
+        List<long> ratepayerIds = [.. lines.Select(l => l.RatepayerCustomerId).Distinct()];
+        List<Customer> ratepayers = await _db.Customers.AsNoTracking().Where(c => c.CompanyId == companyId && ratepayerIds.Contains(c.Id)).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, decimal> balances = (await Trading.OpenItemsAsAt.LoadAsync(_db, companyId, TradingLedger.AccountsReceivable, run.BillDate, ct).ConfigureAwait(false))
+            .Where(i => ratepayerIds.Contains(i.Item.TraderId)).GroupBy(i => i.Item.TraderId).ToDictionary(g => g.Key, g => g.Sum(i => i.Signed(LedgerSign.Debit)));
+        List<Application.Abstractions.Communications.DespatchRecipient> recipients = [];
+        int noMobile = 0;
+        foreach (Customer ratepayer in ratepayers.OrderBy(c => c.Code, StringComparer.Ordinal))
+        {
+            if (string.IsNullOrWhiteSpace(ratepayer.MobileNumber))
+            {
+                noMobile++;
+                continue;
+            }
+
+            List<BillingRunLine> theirs = [.. lines.Where(l => l.RatepayerCustomerId == ratepayer.Id).OrderBy(l => l.StandNumber, StringComparer.Ordinal)];
+            recipients.Add(new Application.Abstractions.Communications.DespatchRecipient(ratepayer.MobileNumber.Trim(), new Dictionary<string, string>
+            {
+                ["Name"] = ratepayer.Name,
+                ["Account"] = ratepayer.Code,
+                ["Stands"] = string.Join(", ", theirs.Select(l => l.StandNumber)),
+                ["Bills"] = string.Join(", ", theirs.Select(l => l.InvoiceNumber)),
+                ["Amount"] = theirs.Sum(l => l.Charge).ToString("N2", System.Globalization.CultureInfo.InvariantCulture),
+                ["Balance"] = balances.GetValueOrDefault(ratepayer.Id).ToString("N2", System.Globalization.CultureInfo.InvariantCulture),
+                ["Currency"] = ratepayer.Currency.ToString(),
+                ["BillDate"] = run.BillDate.ToString("d MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture),
+            }));
+        }
+
+        if (recipients.Count == 0)
+        {
+            return new BillSmsDespatch(0, noMobile, null);
+        }
+
+        Result<long> batch = await _notifications.QueueAsync(companyId, $"Bill SMS {run.RunNumber} {run.BillDate:yyyy-MM}", templateCode, language, Core.Communications.MessageChannel.Sms,
+            recipients, ct).ConfigureAwait(false);
+        return batch.IsFailure ? batch.Error : new BillSmsDespatch(recipients.Count, noMobile, batch.Value);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<PrintedBills>> PrintBillsAsync(long companyId, string runNumber, bool withoutEmailOnly, int width = 72, CancellationToken ct = default)
+    {
+        Result<(BillingRun Run, List<BillingRunLine> Lines)> posted = await PostedLinesAsync(companyId, runNumber, ct).ConfigureAwait(false);
+        if (posted.IsFailure)
+        {
+            return posted.Error;
+        }
+
+        if (_statements is null)
+        {
+            return Error.Rule("Mun.NoStatements", "Bill printing is not available.");
+        }
+
+        (BillingRun run, List<BillingRunLine> lines) = posted.Value;
+        List<long> ratepayerIds = [.. lines.Select(l => l.RatepayerCustomerId).Distinct()];
+        HashSet<long> withEmail = withoutEmailOnly
+            ? [.. await _db.Customers.AsNoTracking().Where(c => ratepayerIds.Contains(c.Id) && c.Email != null && c.Email != string.Empty).Select(c => c.Id).ToListAsync(ct).ConfigureAwait(false)]
+            : [];
+
+        // One page per ratepayer, in the order of their first stand, so the bills come off the printer in delivery order.
+        List<string> pages = [];
+        foreach (long ratepayer in lines.OrderBy(l => l.StandNumber, StringComparer.Ordinal).Select(l => l.RatepayerCustomerId).Distinct().Where(r => !withEmail.Contains(r)))
+        {
+            Result<string> statement = await _statements.RenderCustomerStatementTextAsync(companyId, ratepayer, run.BillDate, width, ct).ConfigureAwait(false);
+            if (statement.IsFailure)
+            {
+                return statement.Error;
+            }
+
+            string stands = string.Join(", ", lines.Where(l => l.RatepayerCustomerId == ratepayer).Select(l => $"{l.StandNumber} ({l.InvoiceNumber})"));
+            pages.Add($"BILL — run {run.RunNumber}, {run.BillDate:d MMMM yyyy} — stand(s) {stands}{Environment.NewLine}{statement.Value}");
+        }
+
+        return new PrintedBills(pages.Count, string.Join(Environment.NewLine + "\f", pages));
+    }
+
+    private async Task<Result<(BillingRun Run, List<BillingRunLine> Lines)>> PostedLinesAsync(long companyId, string runNumber, CancellationToken ct)
+    {
+        BillingRun? run = await _db.Set<BillingRun>().Include(r => r.Lines).AsNoTracking().FirstOrDefaultAsync(r => r.CompanyId == companyId && r.RunNumber == runNumber.Trim(), ct).ConfigureAwait(false);
+        if (run is null)
+        {
+            return Error.NotFound("Mun.RunNotFound", $"Billing run {runNumber} not found.");
+        }
+
+        List<BillingRunLine> lines = [.. run.Lines.Where(l => l.IsPosted)];
+        return lines.Count == 0 ? Error.Rule("Mun.RunNotPosted", $"Run {run.RunNumber} has no posted bills to send.") : (run, lines);
+    }
 
     /// <inheritdoc />
     public async Task<Result<Application.Abstractions.Communications.StatementDespatch>> DespatchBillsAsync(long companyId, string runNumber, string templateCode, string language,
@@ -52,8 +156,11 @@ public sealed class BillingRunService : IBillingRunService
     /// <param name="scopes">Creates the units of work bills post in when a run posts several at a time.</param>
     public BillingRunService(One4AllDbContext db, INumberSequenceService numbers, ISalesLedgerService ar, Application.Abstractions.Integration.IWebhookService? webhooks = null,
         Lazy<Application.Abstractions.Workflow.IWorkflowService>? workflow = null, Application.Abstractions.Communications.IStatementDespatchService? despatch = null,
-        Microsoft.Extensions.DependencyInjection.IServiceScopeFactory? scopes = null)
+        Microsoft.Extensions.DependencyInjection.IServiceScopeFactory? scopes = null, Application.Abstractions.Communications.INotificationService? notifications = null,
+        IStatementService? statements = null)
     {
+        _notifications = notifications;
+        _statements = statements;
         _scopes = scopes;
         _despatch = despatch;
         _workflow = workflow;

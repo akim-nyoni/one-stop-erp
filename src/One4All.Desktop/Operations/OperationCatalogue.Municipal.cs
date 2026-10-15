@@ -211,11 +211,14 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Billing run", ListTitle = "Billing runs",
             Description = "Propose a run for a service (limited to a ward, a meter-reading route or a billing cycle if you like), review its exceptions, include or exclude stands, then approve "
-                + "to post the bills — someone other than the proposer approves. Email bills sends each ratepayer billed in a posted run their statement (those without email are counted for printing).",
-            Fields = [Pick("Step", "Step", ["Propose", "Show exceptions", "Exclude a stand", "Include a stand", "Approve", "Resume posting", "Email bills", "Cancel"]), Pick("Service", "Service", Enum.GetNames<ServiceType>()),
+                + "to post the bills — someone other than the proposer approves. Email bills sends each ratepayer billed in a posted run their statement (those without email are counted for printing); "
+                + "SMS bills texts each ratepayer with a mobile number from an SMS template (fields {{Name}} {{Account}} {{Stands}} {{Bills}} {{Amount}} {{Balance}} {{Currency}} {{BillDate}}); "
+                + "Print bills prints every bill in the run, one ratepayer per page in stand order — or Print bills not emailed for only those without email.",
+            Fields = [Pick("Step", "Step", ["Propose", "Show exceptions", "Exclude a stand", "Include a stand", "Approve", "Resume posting", "Email bills", "SMS bills", "Print bills",
+                    "Print bills not emailed", "Cancel"]), Pick("Service", "Service", Enum.GetNames<ServiceType>()),
                 Today("BillDate", "Bill date"), Opt("Ward", "Ward (blank: all)"), Opt("Route", "Reading route (blank: all)"), Pick("Cycle", "Billing cycle", ["Any", .. Enum.GetNames<BillingCycle>()]),
                 Opt("ServiceCode", "Council service code (blank: the category's own)"), Opt("Prefix", "Invoice prefix", "MB"), Opt("Run", "Run number"), Opt("Stand", "Stand number"),
-                Opt("Template", "Email template (email bills)", "BILL")],
+                Opt("Template", "Email / SMS template (email or SMS bills)", "BILL")],
             Run = async (c, i) =>
             {
                 IBillingRunService runs = c.Get<IBillingRunService>();
@@ -232,7 +235,15 @@ public static partial class OperationCatalogue
                         }).ConfigureAwait(true)));
                     case "Email bills":
                         var sent = Check(await runs.DespatchBillsAsync(c.CompanyId, i.Text("Run"), i.Optional("Template") ?? "BILL", Localization.UiText.Catalog.Culture.TwoLetterISOLanguageName).ConfigureAwait(true));
-                        return $"{sent.Queued} bill(s) queued for email; {sent.NoEmail} ratepayer(s) without an email address to print and post.";
+                        return $"{sent.Queued} bill(s) queued for email; {sent.NoEmail} ratepayer(s) without an email address to print and post (Print bills not emailed).";
+                    case "SMS bills":
+                        BillSmsDespatch texted = Check(await runs.SmsBillsAsync(c.CompanyId, i.Text("Run"), i.Optional("Template") ?? "BILL", Localization.UiText.Catalog.Culture.TwoLetterISOLanguageName)
+                            .ConfigureAwait(true));
+                        return $"{texted.Queued} ratepayer(s) texted (batch {texted.BatchId?.ToString(CultureInfo.InvariantCulture) ?? "-"}); {texted.NoMobile} without a mobile number.";
+                    case "Print bills":
+                    case "Print bills not emailed":
+                        PrintedBills printed = Check(await runs.PrintBillsAsync(c.CompanyId, i.Text("Run"), i.Text("Step") == "Print bills not emailed").ConfigureAwait(true));
+                        return printed.Bills == 0 ? "No bills to print: every ratepayer in the run has an email address." : $"{printed.Bills} bill(s):{Environment.NewLine}{printed.Text}";
                     case "Show exceptions":
                         IReadOnlyList<BillingRunLineView> lines = Check(await runs.LinesAsync(c.CompanyId, i.Text("Run"), exceptionsOnly: true).ConfigureAwait(true));
                         return lines.Count == 0 ? "No exceptions." : string.Join(Environment.NewLine, lines.Select(l =>

@@ -157,4 +157,39 @@ public interface IBillingRunService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>What was queued (ratepayers without email are counted for printing), or the run is not posted.</returns>
     Task<Result<Communications.StatementDespatch>> DespatchBillsAsync(long companyId, string runNumber, string templateCode, string language, CancellationToken ct = default);
+
+    /// <summary>
+    /// Texts a posted run's bills: each ratepayer billed in the run with a mobile number gets one SMS from the template, with the fields Name, Account, Stands,
+    /// Bills, Amount (billed in this run), Balance (owed now), Currency and BillDate (brief §4.9 bulk SMS).
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="runNumber">The run.</param>
+    /// <param name="templateCode">The SMS template.</param>
+    /// <param name="language">The language.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>How many were queued and how many ratepayers have no mobile number.</returns>
+    Task<Result<BillSmsDespatch>> SmsBillsAsync(long companyId, string runNumber, string templateCode, string language, CancellationToken ct = default);
+
+    /// <summary>
+    /// Prints a posted run's bills in one document, one ratepayer statement per page in stand order (brief §4.9 bulk bill print) — all of them, or only the
+    /// ratepayers without an email address (the ones emailing did not reach).
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="runNumber">The run.</param>
+    /// <param name="withoutEmailOnly">Only ratepayers without an email address.</param>
+    /// <param name="width">The page width in characters.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The bills as text with a form feed between pages, and how many.</returns>
+    Task<Result<PrintedBills>> PrintBillsAsync(long companyId, string runNumber, bool withoutEmailOnly, int width = 72, CancellationToken ct = default);
 }
+
+/// <summary>A bulk SMS of a run's bills.</summary>
+/// <param name="Queued">Ratepayers texted.</param>
+/// <param name="NoMobile">Ratepayers without a mobile number.</param>
+/// <param name="BatchId">The despatch batch, if any was queued.</param>
+public sealed record BillSmsDespatch(int Queued, int NoMobile, long? BatchId);
+
+/// <summary>A run's bills printed in one document.</summary>
+/// <param name="Bills">How many bills.</param>
+/// <param name="Text">The bills, a form feed between them.</param>
+public sealed record PrintedBills(int Bills, string Text);
