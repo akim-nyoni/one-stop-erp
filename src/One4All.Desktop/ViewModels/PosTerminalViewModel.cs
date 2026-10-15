@@ -148,7 +148,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
         if (!CashCounts.TryParse(CountedCash, _currency.Value, out IReadOnlyList<CashCount> counts))
         {
-            StatusMessage = "Type the count (120, or 120; ZAR 500), and the next cashier their name and PIN (or swipe their card).";
+            StatusMessage = "Type the count (120, note by note 50x10+20x5, or 120; ZAR 500), and the next cashier their name and PIN (or swipe their card).";
             return;
         }
 

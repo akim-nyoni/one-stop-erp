@@ -93,25 +93,28 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Open or close my session", ListTitle = "Cashier sessions",
-            Description = "Open a session at a station with the float, or close yours by declaring the cash counted (shortages and overs are posted).",
-            Fields = [Pick("Step", "Step", ["Open", "Close"]), Opt("Station", "Station code (open)"), Opt("Currency", "Currency", "USD"), OptNum("Amount", "Float (open) / cash counted (close)"),
+            Description = "Open a session at a station with the float, or close yours by declaring the cash counted (shortages and overs are posted). "
+                + "Type the amount, or count note by note: 50x10 + 20x5 + 1x7 is ten 50s, five 20s and seven 1s; each note or coin must be one of the currency's.",
+            Fields = [Pick("Step", "Step", ["Open", "Close"]), Opt("Station", "Station code (open)"), Opt("Currency", "Currency", "USD"),
+                Opt("Amount", "Float (open) / cash counted (close) — an amount or notes, e.g. 50x10 + 20x5"),
                 Today("Date", "Date"), Opt("Cash", "Cash account", "1000"), Opt("Shortages", "Cash shortages / overs account (close)")],
             Run = async (c, i) =>
             {
                 IReceiptingService receipting = c.Get<IReceiptingService>();
-                FloatDeclaration[] cash = [new FloatDeclaration(CurrencyCode.Parse(i.Optional("Currency") ?? "USD"), i.OptionalNumber("Amount") ?? 0m)];
+                (decimal amount, string counted) = await CountedCashAsync(c, i.Optional("Currency") ?? "USD", i.Optional("Amount")).ConfigureAwait(true);
+                FloatDeclaration[] cash = [new FloatDeclaration(CurrencyCode.Parse(i.Optional("Currency") ?? "USD"), amount)];
                 if (i.Text("Step") == "Open")
                 {
                     string code = i.Optional("Station") ?? throw new OperationException("Give the station code.");
                     long station = await c.Db.CashierStations.AsNoTracking().Where(s => s.CompanyId == c.CompanyId && s.Code == code).Select(s => (long?)s.Id).FirstOrDefaultAsync().ConfigureAwait(true)
                         ?? throw new OperationException($"No station {code}.");
-                    return $"Session {Check(await receipting.OpenSessionAsync(c.CompanyId, station, c.UserId, i.Date("Date"), cash).ConfigureAwait(true))} opened.";
+                    return $"Session {Check(await receipting.OpenSessionAsync(c.CompanyId, station, c.UserId, i.Date("Date"), cash).ConfigureAwait(true))} opened{counted}.";
                 }
 
                 CashUpResult up = Check(await receipting.CloseSessionAsync(c.CompanyId, await MySessionAsync(c).ConfigureAwait(true), i.Date("Date"), cash, i.Optional("Cash") ?? "1000",
                     i.Optional("Shortages") ?? throw new OperationException("Give the account cash shortages and overs post to.")).ConfigureAwait(true));
                 return $"Closed: expected {M(up.ExpectedCashBase)}, counted {M(up.CountedCashBase)}, variance {M(up.VarianceBase)}"
-                    + (up.VarianceJournalNumber is null ? "." : $" (journal {up.VarianceJournalNumber}).");
+                    + (up.VarianceJournalNumber is null ? "." : $" (journal {up.VarianceJournalNumber}).") + counted;
             },
             List = async c => Table(await c.Db.CashierSessions.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderByDescending(s => s.Id).Page(c, 100).ToListAsync().ConfigureAwait(true),
                 ("Session", s => s.Id), ("Station", s => s.StationId), ("Cashier", s => s.CashierUserId), ("Opened", s => s.OpenedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
@@ -389,4 +392,32 @@ public static partial class OperationCatalogue
                 select new { u.Username, cu.Code, cu.Name, r.Relationship }).Page(c, 300).ToListAsync().ConfigureAwait(true),
             ("Cashier", r => r.Username), ("Account", r => r.Code), ("Name", r => r.Name), ("Relationship", r => r.Relationship)),
     };
+
+    // Cash typed as an amount or note by note ("50x10 + 20x5"): the total, and the breakdown to show back. Notes and coins must be the currency's own.
+    private static async Task<(decimal Amount, string Shown)> CountedCashAsync(OperationContext c, string currency, string? typed)
+    {
+        if (string.IsNullOrWhiteSpace(typed))
+        {
+            return (0m, string.Empty);
+        }
+
+        if (!Application.Pos.DenominationCount.TryRead(typed, out decimal total, out IReadOnlyList<Application.Pos.DenominationLine> lines))
+        {
+            throw new OperationException("Type the cash as an amount (120.50) or note by note (50x10 + 20x5 + 0.5x4).");
+        }
+
+        if (!typed.Contains('x', StringComparison.OrdinalIgnoreCase) && !typed.Contains('×', StringComparison.Ordinal))
+        {
+            return (total, string.Empty);
+        }
+
+        CurrencyCode code = CurrencyCode.Parse(currency);
+        List<decimal> faces = await c.Db.Currencies.AsNoTracking().Where(x => x.Code == code).SelectMany(x => x.Denominations.Select(d => d.FaceValue)).ToListAsync().ConfigureAwait(true);
+        if (Application.Pos.DenominationCount.UnknownFace(typed, faces) is decimal unknown)
+        {
+            throw new OperationException($"{unknown} is not a {currency} note or coin ({string.Join(", ", faces.Order())}).");
+        }
+
+        return (total, $"{Environment.NewLine}Counted {M(total)}: {Application.Pos.DenominationCount.Describe(lines)}");
+    }
 }

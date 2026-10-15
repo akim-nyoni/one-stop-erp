@@ -47,7 +47,103 @@ public sealed record CurrencyCashUp(string Currency, decimal Expected, decimal C
     public decimal VarianceBase => decimal.Round(Variance * Rate, 2, MidpointRounding.AwayFromZero);
 }
 
-/// <summary>Reads a till count typed as "120" (base) or "120; ZAR 500; EUR 20" (brief §4.1).</summary>
+/// <summary>A count of one note or coin: its face value and how many.</summary>
+/// <param name="FaceValue">The note or coin's value.</param>
+/// <param name="Pieces">How many were counted.</param>
+public readonly record struct DenominationLine(decimal FaceValue, int Pieces)
+{
+    /// <summary>The value of the pieces.</summary>
+    public decimal Amount => FaceValue * Pieces;
+}
+
+/// <summary>
+/// Cash counted note by note (brief §4.1): "50x10 + 20x5 + 0.5x4" is ten 50s, five 20s and four 50-cent coins; a part without "x" is an amount
+/// counted loose (e.g. a bag of mixed coins). The total is what the cash-up uses; the lines are shown back so the counter can check them.
+/// </summary>
+public static class DenominationCount
+{
+    /// <summary>Reads a count.</summary>
+    /// <param name="text">The typed count.</param>
+    /// <param name="total">The total value.</param>
+    /// <param name="lines">The note-and-coin lines (loose amounts have a face value of the amount and one piece).</param>
+    /// <returns>False when a part cannot be read, a face value is not positive or a number of pieces is negative or not whole.</returns>
+    public static bool TryRead(string? text, out decimal total, out IReadOnlyList<DenominationLine> lines)
+    {
+        List<DenominationLine> list = [];
+        lines = list;
+        total = 0m;
+        string compact = string.Concat((text ?? string.Empty).Where(ch => !char.IsWhiteSpace(ch))).Replace('×', 'x').Replace('X', 'x').Replace('*', 'x');
+        if (compact.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (string part in compact.Split('+'))
+        {
+            string[] bits = part.Split('x');
+            if (bits.Length > 2 || !Number(bits[0], out decimal face) || face <= 0m && bits.Length == 2 || face < 0m)
+            {
+                return false;
+            }
+
+            int pieces = 1;
+            if (bits.Length == 2)
+            {
+                if (!Number(bits[1], out decimal count) || count < 0m || count != decimal.Truncate(count) || count > int.MaxValue)
+                {
+                    return false;
+                }
+
+                pieces = (int)count;
+            }
+
+            DenominationLine line = new(face, pieces);
+            list.Add(line);
+            total += line.Amount;
+        }
+
+        return true;
+    }
+
+    /// <summary>The first counted face value that is not one of the currency's notes or coins (loose amounts are not checked).</summary>
+    /// <param name="text">The typed count.</param>
+    /// <param name="faceValues">The currency's notes and coins; when empty, any face value is accepted.</param>
+    /// <returns>The unknown face value, or null.</returns>
+    public static decimal? UnknownFace(string? text, IReadOnlyCollection<decimal> faceValues)
+    {
+        ArgumentNullException.ThrowIfNull(faceValues);
+        if (faceValues.Count == 0 || !TryRead(text, out _, out _))
+        {
+            return null;
+        }
+
+        string compact = string.Concat((text ?? string.Empty).Where(ch => !char.IsWhiteSpace(ch))).Replace('×', 'x').Replace('X', 'x').Replace('*', 'x');
+        foreach (string part in compact.Split('+').Where(p => p.Contains('x', StringComparison.Ordinal)))
+        {
+            _ = Number(part.Split('x')[0], out decimal face);
+            if (!faceValues.Contains(face))
+            {
+                return face;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The lines as text: "10 × 50 = 500.00; 5 × 20 = 100.00".</summary>
+    /// <param name="lines">The lines.</param>
+    /// <returns>The text.</returns>
+    public static string Describe(IEnumerable<DenominationLine> lines) => string.Join("; ", lines.Select(l => l.Pieces == 1 && !IsWhole(l.FaceValue)
+        ? l.Amount.ToString("0.00", global::System.Globalization.CultureInfo.InvariantCulture)
+        : $"{l.Pieces} × {l.FaceValue.ToString("0.##", global::System.Globalization.CultureInfo.InvariantCulture)} = {l.Amount.ToString("0.00", global::System.Globalization.CultureInfo.InvariantCulture)}"));
+
+    private static bool IsWhole(decimal value) => value == decimal.Truncate(value);
+
+    private static bool Number(string text, out decimal value)
+        => decimal.TryParse(text, global::System.Globalization.NumberStyles.Number, global::System.Globalization.CultureInfo.InvariantCulture, out value);
+}
+
+/// <summary>Reads a till count typed as "120" (base), "50x10+20x5" (notes and coins) or "120; ZAR 100x5; EUR 20" (brief §4.1).</summary>
 public static class CashCounts
 {
     /// <summary>Parses the count.</summary>
@@ -59,13 +155,14 @@ public static class CashCounts
     {
         List<CashCount> list = [];
         counts = list;
-        foreach (string part in (text ?? string.Empty).Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (string raw in (text ?? string.Empty).Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
+            // "50 x 10 + 20 x 5" is read as one amount: close up the spaces around the note-count signs.
+            string part = global::System.Text.RegularExpressions.Regex.Replace(raw, @"(?<=\d)\s*([+xX×*])\s*(?=\d)", "$1");
             string[] bits = part.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             string currency = bits.Length == 2 ? (char.IsLetter(bits[0][0]) ? bits[0] : bits[1]) : baseCurrency;
             string amount = bits.Length == 2 ? (char.IsLetter(bits[0][0]) ? bits[1] : bits[0]) : bits[0];
-            if (bits.Length > 2 || currency.Length != 3 || !currency.All(char.IsLetter)
-                || !decimal.TryParse(amount, global::System.Globalization.NumberStyles.Number, global::System.Globalization.CultureInfo.InvariantCulture, out decimal value) || value < 0m)
+            if (bits.Length > 2 || currency.Length != 3 || !currency.All(char.IsLetter) || !DenominationCount.TryRead(amount, out decimal value, out _) || value < 0m)
             {
                 return false;
             }
