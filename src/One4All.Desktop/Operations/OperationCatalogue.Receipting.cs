@@ -257,7 +257,8 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Import receipts from a file", ListTitle = "Import batches",
             Description = "Receipts a bank statement, mobile money, card settlement, employer or agent file (CSV: payer reference, payer name, amount, value date): lines matching one "
-                + "account are receipted to it, the rest go to suspense; the same file cannot be imported twice.",
+                + "account are receipted to it, the rest go to suspense; the same file cannot be imported twice. Matching tries your matching rules first, then the account code "
+                + "(spaces and dashes ignored), then a stand number (its ratepayer), then a code anywhere in the reference.",
             Fields = [Req("File", "CSV file path"), Pick("Source", "Source", Enum.GetNames<ImportSource>()), Opt("Bank", "Bank account"), Opt("Suspense", "Suspense account"), Today()],
             Run = async (c, i) =>
             {
@@ -298,6 +299,48 @@ public static partial class OperationCatalogue
             },
             List = async c => Table(await c.Db.ImportBatches.AsNoTracking().Include(b => b.Lines).Where(b => b.CompanyId == c.CompanyId).OrderByDescending(b => b.Id).Page(c, 100).ToListAsync().ConfigureAwait(true),
                 ("File", b => b.FileReference), ("Source", b => b.Source), ("Date", b => D(b.ImportDate)), ("Matched", b => b.MatchedCount), ("Unmatched", b => b.UnmatchedCount)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Receipt matching rules", ListTitle = "Matching rules (tried first, lowest priority first)",
+            Description = "Your own rules for matching imported payments: when the reference or the payer's name contains, starts with or equals the text (or fits a "
+                + "regular expression), the payment goes to the account. E.g. payer name contains \"MINISTRY OF HEALTH\" → the employer's account.",
+            Fields = [Pick("Step", "Step", ["Add", "Remove"]), Pick("Field", "Look in", Enum.GetNames<ReceiptMatchField>()), Pick("Kind", "When it", Enum.GetNames<ReceiptMatchKind>()),
+                Opt("Pattern", "Text or pattern"), Opt("Customer", "Account (customer code)"), Num("Priority", "Priority (lowest first)", "100"), OptNum("Rule", "Rule id (remove)")],
+            Run = async (c, i) =>
+            {
+                if (i.Text("Step") == "Remove")
+                {
+                    long id = (long)(i.OptionalNumber("Rule") ?? throw new OperationException("Give the rule id to remove."));
+                    ReceiptMatchRule rule = await c.Db.Set<ReceiptMatchRule>().FirstOrDefaultAsync(r => r.CompanyId == c.CompanyId && r.Id == id).ConfigureAwait(true)
+                        ?? throw new OperationException($"No rule {id}.");
+                    c.Db.Remove(rule);
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Rule {id} removed.";
+                }
+
+                ReceiptMatchKind kind = Enum.Parse<ReceiptMatchKind>(i.Text("Kind"));
+                string pattern = i.Optional("Pattern") ?? string.Empty;
+                if (Application.Receipting.ReceiptMatcher.Problem(kind, pattern) is string problem)
+                {
+                    throw new OperationException(problem);
+                }
+
+                string code = i.Optional("Customer") ?? throw new OperationException("Give the account the payments go to.");
+                long customer = await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.Code == code.Trim()).Select(x => (long?)x.Id).FirstOrDefaultAsync().ConfigureAwait(true)
+                    ?? throw new OperationException($"No account {code}.");
+                ReceiptMatchRule added = new(c.CompanyId, Enum.Parse<ReceiptMatchField>(i.Text("Field")), kind, pattern.Trim(), customer, i.Whole("Priority"));
+                c.Db.Add(added);
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Rule {added.Id} added: {added.Field} {added.Kind} \"{added.Pattern}\" → {code.Trim()}.";
+            },
+            List = async c =>
+            {
+                var rules = await c.Db.Set<ReceiptMatchRule>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Priority).ThenBy(r => r.Id)
+                    .Join(c.Db.Customers, r => r.CustomerId, x => x.Id, (r, x) => new { r.Id, r.Priority, r.Field, r.Kind, r.Pattern, Account = x.Code, x.Name }).ToListAsync().ConfigureAwait(true);
+                return Table(rules, ("Rule", r => r.Id), ("Priority", r => r.Priority), ("Look in", r => r.Field), ("When it", r => r.Kind), ("Text", r => r.Pattern),
+                    ("Account", r => r.Account), ("Name", r => r.Name));
+            },
         };
         yield return new Operation
         {

@@ -287,3 +287,16 @@ internal sealed class CashierRelatedAccountConfiguration : IEntityTypeConfigurat
         b.HasIndex(x => new { x.CompanyId, x.UserId, x.CustomerId }).IsUnique();
     }
 }
+
+internal sealed class ReceiptMatchRuleConfiguration : IEntityTypeConfiguration<ReceiptMatchRule>
+{
+    public void Configure(EntityTypeBuilder<ReceiptMatchRule> b)
+    {
+        b.ToTable("receipt_match_rule", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.HasIndex(x => new { x.CompanyId, x.Priority });
+        b.Property(x => x.Field).HasConversion<int>();
+        b.Property(x => x.Kind).HasConversion<int>();
+        b.Property(x => x.Pattern).HasMaxLength(200).IsRequired();
+    }
+}

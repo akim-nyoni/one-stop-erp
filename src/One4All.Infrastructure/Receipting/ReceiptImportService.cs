@@ -62,12 +62,13 @@ public sealed class ReceiptImportService : IReceiptImportService
             return Error.NotFound("Rcp.CompanyNotFound", $"Company {request.CompanyId} not found.");
         }
 
-        // Candidate accounts for matching (code → id). Councils quote the account in the reference, badly.
-        var customerRows = await _db.Set<Customer>()
-            .Where(c => c.CompanyId == request.CompanyId)
-            .Select(c => new { c.Id, c.Code })
-            .ToListAsync(ct).ConfigureAwait(false);
-        List<(long Id, string Code)> customers = customerRows.Select(x => (x.Id, x.Code)).ToList();
+        // Candidate accounts for matching (code → id) and stands (number → ratepayer), and the council's own rules. Payers quote the account badly.
+        Dictionary<string, long> accounts = (await _db.Set<Customer>().Where(c => c.CompanyId == request.CompanyId).Select(c => new { c.Id, c.Code }).ToListAsync(ct).ConfigureAwait(false))
+            .Where(c => !string.IsNullOrWhiteSpace(c.Code)).GroupBy(c => c.Code).ToDictionary(g => g.Key, g => g.First().Id);
+        Dictionary<string, long> stands = (await _db.Properties.Where(p => p.CompanyId == request.CompanyId).Select(p => new { p.StandNumber, p.RatepayerCustomerId }).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(p => p.StandNumber).Where(g => g.Select(p => p.RatepayerCustomerId).Distinct().Count() == 1).ToDictionary(g => g.Key, g => g.First().RatepayerCustomerId);
+        List<Application.Receipting.MatchRule> rules = [.. (await _db.Set<ReceiptMatchRule>().Where(r => r.CompanyId == request.CompanyId).ToListAsync(ct).ConfigureAwait(false))
+            .Select(r => new Application.Receipting.MatchRule(r.Field, r.Kind, r.Pattern, r.CustomerId, r.Priority))];
 
         ImportBatch batch = new(request.CompanyId, request.FileReference, request.FileHash, request.Source, request.Date, request.BankAccountCode);
         _db.Set<ImportBatch>().Add(batch);
@@ -82,7 +83,8 @@ public sealed class ReceiptImportService : IReceiptImportService
             index++;
             string documentNumber = $"IMP-{hashPrefix}-{index}";
             ImportLine line = batch.AddLine(lineRequest.PayerReference, lineRequest.PayerName, lineRequest.Amount, lineRequest.ValueDate);
-            long? matchedCustomerId = MatchCustomer(lineRequest.PayerReference, customers);
+            Application.Receipting.ReceiptMatch match = Application.Receipting.ReceiptMatcher.Match(lineRequest.PayerReference, lineRequest.PayerName, rules, accounts, stands);
+            long? matchedCustomerId = match.CustomerId;
 
             if (matchedCustomerId is { } customerId)
             {
@@ -95,7 +97,7 @@ public sealed class ReceiptImportService : IReceiptImportService
                     Currency = company.BaseCurrency,
                     Amount = lineRequest.Amount,
                     BankAccountCode = request.BankAccountCode,
-                    Narrative = $"Imported payment — {lineRequest.PayerName}",
+                    Narrative = $"Imported payment — {lineRequest.PayerName} (matched by {match.By})",
                 }, ct).ConfigureAwait(false);
 
                 if (receipt.IsFailure)
@@ -138,18 +140,6 @@ public sealed class ReceiptImportService : IReceiptImportService
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new ImportResult(batch.Id, request.Lines.Count, batch.MatchedCount, batch.UnmatchedCount, matchedAmount, unmatchedAmount);
-    }
-
-    private static long? MatchCustomer(string payerReference, List<(long Id, string Code)> customers)
-    {
-        string reference = payerReference.ToUpperInvariant();
-        List<long> matches = customers
-            .Where(c => !string.IsNullOrEmpty(c.Code) && reference.Contains(c.Code, StringComparison.Ordinal))
-            .Select(c => c.Id)
-            .ToList();
-
-        // Match only when exactly one account is identified; ambiguity goes to the suspense workbench.
-        return matches.Count == 1 ? matches[0] : null;
     }
 
     private async Task AllocateOldestFirstAsync(long companyId, long customerId, long creditItemId, decimal amount, DateOnly date, CancellationToken ct)
