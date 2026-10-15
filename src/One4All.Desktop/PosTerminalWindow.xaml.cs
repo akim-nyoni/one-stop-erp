@@ -56,12 +56,14 @@ public partial class PosTerminalWindow : Window
     private void Contrast_Changed(object sender, RoutedEventArgs e)
     {
         bool on = ContrastToggle.IsChecked == true;
-        SetBrush("WindowBg", on ? Colors.Black : Color.FromRgb(0x1E, 0x27, 0x2E));
-        SetBrush("Card", on ? Colors.Black : Color.FromRgb(0x1F, 0x2A, 0x33));
-        SetBrush("Bar", on ? Colors.Black : Color.FromRgb(0x0F, 0x15, 0x19));
-        SetBrush("Panel", on ? Colors.Black : Color.FromRgb(0x26, 0x31, 0x3A));
-        SetBrush("Ink", on ? Colors.White : Colors.White);
-        SetBrush("Muted", on ? Colors.Yellow : Color.FromRgb(0x9A, 0xA7, 0xB0));
+        // The light palette of the XAML, or black with white and yellow text.
+        SetBrush("WindowBg", on ? Colors.Black : Color.FromRgb(0xEE, 0xF1, 0xF5));
+        SetBrush("Card", on ? Colors.Black : Color.FromRgb(0xF6, 0xF8, 0xFA));
+        SetBrush("Bar", on ? Colors.Black : Color.FromRgb(0x2C, 0x3E, 0x50));
+        SetBrush("Panel", on ? Colors.Black : Colors.White);
+        SetBrush("Ink", on ? Colors.White : Color.FromRgb(0x1C, 0x28, 0x33));
+        SetBrush("Muted", on ? Colors.Yellow : Color.FromRgb(0x6C, 0x7A, 0x89));
+        SetBrush("Line", on ? Colors.Yellow : Color.FromRgb(0xDD, 0xE3, 0xEA));
         SetBrush("EdgeBrush", on ? Colors.Yellow : Colors.Transparent);
         Resources["Edge"] = new Thickness(on ? 3 : 0);
         try

@@ -42,7 +42,7 @@ public sealed class PosProductVm
     public System.Windows.Media.Brush TileBrush { get; init; } = DefaultTileBrush;
 
     /// <summary>The default tile colour.</summary>
-    public static System.Windows.Media.Brush DefaultTileBrush { get; } = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x2C, 0x3E, 0x50));
+    public static System.Windows.Media.Brush DefaultTileBrush { get; } = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1F, 0x61, 0x8D));
 
     /// <summary>The tax-exclusive unit price.</summary>
     public required decimal Price { get; init; }
@@ -714,6 +714,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         {
             _categoryParents[category.Code] = category.ParentCode;
             _categoryParents.TryAdd(category.Name, category.ParentCode);
+            PosCategoryNames.Map[category.Code] = category.Name;
             if (category.ParentCode is string parent)
             {
                 (_categoryChildren.TryGetValue(parent, out List<string>? children) ? children : _categoryChildren[parent] = []).Add(category.Code);
