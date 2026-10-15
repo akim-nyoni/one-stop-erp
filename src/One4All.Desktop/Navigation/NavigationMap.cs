@@ -114,7 +114,7 @@ public static class NavigationMap
                 O("Stock: Adjust stock with a reason", "Adjust stock (damage, loss, found)"), O("Stock: Dispatch a transfer", "Send stock to another warehouse"),
                 O("Stock: Receive a transfer", "Receive stock from another warehouse"), O("Stock: Store requisitions"), O("Stock: Record batches / serials on a movement")),
             G("Stock counts",
-                O("Stock: Start a stocktake"), O("Stock: Record a count"), O("Stock: Record a recount"), O("Stock: Post a stocktake")),
+                O("Stock: Start a stocktake"), O("Stock: Start a cycle count", "Start a cycle count (a few items at a time)"), O("Stock: Record a count"), O("Stock: Record a recount"), O("Stock: Post a stocktake")),
             G("Production",
                 O("Stock: Run an assembly / production batch", "Make or assemble products"), O("Stock: Disassemble finished goods")),
             G("Look up",

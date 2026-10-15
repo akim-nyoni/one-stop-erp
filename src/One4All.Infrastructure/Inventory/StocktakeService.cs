@@ -54,6 +54,54 @@ public sealed class StocktakeService : IStocktakeService
     }
 
     /// <inheritdoc />
+    public async Task<Result<long>> StartCycleCountAsync(long companyId, long warehouseId, DateOnly date, string reference, Application.Inventory.CycleCountRule rule,
+        CancellationToken ct = default, decimal? recountTolerancePercent = null)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        if (string.IsNullOrWhiteSpace(reference) || recountTolerancePercent < 0m || rule.ADays < 1 || rule.BDays < 1 || rule.CDays < 1 || rule.MaxItems < 1)
+        {
+            return Error.Validation("Stocktake.Reference", "A reference is required; intervals and the item limit must be at least 1, and any recount tolerance cannot be negative.");
+        }
+
+        if (await _db.Set<StocktakeSession>().AnyAsync(s => s.CompanyId == companyId && s.WarehouseId == warehouseId && s.Status == StocktakeStatus.Draft, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Stocktake.DraftOpen", "The warehouse already has a stocktake in progress; post or finish it first.");
+        }
+
+        List<StockBalance> balances = await _db.Set<StockBalance>().Where(b => b.CompanyId == companyId && b.WarehouseId == warehouseId).ToListAsync(ct).ConfigureAwait(false);
+        List<long> itemIds = [.. balances.Select(b => b.ItemId)];
+        Dictionary<long, string?> classes = await _db.Items.Where(i => i.CompanyId == companyId && itemIds.Contains(i.Id))
+            .ToDictionaryAsync(i => i.Id, i => i.AbcClass, ct).ConfigureAwait(false);
+
+        // The last posted count of each item in this warehouse.
+        Dictionary<long, DateOnly> lastCounted = await _db.Set<StocktakeSession>()
+            .Where(s => s.CompanyId == companyId && s.WarehouseId == warehouseId && s.Status == StocktakeStatus.Posted)
+            .SelectMany(s => s.Lines.Where(l => l.CountedQuantity != null).Select(l => new { l.ItemId, s.StocktakeDate }))
+            .GroupBy(x => x.ItemId).Select(g => new { ItemId = g.Key, Last = g.Max(x => x.StocktakeDate) })
+            .ToDictionaryAsync(x => x.ItemId, x => x.Last, ct).ConfigureAwait(false);
+
+        IReadOnlyList<Application.Inventory.CycleCountDue> due = Application.Inventory.CycleCountPlan.Due(
+            balances.Select(b => new Application.Inventory.CycleCountCandidate(b.ItemId, classes.GetValueOrDefault(b.ItemId),
+                lastCounted.TryGetValue(b.ItemId, out DateOnly last) ? last : null)), rule, date);
+        if (due.Count == 0)
+        {
+            return Error.Rule("Stocktake.NothingDue", "No item in the warehouse is due a count on that date.");
+        }
+
+        StocktakeSession session = new(companyId, warehouseId, reference.Trim(), date) { RecountTolerancePercent = recountTolerancePercent };
+        Dictionary<long, StockBalance> byItem = balances.ToDictionary(b => b.ItemId);
+        foreach (Application.Inventory.CycleCountDue item in due.OrderBy(d => d.ItemId))
+        {
+            StockBalance balance = byItem[item.ItemId];
+            session.AddLine(balance.ItemId, balance.QuantityOnHand, balance.AverageCost);
+        }
+
+        _db.Set<StocktakeSession>().Add(session);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return session.Id;
+    }
+
+    /// <inheritdoc />
     public async Task<Result> RecordCountAsync(long companyId, long stocktakeId, long itemId, decimal countedQuantity, CancellationToken ct = default, long? countedByUserId = null)
     {
         if (countedQuantity < 0m)

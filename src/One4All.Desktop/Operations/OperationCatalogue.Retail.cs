@@ -784,6 +784,19 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Start a cycle count", ListTitle = "Blind count sheets (draft stocktakes)",
+            Description = "Counts only the items due: never-counted items first, then A items every 30 days, B every 90 and C every 180 (change the days below). "
+                + "Classify items A / B / C first so the busiest items are counted most often. Count, recount and post it like a stocktake.",
+            Fields = [Req("Warehouse", "Warehouse code"), Today(), Req("Reference", "Count reference"), Num("ADays", "Days between counts — A items", "30"),
+                Num("BDays", "Days between counts — B items", "90"), Num("CDays", "Days between counts — C items", "180"), Num("Max", "Most items in this count", "50"),
+                OptNum("Tolerance", "Recount tolerance % (blank: none)")],
+            Run = async (c, i) => Check(await c.Get<IStocktakeService>().StartCycleCountAsync(c.CompanyId, await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true), i.Date("Date"),
+                i.Text("Reference"), new Application.Inventory.CycleCountRule((int)i.Number("ADays"), (int)i.Number("BDays"), (int)i.Number("CDays"), (int)i.Number("Max")),
+                recountTolerancePercent: i.OptionalNumber("Tolerance")).ConfigureAwait(true), id => $"Cycle count {id} started; open the count sheet to see the items to count."),
+            List = CountSheetsAsync,
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Record a count", ListTitle = "Blind count sheets (draft stocktakes)", Description = "The first count of an item, by the signed-in user.",
             Fields = [Num("Stocktake", "Stocktake id"), Req("Item", "Item code"), Num("Counted", "Counted quantity")],
             Run = async (c, i) => Check(await c.Get<IStocktakeService>().RecordCountAsync(c.CompanyId, (long)i.Number("Stocktake"), await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), i.Number("Counted"),

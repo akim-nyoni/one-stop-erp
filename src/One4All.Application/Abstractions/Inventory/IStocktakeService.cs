@@ -35,6 +35,22 @@ public interface IStocktakeService
     /// <param name="recountTolerancePercent">Variance (percent of the frozen quantity) beyond which a recount is required; null for none.</param>
     Task<Result<long>> StartAsync(long companyId, long warehouseId, DateOnly date, string reference, CancellationToken ct = default, decimal? recountTolerancePercent = null);
 
+    /// <summary>
+    /// Starts a cycle count: a stocktake of only the warehouse's items due a count under the rule (<see cref="One4All.Application.Inventory.CycleCountPlan"/>), judged by
+    /// each item's ABC class and its last posted count in the warehouse. Counting, recounts and posting are as for a full stocktake; refused
+    /// (<c>Stocktake.NothingDue</c>) when no item is due.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="warehouseId">The warehouse.</param>
+    /// <param name="date">The count date.</param>
+    /// <param name="reference">The reference.</param>
+    /// <param name="rule">The intervals per class and the most items to take.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <param name="recountTolerancePercent">Variance beyond which a recount is required; null for none.</param>
+    /// <returns>The new stocktake id.</returns>
+    Task<Result<long>> StartCycleCountAsync(long companyId, long warehouseId, DateOnly date, string reference, One4All.Application.Inventory.CycleCountRule rule, CancellationToken ct = default,
+        decimal? recountTolerancePercent = null);
+
     /// <summary>Records the physical count for one item on a draft stocktake.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="stocktakeId">The stocktake session.</param>
