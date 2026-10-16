@@ -110,7 +110,8 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Preparation deadlines and budget alerts", ListTitle = "Preparation board",
             Description = "Set a department's submission deadline; remind budget holders whose submission is due within the days given (or overdue); set where utilisation alerts go "
-                + "and their thresholds; send the alerts now (each vote and threshold once). The scheduled task budget.notices does both daily.",
+                + "and their thresholds — with a department named, that department's budget holder e-mail and own thresholds; send the alerts now (each vote and threshold once). "
+                + "The scheduled task budget.notices does both daily.",
             Fields = [Pick("Step", "Step", ["Set deadline", "Send reminders", "Alert settings", "Send alerts"]), Opt("Department", "Department"), new("Deadline", "Deadline", FieldKind.Date, Required: false),
                 Num("Year", "Fiscal year id (board / reminders)", "0"), Num("Days", "Remind this many days before", "7"), Opt("Email", "Alert email"), Opt("Thresholds", "Thresholds % (e.g. 75, 90, 100)"), Today()],
             Run = async (c, i) =>
@@ -124,6 +125,16 @@ public static partial class OperationCatalogue
                         return Check(await notices.RemindAsync(c.CompanyId, (long)i.Number("Year"), i.Date("Date"), i.Whole("Days")).ConfigureAwait(true),
                             n => $"{n.Messages} reminder(s) queued for {n.Items} department(s) due.");
                     case "Alert settings":
+                        if (i.Optional("Department") is string departmentName)
+                        {
+                            Core.Budgeting.DepartmentUnit unit = await c.Db.DepartmentUnits.FirstOrDefaultAsync(u => u.CompanyId == c.CompanyId && u.Department == departmentName.Trim()).ConfigureAwait(true)
+                                ?? throw new OperationException($"No department unit {departmentName}; set its deadline first.");
+                            unit.BudgetHolderEmail = i.Optional("Email") ?? unit.BudgetHolderEmail;
+                            unit.AlertThresholds = i.Optional("Thresholds");
+                            await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                            return $"{unit.Department}: alerts go to {unit.BudgetHolderEmail ?? "nobody"} at {unit.AlertThresholds ?? "the company's thresholds"}.";
+                        }
+
                         Core.System.Company company = await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
                         company.BudgetAlertEmail = i.Optional("Email");
                         company.BudgetAlertThresholds = i.Optional("Thresholds");

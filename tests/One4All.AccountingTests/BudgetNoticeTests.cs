@@ -65,6 +65,7 @@ public sealed class BudgetNoticeTests
         alerts.Should().HaveCount(2);
         alerts.Last().Body.Should().Contain("6800").And.Contain("past 100%");
 
+
         // Roads is due in 5 days and has not started; Parks is overdue but has submitted; Clinics is due in a month.
         (await notices.SetDeadlineAsync(companyId, "roads", new DateOnly(2026, 3, 25))).IsSuccess.Should().BeTrue();
         (await notices.SetDeadlineAsync(companyId, "Parks", new DateOnly(2026, 3, 1))).IsSuccess.Should().BeTrue();
@@ -78,5 +79,21 @@ public sealed class BudgetNoticeTests
         BudgetNotices reminded = (await notices.RemindAsync(companyId, yearId, new DateOnly(2026, 3, 20), 7)).Value;
         (reminded.Messages, reminded.Items).Should().Be((1, 1));
         (await db.Set<OutboundMessage>().AsNoTracking().SingleAsync(m => m.CompanyId == companyId && m.Recipient == "roads@example.com")).Body.Should().Contain("due in 5 day(s)");
+
+        // A department's holder hears about the votes in that department's budget, at the department's own thresholds: Roads carries 6900 with a 50% threshold.
+        DepartmentUnit roads = await db.DepartmentUnits.SingleAsync(u => u.CompanyId == companyId && u.Department == "Roads");
+        roads.AlertThresholds = "50";
+        await db.SaveChangesAsync();
+        long roadsBudget = (await budgeting.CreateBudgetAsync(companyId, yearId, "2026-ROADS", BudgetType.OriginalApproved, "Roads", [new NewBudgetLine("6900", 3, 1_000m)])).Value;
+        (await budgeting.ActivateAsync(companyId, roadsBudget)).IsSuccess.Should().BeTrue();
+        (await engine.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId, SourceModule = "GL", PostingDate = new DateOnly(2026, 3, 11), TransactionCurrency = Scenario.Usd,
+            Lines = [new JournalLineRequest { AccountCode = "6900", Side = JournalSide.Debit, TransactionAmount = 600m }, new JournalLineRequest { AccountCode = "1100", Side = JournalSide.Credit, TransactionAmount = 600m }],
+        })).IsSuccess.Should().BeTrue();
+        (await notices.AlertAsync(companyId, new DateOnly(2026, 3, 23))).Value.Items.Should().Be(1, "6900 at 60% crosses the Roads holder's 50%");
+        List<OutboundMessage> toRoads = await db.Set<OutboundMessage>().AsNoTracking().Where(m => m.CompanyId == companyId && m.Recipient == "roads@example.com" && m.Subject.Contains("utilisation")).ToListAsync();
+        toRoads.Should().ContainSingle().Which.Body.Should().Contain("6900").And.Contain("past 50%").And.NotContain("6800");
+        (await db.Set<OutboundMessage>().AsNoTracking().CountAsync(m => m.CompanyId == companyId && m.Recipient == "finance@example.com")).Should().Be(2, "50% is not one of the company's thresholds");
     }
 }

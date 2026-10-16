@@ -143,6 +143,7 @@ internal sealed class DepartmentUnitConfiguration : IEntityTypeConfiguration<Dep
         b.Property(x => x.Department).HasMaxLength(80);
         b.Property(x => x.Division).HasMaxLength(80);
         b.Property(x => x.Directorate).HasMaxLength(80);
+        b.Property(x => x.AlertThresholds).HasMaxLength(60);
         b.Property(x => x.BudgetHolder).HasMaxLength(120);
         b.Property(x => x.BudgetHolderEmail).HasMaxLength(200);
         b.HasIndex(x => new { x.CompanyId, x.Department }).IsUnique();

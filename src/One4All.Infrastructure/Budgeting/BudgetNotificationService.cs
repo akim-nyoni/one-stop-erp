@@ -119,8 +119,12 @@ public sealed class BudgetNotificationService : IBudgetNotificationService
     /// <inheritdoc />
     public async Task<Result<BudgetNotices>> AlertAsync(long companyId, DateOnly asAt, CancellationToken ct = default)
     {
+        // Who hears: the company's alert address for every vote, and each department's budget holder for the votes in that department's budget,
+        // at the department's own thresholds when it has them (brief §4.18.5).
         Company company = await _db.Companies.AsNoTracking().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
-        if (string.IsNullOrWhiteSpace(company.BudgetAlertEmail))
+        List<DepartmentUnit> holders = await _db.DepartmentUnits.AsNoTracking().Where(u => u.CompanyId == companyId && u.BudgetHolderEmail != null && u.BudgetHolderEmail != string.Empty)
+            .ToListAsync(ct).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(company.BudgetAlertEmail) && holders.Count == 0)
         {
             return Error.Rule("Budget.NoAlertEmail", "Set the address budget alerts are sent to first.");
         }
@@ -133,7 +137,11 @@ public sealed class BudgetNotificationService : IBudgetNotificationService
             return Error.NotFound("Budget.NoYear", $"No fiscal period contains {asAt:yyyy-MM-dd}.");
         }
 
-        IReadOnlyList<UtilisationAlert> alerts = await _control.UtilisationAlertsAsync(companyId, year.Id, period.PeriodNumber, Thresholds(company.BudgetAlertThresholds), ct).ConfigureAwait(false);
+        IReadOnlyList<decimal> companyThresholds = Thresholds(company.BudgetAlertThresholds);
+        Dictionary<string, IReadOnlyList<decimal>> departmentThresholds = holders.ToDictionary(h => h.Department, h => string.IsNullOrWhiteSpace(h.AlertThresholds) ? companyThresholds : Thresholds(h.AlertThresholds),
+            StringComparer.OrdinalIgnoreCase);
+        List<decimal> every = [.. companyThresholds.Concat(departmentThresholds.Values.SelectMany(t => t)).Distinct().Order()];
+        IReadOnlyList<UtilisationAlert> alerts = await _control.UtilisationAlertsAsync(companyId, year.Id, period.PeriodNumber, every, ct).ConfigureAwait(false);
         HashSet<(string, decimal)> sentBefore = [.. (await _db.BudgetAlertsSent.AsNoTracking().Where(a => a.CompanyId == companyId && a.FiscalYearId == year.Id).ToListAsync(ct).ConfigureAwait(false))
             .Select(a => (a.AccountCode, a.Threshold))];
         List<UtilisationAlert> fresh = [.. alerts.Where(a => !sentBefore.Contains((a.AccountCode, a.ThresholdCrossed)))];
@@ -142,19 +150,61 @@ public sealed class BudgetNotificationService : IBudgetNotificationService
             return new BudgetNotices(0, 0);
         }
 
-        StringBuilder body = new($"Votes that have crossed a utilisation threshold, as at {asAt:yyyy-MM-dd} (period {period.PeriodNumber} of {year.Code}):{Environment.NewLine}{Environment.NewLine}");
-        foreach (UtilisationAlert alert in fresh)
+        // The departments whose budgets carry each vote this year, for routing to their holders.
+        Dictionary<string, HashSet<string>> departmentsByVote = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var budget in await _db.Budgets.AsNoTracking().Where(b => b.CompanyId == companyId && b.FiscalYearId == year.Id && b.Department != null)
+            .Select(b => new { b.Department, Accounts = b.Lines.Select(l => l.AccountCode).Distinct().ToList() }).ToListAsync(ct).ConfigureAwait(false))
         {
-            body.AppendLine(CultureInfo.InvariantCulture,
-                $"{alert.AccountCode} {alert.Name}: {alert.PercentUsed:0.#}% used ({alert.Used:N2} of {alert.Appropriation:N2}) — past {alert.ThresholdCrossed:0.#}%");
-            _db.BudgetAlertsSent.Add(new BudgetAlertSent(companyId, year.Id, alert.AccountCode, alert.ThresholdCrossed, _clock.UtcNow));
+            foreach (string account in budget.Accounts)
+            {
+                if (!departmentsByVote.TryGetValue(account, out HashSet<string>? set))
+                {
+                    set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    departmentsByVote[account] = set;
+                }
+
+                set.Add(budget.Department!);
+            }
         }
 
-        Result<long> queued = await _notifications.QueueDirectAsync(companyId, $"Budget alerts {asAt:yyyy-MM-dd}", MessageChannel.Email, [company.BudgetAlertEmail.Trim()],
-            $"Budget utilisation alerts: {fresh.Count} vote(s)", body.ToString(), null, ct).ConfigureAwait(false);
-        if (queued.IsFailure)
+        string Describe(UtilisationAlert alert) => $"{alert.AccountCode} {alert.Name}: {alert.PercentUsed:0.#}% used ({alert.Used:N2} of {alert.Appropriation:N2}) — past {alert.ThresholdCrossed:0.#}%";
+        async Task<Error?> SendAsync(string recipient, string who, IReadOnlyList<UtilisationAlert> theirs)
         {
-            return queued.Error;
+            if (theirs.Count == 0)
+            {
+                return null;
+            }
+
+            StringBuilder body = new($"Votes that have crossed a utilisation threshold, as at {asAt:yyyy-MM-dd} (period {period.PeriodNumber} of {year.Code}){who}:{Environment.NewLine}{Environment.NewLine}");
+            foreach (UtilisationAlert alert in theirs)
+            {
+                body.AppendLine(Describe(alert));
+            }
+
+            Result<long> queued = await _notifications.QueueDirectAsync(companyId, $"Budget alerts {asAt:yyyy-MM-dd}", MessageChannel.Email, [recipient.Trim()],
+                $"Budget utilisation alerts: {theirs.Count} vote(s)", body.ToString(), null, ct).ConfigureAwait(false);
+            return queued.IsFailure ? queued.Error : null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(company.BudgetAlertEmail)
+            && await SendAsync(company.BudgetAlertEmail, string.Empty, [.. fresh.Where(a => companyThresholds.Contains(a.ThresholdCrossed))]).ConfigureAwait(false) is Error companyError)
+        {
+            return companyError;
+        }
+
+        foreach (DepartmentUnit holder in holders)
+        {
+            IReadOnlyList<decimal> mine = departmentThresholds[holder.Department];
+            List<UtilisationAlert> theirs = [.. fresh.Where(a => mine.Contains(a.ThresholdCrossed) && departmentsByVote.GetValueOrDefault(a.AccountCode)?.Contains(holder.Department) == true)];
+            if (await SendAsync(holder.BudgetHolderEmail!, $" for {holder.Department}", theirs).ConfigureAwait(false) is Error holderError)
+            {
+                return holderError;
+            }
+        }
+
+        foreach (UtilisationAlert alert in fresh)
+        {
+            _db.BudgetAlertsSent.Add(new BudgetAlertSent(companyId, year.Id, alert.AccountCode, alert.ThresholdCrossed, _clock.UtcNow));
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

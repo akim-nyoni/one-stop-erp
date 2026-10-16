@@ -148,14 +148,46 @@ public sealed class AllocationService : IAllocationService
 
     /// <inheritdoc />
     public Task<Result<AllocationRunView>> ApproveAsync(long companyId, string runNumber, long approverUserId, DateOnly date, int offerDays, CancellationToken ct = default)
-        => _db.AtomicAsync(() => ApproveCoreAsync(companyId, runNumber, approverUserId, date, offerDays, ct), ct);
+        => LoggingBlocksAsync(companyId, runNumber, approverUserId, () => _db.AtomicAsync(() => ApproveCoreAsync(companyId, runNumber, approverUserId, date, offerDays, ct), ct), ct);
 
     /// <inheritdoc />
     public Task<Result<AllocationRunView>> ApproveByCommitteeAsync(long companyId, string runNumber, long approverUserId, DateOnly date, int offerDays, string committeeResolution,
         CancellationToken ct = default)
         => string.IsNullOrWhiteSpace(committeeResolution)
             ? Task.FromResult<Result<AllocationRunView>>(Error.Validation("Hse.CommitteeResolution", "Record the allocation committee's resolution."))
-            : _db.AtomicAsync(() => ApproveCoreAsync(companyId, runNumber, approverUserId, date, offerDays, ct, committeeResolution.Trim()), ct);
+            : LoggingBlocksAsync(companyId, runNumber, approverUserId, () => _db.AtomicAsync(() => ApproveCoreAsync(companyId, runNumber, approverUserId, date, offerDays, ct, committeeResolution.Trim()), ct), ct);
+
+    // A refused second allocation (a stand in the run no longer available, or blocked since) is kept as an exception entry after the approval's own
+    // unit of work has rolled back, so the H39 exception report shows the attempt (brief §4.10.4).
+    private async Task<Result<AllocationRunView>> LoggingBlocksAsync(long companyId, string runNumber, long approverUserId, Func<Task<Result<AllocationRunView>>> approve, CancellationToken ct)
+    {
+        Result<AllocationRunView> result = await approve().ConfigureAwait(false);
+        if (result.IsSuccess || result.Error.Code is not ("Hse.StandUnavailable" or "Hse.StandBlocked"))
+        {
+            return result;
+        }
+
+        _db.ChangeTracker.Clear();
+        AllocationRun? run = await _db.Set<AllocationRun>().AsNoTracking().Include(r => r.Allocations).FirstOrDefaultAsync(r => r.CompanyId == companyId && r.RunNumber == runNumber, ct).ConfigureAwait(false);
+        if (run is null)
+        {
+            return result;
+        }
+
+        List<long> standIds = [.. run.Allocations.Select(a => a.StandId)];
+        List<HousingStand> stands = await _db.HousingStands.AsNoTracking().Where(s => standIds.Contains(s.Id)).ToListAsync(ct).ConfigureAwait(false);
+        HashSet<long> blockedIds = [.. await _db.Set<StandBlock>().AsNoTracking().Where(b => standIds.Contains(b.StandId) && b.LiftedOn == null).Select(b => b.StandId).ToListAsync(ct).ConfigureAwait(false)];
+        IEnumerable<HousingStand> offending = result.Error.Code == "Hse.StandUnavailable" ? stands.Where(s => s.Status != StandStatus.Available)
+            : stands.Where(s => blockedIds.Contains(s.Id) || s.Status == StandStatus.Withheld);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        foreach (HousingStand stand in offending)
+        {
+            _db.AllocationBlockLogs.Add(new AllocationBlockLog(companyId, runNumber, stand.Id, stand.StandNumber, result.Error.Message, approverUserId, now));
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return result;
+    }
 
     /// <inheritdoc />
     public Task<Result> SwapAsync(long companyId, string firstCertificate, string secondCertificate, DateOnly date, string reference, string reason, long userId, CancellationToken ct = default)

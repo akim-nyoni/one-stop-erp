@@ -435,6 +435,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Housing stands.</summary>
     public DbSet<Core.Housing.HousingStand> HousingStands => Set<Core.Housing.HousingStand>();
 
+    /// <summary>Gets the refused second allocations (the housing exception report's record of blocked attempts).</summary>
+    public DbSet<Core.Housing.AllocationBlockLog> AllocationBlockLogs => Set<Core.Housing.AllocationBlockLog>();
+
     /// <summary>Housing applicants (waiting list).</summary>
     public DbSet<Core.Housing.HousingApplicant> HousingApplicants => Set<Core.Housing.HousingApplicant>();
 

@@ -327,7 +327,10 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                                 where a.CompanyId == companyId && !(d.Quota == StandQuota.Council && d.HandedOverOn != null)
                                 select new { d.StandId, a.AgreementNumber, d.Quota }).ToListAsync(ct).ConfigureAwait(false)).Select(d => (d.StandId, $"developer {d.AgreementNumber} ({d.Quota} quota)")));
         List<IGrouping<long, (long Stand, string Route)>> doubled = [.. claims.GroupBy(c => c.Stand).Where(g => g.Count() > 1)];
-        if (doubled.Count == 0)
+
+        // Attempts that were refused are incidents too: an allocation run's approval found a stand already promised or blocked.
+        List<AllocationBlockLog> blocked = await _db.AllocationBlockLogs.AsNoTracking().Where(b => b.CompanyId == companyId).OrderBy(b => b.AttemptedOnUtc).ToListAsync(ct).ConfigureAwait(false);
+        if (doubled.Count == 0 && blocked.Count == 0)
         {
             return [];
         }
@@ -335,7 +338,8 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         List<long> ids = [.. doubled.Select(g => g.Key)];
         Dictionary<long, string> numbers = await _db.HousingStands.AsNoTracking().Where(s => ids.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => s.StandNumber, ct).ConfigureAwait(false);
         return [.. doubled.OrderBy(g => numbers[g.Key], StringComparer.Ordinal)
-            .Select(g => Row(("Stand", numbers[g.Key]), ("Claims", g.Count()), ("Routes", string.Join("; ", g.Select(c => c.Route)))))];
+            .Select(g => Row(("Stand", numbers[g.Key]), ("Claims", g.Count()), ("Routes", string.Join("; ", g.Select(c => c.Route)))))
+            .Concat(blocked.Select(b => Row(("Stand", b.StandNumber), ("Claims", 1), ("Routes", $"refused: run {b.RunNumber} approval on {b.AttemptedOnUtc:yyyy-MM-dd} — {b.Reason}"))))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReadyForTitleAsync(long companyId, CancellationToken ct)

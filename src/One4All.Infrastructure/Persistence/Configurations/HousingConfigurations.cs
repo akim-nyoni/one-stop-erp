@@ -1516,3 +1516,16 @@ internal sealed class TenureControlAccountConfiguration : IEntityTypeConfigurati
         b.HasIndex(x => new { x.CompanyId, x.Tenure }).IsUnique();
     }
 }
+
+internal sealed class AllocationBlockLogConfiguration : IEntityTypeConfiguration<AllocationBlockLog>
+{
+    public void Configure(EntityTypeBuilder<AllocationBlockLog> b)
+    {
+        b.ToTable("allocation_block_log", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.RunNumber).HasMaxLength(40);
+        b.Property(x => x.StandNumber).HasMaxLength(40);
+        b.Property(x => x.Reason).HasMaxLength(300);
+        b.HasIndex(x => new { x.CompanyId, x.StandId });
+    }
+}

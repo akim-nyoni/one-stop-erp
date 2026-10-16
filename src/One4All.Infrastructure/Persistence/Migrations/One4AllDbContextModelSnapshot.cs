@@ -730,6 +730,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(20)")
                         .HasColumnName("branch");
 
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
                     b.Property<string>("CostCentre")
                         .IsRequired()
                         .HasMaxLength(3)
@@ -761,6 +765,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(512)")
                         .HasColumnName("narrative");
 
+                    b.Property<DateOnly>("PostingDate")
+                        .HasColumnType("date")
+                        .HasColumnName("posting_date");
+
                     b.Property<string>("Project")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
@@ -775,12 +783,6 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("reporting_debit");
-
-                    b.Property<uint>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
 
                     b.Property<string>("TaxCode")
                         .HasMaxLength(20)
@@ -3634,6 +3636,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("AlertThresholds")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("alert_thresholds");
+
                     b.Property<string>("BudgetHolder")
                         .HasMaxLength(120)
                         .HasColumnType("character varying(120)")
@@ -5878,6 +5885,64 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_allocation_appeal_company_id_appeal_number");
 
                     b.ToTable("allocation_appeal", "hse");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.AllocationBlockLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AttemptedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("attempted_by_user_id");
+
+                    b.Property<DateTimeOffset>("AttemptedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("attempted_on_utc");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("RunNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("run_number");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.Property<string>("StandNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("stand_number");
+
+                    b.HasKey("Id")
+                        .HasName("pk_allocation_block_log");
+
+                    b.HasIndex("CompanyId", "StandId")
+                        .HasDatabaseName("ix_allocation_block_log_company_id_stand_id");
+
+                    b.ToTable("allocation_block_log", "hse");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.AllocationExclusion", b =>
@@ -20075,6 +20140,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<decimal?>("Balance")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("balance");
+
                     b.Property<long>("EmployeeId")
                         .HasColumnType("bigint")
                         .HasColumnName("employee_id");
@@ -20130,6 +20200,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("amount");
+
+                    b.Property<string>("BankBranch")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("bank_branch");
+
+                    b.Property<string>("BankName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("bank_name");
 
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
@@ -20709,6 +20789,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(8)")
                         .HasColumnName("account_code");
 
+                    b.Property<bool>("ArrearsRecoverable")
+                        .HasColumnType("boolean")
+                        .HasColumnName("arrears_recoverable");
+
                     b.Property<int>("Basis")
                         .HasColumnType("integer")
                         .HasColumnName("basis");
@@ -20837,6 +20921,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("pensionable");
 
+                    b.Property<bool>("ProRated")
+                        .HasColumnType("boolean")
+                        .HasColumnName("pro_rated");
+
                     b.Property<decimal>("Rate")
                         .HasPrecision(19, 6)
                         .HasColumnType("numeric(19,6)")
@@ -20886,9 +20974,17 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("taxable");
 
+                    b.Property<bool>("TerminalBenefit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("terminal_benefit");
+
                     b.Property<int>("Type")
                         .HasColumnType("integer")
                         .HasColumnName("type");
+
+                    b.Property<bool>("UnionDues")
+                        .HasColumnType("boolean")
+                        .HasColumnName("union_dues");
 
                     b.HasKey("Id")
                         .HasName("pk_element");
@@ -21393,6 +21489,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("amount");
 
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -21405,15 +21505,13 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("element_code");
 
+                    b.Property<DateOnly>("PayDate")
+                        .HasColumnType("date")
+                        .HasColumnName("pay_date");
+
                     b.Property<long>("PayslipId")
                         .HasColumnType("bigint")
                         .HasColumnName("payslip_id");
-
-                    b.Property<uint>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
 
                     b.Property<bool>("Taxable")
                         .HasColumnType("boolean")
@@ -23388,6 +23486,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -23429,11 +23531,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(8)")
                         .HasColumnName("revenue_account_code");
 
-                    b.Property<uint>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("xid")
-                        .HasColumnName("xmin");
+                    b.Property<DateOnly>("SaleDate")
+                        .HasColumnType("date")
+                        .HasColumnName("sale_date");
 
                     b.Property<long>("SaleId")
                         .HasColumnType("bigint")
@@ -25886,6 +25986,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
+
+                    b.Property<DateTimeOffset?>("StartedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_on_utc");
 
                     b.Property<long>("StationId")
                         .HasColumnType("bigint")
@@ -32460,6 +32564,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("DebitItemId")
                         .HasColumnType("bigint")
                         .HasColumnName("debit_item_id");
+
+                    b.Property<decimal?>("DebitTransactionAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("debit_transaction_amount");
 
                     b.Property<bool>("IsReversed")
                         .HasColumnType("boolean")

@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Housing;
 using One4All.Core.Housing;
@@ -50,7 +51,20 @@ public sealed class AllocationAppealTests
         IAllocationService allocations = scope.ServiceProvider.GetRequiredService<IAllocationService>();
         AllocationProposal Proposal() => new() { CompanyId = companyId, SchemeId = scheme.Id, Category = HousingCategory.HighDensity, Method = AllocationMethod.Seniority, AsAtDate = new DateOnly(2026, 5, 1), UserId = 71 };
         string run = (await allocations.ProposeAsync(Proposal())).Value.RunNumber;
-        string winnerCert = (await allocations.ApproveAsync(companyId, run, 72, new DateOnly(2026, 5, 2), 30)).Value.Lines[0].CertificateNumber!;
+
+        // A stand promised elsewhere since the run was proposed cannot be allocated again: the approval is refused and the attempt is logged for H39.
+        HousingStand stand = await db.HousingStands.SingleAsync(s => s.Id == first.Id);
+        stand.MarkAllocated();
+        await db.SaveChangesAsync();
+        (await allocations.ApproveAsync(companyId, run, 72, new DateOnly(2026, 5, 2), 30)).Error.Code.Should().Be("Hse.StandUnavailable");
+        (await db.AllocationBlockLogs.AsNoTracking().Where(b => b.CompanyId == companyId).ToListAsync()).Should().ContainSingle(b => b.StandNumber == "AP-1" && b.RunNumber == run && b.AttemptedByUserId == 72);
+        stand = await db.HousingStands.SingleAsync(s => s.Id == first.Id); // the refusal's logging cleared the context's tracking
+        stand.ReleaseAllocation();
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var approved = await allocations.ApproveAsync(companyId, run, 72, new DateOnly(2026, 5, 2), 30);
+        approved.IsSuccess.Should().BeTrue(approved.IsFailure ? approved.Error.Code + ": " + approved.Error.Message : string.Empty);
+        string winnerCert = approved.Value.Lines[0].CertificateNumber!;
 
         IAllocationAppealService appeals = scope.ServiceProvider.GetRequiredService<IAllocationAppealService>();
         (await appeals.LodgeAsync(companyId, winner, run, "Wanted another stand", new DateOnly(2026, 5, 5))).Error.Code.Should().Be("Hse.NotUnsuccessful");
