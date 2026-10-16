@@ -48,6 +48,9 @@ public enum CalculationBasis
 
     /// <summary>An amount (or percentage) looked up in the element's table by a variable's value (<see cref="PayElement.LookupBands"/>).</summary>
     TableLookup = 7,
+
+    /// <summary>A fixed amount per period until the employee's balance for the element (an advance, a deposit being recovered) is used up.</summary>
+    BalanceDriven = 8,
 }
 
 /// <summary>
@@ -184,6 +187,18 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Gets or sets a value indicating whether an earning is in leave pay's base (formula variable LEAVEBASE).</summary>
     public bool LeavePayBase { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether an earning is pro-rated for a part period (someone joining or leaving mid-period), like basic pay.</summary>
+    public bool ProRated { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether a deduction that net-pay protection cannot take in full goes into arrears to be recovered later (on by default).</summary>
+    public bool ArrearsRecoverable { get; set; } = true;
+
+    /// <summary>Gets or sets a value indicating whether an earning counts towards terminal benefits (the <c>TERMINALBASE</c> formula variable).</summary>
+    public bool TerminalBenefit { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether an earning is subject to union dues (the <c>UNIONBASE</c> formula variable a dues element can take a percentage of).</summary>
+    public bool UnionDues { get; set; }
 
     /// <summary>Gets or sets the group an earning adds to (formula variable GROUP_name; a <see cref="CalculationBasis.PercentOfGroup"/> element's base).</summary>
     public string? Group { get; set; }

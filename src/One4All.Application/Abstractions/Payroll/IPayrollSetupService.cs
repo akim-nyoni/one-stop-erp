@@ -222,6 +222,18 @@ public sealed record NewPayElement(string Code, string Name, PayElementType Type
     /// <summary>In the leave-pay base.</summary>
     public bool LeavePayBase { get; init; }
 
+    /// <summary>Pro-rated for a part period (someone joining or leaving mid-period), like basic pay.</summary>
+    public bool ProRated { get; init; }
+
+    /// <summary>Whether a deduction net-pay protection cannot take in full goes into arrears (on by default).</summary>
+    public bool ArrearsRecoverable { get; init; } = true;
+
+    /// <summary>Counts towards terminal benefits (the TERMINALBASE formula variable).</summary>
+    public bool TerminalBenefit { get; init; }
+
+    /// <summary>Subject to union dues (the UNIONBASE formula variable).</summary>
+    public bool UnionDues { get; init; }
+
     /// <summary>The element group an earning adds to.</summary>
     public string? Group { get; init; }
 
@@ -297,7 +309,20 @@ public interface IPayrollSetupService
     Task<Result> SetEmployeeTaxCreditAsync(long companyId, string employeeNumber, string creditCode, bool given, CancellationToken ct = default);
 
     /// <summary>Gives an employee a pay element (with its own amount, rate or units if they differ).</summary>
-    Task<Result> AssignElementAsync(long companyId, string employeeNumber, string elementCode, decimal? overrideAmount = null, decimal? overrideRate = null, decimal? units = null, CancellationToken ct = default);
+    Task<Result> AssignElementAsync(long companyId, string employeeNumber, string elementCode, decimal? overrideAmount = null, decimal? overrideRate = null, decimal? units = null, CancellationToken ct = default)
+        => AssignElementAsync(companyId, employeeNumber, elementCode, overrideAmount, overrideRate, units, null, ct);
+
+    /// <summary>Assigns a pay element with a balance to recover (a balance-driven element: an advance, a deposit), taken off period by period.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="employeeNumber">The employee.</param>
+    /// <param name="elementCode">The element.</param>
+    /// <param name="overrideAmount">The employee's own amount per period, or null for the element's.</param>
+    /// <param name="overrideRate">The employee's own rate, or null.</param>
+    /// <param name="units">Units for a rate-per-unit element.</param>
+    /// <param name="balance">The balance to recover, for a balance-driven element.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> AssignElementAsync(long companyId, string employeeNumber, string elementCode, decimal? overrideAmount, decimal? overrideRate, decimal? units, decimal? balance, CancellationToken ct = default);
 
     /// <summary>Stops a pay element for an employee.</summary>
     Task<Result> EndElementAsync(long companyId, string employeeNumber, string elementCode, CancellationToken ct = default);

@@ -67,6 +67,12 @@ public sealed class PayslipDocument
 
     /// <summary>The loan balances outstanding after this pay (reference, balance).</summary>
     public IReadOnlyList<(string Reference, decimal Balance)> LoanBalances { get; init; } = [];
+
+    /// <summary>
+    /// How the net pay goes out when some of it is paid in another currency (brief §4.15.7): each currency's amount, with the base-currency value
+    /// and the rate used for a foreign one (rate 1 for the base currency). Empty when all of it is in the base currency.
+    /// </summary>
+    public IReadOnlyList<(string Currency, decimal Amount, decimal BaseAmount, decimal Rate)> NetPayByCurrency { get; init; } = [];
 }
 
 /// <summary>
@@ -118,6 +124,11 @@ public static class PayslipFormatter
         sb.AppendLine(TwoColumn("Gross earnings", Money(doc.GrossEarnings), width));
         sb.AppendLine(TwoColumn("Total deductions", Money(doc.TotalDeductions), width));
         sb.AppendLine(TwoColumn("NET PAY", Money(doc.NetPay), width));
+        foreach ((string currency, decimal amount, decimal baseAmount, decimal rate) in doc.NetPayByCurrency)
+        {
+            sb.AppendLine(TwoColumn(rate == 1m ? $"  in {currency}" : $"  in {currency} at {rate.ToString("0.####", CultureInfo.InvariantCulture)} ({Money(baseAmount)})", Money(amount), width));
+        }
+
         if (doc.PaidBy is string paidBy)
         {
             sb.AppendLine(paidBy.Length > width ? paidBy[..width] : paidBy);

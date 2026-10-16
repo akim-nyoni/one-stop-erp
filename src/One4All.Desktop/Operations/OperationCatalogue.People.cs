@@ -274,6 +274,8 @@ public static partial class OperationCatalogue
                 OptNum("Rate", "Rate / override rate"), OptNum("Units", "Units"), Opt("Formula", "Formula"), Tick("Taxable", "Taxable"), Opt("TaxTable", "Tax table code"),
                 EmployeePick("Employee", "Employee", required: false), Today("From", "Tax table effective from"), Opt("Bands", "Tax bands"), Tick("Pensionable", "Pensionable"),
                 Tick("SocialSecurity", "Subject to social security"), Tick("OvertimeBase", "In the overtime base"), Tick("LeaveBase", "In the leave-pay base"), Opt("Group", "Adds to group"),
+                Tick("ProRated", "Pro-rated for a part period"), Tick("NoArrears", "Never goes into arrears (deduction)"), Tick("Terminal", "Counts towards terminal benefits"), Tick("Union", "Subject to union dues"),
+                OptNum("Balance", "Balance to recover (assign; balance-driven element)"),
                 Opt("BasisGroup", "Percentage of group (percent-of-group)"), OptNum("Floor", "Floor"), OptNum("Ceiling", "Ceiling"), OptNum("RoundTo", "Round to (unit)"),
                 Pick("Rounding", "Rounding", Enum.GetNames<PayRounding>()), Opt("Expense", "Expense account (contribution / provision)"), Opt("DeptAccounts", "Accounts by department: DEPT=ACCOUNT; …"),
                 Opt("LookupVariable", "Lookup variable (table lookup; blank: BASIC)"), Opt("LookupBands", "Lookup bands from-to:amount or rate%; … (table lookup)"),
@@ -285,7 +287,7 @@ public static partial class OperationCatalogue
                 {
                     case "Assign to employee":
                         _ = Check(await setup.AssignElementAsync(c.CompanyId, i.Optional("Employee") ?? string.Empty, i.Optional("Code") ?? string.Empty, i.OptionalNumber("Amount"), i.OptionalNumber("Rate"),
-                            i.OptionalNumber("Units")).ConfigureAwait(true), string.Empty);
+                            i.OptionalNumber("Units"), i.OptionalNumber("Balance")).ConfigureAwait(true), string.Empty);
                         return "Element assigned.";
                     case "End for employee":
                         _ = Check(await setup.EndElementAsync(c.CompanyId, i.Optional("Employee") ?? string.Empty, i.Optional("Code") ?? string.Empty).ConfigureAwait(true), string.Empty);
@@ -328,6 +330,7 @@ public static partial class OperationCatalogue
                         {
                             FixedAmount = i.OptionalNumber("Amount") ?? 0m, Rate = i.OptionalNumber("Rate") ?? 0m, Formula = i.Optional("Formula"), Taxable = i.Flag("Taxable"), TaxTableCode = i.Optional("TaxTable"),
                             Pensionable = i.Flag("Pensionable"), SubjectToSocialSecurity = i.Flag("SocialSecurity"), OvertimeBase = i.Flag("OvertimeBase"), LeavePayBase = i.Flag("LeaveBase"),
+                            ProRated = i.Flag("ProRated"), ArrearsRecoverable = !i.Flag("NoArrears"), TerminalBenefit = i.Flag("Terminal"), UnionDues = i.Flag("Union"),
                             Group = i.Optional("Group"), BasisGroup = i.Optional("BasisGroup"), Floor = i.OptionalNumber("Floor"), Ceiling = i.OptionalNumber("Ceiling"), RoundTo = i.OptionalNumber("RoundTo"),
                             Rounding = Enum.Parse<PayRounding>(i.Text("Rounding")), ContributionExpenseAccountCode = i.Optional("Expense"), DepartmentAccounts = i.Optional("DeptAccounts"),
                             LookupVariable = i.Optional("LookupVariable"), LookupBands = i.Optional("LookupBands"),
@@ -930,7 +933,7 @@ public static partial class OperationCatalogue
             Description = "Sends part of an employee's net pay to another bank account or wallet — a fixed amount, or a percentage (e.g. 40% to mobile money); the rest goes to their main account. "
                 + "Remove takes a split off.",
             Fields = [EmployeePick("Employee", "Employee"), Pick("Method", "Paid by", Enum.GetNames<PayMethod>()), Req("Destination", "Account or wallet number"), OptNum("Amount", "Fixed amount"),
-                OptNum("Percent", "Percent of net pay"), Tick("Remove", "Remove this split")],
+                OptNum("Percent", "Percent of net pay"), Opt("Bank", "Bank of that account (blank: the employee's bank)"), Opt("Branch", "Branch of that account"), Tick("Remove", "Remove this split")],
             Run = async (c, i) =>
             {
                 long id = await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true);
@@ -954,7 +957,10 @@ public static partial class OperationCatalogue
                     throw new OperationException(problem);
                 }
 
-                c.Db.PaymentSplits.Add(new EmployeePaymentSplit(c.CompanyId, id, method, destination, i.OptionalNumber("Amount") ?? 0m, i.OptionalNumber("Percent")));
+                c.Db.PaymentSplits.Add(new EmployeePaymentSplit(c.CompanyId, id, method, destination, i.OptionalNumber("Amount") ?? 0m, i.OptionalNumber("Percent"))
+                {
+                    BankName = i.Optional("Bank")?.Trim(), BankBranch = i.Optional("Branch")?.Trim(),
+                });
                 await c.Db.SaveChangesAsync().ConfigureAwait(true);
                 return "Split saved.";
             },

@@ -54,6 +54,7 @@ internal sealed class EmployeePayElementConfiguration : IEntityTypeConfiguration
         b.Property(x => x.OverrideAmount).HasPrecision(19, 4);
         b.Property(x => x.OverrideRate).HasPrecision(19, 6);
         b.Property(x => x.Units).HasPrecision(19, 4);
+        b.Property(x => x.Balance).HasPrecision(19, 4);
         b.HasIndex(x => new { x.EmployeeId, x.PayElementId });
     }
 }
@@ -430,6 +431,8 @@ internal sealed class EmployeePaymentSplitConfiguration : IEntityTypeConfigurati
         b.Property(x => x.Destination).HasMaxLength(80);
         b.Property(x => x.Amount).HasPrecision(19, 4);
         b.Property(x => x.Percent).HasPrecision(9, 4);
+        b.Property(x => x.BankName).HasMaxLength(100);
+        b.Property(x => x.BankBranch).HasMaxLength(60);
         b.HasIndex(x => x.EmployeeId);
     }
 }

@@ -248,6 +248,7 @@ public sealed class PayrollSetupService : IPayrollSetupService
             FixedAmount = element.FixedAmount, Rate = element.Rate, Formula = Clean(element.Formula), Taxable = element.Taxable, TaxTableCode = Clean(element.TaxTableCode)?.ToUpperInvariant(),
             ContributionExpenseAccountCode = Clean(element.ContributionExpenseAccountCode)?.ToUpperInvariant(), Pensionable = element.Pensionable,
             SubjectToSocialSecurity = element.SubjectToSocialSecurity, OvertimeBase = element.OvertimeBase, LeavePayBase = element.LeavePayBase,
+            ProRated = element.ProRated, ArrearsRecoverable = element.ArrearsRecoverable, TerminalBenefit = element.TerminalBenefit, UnionDues = element.UnionDues,
             Group = Clean(element.Group)?.ToUpperInvariant(), BasisGroup = Clean(element.BasisGroup)?.ToUpperInvariant(), Floor = element.Floor, Ceiling = element.Ceiling,
             RoundTo = element.RoundTo, Rounding = element.Rounding, DepartmentAccounts = Clean(element.DepartmentAccounts),
             LookupVariable = Clean(element.LookupVariable)?.ToUpperInvariant(), LookupBands = Clean(element.LookupBands),
@@ -315,7 +316,7 @@ public sealed class PayrollSetupService : IPayrollSetupService
     }
 
     /// <inheritdoc />
-    public async Task<Result> AssignElementAsync(long companyId, string employeeNumber, string elementCode, decimal? overrideAmount = null, decimal? overrideRate = null, decimal? units = null,
+    public async Task<Result> AssignElementAsync(long companyId, string employeeNumber, string elementCode, decimal? overrideAmount, decimal? overrideRate, decimal? units, decimal? balance,
         CancellationToken ct = default)
     {
         if (await EmployeeAsync(companyId, employeeNumber, ct).ConfigureAwait(false) is not Employee employee)
@@ -335,7 +336,12 @@ public sealed class PayrollSetupService : IPayrollSetupService
             return Result.Failure(Error.Conflict("Payroll.ElementAssigned", $"{employee.EmployeeNumber} already has {key}; end it first to change it."));
         }
 
-        employee.AssignPayElement(element.Id, overrideAmount, overrideRate, units);
+        if (element.Basis == CalculationBasis.BalanceDriven && balance is not > 0m)
+        {
+            return Result.Failure(Error.Validation("Payroll.BalanceRequired", $"{key} recovers a balance: give the balance to recover."));
+        }
+
+        employee.AssignPayElement(element.Id, overrideAmount, overrideRate, units, element.Basis == CalculationBasis.BalanceDriven ? balance : null);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }

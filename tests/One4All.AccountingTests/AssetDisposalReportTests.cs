@@ -48,7 +48,7 @@ public sealed class AssetDisposalReportTests
             IFixedAssetService fa = scope.ServiceProvider.GetRequiredService<IFixedAssetService>();
             var disposal = await fa.DisposeAsync(companyId, assetId, 1_200m, new DateOnly(2026, 2, 1), "1100", "7300", "7400", "DISP-J1");
             disposal.IsSuccess.Should().BeTrue(disposal.IsFailure ? disposal.Error.ToString() : null);
-            disposal.Value.GainOrLoss.Should().Be(200m);
+            disposal.Value.GainOrLoss.Should().Be(400m, "January and February (100 a month) are charged by the disposal, leaving a carrying amount of 800");
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
@@ -57,11 +57,11 @@ public sealed class AssetDisposalReportTests
             var rows = await vertical.GetRowsAsync(companyId, "AssetDisposals", new Dictionary<string, object?>());
             rows.Should().ContainSingle(r => (string)r["AssetNumber"]! == "DISP-1");
             rows.Single()["Proceeds"].Should().Be(1_200m);
-            rows.Single()["GainOrLoss"].Should().Be(200m);
+            rows.Single()["GainOrLoss"].Should().Be(400m);
 
             IReportRunner runner = scope.ServiceProvider.GetRequiredService<IReportRunner>();
             string html = Encoding.UTF8.GetString((await runner.RenderAsync(companyId, "FA-DISP", new Dictionary<string, object?>(), ReportFormat.Html)).Value.Content);
-            html.Should().Contain("DISP-1").And.Contain("1,200.00").And.Contain("200.00");
+            html.Should().Contain("DISP-1").And.Contain("1,200.00").And.Contain("400.00");
         }
     }
 }

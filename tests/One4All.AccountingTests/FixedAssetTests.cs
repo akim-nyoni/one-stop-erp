@@ -59,11 +59,12 @@ public sealed class FixedAssetTests
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             IFixedAssetService fa = scope.ServiceProvider.GetRequiredService<IFixedAssetService>();
-            // After 3 months: accumulated 3,000, NBV 21,000. Sell for 22,000 → gain 1,000.
+            // After 3 months accumulated is 3,000; the disposal on 1 April charges April too (a full month under the full-month convention), so the
+            // carrying amount at the date is 20,000. Sell for 22,000 → gain 2,000.
             var disp = await fa.DisposeAsync(companyId, assetId, 22_000m, new DateOnly(2026, 4, 1), "1100", "7300", "7400", "DISP-1");
             disp.IsSuccess.Should().BeTrue(disp.IsFailure ? disp.Error.ToString() : null);
-            disp.Value.NetBookValue.Should().Be(21_000m);
-            disp.Value.GainOrLoss.Should().Be(1_000m);
+            disp.Value.NetBookValue.Should().Be(20_000m);
+            disp.Value.GainOrLoss.Should().Be(2_000m);
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
@@ -73,8 +74,8 @@ public sealed class FixedAssetTests
             tb.IsBalanced.Should().BeTrue();
             // Cost and accumulated depreciation fully cleared on disposal.
             tb.Rows.Should().NotContain(r => r.AccountCode == "1600" && (r.Debit != 0m || r.Credit != 0m));
-            tb.Rows.Should().Contain(r => r.AccountCode == "7300" && r.Credit == 1_000m);
-            tb.Rows.Should().Contain(r => r.AccountCode == "6000" && r.Debit == 3_000m);
+            tb.Rows.Should().Contain(r => r.AccountCode == "7300" && r.Credit == 2_000m);
+            tb.Rows.Should().Contain(r => r.AccountCode == "6000" && r.Debit == 4_000m, "three runs plus the disposal month charged in the disposal journal");
         }
     }
 }

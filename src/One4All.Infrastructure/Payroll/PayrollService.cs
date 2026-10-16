@@ -193,8 +193,11 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
             slips.Add(slip.Value);
 
-            // Recoveries (staff purchases, rent) carry their own balances, so only ordinary deductions build up arrears.
-            arrearEntries.AddRange(ArrearEntries(companyId, employee, periodLabel, documentNumber, payDate, [.. outcomes.Where(o => !recoveryCodes.Contains(o.Code))], arrears[employee.Id], floor));
+            // Recoveries (staff purchases, rent) carry their own balances, and an element not flagged arrears-recoverable is simply not taken this
+            // period, so only ordinary, arrears-recoverable deductions build up arrears.
+            HashSet<string> noArrears = new(elements.Values.Where(e => !e.ArrearsRecoverable).Select(e => e.Code), StringComparer.OrdinalIgnoreCase);
+            arrearEntries.AddRange(ArrearEntries(companyId, employee, periodLabel, documentNumber, payDate, [.. outcomes.Where(o => !recoveryCodes.Contains(o.Code) && !noArrears.Contains(o.Code))],
+                arrears[employee.Id], floor));
         }
 
         return new PreparedRun(company, periodLabel, slips, arrearEntries, elements);
@@ -259,6 +262,14 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         decimal totalDeductions = 0m;
         decimal totalNet = 0m;
 
+        // Balance-driven elements: what a committed run deducts comes off the employee's balance for the element.
+        Dictionary<string, PayElement> balanceDriven = elements.Values.Where(e => e.Basis == CalculationBasis.BalanceDriven).ToDictionary(e => e.Code, StringComparer.OrdinalIgnoreCase);
+        List<long> slipEmployeeIds = [.. slips.Select(s => s.EmployeeId).Distinct()];
+        Dictionary<(long EmployeeId, long ElementId), EmployeePayElement> balances = balanceDriven.Count == 0 ? []
+            : (await _db.Set<Employee>().Include(e => e.PayElements).Where(e => slipEmployeeIds.Contains(e.Id)).ToListAsync(ct).ConfigureAwait(false))
+                .SelectMany(e => e.PayElements.Where(a => balanceDriven.Values.Any(b => b.Id == a.PayElementId)).Select(a => (e.Id, a)))
+                .ToDictionary(x => (x.Id, x.a.PayElementId), x => x.a);
+
         List<long> loanIds = [.. slips.SelectMany(s => s.Lines).Select(l => LoanIdOf(l.ElementCode)).OfType<long>().Distinct()];
         Dictionary<long, EmployeeLoan> loansById = loanIds.Count == 0 ? [] : await _db.EmployeeLoans.Where(l => loanIds.Contains(l.Id)).ToDictionaryAsync(l => l.Id, ct).ConfigureAwait(false);
         foreach (Payslip payslip in slips)
@@ -294,6 +305,11 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                     }
 
                     continue;
+                }
+
+                if (line.Amount > 0m && balanceDriven.TryGetValue(line.ElementCode, out PayElement? drawn) && balances.TryGetValue((payslip.EmployeeId, drawn.Id), out EmployeePayElement? held))
+                {
+                    held.Draw(line.Amount);
                 }
 
                 // Memo lines (benefits in kind, notes) are neither paid nor posted.
@@ -432,7 +448,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         vars[TaxableByCurrencyKey] = taxableByCurrency;
 
         // The bases flagged earnings build up (pensionable pay, the social security base…) and each element group's total.
-        foreach (string basis in new[] { "PENSIONABLE", "SOCIALSECURITYBASE", "OVERTIMEBASE", "LEAVEBASE" })
+        foreach (string basis in new[] { "PENSIONABLE", "SOCIALSECURITYBASE", "OVERTIMEBASE", "LEAVEBASE", "UNIONBASE", "TERMINALBASE" })
         {
             vars[basis] = 0m;
         }
@@ -484,6 +500,13 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
             decimal amount = element.ApplyLimits(resolved.Value);
             List<string> workings = [variable?.Amount is decimal keyed ? $"keyed for the period: {Money(keyed)}" : Workings(element, assignment, vars)];
+
+            // A pro-rated earning follows the days employed in the period, as basic does (a keyed amount is taken as it is).
+            if (element.ProRated && element.Type == PayElementType.Earning && variable?.Amount is null && share < 1m)
+            {
+                amount = decimal.Round(amount * share, 2, MidpointRounding.AwayFromZero);
+                workings.Add($"× {worked}/{inPeriod} days");
+            }
             if (decimal.Round(resolved.Value, 2, MidpointRounding.ToEven) != amount)
             {
                 workings.Add($"{Money(resolved.Value)} → {Money(amount)} by the element's floor / ceiling / rounding");
@@ -512,6 +535,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                     Accumulate(element.SubjectToSocialSecurity, "SOCIALSECURITYBASE");
                     Accumulate(element.OvertimeBase, "OVERTIMEBASE");
                     Accumulate(element.LeavePayBase, "LEAVEBASE");
+                    Accumulate(element.UnionDues, "UNIONBASE");
+                    Accumulate(element.TerminalBenefit, "TERMINALBASE");
                     Accumulate(!string.IsNullOrWhiteSpace(element.Group), GroupVariable(element.Group));
                     if (element.Taxable)
                     {
@@ -617,6 +642,9 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         {
             case CalculationBasis.FixedAmount:
                 return assignment.OverrideAmount ?? element.FixedAmount;
+            case CalculationBasis.BalanceDriven:
+                // The period's amount, never more than what is left of the employee's balance for the element.
+                return Math.Max(0m, Math.Min(assignment.OverrideAmount ?? element.FixedAmount, assignment.Balance ?? 0m));
             case CalculationBasis.PercentOfBasic:
                 return basic * rate / 100m;
             case CalculationBasis.PercentOfGross:

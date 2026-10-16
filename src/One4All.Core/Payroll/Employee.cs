@@ -187,9 +187,9 @@ public sealed class Employee : SoftDeletableEntity, ICompanyScoped
     /// <param name="overrideRate">An override rate, if any.</param>
     /// <param name="units">Units for a rate-per-unit element, if any.</param>
     /// <returns>The created assignment.</returns>
-    public EmployeePayElement AssignPayElement(long payElementId, decimal? overrideAmount = null, decimal? overrideRate = null, decimal? units = null)
+    public EmployeePayElement AssignPayElement(long payElementId, decimal? overrideAmount = null, decimal? overrideRate = null, decimal? units = null, decimal? balance = null)
     {
-        EmployeePayElement assignment = new(payElementId, overrideAmount, overrideRate, units);
+        EmployeePayElement assignment = new(payElementId, overrideAmount, overrideRate, units, balance);
         _payElements.Add(assignment);
         return assignment;
     }
@@ -326,14 +326,22 @@ public sealed class EmployeePayElement : Entity
     /// <param name="overrideAmount">An override fixed amount, if any.</param>
     /// <param name="overrideRate">An override rate, if any.</param>
     /// <param name="units">Units for a rate-per-unit element, if any.</param>
-    public EmployeePayElement(long payElementId, decimal? overrideAmount, decimal? overrideRate, decimal? units)
+    public EmployeePayElement(long payElementId, decimal? overrideAmount, decimal? overrideRate, decimal? units, decimal? balance = null)
     {
         PayElementId = payElementId;
         OverrideAmount = overrideAmount;
         OverrideRate = overrideRate;
         Units = units;
+        Balance = balance;
         IsActive = true;
     }
+
+    /// <summary>Gets the balance still to recover for a balance-driven element (an advance, a deposit); null for other elements.</summary>
+    public decimal? Balance { get; private set; }
+
+    /// <summary>Takes a period's deduction off the balance (never below nil).</summary>
+    /// <param name="amount">The amount deducted.</param>
+    public void Draw(decimal amount) => Balance = Balance is decimal balance ? Math.Max(0m, balance - amount) : null;
 
     /// <summary>The owning employee id.</summary>
     public long EmployeeId { get; private set; }

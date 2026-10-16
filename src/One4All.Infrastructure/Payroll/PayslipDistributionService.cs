@@ -3,6 +3,7 @@ using One4All.Application.Abstractions.Communications;
 using One4All.Application.Abstractions.Payroll;
 using One4All.Application.Documents;
 using One4All.Application.Payroll;
+using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.Communications;
 using One4All.Core.Payroll;
@@ -214,6 +215,29 @@ internal static class StoredPayslips
             .OrderBy(b => b.LeaveType, StringComparer.Ordinal).Select(b => (b.LeaveType, b.BalanceDays))];
         List<(string, decimal)> loans = [.. (await db.EmployeeLoans.AsNoTracking().Where(l => l.EmployeeId == employee.Id && l.Outstanding > 0m).ToListAsync(ct).ConfigureAwait(false))
             .OrderBy(l => l.Reference, StringComparer.Ordinal).Select(l => (l.Reference, l.Outstanding))];
+        // Net pay by currency: earnings paid in another currency go out in it at the pay date's rate; the rest in the base currency.
+        Dictionary<string, CurrencyCode> paidIn = await db.PayElements.AsNoTracking().Where(e => e.CompanyId == employee.CompanyId && e.PaidInCurrency != null)
+            .ToDictionaryAsync(e => e.Code, e => e.PaidInCurrency!.Value, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
+        CurrencyCode baseCurrency = await db.Companies.Where(c => c.Id == employee.CompanyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+        List<(string Currency, decimal Amount, decimal BaseAmount, decimal Rate)> byCurrency = [];
+        decimal netLeft = slips.Sum(p => p.NetPay);
+        foreach (IGrouping<CurrencyCode, PayslipLine> foreign in lines.Where(l => l.Type == PayElementType.Earning && paidIn.TryGetValue(l.ElementCode, out CurrencyCode c) && c != baseCurrency)
+            .GroupBy(l => paidIn[l.ElementCode]).OrderBy(g => g.Key.Value, StringComparer.Ordinal))
+        {
+            decimal portion = Math.Min(foreign.Sum(l => l.Amount), netLeft);
+            decimal? rate = portion > 0m ? await Accounting.ExchangeRateResolver.FindAsync(db, foreign.Key, baseCurrency, ExchangeRateType.Daily, payDate, ct).ConfigureAwait(false) : null;
+            if (portion > 0m && rate is > 0m)
+            {
+                byCurrency.Add((foreign.Key.Value, decimal.Round(portion / rate.Value, 2, MidpointRounding.AwayFromZero), portion, rate.Value));
+                netLeft -= portion;
+            }
+        }
+
+        if (byCurrency.Count > 0)
+        {
+            byCurrency.Insert(0, (baseCurrency.Value, netLeft, netLeft, 1m));
+        }
+
         string? paidBy = employee.PaymentMethod switch
         {
             PayMethod.BankTransfer when employee.BankAccountNumber is { Length: > 0 } account => $"Paid by bank transfer to {employee.BankName} …{(account.Length > 4 ? account[^4..] : account)}",
@@ -230,7 +254,7 @@ internal static class StoredPayslips
             NetPay = slips.Sum(p => p.NetPay), EmployerContributions = Items(PayElementType.EmployerContribution), MemoItems = Items(PayElementType.Memo), PaidBy = paidBy,
             TaxablePay = Taxable(lines), TaxDeducted = Tax(lines),
             YearToDate = (year.Sum(p => p.GrossEarnings), Taxable(year.SelectMany(p => p.Lines)), Tax(year.SelectMany(p => p.Lines)), year.Sum(p => p.NetPay)),
-            LeaveBalances = leave, LoanBalances = loans,
+            LeaveBalances = leave, LoanBalances = loans, NetPayByCurrency = byCurrency,
         });
     }
 }

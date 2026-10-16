@@ -38,22 +38,26 @@ public sealed class BankFileTests
             "T|{Count}|{Hash}"))).IsSuccess.Should().BeTrue();
 
         PayElement basic = new(companyId, "BASIC", "Basic Salary", PayElementType.Earning, CalculationBasis.Formula, 1, "6100") { Formula = "BASIC", Taxable = true };
-        db.PayElements.Add(basic);
+        PayElement euro = new(companyId, "EURALLOW", "Allowance paid in EUR", PayElementType.Earning, CalculationBasis.FixedAmount, 2, "6100") { FixedAmount = 220m, PaidInCurrency = Scenario.Eur };
+        db.PayElements.AddRange(basic, euro);
         await db.SaveChangesAsync();
         Employee ann = new(companyId, "EF-1", "Ann Bank", 1000m, new DateOnly(2025, 1, 1)) { BankName = "First Bank", BankBranch = "B1", BankAccountNumber = "111" };
         Employee bob = new(companyId, "EF-2", "Bob Second", 2000m, new DateOnly(2025, 1, 1)) { BankName = "Second Bank", BankAccountNumber = "222" };
         Employee held = new(companyId, "EF-3", "Hal Held", 900m, new DateOnly(2025, 1, 1)) { BankName = "First Bank", BankAccountNumber = "444" };
         Employee wallet = new(companyId, "EF-4", "Mo Wallet", 800m, new DateOnly(2025, 1, 1)) { PaymentMethod = PayMethod.MobileMoney, MobileMoneyNumber = "0771" };
         Employee eve = new(companyId, "EF-5", "Eve Late", 700m, new DateOnly(2025, 1, 1)) { BankName = "First Bank" };
+        Employee cy = new(companyId, "EF-6", "Cy Expat", 1000m, new DateOnly(2025, 1, 1)) { BankName = "Second Bank", BankBranch = "S2", BankAccountNumber = "666" };
         held.HoldSalary("Query on attendance");
-        foreach (Employee e in new[] { ann, bob, held, wallet, eve })
+        foreach (Employee e in new[] { ann, bob, held, wallet, eve, cy })
         {
             e.AssignPayElement(basic.Id);
         }
 
-        db.Employees.AddRange(ann, bob, held, wallet, eve);
+        cy.AssignPayElement(euro.Id);
+        db.Employees.AddRange(ann, bob, held, wallet, eve, cy);
         await db.SaveChangesAsync();
-        db.PaymentSplits.Add(new EmployeePaymentSplit(companyId, bob.Id, PayMethod.BankTransfer, "333", 500m));
+        // Bob sends 500 to an account at another bank; Cy earns a EUR allowance (220 base at 1.10 = EUR 200) on top of a base-currency salary.
+        db.PaymentSplits.Add(new EmployeePaymentSplit(companyId, bob.Id, PayMethod.BankTransfer, "333", 500m) { BankName = "Third Bank", BankBranch = "T3" });
         await db.SaveChangesAsync();
         (await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-09", new DateOnly(2026, 9, 25), "2420", "EF-09")).IsSuccess.Should().BeTrue();
 
@@ -62,10 +66,19 @@ public sealed class BankFileTests
         eve.BankAccountNumber = "555";
         await db.SaveChangesAsync();
         IReadOnlyList<BankFileOutput> payroll = (await files.PayrollFilesAsync(companyId, "EF-09", "FBK")).Value;
-        payroll.Select(f => (f.Bank, f.Count, f.Total, f.Hash)).Should().Equal(("First Bank", 2, 1700m, 666L), ("Second Bank", 2, 2000m, 555L));
+
+        // One file per bank and currency: Cy's EUR allowance goes to Second Bank in EUR; Bob's split goes to Third Bank; the rest in USD per bank.
+        payroll.Select(f => (f.Bank, f.Currency, f.Count, f.Total)).Should().Equal(
+            ("First Bank", "USD", 2, 1700m), ("Second Bank", "EUR", 1, 200m), ("Second Bank", "USD", 2, 2500m), ("Third Bank", "USD", 1, 500m));
         payroll[0].Content.Should().Be($"H|20260925|{originator}|2|1700.00\r\nD|1|2026-09 EF-1|Ann Bank    |B1|111|0000100000\r\nD|2|2026-09 EF-5|Eve Late    ||555|0000070000\r\nT|2|666\r\n");
-        payroll[1].Content.Should().Contain("D|1|2026-09 EF-2|Bob Second  ||333|0000050000\r\nD|2|2026-09 EF-2|Bob Second  ||222|0000150000\r\n");
-        payroll[0].FileName.Should().Be("EF-09-First_Bank-USD.txt");
+        payroll[1].Content.Should().Contain("D|1|2026-09 EF-6|Cy Expat    |S2|666|0000020000\r\n");
+        payroll[2].Content.Should().Contain("D|1|2026-09 EF-2|Bob Second  ||222|0000150000\r\nD|2|2026-09 EF-6|Cy Expat    |S2|666|0000100000\r\n");
+        payroll[3].Content.Should().Contain("D|1|2026-09 EF-2|Bob Second  |T3|333|0000050000\r\n");
+        payroll.Select(f => f.FileName).Should().Equal("EF-09-First_Bank-USD.txt", "EF-09-Second_Bank-EUR.txt", "EF-09-Second_Bank-USD.txt", "EF-09-Third_Bank-USD.txt");
+
+        // Cy's payslip says how the net pay goes out: USD 1,000 and EUR 200 at 1.10.
+        string payslip = One4All.Application.Payroll.PayslipFormatter.ToPlainText(new One4All.Application.Payroll.PayslipDocument { NetPay = 1220m, NetPayByCurrency = [("USD", 1000m, 1000m, 1m), ("EUR", 200m, 220m, 1.1m)] });
+        payslip.Should().Contain("in USD").And.Contain("1,000.00").And.Contain("in EUR at 1.1 (220.00)").And.Contain("200.00");
 
         // A supplier payment run in the same layout; an unknown layout is refused before anything is paid.
         Supplier supplier = new(companyId, "EF-SUP", "Paper Mill", Scenario.Usd) { BankName = "First Bank", BankAccountNumber = "9876543" };

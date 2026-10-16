@@ -328,6 +328,12 @@ public sealed class EmployeePaymentSplit : Entity, ICompanyScoped
     /// <summary>Gets the share of net pay sent there (null: the fixed amount).</summary>
     public decimal? Percent { get; private set; }
 
+    /// <summary>The bank the destination account is at, when it is not the employee's main bank (the bank file for that bank carries the split).</summary>
+    public string? BankName { get; set; }
+
+    /// <summary>The branch of the destination account, when the split has its own bank.</summary>
+    public string? BankBranch { get; set; }
+
     /// <summary>What this split takes from a net pay: its percentage of it, or its fixed amount.</summary>
     /// <param name="netPay">The net pay.</param>
     /// <returns>The amount (before what is left limits it).</returns>

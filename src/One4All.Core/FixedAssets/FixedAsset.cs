@@ -29,6 +29,9 @@ public enum DepreciationConvention
 
     /// <summary>The first month is charged for the days held (from the acquisition day to the month end).</summary>
     DailyProRata = 3,
+
+    /// <summary>Half a year's depreciation in the year of acquisition whatever the month (the rest of that year's months share it), then full years.</summary>
+    MidYear = 4,
 }
 
 /// <summary>Why a depreciation run passed over an asset.</summary>
@@ -260,6 +263,12 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
             charge = decimal.Round(charge * share, 4, MidpointRounding.ToEven);
         }
 
+        // Half-year convention: the acquisition year carries six months' charge spread over the months from acquisition to its end.
+        if (Convention == DepreciationConvention.MidYear && runDate is DateOnly inYear && inYear.Year == AcquisitionDate.Year && Method != DepreciationMethod.UnitsOfProduction)
+        {
+            charge = decimal.Round(charge * 6m / (13 - AcquisitionDate.Month), 4, MidpointRounding.ToEven);
+        }
+
         decimal remaining = NetBookValue - ResidualValue;
         if (remaining <= 0m)
         {
@@ -316,6 +325,16 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Marks the asset disposed.</summary>
     public void Dispose() => Status = FixedAssetStatus.Disposed;
+
+    /// <summary>The share of the disposal month's charge due up to the disposal date, by the convention (a full month; half of a month after the 15th; the days held).</summary>
+    /// <param name="disposalDate">The disposal date.</param>
+    /// <returns>The share (0–1).</returns>
+    public decimal DisposalMonthShare(DateOnly disposalDate) => Convention switch
+    {
+        DepreciationConvention.MidMonth => disposalDate.Day > 15 ? 1m : 0m,
+        DepreciationConvention.DailyProRata => (decimal)disposalDate.Day / DateTime.DaysInMonth(disposalDate.Year, disposalDate.Month),
+        _ => 1m,
+    };
 
     /// <summary>
     /// Revalues the asset by adjusting its gross cost by <paramref name="delta"/> (a positive uplift or a

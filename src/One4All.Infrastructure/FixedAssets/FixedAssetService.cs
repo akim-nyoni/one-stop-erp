@@ -408,6 +408,31 @@ public sealed class FixedAssetService : IFixedAssetService
             return Error.NotFound("Fa.CompanyNotFound", $"Company {companyId} not found.");
         }
 
+        // Depreciation is charged up to the disposal (brief §4.14): every month from the last one charged to the disposal month — that month by
+        // the asset's convention — goes into the disposal journal before the asset is cleared, so the gain or loss is on the carrying amount at the date.
+        decimal caughtUp = 0m;
+        if (asset.Status == FixedAssetStatus.Active && asset.Method != DepreciationMethod.UnitsOfProduction)
+        {
+            DateOnly month = asset.LastDepreciatedPeriod is int last ? new DateOnly(last / 100, last % 100, 1).AddMonths(1) : new DateOnly(asset.AcquisitionDate.Year, asset.AcquisitionDate.Month, 1);
+            for (; FixedAsset.PeriodOf(month) <= FixedAsset.PeriodOf(date) && asset.Status == FixedAssetStatus.Active; month = month.AddMonths(1))
+            {
+                if (FixedAsset.PeriodOf(month) < asset.FirstChargePeriod())
+                {
+                    continue;
+                }
+
+                decimal share = FixedAsset.PeriodOf(month) == FixedAsset.PeriodOf(date) ? asset.DisposalMonthShare(date) : 1m;
+                decimal charge = decimal.Round(asset.MonthlyDepreciation(0m, month) * share, 2, MidpointRounding.AwayFromZero);
+                if (charge <= 0m)
+                {
+                    break;
+                }
+
+                asset.ApplyDepreciation(charge, month);
+                caughtUp += charge;
+            }
+        }
+
         decimal nbv = asset.NetBookValue;
         decimal gainOrLoss = proceeds - nbv;
 
@@ -418,6 +443,12 @@ public sealed class FixedAssetService : IFixedAssetService
             new JournalLineRequest { AccountCode = asset.AccumulatedDepreciationAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Debit, TransactionAmount = asset.AccumulatedDepreciation },
             new JournalLineRequest { AccountCode = asset.CostAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Credit, TransactionAmount = asset.Cost },
         ];
+
+        if (caughtUp > 0m)
+        {
+            lines.Insert(0, new JournalLineRequest { AccountCode = asset.DepreciationExpenseAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Debit, TransactionAmount = caughtUp, Narrative = $"Depreciation to {date:yyyy-MM-dd}" });
+            lines.Insert(1, new JournalLineRequest { AccountCode = asset.AccumulatedDepreciationAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Credit, TransactionAmount = caughtUp, Narrative = $"Depreciation to {date:yyyy-MM-dd}" });
+        }
 
         if (gainOrLoss > 0m)
         {
