@@ -3,46 +3,40 @@
 Since 2026-10-14 the shell is organised **by business module, in plain language**, after user testing showed the Sage-style
 "kind of work first" menus were hard to follow. The source of truth is `One4All.Desktop/Navigation/NavigationMap.cs`.
 
-## Layout regions
+## Layout regions (Explorer, modelled on Sage 200 Evolution — user request 2026-10-16)
 
 ```
-┌───────────────────────────────────────────────────────────────────────────┐
-│ File  Modules  Maintenance  Transactions  Enquiries  Utilities  Reports  View  Help │
-├───────────────────────────────────────────────────────────────────────────┤
-│ 🏠 Home   🔍 [ What do you want to do?  e.g. "add a product" ]  (Ctrl+F)        │
-├──────────────────┬────────────────────────────────────────────────────────┤
-│ Module list      │  Home: one card per module (icon, name, what it is for) │
-│ ▸ Sales & Cust.  │                                                          │
-│ ▾ Accounting ◀lit│  Module page — Home › Accounting                         │
-│   ▸ Maintenance  │  Open screens: [📒 Add an account ✕] [🧾 Journal ✕]  Close all │
-│   ▸ Transactions │   ┌ ⚙ Maintenance — setting up ─────────── 11 screens ┐ │
-│   ▸ Enquiries    │   │ [Add an account] [Add a cost centre] [Tax code] … │ │
-│   ▸ Utilities    │   ┌ 📝 Transactions — day-to-day ────────── 7 screens ┐ │
-│ ▸ Housing        │   │ [Post a journal] [Recurring journals] …           │ │
-└──────────────────┴────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ File  View  Modules  Maintenance  Transactions  Reports  Enquiries  Utilities  Help │
+│ ⏻ Exit  ⬆ Home │ ◀ Back ▶ Forward │ ⭐ Favourites ▾            Search [________] 🔎 │
+├────────────────┬────────────────────────────────────────────────────────────┤
+│ Filter: [____] │ [Home] [Sales & Customers ×] [Customers ×]   ← document tabs │
+│ ▸ Sales & Cust.│ ┌ Related Tasks ┐ ┌ Maintenance (green)  Transactions (red) ┐ │
+│   Maintenance  │ │ tile  tile    │ │ tile tile tile       tile tile tile    │ │
+│   Transactions │ │ tile  tile    │ │ tile tile            tile tile         │ │
+│   Enquiries    │ └───────────────┘ └────────────────────────────────────────┘ │
+│   Utilities    │  …or a list tab: [➕ Add a customer…] [🔄 Refresh] [📝 History] 🔍 │
+│ ▸ Accounting   │   grid of records ……………………………………………  10 records              │
+├────────────────┴────────────────────────────────────────────────────────────┤
+│ Ready.                                        Demo Council & Trading  👤 Admin │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Behaviour rules
 
-- **20 modules** (Sales & Customers, Purchases & Suppliers, Stock & Products, Point of Sale, Restaurant, Accounting, Cash & Banking,
-  Cashiering, Budgets, Fixed Assets, HR & Payroll, Municipality, Housing, Projects & Contracts, Weighbridge, Schools, CRM, Approvals,
-  Reports, Administration), each with plain-language **groups** of screens (`NavigationMap`).
-- **A module page shows every one of its screens, labelled by kind of work**: a section each for Maintenance (setting up), Transactions
-  (day-to-day), Enquiries (looking up) and Utilities (period end and housekeeping) — `NavModule.Categories` — with the group as a chip on each
-  screen card. Choosing a kind of work (sidebar, menu, search) scrolls the page to that section.
-- **The sidebar** is Module ▸ kind of work ▸ screen; the module shown is lit (bar in its colour, bold title) and rows highlight on hover.
-- **Every screen opens in its own window** (`OperationsWindow` hosting `OperationsView`, or the dedicated window), so several can be worked on
-  at once; the **Open screens** bar on the page lists them — click a chip to bring that window to the front, ✕ to close it, "Close all".
-- Menus are multi-level: **Modules ▸ module ▸ kind of work ▸ (group ▸) screen**, and **Maintenance / Transactions / Enquiries / Utilities ▸ module ▸ screen**.
-- **Learnability rules**: the Home page starts with a *Quick start* row of everyday tasks; a screen whose first step is a precondition
-  (open the till, open a cashier session) shows that step in place with its controls and a one-line guide; code boxes are lookups
-  (`Ops.CustomerPick` etc.: pick "CODE — Name" or type the code); required boxes are starred.
-- The **search box** finds any screen by what it does (every typed word must match; plurals match singulars); Enter opens the first hit.
-- Data-driven and gated: entries a user's **licence and permissions** do not cover are hidden; empty sections and modules disappear.
-- Any console action the map does not name falls into its module's **More** group; `NavigationBuilder.Unresolved` lists map entries whose
-  action no longer exists (keep it empty).
-- Adding a screen: place it in `NavigationMap` under the right module and group with a plain title; a new window also needs a key in
-  `ShellWindow.OpenEntry`.
+- **20 modules** with plain-language groups of screens (`NavigationMap`), each screen with a kind of work: Maintenance (green), Transactions (red),
+  Enquiries (blue), Utilities (purple) — `NavCategory.BrushFor`.
+- **Tree**: module ▸ kind of work ▸ screen. The Filter box narrows it to screens whose name (or group) contains the text. Selecting a module or a
+  kind opens the module's tab; double-click / Enter on a screen opens it.
+- **Tabs**: Home (Quick start tiles, module tiles); a module page (`ModulePage`: Related Tasks = its everyday screens; the kinds of work side by
+  side, tiles icon-above-label); a screen's **list** (`OperationsListView`: Add…, Refresh, History, search, grid, record count). × / middle-click /
+  Ctrl+W closes a tab; Back / Forward walk the tabs visited; Favourites pins list screens (per user, `%AppData%\One4Allavourites.txt`).
+- **Forms open in their own window** (`OperationsWindow` hosting `OperationsView`): Add… on a list, or a screen without a list, or a dedicated
+  window (till, teller, approvals…). A form and its list share one `OperationsViewModel`, so the list refreshes when the form saves.
+- Learnability: the till and teller show their first step in place (guide strip); code boxes are lookups (`Ops.CustomerPick` etc.); required boxes
+  are starred; the status bar shows the chosen screen's purpose.
+- Data-driven and gated: licence and permissions hide what the user may not use; `NavigationBuilder.Unresolved` must stay empty.
+- Adding a screen: place it in `NavigationMap` under the right module and group; a new window also needs a key in `ShellWindow.OpenEntry`.
 
 ## MVVM constraint (brief §2.2)
 

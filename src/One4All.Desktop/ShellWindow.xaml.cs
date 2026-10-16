@@ -1,22 +1,24 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using One4All.Desktop.Navigation;
 using One4All.Desktop.ViewModels;
 
 namespace One4All.Desktop;
 
-/// <summary>A screen open in its own window, listed on the shell's "Open screens" bar.</summary>
-/// <param name="Entry">The screen.</param>
-/// <param name="Window">Its window.</param>
-public sealed record OpenScreen(Navigation.NavEntry Entry, Window Window);
-
 /// <summary>
-/// The main shell window: menus, a search box, the module list and the page — Home (the modules) or a module (every screen by kind of work).
-/// Each screen opens in its own window; the "Open screens" bar lists them to jump between.
+/// The Explorer: menus; a toolbar with Exit, Back / Forward, Favourites and Search; the tree (module ▸ kind of work ▸ screen) with a filter;
+/// and document tabs — Home, each module's page, and each list opened. A screen's list opens as a tab; its form opens in a window of its own.
 /// </summary>
-public partial class ShellWindow : Window, System.ComponentModel.INotifyPropertyChanged
+public partial class ShellWindow : Window
 {
     private readonly IServiceProvider _services;
     private readonly IdleLock _idleLock;
+    private readonly List<TabItem> _history = [];
+    private int _historyAt = -1;
+    private bool _navigating;
 
     /// <summary>Gets the command that locks the session (Ctrl+L).</summary>
     public static RoutedCommand LockCommand { get; } = new(nameof(LockCommand), typeof(ShellWindow));
@@ -24,11 +26,8 @@ public partial class ShellWindow : Window, System.ComponentModel.INotifyProperty
     /// <summary>Gets the command that puts the cursor in the search box (Ctrl+F).</summary>
     public static RoutedCommand SearchCommand { get; } = new(nameof(SearchCommand), typeof(ShellWindow));
 
-    /// <summary>Gets the screens open in their own windows.</summary>
-    public System.Collections.ObjectModel.ObservableCollection<OpenScreen> OpenScreens { get; } = [];
-
-    /// <summary>Gets a value indicating whether any screen is open.</summary>
-    public bool HasOpenScreens => OpenScreens.Count > 0;
+    /// <summary>Gets the command that closes the tab shown (Ctrl+W).</summary>
+    public static RoutedCommand CloseTabCommand { get; } = new(nameof(CloseTabCommand), typeof(ShellWindow));
 
     /// <summary>Creates the shell window bound to a session view model.</summary>
     /// <param name="viewModel">The shell view model.</param>
@@ -39,32 +38,28 @@ public partial class ShellWindow : Window, System.ComponentModel.INotifyProperty
         DataContext = viewModel;
         InitializeComponent();
         BuildMenus(viewModel);
-
-        OpenScreens.CollectionChanged += (_, _) => NotifyOpenScreens();
-
-        // Going to a module (from the tree, a card, the back button or search) starts its page at the top; a kind of work scrolls to its section.
-        viewModel.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(ShellViewModel.SelectedModule))
-            {
-                PageScroller.ScrollToTop();
-            }
-        };
-        viewModel.CategoryRequested += category =>
-        {
-            Dispatcher.BeginInvoke(() =>
-            {
-                ModuleSections.UpdateLayout();
-                if (ModuleSections.ItemContainerGenerator.ContainerFromItem(category) is FrameworkElement section)
-                {
-                    Point at = section.TranslatePoint(new Point(0, 0), PageScroller);
-                    PageScroller.ScrollToVerticalOffset(PageScroller.VerticalOffset + at.Y - 8);
-                }
-            }, System.Windows.Threading.DispatcherPriority.Loaded);
-        };
+        LoadFavourites(viewModel);
         FlowDirection = Localization.UiText.Direction;
         StartLicenceChecks(viewModel);
         _idleLock = new IdleLock(services);
+        Loaded += async (_, _) => await ShowCompanyAsync(viewModel).ConfigureAwait(true);
+        Remember(HomeTab);
+    }
+
+    // The company in the status bar: the first the user's data scope reaches.
+    private async Task ShowCompanyAsync(ShellViewModel viewModel)
+    {
+        try
+        {
+            using IServiceScope scope = _services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<Infrastructure.Persistence.One4AllDbContext>();
+            string? name = await db.Companies.OrderBy(c => c.Id).Select(c => c.Name).FirstOrDefaultAsync().ConfigureAwait(true);
+            viewModel.SetCompany(name ?? "No company yet");
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or Npgsql.NpgsqlException)
+        {
+            viewModel.SetCompany(string.Empty);
+        }
     }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
@@ -250,22 +245,26 @@ public partial class ShellWindow : Window, System.ComponentModel.INotifyProperty
         Foreground = (System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString(accent)!,
     };
 
-    // A screen opens in its own window (one already open is brought to the front) and is listed on the "Open screens" bar until it closes.
-    private void OpenEntry(Navigation.NavEntry entry)
+    // ---- Opening things: a module gets a page tab; a screen's list gets a tab; a form or a dedicated window opens on its own. ----
+    /// <summary>Opens a screen: its list as a tab, its form or dedicated window on its own.</summary>
+    /// <param name="entry">The screen.</param>
+    public void OpenEntry(Navigation.NavEntry entry)
     {
         ShellViewModel vm = (ShellViewModel)DataContext;
-        if (OpenScreens.FirstOrDefault(o => ReferenceEquals(o.Entry, entry)) is OpenScreen already)
-        {
-            Bring(already.Window);
-            return;
-        }
-
         if (entry.Operation is Operations.Operation operation)
         {
             string area = Navigation.NavCategory.Kinds.First(k => k.Area == entry.Area).Title;
-            OperationsWindow window = new(_services, vm.UserId, operation, entry.Title, $"{entry.ModuleTitle}  ›  {area}  ›  {entry.GroupTitle}") { Owner = this };
-            Track(entry, window);
-            window.Show();
+            OperationsViewModel model = new(_services, vm.UserId, operation, entry.Title, $"{entry.ModuleTitle}  ›  {area}  ›  {entry.GroupTitle}");
+            if (operation.HasList)
+            {
+                OpenListTab(entry, model);
+            }
+            else
+            {
+                new OperationsWindow(_services, model) { Owner = this }.Show();
+            }
+
+            StatusText.Text = entry.Purpose;
             return;
         }
 
@@ -307,16 +306,160 @@ public partial class ShellWindow : Window, System.ComponentModel.INotifyProperty
         open?.Invoke();
     }
 
-    // A screen's list straight from its card, in its own window (the form is not opened).
-    private void List_Click(object sender, RoutedEventArgs e)
+    /// <summary>Opens a module's page as a tab (or brings it to the front).</summary>
+    /// <param name="module">The module.</param>
+    public void OpenModule(Navigation.NavModule module)
     {
-        e.Handled = true;
-        if (((FrameworkElement)sender).DataContext is Navigation.NavEntry { Operation: Operations.Operation operation } entry)
+        foreach (Navigation.NavModule m in ((ShellViewModel)DataContext).NavModules)
         {
-            ShellViewModel vm = (ShellViewModel)DataContext;
-            string area = Navigation.NavCategory.Kinds.First(k => k.Area == entry.Area).Title;
-            OperationsViewModel model = new(_services, vm.UserId, operation, entry.Title, $"{entry.ModuleTitle}  ›  {area}  ›  {entry.GroupTitle}");
-            new OperationsListWindow(_services, model) { Owner = this }.Show();
+            m.IsActive = ReferenceEquals(m, module) || m.Title == module.Title;
+            if (m.IsActive)
+            {
+                m.IsExpanded = true;
+            }
+        }
+
+        if (FindTab(module) is TabItem open)
+        {
+            Tabs.SelectedItem = open;
+            return;
+        }
+
+        ModulePage page = new(module);
+        page.EntryOpened += OpenEntry;
+        AddTab(module.Title, page, module);
+    }
+
+    private void OpenListTab(Navigation.NavEntry entry, OperationsViewModel model)
+    {
+        if (FindTab(entry) is TabItem open)
+        {
+            Tabs.SelectedItem = open;
+            return;
+        }
+
+        OperationsListView view = new() { DataContext = model, Services = _services };
+        AddTab(entry.Operation?.ListTitle ?? entry.Title, view, entry);
+    }
+
+    private TabItem? FindTab(object key) => Tabs.Items.OfType<TabItem>().FirstOrDefault(t => t.Tag is TabKey k && (ReferenceEquals(k.Key, key) || (k.Key is Navigation.NavModule a && key is Navigation.NavModule b && a.Title == b.Title)));
+
+    private sealed record TabKey(object Key);
+
+    // A document tab with a close button; Ctrl+W or the × closes it.
+    private void AddTab(string title, UIElement content, object key)
+    {
+        TabItem tab = new() { Tag = new TabKey(key), Content = content };
+        StackPanel header = new() { Orientation = Orientation.Horizontal };
+        header.Children.Add(new TextBlock { Text = title, VerticalAlignment = VerticalAlignment.Center });
+        Button close = new() { Content = "✕", Margin = new Thickness(10, 0, 0, 0), Padding = new Thickness(3, 0, 3, 0), FontSize = 10, Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0), Cursor = Cursors.Hand, ToolTip = "Close (Ctrl+W)" };
+        close.Click += (_, _) => CloseTabItem(tab);
+        header.Children.Add(close);
+        header.MouseDown += (_, e) =>
+        {
+            if (e.ChangedButton == MouseButton.Middle)
+            {
+                CloseTabItem(tab);
+            }
+        };
+        tab.Header = header;
+        Tabs.Items.Add(tab);
+        Tabs.SelectedItem = tab;
+    }
+
+    private void CloseTabItem(TabItem tab)
+    {
+        if (ReferenceEquals(tab, HomeTab))
+        {
+            return;
+        }
+
+        _history.RemoveAll(t => ReferenceEquals(t, tab));
+        _historyAt = Math.Min(_historyAt, _history.Count - 1);
+        Tabs.Items.Remove(tab);
+        if (Tabs.SelectedItem is null)
+        {
+            Tabs.SelectedItem = _historyAt >= 0 ? _history[_historyAt] : HomeTab;
+        }
+    }
+
+    private void CloseTab(object sender, ExecutedRoutedEventArgs e)
+    {
+        if (Tabs.SelectedItem is TabItem tab)
+        {
+            CloseTabItem(tab);
+        }
+    }
+
+    // ---- Back / Forward over the tabs visited. ----
+    private void Remember(TabItem tab)
+    {
+        if (_navigating)
+        {
+            return;
+        }
+
+        if (_historyAt < _history.Count - 1)
+        {
+            _history.RemoveRange(_historyAt + 1, _history.Count - _historyAt - 1);
+        }
+
+        if (_history.Count == 0 || !ReferenceEquals(_history[^1], tab))
+        {
+            _history.Add(tab);
+        }
+
+        _historyAt = _history.Count - 1;
+        UpdateHistoryButtons();
+    }
+
+    private void UpdateHistoryButtons()
+    {
+        BackButton.IsEnabled = _historyAt > 0;
+        ForwardButton.IsEnabled = _historyAt < _history.Count - 1;
+    }
+
+    private void Tabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ReferenceEquals(e.OriginalSource, Tabs) && Tabs.SelectedItem is TabItem tab)
+        {
+            Remember(tab);
+            if (tab.Tag is TabKey { Key: Navigation.NavModule module })
+            {
+                foreach (Navigation.NavModule m in ((ShellViewModel)DataContext).NavModules)
+                {
+                    m.IsActive = m.Title == module.Title;
+                }
+            }
+        }
+    }
+
+    private void Go(int step)
+    {
+        int at = _historyAt + step;
+        if (at < 0 || at >= _history.Count)
+        {
+            return;
+        }
+
+        _navigating = true;
+        _historyAt = at;
+        Tabs.SelectedItem = _history[at];
+        _navigating = false;
+        UpdateHistoryButtons();
+    }
+
+    private void Back_Click(object sender, RoutedEventArgs e) => Go(-1);
+
+    private void Forward_Click(object sender, RoutedEventArgs e) => Go(1);
+
+    private void Home_Click(object sender, RoutedEventArgs e) => Tabs.SelectedItem = HomeTab;
+
+    private void Module_Click(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is Navigation.NavModule module)
+        {
+            OpenModule(module);
         }
     }
 
@@ -328,89 +471,91 @@ public partial class ShellWindow : Window, System.ComponentModel.INotifyProperty
         }
     }
 
-    // Choosing a module (or anything in it) in the tree shows that module's page; clicking a screen opens it.
+    // ---- Favourites: pinned screens, kept per user in %AppData%. ----
+    private static string FavouritesFile => System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "One4All", "favourites.txt");
+
+    private void LoadFavourites(ShellViewModel vm)
+    {
+        try
+        {
+            if (!System.IO.File.Exists(FavouritesFile))
+            {
+                return;
+            }
+
+            foreach (string title in System.IO.File.ReadAllLines(FavouritesFile).Where(l => l.Length > 0).Distinct())
+            {
+                if (vm.NavModules.SelectMany(m => m.Entries).FirstOrDefault(e => e.Title == title) is Navigation.NavEntry entry)
+                {
+                    AddFavourite(entry);
+                }
+            }
+        }
+        catch (System.IO.IOException)
+        {
+            // Favourites are a convenience; start without them.
+        }
+    }
+
+    private void AddFavourite(Navigation.NavEntry entry)
+    {
+        if (FavouritesMenu.Items.OfType<MenuItem>().Any(m => m.Tag is Navigation.NavEntry e && e.Title == entry.Title))
+        {
+            return;
+        }
+
+        MenuItem item = new() { Header = entry.Title, Tag = entry, Icon = MenuIcon(entry.Glyph, entry.Accent) };
+        item.Click += (_, _) => OpenEntry(entry);
+        FavouritesMenu.Items.Add(item);
+    }
+
+    private void PinTab_Click(object sender, RoutedEventArgs e)
+    {
+        if (Tabs.SelectedItem is TabItem { Tag: TabKey { Key: Navigation.NavEntry entry } })
+        {
+            AddFavourite(entry);
+            try
+            {
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(FavouritesFile)!);
+                System.IO.File.WriteAllLines(FavouritesFile, FavouritesMenu.Items.OfType<MenuItem>().Where(m => m.Tag is Navigation.NavEntry).Select(m => ((Navigation.NavEntry)m.Tag).Title));
+            }
+            catch (System.IO.IOException)
+            {
+                // Pinned for this session only.
+            }
+
+            StatusText.Text = $"{entry.Title} pinned to Favourites.";
+        }
+        else
+        {
+            StatusText.Text = "Open a screen's list first, then pin it.";
+        }
+    }
+
+    // ---- The tree: a module opens its page; a kind of work opens the module's page; a screen opens on double-click or Enter. ----
     private void ModuleTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         ShellViewModel vm = (ShellViewModel)DataContext;
         switch (e.NewValue)
         {
             case Navigation.NavModule module:
-                vm.OpenModuleCommand.Execute(module);
+                OpenModule(vm.NavModules.FirstOrDefault(m => m.Title == module.Title) ?? module);
                 break;
             case Navigation.NavCategory category:
-                vm.OpenCategoryCommand.Execute(category);
+                OpenModule(vm.NavModules.First(m => m.Title == category.ModuleTitle));
                 break;
             case Navigation.NavEntry entry:
-                vm.ShowPageOf(entry);
+                StatusText.Text = entry.Purpose;
                 break;
         }
     }
 
-    // ---- Open screens: every screen window, listed on the bar; click a chip to bring it to the front, × to close it. ----
-    private void Track(Navigation.NavEntry entry, Window window)
+    private void ModuleTree_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        OpenScreen open = new(entry, window);
-        OpenScreens.Add(open);
-        window.Closed += (_, _) => OpenScreens.Remove(open);
-    }
-
-    private static void Bring(Window window)
-    {
-        if (window.WindowState == WindowState.Minimized)
+        if (ModuleTree.SelectedItem is Navigation.NavEntry entry)
         {
-            window.WindowState = WindowState.Normal;
-        }
-
-        window.Activate();
-    }
-
-    private void NotifyOpenScreens()
-    {
-        // The bar shows while anything is open; a plain property, so the binding is told by hand.
-        System.ComponentModel.PropertyChangedEventHandler? handler = PropertyChanged;
-        handler?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(HasOpenScreens)));
-    }
-
-    /// <inheritdoc />
-    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
-
-    private void ShowScreen_Click(object sender, RoutedEventArgs e)
-    {
-        if (((FrameworkElement)sender).DataContext is OpenScreen open)
-        {
-            Bring(open.Window);
-        }
-    }
-
-    private void CloseScreen_Click(object sender, RoutedEventArgs e)
-    {
-        if (((FrameworkElement)sender).DataContext is OpenScreen open)
-        {
-            open.Window.Close();
-        }
-    }
-
-    private void CloseAllScreens_Click(object sender, RoutedEventArgs e)
-    {
-        foreach (OpenScreen open in OpenScreens.ToList())
-        {
-            open.Window.Close();
-        }
-    }
-
-    private void ModuleTree_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-    {
-        for (DependencyObject? at = e.OriginalSource as DependencyObject; at is not null && at != ModuleTree; at = System.Windows.Media.VisualTreeHelper.GetParent(at))
-        {
-            if (at is System.Windows.Controls.TreeViewItem item)
-            {
-                if (item.DataContext is Navigation.NavEntry entry)
-                {
-                    OpenEntry(entry);
-                }
-
-                return;
-            }
+            OpenEntry(entry);
+            e.Handled = true;
         }
     }
 
@@ -423,7 +568,9 @@ public partial class ShellWindow : Window, System.ComponentModel.INotifyProperty
         }
     }
 
-    // The search: typing lists matching screens under the box; Down moves into the list, Enter opens the first (or chosen) one, Escape clears it.
+    private void ClearFilter_Click(object sender, RoutedEventArgs e) => ((ShellViewModel)DataContext).FilterText = string.Empty;
+
+    // ---- The search: typing lists matching screens under the box; Down moves into the list, Enter opens the first (or chosen) one, Escape clears it. ----
     private void FocusSearch(object sender, ExecutedRoutedEventArgs e)
     {
         SearchBox.Focus();
@@ -442,7 +589,7 @@ public partial class ShellWindow : Window, System.ComponentModel.INotifyProperty
         {
             SearchList.SelectedIndex = 0;
             SearchList.UpdateLayout();
-            ((System.Windows.Controls.ListBoxItem?)SearchList.ItemContainerGenerator.ContainerFromIndex(0))?.Focus();
+            ((ListBoxItem?)SearchList.ItemContainerGenerator.ContainerFromIndex(0))?.Focus();
             e.Handled = true;
         }
         else if (e.Key == Key.Enter && vm.SearchResults.Count > 0)
@@ -477,24 +624,21 @@ public partial class ShellWindow : Window, System.ComponentModel.INotifyProperty
 
     private void OpenFromSearch(Navigation.NavEntry entry)
     {
-        ShellViewModel vm = (ShellViewModel)DataContext;
-        vm.ShowPageOf(entry);
-        vm.SearchText = string.Empty;
+        ((ShellViewModel)DataContext).SearchText = string.Empty;
         OpenEntry(entry);
     }
 
     private void HowTo_Click(object sender, RoutedEventArgs e) => MessageBox.Show(this,
         "Three ways to find a screen:" + Environment.NewLine + Environment.NewLine
-        + "1.  Type what you want to do in the search box at the top (for example \"add a product\", \"pay a supplier\", \"register an applicant\") and press Enter."
+        + "1.  Type what you want to do in the Search box at the top right (for example \"add a product\", \"pay a supplier\") and press Enter."
         + Environment.NewLine + Environment.NewLine
-        + "2.  Click a module on the Home tab (or in the list on the left — the module you are in is lit). It shows four kinds of work: Maintenance (setting up), "
-        + "Transactions (day-to-day work), Enquiries (looking things up) and Utilities (period end and housekeeping); choose one to see its screens. "
-        + "The line at the top (Home › module › kind of work) shows where you are, and the back button goes up one level."
+        + "2.  Use the tree on the left: open a module, then Maintenance (setting up), Transactions (day-to-day work), Enquiries (looking things up) or Utilities "
+        + "(period end and housekeeping), and double-click the screen. The Filter box above the tree narrows it to screens whose name contains what you type."
         + Environment.NewLine + Environment.NewLine
         + "3.  Use the menus: Modules ▸ module ▸ kind of work ▸ screen; or Maintenance / Transactions / Enquiries / Utilities ▸ module ▸ screen."
         + Environment.NewLine + Environment.NewLine
-        + "Every screen opens in its own window, so you can work on several at once. The \"Open screens\" bar at the top of the page lists them: "
-        + "click one to bring it to the front, or ✕ to close it.",
+        + "A module and a screen's list open as tabs across the top; Back and Forward move between tabs you visited, and × or Ctrl+W closes one. "
+        + "Add… on a list opens the form in its own window. Favourites keeps the screens you pin.",
         "How to find a screen", MessageBoxButton.OK, MessageBoxImage.Information);
 
     private void OpenAccountEnquiry_Click(object sender, RoutedEventArgs e)

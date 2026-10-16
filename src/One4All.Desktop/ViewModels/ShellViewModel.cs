@@ -44,6 +44,11 @@ public sealed partial class ShellViewModel : ObservableObject
             }
         }
 
+        foreach (NavModule module in NavModules)
+        {
+            FilteredModules.Add(module);
+        }
+
         _welcome = NavModules.Count == 0 ? "No modules are available for your account. Ask your administrator to give you a role."
             : $"Welcome, {UserDisplayName}. Choose what you want to work on, or type in the search box what you want to do (for example \"add a product\").";
     }
@@ -67,6 +72,48 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>Gets the modules the user may use.</summary>
     public ObservableCollection<NavModule> NavModules { get; } = [];
+
+    /// <summary>Gets the modules the tree shows: all of them, or only the screens whose name contains the filter.</summary>
+    public ObservableCollection<NavModule> FilteredModules { get; } = [];
+
+    /// <summary>What is typed in the tree's filter box.</summary>
+    [ObservableProperty]
+    private string _filterText = string.Empty;
+
+    /// <summary>Gets the company shown in the status bar.</summary>
+    public string CompanyText => _companyText;
+
+    private string _companyText = string.Empty;
+
+    /// <summary>Sets the company shown in the status bar.</summary>
+    /// <param name="text">The company's name.</param>
+    public void SetCompany(string text)
+    {
+        _companyText = text;
+        OnPropertyChanged(nameof(CompanyText));
+    }
+
+    // The filter keeps the modules and kinds that still have a matching screen.
+    partial void OnFilterTextChanged(string value)
+    {
+        FilteredModules.Clear();
+        string text = value.Trim();
+        foreach (NavModule module in NavModules)
+        {
+            if (text.Length == 0)
+            {
+                FilteredModules.Add(module);
+                continue;
+            }
+
+            List<NavGroup> groups = [.. module.Groups.Select(g => g with { Entries = [.. g.Entries.Where(e => e.Title.Contains(text, StringComparison.OrdinalIgnoreCase) || e.GroupTitle.Contains(text, StringComparison.OrdinalIgnoreCase))] })
+                .Where(g => g.Entries.Count > 0)];
+            if (groups.Count > 0)
+            {
+                FilteredModules.Add(new NavModule(module.Title, module.Glyph, module.Accent, module.Purpose, groups) { IsExpanded = true });
+            }
+        }
+    }
 
     /// <summary>Gets the everyday tasks shown first on the home page (those the user may use).</summary>
     public ObservableCollection<NavEntry> QuickStart { get; } = [];

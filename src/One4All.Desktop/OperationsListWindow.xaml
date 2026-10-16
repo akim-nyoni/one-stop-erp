@@ -2,34 +2,11 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:One4All.Desktop.Localization"
+        xmlns:local="clr-namespace:One4All.Desktop"
         Title="{Binding Selected.ListTitle, Converter={StaticResource Text}}" FlowDirection="{x:Static loc:UiText.Direction}" Height="640" Width="1100"
-        WindowStartupLocation="CenterOwner" Background="#F4F6F4" FontFamily="Segoe UI">
+        WindowStartupLocation="CenterOwner" Background="White" FontFamily="Segoe UI">
     <Window.Resources>
         <loc:TextConverter x:Key="Text" />
     </Window.Resources>
-    <DockPanel Margin="12">
-        <!-- Header: what the list is, paging and refresh -->
-        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <Button DockPanel.Dock="Right" Content="{loc:T 'Refresh'}" Padding="12,5" Command="{Binding RefreshCommand}" />
-            <Button DockPanel.Dock="Right" Content="{loc:T 'Next ▶'}" Padding="10,5" Margin="0,0,6,0" Command="{Binding NextPageCommand}" />
-            <TextBlock DockPanel.Dock="Right" Text="{Binding PageText}" Foreground="#667" VerticalAlignment="Center" Margin="0,0,6,0" />
-            <Button DockPanel.Dock="Right" Content="{loc:T '◀ Previous'}" Padding="10,5" Margin="0,0,6,0" Command="{Binding PreviousPageCommand}" />
-            <StackPanel>
-                <TextBlock Text="{Binding Selected.ListTitle, Converter={StaticResource Text}}" FontSize="18" FontWeight="Bold" Foreground="#1E3A2E" />
-                <TextBlock Text="{Binding ListContext}" Foreground="#667" FontSize="12" />
-            </StackPanel>
-        </DockPanel>
-        <Border DockPanel.Dock="Bottom" Background="#E8EEE8" Padding="10,5" Margin="0,8,0,0" CornerRadius="4">
-            <TextBlock Text="Right-click a row for who touched the record. The list refreshes itself after the form saves." Foreground="#334" FontSize="12" />
-        </Border>
-        <DataGrid x:Name="ListGrid" ItemsSource="{Binding List}" AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False"
-                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" Background="White" BorderBrush="#D9E0D9"
-                  RowBackground="White" AlternatingRowBackground="#F7FAF7" AutoGeneratingColumn="ListGrid_AutoGeneratingColumn">
-            <DataGrid.ContextMenu>
-                <ContextMenu>
-                    <MenuItem Header="{loc:T 'Who touched this record?'}" Click="WhoTouched_Click" />
-                </ContextMenu>
-            </DataGrid.ContextMenu>
-        </DataGrid>
-    </DockPanel>
+    <local:OperationsListView x:Name="View" />
 </Window>

@@ -36,6 +36,9 @@ public sealed class NavEntry
     /// <summary>Gets its colour (the module's).</summary>
     public string Accent { get; init; } = "#2E7D32";
 
+    /// <summary>Gets the Explorer colour of the kind of work: green setting up, red day-to-day, blue looking up, purple period end.</summary>
+    public System.Windows.Media.Brush AreaBrush => NavCategory.BrushFor(Area);
+
     /// <summary>Gets the kind of work in plain words (setting up, day-to-day, looking up, period end).</summary>
     public string AreaLabel => Area switch
     {
@@ -99,6 +102,27 @@ public sealed class NavCategory
 
     /// <summary>Gets every screen of this kind.</summary>
     public IReadOnlyList<NavEntry> Entries => [.. Groups.SelectMany(g => g.Entries)];
+
+    /// <summary>Gets the Explorer colour of this kind of work.</summary>
+    public System.Windows.Media.Brush AreaBrush => BrushFor(Area);
+
+    /// <summary>The Explorer colour of a kind of work.</summary>
+    /// <param name="area">The kind.</param>
+    /// <returns>Green for Maintenance, red for Transactions, blue for Enquiries, purple for Utilities.</returns>
+    public static System.Windows.Media.Brush BrushFor(MenuArea area) => area switch
+    {
+        MenuArea.Maintenance => Frozen(0x4C, 0xAF, 0x50),
+        MenuArea.Transactions => Frozen(0xE0, 0x5A, 0x5A),
+        MenuArea.Enquiries => Frozen(0x3C, 0x7D, 0xD9),
+        _ => Frozen(0x8E, 0x6A, 0xC8),
+    };
+
+    private static System.Windows.Media.Brush Frozen(byte r, byte g, byte b)
+    {
+        System.Windows.Media.SolidColorBrush brush = new(System.Windows.Media.Color.FromRgb(r, g, b));
+        brush.Freeze();
+        return brush;
+    }
 
     /// <summary>Gets "n screens" for the card.</summary>
     public string CountText => Entries.Count == 1 ? "1 screen" : $"{Entries.Count} screens";

@@ -136,6 +136,9 @@ public sealed partial class OperationsViewModel : ObservableObject
     /// <summary>Gets the line under the list window's title: where the screen sits.</summary>
     public string ListContext => SingleContext ?? Localization.UiText.T(Module);
 
+    /// <summary>Gets the list toolbar's Add… button text: the screen's own name.</summary>
+    public string AddText => (SingleTitle ?? Selected?.Title ?? "Add") + "…";
+
     /// <summary>Gets the button's text.</summary>
     public string RunText => IsSingle ? "✔  Go" : Localization.UiText.T("Run");
 

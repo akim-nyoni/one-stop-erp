@@ -1,0 +1,53 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="clr-namespace:One4All.Desktop"
+                    xmlns:nav="clr-namespace:One4All.Desktop.Navigation">
+    <!-- The Explorer look: white pages, a coloured heading per kind of work, tiles with the icon above a plain label. -->
+    <local:StringToBrushConverter x:Key="TileBrushConv" />
+    <SolidColorBrush x:Key="MaintenanceBrush" Color="#4CAF50" />
+    <SolidColorBrush x:Key="TransactionsBrush" Color="#E05A5A" />
+    <SolidColorBrush x:Key="EnquiriesBrush" Color="#3C7DD9" />
+    <SolidColorBrush x:Key="UtilitiesBrush" Color="#8E6AC8" />
+    <SolidColorBrush x:Key="PageBorder" Color="#CFD6DC" />
+    <SolidColorBrush x:Key="PageInk" Color="#2B3A42" />
+    <SolidColorBrush x:Key="PageMuted" Color="#7A8A94" />
+
+    <!-- A tile: icon above the label, lights on hover -->
+    <Style x:Key="Tile" TargetType="Button">
+        <Setter Property="Width" Value="150" />
+        <Setter Property="Height" Value="128" />
+        <Setter Property="Margin" Value="4" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="B" Background="{TemplateBinding Background}" CornerRadius="6" Padding="6">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Top" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="B" Property="Background" Value="#EEF3F7" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A screen tile: glyph in the kind's colour, the name under it -->
+    <DataTemplate x:Key="EntryTile" DataType="{x:Type nav:NavEntry}">
+        <StackPanel Width="138">
+            <TextBlock Text="{Binding Glyph}" FontSize="40" HorizontalAlignment="Center" Margin="0,4,0,6" Foreground="{Binding AreaBrush}" />
+            <TextBlock Text="{Binding Title}" FontSize="13" Foreground="{StaticResource PageInk}" TextAlignment="Center" TextWrapping="Wrap" MaxHeight="54" />
+        </StackPanel>
+    </DataTemplate>
+
+    <!-- A section heading in the kind's colour -->
+    <Style x:Key="SectionHeading" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="19" />
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="Margin" Value="8,6,8,6" />
+    </Style>
+</ResourceDictionary>

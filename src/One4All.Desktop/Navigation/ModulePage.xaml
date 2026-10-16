@@ -1,0 +1,69 @@
+<UserControl x:Class="One4All.Desktop.Navigation.ModulePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:nav="clr-namespace:One4All.Desktop.Navigation"
+             Background="White">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/One4All.Desktop;component/Navigation/TileStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <Grid Margin="16">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="330" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Related tasks: the everyday screens of this module -->
+        <Border Grid.Column="0" BorderBrush="{StaticResource PageBorder}" BorderThickness="1" Margin="0,0,16,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="Related Tasks" Style="{StaticResource SectionHeading}" Foreground="{StaticResource PageMuted}" HorizontalAlignment="Center" />
+                    <ItemsControl ItemsSource="{Binding RelatedTasks}" HorizontalAlignment="Center">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel Width="316" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type nav:NavEntry}">
+                                <Button Style="{StaticResource Tile}" Content="{Binding}" ContentTemplate="{StaticResource EntryTile}" Click="Entry_Click" ToolTip="{Binding Purpose}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Separator Margin="16,10" />
+                    <TextBlock Text="About this module" Style="{StaticResource SectionHeading}" Foreground="{StaticResource PageMuted}" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding Module.Purpose}" Foreground="{StaticResource PageInk}" FontSize="13" TextWrapping="Wrap" Margin="16,0,16,12" TextAlignment="Center" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- The kinds of work side by side, each with its screens as tiles -->
+        <Border Grid.Column="1" BorderBrush="{StaticResource PageBorder}" BorderThickness="1">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Module.Categories}" Margin="8">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type nav:NavCategory}">
+                            <StackPanel Margin="0,0,24,0">
+                                <TextBlock Text="{Binding Title}" Style="{StaticResource SectionHeading}" Foreground="{Binding AreaBrush}" />
+                                <ItemsControl ItemsSource="{Binding Entries}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel Width="474" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="{x:Type nav:NavEntry}">
+                                            <Button Style="{StaticResource Tile}" Content="{Binding}" ContentTemplate="{StaticResource EntryTile}" Click="Entry_Click" ToolTip="{Binding Purpose}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>
