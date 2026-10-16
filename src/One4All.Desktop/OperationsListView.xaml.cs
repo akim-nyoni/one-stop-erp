@@ -51,12 +51,30 @@ public partial class OperationsListView : UserControl
         }
     }
 
-    // Add… opens the form window (one per list) and brings it to the front when it is already open.
-    private void Add_Click(object sender, RoutedEventArgs e)
+    // Add… opens the form window (one per list) and brings it to the front when it is already open; Edit… opens it filled from the selected row.
+    private void Add_Click(object sender, RoutedEventArgs e) => OpenForm(prefill: false);
+
+    private void Edit_Click(object sender, RoutedEventArgs e)
+    {
+        if (ListGrid.SelectedItem is null)
+        {
+            Status.Text = "Choose the record to change first.";
+            return;
+        }
+
+        OpenForm(prefill: true);
+    }
+
+    private void OpenForm(bool prefill)
     {
         if (Services is null || DataContext is not OperationsViewModel model)
         {
             return;
+        }
+
+        if (prefill && ListGrid.SelectedItem is DataRowView row)
+        {
+            model.Prefill(row);
         }
 
         if (_form is { IsLoaded: true })
@@ -66,11 +84,41 @@ public partial class OperationsListView : UserControl
         }
 
         _form = new OperationsWindow(Services, model) { Owner = Window.GetWindow(this) };
+        _form.View.Completed += message => Status.Text = message;
         _form.Closed += (_, _) => _form = null;
         _form.Show();
     }
 
-    private void ListGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e) => Add_Click(sender, e);
+    // Delete asks first, then removes the record from use and refreshes the list.
+    private async void Delete_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OperationsViewModel { Selected: { Delete: not null } operation } model)
+        {
+            return;
+        }
+
+        if (ListGrid.SelectedItem is not DataRowView row || !row.Row.Table.Columns.Contains(operation.KeyColumn))
+        {
+            Status.Text = "Choose the record to delete first.";
+            return;
+        }
+
+        string key = Convert.ToString(row[operation.KeyColumn], System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+        if (MessageBox.Show(Window.GetWindow(this), $"Delete {key}? It is removed from use and kept in history.", "Delete", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        Status.Text = await model.DeleteAsync(key).ConfigureAwait(true);
+    }
+
+    private void ListGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (DataContext is OperationsViewModel { Selected.CanEdit: true } && ListGrid.SelectedItem is not null)
+        {
+            OpenForm(prefill: true);
+        }
+    }
 
     // The search box filters the rows on every column.
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e) => ApplyFilter();

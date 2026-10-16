@@ -48,7 +48,7 @@
             <Grid Grid.Column="1" Margin="6,0,6,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <!-- Form -->
@@ -59,10 +59,12 @@
                             <TextBlock Text="{Binding Selected.Description, Converter={StaticResource Text}}" Foreground="#667" FontSize="12" TextWrapping="Wrap" />
                         </StackPanel>
                         <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" LastChildFill="False">
-                            <Button DockPanel.Dock="Right" Content="{Binding RunText}" Padding="22,7" MinWidth="110" Background="#DDEFE0" FontWeight="SemiBold" Command="{Binding RunCommand}" IsDefault="True" />
+                            <Button DockPanel.Dock="Right" Content="{Binding OkText}" Padding="22,7" MinWidth="100" Background="#DDEFE0" FontWeight="SemiBold" Click="Ok_Click" IsDefault="True"
+                                    ToolTip="Saves / runs, then closes when all is well" />
+                            <Button DockPanel.Dock="Right" Content="Cancel" Padding="18,7" MinWidth="90" Margin="0,0,8,0" Click="Cancel_Click" IsCancel="True" ToolTip="Closes without saving" />
                             <Button DockPanel.Dock="Left" Padding="14,7" Click="ShowList_Click" ToolTip="Opens the records in their own window"
                                     Visibility="{Binding Selected.HasList, Converter={StaticResource Visible}}">
-                                <TextBlock><Run Text="📋  Show the list: " /><Run Text="{Binding Selected.ListTitle, Mode=OneWay, Converter={StaticResource Text}}" /></TextBlock>
+                                <TextBlock><Run Text="📋  " /><Run Text="{Binding Selected.ListTitle, Mode=OneWay, Converter={StaticResource Text}}" /></TextBlock>
                             </Button>
                         </DockPanel>
                         <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
@@ -94,9 +96,10 @@
                 </Border>
 
                 <!-- Result -->
-                <TextBox Grid.Row="1" Text="{Binding Result, Mode=OneWay}" IsReadOnly="True" Margin="0,6,0,0" Padding="8"
+                <TextBox Grid.Row="1" Text="{Binding Result, Mode=OneWay}" IsReadOnly="True" Margin="0,6,0,0" Padding="8" MinHeight="120" MaxHeight="420"
                          FontFamily="Consolas" FontSize="12" TextWrapping="NoWrap" AcceptsReturn="True"
-                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" BorderBrush="#D9E0D9">
+                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" BorderBrush="#D9E0D9"
+                         Visibility="{Binding HasResult, Converter={StaticResource Visible}}">
                     <TextBox.Style>
                         <Style TargetType="TextBox">
                             <Setter Property="Foreground" Value="#1E3A2E" />

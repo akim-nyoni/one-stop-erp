@@ -32,6 +32,16 @@ public sealed record NavItemSpec(string? ConsoleModule, string? Operation, strin
 /// </summary>
 public static class NavigationMap
 {
+    /// <summary>The report catalogue's module names and the Explorer module each belongs to.</summary>
+    public static readonly IReadOnlyDictionary<string, string> ReportModules = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Budget"] = "Budgets", ["CashBook"] = "Cash & Banking", ["CRM"] = "CRM", ["Expenses"] = "HR & Payroll", ["FixedAssets"] = "Fixed Assets", ["GeneralLedger"] = "Accounting",
+        ["Housing"] = "Housing", ["HumanResources"] = "HR & Payroll", ["Inventory"] = "Stock & Products", ["JobCosting"] = "Projects & Contracts", ["Municipal"] = "Municipality",
+        ["Payroll"] = "HR & Payroll", ["PointOfSale"] = "Point of Sale", ["Purchasing"] = "Purchases & Suppliers", ["Receipting"] = "Cashiering", ["Receivables"] = "Sales & Customers",
+        ["Restaurant"] = "Restaurant", ["Sales"] = "Sales & Customers", ["SalesOrders"] = "Sales & Customers", ["School"] = "Schools", ["System"] = "Administration",
+        ["Tax"] = "Accounting", ["Weighbridge"] = "Weighbridge",
+    };
+
     private static NavItemSpec O(string moduleAndTitle, string? display = null)
     {
         int split = moduleAndTitle.IndexOf(": ", StringComparison.Ordinal);
@@ -351,8 +361,12 @@ public static class NavigationMap
                 O("Approvals: Segregation-of-duties rules"), O("Approvals: Escalate overdue approvals"), O("Approvals: Request a master-data change"),
                 O("Approvals: Email approval links")),
         ]),
-        new("Reports", "\U0001F4C4", "#455A64", "Run, design, schedule and email reports.", [],
+        new("Administration", "⚙", "#455A64", "The company, users and security, importing data and looking after the system.", ["System Manager", "Documents", "Approvals"],
         [
+            G("Company",
+                O("System Manager: Create a company"), O("System Manager: Set up a company for an industry"), O("System Manager: Add an industry to this company"), O("System Manager: Load sample data for testing"),
+                O("System Manager: Add a branch"), O("System Manager: Set the company logo"), O("System Manager: Company email and SMS settings"),
+                O("System Manager: Language and terminology"), O("System Manager: Attachments", "Attachment rules")),
             G("Reports",
                 W("report-viewer", "Run a report", "Choose a report, fill its options and view, print or export it.", MenuArea.Enquiries),
                 W("report-designer", "Design a report", "Change a report's layout or make a new one.", MenuArea.Maintenance),
@@ -360,13 +374,6 @@ public static class NavigationMap
                 O("System Manager: Report version history"), O("System Manager: Report subscription", "Email a report on a schedule"),
                 O("System Manager: Burst a report by email", "Email a report to each customer or supplier"), O("System Manager: Refresh reporting snapshots"),
                 O("System Manager: Stock valuation and sales snapshots")),
-        ]),
-        new("Administration", "⚙", "#455A64", "The company, users and security, importing data and looking after the system.", ["System Manager", "Documents", "Approvals"],
-        [
-            G("Company",
-                O("System Manager: Create a company"), O("System Manager: Set up a company for an industry"), O("System Manager: Add an industry to this company"), O("System Manager: Load sample data for testing"),
-                O("System Manager: Add a branch"), O("System Manager: Set the company logo"), O("System Manager: Company email and SMS settings"),
-                O("System Manager: Language and terminology"), O("System Manager: Attachments", "Attachment rules")),
             G("Users and security",
                 O("System Manager: Create a user"), O("System Manager: Reset a password"), O("System Manager: Activate or deactivate a user"), O("System Manager: Create a role"),
                 O("System Manager: Assign a role"),

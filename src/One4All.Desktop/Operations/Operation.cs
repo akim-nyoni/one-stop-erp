@@ -87,8 +87,27 @@ public sealed class Operation
     /// <summary>Gets a value indicating whether the operation has a list (shown in its own window).</summary>
     public bool HasList => List is not null;
 
+    /// <summary>Gets the list column that identifies a record for Edit… and Delete (the code, by default).</summary>
+    public string KeyColumn { get; init; } = "Code";
+
+    /// <summary>Gets the delete for a record of the list by its key, when the records can be deleted (removed from use; history is kept).</summary>
+    public Func<OperationContext, string, Task<string>>? Delete { get; init; }
+
+    /// <summary>Gets a value indicating whether a list row can be opened in the form to change it (the form adds or changes, rather than only adds).</summary>
+    public bool CanEdit => HasList && (Delete is not null || System.Text.RegularExpressions.Regex.IsMatch(Title, @"\b(change|update|edit|set|or|amend|maintain|policy|policies|rules|settings|limits)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+
     /// <summary>Gets a value indicating whether the result is a printable document (shown in full, monospaced).</summary>
     public bool IsDocument { get; init; }
+
+    /// <summary>Gets the <c>Module.Feature</c> permission the screen is gated by, when it is not the one the rules give it from its module and title.</summary>
+    public string? Permission { get; init; }
+
+    /// <summary>Gets the permission code the screen is gated by (null: any signed-in user).</summary>
+    public string? PermissionCode => Permission ?? Application.Security.ScreenPermissions.CodeFor(Module, Title);
+
+    /// <summary>Gets the operation flags running the screen needs (any one of them), limited to what its feature offers.</summary>
+    public Core.Security.OperationFlags Needs => Application.Security.ScreenPermissions.NeedsToRun(Title, IsDocument, MenuArea == Application.Navigation.MenuArea.Enquiries,
+        PermissionCode is string code ? Core.Security.PermissionCatalogue.Find(code)?.Available : null);
 
     /// <summary>Gets where the action sits in the menus when its title would place it wrongly (null: worked out from the title).</summary>
     public Application.Navigation.MenuArea? Area { get; init; }
@@ -409,6 +428,38 @@ public static class Ops
     /// <param name="choices">The options (the first is the default).</param>
     /// <returns>The field.</returns>
     public static OperationField Pick(string name, string label, params string[] choices) => new(name, label, FieldKind.Choice, choices[0], Choices: choices);
+
+    /// <summary>
+    /// A delete for a soft-deletable master record found by its code: the record is marked deleted (kept for history and audit) and disappears
+    /// from lists and lookups. Refused when nothing matches.
+    /// </summary>
+    /// <typeparam name="T">The record type.</typeparam>
+    /// <param name="key">Reads the record's code.</param>
+    /// <param name="what">What the record is called, for the message.</param>
+    /// <returns>The delete.</returns>
+    public static Func<OperationContext, string, Task<string>> SoftDelete<T>(Func<T, string> key, string what) where T : Core.Common.SoftDeletableEntity, Core.Common.ICompanyScoped
+        => async (c, code) =>
+        {
+            List<T> rows = await c.Db.Set<T>().Where(x => x.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true);
+            T record = rows.FirstOrDefault(x => string.Equals(key(x), code, StringComparison.OrdinalIgnoreCase)) ?? throw new OperationException($"No {what} {code}.");
+            record.IsDeleted = true;
+            record.DeletedOnUtc = DateTimeOffset.UtcNow;
+            record.DeletedByUserId = c.UserId;
+            await c.Db.SaveChangesAsync().ConfigureAwait(true);
+            return $"{char.ToUpperInvariant(what[0])}{what[1..]} {code} deleted (kept in history).";
+        };
+
+    /// <summary>The company's record with the code, when there is one (so a form adds a new record or changes the existing one).</summary>
+    /// <typeparam name="T">The record type.</typeparam>
+    /// <param name="c">The context.</param>
+    /// <param name="code">The code typed.</param>
+    /// <param name="key">Reads a record's code.</param>
+    /// <returns>The record, or null.</returns>
+    public static async Task<T?> ExistingAsync<T>(OperationContext c, string code, Func<T, string> key) where T : class, Core.Common.ICompanyScoped
+    {
+        List<T> rows = await c.Db.Set<T>().Where(x => x.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true);
+        return rows.FirstOrDefault(x => string.Equals(key(x), code.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>The code part of a lookup choice ("C001 — Tendai Moyo" → "C001"); other text as it is.</summary>
     /// <param name="value">The chosen or typed value.</param>

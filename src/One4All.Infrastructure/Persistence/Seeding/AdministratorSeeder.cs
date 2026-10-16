@@ -56,10 +56,24 @@ public sealed class AdministratorSeeder
     private async Task<Role> EnsureAdminRoleAsync(CancellationToken ct)
     {
         Role? role = await _db.Roles
+            .Include(r => r.Permissions)
             .FirstOrDefaultAsync(r => r.NormalizedName == "SYSTEM ADMINISTRATOR", ct)
             .ConfigureAwait(false);
         if (role is not null)
         {
+            // Features added to the catalogue since the role was made are granted too, so the explicit grant stays complete.
+            bool widened = false;
+            foreach (PermissionDefinition def in PermissionCatalogue.All.Where(d => !role.Permissions.Any(p => string.Equals(p.PermissionCode, d.Code, StringComparison.OrdinalIgnoreCase))))
+            {
+                role.Grant(def.Code, def.Available);
+                widened = true;
+            }
+
+            if (widened)
+            {
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
+
             return role;
         }
 

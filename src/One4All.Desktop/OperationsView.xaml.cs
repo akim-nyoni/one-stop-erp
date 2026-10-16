@@ -24,6 +24,48 @@ public partial class OperationsView : UserControl
 
     private OperationsListWindow? _list;
 
+    /// <summary>Raised when OK saved and the form closed, with the message (shown by the list that opened the form).</summary>
+    public event Action<string>? Completed;
+
+    // OK runs the operation; a plain one-line success closes the form (the list refreshes itself), while a document, an enquiry or an error stays to be read.
+    private async void Ok_Click(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not OperationsViewModel model || !model.RunCommand.CanExecute(null))
+        {
+            return;
+        }
+
+        await model.RunCommand.ExecuteAsync(null);
+        if (!model.Failed && model.ResultIsShort && model.Selected is { IsDocument: false, HasList: true })
+        {
+            Completed?.Invoke(model.Result);
+            if (Window.GetWindow(this) is OperationsWindow host)
+            {
+                host.Close();
+            }
+            else
+            {
+                MessageBox.Show(Window.GetWindow(this), model.Result, model.SingleTitle ?? "Done", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+        else if (!model.Failed && model.ResultIsShort && model.Selected is { IsDocument: false, HasList: false })
+        {
+            MessageBox.Show(Window.GetWindow(this), model.Result, model.SingleTitle ?? "Done", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (Window.GetWindow(this) is OperationsWindow host)
+            {
+                host.Close();
+            }
+        }
+    }
+
+    private void Cancel_Click(object sender, RoutedEventArgs e)
+    {
+        if (Window.GetWindow(this) is OperationsWindow host)
+        {
+            host.Close();
+        }
+    }
+
     // The list opens in its own window, one per form, and comes to the front if it is already open.
     private void ShowList_Click(object sender, RoutedEventArgs e)
     {

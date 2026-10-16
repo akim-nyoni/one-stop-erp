@@ -517,9 +517,20 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Add a warehouse", ListTitle = "Warehouses", Description = "A stock location of the current company.",
+            Module = module, Title = "Add a warehouse", ListTitle = "Warehouses", Delete = SoftDelete<Core.Inventory.Warehouse>(x => x.Code, "warehouse"),
+            Description = "A stock location of the current company. An existing code changes that warehouse.",
             Fields = [Req("Code", "Code"), Req("Name", "Name")],
-            Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateWarehouseAsync(c.CompanyId, i.Text("Code"), i.Text("Name")).ConfigureAwait(true), id => "Warehouse added."),
+            Run = async (c, i) =>
+            {
+                if (await ExistingAsync<Core.Inventory.Warehouse>(c, i.Text("Code"), x => x.Code).ConfigureAwait(true) is { } existing)
+                {
+                    existing.Name = i.Text("Name");
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Warehouse {existing.Code} changed.";
+                }
+
+                return Check(await c.Get<IMasterDataService>().CreateWarehouseAsync(c.CompanyId, i.Text("Code"), i.Text("Name")).ConfigureAwait(true), id => "Warehouse added.");
+            },
             List = async c => Table(await c.Db.Warehouses.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
                 ("Code", x => x.Code), ("Name", x => x.Name), ("Active", x => x.IsActive)),
         };
@@ -539,34 +550,73 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Add a customer", ListTitle = "Customers", Description = "A customer account; raise the credit limit later through approval.",
+            Module = module, Title = "Add a customer", ListTitle = "Customers", Delete = SoftDelete<Core.Trading.Customer>(x => x.Code, "customer"),
+            Description = "A customer account; raise the credit limit later through approval. An existing code changes that customer's name (the currency and limit stay).",
             Fields = [Req("Code", "Account code"), Req("Name", "Name"), Req("Currency", "Currency", "USD"), Num("Limit", "Credit limit", "0")],
-            Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateCustomerAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), CurrencyCode.Parse(i.Text("Currency")), i.Number("Limit"))
-                .ConfigureAwait(true), id => "Customer added."),
+            Run = async (c, i) =>
+            {
+                if (await ExistingAsync<Core.Trading.Customer>(c, i.Text("Code"), x => x.Code).ConfigureAwait(true) is { } existing)
+                {
+                    existing.Name = i.Text("Name");
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Customer {existing.Code} changed.";
+                }
+
+                return Check(await c.Get<IMasterDataService>().CreateCustomerAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), CurrencyCode.Parse(i.Text("Currency")), i.Number("Limit"))
+                    .ConfigureAwait(true), id => "Customer added.");
+            },
             List = async c => Table(await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
                 ("Code", x => x.Code), ("Name", x => x.Name), ("Currency", x => x.Currency.Value), ("Credit limit", x => M(x.CreditLimit))),
         };
         yield return new Operation
         {
-            Module = module, Title = "Add a supplier", ListTitle = "Suppliers", Description = "A supplier account.",
+            Module = module, Title = "Add a supplier", ListTitle = "Suppliers", Delete = SoftDelete<Core.Trading.Supplier>(x => x.Code, "supplier"),
+            Description = "A supplier account. An existing code changes that supplier's name (the currency stays).",
             Fields = [Req("Code", "Account code"), Req("Name", "Name"), Req("Currency", "Currency", "USD")],
-            Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateSupplierAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), CurrencyCode.Parse(i.Text("Currency"))).ConfigureAwait(true),
-                id => "Supplier added."),
+            Run = async (c, i) =>
+            {
+                if (await ExistingAsync<Core.Trading.Supplier>(c, i.Text("Code"), x => x.Code).ConfigureAwait(true) is { } existing)
+                {
+                    existing.Name = i.Text("Name");
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Supplier {existing.Code} changed.";
+                }
+
+                return Check(await c.Get<IMasterDataService>().CreateSupplierAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), CurrencyCode.Parse(i.Text("Currency"))).ConfigureAwait(true),
+                    id => "Supplier added.");
+            },
             List = async c => Table(await c.Db.Suppliers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
                 ("Code", x => x.Code), ("Name", x => x.Name), ("Currency", x => x.Currency.Value)),
         };
         yield return new Operation
         {
-            Module = module, Title = "Add an item", ListTitle = "Items",
+            Module = module, Title = "Add an item", ListTitle = "Items", Delete = SoftDelete<Core.Inventory.Item>(x => x.Code, "item"),
             Description = "A stock, service or other item with the accounts its sales and cost post to, how its stock is costed (weighted average, FIFO, standard with its "
                 + "variance accounts, or specific identification), batch or serial tracking and a shelf life.",
             Fields = [Req("Code", "Item code"), Req("Description", "Description"), Pick("Type", "Type", Enum.GetNames<ItemType>()), Opt("Revenue", "Revenue account"), Opt("Cost", "Cost of sales account"),
                 Pick("Costing", "Costing method", Enum.GetNames<CostingMethod>()), OptNum("Standard", "Standard cost"), Opt("PriceVariance", "Price variance account (standard)"),
                 Opt("UsageVariance", "Usage variance account (standard)"), Pick("Tracking", "Tracking", Enum.GetNames<ItemTracking>()), OptNum("ShelfLife", "Shelf life (days)"), Opt("Category", "Category")],
-            Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateItemAsync(new NewItem(c.CompanyId, i.Text("Code"), i.Text("Description"), Enum.Parse<ItemType>(i.Text("Type")),
-                i.Optional("Revenue"), i.Optional("Cost"), i.OptionalNumber("Standard"), Enum.Parse<CostingMethod>(i.Text("Costing")), Enum.Parse<ItemTracking>(i.Text("Tracking")),
-                i.OptionalNumber("ShelfLife") is decimal days ? (int)days : null, i.Optional("PriceVariance"), i.Optional("UsageVariance"), i.Optional("Category"))).ConfigureAwait(true),
-                id => "Item added."),
+            Run = async (c, i) =>
+            {
+                if (await ExistingAsync<Core.Inventory.Item>(c, i.Text("Code"), x => x.Code).ConfigureAwait(true) is { } existing)
+                {
+                    // The description, accounts, standard cost and category can change; the type, costing method and tracking are fixed once there is stock history.
+                    existing.Description = i.Text("Description");
+                    existing.RevenueAccountCode = i.Optional("Revenue");
+                    existing.CostOfSalesAccountCode = i.Optional("Cost");
+                    existing.StandardCost = i.OptionalNumber("Standard");
+                    existing.PriceVarianceAccountCode = i.Optional("PriceVariance");
+                    existing.UsageVarianceAccountCode = i.Optional("UsageVariance");
+                    existing.Category = i.Optional("Category");
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Item {existing.Code} changed.";
+                }
+
+                return Check(await c.Get<IMasterDataService>().CreateItemAsync(new NewItem(c.CompanyId, i.Text("Code"), i.Text("Description"), Enum.Parse<ItemType>(i.Text("Type")),
+                    i.Optional("Revenue"), i.Optional("Cost"), i.OptionalNumber("Standard"), Enum.Parse<CostingMethod>(i.Text("Costing")), Enum.Parse<ItemTracking>(i.Text("Tracking")),
+                    i.OptionalNumber("ShelfLife") is decimal days ? (int)days : null, i.Optional("PriceVariance"), i.Optional("UsageVariance"), i.Optional("Category"))).ConfigureAwait(true),
+                    id => "Item added.");
+            },
             List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Code", x => x.Code), ("Description", x => x.Description), ("Type", x => x.ItemType), ("Revenue", x => x.RevenueAccountCode), ("Cost of sales", x => x.CostOfSalesAccountCode),
                 ("Costing", x => x.CostingMethod.ToString()), ("Tracking", x => x.Tracking.ToString()), ("Shelf life", x => x.ShelfLifeDays)),

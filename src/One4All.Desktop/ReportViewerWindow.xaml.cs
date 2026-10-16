@@ -19,6 +19,7 @@ namespace One4All.Desktop;
 public partial class ReportViewerWindow : Window
 {
     private readonly ReportViewerViewModel _viewModel;
+    private readonly string? _openOn;
     private readonly IServiceProvider _services;
     private IReadOnlyList<LayoutPage> _pages = [];
     private int _lastHit = -1;
@@ -26,7 +27,16 @@ public partial class ReportViewerWindow : Window
     /// <summary>Creates the window against the application services.</summary>
     /// <param name="services">The application service provider.</param>
     public ReportViewerWindow(IServiceProvider services)
+        : this(services, null)
     {
+    }
+
+    /// <summary>Creates the viewer open on a report.</summary>
+    /// <param name="services">The application service provider.</param>
+    /// <param name="reportCode">The report to select, or null.</param>
+    public ReportViewerWindow(IServiceProvider services, string? reportCode)
+    {
+        _openOn = reportCode;
         _services = services;
         _viewModel = new ReportViewerViewModel(services);
         DataContext = _viewModel;
@@ -36,6 +46,10 @@ public partial class ReportViewerWindow : Window
         Loaded += async (_, _) =>
         {
             await _viewModel.LoadAsync().ConfigureAwait(true);
+            if (_openOn is not null)
+            {
+                _viewModel.SelectedReport = _viewModel.Reports.FirstOrDefault(r => string.Equals(r.Code, _openOn, StringComparison.OrdinalIgnoreCase));
+            }
             ShowPreview();
         };
     }

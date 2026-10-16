@@ -130,17 +130,90 @@ public sealed partial class OperationsViewModel : ObservableObject
 
     /// <summary>Gets the line under the heading: plain instructions for one screen, the console's own line otherwise.</summary>
     public string Subtitle => IsSingle
-        ? (SingleContext is null ? string.Empty : SingleContext + "  —  ") + "Fill in the boxes (those marked * must be filled) and press Go. What happened shows underneath; \"Show the list\" opens the records in their own window."
+        ? (SingleContext is null ? string.Empty : SingleContext + "  —  ") + "Fill in the boxes (those marked * must be filled) and press OK. Cancel closes without saving."
         : Localization.UiText.T("Choose an action, fill the form and run it. Records are looked up by their codes; every rule is enforced by the posting services.");
 
     /// <summary>Gets the line under the list window's title: where the screen sits.</summary>
     public string ListContext => SingleContext ?? Localization.UiText.T(Module);
 
+    /// <summary>Gets a value indicating whether there is output to show under the form.</summary>
+    public bool HasResult => !string.IsNullOrEmpty(Result);
+
+    /// <summary>Gets a value indicating whether the last run's output is a short message (one line) rather than a document or a table.</summary>
+    public bool ResultIsShort => !HasResult || (!Result.Contains('\n') && Result.Length <= 200);
+
+    /// <summary>Fills the form from a list row: each column whose name matches a field (ignoring case and spaces) sets that field, so Edit… starts from the record.</summary>
+    /// <param name="row">The row.</param>
+    public void Prefill(System.Data.DataRowView row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        static string Key(string text) => new([.. text.Where(char.IsLetterOrDigit)]);
+        foreach (OperationFieldVm field in Fields)
+        {
+            System.Data.DataColumn? column = row.Row.Table.Columns.Cast<System.Data.DataColumn>().FirstOrDefault(c => string.Equals(Key(c.ColumnName), Key(field.Field.Name), StringComparison.OrdinalIgnoreCase)
+                || string.Equals(Key(c.ColumnName), Key(field.Field.Label), StringComparison.OrdinalIgnoreCase));
+            if (column is null || row[column.ColumnName] is DBNull or null)
+            {
+                continue;
+            }
+
+            string text = Convert.ToString(row[column.ColumnName], System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+            switch (field.Field.Kind)
+            {
+                case FieldKind.Date when DateTime.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, out DateTime date):
+                    field.DateValue = date;
+                    break;
+                case FieldKind.Flag:
+                    field.IsTicked = text is "True" or "Yes" or "true";
+                    break;
+                case FieldKind.Choice:
+                    field.Value = field.Choices.FirstOrDefault(choice => Ops.CodeOf(choice)?.Equals(text, StringComparison.OrdinalIgnoreCase) == true || choice.Equals(text, StringComparison.OrdinalIgnoreCase)) ?? text;
+                    break;
+                default:
+                    field.Value = text.Replace(",", string.Empty).Length > 0 && field.Field.Kind == FieldKind.Number ? text.Replace(",", string.Empty) : text;
+                    break;
+            }
+        }
+    }
+
+    /// <summary>Deletes the record with the key, when the operation allows it, and refreshes the list.</summary>
+    /// <param name="key">The record's key (its code).</param>
+    /// <returns>What happened.</returns>
+    public async Task<string> DeleteAsync(string key)
+    {
+        if (Selected?.Delete is not Func<OperationContext, string, Task<string>> delete)
+        {
+            return "These records cannot be deleted.";
+        }
+
+        if (await RefusalAsync(Selected, true, Core.Security.OperationFlags.Delete).ConfigureAwait(true) is string refused)
+        {
+            StatusMessage = refused;
+            return refused;
+        }
+
+        try
+        {
+            string done = await InScopeAsync(c => delete(c, key)).ConfigureAwait(true);
+            StatusMessage = done;
+            await RefreshAsync().ConfigureAwait(true);
+            return done;
+        }
+        catch (OperationException ex)
+        {
+            StatusMessage = ex.Message;
+            return ex.Message;
+        }
+    }
+
     /// <summary>Gets the list toolbar's Add… button text: the screen's own name.</summary>
     public string AddText => (SingleTitle ?? Selected?.Title ?? "Add") + "…";
 
+    /// <summary>Gets the OK button's text: OK for a form, Run for a document or an enquiry that shows output.</summary>
+    public string OkText => Selected?.IsDocument == true || Selected?.HasList == false ? "▶  Run" : "✔  OK";
+
     /// <summary>Gets the button's text.</summary>
-    public string RunText => IsSingle ? "✔  Go" : Localization.UiText.T("Run");
+    public string RunText => IsSingle ? "✔  OK" : Localization.UiText.T("Run");
 
     /// <summary>Gets the modules.</summary>
     public IReadOnlyList<string> Modules => OperationCatalogue.Modules;
@@ -170,6 +243,7 @@ public sealed partial class OperationsViewModel : ObservableObject
 
     /// <summary>The outcome of the last run (or the printed document).</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasResult), nameof(ResultIsShort))]
     private string _result = string.Empty;
 
     /// <summary>Whether the last run failed.</summary>
@@ -251,12 +325,15 @@ public sealed partial class OperationsViewModel : ObservableObject
         Selected = Operations.FirstOrDefault();
     }
 
-    // The signed-in user's permission in the action's module and the module's licence, checked before every run and list (brief §5.1).
-    private Task<string?> RefusalAsync(Operation operation, bool isWrite) => InScopeAsync(async c =>
+    // The signed-in user's permission in the action's module and the module's licence, then the screen's own feature and the flags it needs
+    // (any one of them), checked before every run, list and delete (brief §5.1, §18.3).
+    private Task<string?> RefusalAsync(Operation operation, bool isWrite, Core.Security.OperationFlags needs) => InScopeAsync(async c =>
     {
         Core.Security.EffectivePermissions permissions = await c.Get<Application.Abstractions.Security.IPermissionService>().ResolveAsync(c.UserId).ConfigureAwait(true);
         Application.Abstractions.Licensing.ILicenceService licence = c.Get<Application.Abstractions.Licensing.ILicenceService>();
-        return Application.Security.DesktopAccessRules.Refusal(permissions, operation.Module, isWrite, licence.IsModuleLicensed);
+        return operation.PermissionCode is string code
+            ? Application.Security.ScreenPermissions.Unlicensed(code, licence.IsModuleLicensed) ?? Application.Security.ScreenPermissions.Refusal(permissions, code, needs, operation.Title)
+            : Application.Security.DesktopAccessRules.Refusal(permissions, operation.Module, isWrite, licence.IsModuleLicensed);
     });
 
     private async Task<T> InScopeAsync<T>(Func<OperationContext, Task<T>> work)
@@ -283,7 +360,7 @@ public sealed partial class OperationsViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            if (await RefusalAsync(operation, !operation.IsDocument).ConfigureAwait(true) is string refused)
+            if (await RefusalAsync(operation, !operation.IsDocument, operation.Needs).ConfigureAwait(true) is string refused)
             {
                 Result = refused;
                 Failed = true;
@@ -365,7 +442,7 @@ public sealed partial class OperationsViewModel : ObservableObject
 
         try
         {
-            if (await RefusalAsync(Selected, false).ConfigureAwait(true) is string refused)
+            if (await RefusalAsync(Selected, false, Core.Security.OperationFlags.View).ConfigureAwait(true) is string refused)
             {
                 StatusMessage = refused;
                 List = null;

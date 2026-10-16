@@ -196,10 +196,81 @@ public static class PermissionCatalogue
         Add(rpt, LicenceModules.ReportDesigner, "Designer", "Report Designer", master);
         Add(rpt, LicenceModules.Core, "Schedule", "Report Scheduling & Bursting", OperationFlags.View | OperationFlags.Create | OperationFlags.Edit | OperationFlags.Post);
 
+        AddScreenFeatures(list, master, txn, ro, auth);
+
         return list
             .OrderBy(p => p.Module, StringComparer.Ordinal)
             .ThenBy(p => p.Feature, StringComparer.Ordinal)
             .ToList();
+    }
+
+    // Features the desktop's screens are gated by (Application.Security.ScreenPermissions maps every screen to one), beyond the headline ones above.
+    private static void AddScreenFeatures(List<PermissionDefinition> list, OperationFlags master, OperationFlags txn, OperationFlags ro, OperationFlags auth)
+    {
+        void Add(string module, string licence, string feature, string name, OperationFlags flags) =>
+            list.Add(new PermissionDefinition($"{module}.{feature}", module, feature, name, flags, licence));
+
+        const OperationFlags setting = OperationFlags.View | OperationFlags.Edit;
+        const OperationFlags run = OperationFlags.View | OperationFlags.Create | OperationFlags.Post;
+
+        Add("System", LicenceModules.Core, "Workflow", "Approval Workflow (stages, delegation, escalation)", setting | OperationFlags.Approve | OperationFlags.Create);
+        Add("System", LicenceModules.Core, "Industry", "Industry Setup & Sample Data", run);
+        Add("System", LicenceModules.Core, "Integration", "API Keys, Webhooks & Offline Queue", master);
+        Add("System", LicenceModules.Core, "Import", "Data Import & Templates", run | OperationFlags.Export);
+        Add("System", LicenceModules.Core, "Printer", "Printers per Workstation", setting);
+        Add("System", LicenceModules.Core, "Attachment", "Attachment Rules", setting);
+        Add("System", LicenceModules.Core, "Encryption", "Payroll Encryption Keys", setting | OperationFlags.Post);
+
+        Add("GeneralLedger", LicenceModules.GeneralLedger, "Tax", "VAT Returns & Tax Exemption Certificates", txn);
+        Add("GeneralLedger", LicenceModules.GeneralLedger, "Accrual", "Accruals, Prepayments & Deferred Income", txn);
+
+        Add("Sales", LicenceModules.AccountsReceivable, "PriceList", "Price Lists", master | OperationFlags.OverridePrice);
+        Add("Sales", LicenceModules.AccountsReceivable, "Commission", "Sales Commissions", master | OperationFlags.Post);
+        Add("Sales", LicenceModules.AccountsReceivable, "Layby", "Lay-bys", txn);
+        Add("Sales", LicenceModules.AccountsReceivable, "Contract", "Customer Contracts & Call-offs", master | OperationFlags.Post);
+
+        Add("Purchasing", LicenceModules.AccountsPayable, "WithholdingTax", "Withholding Tax Returns", ro | OperationFlags.Post);
+
+        Add("CashBook", LicenceModules.CashBook, "Cheque", "Cheques", txn);
+        Add("CashBook", LicenceModules.CashBook, "StandingOrder", "Standing Orders & Direct Debits", master | OperationFlags.Post);
+        Add("CashBook", LicenceModules.CashBook, "Forecast", "Cash-flow Forecast", ro);
+        Add("CashBook", LicenceModules.CashBook, "BankFileLayout", "Bank File Layouts", master);
+        Add("CashBook", LicenceModules.CashBook, "PettyCash", "Petty Cash", txn);
+        Add("CashBook", LicenceModules.CashBook, "Teller", "Teller / Cashier Till", OperationFlags.View | OperationFlags.Create | OperationFlags.Post | OperationFlags.Print | OperationFlags.Reprint | OperationFlags.VoidReverse);
+        Add("CashBook", LicenceModules.CashBook, "CashOffice", "Cash Office Setup (stations, collectors, receipt books, matching rules)", master);
+
+        Add("Inventory", LicenceModules.Inventory, "Assembly", "Assembly & Production Batches", txn);
+        Add("Inventory", LicenceModules.Inventory, "Price", "Stock Prices & Future Prices", master | OperationFlags.OverridePrice);
+        Add("Inventory", LicenceModules.Inventory, "Replenishment", "Replenishment, Reorder Levels & ABC", master);
+        Add("Inventory", LicenceModules.Inventory, "Consignment", "Supplier- and Customer-owned Stock", master | OperationFlags.Post);
+
+        Add("Procurement", LicenceModules.Procurement, "SupplierPerformance", "Supplier Rebates & Scorecards", master);
+
+        Add("Pos", LicenceModules.PointOfSale, "Loyalty", "Loyalty Programme", master | OperationFlags.Post);
+        Add("Pos", LicenceModules.PointOfSale, "TillSetting", "Till Settings (categories, currency, rounding)", master);
+        Add("Pos", LicenceModules.PointOfSale, "Restaurant", "Restaurant Orders, Tables & Reservations", txn);
+        Add("Pos", LicenceModules.PointOfSale, "Kitchen", "Kitchen Tickets & Wastage", run | OperationFlags.Print);
+        Add("Pos", LicenceModules.PointOfSale, "RestaurantSetup", "Menus, Floor Plan & Kitchen Printers", master);
+
+        Add("Municipal", LicenceModules.Municipal, "Facility", "Cemeteries & Facility Bookings", master | OperationFlags.Post);
+        Add("Municipal", LicenceModules.Municipal, "Prepaid", "Prepaid Vending", txn);
+
+        Add("JobCosting", LicenceModules.JobCosting, "Timesheet", "Timesheets & Plant Hours", txn);
+
+        Add("FixedAssets", LicenceModules.FixedAssets, "CapitalProject", "Capital Projects (CWIP)", txn);
+        Add("FixedAssets", LicenceModules.FixedAssets, "Maintenance", "Asset Maintenance & Usage", master | OperationFlags.Post);
+
+        Add("Crm", LicenceModules.Crm, "Activity", "Activities", txn);
+        Add("Crm", LicenceModules.Crm, "WhatsApp", "WhatsApp Inbox", run);
+
+        Add("Payroll", LicenceModules.Payroll, "Attendance", "Attendance, Rosters & Time Clock", txn);
+        Add("Payroll", LicenceModules.Payroll, "SelfService", "Self-service Requests & Overtime Approval", OperationFlags.View | OperationFlags.Approve | auth);
+        Add("Payroll", LicenceModules.Payroll, "Expense", "Expense Claims", txn | auth);
+        Add("Payroll", LicenceModules.Payroll, "HrRecord", "HR Records (appraisals, training, discipline, documents)", master);
+        Add("Payroll", LicenceModules.Payroll, "Medical", "Medical Records (restricted)", master);
+
+        Add("School", LicenceModules.School, "AcademicYear", "Academic Years, Terms & Classes", master);
+        Add("School", LicenceModules.School, "Wallet", "Student Wallets", txn);
     }
 
     private static void AddHousing(List<PermissionDefinition> list, OperationFlags master, OperationFlags auth)

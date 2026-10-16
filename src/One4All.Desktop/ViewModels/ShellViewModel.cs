@@ -30,7 +30,7 @@ public sealed partial class ShellViewModel : ObservableObject
         _licenceStatusText = StatusLine(licence);
         Registry = registry ?? new ModuleRegistry();
         IsLicensed = licence.IsModuleLicensed;
-        foreach (NavModule module in NavigationBuilder.Build(Operations.OperationCatalogue.All(), IsMenuEntryAvailable))
+        foreach (NavModule module in NavigationBuilder.Build(Operations.OperationCatalogue.All(), IsMenuEntryAvailable, o => Application.Security.ScreenPermissions.CanSee(_permissions, o.PermissionCode, IsLicensed)))
         {
             NavModules.Add(module);
         }

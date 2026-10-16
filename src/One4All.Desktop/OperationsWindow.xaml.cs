@@ -43,6 +43,7 @@ public partial class OperationsWindow : Window
         {
             Title = viewModel.SingleTitle ?? Title;
             Width = 1000;
+            SizeToContent = SizeToContent.Height;
         }
     }
 }

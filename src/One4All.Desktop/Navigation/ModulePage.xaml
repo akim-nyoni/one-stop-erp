@@ -8,6 +8,7 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/One4All.Desktop;component/Navigation/TileStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="Visible" />
         </ResourceDictionary>
     </UserControl.Resources>
     <Grid Margin="16">
@@ -41,7 +42,8 @@
         <!-- The kinds of work side by side, each with its screens as tiles -->
         <Border Grid.Column="1" BorderBrush="{StaticResource PageBorder}" BorderThickness="1">
             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding Module.Categories}" Margin="8">
+                <StackPanel Orientation="Horizontal" Margin="8">
+                <ItemsControl ItemsSource="{Binding Module.Categories}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
@@ -63,6 +65,25 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <StackPanel Visibility="{Binding Module.HasReports, Converter={StaticResource Visible}}">
+                    <TextBlock Text="Reports" Style="{StaticResource SectionHeading}" Foreground="{StaticResource UtilitiesBrush}" />
+                    <ItemsControl ItemsSource="{Binding Module.Reports}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel Width="474" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type nav:NavReport}">
+                                <Button Style="{StaticResource Tile}" Click="Report_Click" ToolTip="{Binding Code}">
+                                    <StackPanel Width="138">
+                                        <TextBlock Text="{Binding Glyph}" FontSize="40" HorizontalAlignment="Center" Margin="0,4,0,6" Foreground="{StaticResource UtilitiesBrush}" />
+                                        <TextBlock Text="{Binding Name}" FontSize="13" Foreground="{StaticResource PageInk}" TextAlignment="Center" TextWrapping="Wrap" MaxHeight="54" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+                </StackPanel>
             </ScrollViewer>
         </Border>
     </Grid>

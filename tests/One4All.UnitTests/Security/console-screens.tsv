@@ -1,0 +1,434 @@
+# Console module	Screen title	IsDocument	Area — a snapshot of One4All.Desktop.Operations.OperationCatalogue.All() (regenerate when screens are added)
+Approvals	Add an approver to a document	False	
+Approvals	Approve or reject several at once	False	
+Approvals	Delegate my approvals	False	
+Approvals	Email approval links	False	
+Approvals	Escalate overdue approvals	False	
+Approvals	Request a master-data change	False	
+Approvals	Segregation-of-duties rules	False	
+Approvals	Set a stage's rules	False	
+Approvals	Set a user's manager	False	
+Banking	Bank statement import and sign-off	False	
+Banking	Capture a supplier statement	False	
+Banking	Cash-flow forecast	False	
+Banking	Issue a cheque	False	
+Banking	Mark a cheque presented / cancelled	False	
+Banking	Print a cheque	False	
+Banking	Run standing orders and direct debits	False	
+Banking	Save a bank file layout	False	
+Banking	Set up a direct debit mandate	False	
+Banking	Set up a standing order	False	
+Banking	Stop a standing order or mandate	False	
+Banking	Transfer between bank accounts	False	
+Banking	Void a cheque leaf	False	
+Banking	Write payroll bank files	True	
+Budgeting	Add a driver-based line	False	
+Budgeting	Budget methods and forecasts	False	
+Budgeting	Budget vs actual by fund, project or branch	False	
+Budgeting	Budget-holder statements	False	
+Budgeting	Build the staff budget from the establishment	False	
+Budgeting	Carry unspent capital forward	False	
+Budgeting	Create or copy a budget	False	
+Budgeting	Export a budget to Excel	False	
+Budgeting	Import a budget workbook	False	
+Budgeting	Move a budget through preparation	False	
+Budgeting	Multi-year framework, archive and lock	False	
+Budgeting	Preparation deadlines and budget alerts	False	
+Budgeting	Propose or revise a figure	False	
+Budgeting	Re-phase an approved budget	False	
+Budgeting	Record actual volumes	False	
+Budgeting	Set a budget's currency and rate	False	
+Budgeting	Set an assumption	False	
+Budgeting	Show a budget's negotiation trail	False	
+Budgeting	Spread an annual figure	False	
+Budgeting	Variance commentary	False	
+Budgeting	Virements	False	
+Budgeting	Vote book and utilisation alerts	False	
+Budgeting	Year-end commitments	False	
+CRM	Capture a lead	False	
+CRM	Complete an activity	False	
+CRM	Link a quotation to an opportunity	False	
+CRM	Log an activity	False	
+CRM	Opportunity pipeline	False	
+CRM	WhatsApp replies	False	
+CRM	Work a lead	False	
+Contracts	Add a BOQ line	False	
+Contracts	Add a WBS element	False	
+Contracts	Book timesheet hours to a job	False	
+Contracts	Certify a subcontract	False	
+Contracts	Client certificates, advance and retention	False	
+Contracts	Contract revenue, losses and budget	False	
+Contracts	Cost to complete by WBS	False	
+Contracts	Decide a variation order	False	
+Contracts	Give an estimate to complete	False	
+Contracts	Import a BOQ	False	
+Contracts	Issue materials to a job	False	
+Contracts	Job cost position and overhead rates	False	
+Contracts	Let a subcontract	False	
+Contracts	Log plant hours / running cost	False	
+Contracts	Measure a BOQ line	False	
+Contracts	Open a job contract	False	
+Contracts	Pay a subcontract advance	False	
+Contracts	Release subcontract retention	False	
+Contracts	Set subcontract withholding tax	False	
+Contracts	Submit a variation order	False	
+Customers	Addresses and contacts	False	
+Customers	Allocate customer items	False	
+Customers	Credit limits	False	
+Customers	Customer ageing basis and group	False	
+Customers	Customer debit note	False	
+Customers	Customer invoice or credit note	False	
+Customers	Customer receipt (bank)	False	
+Customers	Customer statement	False	
+Customers	Debt collection cases	False	
+Customers	Dunning reminders	False	
+Customers	Email a statement	False	
+Customers	Email customer statements	False	
+Customers	Exchange-rate type	False	
+Customers	Expected credit loss on debtors	False	
+Customers	Lay-bys	False	
+Customers	Price lists	False	
+Customers	Promises to pay	False	
+Customers	Raise finance charges	False	
+Customers	Recurring sales invoices	False	
+Customers	Sales commissions	False	
+Customers	Settlement discount	False	
+Documents	Delivery note	True	
+Documents	Fee invoice	True	
+Documents	Goods received note	True	
+Documents	Municipal bill	True	
+Documents	Order confirmation	True	
+Documents	Packing slip	True	
+Documents	Payment certificate	True	
+Documents	Purchase requisition	True	
+Documents	Quotation	True	
+Documents	Shelf labels	True	
+Documents	Supplier debit note	True	
+Fixed Assets	Add a cost to a capital project	False	
+Fixed Assets	Asset classes and impairment	False	
+Fixed Assets	Asset insurance and warranty	False	
+Fixed Assets	Asset register	False	
+Fixed Assets	Capitalise a capital project	False	
+Fixed Assets	Capitalise from a supplier invoice	False	
+Fixed Assets	Close an asset count	False	
+Fixed Assets	Complete planned maintenance	False	
+Fixed Assets	Move an asset to another cost centre	False	
+Fixed Assets	Open a capital project (CWIP)	False	
+Fixed Assets	Plan recurring maintenance	False	
+Fixed Assets	Record an asset sighting	False	
+Fixed Assets	Record asset usage	False	
+Fixed Assets	Start an asset count	False	
+General Ledger	Accounting vouchers	False	
+General Ledger	Accruals and prepayments	False	
+General Ledger	Close or reopen a period	False	
+General Ledger	Exchange-rate policy	False	
+General Ledger	Funds, projects and fund accounting	False	
+General Ledger	Hyperinflation (IAS 29)	False	
+General Ledger	Import journals from a file	False	
+General Ledger	Intercompany journal	False	
+General Ledger	Overhead allocation	False	
+General Ledger	Petty cash	False	
+General Ledger	Recognise deferred income	False	
+General Ledger	Recurring journals	False	
+General Ledger	Reporting trees	False	
+General Ledger	Revalue foreign currency balances	False	
+General Ledger	Settle VAT for a period	False	
+General Ledger	Submit a manual journal	False	
+General Ledger	Tax exemption certificates	False	
+General Ledger	VAT return by tax point basis	False	
+General Ledger	Year-end	False	
+HR & Attendance	Accrue leave	False	
+HR & Attendance	Accrue unpaid salaries	False	
+HR & Attendance	Appoint to act	False	
+HR & Attendance	Approve overtime	False	
+HR & Attendance	Approve payroll	False	
+HR & Attendance	Backpay for a salary change	False	
+HR & Attendance	Bank detail change	False	
+HR & Attendance	Benefits in kind	False	
+HR & Attendance	Bonus and gratuity provisions	False	
+HR & Attendance	Calculate payroll for approval	False	
+HR & Attendance	Capitalise timesheet labour to WIP	False	
+HR & Attendance	Commit approved payroll	False	
+HR & Attendance	Decide self-service requests	False	
+HR & Attendance	Employee contacts, photo and dependants	False	
+HR & Attendance	Employee record	False	
+HR & Attendance	Encash leave	False	
+HR & Attendance	Expense claims	False	
+HR & Attendance	File an employee document	False	
+HR & Attendance	Grievances and property issued	False	
+HR & Attendance	HR expiry alerts	False	
+HR & Attendance	Import legacy payroll (parallel run)	False	
+HR & Attendance	Import pay variables	False	
+HR & Attendance	Import time-clock punches	False	
+HR & Attendance	Key a pay variable	False	
+HR & Attendance	Leave calendar and recall	False	
+HR & Attendance	Leave policies	False	
+HR & Attendance	Leave provision (IAS 19)	False	
+HR & Attendance	Medical records (restricted)	False	
+HR & Attendance	Pay and close a payroll run	False	
+HR & Attendance	Pay elements and tax tables	False	
+HR & Attendance	Payslips: save or email	False	
+HR & Attendance	Raise third-party invoices	False	
+HR & Attendance	Record a disciplinary action	False	
+HR & Attendance	Record an appraisal	False	
+HR & Attendance	Record an attendance day	False	
+HR & Attendance	Record training	False	
+HR & Attendance	Register a garnishee order	False	
+HR & Attendance	Reverse a payroll run	False	
+HR & Attendance	Run payroll	False	
+HR & Attendance	Run the annual increment	False	
+HR & Attendance	Set a salary scale notch	False	
+HR & Attendance	Set an employee's pay group	False	
+HR & Attendance	Set net-pay protection	False	
+HR & Attendance	Set the establishment	False	
+HR & Attendance	Set the tax year	False	
+HR & Attendance	Shift rosters	False	
+HR & Attendance	Split net pay	False	
+HR & Attendance	Staff loans	False	
+HR & Attendance	Supplementary payroll run	False	
+HR & Attendance	Take leave	False	
+HR & Attendance	Tax credits	False	
+HR & Attendance	Termination and final pay	False	
+Housing	Accept or decline an offer	False	
+Housing	Allocation appeals	False	
+Housing	Allocation quotas	False	
+Housing	Allocation run	False	
+Housing	Applicant fees and transfer duty	False	
+Housing	Applicant intake and duplicate queue	False	
+Housing	Compulsory acquisition and compensation	False	
+Housing	Developer agreements	False	
+Housing	Development covenants	False	
+Housing	Development levies	False	
+Housing	Evictions	False	
+Housing	Housing cooperatives	False	
+Housing	Housing expected credit loss	False	
+Housing	Housing grants	False	
+Housing	Informal settlements	False	
+Housing	Instalment arrears and default notices	False	
+Housing	Instalment sales of stands	False	
+Housing	Joint ownership	False	
+Housing	Land acquisition	False	
+Housing	Land register	False	
+Housing	Land, schemes and stands	False	
+Housing	Layout plans	False	
+Housing	Link stands to municipal accounts	False	
+Housing	Map stands and parcels	False	
+Housing	Occupants and lodger permits	False	
+Housing	Receivables control per tenure type	False	
+Housing	Register a waiting-list applicant	False	
+Housing	Rent tariffs and review	False	
+Housing	Rental maintenance	False	
+Housing	Rental property accounting (IAS 40)	False	
+Housing	Rental units and tenancies	False	
+Housing	Repossess a stand	False	
+Housing	Sale, lease and rental agreements	False	
+Housing	Scheme budget and costs	False	
+Housing	Scheme progress	False	
+Housing	Sectional title schemes	False	
+Housing	Servicing cost apportionment	False	
+Housing	Stand blocks and caveats	False	
+Housing	Stand deposits and cancellations	False	
+Housing	Stand leases	False	
+Housing	Stand lifecycle	False	
+Housing	Stand pricing	False	
+Housing	Stand, parcel and scheme details	False	
+Housing	Title deeds	False	
+Housing	Transfer of ownership	False	
+Housing	Waiting list enquiry and ranking	False	
+Housing	Waiting-list control	False	
+Housing	Waiting-list policy and qualification rules	False	
+Municipality	Billing run	False	
+Municipality	Capture a meter reading	False	
+Municipality	Cemeteries	False	
+Municipality	Council licences	False	
+Municipality	Council service types	False	
+Municipality	Disconnections and reconnections	False	
+Municipality	Facility bookings	False	
+Municipality	Fault ticket categories	False	
+Municipality	Indigent register	False	
+Municipality	Meter reading routes	False	
+Municipality	Prepaid vending	False	
+Municipality	Property enquiry	False	
+Municipality	Property ownership	False	
+Municipality	Ratepayer statement	False	
+Municipality	Rates clearance certificates	False	
+Municipality	Service connections	False	
+Municipality	Service deposits	False	
+Municipality	Stand location and meter details	False	
+Municipality	Tariff billing cycle	False	
+Municipality	Tariff catalogue	False	
+Municipality	Valuation roll	False	
+Point of Sale	Activate a gift card	False	
+Point of Sale	Category under a category	False	
+Point of Sale	Change currency and cash rounding	False	
+Point of Sale	Create gift card stock	False	
+Point of Sale	Discard a parked sale	False	
+Point of Sale	Exchange goods	False	
+Point of Sale	Expire loyalty points	False	
+Point of Sale	Gift cards: balance, top up, block, replace, breakage	False	
+Point of Sale	Loyalty: enrol, earn, redeem, statement	False	
+Point of Sale	Price a basket with promotions	False	
+Point of Sale	Promotional codes	False	
+Point of Sale	Record a till event	False	
+Point of Sale	Refund sale lines	False	
+Point of Sale	Refund window	False	
+Point of Sale	Refund without a receipt	False	
+Point of Sale	Save a promotion	False	
+Point of Sale	Till cash-up position	False	
+Point of Sale	Till favourites	False	
+Point of Sale	Till pickup / paid-out / float top-up	False	
+Purchasing	Amend a purchase order	False	
+Purchasing	Check or reserve budget	False	
+Purchasing	Framework agreements	False	
+Purchasing	Match a supplier invoice	False	
+Purchasing	Purchase order	False	
+Purchasing	Purchase requisition	False	
+Purchasing	Quality inspection of a receipt	False	
+Purchasing	Receive goods	False	
+Purchasing	Reconcile budget commitments	False	
+Purchasing	Requests for quotation	False	
+Purchasing	Return stock to a supplier	False	
+Purchasing	Schedule a PO line's deliveries	False	
+Purchasing	Set a budget enforcement rule	False	
+Purchasing	Supplier invoice disputes	False	
+Purchasing	Supplier rebates	False	
+Purchasing	Supplier scorecard	False	
+Receipting	Arrangements, dishonours and refunds	False	
+Receipting	Banking	False	
+Receipting	Cash office drawer	False	
+Receipting	Cashier stations and field collectors	False	
+Receipting	Cashiers' own and related accounts	False	
+Receipting	Collection agents	False	
+Receipting	Import receipts from a file	False	
+Receipting	Manual receipt books	False	
+Receipting	Open or close my session	False	
+Receipting	Receipt matching rules	False	
+Receipting	Reverse a receipt	False	
+Receipting	Take a payment	False	
+Restaurant	Bill an order	False	
+Restaurant	Floor plan and tab warnings	False	
+Restaurant	Kitchen station printers	False	
+Restaurant	Kitchen tickets	False	
+Restaurant	Kitchen wastage	False	
+Restaurant	Menu items	False	
+Restaurant	Reservations	False	
+Restaurant	Restaurant orders	False	
+Restaurant	Tables and sections	False	
+Restaurant	Tips	False	
+Restaurant	Waitlist	False	
+Sales & Schools	Academic years and terms	False	
+Sales & Schools	Amend a sales order	False	
+Sales & Schools	Bursaries	False	
+Sales & Schools	Call off against a contract	False	
+Sales & Schools	Charge for a delivery	False	
+Sales & Schools	Classes and streams	False	
+Sales & Schools	Confirm a delivery (proof of delivery)	False	
+Sales & Schools	Create a customer contract	False	
+Sales & Schools	Delivery vehicles and loads	False	
+Sales & Schools	Drop-ship order lines	False	
+Sales & Schools	Fee structures and term billing	False	
+Sales & Schools	Pick list for a sales order	False	
+Sales & Schools	Quotations	False	
+Sales & Schools	Reserve stock for a sales order	False	
+Sales & Schools	Sales discount limit	False	
+Sales & Schools	Sales order processing	False	
+Sales & Schools	Save a delivery zone rate	False	
+Sales & Schools	Send fee reminders	False	
+Sales & Schools	Set a sibling discount	False	
+Sales & Schools	Staff children and restricted students	False	
+Sales & Schools	Students, hostels and routes	False	
+Sales & Schools	Term dates, optional fees and leavers	False	
+Sales & Schools	Top up / spend a student wallet	False	
+Stock	Add a barcode, synonym, pack or supplier to an item	False	
+Stock	Adjust stock with a reason	False	
+Stock	Bins: add, put away, move, take, pick walk	False	
+Stock	Classify items A / B / C	False	
+Stock	Disassemble finished goods	False	
+Stock	Dispatch a transfer	False	
+Stock	Find an item	False	
+Stock	Future prices	False	
+Stock	Item picture, description and dimensions	False	
+Stock	Landed costs on a receipt	False	
+Stock	Post a stocktake	False	
+Stock	Price a list from cost	False	
+Stock	Recall trace of a batch / serial	False	
+Stock	Receive a transfer	False	
+Stock	Record a count	False	
+Stock	Record a recount	False	
+Stock	Record batches / serials on a movement	False	
+Stock	Revalue an item's standard cost	False	
+Stock	Run an assembly / production batch	False	
+Stock	Set a warehouse reorder level	False	
+Stock	Set an item as catch-weight	False	
+Stock	Set an item's replenishment policy	False	
+Stock	Set item sale limits	False	
+Stock	Start a cycle count	False	
+Stock	Start a stocktake	False	
+Stock	Stock availability and back orders	False	
+Stock	Stock write-down provision	False	
+Stock	Store requisitions	False	
+Stock	Suggest picks (first expiry, first out)	False	
+Stock	Supplier- and customer-owned stock	False	
+Suppliers	Addresses and contacts	False	
+Suppliers	Allocate supplier items	False	
+Suppliers	Allowance vouchers	False	
+Suppliers	Email a statement, remittance or order	False	
+Suppliers	Exchange-rate type	False	
+Suppliers	Payment run approval	False	
+Suppliers	Recurring purchase invoices	False	
+Suppliers	Remittance advice	False	
+Suppliers	Supplier bank details	False	
+Suppliers	Supplier invoice or credit note	False	
+Suppliers	Supplier payment	False	
+Suppliers	Supplier statement	False	
+Suppliers	Withholding tax returns	False	
+System Manager	API keys for integrations	False	
+System Manager	Activate or deactivate a user	False	
+System Manager	Add a branch	False	
+System Manager	Add a cost centre or department	False	
+System Manager	Add a currency	False	
+System Manager	Add a customer	False	
+System Manager	Add a ledger account	False	
+System Manager	Add a supplier	False	
+System Manager	Add a tax code	False	
+System Manager	Add a warehouse	False	
+System Manager	Add an industry to this company	False	
+System Manager	Add an item	False	
+System Manager	Archive an audit year	False	
+System Manager	Assign a role	False	
+System Manager	Attachments	False	
+System Manager	Back up or restore the database	False	
+System Manager	Burst a report by email	False	
+System Manager	Cashier card and fingerprint	False	
+System Manager	Company email and SMS settings	False	
+System Manager	Compare roles or change many at once	False	
+System Manager	Create a company	False	
+System Manager	Create a fiscal year	False	
+System Manager	Create a group or add a role to it	False	
+System Manager	Create a role	False	
+System Manager	Create a user	False	
+System Manager	Failed offline operations	False	
+System Manager	Import master data or opening balances	False	
+System Manager	Import templates and master data export	False	
+System Manager	Join or leave a group	False	
+System Manager	Language and terminology	False	
+System Manager	Licence	False	
+System Manager	Load sample data for testing	False	
+System Manager	Manage webhooks	False	
+System Manager	Payroll encryption	False	
+System Manager	Printers per workstation	False	
+System Manager	Quick search	False	
+System Manager	Refresh reporting snapshots	False	
+System Manager	Report subscription	False	
+System Manager	Report version history	False	
+System Manager	Reset a password	False	
+System Manager	Review direct database changes	False	
+System Manager	Set an exchange rate	False	
+System Manager	Set the company logo	False	
+System Manager	Set the reporting currency	False	
+System Manager	Set up a company for an industry	False	
+System Manager	Stock valuation and sales snapshots	False	
+Weighbridge	Concrete slump and strength tests	False	
+Weighbridge	First weigh (open a ticket)	False	
+Weighbridge	Invoice weighbridge loads	False	
+Weighbridge	Second weigh (complete a ticket)	False	

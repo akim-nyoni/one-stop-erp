@@ -33,6 +33,17 @@ public partial class ModulePage : UserControl
     /// <summary>Raised when a screen tile is clicked.</summary>
     public event Action<NavEntry>? EntryOpened;
 
+    /// <summary>Raised when a report tile is clicked, with the report code.</summary>
+    public event Action<string>? ReportOpened;
+
+    private void Report_Click(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is NavReport report)
+        {
+            ReportOpened?.Invoke(report.Code);
+        }
+    }
+
     private void Entry_Click(object sender, RoutedEventArgs e)
     {
         if (((FrameworkElement)sender).DataContext is NavEntry entry)

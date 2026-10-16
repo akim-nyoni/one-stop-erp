@@ -92,7 +92,7 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Cashier stations and field collectors", ListTitle = "Stations and collectors",
+            Module = module, Title = "Cashier stations and field collectors", ListTitle = "Stations and collectors", Delete = SoftDelete<CashierStation>(x => x.Code, "station"),
             Description = "A counter (station) cashiers open their sessions at, or a field collector's handheld for rent, market stalls, parking and pound fees: tick Field collector, "
                 + "give the route and the pre-numbered receipt range issued to the collector (receipts stop at the end of the range until a new one is issued). "
                 + "The collector opens a session like a cashier and hands the cash back at close; RC47 shows each collector's day and RC48 the routes.",

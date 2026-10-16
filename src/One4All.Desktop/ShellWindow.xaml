@@ -102,10 +102,11 @@
             <MenuItem x:Name="ModulesMenu" Header="{loc:T 'M_odules'}" />
             <MenuItem x:Name="MaintenanceMenu" Header="{loc:T '_Maintenance'}" ToolTip="Setting things up: records, rules, rates and policies" />
             <MenuItem x:Name="TransactionsMenu" Header="{loc:T '_Transactions'}" ToolTip="The day-to-day work: documents, payments and postings" />
-            <MenuItem Header="{loc:T '_Reports'}">
+            <MenuItem x:Name="ReportsMenu" Header="{loc:T '_Reports'}">
                 <MenuItem Header="{loc:T 'Report Viewer…'}" Click="OpenReportViewer_Click" />
                 <MenuItem Header="{loc:T 'Report Designer…'}" Click="OpenBandedDesigner_Click" />
                 <MenuItem Header="{loc:T 'Quick Column Layout…'}" Click="OpenReportDesigner_Click" />
+                <Separator />
             </MenuItem>
             <MenuItem x:Name="EnquiriesMenu" Header="{loc:T '_Enquiries'}" ToolTip="Looking things up: statements, balances and positions" />
             <MenuItem x:Name="UtilitiesMenu" Header="{loc:T '_Utilities'}" ToolTip="Period-end runs, imports and housekeeping" />

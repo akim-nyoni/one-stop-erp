@@ -191,6 +191,19 @@ public partial class ShellWindow : Window
             }
 
             ModulesMenu.Items.Add(moduleItem);
+            if (module.HasReports)
+            {
+                // Reports ▸ module ▸ report, as the Explorer has it: each opens the viewer on that report.
+                System.Windows.Controls.MenuItem reportsItem = new() { Header = Localization.UiText.T(module.Title), Icon = MenuIcon(module.Glyph, module.Accent) };
+                foreach (Navigation.NavReport report in module.Reports)
+                {
+                    System.Windows.Controls.MenuItem item = new() { Header = report.Name, ToolTip = report.Code };
+                    item.Click += (_, _) => OpenReport(report.Code);
+                    reportsItem.Items.Add(item);
+                }
+
+                ReportsMenu.Items.Add(reportsItem);
+            }
         }
 
         foreach ((System.Windows.Controls.MenuItem menu, Application.Navigation.MenuArea area) in new[]
@@ -327,6 +340,7 @@ public partial class ShellWindow : Window
 
         ModulePage page = new(module);
         page.EntryOpened += OpenEntry;
+        page.ReportOpened += OpenReport;
         AddTab(module.Title, page, module);
     }
 
@@ -454,6 +468,14 @@ public partial class ShellWindow : Window
     private void Forward_Click(object sender, RoutedEventArgs e) => Go(1);
 
     private void Home_Click(object sender, RoutedEventArgs e) => Tabs.SelectedItem = HomeTab;
+
+    /// <summary>Opens the Report Viewer on a report.</summary>
+    /// <param name="code">The report code.</param>
+    public void OpenReport(string code)
+    {
+        new ReportViewerWindow(_services, code) { Owner = this }.Show();
+        StatusText.Text = $"Report {code} opened in the viewer.";
+    }
 
     private void Module_Click(object sender, RoutedEventArgs e)
     {

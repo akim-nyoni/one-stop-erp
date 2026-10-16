@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:One4All.Desktop.Localization"
         xmlns:local="clr-namespace:One4All.Desktop"
-        Title="{loc:T 'Operations'}" FlowDirection="{x:Static loc:UiText.Direction}" Height="760" Width="1200"
+        Title="{loc:T 'Operations'}" FlowDirection="{x:Static loc:UiText.Direction}" Height="760" Width="1200" MaxHeight="900"
         WindowStartupLocation="CenterOwner" Background="#F4F6F4" FontFamily="Segoe UI">
-    <local:OperationsView x:Name="View" />
+    <local:OperationsView x:Name="View" x:FieldModifier="public" />
 </Window>

@@ -52,6 +52,15 @@ public sealed class NavEntry
     public string SearchText => $"{Title} {Purpose} {ModuleTitle} {GroupTitle} {Operation?.Title}";
 }
 
+/// <summary>A catalogue report shown under its module (opens in the Report Viewer).</summary>
+/// <param name="Code">The report code.</param>
+/// <param name="Name">Its name.</param>
+public sealed record NavReport(string Code, string Name)
+{
+    /// <summary>Gets the tile icon.</summary>
+    public string Glyph => "📊";
+}
+
 /// <summary>A group of screens in a module.</summary>
 /// <param name="Title">The group's name.</param>
 /// <param name="Entries">Its screens.</param>
@@ -149,6 +158,12 @@ public sealed class NavCategory
 public sealed record NavModule(string Title, string Glyph, string Accent, string Purpose, IReadOnlyList<NavGroup> Groups) : System.ComponentModel.INotifyPropertyChanged
 {
     private IReadOnlyList<NavCategory>? _categories;
+
+    /// <summary>Gets the catalogue reports of this module, for the Reports menu and the module page.</summary>
+    public IReadOnlyList<NavReport> Reports { get; init; } = [];
+
+    /// <summary>Gets a value indicating whether the module has reports.</summary>
+    public bool HasReports => Reports.Count > 0;
     private bool _isActive;
     private bool _isExpanded;
 
@@ -216,8 +231,9 @@ public static class NavigationBuilder
     /// <summary>Builds the modules, leaving out what the user's licence and permissions do not cover and any module left empty.</summary>
     /// <param name="operations">Every console action.</param>
     /// <param name="available">Whether a console module (the gate) may be used; null gates are always open.</param>
+    /// <param name="canOpen">Whether a screen with a feature may be shown (its licence and the user's flags on it); it replaces the module gate for such screens. Null: the module gate alone.</param>
     /// <returns>The modules.</returns>
-    public static IReadOnlyList<NavModule> Build(IReadOnlyList<Operation> operations, Func<string, bool> available)
+    public static IReadOnlyList<NavModule> Build(IReadOnlyList<Operation> operations, Func<string, bool> available, Func<Operation, bool>? canOpen = null)
     {
         Dictionary<(string Module, string Title), Operation> byKey = [];
         foreach (Operation operation in operations)
@@ -238,7 +254,8 @@ public static class NavigationBuilder
                 {
                     if (item.Operation is string title)
                     {
-                        if (!byKey.TryGetValue((item.ConsoleModule!, title), out Operation? operation) || !placed.Add(operation) || !available(operation.Module))
+                        if (!byKey.TryGetValue((item.ConsoleModule!, title), out Operation? operation) || !placed.Add(operation)
+                            || !(canOpen is not null && operation.PermissionCode is not null ? canOpen(operation) : available(operation.Module)))
                         {
                             continue;
                         }
@@ -261,7 +278,7 @@ public static class NavigationBuilder
                 }
             }
 
-            modules.Add(new NavModule(spec.Title, spec.Glyph, spec.Accent, spec.Purpose, groups));
+            modules.Add(new NavModule(spec.Title, spec.Glyph, spec.Accent, spec.Purpose, groups) { Reports = ReportsOf(spec.Title) });
         }
 
         // Anything the map does not name goes to the "More" group of the module that takes its console module, so no action is ever unreachable.
@@ -278,6 +295,13 @@ public static class NavigationBuilder
 
         return [.. modules.Where(m => m.Groups.Count > 0)];
     }
+
+    // The catalogue's reports, by the module they belong to (the catalogue's module names mapped to the Explorer's).
+    private static readonly Lazy<ILookup<string, NavReport>> Catalogue = new(() => One4All.Reporting.SystemReportCatalogue.All()
+        .Where(r => r.Module is not null && NavigationMap.ReportModules.ContainsKey(r.Module))
+        .ToLookup(r => NavigationMap.ReportModules[r.Module!], r => new NavReport(r.Code, r.Name)));
+
+    private static IReadOnlyList<NavReport> ReportsOf(string module) => [.. Catalogue.Value[module].OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)];
 
     /// <summary>The actions the map names that do not exist (a renamed action), for checking the map.</summary>
     /// <param name="operations">Every console action.</param>
