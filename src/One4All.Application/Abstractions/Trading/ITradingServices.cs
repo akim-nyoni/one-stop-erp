@@ -9,7 +9,11 @@ namespace One4All.Application.Abstractions.Trading;
 /// <param name="TransactionAmount">The amount matched in transaction currency.</param>
 /// <param name="RealisedFxBase">The realised FX gain (positive) or loss (negative) in base currency.</param>
 /// <param name="FxJournalNumber">The FX journal number, when a realised gain/loss was posted.</param>
-public readonly record struct AllocationResult(long AllocationId, decimal TransactionAmount, decimal RealisedFxBase, string? FxJournalNumber);
+public readonly record struct AllocationResult(long AllocationId, decimal TransactionAmount, decimal RealisedFxBase, string? FxJournalNumber)
+{
+    /// <summary>Gets the amount drawn from the debit item in its own currency when the items' currencies differ; null when they are the same.</summary>
+    public decimal? DebitTransactionAmount { get; init; }
+}
 
 /// <summary>The result of reversing an allocation (un-allocation).</summary>
 /// <param name="AllocationId">The reversed allocation id.</param>
@@ -219,6 +223,21 @@ public interface IAllocationService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The allocation result.</returns>
     Task<Result<AllocationResult>> AllocateAsync(long companyId, TradingLedger ledger, long debitItemId, long creditItemId, decimal transactionAmount, DateOnly allocationDate, CancellationToken ct = default);
+
+    /// <summary>
+    /// Allocates a credit item to a debit item in another currency (a foreign-currency payment at the counter against a base-currency bill, or a
+    /// base-currency payment against a foreign-currency invoice): the credit's base value settles the debit at the day's rate of the debit's currency,
+    /// and the difference between the two base values is realised exchange gain or loss. Same-currency items allocate as <see cref="AllocateAsync"/>.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="ledger">The sub-ledger.</param>
+    /// <param name="debitItemId">The debit item (invoice) id.</param>
+    /// <param name="creditItemId">The credit item (receipt/payment/credit note) id.</param>
+    /// <param name="creditTransactionAmount">The amount to draw from the credit, in the credit's currency.</param>
+    /// <param name="allocationDate">The allocation (accounting) date, whose rate values the debit.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The allocation result: the credit amount drawn, the debit amount drawn in its currency, and any realised exchange difference.</returns>
+    Task<Result<AllocationResult>> AllocateAcrossCurrenciesAsync(long companyId, TradingLedger ledger, long debitItemId, long creditItemId, decimal creditTransactionAmount, DateOnly allocationDate, CancellationToken ct = default);
 
     /// <summary>
     /// Reverses an allocation (un-allocation, brief §RCP-7): restores the outstanding on both items to their

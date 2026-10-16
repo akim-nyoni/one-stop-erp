@@ -71,6 +71,12 @@ public sealed class Allocation : AuditableEntity, ICompanyScoped
     /// <summary>The realised FX gain (positive) or loss (negative) in base currency.</summary>
     public decimal RealisedFxBase { get; private set; }
 
+    /// <summary>
+    /// The amount drawn from the debit item in its own currency when the two items are in different currencies (a foreign-currency payment
+    /// against a base-currency bill at the counter); null when both are in one currency and <see cref="TransactionAmount"/> is drawn from each.
+    /// </summary>
+    public decimal? DebitTransactionAmount { get; set; }
+
     /// <summary>The GL journal that posted the realised FX (if any).</summary>
     public long? JournalEntryId { get; set; }
 

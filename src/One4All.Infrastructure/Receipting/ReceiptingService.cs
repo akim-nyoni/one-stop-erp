@@ -217,16 +217,11 @@ public sealed class ReceiptingService : IReceiptingService
             receipt.DebtorOpenItemId = receiptPosting.Value.OpenItemId;
             receipt.CashAccountCode = cashCode;
 
-            // Same-currency payments allocate here; a foreign-currency payment posts as an on-account credit
-            // (in its own currency) to be matched — realising FX — in the allocation workbench.
-            if (currency == company.BaseCurrency)
-            {
-                (allocatedToDebt, creditOnAccount) = await AllocateAsync(request.CompanyId, request.PayerAccountId!.Value, receiptPosting.Value.OpenItemId, debtorTotal, request.Date, request.AllocationStrategy, request.DirectedAllocations, ct).ConfigureAwait(false);
-            }
-            else
-            {
-                creditOnAccount = debtorTotal;
-            }
+            // A payment in the base currency allocates here against the account's charges; a foreign-currency payment allocates here too, its base
+            // value settling base-currency charges at the receipt's rate (charges in other currencies wait for the allocation workbench).
+            (allocatedToDebt, creditOnAccount) = currency == company.BaseCurrency
+                ? await AllocateAsync(request.CompanyId, request.PayerAccountId!.Value, receiptPosting.Value.OpenItemId, debtorTotal, request.Date, request.AllocationStrategy, request.DirectedAllocations, ct).ConfigureAwait(false)
+                : await AllocateForeignAsync(request.CompanyId, request.PayerAccountId!.Value, receiptPosting.Value.OpenItemId, debtorTotal, company.BaseCurrency, request.Date, request.AllocationStrategy, request.DirectedAllocations, ct).ConfigureAwait(false);
         }
 
         // Sundry / deposit / suspense → Dr cash / Cr the coded account (never a guessed income account).
@@ -938,6 +933,40 @@ public sealed class ReceiptingService : IReceiptingService
         }
 
         return (allocated, amount - allocated);
+    }
+
+    // A foreign-currency payment: its base value is spread over the account's base-currency charges by the strategy (directed amounts are in the
+    // base currency), each piece allocated across currencies; what is left stays as credit on account in the payment's currency.
+    private async Task<(decimal Allocated, decimal Remainder)> AllocateForeignAsync(long companyId, long customerId, long creditItemId, decimal amount, CurrencyCode baseCurrency, DateOnly date,
+        ReceiptAllocationStrategy strategy, IReadOnlyList<DirectedAllocation> directed, CancellationToken ct)
+    {
+        OpenItem credit = await _db.OpenItems.AsNoTracking().FirstAsync(i => i.Id == creditItemId, ct).ConfigureAwait(false);
+        List<OpenItem> debits = [.. (await OutstandingDebitsAsync(companyId, customerId, ct).ConfigureAwait(false)).Where(d => d.Currency == baseCurrency)];
+        Result<List<(OpenItem Item, decimal Applied)>> plan = BuildPlan(debits, credit.OutstandingBase, strategy, directed);
+        if (plan.IsFailure)
+        {
+            return (0m, amount);
+        }
+
+        decimal allocated = 0m;
+        foreach ((OpenItem item, decimal appliedBase) in plan.Value)
+        {
+            decimal creditAmount = Math.Min(decimal.Round(appliedBase / credit.ExchangeRate, 4, MidpointRounding.ToEven), amount - allocated);
+            if (creditAmount <= 0m)
+            {
+                continue;
+            }
+
+            Result<AllocationResult> result = await _allocation.AllocateAcrossCurrenciesAsync(companyId, TradingLedger.AccountsReceivable, item.Id, creditItemId, creditAmount, date, ct).ConfigureAwait(false);
+            if (result.IsFailure)
+            {
+                break;
+            }
+
+            allocated += result.Value.TransactionAmount;
+        }
+
+        return (allocated, Math.Max(0m, amount - allocated));
     }
 
     private async Task<List<OpenItem>> OutstandingDebitsAsync(long companyId, long customerId, CancellationToken ct) =>

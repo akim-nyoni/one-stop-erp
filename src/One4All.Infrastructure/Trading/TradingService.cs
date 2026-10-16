@@ -1205,6 +1205,86 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     public Task<Result<AllocationResult>> AllocateAsync(long companyId, TradingLedger ledger, long debitItemId, long creditItemId, decimal transactionAmount, DateOnly allocationDate, CancellationToken ct = default)
         => _db.AtomicAsync(() => AllocateCoreAsync(companyId, ledger, debitItemId, creditItemId, transactionAmount, allocationDate, ct), ct);
 
+    /// <inheritdoc />
+    public Task<Result<AllocationResult>> AllocateAcrossCurrenciesAsync(long companyId, TradingLedger ledger, long debitItemId, long creditItemId, decimal creditTransactionAmount, DateOnly allocationDate, CancellationToken ct = default)
+        => _db.AtomicAsync(() => AllocateAcrossCurrenciesCoreAsync(companyId, ledger, debitItemId, creditItemId, creditTransactionAmount, allocationDate, ct), ct);
+
+    // The credit's base value settles the debit at the day's rate of the debit's currency; the base values' difference is realised FX.
+    private async Task<Result<AllocationResult>> AllocateAcrossCurrenciesCoreAsync(long companyId, TradingLedger ledger, long debitItemId, long creditItemId, decimal creditTransactionAmount, DateOnly allocationDate, CancellationToken ct)
+    {
+        OpenItem? debit = await _db.OpenItems.FirstOrDefaultAsync(i => i.Id == debitItemId && i.CompanyId == companyId, ct).ConfigureAwait(false);
+        OpenItem? credit = await _db.OpenItems.FirstOrDefaultAsync(i => i.Id == creditItemId && i.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (debit is null || credit is null)
+        {
+            return Error.NotFound("Alloc.ItemNotFound", "One or both open items were not found.");
+        }
+
+        if (debit.Currency == credit.Currency)
+        {
+            return await AllocateCoreAsync(companyId, ledger, debitItemId, creditItemId, creditTransactionAmount, allocationDate, ct).ConfigureAwait(false);
+        }
+
+        if (debit.Sign != LedgerSign.Debit || credit.Sign != LedgerSign.Credit)
+        {
+            return Error.Validation("Alloc.WrongSides", "Allocation requires a debit item and a credit item.");
+        }
+
+        if (debit.TraderId != credit.TraderId || debit.Ledger != credit.Ledger)
+        {
+            return Error.Validation("Alloc.Mismatch", "Items must be the same trader and ledger.");
+        }
+
+        decimal creditAmount = Math.Min(creditTransactionAmount, credit.OutstandingTransaction);
+        if (creditAmount <= 0m || debit.OutstandingTransaction <= 0m)
+        {
+            return Error.Validation("Alloc.NothingToAllocate", "There is nothing outstanding to allocate.");
+        }
+
+        Company company = await _db.Companies.FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        decimal debitRate = 1m;
+        if (debit.Currency != company.BaseCurrency)
+        {
+            decimal? rate = await Accounting.ExchangeRateResolver.FindAsync(_db, debit.Currency, company.BaseCurrency, ExchangeRateType.Daily, allocationDate, ct).ConfigureAwait(false);
+            if (rate is not > 0m)
+            {
+                return Error.NotFound("Alloc.NoRate", $"No {debit.Currency} rate on {allocationDate:yyyy-MM-dd} to value {debit.DocumentNumber} for the allocation.");
+            }
+
+            debitRate = rate.Value;
+        }
+
+        // What the credit is worth in base settles that much of the debit at today's rate; a credit worth more than the debit settles the debit whole.
+        decimal creditBase = BaseDrawn(credit, creditAmount);
+        decimal debitAmount = Round(creditBase / debitRate);
+        if (debitAmount > debit.OutstandingTransaction)
+        {
+            debitAmount = debit.OutstandingTransaction;
+            creditAmount = Math.Min(credit.OutstandingTransaction, Round(Round(debitAmount * debitRate) / credit.ExchangeRate));
+            creditBase = BaseDrawn(credit, creditAmount);
+        }
+
+        decimal debitBase = BaseDrawn(debit, debitAmount);
+        decimal realisedFx = decimal.Round(creditBase - debitBase, Scale, MidpointRounding.ToEven);
+        string? fxJournalNumber = null;
+        if (realisedFx != 0m)
+        {
+            Result<string> fxResult = await PostRealisedFxAsync(companyId, ledger, realisedFx, allocationDate, ct).ConfigureAwait(false);
+            if (fxResult.IsFailure)
+            {
+                return fxResult.Error;
+            }
+
+            fxJournalNumber = fxResult.Value;
+        }
+
+        debit.ReduceOutstanding(debitAmount, debitBase);
+        credit.ReduceOutstanding(creditAmount, creditBase);
+        Allocation allocation = new(companyId, ledger, debit.TraderId, allocationDate, debit.Id, credit.Id, creditAmount, debitBase, creditBase, realisedFx) { DebitTransactionAmount = debitAmount };
+        _db.Allocations.Add(allocation);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new AllocationResult(allocation.Id, creditAmount, realisedFx, fxJournalNumber) { DebitTransactionAmount = debitAmount };
+    }
+
     // One unit of work, retried if another user allocates against the same items at the same moment.
     private async Task<Result<AllocationResult>> AllocateCoreAsync(long companyId, TradingLedger ledger, long debitItemId, long creditItemId, decimal transactionAmount, DateOnly allocationDate, CancellationToken ct)
     {
@@ -1345,7 +1425,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         }
 
         // Restore both items to their pre-allocation state using the exact base amounts drawn.
-        debit.RestoreOutstanding(allocation.TransactionAmount, allocation.DebitBase);
+        debit.RestoreOutstanding(allocation.DebitTransactionAmount ?? allocation.TransactionAmount, allocation.DebitBase);
         credit.RestoreOutstanding(allocation.TransactionAmount, allocation.CreditBase);
         allocation.Reverse(reversalDate);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

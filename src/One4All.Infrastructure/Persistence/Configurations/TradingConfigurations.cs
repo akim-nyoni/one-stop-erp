@@ -219,6 +219,7 @@ internal sealed class AllocationConfiguration : IEntityTypeConfiguration<Allocat
         b.Property(x => x.DebitBase).HasPrecision(19, 4);
         b.Property(x => x.CreditBase).HasPrecision(19, 4);
         b.Property(x => x.RealisedFxBase).HasPrecision(19, 4);
+        b.Property(x => x.DebitTransactionAmount).HasPrecision(19, 4);
         b.HasIndex(x => new { x.CompanyId, x.Ledger, x.TraderId });
         b.HasIndex(x => x.DebitItemId);
         b.HasIndex(x => x.CreditItemId);
